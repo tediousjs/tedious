@@ -1,9 +1,9 @@
 var
-  Packet = require('../src/packet').Packet,
-  type = require('../src/packet').type;
+  buildPacket = require('../src/packet').build,
+  packetType = require('../src/packet').type;
 
 exports.Packet = function(test){
-  var packet = new Packet(type.PRELOGIN, [0x55, 0xff]);
+  var packet = buildPacket(packetType.PRELOGIN, [0x55, 0xff]);
   var content = packet.content();
 
   test.equal(content.length, 10, 'length');
@@ -15,7 +15,7 @@ exports.Packet = function(test){
 };
 
 exports.PacketNonLast = function(test){
-  var packet = new Packet(type.PRELOGIN, [], {last: false});
+  var packet = buildPacket(packetType.PRELOGIN, [], {last: false});
   var content = packet.content();
 
   test.equal(content.length, 8, 'length');

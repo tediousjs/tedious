@@ -12,7 +12,7 @@ exports.type = {
   LOGIN7: 16
 };
 
-exports.Packet = function(type, data, options) {
+exports.build = function(type, data, options) {
   data = data || [];
   
   if (!options) {

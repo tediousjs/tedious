@@ -1,9 +1,9 @@
 var
-  Packet = require('./packet').Packet,
-  type = require('./packet').type,
+  buildPacket = require('./packet').build,
+  packetType = require('./packet').type,
   jspack = require('./jspack').jspack;
 
-exports.PreloginPacket = function() {
+exports.build = function() {
   var stagedOptions = [];
   
   addVersionOption();
@@ -12,7 +12,7 @@ exports.PreloginPacket = function() {
   addThreadIdOption();
   addMarsOption();
   
-  return new Packet(type.PRELOGIN, buildData());
+  return buildPacket(packetType.PRELOGIN, buildData());
   
   function addOption(token, optionData) {
     stagedOptions.push({

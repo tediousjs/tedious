@@ -1,8 +1,8 @@
 var
-  PreloginPacket = require('../src/prelogin-packet').PreloginPacket;
+  buildPacket = require('../src/prelogin-packet').build;
 
 exports.PreloginPacket = function(test){
-  var packet = new PreloginPacket(),
+  var packet = buildPacket(),
       content = packet.content();
 
   test.equal(content.length, 47, 'packet length');
