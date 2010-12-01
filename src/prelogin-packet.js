@@ -25,7 +25,6 @@ exports.PreloginPacket = function() {
     var options = [],
         optionDatas = [],
         offset =
-                8 +                           // header
                 (stagedOptions.length * 5) +  // options
                 1;                            // terminator token
 
