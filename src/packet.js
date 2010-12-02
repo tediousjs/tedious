@@ -7,6 +7,7 @@ const STATUS_IGNORE = 0x02;                   // EOM must also be set.
 const STATUS_RESETCONNECTION = 0x08;
 const STATUS_RESETCONNECTIONSKIPTRAN = 0x10;
 
+const HEADER_FORMAT = 'BBHHBB';
 const HEADER_LENGTH = 8;
 
 exports.type = {
@@ -44,7 +45,7 @@ exports.build = function(type, data, options) {
     var packetId = 0;   // Spec says that this is currently ignored.
     var window = 0;     // Spec says that this is currently ignored.
     
-    return jspack.Pack('BBHHBB', [type, status, length, spid, packetId, window]);
+    return jspack.Pack(HEADER_FORMAT, [type, status, length, spid, packetId, window]);
   }
   
   function write(stream) {
@@ -56,7 +57,16 @@ exports.parse = function(packetContent, callback) {
   callback(parseHeader(), extractData());
   
   function parseHeader() {
+    var header = jspack.Unpack(HEADER_FORMAT, packetContent, 0);
     
+    return {
+      type: header[0],
+      status: header[1],
+      length: header[2],
+      spid: header[3],
+      packetId: header[4],
+      window: header[5]
+    };
   }
   
   function extractData() {
