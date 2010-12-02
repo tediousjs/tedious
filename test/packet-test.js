@@ -1,6 +1,6 @@
 var
   buildPacket = require('../src/packet').build,
-  parsePacket = require('../src/packet').parse,
+  decodePacket = require('../src/packet').decode,
   packetType = require('../src/packet').type;
 
 exports.BuildPacket = function(test){
@@ -27,11 +27,11 @@ exports.BuildPacketNonLast = function(test){
   test.done();
 };
 
-exports.ParsePacket = function(test){
+exports.DecodePacket = function(test){
   test.expect(7);
   
   var packetContent = [0x12, 0x01, 0x00, 0x0a, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff];
-  var packet = parsePacket(packetContent, function(header, data) {
+  var packet = decodePacket(packetContent, function(header, data) {
     test.equal(header.type, 0x12, 'type');
     test.equal(header.status, 0x01, 'status');
     test.equal(header.length, 0x000a, 'length');

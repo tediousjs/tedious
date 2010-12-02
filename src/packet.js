@@ -53,10 +53,10 @@ exports.build = function(type, data, options) {
   }
 };
 
-exports.parse = function(packetContent, callback) {
-  callback(parseHeader(), extractData());
+exports.decode = function(packetContent, callback) {
+  callback(decodeHeader(), extractData());
   
-  function parseHeader() {
+  function decodeHeader() {
     var header = jspack.Unpack(HEADER_FORMAT, packetContent, 0);
     
     return {
