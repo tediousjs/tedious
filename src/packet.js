@@ -7,9 +7,11 @@ const STATUS_IGNORE = 0x02;                   // EOM must also be set.
 const STATUS_RESETCONNECTION = 0x08;
 const STATUS_RESETCONNECTIONSKIPTRAN = 0x10;
 
+const HEADER_LENGTH = 8;
+
 exports.type = {
-  PRELOGIN: 18,
-  LOGIN7: 16
+  PRELOGIN: 0x12,
+  LOGIN7: 0x10
 };
 
 exports.build = function(type, data, options) {
@@ -37,7 +39,7 @@ exports.build = function(type, data, options) {
       status |= STATUS_EOM;
     }
     
-    var length = 8 + data.length
+    var length = HEADER_LENGTH + data.length
     var spid = 0;
     var packetId = 0;   // Spec says that this is currently ignored.
     var window = 0;     // Spec says that this is currently ignored.
@@ -47,5 +49,17 @@ exports.build = function(type, data, options) {
   
   function write(stream) {
     stream.write(new Buffer(content()));
+  }
+};
+
+exports.parse = function(packetContent, callback) {
+  callback(parseHeader(), extractData());
+  
+  function parseHeader() {
+    
+  }
+  
+  function extractData() {
+    return packetContent.slice(HEADER_LENGTH);
   }
 };
