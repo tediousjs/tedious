@@ -15,34 +15,39 @@ exports.type = {
   LOGIN7: 0x10
 };
 
-exports.build = function(type, data, options) {
+exports.build = function(type, data, headerFields) {
   data = data || [];
-  
-  if (!options) {
-    options = {};
+
+  if (!headerFields) {
+    headerFields = {};
   }
-  if (options.last === undefined) {
-    options.last = true;
-  }
+  defaultheaderFields();
   
-  return {
-    content: content
+  return header().concat(data);
+
+  function defaultheaderFields() {
+    if (headerFields.last === undefined) {
+      headerFields.last = true;
+    }
+    
+    headerFields.spid = headerFields.spid || 0;
+    headerFields.packet = headerFields.packetId || 0; 
+    headerFields.window = headerFields.window || 0; 
   }
 
   function content() {
-    return header().concat(data);
   }
   
   function header() {
     var status = STATUS_NORMAL;
-    if (options.last) {
+    if (headerFields.last) {
       status |= STATUS_EOM;
     }
     
     var length = HEADER_LENGTH + data.length
-    var spid = 0;
-    var packetId = 0;   // Spec says that this is currently ignored.
-    var window = 0;     // Spec says that this is currently ignored.
+    var spid = headerFields.spid;
+    var packetId = headerFields.packetId;   // Spec says that this is currently ignored.
+    var window = headerFields.windowId;     // Spec says that this is currently ignored.
     
     return jspack.Pack(HEADER_FORMAT, [type, status, length, spid, packetId, window]);
   }

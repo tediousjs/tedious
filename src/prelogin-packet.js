@@ -3,7 +3,7 @@ var
   packetType = require('./packet').type,
   jspack = require('./jspack').jspack;
 
-exports.build = function() {
+exports.build = function(headerFields) {
   var stagedOptions = [];
   
   addVersionOption();
@@ -12,7 +12,7 @@ exports.build = function() {
   addThreadIdOption();
   addMarsOption();
   
-  return buildPacket(packetType.PRELOGIN, buildData());
+  return buildPacket(packetType.PRELOGIN, buildData(), headerFields);
   
   function addOption(token, optionData) {
     stagedOptions.push({
