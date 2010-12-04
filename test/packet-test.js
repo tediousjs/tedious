@@ -1,10 +1,11 @@
 var
   buildPacket = require('../src/packet').build,
   decodePacket = require('../src/packet').decode,
+  packetStatus = require('../src/packet').status,
   packetType = require('../src/packet').type;
 
-exports.BuildPacket = function(test){
-  var packet = buildPacket(packetType.PRELOGIN, [0x55, 0xff], {});
+exports.BuildPacketLast = function(test){
+  var packet = buildPacket(packetType.PRELOGIN, [0x55, 0xff], {last: true});
 
   test.equal(packet.length, 10, 'length');
 
@@ -15,7 +16,7 @@ exports.BuildPacket = function(test){
 };
 
 exports.BuildPacketNonLast = function(test){
-  var packet = buildPacket(packetType.PRELOGIN, [], {last: false});
+  var packet = buildPacket(packetType.PRELOGIN, []);
 
   test.equal(packet.length, 8, 'length');
 

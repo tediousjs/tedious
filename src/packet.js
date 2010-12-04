@@ -1,14 +1,18 @@
 var
   jspack = require('./jspack').jspack;
   
-const STATUS_NORMAL = 0x00;
-const STATUS_EOM = 0x01;                      // End Of Message (last packet).
-const STATUS_IGNORE = 0x02;                   // EOM must also be set.
-const STATUS_RESETCONNECTION = 0x08;
-const STATUS_RESETCONNECTIONSKIPTRAN = 0x10;
-
 const HEADER_FORMAT = 'BBHHBB';
 const HEADER_LENGTH = 8;
+
+const STATUS = {
+  NORMAL: 0x00,
+  EOM: 0x01,                      // End Of Message (last packet).
+  IGNORE: 0x02,                   // EOM must also be set.
+  RESETCONNECTION: 0x08,
+  RESETCONNECTIONSKIPTRAN: 0x10
+};
+
+exports.status = STATUS;
 
 exports.type = {
   PRELOGIN: 0x12,
@@ -17,17 +21,25 @@ exports.type = {
 
 exports.build = function(type, data, headerFields) {
   data = data || [];
-
-  if (!headerFields) {
-    headerFields = {};
-  }
-  defaultheaderFields();
+  defaultheaderFields(headerFields);
   
   return header().concat(data);
 
   function defaultheaderFields() {
-    if (headerFields.last === undefined) {
-      headerFields.last = true;
+    if (!headerFields) {
+      headerFields = {};
+    }
+
+    if (headerFields.status === undefined) {
+      headerFields.status = STATUS.NORMAL;
+    }
+
+    if (headerFields.last) {
+      headerFields.status |= STATUS.EOM;
+    }
+
+    if (headerFields.status & STATUS.IGNORE) {
+      headerFields.status |= STATUS.EOM;
     }
     
     headerFields.spid = headerFields.spid || 0;
@@ -35,21 +47,10 @@ exports.build = function(type, data, headerFields) {
     headerFields.window = headerFields.window || 0; 
   }
 
-  function content() {
-  }
-  
   function header() {
-    var status = STATUS_NORMAL;
-    if (headerFields.last) {
-      status |= STATUS_EOM;
-    }
-    
     var length = HEADER_LENGTH + data.length
-    var spid = headerFields.spid;
-    var packetId = headerFields.packetId;   // Spec says that this is currently ignored.
-    var window = headerFields.windowId;     // Spec says that this is currently ignored.
     
-    return jspack.Pack(HEADER_FORMAT, [type, status, length, spid, packetId, window]);
+    return jspack.Pack(HEADER_FORMAT, [type, headerFields.status, length, headerFields.spid, headerFields.packetId, headerFields.window]);
   }
 };
 
