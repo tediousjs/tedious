@@ -2,7 +2,8 @@ var
   buildPacket = require('../src/packet').build,
   decodePacket = require('../src/packet').decode,
   packetStatus = require('../src/packet').status,
-  packetType = require('../src/packet').type;
+  packetType = require('../src/packet').type,
+  toString = require('../src/packet').toString;
 
 exports.BuildPacketLast = function(test){
   var packet = buildPacket(packetType.PRELOGIN, [0x55, 0xff], {last: true});
@@ -44,4 +45,9 @@ exports.DecodePacket = function(test){
   test.deepEqual(data, [0x55, 0xff], 'data');
   
   test.done();
+};
+
+exports.ToString = function(test){
+  var packetContent = [0x12, 0x01, 0x00, 0x0a, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff];
+  console.log(toString(packetContent));
 };

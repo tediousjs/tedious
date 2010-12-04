@@ -77,3 +77,9 @@ exports.decode = function(packetContent) {
     return packetContent.slice(HEADER_LENGTH);
   }
 };
+
+exports.toString = function(packetContent) {
+  var packet = exports.decode(packetContent);
+  
+  return packet;
+}
