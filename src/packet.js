@@ -54,8 +54,11 @@ exports.build = function(type, data, headerFields) {
   }
 };
 
-exports.decode = function(packetContent, callback) {
-  callback(decodeHeader(), extractData());
+exports.decode = function(packetContent) {
+  return {
+    header: decodeHeader(),
+    data: extractData()
+  };
   
   function decodeHeader() {
     var header = jspack.Unpack(HEADER_FORMAT, packetContent, 0);

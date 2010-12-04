@@ -30,16 +30,18 @@ exports.DecodePacket = function(test){
   test.expect(7);
   
   var packetContent = [0x12, 0x01, 0x00, 0x0a, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff];
-  var packet = decodePacket(packetContent, function(header, data) {
-    test.equal(header.type, 0x12, 'type');
-    test.equal(header.status, 0x01, 'status');
-    test.equal(header.length, 0x000a, 'length');
-    test.equal(header.spid, 0x1234, 'spid');
-    test.equal(header.packetId, 0x01, 'packetId');
-    test.equal(header.window, 0x02, 'window');
-    
-    test.deepEqual(data, [0x55, 0xff], 'data');
-  });
+  var packet = decodePacket(packetContent);
+  var header = packet.header;
+  var data = packet.data;
+  
+  test.equal(header.type, 0x12, 'type');
+  test.equal(header.status, 0x01, 'status');
+  test.equal(header.length, 0x000a, 'length');
+  test.equal(header.spid, 0x1234, 'spid');
+  test.equal(header.packetId, 0x01, 'packetId');
+  test.equal(header.window, 0x02, 'window');
+  
+  test.deepEqual(data, [0x55, 0xff], 'data');
   
   test.done();
 };
