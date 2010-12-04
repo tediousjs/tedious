@@ -26,8 +26,7 @@ exports.build = function(type, data, options) {
   }
   
   return {
-    content: content,
-    write: write
+    content: content
   }
 
   function content() {
@@ -46,10 +45,6 @@ exports.build = function(type, data, options) {
     var window = 0;     // Spec says that this is currently ignored.
     
     return jspack.Pack(HEADER_FORMAT, [type, status, length, spid, packetId, window]);
-  }
-  
-  function write(stream) {
-    stream.write(new Buffer(content()));
   }
 };
 
