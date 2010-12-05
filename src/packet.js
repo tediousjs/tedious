@@ -2,22 +2,20 @@ var
   jspack = require('./jspack').jspack,
   sprintf = require('sprintf').sprintf;
   
-const HEADER_FORMAT = 'BBHHBB';
-const HEADER_LENGTH = 8;
-
-const STATUS = {
-  NORMAL: 0x00,
-  EOM: 0x01,                      // End Of Message (last packet).
-  IGNORE: 0x02,                   // EOM must also be set.
-  RESETCONNECTION: 0x08,
-  RESETCONNECTIONSKIPTRAN: 0x10
-};
-
-
-const TYPE = {
-  PRELOGIN: 0x12,
-  LOGIN7: 0x10
-};
+const HEADER_FORMAT = 'BBHHBB',
+      HEADER_LENGTH = 8,
+      NL = '\n',
+      STATUS = {
+        NORMAL: 0x00,
+        EOM: 0x01,                      // End Of Message (last packet).
+        IGNORE: 0x02,                   // EOM must also be set.
+        RESETCONNECTION: 0x08,
+        RESETCONNECTIONSKIPTRAN: 0x10
+      },
+      TYPE = {
+        PRELOGIN: 0x12,
+        LOGIN7: 0x10
+      };
 
 exports.status = STATUS;
 exports.type = TYPE;
@@ -92,11 +90,15 @@ exports.decode = function(packetContent) {
 };
 
 exports.toString = function(packetContent) {
-  const NL = '\n';
-  const packet = exports.decode(packetContent);
-  var string = '';
+  var packet = exports.decode(packetContent);
+  
+  return headerToString(packet) + NL + dataDump(packet);
+}
 
-  var statusText = '';
+function headerToString(packet) {
+  var statusText = '',
+      headerText;
+
   if (packet.header.status === STATUS.NORMAL) {
     statusText += statusAsText[STATUS.NORMAL];
   } else {
@@ -108,17 +110,7 @@ exports.toString = function(packetContent) {
     statusText = statusText.trim();
   }
   
-//  string += 'Header:' + NL;
-//  string += '  type     : ' + typesAsText[packet.header.type] + NL;
-//  string += '  status   : ' + sprintf('0x%02X %s', packet.header.status, statusText) + NL;
-//  string += '  length   : ' + sprintf('0x%04X', packet.header.length) + NL;
-//  string += '  spid     : ' + sprintf('0x%04X', packet.header.spid) + NL;
-//  string += '  packetId : ' + sprintf('0x%02X', packet.header.packetId) + NL;
-//  string += '  window   : ' + sprintf('0x%02X', packet.header.window) + NL;
-//
-//  console.log(string);
-  
-  var headerText = sprintf('header - type:%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
+  headerText = sprintf('header - type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
       packet.header.type, typesAsText[packet.header.type],
       packet.header.status, statusText,
       packet.header.length,
@@ -126,20 +118,20 @@ exports.toString = function(packetContent) {
       packet.header.packetId,
       packet.header.window
   );
-  
-//  console.log('data   - ' + packet.data);
-  
-  console.log('ffffff');
-  
-  const BYTES_PER_GROUP = 0x02;
-  const BYTES_PER_LINE = 0x04;
-  var dataDump = '';
-  
-  var offset = 0;
+ 
+  return headerText;
+}
+
+function dataDump(packet) {
+  const BYTES_PER_GROUP = 0x04,
+        BYTES_PER_LINE = 0x20;
+  var offset = 0,
+      dataDump = '';
+
   while (offset < packet.data.length) {
     if (offset % BYTES_PER_LINE === 0) {
       dataDump += NL;
-      dataDump += sprintf('%04X  ', offset);
+      dataDump += sprintf('  %04X  ', offset);
     }
     dataDump += sprintf('%02X', packet.data[offset]);
     
@@ -151,8 +143,5 @@ exports.toString = function(packetContent) {
   }
 
   dataDump = dataDump.substr(1);
-//  console.log(dataDump);
-  
-  console.log(headerText + NL + dataDump);
-  return headerText + NL + dataDump;
+  return dataDump;
 }

@@ -43,7 +43,6 @@ exports.DecodePacket = function(test){
   test.equal(header.window, 0x02, 'window');
   
   test.deepEqual(data, [0x55, 0xff], 'data');
-console.log('dp');  
   test.done();
 };
 
