@@ -30,6 +30,14 @@ for (var type in TYPE) {
   typesAsText[TYPE[type]] = type;
 }
 
+exports.peekPacketLength = function(potentialPacket) {
+  if (potentialPacket.length < HEADER_LENGTH) {
+    return undefined;
+  } else {
+    return decodeHeader(potentialPacket).length;
+  }
+}
+
 exports.build = function(type, data, headerFields) {
   data = data || [];
   defaultheaderFields(headerFields);
@@ -67,27 +75,28 @@ exports.build = function(type, data, headerFields) {
 
 exports.decode = function(packetContent) {
   return {
-    header: decodeHeader(),
-    data: extractData()
+    header: decodeHeader(packetContent),
+    data: extractData(packetContent)
   };
   
-  function decodeHeader() {
-    var header = jspack.Unpack(HEADER_FORMAT, packetContent, 0);
-    
-    return {
-      type: header[0],
-      status: header[1],
-      length: header[2],
-      spid: header[3],
-      packetId: header[4],
-      window: header[5]
-    };
-  }
-  
-  function extractData() {
-    return packetContent.slice(HEADER_LENGTH);
-  }
 };
+
+function decodeHeader(packetContent) {
+  var header = jspack.Unpack(HEADER_FORMAT, packetContent, 0);
+  
+  return {
+    type: header[0],
+    status: header[1],
+    length: header[2],
+    spid: header[3],
+    packetId: header[4],
+    window: header[5]
+  };
+}
+
+function extractData(packetContent) {
+  return packetContent.slice(HEADER_LENGTH);
+}
 
 exports.toString = function(packetContent) {
   var packet = exports.decode(packetContent);

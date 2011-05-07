@@ -1,0 +1,16 @@
+{
+  "author": "Mike D Pilsbury <mike.pilsbury@gmail.com>",
+  "name": "tds",
+  "description": "A TDS driver, for connecting to MS SQLServer databases.",
+  "version": "0.0.0",
+  "repository": {
+    "url": ""
+  },
+  "engines": {
+    "node": "*"
+  },
+  "dependencies": {
+    "sprintf": "*"
+  },
+  "devDependencies": {}
+}
