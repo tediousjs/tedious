@@ -1,13 +1,15 @@
 var
-  buildPacket = require('../src/prelogin-packet').build;
+  PreLoginPacket = require('../src/prelogin-packet'),
+  toArray = require('../src/buffer-util').toArray;
 
 exports.PreloginPacket = function(test){
-  var packet = buildPacket();
+  var packet = new PreLoginPacket(),
+      buffer = packet.buffer;
 
-  test.equal(packet.length, 47, 'packet length');
+  test.equal(buffer.length, 47, 'packet length');
 
   test.deepEqual(
-      packet.slice(8),
+      toArray(buffer.slice(8)),
       [
         0x00, 0x00, 26, 0x00, 0x06,             // version option
         0x01, 0x00, 32, 0x00, 0x01,             // encryption option

@@ -1,53 +1,71 @@
-var
-  buildPacket = require('../src/packet').build,
-  decodePacket = require('../src/packet').decode,
-  packetStatus = require('../src/packet').status,
-  packetType = require('../src/packet').type,
-  toString = require('../src/packet').toString;
+var Packet = require('../src/packet').Packet,
+    toArray = require('../src/buffer-util').toArray;
+
+exports.PacketFromBuffer = function(test){
+  var type = 0x12,
+      packet = new Packet(new Buffer([type, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x55, 0xff])),
+      buffer = packet.buffer;
+
+  test.equal(buffer.length, 10, 'length');
+  
+  test.done();
+};
 
 exports.BuildPacketLast = function(test){
-  var packet = buildPacket(packetType.PRELOGIN, [0x55, 0xff], {last: true});
+  var data = [0x55, 0xff],
+      type = 0x12,
+      packet = new Packet(type, data, {last: true}),
+      buffer = packet.buffer;
 
-  test.equal(packet.length, 10, 'length');
+  test.equal(buffer.length, 10, 'length');
 
-  test.deepEqual(packet.slice(0, 8), [0x12, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00], 'header');
-  test.deepEqual(packet.slice(8), [0x55, 0xff], 'data');
+  test.deepEqual(toArray(buffer.slice(0, 8)), [type, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00], 'header');
+  test.deepEqual(toArray(buffer.slice(8)), data, 'data');
   
   test.done();
 };
 
 exports.BuildPacketNonLast = function(test){
-  var packet = buildPacket(packetType.PRELOGIN, []);
+  var data = [0x55, 0xff],
+      type = 0x12,
+      packet = new Packet(type, data),
+      buffer = packet.buffer;
 
-  test.equal(packet.length, 8, 'length');
+  test.equal(buffer.length, 10, 'length');
 
-  test.deepEqual(packet.slice(0, 8), [0x12, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00], 'header');
-  test.deepEqual(packet.slice(8), [], 'data');
+  test.deepEqual(toArray(buffer.slice(0, 8)), [type, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00], 'header');
+  test.deepEqual(toArray(buffer.slice(8)), data, 'data');
   
   test.done();
 };
 
 exports.DecodePacket = function(test){
-  test.expect(7);
+  var data = [0x55, 0xff],
+      type = 0x12,
+      packet = new Packet(type, data, {last: true}),
+      decoded = packet.decode();
   
-  var packetContent = [0x12, 0x01, 0x00, 0x0a, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff];
-  var packet = decodePacket(packetContent);
-  var header = packet.header;
-  var data = packet.data;
+  test.equal(decoded.header.type, 0x12, 'type');
+  test.equal(decoded.header.status, 0x01, 'status');
+  test.equal(decoded.header.length, 0x000a, 'length');
+  test.equal(decoded.header.spid, 0x0000, 'spid');
+  test.equal(decoded.header.packetId, 0x00, 'packetId');
+  test.equal(decoded.header.window, 0x00, 'window');
   
-  test.equal(header.type, 0x12, 'type');
-  test.equal(header.status, 0x01, 'status');
-  test.equal(header.length, 0x000a, 'length');
-  test.equal(header.spid, 0x1234, 'spid');
-  test.equal(header.packetId, 0x01, 'packetId');
-  test.equal(header.window, 0x02, 'window');
-  
-  test.deepEqual(data, [0x55, 0xff], 'data');
+  test.deepEqual(toArray(decoded.data), data, 'data');
   test.done();
 };
 
 exports.ToString = function(test) {
-  var packetContent = [0x12, 0x01, 0x00, 0x0a, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04, 0x12, 0x34, 0x01, 0x02, 0x55, 0xff, 0x01, 0x02, 0x03, 0x04];
-  console.log(toString(packetContent));
+  var data = [0x55, 0xff],
+      type = 0x12,
+      packet = new Packet(type, data, {last: true}),
+      packetString = packet.toString();
+
+  console.log(packetString);
+  
+  test.ok(packetString.indexOf('PRELOGIN') !== -1);
+  test.ok(packetString.indexOf('0000  55FF') !== -1);
+  
   test.done();
 };
