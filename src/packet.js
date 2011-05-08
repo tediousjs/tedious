@@ -16,8 +16,9 @@ var HEADER_FORMAT = 'BBHHBB',
     },
     
     TYPE = {
-      PRELOGIN: 0x12,
-      LOGIN7: 0x10
+      TABULAR_RESULT: 0x04,
+      LOGIN7: 0x10,
+      PRELOGIN: 0x12
     },
     
     statusAsText = {},

@@ -9,6 +9,13 @@ var Packet = require('./packet').Packet,
       THREADID: 0x03,
       MARS: 0x04,
       TERMINATOR: 0xFF
+    },
+    
+    ENCRYPT = {
+      OFF: 0x00,
+      ON: 0x01,
+      NOT_SUP: 0x02,
+      REQ: 0x03
     };
 
 var PreLoginPacket = function(headerFields) {
@@ -88,8 +95,8 @@ function createOptions() {
   var options = [],
       version = 0x000000001,
       subbuild = 0x0001,
-      encryption = 0x02,    // Encryption not supported (yet).
-      mars = 0x00;          // Mars off.
+      encryption = ENCRYPT.NOT_SUP,   // Encryption not supported (yet).
+      mars = 0x00;                    // Mars off.
 
   options.push(option(TOKEN.VERSION, jspack.Pack('LH', [version, subbuild])));
   options.push(option(TOKEN.ENCRYPTION, jspack.Pack('B', [encryption])));
@@ -107,4 +114,5 @@ function option(token, optionData) {
   };
 }
 
-module.exports = PreLoginPacket;
+exports.PreLoginPacket = PreLoginPacket;
+exports.ENCRYPT = ENCRYPT;

@@ -5,7 +5,9 @@ events = require("events"),
   util = require('util'),
   isPacketComplete = require('./packet').isPacketComplete,
   Packet = require('./packet').Packet,
-  PreloginPacket = require('./prelogin-packet');
+  PACKET_TYPE = require('./packet').TYPE,
+  PreloginPacket = require('./prelogin-packet').PreLoginPacket,
+  ENCRYPT = require('./prelogin-packet').ENCRYPT;
 
 Buffer.prototype.toByteArray = function () { 
   return Array.prototype.slice.call(this, 0);
@@ -14,7 +16,8 @@ Buffer.prototype.toByteArray = function () {
 var Connection = function(host, port) {
   var self = this,
       connection,
-      packetBuffer = [];
+      packetBuffer = [],
+      packetProcessFunction = expectPreLoginResponse;
 
   events.EventEmitter.call(self);
   
@@ -34,6 +37,8 @@ var Connection = function(host, port) {
     if (isPacketComplete(packetBuffer)) {
       packet = new Packet(packetBuffer);
       self.emit('packet', packet);
+      
+      packetProcessFunction.call(self, packet.decode());
     }
   });
   
@@ -60,5 +65,15 @@ var Connection = function(host, port) {
 }
 
 util.inherits(Connection, events.EventEmitter);
+
+function expectPreLoginResponse(packet) {
+  if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
+    this.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
+  }
+
+  if (packet.header.encryption !== ENCRYPT.NOT_SUP) {
+    this.emit('fail', 'Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
+  }
+}
 
 module.exports = Connection;
