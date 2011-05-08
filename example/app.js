@@ -9,43 +9,10 @@ var
   net = require('net'),
   http = require('http'),
   sys = require('sys'),
-  buildPacket = require('./src/packet').build,
-  buildPreloginPacket = require('./src/prelogin-packet').build,
-  type = require('./src/packet').type,
-  datatypes = require('./datatypes'),
-  jspack = require('./jspack').jspack,
-  
-  encode = datatypes.encode,
-  byte = datatypes.byte,
-  int16 = datatypes.int16,
-  int32 = datatypes.int32,
-  cstring = datatypes.cstring;
+  buildPacket = require('../src/packet').build,
+  buildPreloginPacket = require('../src/prelogin-packet').build,
+  type = require('../src/packet').type;
 
-//var a = '';
-//a += encode(cstring, 'Hello World!');
-//a += encode(cstring, 'Hello World!');
-//console.dir(sys.inspect(new Buffer(a)));
-//
-//var newData = '';
-//newData += encode(byte, 0x12);
-//newData += encode(byte, 0x01);
-//newData += encode(int16, 0x002f);
-//newData += encode(int16, 0x0000);
-//newData += encode(byte, 0x01);
-//newData += encode(byte, 0x00);
-////console.dir(sys.inspect(new Buffer(encode(byte, 0x12))));
-//  
-//console.log(jspack.Pack('BBHHBB4s', [0x12, 0x01, 0x002f, 0x0000, 0x01, 0x00, 'qaz']));
-//console.log(sys.inspect(new Buffer(jspack.Pack('BBHHBB4s', [0x12, 0x01, 0x002f, 0x0000, 0x01, 0x00, 'abc']))));
-//console.log(sys.inspect(require('./jspack')));
-
-//var data = [0x12,       // type - prelogin
-//            0x01,       //status - eom
-//            0x00, 0x2F, // length
-//            0x00, 0x00, // spid
-//            0x01,       // packet id
-//            0x00,       // window
-//            
 var data = [0x00,         // token - version
               0x00, 0x1A,   // offset
               0x00, 0x06,   // length
