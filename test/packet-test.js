@@ -62,7 +62,7 @@ exports.ToString = function(test) {
       packet = new Packet(type, data, {last: true}),
       packetString = packet.toString();
 
-  console.log(packetString);
+  //console.log(packetString);
   
   test.ok(packetString.indexOf('PRELOGIN') !== -1);
   test.ok(packetString.indexOf('0000  55FF') !== -1);
