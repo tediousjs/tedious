@@ -28,3 +28,19 @@ exports.PreloginPacket = function(test){
 
   test.done();
 };
+
+exports.Decode = function(test){
+  var packet = new PreLoginPacket();
+      optionTokens = packet.decodeOptionTokens();
+      
+  test.equal(optionTokens.version.major, 0);
+  test.equal(optionTokens.version.minor, 0);
+  test.equal(optionTokens.version.patch, 1);
+  test.equal(optionTokens.version.subbuild, 1);
+  test.equal(optionTokens.encryption, 0x02);
+  test.equal(optionTokens.instopt, 0);
+  test.equal(optionTokens.threadId, 0);
+  test.equal(optionTokens.mars, 0);
+
+  test.done();
+};

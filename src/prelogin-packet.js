@@ -18,7 +18,52 @@ var PreLoginPacket = function(headerFields) {
   return new Packet(TYPE.PRELOGIN, data, headerFields);
 };
 
-module.exports = PreLoginPacket;
+Packet.prototype.decodeOptionTokens = function() {
+  var optionTokens = {},
+      data = this.decode().data,
+      offset = 0,
+      tokenArray,
+      token,
+      versionArray;
+  
+  while (data[offset] !== TOKEN.TERMINATOR) {
+    tokenArray = jspack.Unpack('BHH', data, offset);
+    token = {
+      type: tokenArray[0],
+      offset: tokenArray[1],
+      length: tokenArray[2]
+    };
+
+    if (token.length > 0) {
+      switch (token.type) {
+      case TOKEN.VERSION:
+        versionArray = jspack.Unpack('BBHH', data, token.offset);
+        optionTokens.version = {};
+        optionTokens.version.major = versionArray[0];
+        optionTokens.version.minor = versionArray[1];
+        optionTokens.version.patch = versionArray[2];
+        optionTokens.version.subbuild = versionArray[3];
+        break;
+      case TOKEN.ENCRYPTION:
+        optionTokens.encryption = jspack.Unpack('B', data, token.offset)[0];
+        break;
+      case TOKEN.INSTOPT:
+        optionTokens.instopt = jspack.Unpack('B', data, token.offset)[0];
+        break;
+      case TOKEN.THREADID:
+        optionTokens.threadId = jspack.Unpack('L', data, token.offset)[0];
+        break;
+      case TOKEN.MARS:
+        optionTokens.mars = jspack.Unpack('B', data, token.offset)[0];
+        break;
+      }
+    }
+    
+    offset += 5;
+  }
+  
+  return optionTokens;
+};
 
 function buildData(stagedOptions) {
   var options = [],
@@ -61,3 +106,5 @@ function option(token, optionData) {
     data: optionData
   };
 }
+
+module.exports = PreLoginPacket;

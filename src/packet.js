@@ -53,8 +53,6 @@ var Packet = function (type, data, headerFields) {
   }
 };
 
-util.inherits(Packet, events.EventEmitter);
-
 Packet.prototype.decode = function() {
   return {
     header: decodeHeader(this.buffer),

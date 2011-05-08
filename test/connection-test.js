@@ -6,6 +6,7 @@ exports.connect = function(test){
   
   connection.on('packet', function (packet) {
     console.log(packet.toString());
+    console.log(packet.decodeOptionTokens());
     test.done();
   });
   
