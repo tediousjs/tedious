@@ -104,10 +104,14 @@ function buildFixedData() {
       packetSize = 4 * 1024,
       clientProgVer = 0,
       clientPid = 0,
-      connectionId = 0;
+      connectionId = 0,
+      clientTimeZone = 0 ;        // Can't figure what form this should take.
+      clientLcid = 0 ;            // Can't figure what form this should take.
   
   data = data.concat(jspack.Pack('LLLLL', [tdsVersion, packetSize, clientProgVer, clientPid, connectionId]));
   data = data.concat(jspack.Pack('BBBB', [flags1, flags2, typeFlags, flags3]));
+  data = data.concat(jspack.Pack('L', [clientTimeZone]));
+  data = data.concat(jspack.Pack('L', [clientLcid]));
   
   return data;
 }
