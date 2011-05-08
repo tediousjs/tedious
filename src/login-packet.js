@@ -57,7 +57,31 @@ var Packet = require('./packet').Packet,
       FLAGS_2.INIT_LANG_WARN |
       FLAGS_2.ODBC_OFF |
       FLAGS_2.USER_NORMAL |
-      FLAGS_2.INTEGRATED_SECURITY_OFF;
+      FLAGS_2.INTEGRATED_SECURITY_OFF,
+      
+    TYPE_FLAGS = {
+      SQL_DFLT: 0x00,
+      SQL_TSQL: 0x01,
+      
+      OLEDB_OFF: 0x00,
+      OLEDB_ON: 0x02
+    },
+    typeFlags =
+      TYPE_FLAGS.SQL_DFLT |
+      TYPE_FLAGS.OLEDB_OFF,
+      
+    FLAGS_3 = {
+      CHANGE_PASSWORD_NO: 0x00,
+      CHANGE_PASSWORD_YES: 0x01,
+      
+      BINARY_XML: 0x02,
+      
+      SPAWN_USER_INSTANCE: 0x04
+    },
+    flags3 =
+      FLAGS_3.CHANGE_PASSWORD_NO
+      
+    ;
 
 var LoginPacket = function(headerFields) {
   var length,
@@ -83,7 +107,7 @@ function buildFixedData() {
       connectionId = 0;
   
   data = data.concat(jspack.Pack('LLLLL', [tdsVersion, packetSize, clientProgVer, clientPid, connectionId]));
-  data = data.concat(jspack.Pack('BB', [flags1, flags2]));
+  data = data.concat(jspack.Pack('BBBB', [flags1, flags2, typeFlags, flags3]));
   
   return data;
 }
