@@ -3,7 +3,7 @@ var jspack = require('./jspack').jspack,
     sprintf = require('sprintf').sprintf,
     util = require('util');
 
-var HEADER_FORMAT = 'BBHHBB',
+var HEADER_FORMAT = 'BB>H>HBB',
     HEADER_LENGTH = 8,
     NL = '\n',
     

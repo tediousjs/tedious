@@ -1,6 +1,8 @@
 var Packet = require('./packet').Packet,
     TYPE = require('./packet').TYPE,
     jspack = require('./jspack').jspack,
+    bufferToArray = require('./buffer-util').toArray;
+    os = require('os'),
     
     FLAGS_1 = {
       ENDIAN_LITTLE: 0x00,
@@ -31,7 +33,7 @@ var Packet = require('./packet').Packet,
       FLAGS_1.FLOAT_IEEE_754 |
       FLAGS_1.BCD_DUMPLOAD_ON |
       FLAGS_1.USE_DB_OFF |
-      FLAGS_1.INIT_DB_FATAL |
+      FLAGS_1.INIT_DB_WARN |
       FLAGS_1.SET_LANG_WARN_ON,
 
     FLAGS_2 = {
@@ -83,13 +85,13 @@ var Packet = require('./packet').Packet,
       
     ;
 
-var LoginPacket = function(headerFields) {
+var LoginPacket = function(headerFields, loginData) {
   var length,
       fixedData = buildFixedData(),
-      variableData = buildVariableData(),
+      variableData = buildVariableData(loginData, 8 + fixedData.length),
       data;
 
-  length = jspack.Pack('L', [4 + fixedData.length + variableData.length]);
+  length = jspack.Pack('<L', [4 + fixedData.length + variableData.length]);
 
   data = length;
   data = data.concat(fixedData)
@@ -100,26 +102,100 @@ var LoginPacket = function(headerFields) {
 
 function buildFixedData() {
   var data = [],
-      tdsVersion = 0x00000071,    // 7.1
+      tdsVersion = 0x72090002,    // 7.2
       packetSize = 4 * 1024,
       clientProgVer = 0,
       clientPid = 0,
       connectionId = 0,
-      clientTimeZone = 0 ;        // Can't figure what form this should take.
+      clientTimeZone = new Date().getTimezoneOffset();
       clientLcid = 0 ;            // Can't figure what form this should take.
   
-  data = data.concat(jspack.Pack('LLLLL', [tdsVersion, packetSize, clientProgVer, clientPid, connectionId]));
+  data = data.concat(jspack.Pack('<L<L<L<L<L', [tdsVersion, packetSize, clientProgVer, clientPid, connectionId]));
   data = data.concat(jspack.Pack('BBBB', [flags1, flags2, typeFlags, flags3]));
-  data = data.concat(jspack.Pack('L', [clientTimeZone]));
-  data = data.concat(jspack.Pack('L', [clientLcid]));
+  data = data.concat(jspack.Pack('<l', [clientTimeZone]));
+  data = data.concat(jspack.Pack('<L', [clientLcid]));
   
   return data;
 }
 
-function buildVariableData() {
-  var data = [];
+function buildVariableData(loginData, offset) {
+  var variableData = {
+        dataOffsetsAndLengths: [],
+        data: [],
+        offset: offset + ((9 * 4) + 6 + (3 * 4))
+      };
   
-  return data;
+  loginData = loginData || {};
+
+  addVariableDataOffsetLength(variableData, os.hostname());
+  addVariableDataOffsetLength(variableData, loginData.userName);
+  addVariableDataPassword(variableData, loginData.password);
+  addVariableDataOffsetLength(variableData, loginData.appName);
+  addVariableDataOffsetLength(variableData, loginData.serverName);
+  addVariableDataOffsetLength(variableData, '');                        // Reserved for future use.
+  addVariableDataOffsetLength(variableData, 'Tedious');
+  addVariableDataOffsetLength(variableData, loginData.language);
+  addVariableDataOffsetLength(variableData, loginData.database);
+  addVariableDataBytes(variableData, [1, 2, 3, 4, 5, 6]);               // Client ID, should be MAC address.
+  addVariableDataOffsetLength(variableData, '');                        // SSPI (NT authentication).
+  addVariableDataOffsetLength(variableData, '');                        // Attach database.
+  addVariableDataOffsetLength(variableData, '');                        // Change password.
+  addVariableDataDword(variableData, 0);                                // cbSSPILong
+  
+  return variableData.dataOffsetsAndLengths.concat(variableData.data);
+}
+
+function addVariableDataOffsetLength(variableData, field) {
+  field = field || '';
+  
+  var offsetAndLength = jspack.Pack('<H<H', [variableData.offset, field.length]),
+      fieldData = toUnicodeCode(field);
+
+  variableData.dataOffsetsAndLengths = variableData.dataOffsetsAndLengths.concat(offsetAndLength);
+  variableData.data = variableData.data.concat(fieldData);
+  variableData.offset += fieldData.length;
+}
+
+function addVariableDataPassword(variableData, field) {
+  var start = variableData.data.length,
+      end,
+      b,
+      byte;
+
+  addVariableDataOffsetLength(variableData, field);
+  end = variableData.data.length;
+
+  for (b = start; b < end; b++) {
+    var lowNibble,
+        highNibble;
+    
+    byte = variableData.data[b];
+    
+    // Swap nibbles.
+    lowNibble = byte & 0x0f;
+    highNibble = (byte >> 4);
+    byte = (lowNibble << 4) | highNibble;
+    
+    byte = byte ^ 0xa5;
+    
+    variableData.data[b] = byte;
+  }
+}
+
+function addVariableDataBytes(variableData, bytes) {
+  variableData.dataOffsetsAndLengths = variableData.dataOffsetsAndLengths.concat(bytes);
+}
+
+function addVariableDataDword(variableData, dword) {
+  var dwordArray = jspack.Pack('<L', [dword]);
+
+  variableData.dataOffsetsAndLengths = variableData.dataOffsetsAndLengths.concat(dwordArray);
+}
+
+function toUnicodeCode(text) {
+  var buffer = new Buffer(text, 'ucs2');
+
+  return bufferToArray(buffer);
 }
 
 exports.LoginPacket = LoginPacket;
