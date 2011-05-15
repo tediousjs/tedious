@@ -26,8 +26,10 @@ var Connection = function(host, port, loginData) {
   events.EventEmitter.call(self);
   
   port = port | DEFAULT_PORT;
-  self.connection = net.createConnection(port, host);
   self.loginData = loginData;
+  self.packetBuffer = [];
+
+  self.connection = net.createConnection(port, host);
   
   this.connection.addListener('connect', function() {
     sendPreLoginPacket.call();
@@ -38,9 +40,14 @@ var Connection = function(host, port, loginData) {
     
     console.log('DATA: ' +  sys.inspect(data));
     
-    packetBuffer = packetBuffer.concat(bufferToArray(data));
-    if (isPacketComplete(packetBuffer)) {
-      packet = new Packet(packetBuffer).decode();
+    self.packetBuffer = self.packetBuffer.concat(bufferToArray(data));
+
+    if (isPacketComplete(self.packetBuffer)) {
+      packet = new Packet(self.packetBuffer).decode();
+
+      // Remove the current packet from the buffer.
+      self.packetBuffer = self.packetBuffer.slice(packet.length);
+      
       //console.log(packet);
       self.emit('packet', packet);            // REMOVE THIS - remove tests' dependency on this
       
