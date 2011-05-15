@@ -60,3 +60,23 @@ exports.loginAck = function(test) {
                   0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00,
                   0x01, 0x02, 0x03, 0x04]);
 };
+
+exports.envChange = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(3);
+
+  decoder.on('envChange', function(envChange) {
+    test.strictEqual(envChange.type, 'database');
+    test.strictEqual(envChange.oldValue, 'ab');
+    test.strictEqual(envChange.newValue, 'ac');
+  });
+  
+  decoder.on('done', function() {
+    test.done();
+  });
+  
+  decoder.decode([0xe3, 0x0b, 0x00, 0x01,
+                  0x02, 0x61, 0x00, 0x62, 0x00,
+                  0x02, 0x61, 0x00, 0x63, 0x00]);
+};

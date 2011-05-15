@@ -23,6 +23,9 @@ TokenDecoder.prototype.decode = function(data) {
     case 0xAD:
       this.emit('loginAck', this.createLoginAck());
       break;
+    case 0xE3:
+      this.emit('envChange', this.createEnvChange());
+      break;
     default:
       this.emit('unknown', tokenType);
       this.emit('done');
@@ -58,6 +61,29 @@ TokenDecoder.prototype.createLoginAck = function() {
   this.offset += 2 + length;
   
   return loginAck;
+}
+
+TokenDecoder.prototype.createEnvChange = function() {
+  var offset = this.offset,
+      unpacked,
+      length,
+      envChange = {};
+  
+  unpacked = jspack.Unpack('<HB', this.data, offset);
+  length = unpacked[0];
+  offset += 3;
+
+  switch (unpacked[1]) {
+  case 1:
+    envChange.type = 'database';
+    envChange.oldValue = this.bVarchar(offset);
+    envChange.newValue = this.bVarchar(offset + 1 + (2 * envChange.oldValue.length));
+    break
+  }
+  
+  this.offset += 2 + length;
+  
+  return envChange;
 }
 
 TokenDecoder.prototype.bVarchar = function(offset) {

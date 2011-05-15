@@ -114,7 +114,11 @@ var Connection = function(host, port, loginData) {
     }
 
     decoder.on('loginAck', function(loginAck) {
-      console.log('loginAck :' + loginAck);
+      console.log('loginAck : ' + loginAck);
+    });
+
+    decoder.on('envChange', function(envChange) {
+      console.log('envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
     });
 
     decoder.on('unknown', function(tokenType) {
