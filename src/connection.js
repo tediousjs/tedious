@@ -10,6 +10,8 @@ events = require("events"),
   ENCRYPT = require('./prelogin-packet').ENCRYPT,
   PreLoginPacket = require('./prelogin-packet').PreLoginPacket,
   LoginPacket = require('./login-packet').LoginPacket,
+  TokenDecoder = require('../src/token-decoder').TokenDecoder;
+
   DEFAULT_PORT = 1433,
   
   STATE = {
@@ -46,7 +48,7 @@ var Connection = function(host, port, loginData) {
       decodedPacket = packet.decode();
 
       // Remove the current packet from the buffer.
-      self.packetBuffer = self.packetBuffer.slice(packet.length);
+      self.packetBuffer = self.packetBuffer.slice(8 + decodedPacket.header.length);
       
       logPacket('Received', packet);
       self.emit('packet', decodedPacket);            // REMOVE THIS - remove tests' dependency on this
@@ -105,9 +107,25 @@ var Connection = function(host, port, loginData) {
   }
 
   function processLoginResponse(rawPacket, packet) {
+    var decoder = new TokenDecoder();
+
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
     }
+
+    decoder.on('loginAck', function(loginAck) {
+      console.log('loginAck :' + loginAck);
+    });
+
+    decoder.on('unknown', function(tokenType) {
+      console.log('unknown : ' + tokenType);
+    });
+
+    decoder.on('done', function() {
+      console.log('tokens done');
+    });
+    
+    decoder.decode(packet.data);
   }
 
   function sendLoginPacket() {

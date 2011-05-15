@@ -1,5 +1,23 @@
 var TokenDecoder = require('../src/token-decoder').TokenDecoder;
 
+exports.unknownToken = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(2);
+
+  decoder.on('unknown', function() {
+    test.ok(true);
+  });
+  
+  decoder.on('done', function() {
+    test.ok(true);
+
+    test.done();
+  });
+  
+  decoder.decode([0x00]);
+};
+
 exports.multipleTokens = function(test) {
   var decoder = new TokenDecoder();
   
