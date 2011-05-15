@@ -1,7 +1,7 @@
 var Packet = require('./packet').Packet,
     TYPE = require('./packet').TYPE,
     jspack = require('./jspack').jspack,
-    bufferToArray = require('./buffer-util').toArray;
+    textToUnicode = require('./unicode').textToUnicode;
     os = require('os'),
     
     FLAGS_1 = {
@@ -152,7 +152,7 @@ function addVariableDataOffsetLength(variableData, field) {
   field = field || '';
   
   var offsetAndLength = jspack.Pack('<H<H', [variableData.offset, field.length]),
-      fieldData = toUnicodeCode(field);
+      fieldData = textToUnicode(field);
 
   variableData.dataOffsetsAndLengths = variableData.dataOffsetsAndLengths.concat(offsetAndLength);
   variableData.data = variableData.data.concat(fieldData);
@@ -193,12 +193,6 @@ function addVariableDataDword(variableData, dword) {
   var dwordArray = jspack.Pack('<L', [dword]);
 
   variableData.dataOffsetsAndLengths = variableData.dataOffsetsAndLengths.concat(dwordArray);
-}
-
-function toUnicodeCode(text) {
-  var buffer = new Buffer(text, 'ucs2');
-
-  return bufferToArray(buffer);
 }
 
 exports.LoginPacket = LoginPacket;
