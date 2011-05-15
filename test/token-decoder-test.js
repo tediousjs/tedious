@@ -133,6 +133,36 @@ exports.info = function(test) {
                   ]);
 };
 
+exports.error = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(7);
+
+  decoder.on('error_', function(info) {
+    test.strictEqual(info.number, 0x1234);
+    test.strictEqual(info.state, 0x01);
+    test.strictEqual(info.class, 0x02);
+    test.strictEqual(info.messageText, 'abc');
+    test.strictEqual(info.serverName, 'ab');
+    test.strictEqual(info.procName, 'ac');
+    test.strictEqual(info.lineNumber, 3);
+  });
+  
+  decoder.on('end', function() {
+    test.done();
+  });
+  
+  decoder.decode([0xaa, 0x1c, 0x00,
+                  0x34, 0x12, 0x00, 0x00,
+                  0x01,
+                  0x02,
+                  0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00,
+                  0x02, 0x61, 0x00, 0x62, 0x00,
+                  0x02, 0x61, 0x00, 0x63, 0x00,
+                  0x03, 0x00, 0x00, 0x00
+                  ]);
+};
+
 exports.done = function(test) {
   var decoder = new TokenDecoder();
   

@@ -121,6 +121,10 @@ var Connection = function(host, port, loginData) {
       console.log('envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
     });
 
+    decoder.on('error_', function(error) {
+      console.log('error : ', error);
+    });
+
     decoder.on('info', function(info) {
       console.log('info : ', info);
     });
@@ -131,6 +135,7 @@ var Connection = function(host, port, loginData) {
 
     decoder.on('done', function(done) {
       console.log('done : ', done);
+      self.state = STATE.SENT_LOGIN
     });
     
     decoder.decode(packet.data);

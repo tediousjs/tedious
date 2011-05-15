@@ -20,6 +20,9 @@ TokenDecoder.prototype.decode = function(data) {
     this.offset++;
 
     switch (tokenType) {
+    case 0xAA:
+      this.emit('error_', this.createError());
+      break;
     case 0xAB:
       this.emit('info', this.createInfo());
       break;
@@ -113,6 +116,10 @@ TokenDecoder.prototype.createEnvChange = function() {
   this.offset += 2 + length;
   
   return envChange;
+}
+
+TokenDecoder.prototype.createError = function() {
+  return this.createInfo();
 }
 
 TokenDecoder.prototype.createInfo = function() {
