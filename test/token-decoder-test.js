@@ -61,22 +61,74 @@ exports.loginAck = function(test) {
                   0x01, 0x02, 0x03, 0x04]);
 };
 
-exports.envChange = function(test) {
+exports.envChangeBVarchar = function(test) {
   var decoder = new TokenDecoder();
   
   test.expect(3);
 
   decoder.on('envChange', function(envChange) {
     test.strictEqual(envChange.type, 'database');
-    test.strictEqual(envChange.oldValue, 'ab');
-    test.strictEqual(envChange.newValue, 'ac');
+    test.strictEqual(envChange.newValue, 'ab');
+    test.strictEqual(envChange.oldValue, 'ac');
   });
   
   decoder.on('done', function() {
     test.done();
   });
   
-  decoder.decode([0xe3, 0x0b, 0x00, 0x01,
+  decoder.decode([0xe3, 0x0b, 0x00,
+                  0x01,
                   0x02, 0x61, 0x00, 0x62, 0x00,
                   0x02, 0x61, 0x00, 0x63, 0x00]);
+};
+
+exports.envChangeBVarbyte = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(3);
+
+  decoder.on('envChange', function(envChange) {
+    test.strictEqual(envChange.type, 'sqlCollation');
+    test.deepEqual(envChange.newValue, [1, 2]);
+    test.deepEqual(envChange.oldValue, [3, 4, 5]);
+  });
+  
+  decoder.on('done', function() {
+    test.done();
+  });
+  
+  decoder.decode([0xe3, 0x08, 0x00,
+                  0x07,
+                  0x02, 0x01, 0x02,
+                  0x03, 0x03, 0x04, 0x05]);
+};
+
+exports.info = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(7);
+
+  decoder.on('info', function(info) {
+    test.strictEqual(info.number, 0x1234);
+    test.strictEqual(info.state, 0x01);
+    test.strictEqual(info.class, 0x02);
+    test.strictEqual(info.messageText, 'abc');
+    test.strictEqual(info.serverName, 'ab');
+    test.strictEqual(info.procName, 'ac');
+    test.strictEqual(info.lineNumber, 3);
+  });
+  
+  decoder.on('done', function() {
+    test.done();
+  });
+  
+  decoder.decode([0xab, 0x1c, 0x00,
+                  0x34, 0x12, 0x00, 0x00,
+                  0x01,
+                  0x02,
+                  0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00,
+                  0x02, 0x61, 0x00, 0x62, 0x00,
+                  0x02, 0x61, 0x00, 0x63, 0x00,
+                  0x03, 0x00, 0x00, 0x00
+                  ]);
 };

@@ -78,10 +78,13 @@ var Packet = require('./packet').Packet,
       
       BINARY_XML: 0x02,
       
-      SPAWN_USER_INSTANCE: 0x04
+      SPAWN_USER_INSTANCE: 0x04,
+
+      UNKNOWN_COLLATION_HANDLING: 0x08
     },
     flags3 =
-      FLAGS_3.CHANGE_PASSWORD_NO
+      FLAGS_3.CHANGE_PASSWORD_NO |
+      FLAGS_3.UNKNOWN_COLLATION_HANDLING
       
     ;
 
