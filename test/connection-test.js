@@ -4,13 +4,13 @@ var
 exports.connect = function(test){
   var connection = new Connection('192.168.1.64', 1433, {
         userName: 'test',
-        password: ''
+        password: 'test'
       }),
       packetCount = 0;
   
   connection.on('packet', function (packet) {
-    console.log(packet.toString());
-    console.log(packet.decodeOptionTokens());
+//    console.log(packet.toString());
+//    console.log(packet.decodeOptionTokens());
     
     packetCount++;
     

@@ -4,15 +4,19 @@ events = require("events"),
   sys = require('sys'),
   util = require('util'),
   isPacketComplete = require('./packet').isPacketComplete,
+  bufferToArray = require('./buffer-util').toArray,
   Packet = require('./packet').Packet,
   PACKET_TYPE = require('./packet').TYPE,
+  ENCRYPT = require('./prelogin-packet').ENCRYPT,
   PreLoginPacket = require('./prelogin-packet').PreLoginPacket,
-  ENCRYPT = require('./prelogin-packet').ENCRYPT;
   LoginPacket = require('./login-packet').LoginPacket,
-
-Buffer.prototype.toByteArray = function () { 
-  return Array.prototype.slice.call(this, 0);
-}
+  DEFAULT_PORT = 1433,
+  
+  STATE = {
+    SENT_PRELOGIN: 0,
+    SENT_LOGIN: 1,
+    LOGGED_IN: 2
+  };
 
 var Connection = function(host, port, loginData) {
   var self = this,
@@ -21,12 +25,11 @@ var Connection = function(host, port, loginData) {
 
   events.EventEmitter.call(self);
   
-  port = port | 1433;
+  port = port | DEFAULT_PORT;
   self.connection = net.createConnection(port, host);
   self.loginData = loginData;
   
   this.connection.addListener('connect', function() {
-    self.packetProcessFunction = expectPreLoginResponse;
     sendPreLoginPacket.call();
   });
   
@@ -35,12 +38,22 @@ var Connection = function(host, port, loginData) {
     
     console.log('DATA: ' +  sys.inspect(data));
     
-    packetBuffer = packetBuffer.concat(data.toByteArray());
+    packetBuffer = packetBuffer.concat(bufferToArray(data));
     if (isPacketComplete(packetBuffer)) {
-      packet = new Packet(packetBuffer);
-      self.emit('packet', packet);
+      packet = new Packet(packetBuffer).decode();
+      //console.log(packet);
+      self.emit('packet', packet);            // REMOVE THIS - remove tests' dependency on this
       
-      self.packetProcessFunction(packet.decode());
+      switch (self.state) {
+      case STATE.SENT_PRELOGIN:
+        processPreLoginResponse(packet);
+        break
+      case STATE.SENT_LOGIN:
+        processLoginResponse(packet);
+        break
+      default:
+        console.log('Unexepected state ' + self.state);
+      }
     }
   });
   
@@ -64,9 +77,10 @@ var Connection = function(host, port, loginData) {
     var packet = new PreLoginPacket({last: true});
     
     self.connection.write(packet.buffer);
+    self.state = STATE.SENT_PRELOGIN
   }
 
-  function expectPreLoginResponse(packet) {
+  function processPreLoginResponse(packet) {
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
     }
@@ -75,11 +89,10 @@ var Connection = function(host, port, loginData) {
       self.emit('fail', 'Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
     }
     
-    self.packetProcessFunction = expectLoginResponse;
     sendLoginPacket();
   }
 
-  function expectLoginResponse(packet) {
+  function processLoginResponse(packet) {
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
     }
@@ -90,6 +103,7 @@ var Connection = function(host, port, loginData) {
 
     console.log(packet.toString());
     self.connection.write(packet.buffer);
+    self.state = STATE.SENT_LOGIN
   }
 }
 
