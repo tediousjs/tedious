@@ -100,6 +100,9 @@ var LoginPacket = function(headerFields, loginData) {
   return new Packet(TYPE.LOGIN7, data, headerFields);
 };
 
+LoginPacket.prototype.dataAsString = function() {
+};
+
 function buildFixedData() {
   var data = [],
       tdsVersion = 0x72090002,    // 7.2

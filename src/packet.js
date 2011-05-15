@@ -61,12 +61,6 @@ Packet.prototype.decode = function() {
   };
 };
 
-Packet.prototype.toString = function() {
-  var decoded = this.decode();
-  
-  return headerToString(decoded) + NL + dataDump(decoded);
-}
-
 function isPacketComplete(potentialPacket) {
   if (potentialPacket.length < HEADER_LENGTH) {
     return false;
@@ -120,10 +114,11 @@ function buildHeader(type, data, headerFields) {
   return jspack.Pack(HEADER_FORMAT, [type, headerFields.status, length, headerFields.spid, headerFields.packetId, headerFields.window]);
 }
 
-function headerToString(packet) {
-  var statusText = '',
+Packet.prototype.headerToString = function(indent) {
+  var packet = this.decode(),
+      statusText = '',
       headerText;
-
+  
   if (packet.header.status === STATUS.NORMAL) {
     statusText += statusAsText[STATUS.NORMAL];
   } else {
@@ -143,20 +138,23 @@ function headerToString(packet) {
       packet.header.packetId,
       packet.header.window
   );
- 
-  return headerText;
+
+  return indent + headerText;
 }
 
-function dataDump(packet) {
+Packet.prototype.dataDump = function(indent) {
   const BYTES_PER_GROUP = 0x04,
         BYTES_PER_LINE = 0x20;
-  var offset = 0,
-      dataDump = '';
 
+  var packet = this.decode(),
+      offset = 0,
+      dataDump = '';
+  
   while (offset < packet.data.length) {
     if (offset % BYTES_PER_LINE === 0) {
       dataDump += NL;
-      dataDump += sprintf('  %04X  ', offset);
+      dataDump += indent;
+      dataDump += sprintf('%04X  ', offset);
     }
     dataDump += sprintf('%02X', packet.data[offset]);
     
@@ -170,6 +168,9 @@ function dataDump(packet) {
   dataDump = dataDump.substr(1);
   return dataDump;
 }
+
+Packet.prototype.dataAsString = function() {
+};
 
 module.exports.Packet = Packet;
 module.exports.isPacketComplete = isPacketComplete;

@@ -32,31 +32,31 @@ var Connection = function(host, port, loginData) {
   self.connection = net.createConnection(port, host);
   
   this.connection.addListener('connect', function() {
-    sendPreLoginPacket.call();
+    sendPreLoginPacket();
   });
   
   this.connection.addListener('data', function(data) {
-    var packet;
-    
-    console.log('DATA: ' +  sys.inspect(data));
+    var packet,
+        decodedPacket;
     
     self.packetBuffer = self.packetBuffer.concat(bufferToArray(data));
 
     if (isPacketComplete(self.packetBuffer)) {
-      packet = new Packet(self.packetBuffer).decode();
+      packet = new Packet(self.packetBuffer);
+      decodedPacket = packet.decode();
 
       // Remove the current packet from the buffer.
       self.packetBuffer = self.packetBuffer.slice(packet.length);
       
-      //console.log(packet);
-      self.emit('packet', packet);            // REMOVE THIS - remove tests' dependency on this
+      logPacket('Received', packet);
+      self.emit('packet', decodedPacket);            // REMOVE THIS - remove tests' dependency on this
       
       switch (self.state) {
       case STATE.SENT_PRELOGIN:
-        processPreLoginResponse(packet);
+        processPreLoginResponse(packet, decodedPacket);
         break
       case STATE.SENT_LOGIN:
-        processLoginResponse(packet);
+        processLoginResponse(packet, decodedPacket);
         break
       default:
         console.log('Unexepected state ' + self.state);
@@ -83,11 +83,19 @@ var Connection = function(host, port, loginData) {
   function sendPreLoginPacket() {
     var packet = new PreLoginPacket({last: true});
     
-    self.connection.write(packet.buffer);
+    sendPacket(packet);
     self.state = STATE.SENT_PRELOGIN
   }
 
-  function processPreLoginResponse(packet) {
+  function processPreLoginResponse(rawPacket, packet) {
+    var preLoginPacket = new PreLoginPacket(rawPacket);
+    var dataAsString;
+    
+    dataAsString = preLoginPacket.dataAsString('  ');
+    if (dataAsString) {
+      console.log(dataAsString);
+    }
+    
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
     }
@@ -99,7 +107,7 @@ var Connection = function(host, port, loginData) {
     sendLoginPacket();
   }
 
-  function processLoginResponse(packet) {
+  function processLoginResponse(rawPacket, packet) {
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
     }
@@ -108,9 +116,20 @@ var Connection = function(host, port, loginData) {
   function sendLoginPacket() {
     var packet = new LoginPacket({last: true}, self.loginData);
 
-    console.log(packet.toString());
-    self.connection.write(packet.buffer);
+    sendPacket(packet);
     self.state = STATE.SENT_LOGIN
+  }
+
+  function sendPacket(packet) {
+    logPacket('Sent', packet);
+    self.connection.write(packet.buffer);
+  }
+
+  function logPacket(text, packet) {
+    console.log(text + ' packet');
+    
+    console.log(packet.headerToString('  '));
+    console.log(packet.dataDump('  '));
   }
 }
 

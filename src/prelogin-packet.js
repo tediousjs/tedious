@@ -1,6 +1,8 @@
 var Packet = require('./packet').Packet,
     TYPE = require('./packet').TYPE,
     jspack = require('./jspack').jspack,
+    sprintf = require('sprintf').sprintf,
+    util = require('util'),
     
     TOKEN = {
       VERSION: 0x00,
@@ -22,10 +24,12 @@ var PreLoginPacket = function(headerFields) {
   var options = createOptions(),
       data = buildData(options);
   
-  return new Packet(TYPE.PRELOGIN, data, headerFields);
+  Packet.call(this, TYPE.PRELOGIN, data, headerFields);
 };
 
-Packet.prototype.decodeOptionTokens = function() {
+util.inherits(PreLoginPacket, Packet);
+
+PreLoginPacket.prototype.decodeOptionTokens = function() {
   var optionTokens = {},
       data = this.decode().data,
       offset = 0,
@@ -70,6 +74,22 @@ Packet.prototype.decodeOptionTokens = function() {
   }
   
   return optionTokens;
+};
+
+PreLoginPacket.prototype.dataAsString = function(indent) {
+  var optionTokens = this.decodeOptionTokens();
+
+  return indent + 'PreLogin - ' +
+      sprintf('version:%d.%d.%d.%d, encryption:0x%02X, instopt:0x%02X, threadId:0x%08X, mars:0x%02X',
+          optionTokens.version.major,
+          optionTokens.version.minor,
+          optionTokens.version.patch,
+          optionTokens.version.subbuild,
+          optionTokens.encryption,
+          optionTokens.instopt,
+          optionTokens.threadId,
+          optionTokens.mars
+          );
 };
 
 function buildData(stagedOptions) {

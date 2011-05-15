@@ -6,7 +6,7 @@ exports.LoginPacket = function(test){
   var packet = new LoginPacket(),
       buffer = packet.buffer;
 
-  console.log(buffer);
+  //console.log(buffer);
   test.equal(buffer.length, 124, 'packet length');
 
 //  test.deepEqual(

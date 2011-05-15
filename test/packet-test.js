@@ -59,13 +59,10 @@ exports.DecodePacket = function(test){
 exports.ToString = function(test) {
   var data = [0x55, 0xff],
       type = 0x12,
-      packet = new Packet(type, data, {last: true}),
-      packetString = packet.toString();
+      packet = new Packet(type, data, {last: true});
 
-  //console.log(packetString);
-  
-  test.ok(packetString.indexOf('PRELOGIN') !== -1);
-  test.ok(packetString.indexOf('0000  55FF') !== -1);
+  test.ok(packet.headerToString().indexOf('PRELOGIN') !== -1);
+  test.ok(packet.dataDump().indexOf('0000  55FF') !== -1);
   
   test.done();
 };
