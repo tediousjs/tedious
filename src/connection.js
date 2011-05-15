@@ -129,8 +129,8 @@ var Connection = function(host, port, loginData) {
       console.log('unknown : ' + tokenType);
     });
 
-    decoder.on('done', function() {
-      console.log('tokens done');
+    decoder.on('done', function(done) {
+      console.log('done : ', done);
     });
     
     decoder.decode(packet.data);

@@ -9,7 +9,7 @@ exports.unknownToken = function(test) {
     test.ok(true);
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.ok(true);
 
     test.done();
@@ -27,7 +27,7 @@ exports.multipleTokens = function(test) {
     test.ok(true);
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.ok(true);
 
     test.done();
@@ -52,7 +52,7 @@ exports.loginAck = function(test) {
     test.strictEqual(loginAck.progVersion.buildNumberLow, 0x04);
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.done();
   });
   
@@ -72,7 +72,7 @@ exports.envChangeBVarchar = function(test) {
     test.strictEqual(envChange.oldValue, 'ac');
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.done();
   });
   
@@ -93,7 +93,7 @@ exports.envChangeBVarbyte = function(test) {
     test.deepEqual(envChange.oldValue, [3, 4, 5]);
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.done();
   });
   
@@ -118,7 +118,7 @@ exports.info = function(test) {
     test.strictEqual(info.lineNumber, 3);
   });
   
-  decoder.on('done', function() {
+  decoder.on('end', function() {
     test.done();
   });
   
@@ -131,4 +131,25 @@ exports.info = function(test) {
                   0x02, 0x61, 0x00, 0x63, 0x00,
                   0x03, 0x00, 0x00, 0x00
                   ]);
+};
+
+exports.done = function(test) {
+  var decoder = new TokenDecoder();
+  
+  test.expect(3);
+
+  decoder.on('done', function(done) {
+    test.strictEqual(done.status, 'DONE_FINAL');
+    test.strictEqual(done.currentCommandToken, 2);
+    test.strictEqual(done.rowCount, 3);
+  });
+  
+  decoder.on('end', function() {
+    test.done();
+  });
+  
+  decoder.decode([0xfd,
+                  0x00, 0x00,
+                  0x02, 0x00,
+                  0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 };

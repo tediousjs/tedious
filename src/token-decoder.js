@@ -29,14 +29,17 @@ TokenDecoder.prototype.decode = function(data) {
     case 0xE3:
       this.emit('envChange', this.createEnvChange());
       break;
+    case 0xFD:
+      this.emit('done', this.createDone());
+      break;
     default:
       this.emit('unknown', 'tokenType: ' + tokenType);
-      this.emit('done');
+      this.emit('end');
       return;
     }
   }
 
-  this.emit('done');
+  this.emit('end');
 }
 
 TokenDecoder.prototype.createLoginAck = function() {
@@ -140,6 +143,32 @@ TokenDecoder.prototype.createInfo = function() {
   this.offset += 2 + length;
   
   return info;
+}
+
+TokenDecoder.prototype.createDone = function() {
+  var offset = this.offset,
+      unpacked,
+      done = {},
+      STATUSES = {
+        0x00 : 'DONE_FINAL',
+        0x01 : 'DONE_MORE',
+        0x02 : 'DONE_ERROR',
+        0x04 : 'DONE_INXACT',
+        0x10 : 'DONE_COUNT',
+        0x20 : 'DONE_ATTN',
+        0x100 : 'DONE_SRVERROR',
+      };
+  
+  unpacked = jspack.Unpack('<H<H<L<L', this.data, offset);
+  done.status = STATUSES[unpacked[0]];
+  done.currentCommandToken = unpacked[1];
+  done.rowCount = unpacked[2];
+  // The high 4 bytes of the row count are currently ignored, as Javascript
+  // can't represent a 64 bit integer.
+
+  this.offset += 12;
+  
+  return done;
 }
 
 TokenDecoder.prototype.bVarbyte = function(offset) {
