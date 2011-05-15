@@ -91,10 +91,7 @@ var Connection = function(host, port, loginData) {
     var preLoginPacket = new PreLoginPacket(rawPacket);
     var dataAsString;
     
-    dataAsString = preLoginPacket.dataAsString('  ');
-    if (dataAsString) {
-      console.log(dataAsString);
-    }
+    log(preLoginPacket.dataAsString('  '));
     
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
@@ -126,10 +123,14 @@ var Connection = function(host, port, loginData) {
   }
 
   function logPacket(text, packet) {
-    console.log(text + ' packet');
+    log(text + ' packet');
     
-    console.log(packet.headerToString('  '));
-    console.log(packet.dataDump('  '));
+    log(packet.headerToString('  '));
+    log(packet.dataDump('  '));
+  }
+  
+  function log(text) {
+    console.log(text);
   }
 }
 
