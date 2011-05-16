@@ -93,7 +93,9 @@ var Connection = function(host, port, loginData) {
     var preLoginPacket = new PreLoginPacket(rawPacket);
     var dataAsString;
     
-    log(preLoginPacket.dataAsString('  '));
+    debug(function (log) {
+      log(preLoginPacket.dataAsString('  '));
+    });
     
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
       self.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
@@ -114,27 +116,40 @@ var Connection = function(host, port, loginData) {
     }
 
     decoder.on('loginAck', function(loginAck) {
-      console.log('loginAck : ', loginAck);
+      debug(function (log) {
+        log('  loginAck : ' + loginAck.progName);
+      });
     });
 
     decoder.on('envChange', function(envChange) {
-      console.log('envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
+      debug(function (log) {
+        log('  envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
+      });
     });
 
     decoder.on('error_', function(error) {
-      console.log('error : ', error);
+      debug(function (log) {
+        log('  error : ' + error.number + ', @' + error.lineNumber + ', ' + error.messageText);
+      });
     });
 
     decoder.on('info', function(info) {
-      console.log('info : ', info);
+      debug(function (log) {
+        log('  info : ' + info.number + ', @' + info.lineNumber + ', ' + info.messageText);
+      });
     });
 
     decoder.on('unknown', function(tokenType) {
-      console.log('unknown : ' + tokenType);
+      debug(function (log) {
+        log('  unknown : ' + tokenType);
+      });
     });
 
     decoder.on('done', function(done) {
-      console.log('done : ', done);
+      debug(function (log) {
+        log('  done : ' + done.status + ', rowCount=' + done.rowCount);
+      });
+
       self.state = STATE.SENT_LOGIN
     });
     
@@ -154,14 +169,20 @@ var Connection = function(host, port, loginData) {
   }
 
   function logPacket(text, packet) {
-    log(text + ' packet');
-    
-    log(packet.headerToString('  '));
-    log(packet.dataDump('  '));
+    debug(function (log) {
+      log(text + ' packet');
+      
+      log(packet.headerToString('  '));
+      log(packet.dataDump('  '));
+    });
   }
   
-  function log(text) {
-    console.log(text);
+  function debug(debugFunction) {
+    if (self.listeners('debug').length > 0) {
+      debugFunction(function(text) {
+        self.emit('debug', text);
+      });
+    }
   }
 }
 

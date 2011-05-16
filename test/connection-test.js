@@ -7,11 +7,12 @@ exports.connect = function(test){
         password: 'test'
       }),
       packetCount = 0;
-  
+
+  connection.on('debug', function (message) {
+    //console.log(message);
+  });
+
   connection.on('packet', function (packet) {
-//    console.log(packet.toString());
-//    console.log(packet.decodeOptionTokens());
-    
     packetCount++;
     
     if (packetCount === 2) {
