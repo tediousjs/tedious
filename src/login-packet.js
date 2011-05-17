@@ -132,6 +132,7 @@ function buildVariableData(loginData, offset) {
       };
   
   loginData = loginData || {};
+  loginData.appName = loginData.appName || 'Tedious';
 
   addVariableDataOffsetLength(variableData, os.hostname());
   addVariableDataOffsetLength(variableData, loginData.userName);
