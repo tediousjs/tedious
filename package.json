@@ -4,7 +4,8 @@
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
   "version": "0.0.0",
   "repository": {
-    "url": ""
+    "type": "git",
+    "url": "git://github.com/pekim/tedious.git"
   },
   "engines": {
     "node": "*"
