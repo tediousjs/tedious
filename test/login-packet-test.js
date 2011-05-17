@@ -7,7 +7,7 @@ exports.LoginPacket = function(test){
       buffer = packet.buffer;
 
   //console.log(buffer);
-  test.equal(buffer.length, 124, 'packet length');
+  test.equal(buffer.length, 138, 'packet length');
 
 //  test.deepEqual(
 //      toArray(buffer.slice(8)),
