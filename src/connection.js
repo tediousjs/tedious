@@ -30,6 +30,7 @@ var Connection = function(host, port, loginData) {
   port = port | DEFAULT_PORT;
   self.loginData = loginData;
   self.packetBuffer = [];
+  self.env = {};
 
   self.connection = net.createConnection(port, host);
   
@@ -51,7 +52,6 @@ var Connection = function(host, port, loginData) {
       self.packetBuffer = self.packetBuffer.slice(8 + decodedPacket.header.length);
       
       logPacket('Received', packet);
-      self.emit('packet', decodedPacket);            // REMOVE THIS - remove tests' dependency on this
       
       switch (self.state) {
       case STATE.SENT_PRELOGIN:
@@ -61,7 +61,7 @@ var Connection = function(host, port, loginData) {
         processLoginResponse(packet, decodedPacket);
         break
       default:
-        console.log('Unexepected state ' + self.state);
+        console.log('Unexpected state ' + self.state);
       }
     }
   });
@@ -80,6 +80,18 @@ var Connection = function(host, port, loginData) {
   
   this.connection.addListener('close', function(had_error){
     console.log('close: ' + had_error);
+  });
+  
+  this.__defineGetter__('database', function() {
+    return self.env.database;
+  });
+
+  this.__defineGetter__('language', function() {
+    return self.env.language;
+  });
+
+  this.__defineGetter__('sqlCollation', function() {
+    return self.env.sqlCollation;
   });
 
   function sendPreLoginPacket() {
@@ -125,6 +137,10 @@ var Connection = function(host, port, loginData) {
       debug(function (log) {
         log('  envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
       });
+      
+      self.env[envChange.type] = envChange.newValue;
+
+      self.emit('envChange', envChange);
     });
 
     decoder.on('error_', function(error) {
@@ -150,7 +166,11 @@ var Connection = function(host, port, loginData) {
         log('  done : ' + done.status + ', rowCount=' + done.rowCount);
       });
 
-      self.state = STATE.SENT_LOGIN
+      if (self.state = STATE.SENT_LOGIN) {
+        self.emit('authenticated');
+      }
+      
+      self.state = STATE.LOGGED_IN;
     });
     
     decoder.decode(packet.data);

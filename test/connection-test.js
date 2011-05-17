@@ -2,22 +2,31 @@ var
   Connection = require('../src/connection');
 
 exports.connect = function(test){
-  var connection = new Connection('192.168.1.64', 1433, {
+  var database = 'test',
+      connection = new Connection('192.168.1.64', 1433, {
         userName: 'test',
-        password: 'test'
-      }),
-      packetCount = 0;
+        password: 'test',
+        database: database
+      });
 
+  test.expect(3);
+  
   connection.on('debug', function (message) {
-    //console.log(message);
+    console.log(message);
   });
 
-  connection.on('packet', function (packet) {
-    packetCount++;
-    
-    if (packetCount === 2) {
-      test.done();
+  connection.on('envChange', function (envChange) {
+    switch (envChange.type) {
+    case 'database':
+      test.strictEqual(envChange.newValue, database);
+      test.strictEqual(connection.database, database);
+      break;
     }
   });
-  
+
+  connection.on('authenticated', function () {
+    test.ok(true);
+    
+    test.done();
+  });
 };
