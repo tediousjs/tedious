@@ -1,5 +1,5 @@
-var Packet = require('../src/packet').Packet,
-    toArray = require('../src/buffer-util').toArray;
+var Packet = require('../../src/packet').Packet,
+    toArray = require('../../src/buffer-util').toArray;
 
 exports.PacketFromBuffer = function(test){
   var type = 0x12,

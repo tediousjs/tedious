@@ -1,6 +1,6 @@
 var
-  LoginPacket = require('../src/login-packet').LoginPacket,
-  toArray = require('../src/buffer-util').toArray;
+  LoginPacket = require('../../src/login-packet').LoginPacket,
+  toArray = require('../../src/buffer-util').toArray;
 
 exports.LoginPacket = function(test){
   var packet = new LoginPacket(),

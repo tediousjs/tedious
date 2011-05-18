@@ -1,4 +1,4 @@
-var TokenDecoder = require('../src/token-decoder').TokenDecoder;
+var TokenDecoder = require('../../src/token-decoder').TokenDecoder;
 
 exports.unknownToken = function(test) {
   var decoder = new TokenDecoder();

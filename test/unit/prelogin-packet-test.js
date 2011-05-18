@@ -1,6 +1,6 @@
 var
-  PreLoginPacket = require('../src/prelogin-packet').PreLoginPacket,
-  toArray = require('../src/buffer-util').toArray;
+  PreLoginPacket = require('../../src/prelogin-packet').PreLoginPacket,
+  toArray = require('../../src/buffer-util').toArray;
 
 exports.PreloginPacket = function(test){
   var packet = new PreLoginPacket(),

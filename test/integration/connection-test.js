@@ -1,5 +1,5 @@
 var
-  Connection = require('../src/connection');
+  Connection = require('../../src/connection');
 
 exports.connect = function(test){
   var database = 'test',
@@ -12,7 +12,7 @@ exports.connect = function(test){
   test.expect(3);
   
   connection.on('debug', function (message) {
-    console.log(message);
+//    console.log(message);
   });
 
   connection.on('envChange', function (envChange) {
