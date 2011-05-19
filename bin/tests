@@ -1,3 +1,5 @@
 #!/bin/sh
 
-node_modules/nodeunit/bin/nodeunit test/unit test/integration/
+node_modules/nodeunit/bin/nodeunit  \
+  test/unit/                        \
+  test/integration/

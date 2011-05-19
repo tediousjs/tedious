@@ -3,9 +3,8 @@ var
 
 exports.connect = function(test){
   var database = 'test',
-      connection = new Connection('192.168.1.64', 1433, {
-        userName: 'test',
-        password: 'test',
+      connection = new Connection('192.168.1.64', 'test', 'test', {
+        port: 1433,
         database: database
       });
 

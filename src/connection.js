@@ -20,19 +20,30 @@ events = require("events"),
     LOGGED_IN: 2
   };
 
-var Connection = function(host, port, loginData) {
+var Connection = function(server, userName, password, options) {
   var self = this,
       connection,
       packetBuffer = [];
 
   events.EventEmitter.call(self);
+
+  options = options || {};
+    
+  self.server = server;
+  self.port = options.port | DEFAULT_PORT;
   
-  port = port | DEFAULT_PORT;
-  self.loginData = loginData;
+  self.loginData = {};
+  self.loginData.userName = userName;
+  self.loginData.password = password;
+  self.loginData.database = options.database;
+  self.loginData.language = options.language;
+  self.loginData.appName = options.appName;
+  self.loginData.serverName = server;
+
   self.packetBuffer = [];
   self.env = {};
 
-  self.connection = net.createConnection(port, host);
+  self.connection = net.createConnection(self.port, self.server);
   
   this.connection.addListener('connect', function() {
     sendPreLoginPacket();
