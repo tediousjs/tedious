@@ -1,13 +1,13 @@
 var
-  Connection = require('../../src/connection');
+  Connection = require('../../src/connection'),
+  fs = require('fs');
 
 exports.connect = function(test){
-  var database = 'test',
-      connection = new Connection('192.168.1.64', 'test', 'test', {
-        port: 1433,
-        database: database
-      });
-
+  var config = JSON.parse(fs.readFileSync(__dirname + '/connection.json', 'utf8')),
+      connection;
+  
+  connection = new Connection(config.server, config.userName, config.password, config.options);
+  
   test.expect(3);
   
   connection.on('debug', function (message) {
@@ -17,8 +17,8 @@ exports.connect = function(test){
   connection.on('envChange', function (envChange) {
     switch (envChange.type) {
     case 'database':
-      test.strictEqual(envChange.newValue, database);
-      test.strictEqual(connection.database, database);
+      test.strictEqual(envChange.newValue, config.options.database);
+      test.strictEqual(connection.database, config.options.database);
       break;
     }
   });

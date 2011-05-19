@@ -1,0 +1,9 @@
+{
+  "server": "192.168.1.64",
+  "userName": "test",
+  "password": "test",
+  "options": {
+    "port": 1433,
+    "database": "test"
+  }
+}
