@@ -2,6 +2,20 @@ var
   Connection = require('../../src/connection'),
   fs = require('fs');
 
+exports.debug = function(test){
+  var config = JSON.parse(fs.readFileSync(__dirname + '/connection.json', 'utf8')),
+      connection = new Connection(config.server, config.userName, config.password, config.options);
+  
+  test.expect(1);
+  
+  connection.on('debug', function (message) {
+    test.ok(message);
+    connection.close();
+
+    test.done();
+  });
+};
+
 exports.connect = function(test){
   var config = JSON.parse(fs.readFileSync(__dirname + '/connection.json', 'utf8')),
       connection;

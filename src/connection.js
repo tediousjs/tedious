@@ -42,6 +42,7 @@ var Connection = function(server, userName, password, options) {
 
   self.packetBuffer = [];
   self.env = {};
+  self.closed = false;
 
   self.connection = net.createConnection(self.port, self.server);
   
@@ -121,11 +122,11 @@ var Connection = function(server, userName, password, options) {
     });
     
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
-      self.emit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
+      safeEmit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
     }
 
     if (packet.header.encryption !== ENCRYPT.NOT_SUP) {
-      self.emit('fail', 'Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
+      safeEmit('fail', 'Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
     }
     
     sendLoginPacket();
@@ -135,7 +136,7 @@ var Connection = function(server, userName, password, options) {
     var decoder = new TokenDecoder();
 
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
-      self.emit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
+      safeEmit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
     }
 
     decoder.on('loginAck', function(loginAck) {
@@ -151,7 +152,7 @@ var Connection = function(server, userName, password, options) {
       
       self.env[envChange.type] = envChange.newValue;
 
-      self.emit('envChange', envChange);
+      safeEmit('envChange', envChange);
     });
 
     decoder.on('error_', function(error) {
@@ -178,7 +179,7 @@ var Connection = function(server, userName, password, options) {
       });
 
       if (self.state = STATE.SENT_LOGIN) {
-        self.emit('authenticated');
+        safeEmit('authenticated');
       }
       
       self.state = STATE.LOGGED_IN;
@@ -211,12 +212,23 @@ var Connection = function(server, userName, password, options) {
   function debug(debugFunction) {
     if (self.listeners('debug').length > 0) {
       debugFunction(function(text) {
-        self.emit('debug', text);
+        safeEmit('debug', text);
       });
+    }
+  }
+  
+  function safeEmit() {
+    if (!self.closed) {
+      self.emit.apply(self, arguments);
     }
   }
 }
 
 util.inherits(Connection, events.EventEmitter);
+
+Connection.prototype.close = function() {
+  this.closed = true;
+  this.connection.destroy();
+}
 
 module.exports = Connection;
