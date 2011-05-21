@@ -47,7 +47,8 @@ var Connection = function(server, userName, password, options, callback) {
   self.activeRequest = {
       info: {
         infos: [],
-        errors: []
+        errors: [],
+        envChanges: []
       },
     callback: callback
   };
@@ -163,6 +164,7 @@ var Connection = function(server, userName, password, options, callback) {
       });
       
       self.env[envChange.type] = envChange.newValue;
+      self.activeRequest.info.envChanges.push(envChange);
 
       safeEmit('envChange', envChange);
     });
