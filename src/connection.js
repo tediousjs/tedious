@@ -44,15 +44,9 @@ var Connection = function(server, userName, password, options, callback) {
   self.packetBuffer = [];
   self.env = {};
   self.closed = false;
-  self.activeRequest = {
-      info: {
-        infos: [],
-        errors: [],
-        envChanges: []
-      },
-    callback: callback
-  };
 
+  startRequest('connect/login');
+  
   self.connection = net.createConnection(self.port, self.server);
   
   this.connection.addListener('connect', function() {
@@ -100,7 +94,7 @@ var Connection = function(server, userName, password, options, callback) {
       log(exception);
     });
 
-    self.activeRequest.callback(exception, self.activeRequest.info);
+    endRequest(exception);
   });
   
   this.connection.addListener('close', function(had_error){
@@ -186,21 +180,19 @@ var Connection = function(server, userName, password, options, callback) {
     decoder.on('unknown', function(tokenType) {
       debug(function (log) {
         log('  unknown token type : ' + tokenType);
-        self.activeRequest.callback('unknown token type received : ' + tokenType, self.activeRequest.info);
+        endRequest('unknown token type received : ' + tokenType);
       });
     });
 
     decoder.on('done', function(done) {
-      var request = self.activeRequest;
-
       debug(function (log) {
         log('  done : ' + done.statusText + '(' + done.status + '), rowCount=' + done.rowCount);
       });
 
       if (done.status === DONE_STATUS.ERROR || done.status === DONE_STATUS.SRVERROR) {
-        request.callback('Error executing request', request.info);
+        endRequest('Error executing request');
       } else {
-        request.callback(undefined, request.info);
+        endRequest();
       }
 
       if (self.state = STATE.SENT_LOGIN) {
@@ -216,6 +208,28 @@ var Connection = function(server, userName, password, options, callback) {
 
     sendPacket(packet);
     self.state = STATE.SENT_LOGIN
+  }
+
+  function isRequestActive() {
+    return !!self.activeRequest;
+  }
+
+  function startRequest(requestName) {
+    self.activeRequest = {
+        requestName: requestName,
+        info: {
+          infos: [],
+          errors: [],
+          envChanges: []
+        },
+      callback: callback
+    };
+  }
+  
+  function endRequest(error) {
+    self.activeRequest.callback(error, self.activeRequest.info);
+    
+    delete self.activeRequest;
   }
 
   function sendPacket(packet) {
