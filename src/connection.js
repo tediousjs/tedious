@@ -149,6 +149,8 @@ var Connection = function(server, userName, password, options, callback) {
     decoder.on('loginAck', function(loginAck) {
       debug(function (log) {
         log('  loginAck : ' + loginAck.progName);
+        
+        self.activeRequest.loginAck = true;
       });
     });
 
@@ -191,6 +193,8 @@ var Connection = function(server, userName, password, options, callback) {
 
       if (done.status === DONE_STATUS.ERROR || done.status === DONE_STATUS.SRVERROR) {
         endRequest('Error executing request');
+      } else if (!self.activeRequest.loginAck) {
+        endRequest('loginAck token not received, but done status is not an error');
       } else {
         endRequest();
       }
