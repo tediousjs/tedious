@@ -10,7 +10,8 @@ events = require("events"),
   ENCRYPT = require('./prelogin-packet').ENCRYPT,
   PreLoginPacket = require('./prelogin-packet').PreLoginPacket,
   LoginPacket = require('./login-packet').LoginPacket,
-  TokenDecoder = require('../src/token-decoder').TokenDecoder;
+  TokenDecoder = require('../src/token-decoder').TokenDecoder,
+  DONE_STATUS = require('./token').DONE_STATUS;
 
   DEFAULT_PORT = 1433,
   
@@ -20,7 +21,7 @@ events = require("events"),
     LOGGED_IN: 2
   };
 
-var Connection = function(server, userName, password, options) {
+var Connection = function(server, userName, password, options, callback) {
   var self = this,
       connection,
       packetBuffer = [];
@@ -43,6 +44,13 @@ var Connection = function(server, userName, password, options) {
   self.packetBuffer = [];
   self.env = {};
   self.closed = false;
+  self.activeRequest = {
+      info: {
+        infos: [],
+        errors: []
+      },
+    callback: callback
+  };
 
   self.connection = net.createConnection(self.port, self.server);
   
@@ -158,31 +166,40 @@ var Connection = function(server, userName, password, options) {
     decoder.on('error_', function(error) {
       debug(function (log) {
         log('  error : ' + error.number + ', @' + error.lineNumber + ', ' + error.messageText);
+        self.activeRequest.info.errors.push(error);
       });
     });
 
     decoder.on('info', function(info) {
       debug(function (log) {
         log('  info : ' + info.number + ', @' + info.lineNumber + ', ' + info.messageText);
+        self.activeRequest.info.infos.push(info);
       });
     });
 
     decoder.on('unknown', function(tokenType) {
       debug(function (log) {
-        log('  unknown : ' + tokenType);
+        log('  unknown token type : ' + tokenType);
+        self.activeRequest.callback('unknown token type received : ' + tokenType, self.activeRequest.info);
       });
     });
 
     decoder.on('done', function(done) {
+      var request = self.activeRequest;
+
       debug(function (log) {
-        log('  done : ' + done.status + ', rowCount=' + done.rowCount);
+        log('  done : ' + done.statusText + '(' + done.status + '), rowCount=' + done.rowCount);
       });
 
-      if (self.state = STATE.SENT_LOGIN) {
-        safeEmit('authenticated');
+      if (done.status === DONE_STATUS.ERROR || done.status === DONE_STATUS.SRVERROR) {
+        request.callback('Error executing request', request.info);
+      } else {
+        request.callback(undefined, request.info);
       }
-      
-      self.state = STATE.LOGGED_IN;
+
+      if (self.state = STATE.SENT_LOGIN) {
+        self.state = STATE.LOGGED_IN;
+      }
     });
     
     decoder.decode(packet.data);

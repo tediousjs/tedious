@@ -1,7 +1,8 @@
 var jspack = require('./jspack').jspack,
     EventEmitter = require("events").EventEmitter,
     inherits = require('util').inherits,
-    unicodeToText = require('../src/unicode').unicodeToText;
+    unicodeToText = require('./unicode').unicodeToText,
+    DONE_STATUSES = require('./token').DONE_STATUSES;
 
 var TokenDecoder = function() {
   EventEmitter.call(this);
@@ -155,19 +156,11 @@ TokenDecoder.prototype.createInfo = function() {
 TokenDecoder.prototype.createDone = function() {
   var offset = this.offset,
       unpacked,
-      done = {},
-      STATUSES = {
-        0x00 : 'DONE_FINAL',
-        0x01 : 'DONE_MORE',
-        0x02 : 'DONE_ERROR',
-        0x04 : 'DONE_INXACT',
-        0x10 : 'DONE_COUNT',
-        0x20 : 'DONE_ATTN',
-        0x100 : 'DONE_SRVERROR',
-      };
+      done = {};
   
   unpacked = jspack.Unpack('<H<H<L<L', this.data, offset);
-  done.status = STATUSES[unpacked[0]];
+  done.status = unpacked[0];
+  done.statusText = DONE_STATUSES[done.status];
   done.currentCommandToken = unpacked[1];
   done.rowCount = unpacked[2];
   // The high 4 bytes of the row count are currently ignored, as Javascript

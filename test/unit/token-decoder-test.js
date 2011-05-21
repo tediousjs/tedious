@@ -1,4 +1,5 @@
-var TokenDecoder = require('../../src/token-decoder').TokenDecoder;
+var TokenDecoder = require('../../src/token-decoder').TokenDecoder,
+    DONE_STATUS = require('../../src/token').DONE_STATUS;
 
 exports.unknownToken = function(test) {
   var decoder = new TokenDecoder();
@@ -169,7 +170,7 @@ exports.done = function(test) {
   test.expect(3);
 
   decoder.on('done', function(done) {
-    test.strictEqual(done.status, 'DONE_FINAL');
+    test.strictEqual(done.status, DONE_STATUS.FINAL);
     test.strictEqual(done.currentCommandToken, 2);
     test.strictEqual(done.rowCount, 3);
   });
