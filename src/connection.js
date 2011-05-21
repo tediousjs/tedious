@@ -95,7 +95,11 @@ var Connection = function(server, userName, password, options, callback) {
   });
   
   this.connection.addListener('error', function(exception){
-    console.log('error: ' + exception);
+    debug(function (log) {
+      log(exception);
+    });
+
+    self.activeRequest.callback(exception, self.activeRequest.info);
   });
   
   this.connection.addListener('close', function(had_error){

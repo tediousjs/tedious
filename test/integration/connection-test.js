@@ -80,6 +80,23 @@ exports.connectSuccess = function(test){
 //  });
 };
 
+exports.connectBadServer = function(test){
+  var config = JSON.parse(fs.readFileSync(__dirname + '/connection.json', 'utf8')),
+      connection;
+
+  test.expect(1);
+
+  connection = new Connection('bad', config.userName, config.password, config.options, function(err, info) {
+    test.ok(err);
+    
+    test.done();
+  });
+  
+  connection.on('debug', function (message) {
+//    console.log(message);
+  });
+};
+
 exports.connectBadLoginCredentials = function(test){
   var config = JSON.parse(fs.readFileSync(__dirname + '/connection.json', 'utf8')),
       connection;
@@ -94,6 +111,6 @@ exports.connectBadLoginCredentials = function(test){
   });
   
   connection.on('debug', function (message) {
-    console.log(message);
+//    console.log(message);
   });
 };
