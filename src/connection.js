@@ -98,7 +98,7 @@ var Connection = function(server, userName, password, options, callback) {
   });
   
   this.connection.addListener('close', function(had_error){
-    console.log('close: ' + had_error);
+//    console.log('close: ' + had_error);
   });
   
   this.__defineGetter__('database', function() {
@@ -129,11 +129,13 @@ var Connection = function(server, userName, password, options, callback) {
     });
     
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
-      safeEmit('fail', 'Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
+      endRequest('Expected TABULAR_RESULT packet in response to PRELOGIN, but received ' + packet.header.type);
+      return;
     }
 
-    if (packet.header.encryption !== ENCRYPT.NOT_SUP) {
-      safeEmit('fail', 'Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
+    if (packet.header.encryption && packet.header.encryption !== ENCRYPT.OFF) {
+      endRequest('Encryption not supported (yet), but response to PRELOGIN specified encryption ' + packet.header.encryption);
+      return;
     }
     
     sendLoginPacket();
@@ -143,7 +145,8 @@ var Connection = function(server, userName, password, options, callback) {
     var decoder = new TokenDecoder();
 
     if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
-      safeEmit('fail', 'Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
+      endRequest('Expected TABULAR_RESULT packet in response to LOGIN, but received ' + packet.header.type);
+      return;
     }
 
     decoder.on('loginAck', function(loginAck) {
@@ -161,8 +164,6 @@ var Connection = function(server, userName, password, options, callback) {
       
       self.env[envChange.type] = envChange.newValue;
       self.activeRequest.info.envChanges.push(envChange);
-
-      safeEmit('envChange', envChange);
     });
 
     decoder.on('error_', function(error) {
@@ -253,14 +254,10 @@ var Connection = function(server, userName, password, options, callback) {
   function debug(debugFunction) {
     if (self.listeners('debug').length > 0) {
       debugFunction(function(text) {
-        safeEmit('debug', text);
+        if (!self.closed) {
+          self.emit('debug', text);
+        }
       });
-    }
-  }
-  
-  function safeEmit() {
-    if (!self.closed) {
-      self.emit.apply(self, arguments);
     }
   }
 }
