@@ -49,11 +49,11 @@ var Connection = function(server, userName, password, options, callback) {
   
   self.connection = net.createConnection(self.port, self.server);
   
-  this.connection.addListener('connect', function() {
+  this.connection.addListener('connect', function connectEvent() {
     sendPreLoginPacket();
   });
   
-  this.connection.addListener('data', function(data) {
+  this.connection.addListener('data', function dataEvent(data) {
     var packet,
         decodedPacket;
     
@@ -81,15 +81,15 @@ var Connection = function(server, userName, password, options, callback) {
     }
   });
   
-  this.connection.addListener('end', function(){
+  this.connection.addListener('end', function endEvent(){
     console.log('end');
   });
   
-  this.connection.addListener('timeout', function(){
+  this.connection.addListener('timeout', function timeoutEvent(){
     console.log('timeout');
   });
   
-  this.connection.addListener('error', function(exception){
+  this.connection.addListener('error', function errorEvent(exception){
     debug(function (log) {
       log(exception);
     });
@@ -97,19 +97,19 @@ var Connection = function(server, userName, password, options, callback) {
     endRequest(exception);
   });
   
-  this.connection.addListener('close', function(had_error){
+  this.connection.addListener('close', function closeEvent(had_error){
 //    console.log('close: ' + had_error);
   });
   
-  this.__defineGetter__('database', function() {
+  this.__defineGetter__('database', function getDatabase() {
     return self.env.database;
   });
 
-  this.__defineGetter__('language', function() {
+  this.__defineGetter__('language', function getLanguage() {
     return self.env.language;
   });
 
-  this.__defineGetter__('sqlCollation', function() {
+  this.__defineGetter__('sqlCollation', function getSqlCollation() {
     return self.env.sqlCollation;
   });
 
@@ -149,7 +149,7 @@ var Connection = function(server, userName, password, options, callback) {
       return;
     }
 
-    decoder.on('loginAck', function(loginAck) {
+    decoder.on('loginAck', function loginAckEvent(loginAck) {
       debug(function (log) {
         log('  loginAck : ' + loginAck.progName);
         
@@ -157,7 +157,7 @@ var Connection = function(server, userName, password, options, callback) {
       });
     });
 
-    decoder.on('envChange', function(envChange) {
+    decoder.on('envChange', function envChangeEvent(envChange) {
       debug(function (log) {
         log('  envChange : ' + envChange.type + ' : ' + envChange.oldValue + ' ==> ' + envChange.newValue);
       });
@@ -166,28 +166,28 @@ var Connection = function(server, userName, password, options, callback) {
       self.activeRequest.info.envChanges.push(envChange);
     });
 
-    decoder.on('error_', function(error) {
+    decoder.on('error_', function errorEvent(error) {
       debug(function (log) {
         log('  error : ' + error.number + ', @' + error.lineNumber + ', ' + error.messageText);
         self.activeRequest.info.errors.push(error);
       });
     });
 
-    decoder.on('info', function(info) {
+    decoder.on('info', function infoEvent(info) {
       debug(function (log) {
         log('  info : ' + info.number + ', @' + info.lineNumber + ', ' + info.messageText);
         self.activeRequest.info.infos.push(info);
       });
     });
 
-    decoder.on('unknown', function(tokenType) {
+    decoder.on('unknown', function unknownEvent(tokenType) {
       debug(function (log) {
         log('  unknown token type : ' + tokenType);
         endRequest('unknown token type received : ' + tokenType);
       });
     });
 
-    decoder.on('done', function(done) {
+    decoder.on('done', function doneEvent(done) {
       debug(function (log) {
         log('  done : ' + done.statusText + '(' + done.status + '), rowCount=' + done.rowCount);
       });
