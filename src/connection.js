@@ -44,10 +44,13 @@ var Connection = function(server, userName, password, options, callback) {
   self.packetBuffer = [];
   self.env = {};
   self.closed = false;
+  self.state = false;
 
-  startRequest('connect/login');
+  startRequest('connect/login', callback);
   
-  self.connection = net.createConnection(self.port, self.server);
+  self.connection = new net.Socket({});
+  self.connection.setTimeout(1000);
+  self.connection.connect(self.port, self.server);
   
   this.connection.addListener('connect', function connectEvent() {
     sendPreLoginPacket();
@@ -76,17 +79,20 @@ var Connection = function(server, userName, password, options, callback) {
         processLoginResponse(packet, decodedPacket);
         break
       default:
-        console.log('Unexpected state ' + self.state);
+        requestEnd('Unexpected state ' + self.state);
       }
     }
   });
   
   this.connection.addListener('end', function endEvent(){
-    console.log('end');
   });
   
   this.connection.addListener('timeout', function timeoutEvent(){
-    console.log('timeout');
+    debug(function (log) {
+      log('timeout');
+    });
+
+    endRequest('Socket timeout');
   });
   
   this.connection.addListener('error', function errorEvent(exception){
@@ -219,20 +225,23 @@ var Connection = function(server, userName, password, options, callback) {
     return !!self.activeRequest;
   }
 
-  function startRequest(requestName) {
+  function startRequest(requestName, callback) {
     self.activeRequest = {
-        requestName: requestName,
-        info: {
-          infos: [],
-          errors: [],
-          envChanges: []
-        },
+      requestName: requestName,
+      info: {
+        infos: [],
+        errors: [],
+        envChanges: []
+      },
       callback: callback
     };
   }
   
   function endRequest(error) {
-    self.activeRequest.callback(error, self.activeRequest.info);
+    if (!self.closed) {
+      self.close();
+      self.activeRequest.callback(error, self.activeRequest.info);
+    }
     
     delete self.activeRequest;
   }
