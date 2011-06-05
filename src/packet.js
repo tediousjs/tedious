@@ -16,6 +16,7 @@ var HEADER_FORMAT = 'BB>H>HBB',
     },
     
     TYPE = {
+      RPC_REQUEST: 0x03,
       TABULAR_RESULT: 0x04,
       LOGIN7: 0x10,
       PRELOGIN: 0x12

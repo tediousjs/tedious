@@ -10,6 +10,7 @@ events = require("events"),
   ENCRYPT = require('./prelogin-packet').ENCRYPT,
   PreLoginPacket = require('./prelogin-packet').PreLoginPacket,
   LoginPacket = require('./login-packet').LoginPacket,
+  RpcRequestPacket = require('./rpc-request-packet').RpcRequestPacket,
   TokenDecoder = require('../src/token-decoder').TokenDecoder,
   DONE_STATUS = require('./token').DONE_STATUS;
 
@@ -18,7 +19,8 @@ events = require("events"),
   STATE = {
     SENT_PRELOGIN: 0,
     SENT_LOGIN: 1,
-    LOGGED_IN: 2
+    LOGGED_IN: 2,
+    REQUEST_SENT: 3
   };
 
 var Connection = function(server, userName, password, options, callback) {
@@ -46,7 +48,7 @@ var Connection = function(server, userName, password, options, callback) {
   self.closed = false;
   self.state = false;
 
-  startRequest('connect/login', callback);
+  self.startRequest('connect/login', callback);
   
   self.connection = new net.Socket({});
   self.connection.setTimeout(1000);
@@ -70,7 +72,7 @@ var Connection = function(server, userName, password, options, callback) {
       self.packetBuffer = self.packetBuffer.slice(8 + decodedPacket.header.length);
       
       logPacket('Received', packet);
-      
+
       switch (self.state) {
       case STATE.SENT_PRELOGIN:
         processPreLoginResponse(packet, decodedPacket);
@@ -78,8 +80,11 @@ var Connection = function(server, userName, password, options, callback) {
       case STATE.SENT_LOGIN:
         processLoginResponse(packet, decodedPacket);
         break
+      case STATE.REQUEST_SENT:
+        processRequestResponse(packet, decodedPacket);
+        break
       default:
-        requestEnd('Unexpected state ' + self.state);
+        endRequest('Unexpected state ' + self.state);
       }
     }
   });
@@ -118,6 +123,13 @@ var Connection = function(server, userName, password, options, callback) {
   this.__defineGetter__('sqlCollation', function getSqlCollation() {
     return self.env.sqlCollation;
   });
+
+  this.sendRpcRequestPacket = function() {
+    var packet = new RpcRequestPacket({last: true});
+    
+    sendPacket(packet);
+    this.state = STATE.REQUEST_SENT;
+  };
 
   function sendPreLoginPacket() {
     var packet = new PreLoginPacket({last: true});
@@ -203,12 +215,73 @@ var Connection = function(server, userName, password, options, callback) {
       } else if (!self.activeRequest.loginAck) {
         endRequest('loginAck token not received, but done status is not an error');
       } else {
+        if (self.state = STATE.SENT_LOGIN) {
+          self.state = STATE.LOGGED_IN;
+        }
+
+        endRequest();
+      }
+    });
+    
+    decoder.decode(packet.data);
+  }
+
+  function processRequestResponse(rawPacket, packet) {
+    var decoder = new TokenDecoder();
+
+    if (packet.header.type !== PACKET_TYPE.TABULAR_RESULT) {
+      endRequest('Expected TABULAR_RESULT packet in response to RpcRequest, but received ' + packet.header.type);
+      return;
+    }
+
+    decoder.on('error_', function errorEvent(error) {
+      debug(function (log) {
+        log('  error : ' + error.number + ', @' + error.lineNumber + ', ' + error.messageText);
+        self.activeRequest.info.errors.push(error);
+      });
+    });
+
+    decoder.on('info', function infoEvent(info) {
+      debug(function (log) {
+        log('  info : ' + info.number + ', @' + info.lineNumber + ', ' + info.messageText);
+        self.activeRequest.info.infos.push(info);
+      });
+    });
+
+    decoder.on('colMetadata', function infoEvent(colMetadata) {
+      debug(function (log) {
+        var message = '  colMetadata : \n',
+            col, 
+            column;
+        
+        for (col in colMetadata) {
+          column = colMetadata[col];
+          message += '    ' + column.name + ' : ' + column.type.name + '(' + column.type.length +')\n';
+        }
+        
+        log(message);
+      });
+    });
+
+    decoder.on('unknown', function unknownEvent(tokenType) {
+      debug(function (log) {
+        log('  unknown token type : ' + tokenType);
+        endRequest('unknown token type received : ' + tokenType);
+      });
+    });
+
+    decoder.on('doneInProc', function doneEvent(done) {
+      debug(function (log) {
+        log('  doneInProc : ' + done.statusText + '(' + done.status + '), rowCount=' + done.rowCount);
+      });
+
+      if (done.status === DONE_STATUS.ERROR || done.status === DONE_STATUS.SRVERROR) {
+        endRequest('Error executing request');
+      } else {
         endRequest();
       }
 
-      if (self.state = STATE.SENT_LOGIN) {
-        self.state = STATE.LOGGED_IN;
-      }
+      self.state = STATE.LOGGED_IN;
     });
     
     decoder.decode(packet.data);
@@ -218,32 +291,27 @@ var Connection = function(server, userName, password, options, callback) {
     var packet = new LoginPacket({last: true}, self.loginData);
 
     sendPacket(packet);
-    self.state = STATE.SENT_LOGIN
+    self.state = STATE.SENT_LOGIN;
   }
 
   function isRequestActive() {
     return !!self.activeRequest;
   }
 
-  function startRequest(requestName, callback) {
-    self.activeRequest = {
-      requestName: requestName,
-      info: {
-        infos: [],
-        errors: [],
-        envChanges: []
-      },
-      callback: callback
-    };
-  }
-  
   function endRequest(error) {
-    if (!self.closed) {
-      self.close();
-      self.activeRequest.callback(error, self.activeRequest.info);
-    }
+    var activeRequest = self.activeRequest;
     
-    delete self.activeRequest;
+    if (!self.closed) {
+      if (error) {
+        self.close();
+      }
+      
+      delete self.activeRequest;
+
+      if (activeRequest) {
+        activeRequest.callback(error, activeRequest.info);
+      }
+    }
   }
 
   function sendPacket(packet) {
@@ -273,9 +341,26 @@ var Connection = function(server, userName, password, options, callback) {
 
 util.inherits(Connection, events.EventEmitter);
 
+Connection.prototype.startRequest = function(requestName, callback) {
+  this.activeRequest = {
+    requestName: requestName,
+    info: {
+      infos: [],
+      errors: [],
+      envChanges: []
+    },
+    callback: callback
+  };
+}
+
 Connection.prototype.close = function() {
   this.closed = true;
   this.connection.destroy();
+}
+
+Connection.prototype.execProc = function(callback) {
+  this.startRequest('execProc', callback);
+  this.sendRpcRequestPacket();
 }
 
 module.exports = Connection;

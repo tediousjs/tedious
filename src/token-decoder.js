@@ -2,7 +2,20 @@ var jspack = require('./jspack').jspack,
     EventEmitter = require("events").EventEmitter,
     inherits = require('util').inherits,
     unicodeToText = require('./unicode').unicodeToText,
-    DONE_STATUSES = require('./token').DONE_STATUSES;
+    DONE_STATUSES = require('./token').DONE_STATUSES,
+    
+    COLMETADATA_FLAGS = {
+      NULLABLE: 0x0001,
+      CASE_SENSISTIVE: 0x0002,
+      READ_WRITE: 0x0004,
+      IDENTITY: 0x0010,
+      COMPUTED: 0x0020,
+      FIXED_LEN_CLR_TYPE: 0x0100,
+      HIDDEN: 0x2000,
+      KEY: 0x4000,
+      NULLABLE_UNKNOWN: 0x8000
+    }
+    ;
 
 var TokenDecoder = function() {
   EventEmitter.call(this);
@@ -21,6 +34,9 @@ TokenDecoder.prototype.decode = function(data) {
     this.offset++;
 
     switch (tokenType) {
+    case 0x81:
+      this.emit('colMetadata', this.createColMetadata());
+      break;
     case 0xAA:
       this.emit('error_', this.createError());
       break;
@@ -36,6 +52,9 @@ TokenDecoder.prototype.decode = function(data) {
     case 0xFD:
       this.emit('done', this.createDone());
       break;
+    case 0xFF:
+      this.emit('doneInProc', this.createDone());
+      break;
     default:
       this.emit('unknown', 'tokenType: ' + tokenType);
       this.emit('end');
@@ -44,6 +63,75 @@ TokenDecoder.prototype.decode = function(data) {
   }
 
   this.emit('end');
+}
+
+TokenDecoder.prototype.createColMetadata = function() {
+  var columnCount,
+      columnNumber,
+      NO_METADATA = 0xffff,
+      colMetadata = [],
+      column,
+      flags,
+      dataType;
+  
+  columnCount = jspack.Unpack('<H', this.data, this.offset)[0];
+  this.offset += 2;
+  if (columnCount == NO_METADATA) {
+    columnCount = 0;
+  }
+
+  for (columnNumber = 0; columnNumber < columnCount; columnNumber++) {
+    column = {};
+    
+    column.userType = jspack.Unpack('<L', this.data, this.offset)[0];
+    this.offset += 4;
+    
+    flags = jspack.Unpack('<H', this.data, this.offset)[0];
+    this.offset += 2;
+    column.nullable = Boolean(flags & COLMETADATA_FLAGS.NULLABLE);
+    column.caseSensitive = Boolean(flags & COLMETADATA_FLAGS.CASE_SENSISTIVE);
+    column.readOnly = !Boolean(flags & COLMETADATA_FLAGS.READ_WRITE);
+    column.identity = Boolean(flags & COLMETADATA_FLAGS.IDENTITY);
+    column.computed = Boolean(flags & COLMETADATA_FLAGS.COMPUTED);
+    column.fixedLengthClrUdt= Boolean(flags & COLMETADATA_FLAGS.FIXED_LEN_CLR_TYPE);
+    column.hidden= Boolean(flags & COLMETADATA_FLAGS.HIDDEN);
+    column.key = Boolean(flags & COLMETADATA_FLAGS.KEY);
+    column.nullableUnknown = Boolean(flags & COLMETADATA_FLAGS.NULLABLE_UNKNOWN);
+
+    column.type = this.getDataType();
+    
+    column.name = this.bVarchar(this.offset);
+    this.offset += 1 + (2 * column.name.length);
+
+    colMetadata.push(column);
+  }
+ 
+  return colMetadata;
+}
+
+TokenDecoder.prototype.getDataType = function() {
+  var variableUShortLenTypes = {
+        0xE7: 'NVarChar',
+        0xA7: 'VarChar',
+        0xAF: 'Char'
+      },
+      type = jspack.Unpack('B', this.data, this.offset)[0],
+      dataType = {};
+  
+  this.offset++;
+  
+  if (variableUShortLenTypes[type]) {
+    dataType.name = variableUShortLenTypes[type];
+    dataType.length = jspack.Unpack('<H', this.data, this.offset)[0];
+    this.offset += 2;
+    // skip collation
+    this.offset += 5;
+  } else {
+    console.log('unknown type : ' + type);
+    dataType.name = 'UNKNOWN:' + type;
+  }
+  
+  return dataType;
 }
 
 TokenDecoder.prototype.createLoginAck = function() {
