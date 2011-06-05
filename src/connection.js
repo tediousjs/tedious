@@ -157,7 +157,7 @@ var Connection = function(server, userName, password, options, callback) {
 
     decoder.on('loginAck', function loginAckEvent(loginAck) {
       debug(function (log) {
-        log('  loginAck : ' + loginAck.progName);
+        log('  loginAck : ' + loginAck.progName + ' ' + loginAck.progVersion.string);
         
         self.activeRequest.loginAck = true;
       });

@@ -43,7 +43,7 @@ exports.connectSuccess = function(test){
   });
   
   connection.on('debug', function (message) {
-//    console.log(message);
+    console.log(message);
   });
 };
 

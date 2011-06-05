@@ -67,6 +67,11 @@ TokenDecoder.prototype.createLoginAck = function() {
   loginAck.progVersion.minor = this.data[offset + 1];
   loginAck.progVersion.buildNumberHigh = this.data[offset + 2];
   loginAck.progVersion.buildNumberLow = this.data[offset + 3];
+  loginAck.progVersion.string =
+    loginAck.progVersion.major + '.' +
+    loginAck.progVersion.minor + '.' +
+    loginAck.progVersion.buildNumberHigh + '.' +
+    loginAck.progVersion.buildNumberLow;
 
   this.offset += 2 + length;
   
