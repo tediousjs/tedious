@@ -122,7 +122,9 @@ TokenDecoder.prototype.getDataType = function() {
   
   if (variableUShortLenTypes[type]) {
     dataType.name = variableUShortLenTypes[type];
-    dataType.length = jspack.Unpack('<H', this.data, this.offset)[0];
+    dataType.lengthUnpack = '<H';
+    dataType.lengthBytes = 2;
+    dataType.length = jspack.Unpack(dataType.lengthUnpack, this.data, this.offset)[0];
     this.offset += 2;
     // skip collation
     this.offset += 5;
