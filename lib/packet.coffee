@@ -30,10 +30,20 @@ class Packet
 
     @buffer.writeUInt8(@Type, OFFSET.Type)
     @buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status)
-    @buffer.writeUInt16BE(@buffer.length, OFFSET.Length)
     @buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID)
     @buffer.writeUInt8(DEFAULT_PACKETID, OFFSET.PacketID)
     @buffer.writeUInt8(DEFAULT_WINDOW, OFFSET.Window)
+
+    @setLength()
+
+  setLength: ->
+    @buffer.writeUInt16BE(@buffer.length, OFFSET.Length)
+
+  setEom: ->
+    status = @buffer.readUInt8(OFFSET.Status) | STATUS.EOM
+    @buffer.writeUInt8(status, OFFSET.Status)
+
+    @this
 
 exports.Packet = Packet
 exports.TYPE = TYPE
