@@ -1,3 +1,6 @@
+require('buffertools')
+
+HEADER_LENGTH = 8
 
 TYPE =
   RPC_REQUEST: 0x03,
@@ -26,7 +29,7 @@ DEFAULT_WINDOW = 0;
 
 class Packet
   constructor: (@Type) ->
-    @buffer = new Buffer(8)
+    @buffer = new Buffer(HEADER_LENGTH)
 
     @buffer.writeUInt8(@Type, OFFSET.Type)
     @buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status)
@@ -39,6 +42,9 @@ class Packet
   setLength: ->
     @buffer.writeUInt16BE(@buffer.length, OFFSET.Length)
 
+  length: ->
+    @buffer.readUInt16BE(OFFSET.Length)
+
   setLast: ->
     status = @buffer.readUInt8(OFFSET.Status) | STATUS.EOM
     @buffer.writeUInt8(status, OFFSET.Status)
@@ -46,6 +52,14 @@ class Packet
 
   isLast: ->
     @buffer.readUInt8(OFFSET.Status) & STATUS.EOM
+
+  addData: (data) ->
+    @buffer = new Buffer(@buffer.concat(data))
+    @setLength()
+    @
+
+  data: ->
+    @buffer.slice(HEADER_LENGTH)
 
 exports.Packet = Packet
 exports.TYPE = TYPE
