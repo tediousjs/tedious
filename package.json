@@ -11,9 +11,11 @@
     "node": ">=0.5.x"
   },
   "dependencies": {
-    "sprintf": "*"
+    "buffertools": "1.0.5",
+    "coffee-script": "1.1.2",
+    "sprintf": "0.1.1"
   },
   "devDependencies": {
-    "nodeunit": "*"
+    "nodeunit": "0.5.5"
   }
 }
