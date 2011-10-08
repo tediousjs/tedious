@@ -39,11 +39,13 @@ class Packet
   setLength: ->
     @buffer.writeUInt16BE(@buffer.length, OFFSET.Length)
 
-  setEom: ->
+  setLast: ->
     status = @buffer.readUInt8(OFFSET.Status) | STATUS.EOM
     @buffer.writeUInt8(status, OFFSET.Status)
+    @
 
-    @this
+  isLast: ->
+    @buffer.readUInt8(OFFSET.Status) & STATUS.EOM
 
 exports.Packet = Packet
 exports.TYPE = TYPE

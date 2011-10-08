@@ -11,10 +11,12 @@ exports.createEmpty = (test) ->
 
   test.done()
 
-exports.createLast = (test) ->
+exports.last = (test) ->
+  packet = new Packet(TYPE.PRELOGIN)
+  test.ok(!packet.isLast())
+
   packet = new Packet(TYPE.PRELOGIN)
   packet.setLast()
-  
-  test.strictEqual(packet.buffer[1], 0x01)
+  test.ok(packet.isLast())
 
   test.done()
