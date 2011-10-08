@@ -39,3 +39,13 @@ exports.data = (test) ->
   test.ok(packet.data().equals(allData))
 
   test.done()
+
+exports.createFromBuffer = (test) ->
+  buffer = new Buffer([TYPE.PRELOGIN, 0x01, 0x00, 0x0A, 0, 0, 0, 0, 0x01, 0xFF])
+  packet = new Packet(buffer)
+
+  test.strictEqual(packet.length(), 0x0A)
+  test.ok(packet.isLast())
+  test.ok(packet.data().equals(new Buffer([0x01, 0xFF])))
+
+  test.done()

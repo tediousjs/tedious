@@ -28,16 +28,21 @@ DEFAULT_PACKETID = 0;
 DEFAULT_WINDOW = 0;
 
 class Packet
-  constructor: (@Type) ->
-    @buffer = new Buffer(HEADER_LENGTH)
+  constructor: (typeOrBuffer) ->
+    if typeOrBuffer instanceof Buffer
+      @buffer = typeOrBuffer
+    else
+      type = typeOrBuffer
 
-    @buffer.writeUInt8(@Type, OFFSET.Type)
-    @buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status)
-    @buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID)
-    @buffer.writeUInt8(DEFAULT_PACKETID, OFFSET.PacketID)
-    @buffer.writeUInt8(DEFAULT_WINDOW, OFFSET.Window)
+      @buffer = new Buffer(HEADER_LENGTH)
 
-    @setLength()
+      @buffer.writeUInt8(type, OFFSET.Type)
+      @buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status)
+      @buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID)
+      @buffer.writeUInt8(DEFAULT_PACKETID, OFFSET.PacketID)
+      @buffer.writeUInt8(DEFAULT_WINDOW, OFFSET.Window)
+
+      @setLength()
 
   setLength: ->
     @buffer.writeUInt16BE(@buffer.length, OFFSET.Length)
