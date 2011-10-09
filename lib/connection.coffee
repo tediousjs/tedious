@@ -1,5 +1,7 @@
 EventEmitter = require('events').EventEmitter
+Packet = require('./packet').Packet
 PreloginPacket = require('./packet-prelogin').PreloginPacket
+isPacketComplete = require('./packet').isPacketComplete
 Socket = require('net').Socket
 
 class Connection extends EventEmitter
@@ -9,16 +11,17 @@ class Connection extends EventEmitter
     @connection = new Socket({})
     @connection.setTimeout(1000)
     @connection.connect(@options.port, @server)
-  
+
     @connection.addListener('close', @eventClose)
     @connection.addListener('connect', @eventConnect)
     @connection.addListener('data', @eventData)
     @connection.addListener('end', @eventEnd)
     @connection.addListener('error', @eventError)
     @connection.addListener('timeout', @eventTimeout)
-    #console.log(@connection)
 
     @startRequest('connect/login', callback);
+
+    @packetBuffer = new Buffer(0)
 
   eventClose: (hadError) =>
     console.log('close', hadError)
@@ -29,7 +32,12 @@ class Connection extends EventEmitter
     @activeRequest.callback(undefined, true)
 
   eventData: (data) =>
-    console.log('data', data)
+    @packetBuffer = new Buffer(@packetBuffer.concat(data))
+    if isPacketComplete(@packetBuffer)
+      packet = new Packet(@packetBuffer)
+      @logPacket('Received', packet);
+
+      @packetBuffer = new Buffer(0)
 
   eventEnd: =>
     console.log('end')
