@@ -5,12 +5,16 @@ config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connectio
 
 exports.test = (test) ->
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, info) ->
-    console.log 'cb'
     test.ok(!err)
     test.ok(info)
 
     test.done()
   )
+
+  connection.on('debug', (message) ->
+    console.log(message);
+  )
+
   
     #test.ok(info.infos.length > 0);
     #test.strictEqual(info.errors.length, 0);
