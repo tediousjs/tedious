@@ -57,10 +57,18 @@ class Packet
   length: ->
     @buffer.readUInt16BE(OFFSET.Length)
 
-  setLast: ->
-    status = @buffer.readUInt8(OFFSET.Status) | STATUS.EOM
-    @buffer.writeUInt8(status, OFFSET.Status)
-    @
+  last: (last) ->
+    status = @buffer.readUInt8(OFFSET.Status)
+
+    if arguments.length > 0
+      if last
+        status |= STATUS.EOM
+      else
+        status &= 0xFF - STATUS.EOM
+
+      @buffer.writeUInt8(status, OFFSET.Status)
+    
+    status
 
   isLast: ->
     @buffer.readUInt8(OFFSET.Status) & STATUS.EOM

@@ -16,8 +16,9 @@ exports.last = (test) ->
   test.ok(!packet.isLast())
 
   packet = new Packet(TYPE.PRELOGIN)
-  packet.setLast()
-  test.ok(packet.isLast())
+  test.ok(!packet.last())
+  packet.last(true)
+  test.ok(packet.last())
 
   test.done()
 
