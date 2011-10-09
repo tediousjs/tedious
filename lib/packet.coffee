@@ -65,6 +65,12 @@ class Packet
   isLast: ->
     @buffer.readUInt8(OFFSET.Status) & STATUS.EOM
 
+  packetId: (packetId) ->
+    if packetId
+      @buffer.writeUInt8(packetId, OFFSET.PacketID)
+
+    @buffer.readUInt8(OFFSET.PacketID)
+
   addData: (data) ->
     @buffer = new Buffer(@buffer.concat(data))
     @setLength()
@@ -87,7 +93,7 @@ class Packet
       @buffer.readUInt16BE(OFFSET.Length),
       @buffer.readUInt16BE(OFFSET.SPID),
       @buffer.readUInt8(OFFSET.PacketID),
-      @buffer.readUInt8(OFFSET.Window),
+      @buffer.readUInt8(OFFSET.Window)
     )
 
     indent + text

@@ -21,6 +21,15 @@ exports.last = (test) ->
 
   test.done()
 
+exports.packetId = (test) ->
+  packet = new Packet(TYPE.PRELOGIN)
+  test.strictEqual(packet.packetId(), 0)
+
+  packet.packetId(2)
+  test.strictEqual(packet.packetId(), 2)
+
+  test.done()
+
 exports.data = (test) ->
   data1 = new Buffer([0x01, 0x02, 0x03])
   data2 = new Buffer([0xFF, 0xFE])
