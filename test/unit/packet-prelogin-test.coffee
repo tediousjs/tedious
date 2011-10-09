@@ -18,4 +18,3 @@ exports.test = (test) ->
   test.strictEqual(packet.marsString, 'OFF')
 
   test.done()
-
