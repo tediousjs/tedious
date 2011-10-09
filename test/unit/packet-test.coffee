@@ -49,3 +49,12 @@ exports.createFromBuffer = (test) ->
   test.ok(packet.data().equals(new Buffer([0x01, 0xFF])))
 
   test.done()
+
+exports.toString = (test) ->
+  buffer = new Buffer([TYPE.PRELOGIN, 0x03, 0x00, 0x0A, 0, 1, 2, 3, 0x01, 0xFF])
+  packet = new Packet(buffer)
+
+  expectedText = '--header - type:0x12(PRELOGIN), status:0x03(EOM IGNORE), length:0x000A, spid:0x0001, packetId:0x02, window:0x03'
+  test.strictEqual(packet.headerToString('--'), expectedText)
+
+  test.done()

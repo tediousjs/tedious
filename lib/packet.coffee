@@ -1,4 +1,5 @@
 require('buffertools')
+sprintf = require('sprintf').sprintf
 
 HEADER_LENGTH = 8
 
@@ -7,6 +8,10 @@ TYPE =
   TABULAR_RESULT: 0x04,
   LOGIN7: 0x10,
   PRELOGIN: 0x12
+
+typeByValue = {}
+for name, value of TYPE
+  typeByValue[value] = name
 
 STATUS =
   NORMAL: 0x00,
@@ -65,6 +70,25 @@ class Packet
 
   data: ->
     @buffer.slice(HEADER_LENGTH)
+
+  statusAsString: ->
+    status = @buffer.readUInt8(OFFSET.Status)
+    statuses = for name, value of STATUS
+      if status & value
+        name
+    statuses.join(' ').trim() 
+
+  headerToString: (indent) ->
+    text = sprintf('header - type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
+      @buffer.readUInt8(OFFSET.Type), typeByValue[@buffer.readUInt8(OFFSET.Type)],
+      @buffer.readUInt8(OFFSET.Status), @statusAsString(),
+      @buffer.readUInt16BE(OFFSET.Length),
+      @buffer.readUInt16BE(OFFSET.SPID),
+      @buffer.readUInt8(OFFSET.PacketID),
+      @buffer.readUInt8(OFFSET.Window),
+    )
+
+    indent + text
 
 exports.Packet = Packet
 exports.TYPE = TYPE
