@@ -32,6 +32,8 @@ DEFAULT_SPID = 0;
 DEFAULT_PACKETID = 0;
 DEFAULT_WINDOW = 0;
 
+NL = '\n'
+
 class Packet
   constructor: (typeOrBuffer) ->
     if typeOrBuffer instanceof Buffer
@@ -89,6 +91,29 @@ class Packet
     )
 
     indent + text
+
+  dataToString: (indent) ->
+    BYTES_PER_GROUP = 0x04
+    BYTES_PER_LINE = 0x20
+
+    data = @data()
+    dataDump = ''
+
+    for offset in [0..data.length - 1]
+      if offset % BYTES_PER_LINE == 0
+        dataDump += indent;
+        dataDump += sprintf('%04X  ', offset);
+
+      dataDump += sprintf('%02X', data[offset]);
+    
+      if ((offset + 1) % BYTES_PER_GROUP == 0) && !((offset + 1) % BYTES_PER_LINE == 0)
+        # Inter-group space.
+        dataDump += ' '
+
+      if ((offset + 1) % BYTES_PER_LINE == 0) && (offset < data.length - 1)
+        dataDump += NL;
+
+    dataDump
 
 exports.Packet = Packet
 exports.TYPE = TYPE
