@@ -94,24 +94,41 @@ class Packet
 
   dataToString: (indent) ->
     BYTES_PER_GROUP = 0x04
+    CHARS_PER_GROUP = 0x08
     BYTES_PER_LINE = 0x20
 
     data = @data()
     dataDump = ''
+    chars = ''
 
     for offset in [0..data.length - 1]
       if offset % BYTES_PER_LINE == 0
         dataDump += indent;
         dataDump += sprintf('%04X  ', offset);
 
+      if data[offset] < 0x20 || data[offset] > 0x7E
+        chars += '.'
+
+        if ((offset + 1) % CHARS_PER_GROUP == 0) && !((offset + 1) % BYTES_PER_LINE == 0)
+          chars += ' '
+      else
+        chars += String.fromCharCode(data[offset])
+
       dataDump += sprintf('%02X', data[offset]);
-    
+
       if ((offset + 1) % BYTES_PER_GROUP == 0) && !((offset + 1) % BYTES_PER_LINE == 0)
         # Inter-group space.
         dataDump += ' '
 
-      if ((offset + 1) % BYTES_PER_LINE == 0) && (offset < data.length - 1)
-        dataDump += NL;
+      if (offset + 1) % BYTES_PER_LINE == 0
+        dataDump += '  ' + chars
+        chars = ''
+
+        if offset < data.length - 1
+          dataDump += NL;
+
+    if chars.length
+      dataDump += '  ' + chars
 
     dataDump
 
