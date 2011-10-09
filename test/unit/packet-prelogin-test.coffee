@@ -1,10 +1,7 @@
 PreloginPacket = require('../../lib/packet-prelogin').PreloginPacket
-TYPE = require('../../lib/packet').TYPE
 
-exports.test = (test) ->
+exports.create = (test) ->
   packet = new PreloginPacket()
-
-  #console.log(packet.payloadString())
 
   test.strictEqual(packet.version.major, 0)
   test.strictEqual(packet.version.minor, 0)
