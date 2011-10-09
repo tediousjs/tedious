@@ -95,6 +95,8 @@ class Packet
     statuses.join(' ').trim() 
 
   headerToString: (indent) ->
+    indent ||= ''
+
     text = sprintf('header - type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
       @buffer.readUInt8(OFFSET.Type), typeByValue[@buffer.readUInt8(OFFSET.Type)],
       @buffer.readUInt8(OFFSET.Status), @statusAsString(),
@@ -110,6 +112,8 @@ class Packet
     BYTES_PER_GROUP = 0x04
     CHARS_PER_GROUP = 0x08
     BYTES_PER_LINE = 0x20
+
+    indent ||= ''
 
     data = @data()
     dataDump = ''
@@ -145,6 +149,11 @@ class Packet
       dataDump += '  ' + chars
 
     dataDump
+
+  toString: (indent) ->
+    indent ||= ''
+
+    @headerToString(indent) + '\n' + @dataToString(indent + indent)
 
 exports.Packet = Packet
 exports.TYPE = TYPE
