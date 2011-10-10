@@ -155,6 +155,9 @@ class Packet
 
     @headerToString(indent) + '\n' + @dataToString(indent + indent)
 
+  payloadString: (indent) ->
+    ""
+
 isPacketComplete = (potentialPacketBuffer) ->
   if potentialPacketBuffer.length < HEADER_LENGTH
     false
@@ -162,5 +165,6 @@ isPacketComplete = (potentialPacketBuffer) ->
     potentialPacketBuffer.length >= potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 
 exports.Packet = Packet
+exports.OFFSET = OFFSET
 exports.TYPE = TYPE
 exports.isPacketComplete = isPacketComplete

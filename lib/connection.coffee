@@ -1,6 +1,7 @@
 EventEmitter = require('events').EventEmitter
 Packet = require('./packet').Packet
 PreloginPacket = require('./packet-prelogin').PreloginPacket
+packetFromBuffer = require('./packet-util').packetFromBuffer
 isPacketComplete = require('./packet').isPacketComplete
 Socket = require('net').Socket
 
@@ -34,7 +35,7 @@ class Connection extends EventEmitter
   eventData: (data) =>
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
     if isPacketComplete(@packetBuffer)
-      packet = new Packet(@packetBuffer)
+      packet = packetFromBuffer(@packetBuffer)
       @logPacket('Received', packet);
 
       @packetBuffer = new Buffer(0)
@@ -74,7 +75,10 @@ class Connection extends EventEmitter
       log(text + ' packet')
       
       log(packet.headerToString('  '))
+      log('')
       log(packet.dataToString('  '))
+      log('')
+      log(packet.payloadString('  '))
     )
 
   debug: (debugFunction) =>
