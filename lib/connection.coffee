@@ -1,7 +1,7 @@
 EventEmitter = require('events').EventEmitter
 Packet = require('./packet').Packet
-PreloginPacket = require('./packet-prelogin').PreloginPacket
-packetFromBuffer = require('./packet-util').packetFromBuffer
+TYPE = require('./packet').TYPE
+PreloginPayload = require('./payload-prelogin').PreloginPayload
 isPacketComplete = require('./packet').isPacketComplete
 Socket = require('net').Socket
 
@@ -36,8 +36,13 @@ class Connection extends EventEmitter
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
 
     if isPacketComplete(@packetBuffer)
-      packet = packetFromBuffer(@packetBuffer)
+      packet = new Packet(@packetBuffer)
       @logPacket('Received', packet);
+
+      preloginPayload = new PreloginPayload(packet.data())
+      @debug((log) ->
+        log(preloginPayload.toString('  '))
+      )
 
       @packetBuffer = new Buffer(0)
 
@@ -61,10 +66,16 @@ class Connection extends EventEmitter
       callback: callback
 
   sendPreLoginPacket: ->
-    packet = new PreloginPacket()
+    #packet = new PreloginPacket()
+    preloginPayload = new PreloginPayload()
+    packet = new Packet(TYPE.PRELOGIN)
+    packet.addData(preloginPayload.data)
     packet.last(true)
     
     @sendPacket(packet)
+    @debug((log) ->
+      log(preloginPayload.toString('  '))
+    )
     #@state = STATE.SENT_PRELOGIN
 
   sendPacket: (packet) =>
@@ -79,7 +90,6 @@ class Connection extends EventEmitter
       log('')
       log(packet.dataToString('  '))
       log('')
-      log(packet.payloadString('  '))
     )
 
   debug: (debugFunction) =>

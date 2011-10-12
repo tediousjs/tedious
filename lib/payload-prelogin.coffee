@@ -1,8 +1,6 @@
 assert = require('assert')
 buildBuffer = require('./build-buffer')
-Packet = require('./packet').Packet
 sprintf = require('sprintf').sprintf
-TYPE = require('./packet').TYPE
 
 VERSION = 0x000000001
 SUBBUILD = 0x0001
@@ -33,18 +31,16 @@ marsByValue = {}
 for name, value of MARS
   marsByValue[value] = name
 
-class PreloginPacket extends Packet
+class PreloginPayload
   constructor: (buffer) ->
     if buffer instanceof Buffer
-      super(buffer)
+      @data = buffer
     else
-      super(TYPE.PRELOGIN)
-
-      @addOptions()
+      @createOptions()
 
     @extractOptions()
 
-  addOptions: ->
+  createOptions: ->
     options = [
       @createVersionOption(),
       @createEncryptionOption(),
@@ -58,21 +54,19 @@ class PreloginPacket extends Packet
       length += 5 + option.data.length
     length++ # terminator
 
-    data = new Buffer(length)
+    @data = new Buffer(length)
     optionOffset = 0
     optionDataOffset = 5 * options.length + 1
     for option in options
-      data.writeUInt8(option.token, optionOffset + 0)
-      data.writeUInt16BE(optionDataOffset, optionOffset + 1)
-      data.writeUInt16BE(option.data.length, optionOffset + 3)
+      @data.writeUInt8(option.token, optionOffset + 0)
+      @data.writeUInt16BE(optionDataOffset, optionOffset + 1)
+      @data.writeUInt16BE(option.data.length, optionOffset + 3)
       optionOffset += 5
 
-      option.data.copy(data, optionDataOffset)
+      option.data.copy(@data, optionDataOffset)
       optionDataOffset += option.data.length
 
-    data.writeUInt8(TOKEN.TERMINATOR, optionOffset)
-
-    @addData(data)
+    @data.writeUInt8(TOKEN.TERMINATOR, optionOffset)
 
   createVersionOption: () ->
     token: TOKEN.VERSION,
@@ -95,51 +89,50 @@ class PreloginPacket extends Packet
     data: buildBuffer('8', MARS.OFF)
 
   extractOptions: ->
-    data = @data()
-
     offset = 0;
-    while data[offset] != TOKEN.TERMINATOR
-      dataOffset = data.readUInt16BE(offset + 1)
-      dataLength = data.readUInt16BE(offset + 3)
+    while @data[offset] != TOKEN.TERMINATOR
+      dataOffset = @data.readUInt16BE(offset + 1)
+      dataLength = @data.readUInt16BE(offset + 3)
 
-      switch data[offset]
+      switch @data[offset]
         when TOKEN.VERSION
-          @extractVersion(data, dataOffset)
+          @extractVersion(dataOffset)
         when TOKEN.ENCRYPTION
-          @extractEncryption(data, dataOffset)
+          @extractEncryption(dataOffset)
         when TOKEN.INSTOPT
-          @extractInstance(data, dataOffset)
+          @extractInstance(dataOffset)
         when TOKEN.THREADID
-          @extractThreadId(data, dataOffset)
+          if (dataLength > 0)
+            @extractThreadId(dataOffset)
         when TOKEN.MARS
-          @extractMars(data, dataOffset)
+          @extractMars(dataOffset)
 
       offset += 5
       dataOffset += dataLength
 
-  extractVersion: (data, offset) ->
+  extractVersion: (offset) ->
     @version =
-      major: data.readUInt8(offset + 0),
-      minor: data.readUInt8(offset + 1),
-      patch: data.readUInt8(offset + 2),
-      trivial: data.readUInt8(offset + 3),
-      subbuild: data.readUInt16BE(offset + 4)
+      major: @data.readUInt8(offset + 0),
+      minor: @data.readUInt8(offset + 1),
+      patch: @data.readUInt8(offset + 2),
+      trivial: @data.readUInt8(offset + 3),
+      subbuild: @data.readUInt16BE(offset + 4)
 
-  extractEncryption: (data, offset) ->
-    @encryption = data.readUInt8(offset)
+  extractEncryption: (offset) ->
+    @encryption = @data.readUInt8(offset)
     @encryptionString = encryptByValue[@encryption]
 
-  extractInstance: (data, offset) ->
-    @instance = data.readUInt8(offset)
+  extractInstance: (offset) ->
+    @instance = @data.readUInt8(offset)
 
-  extractThreadId: (data, offset) ->
-    @threadId = data.readUInt32BE(offset)
+  extractThreadId: (offset) ->
+    @threadId = @data.readUInt32BE(offset)
 
-  extractMars: (data, offset) ->
-    @mars = data.readUInt8(offset)
+  extractMars: (offset) ->
+    @mars = @data.readUInt8(offset)
     @marsString = marsByValue[@mars]
 
-  payloadString: (indent) ->
+  toString: (indent) ->
     indent ||= ''
 
     indent + 'PreLogin - ' +
@@ -151,8 +144,8 @@ class PreloginPacket extends Packet
           @version.subbuild,
           @encryption, @encryptionString,
           @instance,
-          @threadId,
+          if @threadId then @threadId else 0,
           @mars, @marsString
       )
 
-exports.PreloginPacket = PreloginPacket
+exports.PreloginPayload = PreloginPayload
