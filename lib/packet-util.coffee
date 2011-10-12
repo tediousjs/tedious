@@ -12,6 +12,6 @@ packetFromBuffer = (buffer) ->
     when TYPE.TABULAR_RESULT
       new TabularResultPacket(buffer)
     else
-      undefined
+      new Packet(buffer)
 
 exports.packetFromBuffer = packetFromBuffer

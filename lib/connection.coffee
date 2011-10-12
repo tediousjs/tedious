@@ -34,6 +34,7 @@ class Connection extends EventEmitter
 
   eventData: (data) =>
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
+
     if isPacketComplete(@packetBuffer)
       packet = packetFromBuffer(@packetBuffer)
       @logPacket('Received', packet);
