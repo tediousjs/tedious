@@ -2,6 +2,9 @@ Connection = require('../../lib/connection')
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
+config.options.debug =
+  data: true,
+  payload: true
 
 exports.test = (test) ->
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, info) ->
@@ -12,7 +15,7 @@ exports.test = (test) ->
   )
 
   connection.on('debug', (message) ->
-    console.log(message);
+    #console.log(message);
   )
 
   

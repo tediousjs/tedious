@@ -8,9 +8,14 @@ Socket = require('net').Socket
 
 class Connection extends EventEmitter
   constructor: (@server, @userName, @password, @options, callback) ->
-    @options.port |= 1433
+    @options ||= {}
+    @options.port ||= 1433
 
-    @debug = new Debug(@)
+    @debug = new Debug(@, ->
+      !@closed
+    , @options.debug)
+
+    @closed = false
 
     @connection = new Socket({})
     @connection.setTimeout(1000)
