@@ -1,3 +1,4 @@
+Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 Packet = require('./packet').Packet
 TYPE = require('./packet').TYPE
@@ -8,6 +9,8 @@ Socket = require('net').Socket
 class Connection extends EventEmitter
   constructor: (@server, @userName, @password, @options, callback) ->
     @options.port |= 1433
+
+    @debug = new Debug(@)
 
     @connection = new Socket({})
     @connection.setTimeout(1000)
@@ -40,7 +43,7 @@ class Connection extends EventEmitter
       @logPacket('Received', packet);
 
       preloginPayload = new PreloginPayload(packet.data())
-      @debug(preloginPayload.toString('  '))
+      @debug.payload(preloginPayload.toString('  '))
 
       @packetBuffer = new Buffer(0)
 
@@ -71,23 +74,15 @@ class Connection extends EventEmitter
     packet.last(true)
     
     @sendPacket(packet)
-    @debug(preloginPayload.toString('  '))
+    @debug.payload(preloginPayload.toString('  '))
     #@state = STATE.SENT_PRELOGIN
 
   sendPacket: (packet) =>
     @logPacket('Sent', packet);
     @connection.write(packet.buffer)
 
-  logPacket: (text, packet) ->
-    @debug(text + ' packet')
-    @debug(packet.headerToString('  '))
-    @debug('')
-    @debug(packet.dataToString('  '))
-    @debug('')
-
-  debug: (text) ->
-    if @listeners('debug').length > 0
-      if !@closed
-        @emit('debug', text)
+  logPacket: (direction, packet) ->
+    @debug.packet(direction, packet)
+    @debug.data(packet)
 
 module.exports = Connection

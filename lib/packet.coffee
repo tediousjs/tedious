@@ -97,7 +97,7 @@ class Packet
   headerToString: (indent) ->
     indent ||= ''
 
-    text = sprintf('header - type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
+    text = sprintf('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X',
       @buffer.readUInt8(OFFSET.Type), typeByValue[@buffer.readUInt8(OFFSET.Type)],
       @buffer.readUInt8(OFFSET.Status), @statusAsString(),
       @buffer.readUInt16BE(OFFSET.Length),
