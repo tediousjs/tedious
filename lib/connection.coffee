@@ -40,9 +40,7 @@ class Connection extends EventEmitter
       @logPacket('Received', packet);
 
       preloginPayload = new PreloginPayload(packet.data())
-      @debug((log) ->
-        log(preloginPayload.toString('  '))
-      )
+      @debug(preloginPayload.toString('  '))
 
       @packetBuffer = new Buffer(0)
 
@@ -73,9 +71,7 @@ class Connection extends EventEmitter
     packet.last(true)
     
     @sendPacket(packet)
-    @debug((log) ->
-      log(preloginPayload.toString('  '))
-    )
+    @debug(preloginPayload.toString('  '))
     #@state = STATE.SENT_PRELOGIN
 
   sendPacket: (packet) =>
@@ -83,20 +79,15 @@ class Connection extends EventEmitter
     @connection.write(packet.buffer)
 
   logPacket: (text, packet) ->
-    @debug((log) ->
-      log(text + ' packet')
-      
-      log(packet.headerToString('  '))
-      log('')
-      log(packet.dataToString('  '))
-      log('')
-    )
+    @debug(text + ' packet')
+    @debug(packet.headerToString('  '))
+    @debug('')
+    @debug(packet.dataToString('  '))
+    @debug('')
 
-  debug: (debugFunction) =>
+  debug: (text) ->
     if @listeners('debug').length > 0
-      debugFunction((text) =>
-        if !@closed
-          @emit('debug', text)
-      )
+      if !@closed
+        @emit('debug', text)
 
 module.exports = Connection
