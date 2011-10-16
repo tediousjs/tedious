@@ -148,4 +148,4 @@ class PreloginPayload
           @mars, @marsString
       )
 
-exports.PreloginPayload = PreloginPayload
+module.exports = PreloginPayload

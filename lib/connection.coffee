@@ -1,7 +1,7 @@
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 TYPE = require('./packet').TYPE
-PreloginPayload = require('./prelogin-payload').PreloginPayload
+PreloginPayload = require('./prelogin-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
 
@@ -42,7 +42,6 @@ class Connection extends EventEmitter
   eventConnect: =>
     console.log('connect')
     @sendPreLoginPacket()
-    @activeRequest.callback(undefined, true)
 
   eventEnd: =>
     console.log('end')
@@ -58,8 +57,10 @@ class Connection extends EventEmitter
     @connection.destroy()
 
   eventMessage: (type, payload) =>
-      preloginPayload = new PreloginPayload(payload)
-      @debug.payload(preloginPayload.toString('  '))
+    preloginPayload = new PreloginPayload(payload)
+    @debug.payload(preloginPayload.toString('  '))
+
+    @activeRequest.callback(undefined, true)
 
   startRequest: (requestName, callback) =>
     @activeRequest =

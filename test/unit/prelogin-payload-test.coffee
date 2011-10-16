@@ -1,4 +1,4 @@
-PreloginPayload = require('../../lib/prelogin-payload').PreloginPayload
+PreloginPayload = require('../../lib/prelogin-payload')
 
 exports.createFromScratch = (test) ->
   payload = new PreloginPayload()
