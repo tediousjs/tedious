@@ -10,7 +10,7 @@ class Connection extends EventEmitter
   constructor: (@server, @userName, @password, @options, callback) ->
     @options ||= {}
     @options.port ||= 1433
-    @options.timeout ||= 1000
+    @options.timeout ||= 10 * 1000
 
     @debug = new Debug(@options.debug)
     @debug.on('debug', (message) =>
