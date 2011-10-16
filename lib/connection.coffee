@@ -1,6 +1,5 @@
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
-Packet = require('./packet').Packet
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload').PreloginPayload
 MessageIO = require('./message-io')
