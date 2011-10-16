@@ -13,7 +13,8 @@ class Connection extends EventEmitter
 
     @debug = new Debug(@options.debug)
     @debug.on('debug', (message) =>
-      @emit('debug', message)
+      if !@closed
+        @emit('debug', message)
     )
 
     @closed = false
