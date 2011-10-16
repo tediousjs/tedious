@@ -167,7 +167,11 @@ isPacketComplete = (potentialPacketBuffer) ->
   else
     potentialPacketBuffer.length >= potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 
+packetLength = (potentialPacketBuffer) ->
+  potentialPacketBuffer.readUInt16BE(OFFSET.Length)
+
 exports.Packet = Packet
 exports.OFFSET = OFFSET
 exports.TYPE = TYPE
 exports.isPacketComplete = isPacketComplete
+exports.packetLength = packetLength

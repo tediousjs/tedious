@@ -129,3 +129,26 @@ exports.receiveTwoPackets = (test) ->
   packet.last(true)
   packet.addData(payload.slice(2, 3))
   connection.emit('data', packet.buffer)
+
+exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
+  payload = new Buffer([1, 2, 3, 4])
+  connection = new Connection()
+
+  io = new MessageIO(connection, 0, new Debug())
+  io.on('message', (messageType, messagePayload) ->
+    test.strictEqual(messageType, packetType)
+    test.ok(messagePayload.equals(payload))
+
+    test.done()
+  )
+
+  packet1 = new Packet(packetType)
+  packet1.addData(payload.slice(0, 2))
+
+  packet2 = new Packet(packetType)
+  packet2.last(true)
+  packet2.addData(payload.slice(2, 4))
+
+  connection.emit('data', packet1.buffer.slice(0, 6))
+  connection.emit('data', packet1.buffer.slice(6).concat(packet2.buffer.slice(0, 4)))
+  connection.emit('data', packet2.buffer.slice(4))

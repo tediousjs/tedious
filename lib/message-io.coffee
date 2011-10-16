@@ -1,5 +1,6 @@
 EventEmitter = require('events').EventEmitter
 isPacketComplete = require('./packet').isPacketComplete
+packetLength = require('./packet').packetLength
 Packet = require('./packet').Packet
 
 DEFAULT_PACKET_SIZE = 4 * 1024
@@ -31,11 +32,12 @@ class MessageIO extends EventEmitter
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
 
     if isPacketComplete(@packetBuffer)
-      packet = new Packet(@packetBuffer)
+      length = packetLength(@packetBuffer)
+      packet = new Packet(@packetBuffer.slice(0, length))
       @logPacket('Received', packet);
 
       @addToMessage(packet)
-      @packetBuffer = new Buffer(0)
+      @packetBuffer = @packetBuffer.slice(length)
 
   eventEnd: =>
     @debug.log('end')
