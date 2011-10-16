@@ -31,6 +31,9 @@ marsByValue = {}
 for name, value of MARS
   marsByValue[value] = name
 
+###
+  s2.2.6.4
+###
 class PreloginPayload
   constructor: (buffer) ->
     if buffer instanceof Buffer
