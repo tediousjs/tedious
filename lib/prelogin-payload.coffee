@@ -70,23 +70,23 @@ class PreloginPayload
 
   createVersionOption: () ->
     token: TOKEN.VERSION,
-    data: buildBuffer('32', VERSION, '16', SUBBUILD)
+    data: buildBuffer('U32', VERSION, 'U16', SUBBUILD)
 
   createEncryptionOption: () ->
     token: TOKEN.ENCRYPTION,
-    data: buildBuffer('8', ENCRYPT.NOT_SUP)
+    data: buildBuffer('U8', ENCRYPT.NOT_SUP)
 
   createInstanceOption: () ->
     token: TOKEN.INSTOPT,
-    data: buildBuffer('8', 0x00)
+    data: buildBuffer('U8', 0x00)
 
   createThreadIdOption: () ->
     token: TOKEN.THREADID,
-    data: buildBuffer('32', 0x00)
+    data: buildBuffer('U32', 0x00)
 
   createMarsOption: () ->
     token: TOKEN.MARS,
-    data: buildBuffer('8', MARS.OFF)
+    data: buildBuffer('U8', MARS.OFF)
 
   extractOptions: ->
     offset = 0;
