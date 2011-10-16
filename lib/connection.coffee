@@ -11,9 +11,10 @@ class Connection extends EventEmitter
     @options ||= {}
     @options.port ||= 1433
 
-    @debug = new Debug(@, ->
-      !@closed
-    , @options.debug)
+    @debug = new Debug(@options.debug)
+    @debug.on('debug', (message) =>
+      @emit('debug', message)
+    )
 
     @closed = false
 
