@@ -68,14 +68,14 @@ class Packet
 
       @buffer.writeUInt8(status, OFFSET.Status)
     
-    status
+    @isLast()
 
   isLast: ->
-    @buffer.readUInt8(OFFSET.Status) & STATUS.EOM
+    !!(@buffer.readUInt8(OFFSET.Status) & STATUS.EOM)
 
   packetId: (packetId) ->
     if packetId
-      @buffer.writeUInt8(packetId, OFFSET.PacketID)
+      @buffer.writeUInt8(packetId % 256, OFFSET.PacketID)
 
     @buffer.readUInt8(OFFSET.PacketID)
 
@@ -86,6 +86,9 @@ class Packet
 
   data: ->
     @buffer.slice(HEADER_LENGTH)
+
+  type: ->
+    @buffer.readUInt8(OFFSET.Type)
 
   statusAsString: ->
     status = @buffer.readUInt8(OFFSET.Status)
