@@ -6,27 +6,13 @@ Packet = require('./packet').Packet
 DEFAULT_PACKET_SIZE = 4 * 1024
 
 class MessageIO extends EventEmitter
-  constructor: (@connection, timeout, @debug) ->
+  constructor: (@connection, @debug) ->
     @_packetSize = DEFAULT_PACKET_SIZE
 
-    @connection.setTimeout(timeout)
-    @connection.connect(@port, @server)
-
-    @connection.addListener('close', @eventClose)
-    @connection.addListener('connect', @eventConnect)
     @connection.addListener('data', @eventData)
-    @connection.addListener('end', @eventEnd)
-    @connection.addListener('error', @eventError)
-    @connection.addListener('timeout', @eventTimeout)
 
     @packetBuffer = new Buffer(0)
     @payloadBuffer = new Buffer(0)
-
-  eventClose: (hadError) =>
-    @debug.log('close', hadError)
-
-  eventConnect: =>
-    @debug.log("connected to #{@server}:#{@port}")
 
   eventData: (data) =>
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
@@ -38,16 +24,6 @@ class MessageIO extends EventEmitter
 
       @addToMessage(packet)
       @packetBuffer = @packetBuffer.slice(length)
-
-  eventEnd: =>
-    @debug.log('end')
-
-  eventError: (exception) =>
-    @debug.log('error', exception)
-
-  eventTimeout: =>
-    @debug.log('timeout')
-    @connection.end()
 
   packetSize: (packetSize) ->
     if arguments.length > 0

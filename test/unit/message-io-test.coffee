@@ -27,7 +27,7 @@ exports.sendSmallerThanOnePacket = (test) ->
     test.done()
   )
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.packetSize(4)
   io.sendMessage(packetType, payload)
 
@@ -43,7 +43,7 @@ exports.sendExactlyPacket = (test) ->
     test.done()
   )
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.packetSize(4)
   io.sendMessage(packetType, payload)
 
@@ -70,7 +70,7 @@ exports.sendOneLongerThanPacket = (test) ->
         test.done()
   )
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.packetSize(4)
   io.sendMessage(packetType, payload)
 
@@ -78,7 +78,7 @@ exports.receiveOnePacket = (test) ->
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.on('message', (messageType, messagePayload) ->
     test.strictEqual(messageType, packetType)
     test.ok(messagePayload.equals(payload))
@@ -95,7 +95,7 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.on('message', (messageType, messagePayload) ->
     test.strictEqual(messageType, packetType)
     test.ok(messagePayload.equals(payload))
@@ -113,7 +113,7 @@ exports.receiveTwoPackets = (test) ->
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.on('message', (messageType, messagePayload) ->
     test.strictEqual(messageType, packetType)
     test.ok(messagePayload.equals(payload))
@@ -134,7 +134,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   payload = new Buffer([1, 2, 3, 4])
   connection = new Connection()
 
-  io = new MessageIO(connection, 0, new Debug())
+  io = new MessageIO(connection, new Debug())
   io.on('message', (messageType, messagePayload) ->
     test.strictEqual(messageType, packetType)
     test.ok(messagePayload.equals(payload))
