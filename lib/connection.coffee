@@ -48,11 +48,14 @@ class Connection extends EventEmitter
     console.log('end')
 
   eventError: (exception) =>
-    console.log('error', exception)
+    @debug.log(exception)
+    @emit('fatal', exception)
+    @connection.destroy()
 
   eventTimeout: =>
-    console.log('timeout')
-    @connection.end()
+    @debug.log('timeout')
+    @emit('fatal', 'timeout')
+    @connection.destroy()
 
   eventMessage: (type, payload) =>
       preloginPayload = new PreloginPayload(payload)
@@ -69,7 +72,7 @@ class Connection extends EventEmitter
 
   sendPreLoginPacket: ->
     payload = new PreloginPayload()
-    @messageIo.sendMessage(TYPE.PRELOGIN, payload)
+    @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
     #@state = STATE.SENT_PRELOGIN
 
 module.exports = Connection

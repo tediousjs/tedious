@@ -6,11 +6,38 @@ config.options.debug =
   data: true,
   payload: true
 
-exports.test = (test) ->
+exports.connect = (test) ->
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, info) ->
     test.ok(!err)
     test.ok(info)
 
+    test.done()
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message);
+  )
+
+exports.badServer = (test) ->
+  connection = new Connection('bad-server', config.userName, config.password, config.options, (err, info) ->
+    test.ok(false)
+  )
+
+  connection.on('fatal', (error) ->
+    test.done()
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message);
+  )
+
+exports.badPort = (test) ->
+  config.options.port = -1
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, info) ->
+    test.ok(false)
+  )
+
+  connection.on('fatal', (error) ->
     test.done()
   )
 
