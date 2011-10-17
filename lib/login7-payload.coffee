@@ -84,7 +84,6 @@ class Login7Payload
     length = buildBuffer('U32', lengthLength + fixed.length + variable.length)
 
     @data = new Buffer(length.concat(fixed, variable))
-    console.log(@data.length, @data)
 
   createFixedData: ->
     @tdsVersion = DEFAULT_TDS_VERSION
