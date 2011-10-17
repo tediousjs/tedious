@@ -162,8 +162,8 @@ class Login7Payload
     @addVariableData(variableData, @loginData.language)
     @addVariableData(variableData, @loginData.database)
     @addVariableDataBytes(variableData, @clientId)
-    @addVariableData(variableData, @sspi)                     # SSPI (NT authentication).
-    @addVariableData(variableData, @attachDbFile)             # Attach database file.
+    @addVariableData(variableData, @sspi)
+    @addVariableData(variableData, @attachDbFile)
     @addVariableData(variableData, @changePassword)           # Introduced in TDS 7.2
     @addVariableDataBytes(variableData, cbSSPILong)           # Introduced in TDS 7.2
 
@@ -212,7 +212,7 @@ class Login7Payload
           @clientPid,
           @connectionId
       ) + '\n' +
-    indent + '           ' +
+      indent + '           ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
           @flags1,
           @flags2,
@@ -220,6 +220,23 @@ class Login7Payload
           @flags3,
           @clientTimeZone,
           @clientLcid
-    )
+      ) + '\n' +
+      indent + '           ' +
+      sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
+          @hostname,
+          @loginData.userName,
+          @loginData.password,
+          @loginData.appName,
+          @loginData.serverName,
+          libraryName
+      ) + '\n' +
+      indent + '           ' +
+      sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
+          @loginData.language,
+          @loginData.database,
+          @sspi,
+          @attachDbFile
+          @changePassword
+      )
 
 module.exports = Login7Payload
