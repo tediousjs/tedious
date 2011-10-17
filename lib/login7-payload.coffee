@@ -34,9 +34,9 @@ FLAGS_2 =
   ODBC_OFF: 0x00,
   ODBC_ON: 0x02,
   
-  F_TRAN_BOUNDARY: 0x04,
+  F_TRAN_BOUNDARY: 0x04,          # Removed in TDS 7.2
   
-  F_CACHE_CONNECT: 0x08,
+  F_CACHE_CONNECT: 0x08,          # Removed in TDS 7.2
   
   USER_NORMAL: 0x00,
   USER_SERVER: 0x10, 
@@ -51,17 +51,19 @@ TYPE_FLAGS =
   SQL_TSQL: 0x01,
   
   OLEDB_OFF: 0x00,
-  OLEDB_ON: 0x02
+  OLEDB_ON: 0x02,                 # Introduced in TDS 7.2
+
+  READ_ONLY_INTENT: 0x04          # Introduced in TDS 7.4
 
 FLAGS_3 =
   CHANGE_PASSWORD_NO: 0x00,
-  CHANGE_PASSWORD_YES: 0x01,
+  CHANGE_PASSWORD_YES: 0x01,      # Introduced in TDS 7.2
   
-  BINARY_XML: 0x02,
+  BINARY_XML: 0x02,               # Introduced in TDS 7.2
   
-  SPAWN_USER_INSTANCE: 0x04,
+  SPAWN_USER_INSTANCE: 0x04,      # Introduced in TDS 7.2
 
-  UNKNOWN_COLLATION_HANDLING: 0x08
+  UNKNOWN_COLLATION_HANDLING: 0x08  # Introduced in TDS 7.3
 
 TDS_VERSION_7_2 = 0x72090002
 TDS_VERSION_7_3_A = 0x730A0003
@@ -85,15 +87,15 @@ class Login7Payload
     console.log(@data.length, @data)
 
   createFixedData: ->
-    tdsVersion = DEFAULT_TDS_VERSION
-    packetSize = DEFAULT_PACKET_SIZE
-    clientProgVer = 0
-    clientPid = process.pid
-    connectionId = 0
-    clientTimeZone = new Date().getTimezoneOffset()
-    clientLcid = 5                #Can't figure what form this should take.
+    @tdsVersion = DEFAULT_TDS_VERSION
+    @packetSize = DEFAULT_PACKET_SIZE
+    @clientProgVer = 0
+    @clientPid = process.pid
+    @connectionId = 0
+    @clientTimeZone = new Date().getTimezoneOffset()
+    @clientLcid = 5                #Can't figure what form this should take.
 
-    flags1 =
+    @flags1 =
       FLAGS_1.ENDIAN_LITTLE |
       FLAGS_1.CHARSET_ASCII |
       FLAGS_1.FLOAT_IEEE_754 |
@@ -102,32 +104,32 @@ class Login7Payload
       FLAGS_1.INIT_DB_WARN |
       FLAGS_1.SET_LANG_WARN_ON
 
-    flags2 =
+    @flags2 =
       FLAGS_2.INIT_LANG_WARN |
       FLAGS_2.ODBC_OFF |
       FLAGS_2.USER_NORMAL |
       FLAGS_2.INTEGRATED_SECURITY_OFF
 
-    flags3 =
+    @flags3 =
       FLAGS_3.CHANGE_PASSWORD_NO |
       FLAGS_3.UNKNOWN_COLLATION_HANDLING
 
-    typeFlags =
+    @typeFlags =
       TYPE_FLAGS.SQL_DFLT |
       TYPE_FLAGS.OLEDB_OFF
 
     buffer = buildBuffer(
-      'U32', tdsVersion,
-      'U32', packetSize,
-      'U32', clientProgVer,
-      'U32', clientPid,
-      'U32', connectionId,
-      'U8', flags1,
-      'U8', flags2,
-      'U8', typeFlags,
-      'U8', flags3,
-      '32', clientTimeZone,
-      'U32', clientLcid
+      'U32', @tdsVersion,
+      'U32', @packetSize,
+      'U32', @clientProgVer,
+      'U32', @clientPid,
+      'U32', @connectionId,
+      'U8', @flags1,
+      'U8', @flags2,
+      'U8', @typeFlags,
+      'U8', @flags3,
+      '32', @clientTimeZone,
+      'U32', @clientLcid
     )
 
   createVariableData: (offset) ->
@@ -136,25 +138,34 @@ class Login7Payload
       data: new Buffer(0),
       offset: offset + ((9 * 4) + 6 + (3 * 4))
     
-    loginData = loginData || {};
-    loginData.appName = loginData.appName || 'Tedious';
+    @hostname = os.hostname()
 
-    @addVariableData(variableData, os.hostname());
-    @addVariableData(variableData, @loginData.userName);
-    @addVariableData(variableData, @loginData.password);
-    @addVariableData(variableData, @loginData.appName);
-    @addVariableData(variableData, @loginData.serverName);
-    @addVariableData(variableData, '');                           # Reserved for future use.
-    @addVariableData(variableData, libraryName);
-    @addVariableData(variableData, @loginData.language);
-    @addVariableData(variableData, @loginData.database);
-    ###
-    addVariableDataBytes(variableData, [1, 2, 3, 4, 5, 6]);               // Client ID, should be MAC address or other randomly generated GUID like value.
-    addVariableDataOffsetLength(variableData, '');                        // SSPI (NT authentication).
-    addVariableDataOffsetLength(variableData, '');                        // Attach database.
-    addVariableDataOffsetLength(variableData, '');                        // Change password.
-    addVariableDataDword(variableData, 0);                                // cbSSPILong
-    ###
+    @loginData = @loginData || {}
+    @loginData.appName = @loginData.appName || 'Tedious'
+    
+    # Client ID, should be MAC address or other randomly generated GUID like value.
+    @clientId = new Buffer([1, 2, 3, 4, 5, 6])
+
+    @sspi = ''
+    @attachDbFile = ''
+    @changePassword = ''
+
+    cbSSPILong = buildBuffer('U32', 0)
+
+    @addVariableData(variableData, @hostname)
+    @addVariableData(variableData, @loginData.userName)
+    @addVariableDataBytes(variableData, @createPasswordBuffer())
+    @addVariableData(variableData, @loginData.appName)
+    @addVariableData(variableData, @loginData.serverName)
+    @addVariableData(variableData, '')                        # Reserved for future use.
+    @addVariableData(variableData, libraryName)
+    @addVariableData(variableData, @loginData.language)
+    @addVariableData(variableData, @loginData.database)
+    @addVariableDataBytes(variableData, @clientId)
+    @addVariableData(variableData, @sspi)                     # SSPI (NT authentication).
+    @addVariableData(variableData, @attachDbFile)             # Attach database file.
+    @addVariableData(variableData, @changePassword)           # Introduced in TDS 7.2
+    @addVariableDataBytes(variableData, cbSSPILong)           # Introduced in TDS 7.2
 
     variableData.offsetsAndLengths.concat(variableData.data)
 
@@ -171,9 +182,44 @@ class Login7Payload
     variableData.data = variableData.data.concat(value)
     variableData.offset += value.length
 
+  addVariableDataBytes: (variableData, bytes) ->
+    variableData.offsetsAndLengths = variableData.offsetsAndLengths.concat(bytes);
+
+  createPasswordBuffer: () ->
+    password = new Buffer(@loginData.password, 'ucs2')
+
+    for b in [0..password.length - 1]
+      byte = password[b]
+
+      lowNibble = byte & 0x0f
+      highNibble = (byte >> 4)
+      byte = (lowNibble << 4) | highNibble
+
+      byte = byte ^ 0xa5
+
+      password[b] = byte
+
+    password
+
   toString: (indent) ->
     indent ||= ''
 
-    indent
+    indent + 'PreLogin - ' +
+      sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
+          @tdsVersion,
+          @packetSize,
+          @clientProgVer,
+          @clientPid,
+          @connectionId
+      ) + '\n' +
+    indent + '           ' +
+      sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
+          @flags1,
+          @flags2,
+          @typeFlags,
+          @flags3,
+          @clientTimeZone,
+          @clientLcid
+    )
 
 module.exports = Login7Payload

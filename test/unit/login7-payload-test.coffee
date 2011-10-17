@@ -10,6 +10,8 @@ exports.create = (test) ->
     database: 'db'
   })
 
+  console.log(payload.toString(''))
+
   #assertPayload(test, payload)
 
   test.done()
