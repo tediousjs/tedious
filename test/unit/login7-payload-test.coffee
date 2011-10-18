@@ -1,39 +1,42 @@
+require('buffertools')
 Login7Payload = require('../../lib/login7-payload')
 
 exports.create = (test) ->
-  payload = new Login7Payload({
+  loginData =
     userName: 'user',
     password: 'pw',
     appName: 'app',
     serverName: 'server',
     language: 'lang',
     database: 'db'
-  })
 
-  test.ok(payload.data)
-  #assertPayload(test, payload)
-  console.log(payload.toString(''))
+  payload = new Login7Payload(loginData)
+
+  expectedLength =
+    4 +                                               # Length
+    32 +                                              # Variable
+    2 + 2 + (2 * payload.hostname.length) +
+    2 + 2 + (2 * loginData.userName.length) +
+    2 + 2 + (2 * loginData.password.length) +
+    2 + 2 + (2 * loginData.appName.length) +
+    2 + 2 + (2 * loginData.serverName.length) +
+    2 + 2 + (2 * 0) +                                 # Reserved
+    2 + 2 + (2 * payload.libraryName.length) +
+    2 + 2 + (2 * loginData.language.length) +
+    2 + 2 + (2 * loginData.database.length) +
+    payload.clientId.length +
+    2 + 2 + (2 * payload.sspi.length) +
+    2 + 2 + (2 * payload.attachDbFile.length) +
+    2 + 2 + (2 * payload.changePassword.length) +
+    4                                                 # cbSSPILong
+
+  test.strictEqual(payload.data.length, expectedLength)    
+
+  passwordStart = payload.data.readUInt16BE(4 + 32 + (2 * 4))
+  passwordEnd = passwordStart + (2 * loginData.password.length)
+  passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5])
+  test.ok(payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected))
+
+  #console.log(payload.toString(''))
 
   test.done()
-
-###
-exports.createFromBuffer = (test) ->
-  payload = new Login7Payload()
-  new Login7Payload(payload.data)
-
-  assertPayload(test, payload)
-
-  test.done()
-###
-
-assertPayload = (test, payload) ->
-  test.strictEqual(payload.version.major, 0)
-  test.strictEqual(payload.version.minor, 0)
-  test.strictEqual(payload.version.patch, 0)
-  test.strictEqual(payload.version.trivial, 1)
-  test.strictEqual(payload.version.subbuild, 1)
-
-  test.strictEqual(payload.encryptionString, 'NOT_SUP')
-  test.strictEqual(payload.instance, 0)
-  test.strictEqual(payload.threadId, 0)
-  test.strictEqual(payload.marsString, 'OFF')

@@ -135,12 +135,13 @@ class Login7Payload
     variableData =
       offsetsAndLengths: new Buffer(0),
       data: new Buffer(0),
-      offset: offset + ((9 * 4) + 6 + (3 * 4))
+      offset: offset + ((9 * 4) + 6 + (3 * 4) + 4)
     
     @hostname = os.hostname()
 
     @loginData = @loginData || {}
     @loginData.appName = @loginData.appName || 'Tedious'
+    @libraryName = libraryName
     
     # Client ID, should be MAC address or other randomly generated GUID like value.
     @clientId = new Buffer([1, 2, 3, 4, 5, 6])
@@ -153,11 +154,11 @@ class Login7Payload
 
     @addVariableData(variableData, @hostname)
     @addVariableData(variableData, @loginData.userName)
-    @addVariableDataBytes(variableData, @createPasswordBuffer())
+    @addVariableData(variableData, @createPasswordBuffer())
     @addVariableData(variableData, @loginData.appName)
     @addVariableData(variableData, @loginData.serverName)
     @addVariableData(variableData, '')                        # Reserved for future use.
-    @addVariableData(variableData, libraryName)
+    @addVariableData(variableData, @libraryName)
     @addVariableData(variableData, @loginData.language)
     @addVariableData(variableData, @loginData.database)
     @addVariableDataBytes(variableData, @clientId)
@@ -169,8 +170,9 @@ class Login7Payload
     variableData.offsetsAndLengths.concat(variableData.data)
 
   addVariableData: (variableData, value) ->
-    value ||= ''
-    value = new Buffer(value, 'ucs2')
+    if !(value instanceof Buffer)
+      value ||= ''
+      value = new Buffer(value, 'ucs2')
     
     offsetAndLength = buildBuffer(
         'U16', variableData.offset,
