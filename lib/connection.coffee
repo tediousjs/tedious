@@ -2,8 +2,14 @@ Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
+Login7Payload = require('./login7-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
+
+STATE =
+  SENT_PRELOGIN: 1,
+  SENT_LOGIN7: 2,
+
 
 class Connection extends EventEmitter
   constructor: (@server, @userName, @password, @options, callback) ->
@@ -57,10 +63,17 @@ class Connection extends EventEmitter
     @connection.destroy()
 
   eventMessage: (type, payload) =>
-    preloginPayload = new PreloginPayload(payload)
-    @debug.payload(preloginPayload.toString('  '))
+    switch @state
+      when STATE.SENT_PRELOGIN
+        preloginPayload = new PreloginPayload(payload)
+        @debug.payload(preloginPayload.toString('  '))
 
-    @activeRequest.callback(undefined, true)
+        @sendLogin7Packet()
+
+      when STATE.SENT_LOGIN7
+        console.log('LOGIN7 response')
+        console.log(payload)
+        @activeRequest.callback(undefined, true)
 
   startRequest: (requestName, callback) =>
     @activeRequest =
@@ -74,6 +87,17 @@ class Connection extends EventEmitter
   sendPreLoginPacket: ->
     payload = new PreloginPayload()
     @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
-    #@state = STATE.SENT_PRELOGIN
+    @state = STATE.SENT_PRELOGIN
+
+  sendLogin7Packet: ->
+    loginData =
+      userName: @userName,
+      password: @password,
+      database: @options.database
+
+    payload = new Login7Payload(loginData)
+    @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
+    @debug.payload(payload.toString('  '))
+    @state = STATE.SENT_LOGIN7
 
 module.exports = Connection

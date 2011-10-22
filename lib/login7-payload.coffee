@@ -81,7 +81,7 @@ class Login7Payload
 
     fixed = @createFixedData()
     variable = @createVariableData(lengthLength + fixed.length)
-    length = buildBuffer('U32', lengthLength + fixed.length + variable.length)
+    length = buildBuffer('U32L', lengthLength + fixed.length + variable.length)
 
     @data = new Buffer(length.concat(fixed, variable))
 
@@ -92,7 +92,7 @@ class Login7Payload
     @clientPid = process.pid
     @connectionId = 0
     @clientTimeZone = new Date().getTimezoneOffset()
-    @clientLcid = 5                #Can't figure what form this should take.
+    @clientLcid = 0x00000409                #Can't figure what form this should take.
 
     @flags1 =
       FLAGS_1.ENDIAN_LITTLE |
@@ -118,17 +118,17 @@ class Login7Payload
       TYPE_FLAGS.OLEDB_OFF
 
     buffer = buildBuffer(
-      'U32', @tdsVersion,
-      'U32', @packetSize,
-      'U32', @clientProgVer,
-      'U32', @clientPid,
-      'U32', @connectionId,
+      'U32L', @tdsVersion,
+      'U32L', @packetSize,
+      'U32L', @clientProgVer,
+      'U32L', @clientPid,
+      'U32L', @connectionId,
       'U8', @flags1,
       'U8', @flags2,
       'U8', @typeFlags,
       'U8', @flags3,
-      '32', @clientTimeZone,
-      'U32', @clientLcid
+      '32L', @clientTimeZone,
+      'U32L', @clientLcid
     )
 
   createVariableData: (offset) ->
@@ -150,7 +150,7 @@ class Login7Payload
     @attachDbFile = ''
     @changePassword = ''
 
-    cbSSPILong = buildBuffer('U32', 0)
+    cbSSPILong = buildBuffer('U32L', 0)
 
     @addVariableData(variableData, @hostname)
     @addVariableData(variableData, @loginData.userName)
@@ -173,10 +173,10 @@ class Login7Payload
     if !(value instanceof Buffer)
       value ||= ''
       value = new Buffer(value, 'ucs2')
-    
+
     offsetAndLength = buildBuffer(
-        'U16', variableData.offset,
-        'U16', value.length
+        'U16L', variableData.offset,
+        'U16L', value.length / 2
     )
 
     variableData.offsetsAndLengths = variableData.offsetsAndLengths.concat(offsetAndLength)
@@ -187,7 +187,8 @@ class Login7Payload
     variableData.offsetsAndLengths = variableData.offsetsAndLengths.concat(bytes);
 
   createPasswordBuffer: () ->
-    password = new Buffer(@loginData.password, 'ucs2')
+    password = @loginData.password || ''
+    password = new Buffer(password, 'ucs2')
 
     for b in [0..password.length - 1]
       byte = password[b]
