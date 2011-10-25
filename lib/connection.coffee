@@ -36,7 +36,7 @@ class Connection extends EventEmitter
     @connection.addListener('timeout', @eventTimeout)
 
     @messageIo = new MessageIO(@connection, @debug)
-    @messageIo.on('message', @eventMessage)
+    @messageIo.on('packet', @eventPacket)
 
     @startRequest('connect/login', callback);
 
@@ -62,18 +62,26 @@ class Connection extends EventEmitter
     @emit('fatal', 'timeout')
     @connection.destroy()
 
-  eventMessage: (type, payload) =>
+  eventPacket: (packet) =>
     switch @state
       when STATE.SENT_PRELOGIN
-        preloginPayload = new PreloginPayload(payload)
-        @debug.payload(preloginPayload.toString('  '))
+        if packet.isLast()
+          preloginPayload = new PreloginPayload(packet.data())
+          @debug.payload(preloginPayload.toString('  '))
 
-        @sendLogin7Packet()
+          @sendLogin7Packet()
+        else
+          # Naive, but reasonable, assumption not valid.
+          fatalError("Expected only a single packet response from PRELOGIN message")
 
       when STATE.SENT_LOGIN7
-        console.log('LOGIN7 response')
-        console.log(payload)
-        @activeRequest.callback(undefined, true)
+        if packet.isLast()
+          console.log('LOGIN7 response')
+          console.log(packet.data())
+          @activeRequest.callback(undefined, true)
+        else
+          # Naive, but reasonable, assumption not valid.
+          fatalError("Expected only a single packet response from LOGIN7 message")
 
   startRequest: (requestName, callback) =>
     @activeRequest =
@@ -99,5 +107,9 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
     @debug.payload(payload.toString('  '))
     @state = STATE.SENT_LOGIN7
+
+  fatalError: (message) ->
+    # TODO close connection, and emit fatal error to client.
+    console.log("FATAL ERROR #{message}")
 
 module.exports = Connection

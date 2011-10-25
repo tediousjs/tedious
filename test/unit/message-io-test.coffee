@@ -79,9 +79,9 @@ exports.receiveOnePacket = (test) ->
   connection = new Connection()
 
   io = new MessageIO(connection, new Debug())
-  io.on('message', (messageType, messagePayload) ->
-    test.strictEqual(messageType, packetType)
-    test.ok(messagePayload.equals(payload))
+  io.on('packet', (packet) ->
+    test.strictEqual(packet.type(), packetType)
+    test.ok(packet.data().equals(payload))
 
     test.done()
   )
@@ -96,9 +96,9 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   connection = new Connection()
 
   io = new MessageIO(connection, new Debug())
-  io.on('message', (messageType, messagePayload) ->
-    test.strictEqual(messageType, packetType)
-    test.ok(messagePayload.equals(payload))
+  io.on('packet', (packet) ->
+    test.strictEqual(packet.type(), packetType)
+    test.ok(packet.data().equals(payload))
 
     test.done()
   )
@@ -111,35 +111,55 @@ exports.receiveOnePacketInTwoChunks = (test) ->
 
 exports.receiveTwoPackets = (test) ->
   payload = new Buffer([1, 2, 3])
+  payload1 = payload.slice(0, 2)
+  payload2 = payload.slice(2, 3)
+
   connection = new Connection()
+  receivedPacketCount = 0
 
   io = new MessageIO(connection, new Debug())
-  io.on('message', (messageType, messagePayload) ->
-    test.strictEqual(messageType, packetType)
-    test.ok(messagePayload.equals(payload))
+  io.on('packet', (packet) ->
+    receivedPacketCount++
 
-    test.done()
+    test.strictEqual(packet.type(), packetType)
+
+    switch receivedPacketCount
+      when 1
+        test.ok(packet.data().equals(payload1))
+      when 2
+        test.ok(packet.data().equals(payload2))
+        test.done()
   )
 
   packet = new Packet(packetType)
-  packet.addData(payload.slice(0, 2))
+  packet.addData(payload1)
   connection.emit('data', packet.buffer)
 
   packet = new Packet(packetType)
   packet.last(true)
-  packet.addData(payload.slice(2, 3))
+  packet.addData(payload2)
   connection.emit('data', packet.buffer)
 
 exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   payload = new Buffer([1, 2, 3, 4])
+  payload1 = payload.slice(0, 2)
+  payload2 = payload.slice(2, 4)
+
   connection = new Connection()
+  receivedPacketCount = 0
 
   io = new MessageIO(connection, new Debug())
-  io.on('message', (messageType, messagePayload) ->
-    test.strictEqual(messageType, packetType)
-    test.ok(messagePayload.equals(payload))
+  io.on('packet', (packet) ->
+    receivedPacketCount++
 
-    test.done()
+    test.strictEqual(packet.type(), packetType)
+
+    switch receivedPacketCount
+      when 1
+        test.ok(packet.data().equals(payload1))
+      when 2
+        test.ok(packet.data().equals(payload2))
+        test.done()
   )
 
   packet1 = new Packet(packetType)

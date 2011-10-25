@@ -22,21 +22,14 @@ class MessageIO extends EventEmitter
       packet = new Packet(@packetBuffer.slice(0, length))
       @logPacket('Received', packet);
 
-      @addToMessage(packet)
-      @packetBuffer = @packetBuffer.slice(length)
+      @emit('packet', packet)
+      @packetBuffer = new Buffer(@packetBuffer.slice(length))
 
   packetSize: (packetSize) ->
     if arguments.length > 0
       @_packetSize = packetSize
 
     @_packetSize
-
-  addToMessage: (packet) ->
-    @payloadBuffer = new Buffer(@payloadBuffer.concat(packet.data()))
-
-    if packet.isLast()
-      @emit('message', packet.type(), @payloadBuffer)
-      @payloadBuffer = new Buffer(0)
 
   sendMessage: (packetType, payload) ->
     numberOfPackets = (Math.floor((payload.length - 1) / @_packetSize)) + 1
