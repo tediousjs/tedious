@@ -2,7 +2,7 @@ buildBuffer = require('./build-buffer')
 require('buffertools')
 os= require('os')
 sprintf = require('sprintf').sprintf
-libraryName = require('./tedious').libraryName
+libraryName = require('./library').name
 
 FLAGS_1 =
   ENDIAN_LITTLE: 0x00,

@@ -10,6 +10,11 @@ exports.create = (test) ->
     language: 'lang',
     database: 'db'
 
+  #start = new Date().getTime()
+  #for c in [1..1000]
+  #  payload = new Login7Payload(loginData)
+  #end = new Date().getTime()
+  #console.log(end - start)
   payload = new Login7Payload(loginData)
 
   expectedLength =
