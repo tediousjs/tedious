@@ -32,7 +32,7 @@ exports.create = (test) ->
 
   test.strictEqual(payload.data.length, expectedLength)    
 
-  passwordStart = payload.data.readUInt16BE(4 + 32 + (2 * 4))
+  passwordStart = payload.data.readUInt16LE(4 + 32 + (2 * 4))
   passwordEnd = passwordStart + (2 * loginData.password.length)
   passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5])
   test.ok(payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected))
