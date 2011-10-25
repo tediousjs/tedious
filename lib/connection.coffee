@@ -65,23 +65,28 @@ class Connection extends EventEmitter
   eventPacket: (packet) =>
     switch @state
       when STATE.SENT_PRELOGIN
-        if packet.isLast()
-          preloginPayload = new PreloginPayload(packet.data())
-          @debug.payload(preloginPayload.toString('  '))
-
-          @sendLogin7Packet()
-        else
-          # Naive, but reasonable, assumption not valid.
-          fatalError("Expected only a single packet response from PRELOGIN message")
-
+        @processPreloginResponsePacket(packet)
       when STATE.SENT_LOGIN7
-        if packet.isLast()
-          console.log('LOGIN7 response')
-          console.log(packet.data())
-          @activeRequest.callback(undefined, true)
-        else
-          # Naive, but reasonable, assumption not valid.
-          fatalError("Expected only a single packet response from LOGIN7 message")
+        @processLogin7ResponsePacket(packet)
+
+  processPreloginResponsePacket: (packet) ->
+    if packet.isLast()
+      preloginPayload = new PreloginPayload(packet.data())
+      @debug.payload(preloginPayload.toString('  '))
+
+      @sendLogin7Packet()
+    else
+      # Naive, but reasonable, assumption not valid.
+      fatalError("Expected only a single packet response from PRELOGIN message")
+
+  processLogin7ResponsePacket: (packet) ->
+    if packet.isLast()
+      console.log('LOGIN7 response')
+      console.log(packet.data())
+      @activeRequest.callback(undefined, true)
+    else
+      # Naive, but reasonable, assumption not valid.
+      fatalError("Expected only a single packet response from LOGIN7 message")
 
   startRequest: (requestName, callback) =>
     @activeRequest =
