@@ -206,7 +206,7 @@ class Login7Payload
   toString: (indent) ->
     indent ||= ''
 
-    indent + 'PreLogin - ' +
+    indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
           @tdsVersion,
           @packetSize,
@@ -214,7 +214,7 @@ class Login7Payload
           @clientPid,
           @connectionId
       ) + '\n' +
-      indent + '           ' +
+      indent + '         ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
           @flags1,
           @flags2,
@@ -223,7 +223,7 @@ class Login7Payload
           @clientTimeZone,
           @clientLcid
       ) + '\n' +
-      indent + '           ' +
+      indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
           @hostname,
           @loginData.userName,
@@ -232,7 +232,7 @@ class Login7Payload
           @loginData.serverName,
           libraryName
       ) + '\n' +
-      indent + '           ' +
+      indent + '         ' +
       sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
           @loginData.language,
           @loginData.database,
