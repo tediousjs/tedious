@@ -21,7 +21,7 @@ module.exports.tooShortForLength = (test) ->
   test.ok(!token)
   test.done()
 
-module.exports.envChange = (test) ->
+module.exports.database = (test) ->
   oldDb = 'old'
   newDb = 'new'
 
@@ -31,15 +31,17 @@ module.exports.envChange = (test) ->
   buffer.writeUInt8(TYPE.ENVCHANGE, pos); pos++
   buffer.writeUInt16LE(buffer.length - (1 + 2), pos); pos += 2
   buffer.writeUInt8(0x01, pos); pos++ #Database
-  buffer.writeUInt8(oldDb.length, pos); pos++
-  buffer.write(oldDb, pos, 'ucs-2'); pos += (oldDb.length * 2)
   buffer.writeUInt8(newDb.length, pos); pos++
   buffer.write(newDb, pos, 'ucs-2'); pos += (newDb.length * 2)
+  buffer.writeUInt8(oldDb.length, pos); pos++
+  buffer.write(oldDb, pos, 'ucs-2'); pos += (oldDb.length * 2)
   #console.log(buffer)
 
   token = parser(buffer, 1)
 
   test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.type, 'DATABASE')
+  test.strictEqual(token.oldValue, 'old')
+  test.strictEqual(token.newValue, 'new')
 
   test.done()
