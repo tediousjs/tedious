@@ -45,3 +45,43 @@ module.exports.database = (test) ->
   test.strictEqual(token.newValue, 'new')
 
   test.done()
+
+module.exports.packetSize = (test) ->
+  oldSize = '1024'
+  newSize = '2048'
+
+  buffer = new Buffer(1 + 2 + 1 + 1 + (oldSize.length * 2) + 1 + (newSize.length * 2))
+  pos = 0;
+
+  buffer.writeUInt8(TYPE.ENVCHANGE, pos); pos++
+  buffer.writeUInt16LE(buffer.length - (1 + 2), pos); pos += 2
+  buffer.writeUInt8(0x04, pos); pos++ #Packet Size
+  buffer.writeUInt8(newSize.length, pos); pos++
+  buffer.write(newSize, pos, 'ucs-2'); pos += (newSize.length * 2)
+  buffer.writeUInt8(oldSize.length, pos); pos++
+  buffer.write(oldSize, pos, 'ucs-2'); pos += (oldSize.length * 2)
+  #console.log(buffer)
+
+  token = parser(buffer, 1)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.type, 'PACKET_SIZE')
+  test.strictEqual(token.oldValue, 1024)
+  test.strictEqual(token.newValue, 2048)
+
+  test.done()
+
+module.exports.badType = (test) ->
+  buffer = new Buffer(1 + 2 + 1)
+  pos = 0;
+
+  buffer.writeUInt8(TYPE.ENVCHANGE, pos); pos++
+  buffer.writeUInt16LE(buffer.length - (1 + 2), pos); pos += 2
+  buffer.writeUInt8(0xFF, pos); pos++ #Bad type
+  #console.log(buffer)
+
+  token = parser(buffer, 1)
+
+  test.ok(token.error)
+
+  test.done()
