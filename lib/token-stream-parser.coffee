@@ -23,7 +23,6 @@ class Parser extends EventEmitter
     if tokenParsers[type]
       token = tokenParsers[type](@buffer, @position)
       if token
-        console.log(token.length)
         @position += token.length
       else
         false

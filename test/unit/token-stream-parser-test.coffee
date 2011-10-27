@@ -15,7 +15,7 @@ module.exports.envChange = (test) ->
   buffer.write(oldDb, pos, 'ucs-2'); pos += (oldDb.length * 2)
   buffer.writeUInt8(newDb.length, pos); pos++
   buffer.write(newDb, pos, 'ucs-2'); pos += (newDb.length * 2)
-  console.log(buffer)
+  #console.log(buffer)
 
   parser = new Parser()
   parser.addBuffer(buffer)
