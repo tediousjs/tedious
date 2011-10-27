@@ -1,3 +1,4 @@
+require('buffertools')
 EventEmitter = require('events').EventEmitter
 isPacketComplete = require('./packet').isPacketComplete
 packetLength = require('./packet').packetLength

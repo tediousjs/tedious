@@ -5,3 +5,5 @@ todo
 *sublime*
 npm-debug.log
 coffee/*
+
+test/unit/perf-buffer.coffee
