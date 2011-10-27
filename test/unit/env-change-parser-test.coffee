@@ -1,5 +1,25 @@
-Parser = require('../../lib/token-stream-parser').Parser
+parser = require('../../lib/env-change-parser')
 TYPE = require('../../lib/token').TYPE
+
+module.exports.tooShortToHoldTypeAndLengthValues = (test) ->
+  buffer = new Buffer(3)
+
+  token = parser(buffer, 1)
+
+  test.ok(!token)
+  test.done()
+
+module.exports.tooShortForLength = (test) ->
+  buffer = new Buffer(5)
+  pos = 0;
+
+  buffer.writeUInt8(TYPE.ENVCHANGE, pos); pos++
+  buffer.writeUInt16LE(3, pos); pos += 2
+
+  token = parser(buffer, 1)
+
+  test.ok(!token)
+  test.done()
 
 module.exports.envChange = (test) ->
   oldDb = 'old'
@@ -15,9 +35,11 @@ module.exports.envChange = (test) ->
   buffer.write(oldDb, pos, 'ucs-2'); pos += (oldDb.length * 2)
   buffer.writeUInt8(newDb.length, pos); pos++
   buffer.write(newDb, pos, 'ucs-2'); pos += (newDb.length * 2)
-  console.log(buffer)
+  #console.log(buffer)
 
-  parser = new Parser()
-  parser.addBuffer(buffer)
+  token = parser(buffer, 1)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.type, 'DATABASE')
 
   test.done()
