@@ -6,6 +6,7 @@ PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
+TokenStreamParser = require('./token-stream-parser').Parser
 
 # s3.2.1
 STATE =
@@ -99,6 +100,9 @@ class Connection extends EventEmitter
 
   processLogin7Response: ->
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
+    parser = new TokenStreamParser()
+    parser.addBuffer(@messagePayloadBuffer)
+
     @activeRequest.callback(undefined, true)
 
   startRequest: (requestName, callback) =>

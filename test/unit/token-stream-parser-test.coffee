@@ -2,6 +2,27 @@ Parser = require('../../lib/token-stream-parser').Parser
 TYPE = require('../../lib/token').TYPE
 
 module.exports.envChange = (test) ->
+  buffer = createDbChangeBuffer()
+
+  parser = new Parser()
+  parser.addBuffer(buffer)
+
+  test.ok(parser.end())
+
+  test.done()
+
+module.exports.tokenSplitAcrossBuffers = (test) ->
+  buffer = createDbChangeBuffer()
+
+  parser = new Parser()
+  parser.addBuffer(buffer.slice(0,6))
+  parser.addBuffer(buffer.slice(6))
+
+  test.ok(parser.end())
+
+  test.done()
+
+createDbChangeBuffer = ->
   oldDb = 'old'
   newDb = 'new'
 
@@ -17,7 +38,4 @@ module.exports.envChange = (test) ->
   buffer.write(newDb, pos, 'ucs-2'); pos += (newDb.length * 2)
   #console.log(buffer)
 
-  parser = new Parser()
-  parser.addBuffer(buffer)
-
-  test.done()
+  buffer
