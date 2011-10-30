@@ -3,7 +3,8 @@ EventEmitter = require('events').EventEmitter
 TYPE = require('./token').TYPE
 
 tokenParsers = {}
-tokenParsers[TYPE.ENVCHANGE] = require('./env-change-parser')
+tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
+tokenParsers[TYPE.INFO] = require('./info-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
@@ -40,9 +41,17 @@ class Parser extends EventEmitter
     if tokenParsers[type]
       token = tokenParsers[type](@buffer, @position + 1)
       if token
-        @position += 1 + token.length
-        #console.log token
-        true
+        if !token.error
+          #console.log(token)
+          @position += 1 + token.length
+
+          if token.event
+            @emit(token.event, token)
+
+          true
+        else
+          console.log(token.error)
+          false
       else
         false
       

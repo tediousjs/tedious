@@ -101,6 +101,9 @@ class Connection extends EventEmitter
   processLogin7Response: ->
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
     parser = new TokenStreamParser()
+    parser.on('packetSizeChange', (token) ->
+      console.log('ps event!!!!!!!!!!', token)
+    )
     parser.addBuffer(@messagePayloadBuffer)
 
     @activeRequest.callback(undefined, true)
