@@ -13,11 +13,17 @@ types =
   4:
     name: 'PACKET_SIZE'
     event: 'packetSizeChange'
-  7: 'SQL_COLLATION'
-  8: 'BEGIN_TXN'
-  9: 'COMMIT_TXN'
-  10: 'ROLLBACK_TXN'
-  17: 'TXN_ENDED'
+  7:
+    name: 'SQL_COLLATION'
+    event: 'sqlCollationChange'
+  8:
+    name: 'BEGIN_TXN'
+  9:
+    name: 'COMMIT_TXN'
+  10:
+    name: 'ROLLBACK_TXN'
+  17:
+    name: 'TXN_ENDED'
 
 module.exports = (buffer, position) ->
   if buffer.length - position < 3
@@ -46,8 +52,18 @@ module.exports = (buffer, position) ->
         position++
         oldValue = buffer.toString('ucs-2', position, position + valueLength)
         position += valueLength
+      when 'SQL_COLLATION'
+        valueLength = buffer.readUInt8(position)
+        position++
+        newValue = buffer.slice(position, position + valueLength)
+        position += valueLength
+
+        valueLength = buffer.readUInt8(position)
+        position++
+        oldValue = buffer.slice(position, position + valueLength)
+        position += valueLength
       else
-        error = "Unsupported ENVCHANGE type #{type.name}"
+        error = "Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{position}"
 
     if type.name == 'PACKET_SIZE'
       newValue = parseInt(newValue)

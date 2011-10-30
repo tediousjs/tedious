@@ -57,7 +57,7 @@ class Parser extends EventEmitter
         false
       
     else
-      console.log("Unknown token type #{type}")
+      console.log("Unknown token type #{type} at offet #{@position}")
       false
 
 exports.Parser = Parser
