@@ -1,5 +1,4 @@
-
-module.exports = (buffer, position) ->
+parser = (buffer, position) ->
   if buffer.length - position < 3
     # Not long enough to contain length and type bytes.
     return false
@@ -39,7 +38,6 @@ module.exports = (buffer, position) ->
 
   token =
     length: length + 2
-    event: 'infoMessage'
     number: number
     state: state
     class: class_
@@ -47,3 +45,18 @@ module.exports = (buffer, position) ->
     serverName: serverName
     procName: procName
     lineNumber: lineNumber
+
+infoParser = (buffer, position) ->
+  token = parser(buffer, position)
+  token.event = 'infoMessage'
+
+  token
+
+errorParser = (buffer, position) ->
+  token = parser(buffer, position)
+  token.event = 'errorMessage'
+
+  token
+
+exports.infoParser = infoParser
+exports.errorParser = errorParser

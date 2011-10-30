@@ -4,7 +4,8 @@ TYPE = require('./token').TYPE
 
 tokenParsers = {}
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
-tokenParsers[TYPE.INFO] = require('./info-token-parser')
+tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
+tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).

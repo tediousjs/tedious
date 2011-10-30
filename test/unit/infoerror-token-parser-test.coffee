@@ -1,4 +1,4 @@
-parser = require('../../lib/info-token-parser')
+infoParser = require('../../lib/infoerror-token-parser').infoParser
 TYPE = require('../../lib/token').TYPE
 
 module.exports.info = (test) ->
@@ -32,7 +32,8 @@ module.exports.info = (test) ->
   buffer.writeUInt32LE(lineNumber, pos); pos += 4
   #console.log(buffer)
 
-  token = parser(buffer, 1)
+  token = infoParser(buffer, 1)
+  #console.log(token)
 
   test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.number, number)
