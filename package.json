@@ -16,7 +16,7 @@
     "sprintf": "0.1.1"
   },
   "devDependencies": {
-    "nodeunit": "0.5.5"
+    "nodeunit": "0.6.2"
   },
   "scripts": {
     "test": "scripts/tests"
