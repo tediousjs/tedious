@@ -6,6 +6,7 @@ tokenParsers = {}
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
+tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
@@ -43,7 +44,7 @@ class Parser extends EventEmitter
       token = tokenParsers[type](@buffer, @position + 1)
       if token
         if !token.error
-          #console.log(token)
+          console.log(token)
           @position += 1 + token.length
 
           if token.event

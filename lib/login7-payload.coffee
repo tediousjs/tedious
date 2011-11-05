@@ -3,6 +3,7 @@ require('buffertools')
 os= require('os')
 sprintf = require('sprintf').sprintf
 libraryName = require('./library').name
+versions = require('./tds-versions').versions
 
 FLAGS_1 =
   ENDIAN_LITTLE: 0x00,
@@ -65,10 +66,7 @@ FLAGS_3 =
 
   UNKNOWN_COLLATION_HANDLING: 0x08  # Introduced in TDS 7.3
 
-TDS_VERSION_7_2 = 0x72090002
-TDS_VERSION_7_3_A = 0x730A0003
-TDS_VERSION_7_3_B = 0x730B0003
-DEFAULT_TDS_VERSION = TDS_VERSION_7_2
+DEFAULT_TDS_VERSION = versions['7_2']
 
 DEFAULT_PACKET_SIZE = 4 * 1024
 

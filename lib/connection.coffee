@@ -102,7 +102,7 @@ class Connection extends EventEmitter
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
     parser = new TokenStreamParser()
     parser.on('packetSizeChange', (token) ->
-      console.log('ps event!!!!!!!!!!', token)
+      console.log('packetSizeChange event', token)
     )
     parser.addBuffer(@messagePayloadBuffer)
 
