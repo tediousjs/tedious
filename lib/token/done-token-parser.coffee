@@ -33,7 +33,9 @@ parser = (buffer, position) ->
     rowCount = rowCountLow + (0x100000000 * rowCountHigh)
 
   token =
+    name: 'DONE'
     length: 2 + 2 + 8
+    event: 'done'
     more: more
     sqlError: sqlError
     attention: attention

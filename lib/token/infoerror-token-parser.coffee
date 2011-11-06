@@ -50,12 +50,14 @@ parser = (buffer, position) ->
 
 infoParser = (buffer, position) ->
   token = parser(buffer, position)
+  token.name = 'INFO'
   token.event = 'infoMessage'
 
   token
 
 errorParser = (buffer, position) ->
   token = parser(buffer, position)
+  token.name = 'ERROR'
   token.event = 'errorMessage'
 
   token

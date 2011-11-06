@@ -75,9 +75,11 @@ module.exports = (buffer, position) ->
 
   if error
     token =
+      name: 'ENVCHANGE'
       error: error
   else
     token =
+      name: 'ENVCHANGE'
       length: length + 2
       type: type.name
       event: type.event

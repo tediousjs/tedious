@@ -42,10 +42,13 @@ parser = (buffer, position) ->
 
   if error
     token =
+      name: 'LOGINACK'
       error: error
   else
     token =
+      name: 'LOGINACK'
       length: length + 2
+      event: 'loginack'
       interface: interface
       tdsVersion: tdsVersion
       progName: progName

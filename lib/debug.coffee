@@ -10,6 +10,7 @@ class Debug extends EventEmitter
     @options = @options || {}
     @options.data = @options.data || false
     @options.payload = @options.payload || false
+    @options.payload = @options.token || false
 
     @indent = '  '
 
@@ -26,6 +27,10 @@ class Debug extends EventEmitter
   payload: (payload) ->
     if @haveListeners() && @options.payload
       @log(payload)
+
+  token: (token) ->
+    if @haveListeners() && @options.token
+      @log(token)
 
   # Only incur the overhead of producing formatted messages when necessary.
   haveListeners: ->

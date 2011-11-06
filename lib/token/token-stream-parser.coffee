@@ -20,7 +20,7 @@ tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser')
   parsing resumes.
 ###
 class Parser extends EventEmitter
-  constructor: () ->
+  constructor: (@debug) ->
     @buffer = new Buffer(0)
     @position = 0
 
@@ -44,6 +44,8 @@ class Parser extends EventEmitter
     if tokenParsers[type]
       token = tokenParsers[type](@buffer, @position + 1)
       if token
+        @debug.token(token)
+
         if !token.error
           #console.log(token)
           @position += 1 + token.length

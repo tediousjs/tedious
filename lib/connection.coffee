@@ -25,6 +25,7 @@ class Connection extends EventEmitter
     @options.port ||= 1433
     @options.timeout ||= 10 * 1000
 
+    @loggedIn = false
     @state = STATE.INITIAL
 
     @debug = new Debug(@options.debug)
@@ -100,13 +101,36 @@ class Connection extends EventEmitter
 
   processLogin7Response: ->
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
-    parser = new TokenStreamParser()
-    parser.on('packetSizeChange', (token) ->
-      console.log('packetSizeChange event', token)
+    parser = new TokenStreamParser(@debug)
+    parser.on('loginack', (token) =>
+      @loggedIn = true
     )
-    parser.addBuffer(@messagePayloadBuffer)
+    parser.on('infoMessage', (token) =>
+      @emit('infoMessage', token)
+    )
+    parser.on('errorMessage', (token) =>
+      @emit('errorMessage', token)
+    )
+    parser.on('packetSizeChange', (token) =>
+      @messageIo.packetSize(token.newValue)
+    )
+    parser.on('databaseChange', (token) =>
+      @_database = token.newValue
+      @emit(arguments[0], @_database)
+    )
+    parser.on('languageChange', (token) =>
+      @_language = token.newValue
+      @emit(arguments[0], @_language)
+    )
+    parser.on('charsetChange', (token) =>
+      @_charset = token.newValue
+      @emit(arguments[0], @_charset)
+    )
+    parser.on('done', (token) =>
+      @activeRequest.callback(undefined, @loggedIn)
+    )
 
-    @activeRequest.callback(undefined, true)
+    parser.addBuffer(@messagePayloadBuffer)
 
   startRequest: (requestName, callback) =>
     @activeRequest =
@@ -138,6 +162,15 @@ class Connection extends EventEmitter
     @debug.log("FATAL ERROR: #{message}")
     @close()
     @emit('fatal', message)
+
+  database: ->
+    @_database
+
+  language: ->
+    @_language
+
+  charset: ->
+    @_charset
 
   close: ->
     @connection.end()
