@@ -1,4 +1,4 @@
-versions = require('./tds-versions').versionsByValue
+versions = require('../tds-versions').versionsByValue
 
 interfaces =
   0: 'SQL_DFLT'

@@ -1,5 +1,5 @@
-parser = require('../../lib/env-change-token-parser')
-TYPE = require('../../lib/token').TYPE
+parser = require('../../../lib/token/env-change-token-parser')
+TYPE = require('../../../lib/token/token').TYPE
 
 module.exports.tooShortToHoldTypeAndLengthValues = (test) ->
   buffer = new Buffer(3)

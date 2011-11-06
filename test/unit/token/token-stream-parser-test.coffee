@@ -1,5 +1,5 @@
-Parser = require('../../lib/token-stream-parser').Parser
-TYPE = require('../../lib/token').TYPE
+Parser = require('../../../lib/token/token-stream-parser').Parser
+TYPE = require('../../../lib/token/token').TYPE
 
 module.exports.envChange = (test) ->
   buffer = createDbChangeBuffer()

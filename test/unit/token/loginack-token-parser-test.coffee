@@ -1,5 +1,5 @@
-parser = require('../../lib/loginack-token-parser')
-TYPE = require('../../lib/token').TYPE
+parser = require('../../../lib/token/loginack-token-parser')
+TYPE = require('../../../lib/token/token').TYPE
 
 module.exports.info = (test) ->
   interface = 1

@@ -1,5 +1,5 @@
-infoParser = require('../../lib/infoerror-token-parser').infoParser
-TYPE = require('../../lib/token').TYPE
+infoParser = require('../../../lib/token/infoerror-token-parser').infoParser
+TYPE = require('../../../lib/token/token').TYPE
 
 module.exports.info = (test) ->
   number = 3
