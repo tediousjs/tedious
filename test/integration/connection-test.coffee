@@ -24,7 +24,6 @@ exports.badCredentials = (test) ->
   test.expect(4)
 
   connection = new Connection(config.server, config.userName, 'bad-password', config.options, (err, loggedIn) ->
-    console.log(err, loggedIn)
     test.ok(!err)
     test.ok(!loggedIn)
 
