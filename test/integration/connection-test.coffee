@@ -20,6 +20,21 @@ exports.connect = (test) ->
     #console.log(message)
   )
 
+exports.execSql = (test) ->
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    test.ok(loggedIn)
+    
+    connection.execSql('select 8', (err) ->
+      console.log("execed - #{err}")
+      test.done()
+    )
+  )
+
+  connection.on('debug', (message) ->
+    console.log(message)
+  )
+
 exports.badCredentials = (test) ->
   test.expect(4)
 

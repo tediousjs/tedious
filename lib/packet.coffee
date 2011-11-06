@@ -4,9 +4,10 @@ sprintf = require('sprintf').sprintf
 HEADER_LENGTH = 8
 
 TYPE =
-  RPC_REQUEST: 0x03,
-  TABULAR_RESULT: 0x04,
-  LOGIN7: 0x10,
+  SQL_BATCH: 0x01
+  RPC_REQUEST: 0x03
+  TABULAR_RESULT: 0x04
+  LOGIN7: 0x10
   PRELOGIN: 0x12
 
 typeByValue = {}

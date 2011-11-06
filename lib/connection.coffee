@@ -4,6 +4,7 @@ EventEmitter = require('events').EventEmitter
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
+SqlBatchPayload = require('./sqlbatch-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
 TokenStreamParser = require('./token/token-stream-parser').Parser
@@ -53,6 +54,13 @@ class Connection extends EventEmitter
 
     @packetBuffer = new Buffer(0)
 
+  execSql: (sqlText) ->
+    payload = new SqlBatchPayload(sqlText)
+    
+    @state = STATE.SENT_CLIENT_REQUEST
+    @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+    @debug.payload(payload.toString('  '))
+
   eventClose: (hadError) =>
     @emit('closed')
     @debug.log("connection close, hadError:#{hadError}")
@@ -76,10 +84,10 @@ class Connection extends EventEmitter
     switch @state
       when STATE.SENT_PRELOGIN
         @buildMessage(packet, @processPreloginResponse)
-      when STATE.SENT_LOGIN7
-        @buildMessage(packet, @processLogin7Response)
+      when STATE.SENT_LOGIN7, STATE.SENT_CLIENT_REQUEST
+        @buildMessage(packet, @processTokenStreamResponse)
       else
-        @fatalError("Unexpected packet, type #{packet.type()}")
+        @fatalError("Unexpected packet in state #{@state}: packet type #{packet.type()}")
 
   # Accumulates packet payloads into a buffer until all of the packets
   # for a message have been received.
@@ -100,7 +108,7 @@ class Connection extends EventEmitter
     @sendLogin7Packet()
 
   # s2.2.2.2
-  processLogin7Response: ->
+  processTokenStreamResponse: ->
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
     parser = new TokenStreamParser(@debug)
     parser.on('loginack', (token) =>
@@ -128,6 +136,7 @@ class Connection extends EventEmitter
       @emit(arguments[0], @_charset)
     )
     parser.on('done', (token) =>
+      @state = STATE.LOGGED_IN
       @activeRequest.callback(undefined, @loggedIn)
     )
 

@@ -1,4 +1,3 @@
-assert = require('assert')
 buildBuffer = require('./build-buffer')
 sprintf = require('sprintf').sprintf
 
