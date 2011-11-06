@@ -99,6 +99,7 @@ class Connection extends EventEmitter
 
     @sendLogin7Packet()
 
+  # s2.2.2.2
   processLogin7Response: ->
     #console.log("LOGIN7 response #{@messagePayloadBuffer}")
     parser = new TokenStreamParser(@debug)

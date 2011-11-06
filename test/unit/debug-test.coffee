@@ -66,3 +66,23 @@ exports.dataNotEnabled = (test) ->
   debug.data(new Packet())
 
   test.done()
+
+exports.tokenEnabled = (test) ->
+  debug = new Debug({token: true})
+  debug.on('debug', (token) ->
+    test.strictEqual(token.name, 'test')
+
+    test.done()
+  )
+
+  debug.token({name: 'test'})
+
+exports.payloadNotEnabled = (test) ->
+  debug = new Debug()
+  debug.on('debug', (token) ->
+    test.ok(false)
+  )
+
+  debug.token({name: 'test'})
+
+  test.done()

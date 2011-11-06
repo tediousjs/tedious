@@ -10,7 +10,7 @@ class Debug extends EventEmitter
     @options = @options || {}
     @options.data = @options.data || false
     @options.payload = @options.payload || false
-    @options.payload = @options.token || false
+    @options.token = @options.token || false
 
     @indent = '  '
 

@@ -17,7 +17,7 @@ exports.connect = (test) ->
   )
 
   connection.on('debug', (message) ->
-    console.log(message)
+    #console.log(message)
   )
 
 exports.badCredentials = (test) ->
@@ -37,7 +37,7 @@ exports.badCredentials = (test) ->
   )
 
   connection.on('debug', (message) ->
-    console.log(message)
+    #console.log(message)
   )
 
 exports.badServer = (test) ->
