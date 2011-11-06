@@ -1,3 +1,5 @@
+# s2.2.7.9, s2.2.7.10
+
 parser = (buffer, position) ->
   if buffer.length - position < 3
     # Not long enough to contain length and type bytes.

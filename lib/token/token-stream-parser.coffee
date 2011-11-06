@@ -3,6 +3,7 @@ EventEmitter = require('events').EventEmitter
 TYPE = require('./token').TYPE
 
 tokenParsers = {}
+tokenParsers[TYPE.DONE] = require('./done-token-parser')
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
