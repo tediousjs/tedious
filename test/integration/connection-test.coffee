@@ -25,7 +25,7 @@ exports.execSql = (test) ->
     test.ok(!err)
     test.ok(loggedIn)
     
-    connection.execSql('select 8', (err) ->
+    connection.execSql("select 8 as C1, 'abc' as C2, N'def' as C3", (err) ->
       console.log("execed - #{err}")
       test.done()
     )
