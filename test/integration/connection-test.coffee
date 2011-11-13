@@ -25,7 +25,7 @@ exports.connect = (test) ->
   )
 
 exports.execSql = (test) ->
-  test.expect(8)
+  test.expect(11)
 
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
@@ -43,9 +43,15 @@ exports.execSql = (test) ->
   
   connection.on('row', (columns) ->
     test.strictEqual(columns.length, 3)
+
     test.strictEqual(columns[0].value, 8)
     test.strictEqual(columns[1].value, 'abc')
     test.strictEqual(columns[2].value, 'def')
+    
+    byName = columns.byName()
+    test.strictEqual(byName.C1.value, 8)
+    test.strictEqual(byName.C2.value, 'abc')
+    test.strictEqual(byName.C3.value, 'def')
   )
 
   connection.on('debug', (message) ->
