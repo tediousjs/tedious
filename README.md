@@ -10,15 +10,16 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Tedious is not yet useable.
+Tedious is not yet really useable.
 
-PreLogin and Login7 packets and their responses are broadly implemented.
-Authentication works.
+- `PRELOGIN` and `LOGIN7` packets and their responses are broadly implemented.
+- Authentication works.
+- A SQL statement request (in a `SQL_BATCH` packet) can be sent.
+ - Only `Int`, `VarChar` and `NVarChar` types are supported so far.
+ - An event for column metadata in the response is emitted.
+ - Events for each row in the response are emitted.
 
-A SQL statement request can be sent.
-The response token for column metadata can be parsed (for a few simple datatypes)
-Work is in progress to parse the row token (again for a few datatypes.
-Once this is more or less working, tedious might be useable, after a fashion, for very simple use cases.
+Tedious might soon be useable, after a fashion, for very simple use cases.
 
 Licence
 -------
