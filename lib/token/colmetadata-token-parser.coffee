@@ -20,7 +20,7 @@ parser = (buffer, position) ->
     position++
     
     if !type
-      error = "Unrecognised data type #{typeNumber}"
+      error = "Unrecognised data type #{typeNumber} at offset #{position - 1}"
       break
 
     #console.log(type)

@@ -11,7 +11,7 @@ parser = (buffer, position, columnsMetaData) ->
       when 'Int'
         value = buffer.readUInt32LE(position)
         position += type.dataLength
-      when 'VarChar'
+      when 'VarChar', 'Char'
         dataLength = buffer.readUInt16LE(position)
         position += 2
         value = buffer.toString('ascii', position, position + dataLength)
