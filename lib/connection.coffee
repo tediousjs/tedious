@@ -54,7 +54,9 @@ class Connection extends EventEmitter
 
     @packetBuffer = new Buffer(0)
 
-  execSql: (sqlText) ->
+  execSql: (sqlText, callback) ->
+    @startRequest('execSql', callback);
+
     payload = new SqlBatchPayload(sqlText)
     
     @state = STATE.SENT_CLIENT_REQUEST
@@ -125,15 +127,21 @@ class Connection extends EventEmitter
     )
     parser.on('databaseChange', (token) =>
       @_database = token.newValue
-      @emit(arguments[0], @_database)
+      @emit('databaseChange', @_database)
     )
     parser.on('languageChange', (token) =>
       @_language = token.newValue
-      @emit(arguments[0], @_language)
+      @emit('languageChange', @_language)
     )
     parser.on('charsetChange', (token) =>
       @_charset = token.newValue
-      @emit(arguments[0], @_charset)
+      @emit('charsetChange', @_charset)
+    )
+    parser.on('columnMetadata', (token) =>
+      @emit('columnMetadata', token.columns)
+    )
+    parser.on('row', (token) =>
+      @emit('row', token.columns)
     )
     parser.on('done', (token) =>
       @state = STATE.LOGGED_IN

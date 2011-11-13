@@ -19,7 +19,7 @@ parser = (buffer, position, columnsMetaData) ->
       when 'NVarChar'
         dataLength = buffer.readUInt16LE(position)
         position += 2
-        value = buffer.toString('ucs-2', position, position + (dataLength * 2))
+        value = buffer.toString('ucs-2', position, position + (dataLength))
         position += dataLength
       else
         error = "Unrecognised column type #{type.name}"

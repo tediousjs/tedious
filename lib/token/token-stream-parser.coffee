@@ -9,6 +9,7 @@ tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
 tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser')
+tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
@@ -43,7 +44,8 @@ class Parser extends EventEmitter
     type = @buffer.readUInt8(@position)
 
     if tokenParsers[type]
-      token = tokenParsers[type](@buffer, @position + 1)
+      token = tokenParsers[type](@buffer, @position + 1, @colMetadata)
+
       if token
         @debug.token(token)
 
@@ -56,7 +58,7 @@ class Parser extends EventEmitter
             
           switch token.name
             when 'COLMETADATA'
-              colMetadata = token.columns
+              @colMetadata = token.columns
 
           true
         else

@@ -21,14 +21,27 @@ exports.connect = (test) ->
   )
 
 exports.execSql = (test) ->
+  test.expect(8)
+
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
     test.ok(loggedIn)
     
     connection.execSql("select 8 as C1, 'abc' as C2, N'def' as C3", (err) ->
-      console.log("execed - #{err}")
+      test.ok(!err)
       test.done()
     )
+  )
+  
+  connection.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(columnsMetadata.length, 3)
+  )
+  
+  connection.on('row', (columns) ->
+    test.strictEqual(columns.length, 3)
+    test.strictEqual(columns[0].value, 8)
+    test.strictEqual(columns[1].value, 'abc')
+    test.strictEqual(columns[2].value, 'def')
   )
 
   connection.on('debug', (message) ->
