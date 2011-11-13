@@ -16,6 +16,10 @@ exports.connect = (test) ->
     test.done()
   )
 
+  connection.on('databaseChange', (database) ->
+    test.strictEqual(database, config.options.database)
+  )
+
   connection.on('debug', (message) ->
     #console.log(message)
   )
@@ -45,7 +49,7 @@ exports.execSql = (test) ->
   )
 
   connection.on('debug', (message) ->
-    console.log(message)
+    #console.log(message)
   )
 
 exports.badCredentials = (test) ->
@@ -93,13 +97,3 @@ exports.badPort = (test) ->
   connection.on('debug', (message) ->
     #console.log(message)
   )
-
-  
-    #test.ok(info.infos.length > 0);
-    #test.strictEqual(info.errors.length, 0);
-  
-    #test.ok(info.envChanges.length > 0);
-    #info.envChanges.forEach(function(envChange) {
-    #  if (envChange.type === 'database') {
-    #    test.strictEqual(envChange.newValue, config.options.database);
-    #  }
