@@ -1,4 +1,4 @@
-parser = require('../../../lib/token/done-token-parser')
+parser = require('../../../lib/token/done-token-parser').doneParser
 TYPE = require('../../../lib/token/token').TYPE
 
 parse = (status, curCmd, doneRowCount) ->

@@ -4,7 +4,9 @@ TYPE = require('./token').TYPE
 
 tokenParsers = {}
 tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser')
-tokenParsers[TYPE.DONE] = require('./done-token-parser')
+tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser
+tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser
+tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser

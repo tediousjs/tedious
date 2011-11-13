@@ -43,4 +43,27 @@ parser = (buffer, position) ->
     rowCount: rowCount
     curCmd: curCmd
 
-module.exports = parser
+doneParser = (buffer, position) ->
+  token = parser(buffer, position)
+  token.name = 'DONE'
+  token.event = 'done'
+
+  token
+
+doneInProcParser = (buffer, position) ->
+  token = parser(buffer, position)
+  token.name = 'DONEINPROC'
+  token.event = 'doneInProc'
+
+  token
+
+doneProcParser = (buffer, position) ->
+  token = parser(buffer, position)
+  token.name = 'DONEPROC'
+  token.event = 'doneProc'
+
+  token
+
+exports.doneParser = doneParser
+exports.doneInProcParser = doneInProcParser
+exports.doneProcParser = doneProcParser
