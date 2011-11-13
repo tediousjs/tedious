@@ -115,11 +115,13 @@ TYPE =
   IMAGETYPE:            0x22  # Image
   NTEXTTYPE:            0x63  # NText
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)
-
-typeById = {}
-for name, value of TYPE
-  typeById[value.id] = value
 ###
 
+typeByName = {}
+for id, type of TYPE
+  type.id = parseInt(id, 10)
+  typeByName[type.name] = type
+
+
 exports.TYPE = TYPE
-#exports.typeByValue = typeById
+exports.typeByName = typeByName

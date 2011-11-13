@@ -53,6 +53,10 @@ class Parser extends EventEmitter
 
           if token.event
             @emit(token.event, token)
+            
+          switch token.name
+            when 'COLMETADATA'
+              colMetadata = token.columns
 
           true
         else

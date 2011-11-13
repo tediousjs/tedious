@@ -23,7 +23,7 @@ parser = (buffer, position) ->
       error = "Unrecognised data type #{typeNumber}"
       break
 
-    console.log(type)
+    #console.log(type)
 
     if type.fixedLength
       dataLength = type.dataLength
