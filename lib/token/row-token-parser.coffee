@@ -29,6 +29,14 @@ parser = (buffer, position, columnsMetaData) ->
       value: value
       metadata: columnMetaData
 
+  columns.byName = ->
+    byName = {}
+
+    for column in columns
+      byName[column.metadata.colName] = column
+
+    byName
+
   if error
     token =
       name: 'ROW'
