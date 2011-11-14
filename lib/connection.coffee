@@ -143,9 +143,24 @@ class Connection extends EventEmitter
     parser.on('row', (token) =>
       @emit('row', token.columns)
     )
+    parser.on('returnStatus', (token) =>
+      @procReturnStatusValue = token.value
+    )
     parser.on('done', (token) =>
+      state = @state
+
+      if @loggedIn
+        @state = STATE.LOGGED_IN
+
+      if state == STATE.SENT_LOGIN7
+        @activeRequest.callback(undefined, @loggedIn)
+      else
+        @activeRequest.callback(undefined, token.rowCount)
+    )
+    parser.on('doneProc', (token) =>
       @state = STATE.LOGGED_IN
-      @activeRequest.callback(undefined, @loggedIn)
+      @activeRequest.callback(undefined, @procReturnStatusValue)
+      @procReturnStatusValue = undefined
     )
 
     parser.addBuffer(@messagePayloadBuffer)

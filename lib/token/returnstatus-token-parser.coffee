@@ -9,6 +9,7 @@ parser = (buffer, position) ->
   token =
     name: 'RETURNSTATUS'
     length: position - startPosition
+    event: 'returnStatus'
     value: value
 
 module.exports = parser
