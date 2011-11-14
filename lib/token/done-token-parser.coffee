@@ -14,12 +14,12 @@ parser = (buffer, position) ->
   status = buffer.readUInt16LE(position)
   position += 2
 
-  more = status & STATUS.MORE
-  sqlError = status & STATUS.ERROR
-  inTxn = status & STATUS.INXACT
-  rowCountValid = status & STATUS.COUNT
-  attention = status & STATUS.ATTN
-  serverError = status & STATUS.SRVERROR
+  more = !!(status & STATUS.MORE)
+  sqlError = !!(status & STATUS.ERROR)
+  inTxn = !!(status & STATUS.INXACT)
+  rowCountValid = !!(status & STATUS.COUNT)
+  attention = !!(status & STATUS.ATTN)
+  serverError = !!(status & STATUS.SRVERROR)
 
   curCmd = buffer.readUInt16LE(position)
   position += 2
