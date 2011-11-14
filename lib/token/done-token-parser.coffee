@@ -1,4 +1,4 @@
-# s2.2.7.5
+# s2.2.7.5/6/7
 
 versions = require('../tds-versions').versionsByValue
 
