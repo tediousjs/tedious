@@ -172,3 +172,45 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   connection.emit('data', packet1.buffer.slice(0, 6))
   connection.emit('data', packet1.buffer.slice(6).concat(packet2.buffer.slice(0, 4)))
   connection.emit('data', packet2.buffer.slice(4))
+
+exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
+  payload = new Buffer([1, 2, 3, 4, 5, 6])
+  payload1 = payload.slice(0, 2)
+  payload2 = payload.slice(2, 4)
+  payload3 = payload.slice(4, 6)
+
+  connection = new Connection()
+  receivedPacketCount = 0
+
+  io = new MessageIO(connection, new Debug())
+  io.on('packet', (packet) ->
+    receivedPacketCount++
+
+    test.strictEqual(packet.type(), packetType)
+
+    switch receivedPacketCount
+      when 1
+        test.ok(packet.data().equals(payload1))
+      when 2
+        test.ok(packet.data().equals(payload2))
+      when 3
+        test.ok(packet.data().equals(payload3))
+        test.done()
+  )
+
+  packet1 = new Packet(packetType)
+  packet1.addData(payload.slice(0, 2))
+
+  packet2 = new Packet(packetType)
+  packet2.addData(payload.slice(2, 4))
+
+  packet3 = new Packet(packetType)
+  packet3.last(true)
+  packet3.addData(payload.slice(4, 6))
+  
+  allData = new Buffer(packet1.buffer.concat(packet2.buffer, packet3.buffer))
+  data1 = allData.slice(0, 5)
+  data2 = allData.slice(5)
+
+  connection.emit('data', data1)
+  connection.emit('data', data2)

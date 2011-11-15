@@ -18,7 +18,7 @@ class MessageIO extends EventEmitter
   eventData: (data) =>
     @packetBuffer = new Buffer(@packetBuffer.concat(data))
 
-    if isPacketComplete(@packetBuffer)
+    while isPacketComplete(@packetBuffer)
       length = packetLength(@packetBuffer)
       packet = new Packet(@packetBuffer.slice(0, length))
       @logPacket('Received', packet);
