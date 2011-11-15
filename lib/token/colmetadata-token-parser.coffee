@@ -5,10 +5,16 @@ TYPE = require('./data-type').TYPE
 parser = (buffer, position) ->
   startPosition = position
 
+  if buffer.length - position < 2
+    return false
   columnCount = buffer.readUInt16LE(position)
   position += 2
 
-  columns = for c in [1..columnCount]
+  columns = []
+  for c in [1..columnCount]
+    if buffer.length - position < 4 + 2 + 1
+      return false
+
     userType = buffer.readUInt32LE(position)
     position += 4
 
@@ -28,6 +34,9 @@ parser = (buffer, position) ->
     if type.fixedLength
       dataLength = type.dataLength
     else if type.variableLength
+      if buffer.length - position < type.dataLengthLength
+        return false
+
       switch type.dataLengthLength
         when 1
           dataLength = buffer.readUInt8(position)
@@ -41,21 +50,29 @@ parser = (buffer, position) ->
       position += type.dataLengthLength
       
     if type.hasCollation
+      if buffer.length - position < 5
+        return false
       collation = Array.prototype.slice.call(buffer, position, position + 5)
       position += 5
 
+    if buffer.length - position < 1
+      return false
     colNameLength = buffer.readUInt8(position) * 2
     position++
+
+    if buffer.length - position < colNameLength
+      return false
     colName = buffer.toString('ucs-2', position, position + colNameLength)
     position += colNameLength
 
-    column =
+    columns.push(
       userType: userType
       flags: flags
       type: type
       colName: colName
       collation: collation
       dataLength: dataLength
+    )
 
   if error
     token =

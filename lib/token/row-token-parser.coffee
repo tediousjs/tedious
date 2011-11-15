@@ -5,29 +5,43 @@ TYPE = require('./data-type').TYPE
 parser = (buffer, position, columnsMetaData) ->
   startPosition = position
 
-  columns = for columnMetaData in columnsMetaData
+  columns = []
+  for columnMetaData in columnsMetaData
     type = columnMetaData.type
     switch type.name
       when 'Int'
+        if buffer.length - position < type.dataLength
+          return false
         value = buffer.readUInt32LE(position)
         position += type.dataLength
       when 'VarChar', 'Char'
+        if buffer.length - position < 2
+          return false
         dataLength = buffer.readUInt16LE(position)
         position += 2
+
+        if buffer.length - position < dataLength
+          return false
         value = buffer.toString('ascii', position, position + dataLength)
         position += dataLength
       when 'NVarChar'
+        if buffer.length - position < 2
+          return false
         dataLength = buffer.readUInt16LE(position)
         position += 2
+
+        if buffer.length - position < dataLength
+          return false
         value = buffer.toString('ucs-2', position, position + (dataLength))
         position += dataLength
       else
         error = "Unrecognised column type #{type.name}"
         break
-
-    column =
+      
+    columns.push(
       value: value
       metadata: columnMetaData
+    )
 
   columns.byName = ->
     byName = {}

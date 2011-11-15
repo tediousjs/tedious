@@ -3,6 +3,9 @@
 parser = (buffer, position) ->
   startPosition = position
 
+  if buffer.length - position < 4
+    return false
+
   value = buffer.readUInt32LE(position)
   position += 4
 

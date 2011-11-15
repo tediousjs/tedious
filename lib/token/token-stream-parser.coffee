@@ -36,6 +36,7 @@ class Parser extends EventEmitter
       'NOOP'
 
     @buffer = @buffer.slice(@position)
+    @position = 0
 
   end: ->
     @buffer.length == 0
@@ -53,7 +54,6 @@ class Parser extends EventEmitter
         @debug.token(token)
 
         if !token.error
-          #console.log(token)
           @position += 1 + token.length
 
           if token.event
@@ -65,13 +65,11 @@ class Parser extends EventEmitter
 
           true
         else
-          console.log(token.error)
           false
       else
         false
       
     else
-      console.log("Unknown token type #{type} at offet #{@position}")
       false
 
 exports.Parser = Parser

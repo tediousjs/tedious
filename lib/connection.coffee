@@ -36,6 +36,7 @@ class Connection extends EventEmitter
     )
 
     @messagePayloadBuffer = new Buffer(0)
+    @createTokenStreamParser()
 
     @connection = new Socket({})
     @connection.setTimeout(options.timeout)
@@ -87,7 +88,7 @@ class Connection extends EventEmitter
       when STATE.SENT_PRELOGIN
         @buildMessage(packet, @processPreloginResponse)
       when STATE.SENT_LOGIN7, STATE.SENT_CLIENT_REQUEST
-        @buildMessage(packet, @processTokenStreamResponse)
+        @tokenStreamParser.addBuffer(packet.data())
       else
         @fatalError("Unexpected packet in state #{@state}: packet type #{packet.type()}")
 
@@ -110,43 +111,43 @@ class Connection extends EventEmitter
     @sendLogin7Packet()
 
   # s2.2.2.2
-  processTokenStreamResponse: ->
-    #console.log("LOGIN7 response #{@messagePayloadBuffer}")
-    parser = new TokenStreamParser(@debug)
-    parser.on('loginack', (token) =>
+  createTokenStreamParser: ->
+    @tokenStreamParser = new TokenStreamParser(@debug)
+
+    @tokenStreamParser.on('loginack', (token) =>
       @loggedIn = true
     )
-    parser.on('infoMessage', (token) =>
+    @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
-    parser.on('errorMessage', (token) =>
+    @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
     )
-    parser.on('packetSizeChange', (token) =>
+    @tokenStreamParser.on('packetSizeChange', (token) =>
       @messageIo.packetSize(token.newValue)
     )
-    parser.on('databaseChange', (token) =>
+    @tokenStreamParser.on('databaseChange', (token) =>
       @_database = token.newValue
       @emit('databaseChange', @_database)
     )
-    parser.on('languageChange', (token) =>
+    @tokenStreamParser.on('languageChange', (token) =>
       @_language = token.newValue
       @emit('languageChange', @_language)
     )
-    parser.on('charsetChange', (token) =>
+    @tokenStreamParser.on('charsetChange', (token) =>
       @_charset = token.newValue
       @emit('charsetChange', @_charset)
     )
-    parser.on('columnMetadata', (token) =>
+    @tokenStreamParser.on('columnMetadata', (token) =>
       @emit('columnMetadata', token.columns)
     )
-    parser.on('row', (token) =>
+    @tokenStreamParser.on('row', (token) =>
       @emit('row', token.columns)
     )
-    parser.on('returnStatus', (token) =>
+    @tokenStreamParser.on('returnStatus', (token) =>
       @procReturnStatusValue = token.value
     )
-    parser.on('done', (token) =>
+    @tokenStreamParser.on('done', (token) =>
       state = @state
 
       if @loggedIn
@@ -157,13 +158,11 @@ class Connection extends EventEmitter
       else
         @activeRequest.callback(undefined, token.rowCount)
     )
-    parser.on('doneProc', (token) =>
+    @tokenStreamParser.on('doneProc', (token) =>
       @state = STATE.LOGGED_IN
       @activeRequest.callback(undefined, @procReturnStatusValue)
       @procReturnStatusValue = undefined
     )
-
-    parser.addBuffer(@messagePayloadBuffer)
 
   startRequest: (requestName, callback) =>
     @activeRequest =

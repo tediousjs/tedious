@@ -11,6 +11,8 @@ STATUS =
   SRVERROR: 0x0100
 
 parser = (buffer, position) ->
+  if buffer.length - position < 2
+    return false
   status = buffer.readUInt16LE(position)
   position += 2
 
@@ -21,10 +23,15 @@ parser = (buffer, position) ->
   attention = !!(status & STATUS.ATTN)
   serverError = !!(status & STATUS.SRVERROR)
 
+  if buffer.length - position < 2
+    return false
   curCmd = buffer.readUInt16LE(position)
   position += 2
 
   if rowCountValid
+    if buffer.length - position < 8
+      return false
+
     # If rowCount > 53 bits then rowCount will be incorrect (because Javascript uses IEEE_754 for number representation).
     rowCountLow = buffer.readUInt32LE(position)
     position += 4
