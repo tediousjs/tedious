@@ -24,7 +24,7 @@ exports.connect = (test) ->
     #console.log(message)
   )
 
-exports.execSql = (test) ->
+exports.execSimpleSql = (test) ->
   test.expect(12)
 
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
@@ -53,6 +53,34 @@ exports.execSql = (test) ->
     test.strictEqual(byName.C1.value, 8)
     test.strictEqual(byName.C2.value, 'abc')
     test.strictEqual(byName.C3.value, 'def')
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message)
+  )
+
+exports.execSqlWithLotsOfRowsReturned = (test) ->
+  numberOfRows = 1000
+
+  test.expect(numberOfRows + 5)
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    test.ok(loggedIn)
+    
+    connection.execSql("select top #{numberOfRows} object_id, name from sys.all_columns", (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, numberOfRows)
+      test.done()
+    )
+  )
+  
+  connection.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(columnsMetadata.length, 2)
+  )
+  
+  connection.on('row', (columns) ->
+    test.strictEqual(columns.length, 2)
   )
 
   connection.on('debug', (message) ->
