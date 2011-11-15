@@ -61,8 +61,9 @@ exports.execSimpleSql = (test) ->
 
 exports.execSqlWithLotsOfRowsReturned = (test) ->
   numberOfRows = 1000
+  rowsReceived = 0
 
-  test.expect(numberOfRows + 5)
+  test.expect(6)
 
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
@@ -71,6 +72,7 @@ exports.execSqlWithLotsOfRowsReturned = (test) ->
     connection.execSql("select top #{numberOfRows} object_id, name from sys.all_columns", (err, rowCount) ->
       test.ok(!err)
       test.strictEqual(rowCount, numberOfRows)
+      test.strictEqual(rowsReceived, numberOfRows)
       test.done()
     )
   )
@@ -80,7 +82,7 @@ exports.execSqlWithLotsOfRowsReturned = (test) ->
   )
   
   connection.on('row', (columns) ->
-    test.strictEqual(columns.length, 2)
+    rowsReceived++
   )
 
   connection.on('debug', (message) ->
