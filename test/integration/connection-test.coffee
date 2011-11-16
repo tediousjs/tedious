@@ -89,6 +89,33 @@ exports.execSqlWithLotsOfRowsReturned = (test) ->
     #console.log(message)
   )
 
+exports.execBadSql = (test) ->
+  test.expect(6)
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    test.ok(loggedIn)
+    
+    connection.execSql("select bad syntax here", (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, undefined)
+      test.done()
+    )
+  )
+  
+  connection.on('errorMessage', (error) ->
+    test.ok(error.message.indexOf('syntax'))
+    test.strictEqual(error.number, 102)
+  )
+  
+  connection.on('row', (columns) ->
+    test.ok(false)
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message)
+  )
+
 exports.execSqlProc = (test) ->
   test.expect(6)
 
