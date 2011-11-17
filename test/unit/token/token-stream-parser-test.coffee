@@ -1,10 +1,13 @@
+Debug = require('../../../lib/debug')
 Parser = require('../../../lib/token/token-stream-parser').Parser
 TYPE = require('../../../lib/token/token').TYPE
+
+debug = new Debug({token: true})
 
 module.exports.envChange = (test) ->
   buffer = createDbChangeBuffer()
 
-  parser = new Parser()
+  parser = new Parser(debug)
   parser.addBuffer(buffer)
 
   test.ok(parser.end())
@@ -14,7 +17,7 @@ module.exports.envChange = (test) ->
 module.exports.tokenSplitAcrossBuffers = (test) ->
   buffer = createDbChangeBuffer()
 
-  parser = new Parser()
+  parser = new Parser(debug)
   parser.addBuffer(buffer.slice(0,6))
   parser.addBuffer(buffer.slice(6))
 
