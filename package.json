@@ -20,6 +20,6 @@
     "nodeunit": "0.6.2"
   },
   "scripts": {
-    "test": "scripts/tests"
+    "test": "scripts/tests-unit"
   }
 }
