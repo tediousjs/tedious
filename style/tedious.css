@@ -18,13 +18,25 @@ a:hover {
 }
 
 p {
-  margin-bottom: 1em;
+  margin: 0 0 1em 0;
   line-height: 1.3em;
+}
+
+code,
+.code {
+  font-family: monospace;
+}
+
+pre.code {
+  background-color: lightGrey;
+  border: 1px solid darkGrey;
+  padding: 0.5em;
+  margin-bottom: 1em;
 }
 
 #content {
   width: 600px;
-  margin: 3em auto 1em auto;
+  margin: 3em auto 3em auto;
   padding: 1em;
   background-color: #f2f2f2;
   border-left: 1px solid darkGrey;
@@ -80,12 +92,30 @@ p {
   width: 12em;
 }
 
+#footer {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  font-size: 80%;
+  height: 1.2em;
+  border-top: 1px solid darkGrey;
+  background-color: white;
+  padding: 0.4em;
+  text-align: center;
+}
+
 h1, h2 {
   font-family: 'The Girl Next Door';
 }
 
 h1, h2 {
   font-size: 200%;
+}
+
+h3 {
+  font-size: 120%;
+  font-weight: bold;
+  margin-bottom: 0.5em;
 }
 
 h1 a,
@@ -96,7 +126,7 @@ h1 a:visited {
 }
 
 #navigation ul li {
-  margin-bottom: 0.3em;
+  margin-bottom: 0.4em;
 }
 
 h2 {

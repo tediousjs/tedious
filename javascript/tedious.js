@@ -1,4 +1,7 @@
 $(document).ready(function() {
+  var defaultPage = 'overview';
+
+  cleanCodeWhitespace();  
   showPageForHash();
 
   window.onhashchange = function() {
@@ -13,7 +16,7 @@ $(document).ready(function() {
     }
     
     if (!page) {
-      page = 'overview'
+      page = defaultPage;
     }
     
     showPage(page);
@@ -26,5 +29,15 @@ $(document).ready(function() {
     
     // Set the URL hash fragment.
     window.location.hash = pageName;
+  }
+  
+  function cleanCodeWhitespace() {
+    $('pre.code code').each(function() {
+      var code = $(this).text();
+    
+      code = $.trim(code);
+      console.log(code);
+      $(this).text(code);
+    });
   }
 });

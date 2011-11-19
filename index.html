@@ -35,6 +35,9 @@
          <a href="#getting-started">Getting started</a>
        </li>
        <li>
+         <a href="#api">API</a>
+       </li>
+       <li>
          <a href="#licence">Licence</a>
        </li>
      </ul>
@@ -45,21 +48,28 @@
         <h2>Overview</h2>
   
         <p>
-          Introduction content here …
+          Tedious is a
+          <a href="http://nodejs.org">Node</a>
+          package that provides an implementation of the
+          <a href="http://msdn.microsoft.com/en-us/library/dd304523.aspx">TDS protocol</a>,
+          which is used to interact with instances of Microsoft's SQL Server.
         </p>
+        
         <p>
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
+          It is pure Javascript
+          (well the source is <a href="http://jashkenas.github.com/coffee-script/">CoffeeScript</a>),
+          and it should run without change on any platform where Node is supported.
         </p>
+
+        <h3>
+          Name
+        </h3>
         <p>
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
-          … Your HTML content here …
+          The name
+          <span class="code">Tedious</span>
+          is simply derived from a fast,
+          slightly garbled, pronunciation of the letters
+          T,&nbsp;D&nbsp;and&nbsp;S.
         </p>
       </div>
 
@@ -67,20 +77,43 @@
         <h2>Installation</h2>
   
         <p>
-          Installation content here …
+          Installation is simple, following normal Node expectations.
         </p>
+
+        <pre class="code"><code>
+cd &lt;your-project-directory&gt;
+
+npm install tedious
+        </code></pre>
+
         <p>
-          … Your HTML content here …
+          Of course, if your project's
+          <span class="code">package.json</span>
+          declares a dependency on
+          <span class="code">tedious</span>
+          then it's even simpler.
+          .
         </p>
+
+        <pre class="code"><code>
+cd &lt;your-project-directory&gt;
+
+npm install
+        </code></pre>
       </div>
 
       <div class="page getting-started">
         <h2>Getting started</h2>
+      </div>
+
+      <div class="page api">
+        <h2>API</h2>
   
         <p>
-          Getting started …
+          …
         </p>
       </div>
+      
       <div class="page licence">
         <h2>Licence</h2>
 
@@ -106,6 +139,10 @@
         </p>
         </div>
       </div>
+    </div>
+    
+    <div id="footer">
+      Copyright &copy; 2011 Mike D Pilsbury
     </div>
   </body>
 </html>
