@@ -3,6 +3,7 @@ body {
   font-size: 90%;
 }
 
+a,
 a:visited {
   color: darkBlue;
 }
@@ -16,6 +17,11 @@ a:hover {
   text-decoration: underline;
 }
 
+p {
+  margin-bottom: 1em;
+  line-height: 1.3em;
+}
+
 #content {
   width: 600px;
   margin: 3em auto 1em auto;
@@ -27,6 +33,10 @@ a:hover {
 
 #content .page {
   display: none;
+}
+
+#content .licence-text {
+  font-family: monospace;
 }
 
 .ribbon {
@@ -70,9 +80,17 @@ a:hover {
   width: 12em;
 }
 
-#navigation .title a {
+h1, h2 {
   font-family: 'The Girl Next Door';
+}
+
+h1, h2 {
   font-size: 200%;
+}
+
+h1 a,
+h1 a:hover,
+h1 a:visited {
   color: #a00;
   text-decoration: none;
 }
@@ -81,8 +99,7 @@ a:hover {
   margin-bottom: 0.3em;
 }
 
-h1 {
-  font-family: 'The Girl Next Door';
+h2 {
   font-size: 200%;
   margin-bottom: 0.5em;
 }
