@@ -3,6 +3,19 @@ body {
   font-size: 90%;
 }
 
+a:visited {
+  color: darkBlue;
+}
+
+a {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 #content {
   width: 600px;
   margin: 3em auto 1em auto;
@@ -57,10 +70,11 @@ body {
   width: 12em;
 }
 
-#navigation .title {
+#navigation .title a {
   font-family: 'The Girl Next Door';
   font-size: 200%;
   color: #a00;
+  text-decoration: none;
 }
 
 #navigation ul li {
@@ -71,14 +85,4 @@ h1 {
   font-family: 'The Girl Next Door';
   font-size: 200%;
   margin-bottom: 0.5em;
-}
-
-
-.link {
-  color: darkBlue;
-  cursor: pointer;
-}
-
-.link:hover {
-  text-decoration: underline;
 }
