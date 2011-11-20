@@ -36,7 +36,6 @@ $(document).ready(function() {
       var code = $(this).text();
     
       code = $.trim(code);
-      console.log(code);
       $(this).text(code);
     });
   }
