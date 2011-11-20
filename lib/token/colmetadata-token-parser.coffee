@@ -1,6 +1,7 @@
 # s2.2.7.4
 
 TYPE = require('./data-type').TYPE
+sprintf = require('sprintf').sprintf
 
 parser = (buffer, position) ->
   startPosition = position
@@ -27,6 +28,7 @@ parser = (buffer, position) ->
     
     if !type
       error = "Unrecognised data type #{typeNumber} at offset #{position - 1}"
+      error = sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (position - 1))
       break
 
     #console.log(type)

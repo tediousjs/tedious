@@ -10,6 +10,8 @@ parser = (buffer, position, columnsMetaData) ->
 
   columns = []
   for columnMetaData in columnsMetaData
+    #console.log sprintf('Token @ 0x%02X', position)
+
     isNull = false
     type = columnMetaData.type
     switch type.name
@@ -18,6 +20,27 @@ parser = (buffer, position, columnsMetaData) ->
           return false
         value = buffer.readUInt32LE(position)
         position += type.dataLength
+      when 'IntN'
+        if buffer.length - position < 1
+          return false
+        dataLength = buffer.readUInt8(position)
+        position++
+
+        if buffer.length - position < dataLength
+          return false
+
+        #console.log dataLength, position
+        switch dataLength
+          when 0
+            isNull = true
+          when 1
+            value = buffer.readUInt8(position)
+          when 2
+            value = buffer.readUInt16LE(position)
+          when 4
+            value = buffer.readUInt32LE(position)
+
+        position += dataLength
       when 'VarChar', 'Char'
         if buffer.length - position < 2
           return false
@@ -52,6 +75,7 @@ parser = (buffer, position, columnsMetaData) ->
       
     columns.push(
       value: value
+      isNull: isNull,
       metadata: columnMetaData
     )
 

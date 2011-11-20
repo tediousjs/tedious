@@ -62,6 +62,11 @@ TYPE =
     dataLength: 8
 
   # Variable-length types
+  0x26:
+    type: 'INTNTYPE'
+    name: 'IntN'
+    variableLength: true
+    dataLengthLength: 1
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'

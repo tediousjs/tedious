@@ -25,7 +25,7 @@ exports.connect = (test) ->
   )
 
 exports.execSimpleSql = (test) ->
-  test.expect(12)
+  test.expect(15)
 
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
@@ -48,11 +48,47 @@ exports.execSimpleSql = (test) ->
     test.strictEqual(columns[0].value, 8)
     test.strictEqual(columns[1].value, 'abc')
     test.strictEqual(columns[2].value, 'def')
+
+    test.strictEqual(columns[0].isNull, false)
+    test.strictEqual(columns[1].isNull, false)
+    test.strictEqual(columns[2].isNull, false)
     
     byName = columns.byName()
     test.strictEqual(byName.C1.value, 8)
     test.strictEqual(byName.C2.value, 'abc')
     test.strictEqual(byName.C3.value, 'def')
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message)
+  )
+
+exports.execSqlReturningNulls = (test) ->
+  test.expect(11)
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    test.ok(loggedIn)
+    
+    connection.execSql("select cast(null as int), cast(1 as int), cast(null as varchar(1)), cast(null as nvarchar(1))", (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, 1)
+      test.done()
+    )
+  )
+  
+  connection.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(columnsMetadata.length, 4)
+  )
+  
+  connection.on('row', (columns) ->
+    test.strictEqual(columns.length, 4)
+
+    test.strictEqual(columns[0].isNull, true)
+    test.strictEqual(columns[1].isNull, false)
+    test.strictEqual(columns[1].value, 1)
+    test.strictEqual(columns[2].isNull, true)
+    test.strictEqual(columns[3].isNull, true)
   )
 
   connection.on('debug', (message) ->
