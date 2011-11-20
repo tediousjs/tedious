@@ -1,12 +1,16 @@
 # s2.2.7.17
 
 TYPE = require('./data-type').TYPE
+sprintf = require('sprintf').sprintf
+
+NULL = (1 << 16) - 1
 
 parser = (buffer, position, columnsMetaData) ->
   startPosition = position
 
   columns = []
   for columnMetaData in columnsMetaData
+    isNull = false
     type = columnMetaData.type
     switch type.name
       when 'Int'
@@ -20,20 +24,28 @@ parser = (buffer, position, columnsMetaData) ->
         dataLength = buffer.readUInt16LE(position)
         position += 2
 
-        if buffer.length - position < dataLength
-          return false
-        value = buffer.toString('ascii', position, position + dataLength)
-        position += dataLength
+        if dataLength == NULL
+          value = undefined
+          isNull = true
+        else
+          if buffer.length - position < dataLength
+            return false
+          value = buffer.toString('ascii', position, position + dataLength)
+          position += dataLength
       when 'NVarChar'
         if buffer.length - position < 2
           return false
         dataLength = buffer.readUInt16LE(position)
         position += 2
 
-        if buffer.length - position < dataLength
-          return false
-        value = buffer.toString('ucs-2', position, position + (dataLength))
-        position += dataLength
+        if dataLength == NULL
+          value = undefined
+          isNull = true
+        else
+          if buffer.length - position < dataLength
+            return false
+          value = buffer.toString('ucs-2', position, position + (dataLength))
+          position += dataLength
       else
         error = "Unrecognised column type #{type.name}"
         break

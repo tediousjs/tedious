@@ -117,8 +117,8 @@ exports.execBadSql = (test) ->
   )
 
 exports.execSqlProc = (test) ->
-  test.expect(6)
-
+  rows = 0
+  
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
     test.ok(loggedIn)
@@ -126,6 +126,7 @@ exports.execSqlProc = (test) ->
     connection.execSql("exec sp_who2", (err, returnStatus) ->
       test.ok(!err)
       test.strictEqual(returnStatus, 0)
+      test.ok(rows > 0)
       test.done()
     )
   )
@@ -135,6 +136,7 @@ exports.execSqlProc = (test) ->
   )
   
   connection.on('row', (columns) ->
+    rows++
     test.strictEqual(columns.length, 13)
   )
 
@@ -146,7 +148,7 @@ exports.badCredentials = (test) ->
   test.expect(4)
 
   connection = new Connection(config.server, config.userName, 'bad-password', config.options, (err, loggedIn) ->
-    test.ok(!err)
+    test.ok(err)
     test.ok(!loggedIn)
 
     test.done()
