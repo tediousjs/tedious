@@ -11,6 +11,7 @@ a:visited {
 a {
   cursor: pointer;
   text-decoration: none;
+  outline: none;
 }
 
 a:hover {
