@@ -4,3 +4,20 @@ title: API
 ---
 
 <h2>API</h2>
+
+<p>
+  Some code
+</p>
+
+{% highlight javascript %}
+  var Connection = require('tedious');
+
+  var connection = new Connection('server', 'username', 'password', options,
+    function(err, loggedIn) {
+      assert(!err)
+      assert(loggedIn)
+      
+      // ...
+    }
+  )
+{% endhighlight %}

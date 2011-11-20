@@ -130,3 +130,7 @@ h2 {
   font-size: 200%;
   margin-bottom: 0.5em;
 }
+
+.highlight {
+  padding: 0.5em;
+}
