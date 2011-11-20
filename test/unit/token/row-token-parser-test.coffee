@@ -23,6 +23,7 @@ module.exports.int = (test) ->
 
   test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -50,6 +51,7 @@ module.exports.varChar = (test) ->
 
   test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -77,7 +79,34 @@ module.exports.nVarChar = (test) ->
 
   test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.intN = (test) ->
+  colMetaData = [
+    type:
+      name: 'IntN'
+      dataLengthLength: 1
+  ]
+
+  value = 0
+
+  buffer = new Buffer(1 + 1)
+  pos = 0;
+
+  buffer.writeUInt8(TYPE.ROW, pos); pos++
+  buffer.writeUInt8(value, pos); pos++
+  #console.log(buffer)
+
+  token = parser(buffer, 1, colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].value)
+  test.ok(token.columns[0].isNull)
 
   test.done()
