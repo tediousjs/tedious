@@ -97,7 +97,7 @@ exports.execBadSql = (test) ->
     test.ok(loggedIn)
     
     connection.execSql("select bad syntax here", (err, rowCount) ->
-      test.ok(!err)
+      test.ok(err)
       test.strictEqual(rowCount, undefined)
       test.done()
     )

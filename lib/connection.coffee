@@ -121,6 +121,7 @@ class Connection extends EventEmitter
       @emit('infoMessage', token)
     )
     @tokenStreamParser.on('errorMessage', (token) =>
+      @activeRequest.error = token.message
       @emit('errorMessage', token)
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
@@ -154,13 +155,13 @@ class Connection extends EventEmitter
         @state = STATE.LOGGED_IN
 
       if state == STATE.SENT_LOGIN7
-        @activeRequest.callback(undefined, @loggedIn)
+        @activeRequest.callback(@activeRequest.error, @loggedIn)
       else
-        @activeRequest.callback(undefined, token.rowCount)
+        @activeRequest.callback(@activeRequest.error, token.rowCount)
     )
     @tokenStreamParser.on('doneProc', (token) =>
       @state = STATE.LOGGED_IN
-      @activeRequest.callback(undefined, @procReturnStatusValue)
+      @activeRequest.callback(@activeRequest.error, @procReturnStatusValue)
       @procReturnStatusValue = undefined
     )
 
