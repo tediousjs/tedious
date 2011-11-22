@@ -65,6 +65,7 @@ class Parser extends EventEmitter
 
           true
         else
+          @emit('error', token)
           false
       else
         false

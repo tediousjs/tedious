@@ -15,7 +15,7 @@ class Debug extends EventEmitter
     @indent = '  '
 
   packet: (direction, packet) ->
-    if @haveListeners()
+    if @haveListeners() && @options.packet
       @log('')
       @log(direction)
       @log(packet.headerToString(@indent))
