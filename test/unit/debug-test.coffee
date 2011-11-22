@@ -12,7 +12,7 @@ class Packet
 exports.packet = (test) ->
   emitCount = 0;
 
-  debug = new Debug()
+  debug = new Debug({packet: true})
 
   debug.on('debug', (text) ->
     emitCount++
