@@ -4,6 +4,7 @@ TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
 NULL = (1 << 16) - 1
+THREE_AND_A_THIRD = 3 + (1 / 3)
 
 parser = (buffer, position, columnsMetaData) ->
   startPosition = position
@@ -101,6 +102,61 @@ parser = (buffer, position, columnsMetaData) ->
             return false
           value = buffer.toString('ucs-2', position, position + (dataLength))
           position += dataLength
+      when 'SmallDateTime'
+        if buffer.length - position < 4
+          return false
+
+        days = buffer.readUInt16LE(position)
+        minutes = buffer.readUInt16LE(position + 2)
+        
+        value = new Date(1900, 0, 1)
+        value.setDate(value.getDate() + days)
+        value.setMinutes(value.getMinutes() + minutes)
+        
+        position += type.dataLength
+      when 'DateTime'
+        if buffer.length - position < 8
+          return false
+
+        days = buffer.readInt32LE(position)
+        threeHundredthsOfSecond = buffer.readUInt32LE(position + 4)
+        milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
+        
+        value = new Date(1900, 0, 1)
+        value.setDate(value.getDate() + days)
+        value.setMilliseconds(value.getMilliseconds() + milliseconds)
+        
+        position += type.dataLength
+      when 'DateTimeN'
+        if buffer.length - position < 1
+          return false
+        dataLength = buffer.readUInt8(position)
+        position++
+
+        if buffer.length - position < dataLength
+          return false
+
+        console.log dataLength
+        switch dataLength
+          when 0
+            isNull = true
+          when 4
+            days = buffer.readUInt16LE(position)
+            minutes = buffer.readUInt16LE(position + 2)
+            
+            value = new Date(1900, 0, 1)
+            value.setDate(value.getDate() + days)
+            value.setMinutes(value.getMinutes() + minutes)
+          when 8
+            days = buffer.readInt32LE(position)
+            threeHundredthsOfSecond = buffer.readUInt32LE(position + 4)
+            milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
+            
+            value = new Date(1900, 0, 1)
+            value.setDate(value.getDate() + days)
+            value.setMilliseconds(value.getMilliseconds() + milliseconds)
+        
+        position += dataLength
       else
         error = sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (position - 1))
         break

@@ -63,13 +63,18 @@ TYPE =
 
   # Variable-length types
   0x26:
-    type: 'INTNTYPE'
+    type: 'INTN'
     name: 'IntN'
     variableLength: true
     dataLengthLength: 1
   0x68:
-    type: 'BITNTYPE'
+    type: 'BITN'
     name: 'BitN'
+    variableLength: true
+    dataLengthLength: 1
+  0x6F:
+    type: 'DATETIMN'
+    name: 'DateTimeN'
     variableLength: true
     dataLengthLength: 1
   0xA7:
@@ -79,7 +84,7 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
   0xAF:
-    type: 'BIGCHARTYPE'
+    type: 'BIGCHAR'
     name: 'Char'
     variableLength: true
     hasCollation: true
@@ -107,7 +112,6 @@ TYPE =
   NUMERICNTYPE:         0x6C  # Numeric
   FLTNTYPE:             0x6D  # (see below)
   MONEYNTYPE:           0x6E  # (see below)
-  DATETIMNTYPE:         0x6F  # (see below)
   DATENTYPE:            0x28  # (introduced in TDS 7.3)
   TIMENTYPE:            0x29  # (introduced in TDS 7.3)
   DATETIME2NTYPE:       0x2A  # (introduced in TDS 7.3)

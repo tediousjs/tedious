@@ -5,10 +5,10 @@ var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-conne
 
 config.options.timeout = 30 * 1000;
 config.options.debug = {
-  data: false,
+  data: true,
   payload: false,
   token: false,
-  packet: false
+  packet: true
 }
 
 var connection = new Connection(config.server, config.userName, config.password, config.options, connected);
