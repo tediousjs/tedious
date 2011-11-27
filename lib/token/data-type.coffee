@@ -67,6 +67,11 @@ TYPE =
     name: 'IntN'
     variableLength: true
     dataLengthLength: 1
+  0x68:
+    type: 'BITNTYPE'
+    name: 'BitN'
+    variableLength: true
+    dataLengthLength: 1
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'

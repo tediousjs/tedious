@@ -80,7 +80,13 @@ function row(columns) {
   var values = '';
   
   columns.forEach(function(column) {
-    values += column.value + '\t';
+    if (column.isNull) {
+      value = 'NULL';
+    } else {
+      value = column.value;
+    }
+    
+    values += value + '\t';
   });
 
   console.log(values);

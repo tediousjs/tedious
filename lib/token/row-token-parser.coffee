@@ -15,10 +15,20 @@ parser = (buffer, position, columnsMetaData) ->
     isNull = false
     type = columnMetaData.type
     switch type.name
+      when 'TinyInt'
+        if buffer.length - position < type.dataLength
+          return false
+        value = buffer.readUInt8(position)
+        position += type.dataLength
       when 'Int'
         if buffer.length - position < type.dataLength
           return false
-        value = buffer.readUInt32LE(position)
+        value = buffer.readInt32LE(position)
+        position += type.dataLength
+      when 'SmallInt'
+        if buffer.length - position < type.dataLength
+          return false
+        value = buffer.readInt16LE(position)
         position += type.dataLength
       when 'IntN'
         if buffer.length - position < 1
@@ -34,11 +44,33 @@ parser = (buffer, position, columnsMetaData) ->
           when 0
             isNull = true
           when 1
-            value = buffer.readUInt8(position)
+            value = buffer.readInt8(position)
           when 2
-            value = buffer.readUInt16LE(position)
+            value = buffer.readInt16LE(position)
           when 4
-            value = buffer.readUInt32LE(position)
+            value = buffer.readInt32LE(position)
+
+        position += dataLength
+      when 'Bit'
+        if buffer.length - position < type.dataLength
+          return false
+        value = !!buffer.readUInt8(position)
+        position += type.dataLength
+      when 'BitN'
+        if buffer.length - position < 1
+          return false
+        dataLength = buffer.readUInt8(position)
+        position++
+
+        if buffer.length - position < dataLength
+          return false
+
+        #console.log dataLength, position
+        switch dataLength
+          when 0
+            isNull = true
+          when 1
+            value = !!buffer.readUInt8(position)
 
         position += dataLength
       when 'VarChar', 'Char'
@@ -70,7 +102,7 @@ parser = (buffer, position, columnsMetaData) ->
           value = buffer.toString('ucs-2', position, position + (dataLength))
           position += dataLength
       else
-        error = "Unrecognised column type #{type.name}"
+        error = sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (position - 1))
         break
       
     columns.push(

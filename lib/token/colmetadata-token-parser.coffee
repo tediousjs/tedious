@@ -27,7 +27,6 @@ parser = (buffer, position) ->
     position++
     
     if !type
-      error = "Unrecognised data type #{typeNumber} at offset #{position - 1}"
       error = sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (position - 1))
       break
 
