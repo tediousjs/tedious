@@ -125,6 +125,30 @@ exports.execSqlWithLotsOfRowsReturned = (test) ->
     #console.log(message)
   )
 
+exports.datetimeType = (test) ->
+  test.expect(3)
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    
+    connection.execSql("select getdate()", (err, rowCount) ->
+      test.ok(!err)
+      test.done()
+    )
+  )
+  
+  connection.on('row', (columns) ->
+    dbDate = columns[0].value.getTime()
+    now = new Date().getTime()
+    difference = Math.abs(now - dbDate)
+
+    test.ok(difference < 100)
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message)
+  )
+
 exports.execBadSql = (test) ->
   test.expect(6)
 
