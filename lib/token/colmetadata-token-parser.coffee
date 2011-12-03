@@ -49,12 +49,26 @@ parser = (buffer, position) ->
           error = "Unrecognised dataLengthLength for type #{type}"
           break
       position += type.dataLengthLength
-      
+
+    if type.hasPrecision
+      precision = buffer.readUInt8(position)
+      position++
+    else
+      precision = undefined
+
+    if type.hasScale
+      scale = buffer.readUInt8(position)
+      position++
+    else
+      scale = undefined
+
     if type.hasCollation
       if buffer.length - position < 5
         return false
       collation = Array.prototype.slice.call(buffer, position, position + 5)
       position += 5
+    else
+      collation = undefined
 
     if buffer.length - position < 1
       return false
@@ -72,6 +86,8 @@ parser = (buffer, position) ->
       type: type
       colName: colName
       collation: collation
+      precision: precision
+      scale: scale
       dataLength: dataLength
     )
 

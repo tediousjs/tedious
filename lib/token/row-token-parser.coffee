@@ -157,6 +157,38 @@ parser = (buffer, position, columnsMetaData) ->
             value.setMilliseconds(value.getMilliseconds() + milliseconds)
         
         position += dataLength
+      when 'NumericN'
+        if buffer.length - position < 1
+          return false
+        dataLength = buffer.readUInt8(position)
+        position++
+
+        if dataLength == 0
+          value = undefined
+          isNull = true
+        else
+          if buffer.length - position < dataLength
+            return false
+            
+          sign = if buffer.readUInt8(position) == 1 then 1 else -1
+          position++
+
+          switch dataLength - 1
+            when 4
+              value = buffer.readUInt32LE(position)
+              position += 4
+            when 8
+              valueLow = buffer.readUInt32LE(position)
+              position += 4
+              valueHigh = buffer.readUInt32LE(position)
+              position += 4
+              value = valueLow + (0x100000000 * valueHigh)
+            else
+              error = sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, position)
+              break
+
+          value *= sign
+          value /= Math.pow(10, columnMetaData.scale)
       else
         error = sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (position - 1))
         break

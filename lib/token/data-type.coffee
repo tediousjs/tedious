@@ -72,6 +72,13 @@ TYPE =
     name: 'BitN'
     variableLength: true
     dataLengthLength: 1
+  0x6C:
+    type: 'NUMERICNTYPE'
+    name: 'NumericN'
+    variableLength: true
+    dataLengthLength: 1
+    hasPrecision: true
+    hasScale: true
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
@@ -104,12 +111,9 @@ TYPE =
     name: 'UniqueIdentifier'
     dataLengthLength: 1
   GUIDTYPE:             0x24  # UniqueIdentifier
-  INTNTYPE:             0x26  # (see below)
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
-  BITNTYPE:             0x68  # (see below)
   DECIMALNTYPE:         0x6A  # Decimal
-  NUMERICNTYPE:         0x6C  # Numeric
   FLTNTYPE:             0x6D  # (see below)
   MONEYNTYPE:           0x6E  # (see below)
   DATENTYPE:            0x28  # (introduced in TDS 7.3)

@@ -149,6 +149,29 @@ exports.datetimeType = (test) ->
     #console.log(message)
   )
 
+exports.numericType = (test) ->
+  test.expect(6)
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+    
+    connection.execSql('select 1.23, -5.4321, 98765432.12345, cast(null as numeric)', (err, rowCount) ->
+      test.ok(!err)
+      test.done()
+    )
+  )
+  
+  connection.on('row', (columns) ->
+    test.strictEqual(columns[0].value, 1.23)
+    test.strictEqual(columns[1].value, -5.4321)
+    test.strictEqual(columns[2].value, 98765432.12345)
+    test.ok(columns[3].isNull)
+  )
+
+  connection.on('debug', (message) ->
+    #console.log(message)
+  )
+
 exports.execBadSql = (test) ->
   test.expect(6)
 
