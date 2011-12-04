@@ -136,7 +136,6 @@ parser = (buffer, position, columnsMetaData) ->
         if buffer.length - position < dataLength
           return false
 
-        console.log dataLength
         switch dataLength
           when 0
             isNull = true

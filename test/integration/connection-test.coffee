@@ -25,13 +25,13 @@ exports.connect = (test) ->
   )
 
 exports.execSimpleSql = (test) ->
-  test.expect(15)
+  test.expect(9)
 
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(!err)
     test.ok(loggedIn)
     
-    connection.execSql("select 8 as C1, 'abc' as C2, N'def' as C3", (err, rowCount) ->
+    connection.execSql("select 8 as C1", (err, rowCount) ->
       test.ok(!err)
       test.strictEqual(rowCount, 1)
       test.done()
@@ -39,56 +39,18 @@ exports.execSimpleSql = (test) ->
   )
   
   connection.on('columnMetadata', (columnsMetadata) ->
-    test.strictEqual(columnsMetadata.length, 3)
+    test.strictEqual(columnsMetadata.length, 1)
   )
   
   connection.on('row', (columns) ->
-    test.strictEqual(columns.length, 3)
+    test.strictEqual(columns.length, 1)
 
     test.strictEqual(columns[0].value, 8)
-    test.strictEqual(columns[1].value, 'abc')
-    test.strictEqual(columns[2].value, 'def')
 
     test.strictEqual(columns[0].isNull, false)
-    test.strictEqual(columns[1].isNull, false)
-    test.strictEqual(columns[2].isNull, false)
     
     byName = columns.byName()
     test.strictEqual(byName.C1.value, 8)
-    test.strictEqual(byName.C2.value, 'abc')
-    test.strictEqual(byName.C3.value, 'def')
-  )
-
-  connection.on('debug', (message) ->
-    #console.log(message)
-  )
-
-exports.execSqlReturningNulls = (test) ->
-  test.expect(11)
-
-  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
-    test.ok(!err)
-    test.ok(loggedIn)
-    
-    connection.execSql("select cast(null as int), cast(1 as int), cast(null as varchar(1)), cast(null as nvarchar(1))", (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 1)
-      test.done()
-    )
-  )
-  
-  connection.on('columnMetadata', (columnsMetadata) ->
-    test.strictEqual(columnsMetadata.length, 4)
-  )
-  
-  connection.on('row', (columns) ->
-    test.strictEqual(columns.length, 4)
-
-    test.strictEqual(columns[0].isNull, true)
-    test.strictEqual(columns[1].isNull, false)
-    test.strictEqual(columns[1].value, 1)
-    test.strictEqual(columns[2].isNull, true)
-    test.strictEqual(columns[3].isNull, true)
   )
 
   connection.on('debug', (message) ->
@@ -119,53 +81,6 @@ exports.execSqlWithLotsOfRowsReturned = (test) ->
   
   connection.on('row', (columns) ->
     rowsReceived++
-  )
-
-  connection.on('debug', (message) ->
-    #console.log(message)
-  )
-
-exports.datetimeType = (test) ->
-  test.expect(3)
-
-  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
-    test.ok(!err)
-    
-    connection.execSql("select getdate()", (err, rowCount) ->
-      test.ok(!err)
-      test.done()
-    )
-  )
-  
-  connection.on('row', (columns) ->
-    dbDate = columns[0].value.getTime()
-    now = new Date().getTime()
-    difference = Math.abs(now - dbDate)
-
-    test.ok(difference < 100)
-  )
-
-  connection.on('debug', (message) ->
-    #console.log(message)
-  )
-
-exports.numericType = (test) ->
-  test.expect(6)
-
-  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
-    test.ok(!err)
-    
-    connection.execSql('select 1.23, -5.4321, 98765432.12345, cast(null as numeric)', (err, rowCount) ->
-      test.ok(!err)
-      test.done()
-    )
-  )
-  
-  connection.on('row', (columns) ->
-    test.strictEqual(columns[0].value, 1.23)
-    test.strictEqual(columns[1].value, -5.4321)
-    test.strictEqual(columns[2].value, 98765432.12345)
-    test.ok(columns[3].isNull)
   )
 
   connection.on('debug', (message) ->
