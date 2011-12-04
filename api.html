@@ -6,18 +6,9 @@ title: API
 <h2>API</h2>
 
 <p>
-  Some code
+  The API comprises two classes,
+  <a href="api-connection.html"><code>Connection</code></a>
+  and
+  <a href="api-request.html"><code>Request</code></a>
+  .
 </p>
-
-{% highlight javascript %}
-  var Connection = require('tedious');
-
-  var connection = new Connection('server', 'username', 'password', options,
-    function(err, loggedIn) {
-      assert(!err)
-      assert(loggedIn)
-      
-      // ...
-    }
-  )
-{% endhighlight %}

@@ -19,7 +19,7 @@ a:hover {
 }
 
 p {
-  margin: 0 0 1em 0;
+  margin: 0.5em 0;
   line-height: 1.3em;
 }
 
@@ -33,6 +33,10 @@ pre.code {
   border: 1px solid darkGrey;
   padding: 0.5em;
   margin-bottom: 1em;
+}
+
+code li {
+  margin: 0.5em 0 0.5em 1em;
 }
 
 #content {
@@ -87,6 +91,10 @@ pre.code {
   top: 5em;
   left: 5em;
   width: 12em;
+}
+
+#navigation ul ul {
+  margin-left: 1em;
 }
 
 #footer {

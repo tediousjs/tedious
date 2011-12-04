@@ -6,5 +6,47 @@ title: Getting started
 <h2>Getting started</h2>
 
 <p>
-  Some text.
+  In this introduction, error handling, and some other details are glossed over.
 </p>
+
+<p>
+  Connecting to the database looks like this.
+</p>
+
+{% highlight javascript %}
+  var Connection = require('tedious').Connection;
+  var Request = require('tedious').Request;
+
+  var options = {};
+  
+  var connection = new Connection('192.168.1.210', 'test', 'test', options,
+    function(err, loggedIn) {
+      // If no error, then good to go...
+      executeStatement()
+    }
+  )
+{% endhighlight %}
+
+<p>
+  Once a connection has been established, a query can be executed.
+</p>
+
+{% highlight javascript %}
+  function executeStatement() {
+    request = new Request("select 42, 'hello world'", function(err, rowCount) {
+      console.log(rowCount + ' rows returned');
+    });
+
+    request.on('row', function(columns) {
+      columns.forEach(function(column) {
+        if (column.isNull) {
+          console.log('NULL');
+        } else {
+          console.log(column.value);
+        }
+      });
+    });
+  
+    connection.execSql(request);
+  }
+{% endhighlight %}
