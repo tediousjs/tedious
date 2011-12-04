@@ -1,5 +1,5 @@
-ReadableTrackingBuffer = require('../../lib/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../lib/tracking-buffer').WritableTrackingBuffer
+ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 exports.readableTrackingBuffer = (test) ->
   buffer = new ReadableTrackingBuffer()

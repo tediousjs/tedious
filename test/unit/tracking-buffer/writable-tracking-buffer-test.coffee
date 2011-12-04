@@ -1,5 +1,5 @@
 require('buffertools')
-TrackingBuffer = require('../../lib/tracking-buffer').WritableTrackingBuffer
+TrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 exports.create = (test) ->
   buffer = new TrackingBuffer(2)
