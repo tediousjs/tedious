@@ -74,12 +74,10 @@ module.exports.nVarChar = (test) ->
 module.exports.intN = (test) ->
   colMetaData = [type: dataTypeByName.IntN]
 
-  value = 0
-
   buffer = new WritableBuffer(0)
 
   buffer.writeUInt8(TYPE.ROW)
-  buffer.writeUInt8(value)
+  buffer.writeUInt8(0)
   buffer = buffer.data
   #console.log(buffer)
 
@@ -90,5 +88,29 @@ module.exports.intN = (test) ->
   test.strictEqual(token.columns.length, 1)
   test.ok(!token.columns[0].value)
   test.ok(token.columns[0].isNull)
+
+  test.done()
+
+module.exports.datetime = (test) ->
+  colMetaData = [type: dataTypeByName.DateTime]
+
+  days = 2                                        # 3rd January 1900
+  threeHundredthsOfSecond = 45 * 300              # 45 seconds
+
+  buffer = new WritableBuffer(0)
+
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeInt32LE(days)
+  buffer.writeUInt32LE(threeHundredthsOfSecond)
+  buffer = buffer.data
+  #console.log(buffer)
+
+  token = parser(buffer, 1, colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
 
   test.done()
