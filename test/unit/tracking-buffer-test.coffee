@@ -8,7 +8,7 @@ exports.readableTrackingBuffer = (test) ->
   test.done()
 
 exports.writableTrackingBuffer = (test) ->
-  buffer = new WritableTrackingBuffer()
+  buffer = new WritableTrackingBuffer(1)
   
   test.ok(buffer)
   test.done()
