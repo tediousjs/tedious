@@ -1,21 +1,17 @@
 parser = require('../../../lib/token/row-token-parser')
 TYPE = require('../../../lib/token/token').TYPE
 dataTypeByName = require('../../../lib/token/data-type').typeByName
+WritableBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.int = (test) ->
-  colMetaData = [
-    type:
-      name: 'Int'
-      dataLength: 4
-  ]
+  colMetaData = [type: dataTypeByName.Int]
 
   value = 3
 
-  buffer = new Buffer(1 + 4)
-  pos = 0;
-
-  buffer.writeUInt8(TYPE.ROW, pos); pos++
-  buffer.writeUInt32LE(value, pos); pos += 4
+  buffer = new WritableBuffer(0)
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt32LE(value)
+  buffer = buffer.data
   #console.log(buffer)
 
   token = parser(buffer, 1, colMetaData)
@@ -30,20 +26,15 @@ module.exports.int = (test) ->
   test.done()
 
 module.exports.varChar = (test) ->
-  colMetaData = [
-    type:
-      name: 'VarChar'
-      dataLengthLength: 2
-  ]
+  colMetaData = [type: dataTypeByName.VarChar]
 
   value = 'abc'
 
-  buffer = new Buffer(1 + 2 + 3)
-  pos = 0;
-
-  buffer.writeUInt8(TYPE.ROW, pos); pos++
-  buffer.writeUInt16LE(value.length, pos); pos += colMetaData[0].type.dataLengthLength
-  buffer.write(value, pos, 'ascii'); pos += value.length
+  buffer = new WritableBuffer(0, 'ascii')
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt16LE(value.length)
+  buffer.writeString(value)
+  buffer = buffer.data
   #console.log(buffer)
 
   token = parser(buffer, 1, colMetaData)
@@ -58,20 +49,15 @@ module.exports.varChar = (test) ->
   test.done()
 
 module.exports.nVarChar = (test) ->
-  colMetaData = [
-    type:
-      name: 'NVarChar'
-      dataLengthLength: 2
-  ]
+  colMetaData = [type: dataTypeByName.NVarChar]
 
   value = 'abc'
 
-  buffer = new Buffer(1 + 2 + 6)
-  pos = 0;
-
-  buffer.writeUInt8(TYPE.ROW, pos); pos++
-  buffer.writeUInt16LE(value.length * 2, pos); pos += colMetaData[0].type.dataLengthLength
-  buffer.write(value, pos, 'ucs-2'); pos += (value.length * 2)
+  buffer = new WritableBuffer(0, 'ucs2')
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt16LE(value.length * 2)
+  buffer.writeString(value)
+  buffer = buffer.data
   #console.log(buffer)
 
   token = parser(buffer, 1, colMetaData)
@@ -86,19 +72,15 @@ module.exports.nVarChar = (test) ->
   test.done()
 
 module.exports.intN = (test) ->
-  colMetaData = [
-    type:
-      name: 'IntN'
-      dataLengthLength: 1
-  ]
+  colMetaData = [type: dataTypeByName.IntN]
 
   value = 0
 
-  buffer = new Buffer(1 + 1)
-  pos = 0;
+  buffer = new WritableBuffer(0)
 
-  buffer.writeUInt8(TYPE.ROW, pos); pos++
-  buffer.writeUInt8(value, pos); pos++
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt8(value)
+  buffer = buffer.data
   #console.log(buffer)
 
   token = parser(buffer, 1, colMetaData)
