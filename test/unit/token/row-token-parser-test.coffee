@@ -114,3 +114,23 @@ module.exports.datetime = (test) ->
   test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
 
   test.done()
+
+module.exports.datetimeN = (test) ->
+  colMetaData = [type: dataTypeByName.DateTimeN]
+
+  buffer = new WritableBuffer(0)
+
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt8(0)
+  buffer = buffer.data
+  #console.log(buffer)
+
+  token = parser(buffer, 1, colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].value)
+  test.ok(token.columns[0].isNull)
+
+  test.done()
