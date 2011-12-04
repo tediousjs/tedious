@@ -1,4 +1,5 @@
 Connection = require('../../lib/connection')
+Request = require('../../lib/request')
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
@@ -80,22 +81,24 @@ exports.ncharNull = (test) ->
 execSql = (test, sql, expectedValue) ->
   test.expect(3)
 
-  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+  request = new Request(sql, (err, rowCount) ->
     test.ok(!err)
-    
-    connection.execSql(sql, (err, rowCount) ->
-      test.ok(!err)
-      test.done()
-    )
+    test.done()
   )
-  
-  connection.on('row', (columns) ->
+
+  request.on('row', (columns) ->
     if expectedValue == null
       test.ok(columns[0].isNull)
     else if expectedValue instanceof Date
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
     else
       test.strictEqual(columns[0].value, expectedValue)
+  )
+
+  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
+    test.ok(!err)
+
+    connection.execSql(request)
   )
 
   connection.on('error', (message) ->

@@ -1,4 +1,5 @@
 var Connection = require('../lib/tedious').Connection;
+var Request = require('../lib/tedious').Request;
 var fs = require('fs');
 
 var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
@@ -13,8 +14,6 @@ config.options.debug = {
 
 var connection = new Connection(config.server, config.userName, config.password, config.options, connected);
 
-connection.on('columnMetadata', columnMetadata);
-connection.on('row', row);
 connection.on('infoMessage', infoError);
 connection.on('errorMessage', infoError);
 connection.on('timeout', timeout);
@@ -42,7 +41,12 @@ function connected(err, loggedIn) {
 
 function exec(sql) {
   sql = sql.toString();
-  connection.execSql(sql, statementComplete);
+
+  request = new Request(sql, statementComplete)
+  request.on('columnMetadata', columnMetadata);
+  request.on('row', row);
+
+  connection.execSql(request);
 }
 
 function statementComplete(err, rowCount) {

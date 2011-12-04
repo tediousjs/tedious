@@ -51,14 +51,15 @@ class Connection extends EventEmitter
     @messageIo = new MessageIO(@connection, @debug)
     @messageIo.on('packet', @eventPacket)
 
-    @startRequest('connect/login', callback);
+    @startRequest('connect/login', callback)
 
     @packetBuffer = new Buffer(0)
 
-  execSql: (sqlText, callback) ->
-    @startRequest('execSql', callback);
+  execSql: (request) ->
+    @sqlRequest = request
+    @startRequest('execSql', request.callback)
 
-    payload = new SqlBatchPayload(sqlText)
+    payload = new SqlBatchPayload(request.sqlText)
     
     @state = STATE.SENT_CLIENT_REQUEST
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
@@ -141,10 +142,10 @@ class Connection extends EventEmitter
       @emit('charsetChange', @_charset)
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
-      @emit('columnMetadata', token.columns)
+      @sqlRequest.emit('columnMetadata', token.columns)
     )
     @tokenStreamParser.on('row', (token) =>
-      @emit('row', token.columns)
+      @sqlRequest.emit('row', token.columns)
     )
     @tokenStreamParser.on('returnStatus', (token) =>
       @procReturnStatusValue = token.value
