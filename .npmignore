@@ -1,2 +1,4 @@
-coffee
+coffee/
 todo
+.git*
+.project
