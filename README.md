@@ -11,16 +11,37 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Tedious is not yet really useable.
+Tedious is just about useable for simple statements.
 
-- `PRELOGIN` and `LOGIN7` packets and their responses are broadly implemented.
-- Authentication works.
-- A SQL statement request (in a `SQL_BATCH` packet) can be sent.
- - Only `Int`, `VarChar` and `NVarChar` types are supported so far.
+- Session establishment and authentication work.
+- Sending SQL statements (in a `SQL_BATCH` packet) works in simple case.
+ - Many simple data types are supported.
  - An event for column metadata in the response is emitted.
  - Events for each row in the response are emitted.
 
-Tedious might soon be useable, after a fashion, for very simple use cases.
+There's still a lot that needs doing.
+
+- Support for more data types.
+- The API needs to change to support statement execution with a Statement class.
+- Decoding of columns metadata flags.
+- Decoding of collation data.
+- Ability to cancel a request.
+- Support for transactions.
+- Better support for large datatypes (for example integers over 53 bits).
+
+Supported data types
+----------
+- Null
+- TinyInt
+- SmallInt
+- Int
+- Bit
+- DateTime
+- Numeric
+- VarChar
+- Char
+- NVarChar
+- NChar
 
 Licence
 -------
