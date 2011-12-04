@@ -7,7 +7,7 @@ buffertools = require('buffertools')
   When writing, automatically allocates new buffers if there's not enough space.
   When reading, if the read would pass the end of the buffer, null is returned.
 ###
-class BinaryBuffer
+class TrackingBuffer
   constructor: (@sizeIncrement) ->
     @sizeIncrement ||= 4 * 1024
     @encoding = 'ucs2'
@@ -104,4 +104,4 @@ class BinaryBuffer
     bytesWritten = @buffer.write(value, @position, @encoding)
     @position += length
 
-module.exports = BinaryBuffer
+module.exports = TrackingBuffer

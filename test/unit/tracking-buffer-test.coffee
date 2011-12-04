@@ -1,8 +1,8 @@
 require('buffertools')
-BinaryBuffer = require('../../lib/binary-buffer')
+TrackingBuffer = require('../../lib/tracking-buffer')
 
 exports.create = (test) ->
-  buffer = new BinaryBuffer()
+  buffer = new TrackingBuffer()
   
   test.ok(buffer)
   test.strictEqual(0, buffer.data.length)
@@ -10,7 +10,7 @@ exports.create = (test) ->
   test.done()
 
 exports.writeUnsignedInt = (test) ->
-  buffer = new BinaryBuffer(2)
+  buffer = new TrackingBuffer(2)
 
   buffer.writeUInt8(1)
   buffer.writeUInt16LE(2)
@@ -29,7 +29,7 @@ exports.writeUnsignedInt = (test) ->
   test.done()
 
 exports.writeSignedInt = (test) ->
-  buffer = new BinaryBuffer(2)
+  buffer = new TrackingBuffer(2)
 
   buffer.writeInt8(-1)
   buffer.writeInt16LE(-2)
@@ -49,7 +49,7 @@ exports.writeSignedInt = (test) ->
 
 
 exports.writeString = (test) ->
-  buffer = new BinaryBuffer(2)
+  buffer = new TrackingBuffer(2)
 
   buffer.writeString('abc')
 
