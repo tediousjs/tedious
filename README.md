@@ -29,19 +29,9 @@ There's still a lot that needs doing.
 - Support for transactions.
 - Better support for large values (for example integers over 53 bits).
 
-Supported data types
-----------
-- Null
-- TinyInt
-- SmallInt
-- Int
-- Bit
-- DateTime
-- Numeric
-- VarChar
-- Char
-- NVarChar
-- NChar
+Documentation
+-------------
+More documentation is available at [pekim.github.com/tedious/](http://pekim.github.com/tedious/)
 
 Licence
 -------
