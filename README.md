@@ -14,7 +14,7 @@ Status
 Tedious is just about useable for simple statements.
 
 - Session establishment and authentication work.
-- Sending SQL statements (in a `SQL_BATCH` packet) works in simple case.
+- Sending SQL statements (in a `SQL_BATCH` packet) works for some simple statements.
  - Many simple data types are supported.
  - An event for column metadata in the response is emitted.
  - Events for each row in the response are emitted.
@@ -23,11 +23,11 @@ There's still a lot that needs doing.
 
 - Support for more data types.
 - The API needs to change to support statement execution with a Statement class.
-- Decoding of columns metadata flags.
+- Decoding of column metadata flags.
 - Decoding of collation data.
 - Ability to cancel a request.
 - Support for transactions.
-- Better support for large datatypes (for example integers over 53 bits).
+- Better support for large values (for example integers over 53 bits).
 
 Supported data types
 ----------
