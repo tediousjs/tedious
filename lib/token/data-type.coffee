@@ -97,8 +97,14 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
   0xE7:
-    type: 'NVARCHR'
+    type: 'NVARCHAR'
     name: 'NVarChar'
+    variableLength: true
+    hasCollation: true
+    dataLengthLength: 2
+  0xEF:
+    type: 'NCHAR'
+    name: 'NChar'
     variableLength: true
     hasCollation: true
     dataLengthLength: 2
@@ -126,11 +132,7 @@ TYPE =
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
   BIGVARBINTYPE:        0xA5  # VarBinary
-  #BIGVARCHRTYPE:        0xA7  # VarChar
   BIGBINARYTYPE:        0xAD  # Binary
-  #BIGCHARTYPE:          0xAF  # Char
-  #NVARCHARTYPE:         0xE7  # NVarChar
-  NCHARTYPE:            0xEF  # NChar
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   

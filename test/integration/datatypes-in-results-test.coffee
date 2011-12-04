@@ -70,11 +70,11 @@ exports.char = (test) ->
 exports.charNull = (test) ->
   execSql(test, "select cast(null as char(5))", null)
 
-# exports.nchar = (test) ->
-  # execSql(test, "select cast('abc' as nchar(5))", 'abc  ')
-# 
-# exports.ncharNull = (test) ->
-  # execSql(test, "select cast(null as nchar(5))", null)
+exports.nchar = (test) ->
+  execSql(test, "select cast('abc' as nchar(5))", 'abc  ')
+
+exports.ncharNull = (test) ->
+  execSql(test, "select cast(null as nchar(5))", null)
 
 
 execSql = (test, sql, expectedValue) ->

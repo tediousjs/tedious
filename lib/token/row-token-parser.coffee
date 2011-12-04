@@ -88,7 +88,7 @@ parser = (buffer, position, columnsMetaData) ->
             return false
           value = buffer.toString('ascii', position, position + dataLength)
           position += dataLength
-      when 'NVarChar'
+      when 'NVarChar', 'NChar'
         if buffer.length - position < 2
           return false
         dataLength = buffer.readUInt16LE(position)
