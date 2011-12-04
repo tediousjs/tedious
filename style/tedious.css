@@ -23,6 +23,15 @@ p {
   line-height: 1.3em;
 }
 
+#content ul {
+  margin-left: 1em;
+}
+
+#content ul li {
+  list-style-type: disc;
+  margin: 0.5em;
+}
+
 code,
 .code {
   font-family: monospace;
@@ -93,6 +102,10 @@ code li {
   width: 12em;
 }
 
+#navigation ul li {
+  margin-bottom: 0.4em;
+}
+
 #navigation ul ul {
   margin-left: 1em;
 }
@@ -128,10 +141,6 @@ h1 a:hover,
 h1 a:visited {
   color: #a00;
   text-decoration: none;
-}
-
-#navigation ul li {
-  margin-bottom: 0.4em;
 }
 
 h2 {
