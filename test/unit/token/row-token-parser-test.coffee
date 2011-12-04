@@ -134,3 +134,55 @@ module.exports.datetimeN = (test) ->
   test.ok(token.columns[0].isNull)
 
   test.done()
+
+module.exports.numeric = (test) ->
+  colMetaData = [
+    type: dataTypeByName.NumericN
+    precision: 3
+    scale: 1
+  ]
+
+  value = -9.3
+
+  buffer = new WritableBuffer(0)
+
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt8(5)
+  buffer.writeUInt8(0)      # negative
+  buffer.writeUInt32LE(93)
+  buffer = buffer.data
+  #console.log(buffer)
+
+  token = parser(buffer, 1, colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, value)
+
+  test.done()
+
+module.exports.numericN = (test) ->
+  colMetaData = [
+    type: dataTypeByName.NumericN
+    precision: 3
+    scale: 1
+  ]
+
+  buffer = new WritableBuffer(0)
+
+  buffer.writeUInt8(TYPE.ROW)
+  buffer.writeUInt8(0)
+  buffer = buffer.data
+  #console.log(buffer)
+
+  token = parser(buffer, 1, colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].value)
+  test.ok(token.columns[0].isNull)
+
+  test.done()
