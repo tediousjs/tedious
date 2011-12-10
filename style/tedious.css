@@ -49,8 +49,8 @@ code li {
 }
 
 #content {
-  width: 600px;
-  margin: 3em auto 3em auto;
+  max-width: 45em;
+  margin: 3em 3em 2em 17em;
   padding: 1em;
   background-color: #f2f2f2;
   border-left: 1px solid darkGrey;
@@ -99,7 +99,7 @@ code li {
   position: fixed;
   top: 5em;
   left: 5em;
-  width: 12em;
+  width: 10em;
 }
 
 #navigation ul li {
