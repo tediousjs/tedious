@@ -22,10 +22,26 @@ title: Getting started
   var connection = new Connection('192.168.1.210', 'test', 'test', options,
     function(err, loggedIn) {
       // If no error, then good to go...
-      executeStatement()
+      executeStatement();
     }
   )
 {% endhighlight %}
+
+<p>
+  The arguments to the
+  <a href="api-connection.html">
+    <code>Connection</code>
+  </a>
+  constructor are
+  <em>host</em>, <em>username</em>, <em>password</em>,
+  an <em>options object</em> (empty in this example),
+  and a <em>callback function</em>. 
+</p>
+
+<p>
+  The callback is called when either the connection has been established
+  and authentication has succeeded, or an error occured during connection or authentication.
+</p>
 
 <p>
   Once a connection has been established, a query can be executed.
@@ -50,3 +66,31 @@ title: Getting started
     connection.execSql(request);
   }
 {% endhighlight %}
+
+<p>
+  A request is represented by a
+  <a href="api-request.html">
+    <code>Request</code>
+  </a>
+  instance.
+  The arguments to <code>Request</code>'s constructor are
+  the SQL statement, and a callback function. 
+  The callback is called when the request has completed (either successfully, or with errors).
+</p>
+
+<p>
+  A <code>row</code> event is emmitted for each row returned as a result of executing the statement.
+  An array of columns is the sole parameter to the callback.
+  For each column, a value and metadata is provided (although only the value is used in this example).
+</p>
+
+<p>
+  To execute the statement, the <code>Connection</code>'s <code>execute</code> must be called.
+</p>
+
+<p>
+  An example based around these code fragments can be found in
+  <a href="https://github.com/pekim/tedious/blob/master/examples/minimal.js">
+    <code>examples/minimal.js</code>
+  </a>.
+</p>

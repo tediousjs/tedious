@@ -3,6 +3,10 @@ body {
   font-size: 90%;
 }
 
+em {
+  font-style: italic;
+}
+
 a,
 a:visited {
   color: darkBlue;
