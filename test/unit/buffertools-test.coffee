@@ -21,6 +21,38 @@ exports.concatTwoArguments = (test) ->
 
   test.done()
 
+exports.toByteArray = (test) ->
+  buffer = new Buffer([1, 2, 3])
+  array = buffer.toByteArray();
+  
+  test.ok(arrayEqual(array, [1, 2, 3]));
+
+  test.done()
+
+exports.equalsNonEmpty = (test) ->
+  buffer1 = new Buffer([1, 2, 3])
+  buffer2 = new Buffer([1, 2, 3])
+  
+  test.ok(buffer1.equals(buffer2));
+
+  test.done()
+
+exports.equalsEmpty = (test) ->
+  buffer1 = new Buffer([])
+  buffer2 = new Buffer([])
+  
+  test.ok(buffer1.equals(buffer2));
+
+  test.done()
+
+exports.equalsOneEmpty = (test) ->
+  buffer1 = new Buffer([1, 2, 3])
+  buffer2 = new Buffer([])
+  
+  test.ok(!buffer1.equals(buffer2));
+
+  test.done()
+
 bufferEqual = (actual, expected) ->
   if actual.length != expected.length
     return false
@@ -32,3 +64,5 @@ bufferEqual = (actual, expected) ->
       return false
     
     true
+
+arrayEqual = bufferEqual
