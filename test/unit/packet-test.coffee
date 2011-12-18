@@ -1,4 +1,4 @@
-require('buffertools')
+require('../../lib/buffertools')
 
 Packet = require('../../lib/packet').Packet
 TYPE = require('../../lib/packet').TYPE

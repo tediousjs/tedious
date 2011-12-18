@@ -1,4 +1,3 @@
-require('buffertools')
 TrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 
 exports.createNoArgs = (test) ->

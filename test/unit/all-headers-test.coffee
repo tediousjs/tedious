@@ -1,4 +1,4 @@
-require('buffertools')
+require('../../lib/buffertools')
 
 makeBuffer = require('../../lib/all-headers')
 

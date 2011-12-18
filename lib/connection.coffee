@@ -1,4 +1,4 @@
-require('buffertools')
+require('./buffertools')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 TYPE = require('./packet').TYPE

@@ -1,4 +1,3 @@
-require('buffertools')
 TrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 exports.create = (test) ->
@@ -57,30 +56,11 @@ exports.writeString = (test) ->
 
   test.done()
 
-# exports.readUnsignedInt = (test) ->
-  # buffer = new TrackingBuffer([
-    # 0x01
-    # 0x02, 0x00
-    # 0x00, 0x03
-    # 0x04, 0x00, 0x00, 0x00
-    # 0x00, 0x00, 0x00, 0x05
-  # ])
-# 
-  # test.strictEqual(buffer.readUInt8(), 1)
-  # test.strictEqual(buffer.readUInt16LE(), 2)
-  # test.strictEqual(buffer.readUInt16BE(), 3)
-  # test.strictEqual(buffer.readUInt32LE(), 4)
-  # test.strictEqual(buffer.readUInt32BE(), 5)
-# 
-  # test.done()
-
 assertBuffer = (test, actual, expected) ->
   actual = actual.data
   expected = new Buffer(expected)
 
-  comparisonResult = actual.compare(expected)
-  if (comparisonResult != 0)
+  comparisonResult = actual.equals(expected)
+  if (!comparisonResult)
     console.log('actual  ', actual)
     console.log('expected', expected)
-  
-  test.strictEqual(comparisonResult, 0)

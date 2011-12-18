@@ -2,7 +2,7 @@ Debug = require('../../lib/debug')
 EventEmitter = require('events').EventEmitter
 MessageIO = require('../../lib/message-io')
 Packet = require('../../lib/packet').Packet
-require('buffertools')
+require('../../lib/buffertools')
 
 class Connection extends EventEmitter
   setTimeout: ->

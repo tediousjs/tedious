@@ -1,4 +1,4 @@
-require('buffertools')
+require('./buffertools')
 sprintf = require('sprintf').sprintf
 
 HEADER_LENGTH = 8

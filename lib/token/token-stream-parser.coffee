@@ -1,4 +1,4 @@
-require('buffertools')
+require('../buffertools')
 EventEmitter = require('events').EventEmitter
 TYPE = require('./token').TYPE
 

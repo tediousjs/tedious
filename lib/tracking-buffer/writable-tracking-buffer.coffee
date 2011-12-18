@@ -1,4 +1,4 @@
-buffertools = require('buffertools')
+buffertools = require('../buffertools')
 
 ###
   A Buffer-like class that tracks position.

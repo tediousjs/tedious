@@ -37,6 +37,14 @@ exports.equalsNonEmpty = (test) ->
 
   test.done()
 
+exports.equalsDifferent = (test) ->
+  buffer1 = new Buffer([1, 2, 3])
+  buffer2 = new Buffer([1, 2, 9])
+  
+  test.ok(!buffer1.equals(buffer2));
+
+  test.done()
+
 exports.equalsEmpty = (test) ->
   buffer1 = new Buffer([])
   buffer2 = new Buffer([])

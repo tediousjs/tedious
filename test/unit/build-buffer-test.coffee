@@ -1,5 +1,5 @@
 buildBuffer = require('../../lib/build-buffer')
-require('buffertools')
+require('../../lib/buffertools')
 
 exports.unpairedArguments = (test) ->
   try

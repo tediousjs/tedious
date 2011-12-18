@@ -1,4 +1,4 @@
-require('buffertools')
+require('../../lib/buffertools')
 Login7Payload = require('../../lib/login7-payload')
 
 exports.create = (test) ->

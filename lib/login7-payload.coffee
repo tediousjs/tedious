@@ -1,5 +1,5 @@
 buildBuffer = require('./build-buffer')
-require('buffertools')
+require('./buffertools')
 os= require('os')
 sprintf = require('sprintf').sprintf
 libraryName = require('./library').name

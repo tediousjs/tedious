@@ -32,4 +32,4 @@ Buffer.prototype.equals = (other) ->
     if thisArray[b] != otherArray[b]
       return false
     
-    true
+  true
