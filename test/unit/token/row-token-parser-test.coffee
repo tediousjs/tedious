@@ -3,6 +3,58 @@ TYPE = require('../../../lib/token/token').TYPE
 dataTypeByName = require('../../../lib/token/data-type').typeByName
 WritableBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
+writeBytes = (buffer, array) ->
+  for b in array
+    do (b) ->
+      buffer.writeUInt8( b )
+
+module.exports.bigint = (test) ->
+  colMetaData = [{type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt},
+                 {type: dataTypeByName.BigInt}]
+
+  buffer = new WritableBuffer(0)
+
+  buffer.writeUInt8(TYPE.ROW)
+  writeBytes( buffer, [0,0,0,0,0,0,0,0,
+                       1,0,0,0,0,0,0,0,
+                       255,255,255,255,255,255,255,255,
+                       2,0,0,0,0,0,0,0,
+                       254,255,255,255,255,255,255,255,
+                       255,255,255,255,255,255,255,127,
+                       0,0,0,0,0,0,0,128,
+                       10,0,0,0,0,0,0,0,
+                       100,0,0,0,0,0,0,0,
+                       232,3,0,0,0,0,0,0,
+                       16,39,0,0,0,0,0,0] )
+  buffer = buffer.data
+
+  token = parser(buffer, 1, colMetaData)
+  test.strictEqual(token.length, buffer.length - 1)
+  test.strictEqual(token.columns.length, 11)
+  test.strictEqual("0", token.columns[0].value)
+  test.strictEqual("1", token.columns[1].value)
+  test.strictEqual("-1", token.columns[2].value)
+  test.strictEqual("2", token.columns[3].value)
+  test.strictEqual("-2", token.columns[4].value)
+  test.strictEqual("9223372036854775807", token.columns[5].value)
+  test.strictEqual("-9223372036854775808", token.columns[6].value)
+  test.strictEqual("10", token.columns[7].value)
+  test.strictEqual("100", token.columns[8].value)
+  test.strictEqual("1000", token.columns[9].value)
+  test.strictEqual("10000", token.columns[10].value)
+
+  test.done()
+
+
 module.exports.int = (test) ->
   colMetaData = [type: dataTypeByName.Int]
 
@@ -72,12 +124,34 @@ module.exports.nVarChar = (test) ->
   test.done()
 
 module.exports.intN = (test) ->
-  colMetaData = [type: dataTypeByName.IntN]
+  colMetaData = [{type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN},
+                 {type: dataTypeByName.IntN}]
 
   buffer = new WritableBuffer(0)
 
   buffer.writeUInt8(TYPE.ROW)
   buffer.writeUInt8(0)
+  writeBytes( buffer, [8, 0,0,0,0,0,0,0,0,
+                        8, 1,0,0,0,0,0,0,0,
+                        8, 255,255,255,255,255,255,255,255,
+                        8, 2,0,0,0,0,0,0,0,
+                        8, 254,255,255,255,255,255,255,255,
+                        8, 255,255,255,255,255,255,255,127,
+                        8, 0,0,0,0,0,0,0,128,
+                        8, 10,0,0,0,0,0,0,0,
+                        8, 100,0,0,0,0,0,0,0,
+                        8, 232,3,0,0,0,0,0,0,
+                        8, 16,39,0,0,0,0,0,0] )
   buffer = buffer.data
   #console.log(buffer)
 
@@ -85,9 +159,20 @@ module.exports.intN = (test) ->
   #console.log(token)
 
   test.strictEqual(token.length, buffer.length - 1)
-  test.strictEqual(token.columns.length, 1)
+  test.strictEqual(token.columns.length, 12)
   test.ok(!token.columns[0].value)
   test.ok(token.columns[0].isNull)
+  test.strictEqual("0", token.columns[1].value)
+  test.strictEqual("1", token.columns[2].value)
+  test.strictEqual("-1", token.columns[3].value)
+  test.strictEqual("2", token.columns[4].value)
+  test.strictEqual("-2", token.columns[5].value)
+  test.strictEqual("9223372036854775807", token.columns[6].value)
+  test.strictEqual("-9223372036854775808", token.columns[7].value)
+  test.strictEqual("10", token.columns[8].value)
+  test.strictEqual("100", token.columns[9].value)
+  test.strictEqual("1000", token.columns[10].value)
+  test.strictEqual("10000", token.columns[11].value)
 
   test.done()
 
