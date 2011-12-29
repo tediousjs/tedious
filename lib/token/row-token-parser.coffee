@@ -2,6 +2,7 @@
 
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
+convertLEBytesToString= require('./bigint').convertLEBytesToString
 
 NULL = (1 << 16) - 1
 THREE_AND_A_THIRD = 3 + (1 / 3)
@@ -31,6 +32,11 @@ parser = (buffer, position, columnsMetaData) ->
           return false
         value = buffer.readInt16LE(position)
         position += type.dataLength
+      when 'BigInt'
+        if buffer.length - position < type.dataLength
+          return false
+        value= convertLEBytesToString( buffer.slice(position, position+8) )
+        position += type.dataLength
       when 'IntN'
         if buffer.length - position < 1
           return false
@@ -50,6 +56,8 @@ parser = (buffer, position, columnsMetaData) ->
             value = buffer.readInt16LE(position)
           when 4
             value = buffer.readInt32LE(position)
+          when 8
+            value= convertLEBytesToString( buffer.slice(position, position+8) )
 
         position += dataLength
       when 'Bit'
