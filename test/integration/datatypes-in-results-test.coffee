@@ -29,6 +29,12 @@ exports.int = (test) ->
 exports.intNull = (test) ->
   execSql(test, 'select cast(null as int)', null)
 
+exports.bigint = (test) ->
+  execSql(test, 'select cast(8 as bigint)', '8')
+
+exports.bigintNull = (test) ->
+  execSql(test, 'select cast(null as bigint)', null)
+
 exports.bitFalse = (test) ->
   execSql(test, "select cast('false' as bit)", false)
 
