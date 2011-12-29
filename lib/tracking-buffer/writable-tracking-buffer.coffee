@@ -102,4 +102,10 @@ class WritableTrackingBuffer
     bytesWritten = @buffer.write(value, @position, @encoding)
     @position += length
 
+  writeBuffer: (value) ->
+    length = value.length
+    @makeRoomFor(length)
+    value.copy(@buffer, @position)
+    @position += length
+
 module.exports = WritableTrackingBuffer

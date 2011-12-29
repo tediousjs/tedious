@@ -1,4 +1,4 @@
-buildBuffer = require('./build-buffer')
+WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer')
 require('./buffertools')
 os= require('os')
 sprintf = require('sprintf').sprintf
@@ -79,9 +79,14 @@ class Login7Payload
 
     fixed = @createFixedData()
     variable = @createVariableData(lengthLength + fixed.length)
-    length = buildBuffer('U32L', lengthLength + fixed.length + variable.length)
+    length = lengthLength + fixed.length + variable.length
 
-    @data = new Buffer(length.concat(fixed, variable))
+    data = new WritableTrackingBuffer(300)
+    data.writeUInt32LE(length)
+    data.writeBuffer(fixed)
+    data.writeBuffer(variable)
+
+    @data = data.data
 
   createFixedData: ->
     @tdsVersion = DEFAULT_TDS_VERSION
@@ -115,24 +120,25 @@ class Login7Payload
       TYPE_FLAGS.SQL_DFLT |
       TYPE_FLAGS.OLEDB_OFF
 
-    buffer = buildBuffer(
-      'U32L', @tdsVersion,
-      'U32L', @packetSize,
-      'U32L', @clientProgVer,
-      'U32L', @clientPid,
-      'U32L', @connectionId,
-      'U8', @flags1,
-      'U8', @flags2,
-      'U8', @typeFlags,
-      'U8', @flags3,
-      '32L', @clientTimeZone,
-      'U32L', @clientLcid
-    )
+    buffer = new WritableTrackingBuffer(100)
+    buffer.writeUInt32LE(@tdsVersion)
+    buffer.writeUInt32LE(@packetSize)
+    buffer.writeUInt32LE(@clientProgVer)
+    buffer.writeUInt32LE(@clientPid)
+    buffer.writeUInt32LE(@connectionId)
+    buffer.writeUInt8(@flags1)
+    buffer.writeUInt8(@flags2)
+    buffer.writeUInt8(@typeFlags)
+    buffer.writeUInt8(@flags3)
+    buffer.writeInt32LE(@clientTimeZone)
+    buffer.writeUInt32LE(@clientLcid)
+    
+    buffer.data
 
   createVariableData: (offset) ->
     variableData =
-      offsetsAndLengths: new Buffer(0),
-      data: new Buffer(0),
+      offsetsAndLengths: new WritableTrackingBuffer(200)
+      data: new WritableTrackingBuffer(200, 'ucs2')
       offset: offset + ((9 * 4) + 6 + (3 * 4) + 4)
     
     @hostname = os.hostname()
@@ -145,44 +151,43 @@ class Login7Payload
     @clientId = new Buffer([1, 2, 3, 4, 5, 6])
 
     @sspi = ''
+    @sspiLong = 0
     @attachDbFile = ''
     @changePassword = ''
 
-    cbSSPILong = buildBuffer('U32L', 0)
+    @addVariableDataString(variableData, @hostname)
+    @addVariableDataString(variableData, @loginData.userName)
+    @addVariableDataBuffer(variableData, @createPasswordBuffer())
+    @addVariableDataString(variableData, @loginData.appName)
+    @addVariableDataString(variableData, @loginData.serverName)
+    @addVariableDataString(variableData, '')                        # Reserved for future use.
+    @addVariableDataString(variableData, @libraryName)
+    @addVariableDataString(variableData, @loginData.language)
+    @addVariableDataString(variableData, @loginData.database)
+    variableData.offsetsAndLengths.writeBuffer(@clientId)
+    @addVariableDataString(variableData, @sspi)
+    @addVariableDataString(variableData, @attachDbFile)
+    @addVariableDataString(variableData, @changePassword)           # Introduced in TDS 7.2
+    variableData.offsetsAndLengths.writeUInt32LE(@sspiLong)         # Introduced in TDS 7.2
 
-    @addVariableData(variableData, @hostname)
-    @addVariableData(variableData, @loginData.userName)
-    @addVariableData(variableData, @createPasswordBuffer())
-    @addVariableData(variableData, @loginData.appName)
-    @addVariableData(variableData, @loginData.serverName)
-    @addVariableData(variableData, '')                        # Reserved for future use.
-    @addVariableData(variableData, @libraryName)
-    @addVariableData(variableData, @loginData.language)
-    @addVariableData(variableData, @loginData.database)
-    @addVariableDataBytes(variableData, @clientId)
-    @addVariableData(variableData, @sspi)
-    @addVariableData(variableData, @attachDbFile)
-    @addVariableData(variableData, @changePassword)           # Introduced in TDS 7.2
-    @addVariableDataBytes(variableData, cbSSPILong)           # Introduced in TDS 7.2
+    variableData.offsetsAndLengths.data.concat(variableData.data.data)
 
-    variableData.offsetsAndLengths.concat(variableData.data)
+  addVariableDataBuffer: (variableData, buffer) ->
+    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset)
+    variableData.offsetsAndLengths.writeUInt16LE(buffer.length / 2)
 
-  addVariableData: (variableData, value) ->
-    if !(value instanceof Buffer)
-      value ||= ''
-      value = new Buffer(value, 'ucs2')
+    variableData.data.writeBuffer(buffer)
 
-    offsetAndLength = buildBuffer(
-        'U16L', variableData.offset,
-        'U16L', value.length / 2
-    )
+    variableData.offset += buffer.length
 
-    variableData.offsetsAndLengths = variableData.offsetsAndLengths.concat(offsetAndLength)
-    variableData.data = variableData.data.concat(value)
-    variableData.offset += value.length
+  addVariableDataString: (variableData, value) ->
+    value ||= ''
+    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset)
+    variableData.offsetsAndLengths.writeUInt16LE(value.length)
 
-  addVariableDataBytes: (variableData, bytes) ->
-    variableData.offsetsAndLengths = variableData.offsetsAndLengths.concat(bytes);
+    variableData.data.writeString(value);
+
+    variableData.offset += value.length * 2
 
   createPasswordBuffer: () ->
     password = @loginData.password || ''
