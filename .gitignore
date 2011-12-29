@@ -1,5 +1,6 @@
 
 .project
+.idea/*
 node_modules/*
 todo
 *sublime*
