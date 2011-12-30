@@ -56,6 +56,12 @@ exports.datetime = (test) ->
 exports.datetimeNull = (test) ->
   execSql(test, "select cast(null as datetime)", null)
 
+exports.decimalSmallValue = (test) ->
+  execSql(test, "select cast(9.3 as decimal(3,2))", 9.3)
+
+exports.decimalLargeValue = (test) ->
+  execSql(test, "select cast(9876543.3456 as decimal(12,5))", 9876543.3456)
+
 exports.numericSmallValue = (test) ->
   execSql(test, "select cast(9.3 as numeric(3,2))", 9.3)
 
