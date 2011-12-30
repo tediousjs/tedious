@@ -24,6 +24,17 @@ parser = (buffer, position, columnsMetaData) ->
     isNull = false
     type = columnMetaData.type
     switch type.name
+      when 'Binary'
+        if buffer.length - position < type.dataLengthLength
+          return false
+        dataLength = buffer.readUInt16LE(position)
+        position += 2
+        if dataLength == 65535
+          value = undefined
+          isNull = true
+        else
+          value= Array.prototype.slice.call( buffer, position, position + dataLength )
+          position += dataLength
       when 'TinyInt'
         if buffer.length - position < type.dataLength
           return false

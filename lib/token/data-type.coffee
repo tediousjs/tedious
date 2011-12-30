@@ -90,6 +90,11 @@ TYPE =
     variableLength: true
     hasCollation: true
     dataLengthLength: 2
+  0xAD:
+    type: 'BIGBINARY'
+    name: 'Binary'
+    variableLength: true
+    dataLengthLength: 2
   0xAF:
     type: 'BIGCHAR'
     name: 'Char'
@@ -132,7 +137,6 @@ TYPE =
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
   BIGVARBINTYPE:        0xA5  # VarBinary
-  BIGBINARYTYPE:        0xAD  # Binary
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   
