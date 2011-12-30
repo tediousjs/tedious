@@ -44,6 +44,12 @@ exports.bitTrue = (test) ->
 exports.bitNull = (test) ->
   execSql(test, "select cast(null as bit)", null)
 
+exports.binary = (test) ->
+  execSql(test, "select cast(16719615 as binary(3))", [255,30,255])
+
+exports.binaryNull = (test) ->
+  execSql(test, "select cast(null as binary(16))", null)
+
 exports.datetime = (test) ->
   execSql(test, "select cast('2011-12-4 10:04:23' as datetime)", new Date('December 4, 2011 10:04:23'))
 
@@ -102,6 +108,8 @@ execSql = (test, sql, expectedValue) ->
   request.on('row', (columns) ->
     if expectedValue == null
       test.ok(columns[0].isNull)
+    else if expectedValue instanceof Array
+      test.deepEqual(expectedValue, columns[0].value)
     else if expectedValue instanceof Date
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
     else
