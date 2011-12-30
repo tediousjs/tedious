@@ -91,6 +91,11 @@ TYPE =
     name: 'DateTimeN'
     variableLength: true
     dataLengthLength: 1
+  0xA5:
+    type: 'BIGVARBINTYPE'
+    name: 'VarBin'
+    variableLength: true
+    dataLengthLength: 2
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
@@ -142,7 +147,6 @@ TYPE =
   BINARYTYPE:           0x2D  # Binary (legacy support)
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
-  BIGVARBINTYPE:        0xA5  # VarBinary
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   

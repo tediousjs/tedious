@@ -114,7 +114,7 @@ parser = (buffer, position, columnsMetaData) ->
             return false
           value = buffer.toString('ascii', position, position + dataLength)
           position += dataLength
-      when 'NVarChar'
+      when 'NVarChar', 'VarBin'
         if columnMetaData.dataLength == 65535
           # PARTLENTYPE (See 2.2.5.4.3 of MS-TDS.pdf)
           if buffer.length - position < 8
@@ -147,7 +147,10 @@ parser = (buffer, position, columnsMetaData) ->
             # noted up above with the actual received length of data, but as this
             # could be a 64bit number that could be a PITA (I suspect the buffer would
             # die long before this becomes an actual issue.. so for now we just hope for the best)
-            value = buf2.toString('ucs-2')
+            if type.name == 'NVarChar'
+              value = buf2.toString('ucs-2')
+            else
+              value = Array.prototype.slice.call( buf2, 0 )
         else
           if buffer.length - position < 2
             return false
@@ -160,7 +163,10 @@ parser = (buffer, position, columnsMetaData) ->
           else
             if buffer.length - position < dataLength
               return false
-            value = buffer.toString('ucs-2', position, position + (dataLength))
+            if type.name == 'NVarChar'
+              value = buffer.toString('ucs-2', position, position + (dataLength))
+            else
+              value = Array.prototype.slice.call( buffer, position, position + (dataLength) )
             position += dataLength
       when 'NChar'
         if buffer.length - position < 2
