@@ -230,7 +230,7 @@ parser = (buffer, position, columnsMetaData) ->
             value.setMilliseconds(value.getMilliseconds() + milliseconds)
         
         position += dataLength
-      when 'NumericN'
+      when 'NumericN','DecimalN'
         if buffer.length - position < 1
           return false
         dataLength = buffer.readUInt8(position)
