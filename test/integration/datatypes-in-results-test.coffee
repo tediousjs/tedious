@@ -45,7 +45,7 @@ exports.bitNull = (test) ->
   execSql(test, "select cast(null as bit)", null)
 
 exports.binary = (test) ->
-  execSql(test, "select cast(16719615 as binary(3))", [255,30,255])
+  execSql(test, "select cast(0x1EFF1EFF as binary(10))", [30,255,30,255,0,0,0,0,0,0])
 
 exports.binaryNull = (test) ->
   execSql(test, "select cast(null as binary(16))", null)
@@ -88,6 +88,21 @@ exports.nvarcharMax = (test) ->
 
 exports.nvarcharMaxNull = (test) ->
   execSql(test, "select cast(null as nvarchar(MAX))", null)
+
+exports.varbinary = (test) ->
+  execSql(test, "select cast(0x1EFF1EFF as varbinary(20))", [30,255,30,255])
+
+exports.varbinaryEmpty = (test) ->
+  execSql(test, "select cast(0x as varbinary(3))", [])
+
+exports.varbinaryNull = (test) ->
+  execSql(test, "select cast(null as varbinary(2000))", null)
+
+exports.varbinaryMax = (test) ->
+    execSql(test, "select cast(0x1EFF1EFF as varbinary(max))", [30,255,30,255])
+
+exports.varbinaryMaxNull = (test) ->
+    execSql(test, "select cast(null as varbinary(16))", null)
 
 
 exports.char = (test) ->
