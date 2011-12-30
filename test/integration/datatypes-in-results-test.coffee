@@ -44,11 +44,23 @@ exports.bitTrue = (test) ->
 exports.bitNull = (test) ->
   execSql(test, "select cast(null as bit)", null)
 
+exports.binary = (test) ->
+  execSql(test, "select cast(0x1EFF1EFF as binary(10))", [30,255,30,255,0,0,0,0,0,0])
+
+exports.binaryNull = (test) ->
+  execSql(test, "select cast(null as binary(16))", null)
+
 exports.datetime = (test) ->
   execSql(test, "select cast('2011-12-4 10:04:23' as datetime)", new Date('December 4, 2011 10:04:23'))
 
 exports.datetimeNull = (test) ->
   execSql(test, "select cast(null as datetime)", null)
+
+exports.decimalSmallValue = (test) ->
+  execSql(test, "select cast(9.3 as decimal(3,2))", 9.3)
+
+exports.decimalLargeValue = (test) ->
+  execSql(test, "select cast(9876543.3456 as decimal(12,5))", 9876543.3456)
 
 exports.numericSmallValue = (test) ->
   execSql(test, "select cast(9.3 as numeric(3,2))", 9.3)
@@ -70,6 +82,28 @@ exports.nvarchar = (test) ->
 
 exports.nvarcharNull = (test) ->
   execSql(test, "select cast(null as nvarchar(10))", null)
+
+exports.nvarcharMax = (test) ->
+  execSql(test, "select cast('abc' as nvarchar(MAX))", 'abc')
+
+exports.nvarcharMaxNull = (test) ->
+  execSql(test, "select cast(null as nvarchar(MAX))", null)
+
+exports.varbinary = (test) ->
+  execSql(test, "select cast(0x1EFF1EFF as varbinary(20))", [30,255,30,255])
+
+exports.varbinaryEmpty = (test) ->
+  execSql(test, "select cast(0x as varbinary(3))", [])
+
+exports.varbinaryNull = (test) ->
+  execSql(test, "select cast(null as varbinary(2000))", null)
+
+exports.varbinaryMax = (test) ->
+    execSql(test, "select cast(0x1EFF1EFF as varbinary(max))", [30,255,30,255])
+
+exports.varbinaryMaxNull = (test) ->
+    execSql(test, "select cast(null as varbinary(16))", null)
+
 
 exports.char = (test) ->
   execSql(test, "select cast('abc' as char(5))", 'abc  ')
@@ -95,6 +129,8 @@ execSql = (test, sql, expectedValue) ->
   request.on('row', (columns) ->
     if expectedValue == null
       test.ok(columns[0].isNull)
+    else if expectedValue instanceof Array
+      test.deepEqual(expectedValue, columns[0].value)
     else if expectedValue instanceof Date
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
     else

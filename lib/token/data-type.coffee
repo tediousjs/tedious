@@ -79,16 +79,33 @@ TYPE =
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
+  0x6A:
+    type: 'DECIMALNTYPE'
+    name: 'DecimalN'
+    variableLength: true
+    dataLengthLength: 1
+    hasPrecision: true
+    hasScale: true
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
     variableLength: true
     dataLengthLength: 1
+  0xA5:
+    type: 'BIGVARBINTYPE'
+    name: 'VarBin'
+    variableLength: true
+    dataLengthLength: 2
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
     variableLength: true
     hasCollation: true
+    dataLengthLength: 2
+  0xAD:
+    type: 'BIGBINARY'
+    name: 'Binary'
+    variableLength: true
     dataLengthLength: 2
   0xAF:
     type: 'BIGCHAR'
@@ -119,7 +136,6 @@ TYPE =
   GUIDTYPE:             0x24  # UniqueIdentifier
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
-  DECIMALNTYPE:         0x6A  # Decimal
   FLTNTYPE:             0x6D  # (see below)
   MONEYNTYPE:           0x6E  # (see below)
   DATENTYPE:            0x28  # (introduced in TDS 7.3)
@@ -131,8 +147,6 @@ TYPE =
   BINARYTYPE:           0x2D  # Binary (legacy support)
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
-  BIGVARBINTYPE:        0xA5  # VarBinary
-  BIGBINARYTYPE:        0xAD  # Binary
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   

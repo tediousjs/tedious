@@ -3,9 +3,16 @@
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 convertLEBytesToString= require('./bigint').convertLEBytesToString
+convertUnsignedLEBytesToString= require('./bigint').convertUnsignedLEBytesToString
 
 NULL = (1 << 16) - 1
 THREE_AND_A_THIRD = 3 + (1 / 3)
+
+isNullPLP= (buffer, position) ->
+  return buffer.readUInt8(position) == 255 and buffer.readUInt8(position+1) == 255 and buffer.readUInt8(position+2) == 255 and buffer.readUInt8(position+3) == 255 and buffer.readUInt8(position+4) == 255 and buffer.readUInt8(position+5) == 255 and buffer.readUInt8(position+6) == 255 and buffer.readUInt8(position+7) == 255
+
+isUnknownLengthPLP= (buffer, position) ->
+  return buffer.readUInt8(position) == 254 and buffer.readUInt8(position+1) == 255 and buffer.readUInt8(position+2) == 255 and buffer.readUInt8(position+3) == 255 and buffer.readUInt8(position+4) == 255 and buffer.readUInt8(position+5) == 255 and buffer.readUInt8(position+6) == 255 and buffer.readUInt8(position+7) == 255
 
 parser = (buffer, position, columnsMetaData) ->
   startPosition = position
@@ -17,6 +24,17 @@ parser = (buffer, position, columnsMetaData) ->
     isNull = false
     type = columnMetaData.type
     switch type.name
+      when 'Binary'
+        if buffer.length - position < type.dataLengthLength
+          return false
+        dataLength = buffer.readUInt16LE(position)
+        position += 2
+        if dataLength == 65535
+          value = undefined
+          isNull = true
+        else
+          value= Array.prototype.slice.call( buffer, position, position + dataLength )
+          position += dataLength
       when 'TinyInt'
         if buffer.length - position < type.dataLength
           return false
@@ -96,7 +114,61 @@ parser = (buffer, position, columnsMetaData) ->
             return false
           value = buffer.toString('ascii', position, position + dataLength)
           position += dataLength
-      when 'NVarChar', 'NChar'
+      when 'NVarChar', 'VarBin'
+        if columnMetaData.dataLength == 65535
+          # PARTLENTYPE (See 2.2.5.4.3 of MS-TDS.pdf)
+          if buffer.length - position < 8
+            return false
+          if isNullPLP( buffer, position )
+            position+= 8
+            value = undefined
+            isNull = true
+          else if isUnknownLengthPLP( buffer, position )
+            position+= 8
+            #TODO: handle unknown lengths...
+            return false
+          else
+            dataLength= convertUnsignedLEBytesToString( buffer.slice(position, position+8) )
+            position+= 8
+
+            chunkLength= buffer.readUInt32LE( position )
+            position+= 4
+            buf2= new Buffer(0)
+            while( chunkLength != 0)
+              buf3= new Buffer( buf2.length+ chunkLength)
+              buf2.copy( buf3, 0, 0)
+              buffer.copy( buf3, buf2.length, position, position+chunkLength )
+              buf2= buf3
+              position+= chunkLength
+              chunkLength= buffer.readUInt32LE( position )
+              position+=4
+
+            #todo: the specification says that we need to compare the 'dataLength' we
+            # noted up above with the actual received length of data, but as this
+            # could be a 64bit number that could be a PITA (I suspect the buffer would
+            # die long before this becomes an actual issue.. so for now we just hope for the best)
+            if type.name == 'NVarChar'
+              value = buf2.toString('ucs-2')
+            else
+              value = Array.prototype.slice.call( buf2, 0 )
+        else
+          if buffer.length - position < 2
+            return false
+          dataLength = buffer.readUInt16LE(position)
+          position += 2
+
+          if dataLength == NULL
+            value = undefined
+            isNull = true
+          else
+            if buffer.length - position < dataLength
+              return false
+            if type.name == 'NVarChar'
+              value = buffer.toString('ucs-2', position, position + (dataLength))
+            else
+              value = Array.prototype.slice.call( buffer, position, position + (dataLength) )
+            position += dataLength
+      when 'NChar'
         if buffer.length - position < 2
           return false
         dataLength = buffer.readUInt16LE(position)
@@ -164,7 +236,7 @@ parser = (buffer, position, columnsMetaData) ->
             value.setMilliseconds(value.getMilliseconds() + milliseconds)
         
         position += dataLength
-      when 'NumericN'
+      when 'NumericN','DecimalN'
         if buffer.length - position < 1
           return false
         dataLength = buffer.readUInt8(position)
