@@ -27,23 +27,28 @@ invert = (array) ->
     else
       break
 
-convertLEBytesToString = (buffer) ->
-  array = Array.prototype.slice.call(buffer, 0, buffer.length)
-
+formatArrayAsNumber = (array) ->
+  result = ''
   if isZero(array)
-    '0'
+    result= '0'
   else
-    if array[array.length - 1] & 0x80
-      sign = '-'
-      invert(array)
-    else
-      sign = ''
-
-    result = ''
     until isZero(array)
       t = getNextRemainder(array)
       result = t + result
+  result
+    
+convertLEBytesToString = (buffer) ->
+  array = Array.prototype.slice.call(buffer, 0, buffer.length)
+  if array[array.length - 1] & 0x80
+    sign = '-'
+    invert(array)
+  else
+    sign = ''
+  sign + formatArrayAsNumber( array )
 
-    sign + result
+convertUnsignedLEBytesToString = (buffer) ->
+  array = Array.prototype.slice.call(buffer, 0, buffer.length)
+  formatArrayAsNumber( array )
 
 module.exports.convertLEBytesToString = convertLEBytesToString
+module.exports.convertUnsignedLEBytesToString = convertUnsignedLEBytesToString
