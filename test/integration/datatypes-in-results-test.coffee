@@ -71,6 +71,13 @@ exports.nvarchar = (test) ->
 exports.nvarcharNull = (test) ->
   execSql(test, "select cast(null as nvarchar(10))", null)
 
+exports.nvarcharMax = (test) ->
+  execSql(test, "select cast('abc' as nvarchar(MAX))", 'abc')
+
+exports.nvarcharMaxNull = (test) ->
+  execSql(test, "select cast(null as nvarchar(MAX))", null)
+
+
 exports.char = (test) ->
   execSql(test, "select cast('abc' as char(5))", 'abc  ')
 
