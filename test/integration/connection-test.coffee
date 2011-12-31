@@ -185,6 +185,7 @@ exports.badServer = (test) ->
 
 exports.badPort = (test) ->
   config.options.port = -1
+  config.options.timeout = 50    # Fail fast, to stop the tests taking too long.
   connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
     test.ok(false)
   )
