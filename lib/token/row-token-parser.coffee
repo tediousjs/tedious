@@ -11,6 +11,8 @@ parser = (buffer, columnsMetaData) ->
     #console.log sprintf('Token @ 0x%02X', buffer.position)
 
     isNull = false
+    value = undefined
+
     type = columnMetaData.type
     switch type.name
       when 'TinyInt'
@@ -46,36 +48,13 @@ parser = (buffer, columnsMetaData) ->
           when 1
             value = !!buffer.readUInt8()
       when 'VarChar', 'Char'
-        dataLength = buffer.readUInt16LE()
-
-        if dataLength == NULL
-          value = undefined
-          isNull = true
-        else
-          value = buffer.readString(dataLength, 'ascii')
+        {value: value, isNull: isNull} = readChars(buffer, 'ascii')
       when 'NVarChar', 'NChar'
-        dataLength = buffer.readUInt16LE()
-
-        if dataLength == NULL
-          value = undefined
-          isNull = true
-        else
-          value = buffer.readString(dataLength, 'ucs2')
+        {value: value, isNull: isNull} = readChars(buffer, 'ucs2')
       when 'SmallDateTime'
-        days = buffer.readUInt16LE()
-        minutes = buffer.readUInt16LE()
-        
-        value = new Date(1900, 0, 1)
-        value.setDate(value.getDate() + days)
-        value.setMinutes(value.getMinutes() + minutes)
+        value = readSmallDateTime(buffer)
       when 'DateTime'
-        days = buffer.readInt32LE()
-        threeHundredthsOfSecond = buffer.readUInt32LE()
-        milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
-        
-        value = new Date(1900, 0, 1)
-        value.setDate(value.getDate() + days)
-        value.setMilliseconds(value.getMilliseconds() + milliseconds)
+        value = readDateTime(buffer)
       when 'DateTimeN'
         dataLength = buffer.readUInt8()
 
@@ -83,20 +62,9 @@ parser = (buffer, columnsMetaData) ->
           when 0
             isNull = true
           when 4
-            days = buffer.readUInt16LE()
-            minutes = buffer.readUInt16LE()
-            
-            value = new Date(1900, 0, 1)
-            value.setDate(value.getDate() + days)
-            value.setMinutes(value.getMinutes() + minutes)
+            value = readSmallDateTime(buffer)
           when 8
-            days = buffer.readInt32LE()
-            threeHundredthsOfSecond = buffer.readUInt32LE()
-            milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
-            
-            value = new Date(1900, 0, 1)
-            value.setDate(value.getDate() + days)
-            value.setMilliseconds(value.getMilliseconds() + milliseconds)
+            value = readDateTime(buffer)
       when 'NumericN', 'DecimalN'
         dataLength = buffer.readUInt8()
 
@@ -148,5 +116,34 @@ parser = (buffer, columnsMetaData) ->
       name: 'ROW'
       event: 'row'
       columns: columns
+
+readChars = (buffer, encoding) ->
+  dataLength = buffer.readUInt16LE()
+
+  if dataLength == NULL
+      value: undefined
+      isNull: true
+  else
+    value: buffer.readString(dataLength, encoding)
+    isNull: false
+
+readSmallDateTime = (buffer) ->
+  days = buffer.readUInt16LE()
+  minutes = buffer.readUInt16LE()
+
+  value = new Date(1900, 0, 1)
+  value.setDate(value.getDate() + days)
+  value.setMinutes(value.getMinutes() + minutes)
+  value
+
+readDateTime = (buffer) ->
+  days = buffer.readInt32LE()
+  threeHundredthsOfSecond = buffer.readUInt32LE()
+  milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
+
+  value = new Date(1900, 0, 1)
+  value.setDate(value.getDate() + days)
+  value.setMilliseconds(value.getMilliseconds() + milliseconds)
+  value
 
 module.exports = parser
