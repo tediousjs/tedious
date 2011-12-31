@@ -35,6 +35,7 @@ class Parser extends EventEmitter
     while @nextToken()
       'NOOP'
 
+    # Position to the end of the last successfully parsed token.
     @buffer.position = @position
 
   isEnd: ->
@@ -51,6 +52,7 @@ class Parser extends EventEmitter
           @debug.token(token)
 
           if !token.error
+            # Note current position, so that it can be rolled back to if the next token runs out of buffer.
             @position = @buffer.position
 
             if token.event
@@ -71,6 +73,8 @@ class Parser extends EventEmitter
         return false
     catch error
       if error?.error == 'oob'
+        # There was an attempt to read past the end of the buffer.
+        # In other words, we've run out of buffer.
         return false
       else
         throw error
