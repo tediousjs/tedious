@@ -69,7 +69,6 @@ parser = (buffer, columnsMetaData) ->
         dataLength = buffer.readUInt8()
 
         if dataLength == 0
-          value = undefined
           isNull = true
         else
           sign = if buffer.readUInt8() == 1 then 1 else -1
