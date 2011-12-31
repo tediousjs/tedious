@@ -56,6 +56,12 @@ exports.numericSmallValue = (test) ->
 exports.numericLargeValue = (test) ->
   execSql(test, "select cast(9876543.3456 as numeric(12,5))", 9876543.3456)
 
+exports.numericVeryLargeValue = (test) ->
+  execSql(test, "select cast(9876543219876543.3456 as numeric(25,5))", 9876543219876543.3456)
+
+exports.numericExtremelyLargeValue = (test) ->
+  execSql(test, "select cast(98765432198765432198765432.3456 as numeric(35,5))", 98765432198765432198765432.3456)
+
 exports.numericNull = (test) ->
   execSql(test, "select cast(null as numeric(3,2))", null)
 

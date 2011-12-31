@@ -99,6 +99,28 @@ class ReadableTrackingBuffer
 
     low + (0x100000000 * high)
 
+  readUNumeric64LE: ->
+    low = @readUInt32LE()
+    high = @readUInt32LE()
+
+    low + (0x100000000 * high)
+
+
+  readUNumeric96LE: ->
+    dword1 = @readUInt32LE()
+    dword2 = @readUInt32LE()
+    dword3 = @readUInt32LE()
+
+    dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3)
+
+  readUNumeric128LE: ->
+    dword1 = @readUInt32LE()
+    dword2 = @readUInt32LE()
+    dword3 = @readUInt32LE()
+    dword4 = @readUInt32LE()
+
+    dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4)
+
   readString: (length, encoding) ->
     encoding ||= @encoding
 

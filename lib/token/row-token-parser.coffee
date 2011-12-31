@@ -97,7 +97,7 @@ parser = (buffer, columnsMetaData) ->
             value = new Date(1900, 0, 1)
             value.setDate(value.getDate() + days)
             value.setMilliseconds(value.getMilliseconds() + milliseconds)
-      when 'NumericN'
+      when 'NumericN', 'DecimalN'
         dataLength = buffer.readUInt8()
 
         if dataLength == 0
@@ -110,9 +110,11 @@ parser = (buffer, columnsMetaData) ->
             when 4
               value = buffer.readUInt32LE()
             when 8
-              valueLow = buffer.readUInt32LE()
-              valueHigh = buffer.readUInt32LE()
-              value = valueLow + (0x100000000 * valueHigh)
+              value = buffer.readUNumeric64LE()
+            when 12
+              value = buffer.readUNumeric96LE()
+            when 16
+              value = buffer.readUNumeric128LE()
             else
               error = sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, buffer.position)
               break
