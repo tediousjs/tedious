@@ -120,8 +120,8 @@ readChars = (buffer, encoding) ->
   dataLength = buffer.readUInt16LE()
 
   if dataLength == NULL
-      value: undefined
-      isNull: true
+    value: undefined
+    isNull: true
   else
     value: buffer.readString(dataLength, encoding)
     isNull: false
