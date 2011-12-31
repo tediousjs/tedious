@@ -1,17 +1,10 @@
 # s2.2.7.15
 
-parser = (buffer, position) ->
-  startPosition = position
-
-  if buffer.length - position < 4
-    return false
-
-  value = buffer.readUInt32LE(position)
-  position += 4
+parser = (buffer) ->
+  value = buffer.readUInt32LE()
 
   token =
     name: 'RETURNSTATUS'
-    length: position - startPosition
     event: 'returnStatus'
     value: value
 

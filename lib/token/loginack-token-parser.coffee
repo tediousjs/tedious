@@ -6,39 +6,26 @@ interfaces =
   0: 'SQL_DFLT'
   1: 'SQL_TSQL'
 
-parser = (buffer, position) ->
-  if buffer.length - position < 3
-    # Not long enough to contain length and type bytes.
-    return false
+parser = (buffer) ->
+  length = buffer.readUInt16LE()
 
-  length = buffer.readUInt16LE(position)
-  position += 2
-  if (buffer.length - position < length)
-    # Not long enough for the extracted length
-    return false
-
-  interfaceNumber = buffer.readUInt8(position)
+  interfaceNumber = buffer.readUInt8()
   interface = interfaces[interfaceNumber]
   if !interface
-    error = "Unknown LOGINACK Interface #{interfaceNumber} at offset #{position}"
-  position++
+    error = "Unknown LOGINACK Interface #{interfaceNumber} at offset #{buffer.position}"
 
-  tdsVersionNumber = buffer.readUInt32BE(position)
+  tdsVersionNumber = buffer.readUInt32BE()
   tdsVersion = versions[tdsVersionNumber]
   if !tdsVersion
-    error = "Unknown LOGINACK TDSVersion #{tdsVersionNumber} at offset #{position}"
-  position += 4
+    error = "Unknown LOGINACK TDSVersion #{tdsVersionNumber} at offset #{buffer.position}"
 
-  valueLength = buffer.readUInt8(position) * 2
-  position++
-  progName = buffer.toString('ucs-2', position, position + valueLength)
-  position += valueLength
-  
+  progName = buffer.readBVarchar()
+
   progVersion =
-    major: buffer.readUInt8(position++)
-    minor: buffer.readUInt8(position++)
-    buildNumHi: buffer.readUInt8(position++)
-    buildNumLow: buffer.readUInt8(position++)
+    major: buffer.readUInt8()
+    minor: buffer.readUInt8()
+    buildNumHi: buffer.readUInt8()
+    buildNumLow: buffer.readUInt8()
 
   if error
     token =
@@ -47,7 +34,6 @@ parser = (buffer, position) ->
   else
     token =
       name: 'LOGINACK'
-      length: length + 2
       event: 'loginack'
       interface: interface
       tdsVersion: tdsVersion

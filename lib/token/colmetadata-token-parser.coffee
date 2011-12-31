@@ -3,31 +3,18 @@
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parser = (buffer, position) ->
-  startPosition = position
-
-  if buffer.length - position < 2
-    return false
-  columnCount = buffer.readUInt16LE(position)
-  position += 2
+parser = (buffer) ->
+  columnCount = buffer.readUInt16LE()
 
   columns = []
   for c in [1..columnCount]
-    if buffer.length - position < 4 + 2 + 1
-      return false
-
-    userType = buffer.readUInt32LE(position)
-    position += 4
-
-    flags = buffer.readUInt16LE(position)
-    position +=2
-
-    typeNumber = buffer.readUInt8(position)
+    userType = buffer.readUInt32LE()
+    flags = buffer.readUInt16LE()
+    typeNumber = buffer.readUInt8()
     type = TYPE[typeNumber]
-    position++
-    
+
     if !type
-      error = sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (position - 1))
+      error = sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1))
       break
 
     #console.log(type)
@@ -35,50 +22,33 @@ parser = (buffer, position) ->
     if type.fixedLength
       dataLength = type.dataLength
     else if type.variableLength
-      if buffer.length - position < type.dataLengthLength
-        return false
-
       switch type.dataLengthLength
         when 1
-          dataLength = buffer.readUInt8(position)
+          dataLength = buffer.readUInt8()
         when 2
-          dataLength = buffer.readUInt16LE(position)
+          dataLength = buffer.readUInt16LE()
         when 4
-          dataLength = buffer.readUInt32LE(position)
+          dataLength = buffer.readUInt32LE()
         else
           error = "Unrecognised dataLengthLength for type #{type}"
           break
-      position += type.dataLengthLength
 
     if type.hasPrecision
-      precision = buffer.readUInt8(position)
-      position++
+      precision = buffer.readUInt8()
     else
       precision = undefined
 
     if type.hasScale
-      scale = buffer.readUInt8(position)
-      position++
+      scale = buffer.readUInt8()
     else
       scale = undefined
 
     if type.hasCollation
-      if buffer.length - position < 5
-        return false
-      collation = Array.prototype.slice.call(buffer, position, position + 5)
-      position += 5
+      collation = buffer.readBuffer(5)
     else
       collation = undefined
 
-    if buffer.length - position < 1
-      return false
-    colNameLength = buffer.readUInt8(position) * 2
-    position++
-
-    if buffer.length - position < colNameLength
-      return false
-    colName = buffer.toString('ucs-2', position, position + colNameLength)
-    position += colNameLength
+    colName = buffer.readBVarchar()
 
     columns.push(
       userType: userType
@@ -98,7 +68,6 @@ parser = (buffer, position) ->
   else
     token =
       name: 'COLMETADATA'
-      length: position - startPosition
       event: 'columnMetadata'
       columns: columns
 

@@ -1,8 +1,10 @@
+convertLEBytesToString= require('./bigint').convertLEBytesToString
+
 ###
   A Buffer-like class that tracks position.
 
   As values are read, the position advances by the size of the read data.
-  When reading, if the read would pass the end of the buffer, null is returned.
+  When reading, if the read would pass the end of the buffer, an error object is thrown.
 ###
 class ReadableTrackingBuffer
   constructor: (@buffer, @encoding) ->
@@ -17,94 +19,118 @@ class ReadableTrackingBuffer
     @buffer = @buffer.slice(@position).concat(buffer)
     @position = 0
 
-  enoughLeftFor: (lengthRequired) ->
-    @buffer.length - @position >= lengthRequired
+  assertEnoughLeftFor: (lengthRequired) ->
+    available = @buffer.length - @position
+
+    if available < lengthRequired
+      throw
+        error: 'oob'
+        message: "required : #{lengthRequired}, available : #{available}"
+
+  empty: ->
+    @position == @buffer.length
 
   readUInt8: ->
     length = 1
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      value = @buffer.readUInt8(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    value = @buffer.readUInt8(@position - length)
 
   readUInt16LE: ->
     length = 2
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readUInt16LE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readUInt16LE(@position - length)
 
   readUInt16BE: ->
     length = 2
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readUInt16BE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readUInt16BE(@position - length)
 
   readUInt32LE: ->
     length = 4
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readUInt32LE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readUInt32LE(@position - length)
 
   readUInt32BE: ->
     length = 4
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readUInt32BE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readUInt32BE(@position - length)
 
   readInt8: ->
     length = 1
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      value = @buffer.readInt8(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    value = @buffer.readInt8(@position - length)
 
   readInt16LE: ->
     length = 2
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readInt16LE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readInt16LE(@position - length)
 
   readInt16BE: ->
     length = 2
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readInt16BE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readInt16BE(@position - length)
 
   readInt32LE: ->
     length = 4
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readInt32LE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readInt32LE(@position - length)
 
   readInt32BE: ->
     length = 4
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.readInt32BE(@position - length)
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readInt32BE(@position - length)
 
-  readString: (length) ->
-    if !@enoughLeftFor(length)
-      null
-    else
-      @position += length
-      @buffer.toString(@encoding, @position - length, @position)
+  # If value > 53 bits then it will be incorrect (because Javascript uses IEEE_754 for number representation).
+  readUInt64LE: ->
+    low = @readUInt32LE()
+    high = @readUInt32LE()
+    if (high >= (2 << (53 - 32)))
+      console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
+
+    low + (0x100000000 * high)
+
+  readString: (length, encoding) ->
+    encoding ||= @encoding
+
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.toString(encoding, @position - length, @position)
+
+  readBVarchar: (encoding) ->
+    encoding ||= @encoding
+
+    multiplier = if encoding = 'ucs2' then 2 else 1
+    length = @readUInt8() * multiplier
+    @readString(length, encoding)
+
+  readUsVarchar: (encoding) ->
+    encoding ||= @encoding
+
+    multiplier = if encoding = 'ucs2' then 2 else 1
+    length = @readUInt16LE() * multiplier
+    @readString(length, encoding)
+
+  readBuffer: (length) ->
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.slice(@position - length, @position)
+
+  readAsStringBigIntLE: (length) ->
+    @assertEnoughLeftFor(length)
+    @position += length
+    convertLEBytesToString(@buffer.slice(@position - length, @position))
+
+  readAsStringInt64LE: (length) ->
+    @readAsStringBigIntLE(8)
 
 module.exports = ReadableTrackingBuffer

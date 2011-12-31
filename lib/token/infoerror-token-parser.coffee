@@ -1,45 +1,16 @@
 # s2.2.7.9, s2.2.7.10
 
-parser = (buffer, position) ->
-  if buffer.length - position < 3
-    # Not long enough to contain length and type bytes.
-    return false
-
-  length = buffer.readUInt16LE(position)
-  position += 2
-  if (buffer.length - position < length)
-    # Not long enough for the extracted length
-    return false
-
-  number = buffer.readUInt32LE(position)
-  position += 4
-
-  state = buffer.readUInt8(position)
-  position++
-
-  class_ = buffer.readUInt8(position)
-  position++
-
-  valueLength = buffer.readUInt16LE(position) * 2
-  position += 2
-  message = buffer.toString('ucs-2', position, position + valueLength)
-  position += valueLength
-
-  valueLength = buffer.readUInt8(position) * 2
-  position++
-  serverName = buffer.toString('ucs-2', position, position + valueLength)
-  position += valueLength
-
-  valueLength = buffer.readUInt8(position) * 2
-  position++
-  procName = buffer.toString('ucs-2', position, position + valueLength)
-  position += valueLength
-
-  lineNumber = buffer.readUInt32LE(position)
-  position += 4
+parser = (buffer) ->
+  length = buffer.readUInt16LE()
+  number = buffer.readUInt32LE()
+  state = buffer.readUInt8()
+  class_ = buffer.readUInt8()
+  message = buffer.readUsVarchar()
+  serverName = buffer.readBVarchar()
+  procName = buffer.readBVarchar()
+  lineNumber = buffer.readUInt32LE()
 
   token =
-    length: length + 2
     number: number
     state: state
     class: class_
@@ -48,15 +19,15 @@ parser = (buffer, position) ->
     procName: procName
     lineNumber: lineNumber
 
-infoParser = (buffer, position) ->
-  token = parser(buffer, position)
+infoParser = (buffer) ->
+  token = parser(buffer)
   token.name = 'INFO'
   token.event = 'infoMessage'
 
   token
 
-errorParser = (buffer, position) ->
-  token = parser(buffer, position)
+errorParser = (buffer) ->
+  token = parser(buffer)
   token.name = 'ERROR'
   token.event = 'errorMessage'
 

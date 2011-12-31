@@ -1,6 +1,7 @@
 parser = require('../../../lib/token/colmetadata-token-parser')
-TYPE = require('../../../lib/token/token').TYPE
 dataTypeByName = require('../../../lib/token/data-type').typeByName
+ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.int = (test) ->
   numberOfColumns = 1
@@ -8,22 +9,19 @@ module.exports.int = (test) ->
   flags = 3
   columnName = 'name'
 
-  buffer = new Buffer(1 + 2 + (4 + 2 + 1 + 1 + (columnName.length * 2)))
-  pos = 0;
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
 
-  buffer.writeUInt8(TYPE.COLMETADATA, pos); pos++
-  buffer.writeUInt16LE(numberOfColumns, pos); pos += 2
-  buffer.writeUInt32LE(userType, pos); pos += 4
-  buffer.writeUInt16LE(flags, pos); pos += 2
-  buffer.writeUInt8(dataTypeByName.Int.id, pos); pos++
-  buffer.writeUInt8(columnName.length, pos); pos++
-  buffer.write(columnName, pos, 'ucs-2'); pos += (columnName.length * 2)
-  #console.log(buffer)
+  buffer.writeUInt16LE(numberOfColumns)
+  buffer.writeUInt32LE(userType)
+  buffer.writeUInt16LE(flags)
+  buffer.writeUInt8(dataTypeByName.Int.id)
+  buffer.writeBVarchar(columnName)
+  #console.log(buffer.data)
 
-  token = parser(buffer, 1)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
   #console.log(token)
 
-  test.strictEqual(token.length, buffer.length - 1)
+  test.ok(!token.error)
   test.strictEqual(token.columns.length, 1)
   test.strictEqual(token.columns[0].userType, 2)
   test.strictEqual(token.columns[0].flags, 3)
@@ -38,34 +36,29 @@ module.exports.varchar = (test) ->
   userType = 2
   flags = 3
   length = 3
-  collation = [1,2,3,4,5]
+  collation = new Buffer([1,2,3,4,5])
   columnName = 'name'
 
-  buffer = new Buffer(1 + 2 + (4 + 2 + 1 + 2 + 5 + 1 + (columnName.length * 2)))
-  pos = 0;
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
 
-  buffer.writeUInt8(TYPE.COLMETADATA, pos); pos++
-  buffer.writeUInt16LE(numberOfColumns, pos); pos += 2
-  buffer.writeUInt32LE(userType, pos); pos += 4
-  buffer.writeUInt16LE(flags, pos); pos += 2
-  buffer.writeUInt8(dataTypeByName.VarChar.id, pos); pos++
-  buffer.writeUInt16LE(length, pos); pos += 2
-  for p in [0..(collation.length - 1)]
-    buffer[pos + p] = collation[p]
-  pos += collation.length
-  buffer.writeUInt8(columnName.length, pos); pos++
-  buffer.write(columnName, pos, 'ucs-2'); pos += (columnName.length * 2)
+  buffer.writeUInt16LE(numberOfColumns)
+  buffer.writeUInt32LE(userType)
+  buffer.writeUInt16LE(flags)
+  buffer.writeUInt8(dataTypeByName.VarChar.id)
+  buffer.writeUInt16LE(length)
+  buffer.writeBuffer(collation)
+  buffer.writeBVarchar(columnName)
   #console.log(buffer)
 
-  token = parser(buffer, 1)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
   #console.log(token)
 
-  test.strictEqual(token.length, buffer.length - 1)
+  test.ok(!token.error)
   test.strictEqual(token.columns.length, 1)
   test.strictEqual(token.columns[0].userType, 2)
   test.strictEqual(token.columns[0].flags, 3)
   test.strictEqual(token.columns[0].type.name, 'VarChar')
-  test.deepEqual(token.columns[0].collation, collation)
+  test.ok(token.columns[0].collation.equals(collation))
   test.strictEqual(token.columns[0].colName, 'name')
   test.strictEqual(token.columns[0].dataLength, length)
 

@@ -56,6 +56,24 @@ exports.writeString = (test) ->
 
   test.done()
 
+exports.writeBVarchar = (test) ->
+  buffer = new TrackingBuffer(2, 'ucs2')
+
+  buffer.writeBVarchar('abc')
+
+  assertBuffer(test, buffer, [0x06, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  test.done()
+
+exports.writeUsVarchar = (test) ->
+  buffer = new TrackingBuffer(2, 'ucs2')
+
+  buffer.writeUsVarchar('abc')
+
+  assertBuffer(test, buffer, [0x06, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  test.done()
+
 assertBuffer = (test, actual, expected) ->
   actual = actual.data
   expected = new Buffer(expected)

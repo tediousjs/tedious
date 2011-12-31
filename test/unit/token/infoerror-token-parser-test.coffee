@@ -1,5 +1,6 @@
 infoParser = require('../../../lib/token/infoerror-token-parser').infoParser
-TYPE = require('../../../lib/token/token').TYPE
+ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.info = (test) ->
   number = 3
@@ -10,32 +11,24 @@ module.exports.info = (test) ->
   procName = 'proc'
   lineNumber = 6
 
-  buffer = new Buffer(1 + 2 + 4 + 1 + 1 + 2 +
-    (message.length * 2) + 1 + (serverName.length * 2) + 1 + (procName.length * 2) + 4)
-  pos = 0;
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
 
-  buffer.writeUInt8(TYPE.INFO, pos); pos++
-  buffer.writeUInt16LE(buffer.length - (1 + 2), pos); pos += 2
-  buffer.writeUInt32LE(number, pos); pos += 4
-  buffer.writeUInt8(state, pos); pos++
-  buffer.writeUInt8(class_, pos); pos++
+  buffer.writeUInt16LE(0)         # Length written later
+  buffer.writeUInt32LE(number)
+  buffer.writeUInt8(state)
+  buffer.writeUInt8(class_)
+  buffer.writeUsVarchar(message)
+  buffer.writeBVarchar(serverName)
+  buffer.writeBVarchar(procName)
+  buffer.writeUInt32LE(lineNumber)
 
-  buffer.writeUInt16LE(message.length, pos); pos += 2
-  buffer.write(message, pos, 'ucs-2'); pos += (message.length * 2)
-
-  buffer.writeUInt8(serverName.length, pos); pos++
-  buffer.write(serverName, pos, 'ucs-2'); pos += (serverName.length * 2)
-
-  buffer.writeUInt8(procName.length, pos); pos++
-  buffer.write(procName, pos, 'ucs-2'); pos += (procName.length * 2)
-
-  buffer.writeUInt32LE(lineNumber, pos); pos += 4
+  data = buffer.data
+  data.writeUInt16LE(data.length - 2, 0)
   #console.log(buffer)
 
-  token = infoParser(buffer, 1)
+  token = infoParser(new ReadableTrackingBuffer(data, 'ucs2'))
   #console.log(token)
 
-  test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.number, number)
   test.strictEqual(token.state, state)
   test.strictEqual(token.class, class_)

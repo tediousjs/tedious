@@ -10,11 +10,8 @@ STATUS =
   ATTN: 0x0020
   SRVERROR: 0x0100
 
-parser = (buffer, position) ->
-  if buffer.length - position < 2
-    return false
-  status = buffer.readUInt16LE(position)
-  position += 2
+parser = (buffer) ->
+  status = buffer.readUInt16LE()
 
   more = !!(status & STATUS.MORE)
   sqlError = !!(status & STATUS.ERROR)
@@ -23,25 +20,15 @@ parser = (buffer, position) ->
   attention = !!(status & STATUS.ATTN)
   serverError = !!(status & STATUS.SRVERROR)
 
-  if buffer.length - position < 2
-    return false
-  curCmd = buffer.readUInt16LE(position)
-  position += 2
+  curCmd = buffer.readUInt16LE()
 
-  if rowCountValid
-    if buffer.length - position < 8
-      return false
-
-    # If rowCount > 53 bits then rowCount will be incorrect (because Javascript uses IEEE_754 for number representation).
-    rowCountLow = buffer.readUInt32LE(position)
-    position += 4
-    rowCountHigh = buffer.readUInt32LE(position)
-    position += 4
-    rowCount = rowCountLow + (0x100000000 * rowCountHigh)
+  # If rowCount > 53 bits then rowCount will be incorrect (because Javascript uses IEEE_754 for number representation).
+  rowCount = buffer.readUInt64LE()
+  if !rowCountValid
+    rowCount = undefined
 
   token =
     name: 'DONE'
-    length: 2 + 2 + 8
     event: 'done'
     more: more
     sqlError: sqlError
@@ -50,22 +37,22 @@ parser = (buffer, position) ->
     rowCount: rowCount
     curCmd: curCmd
 
-doneParser = (buffer, position) ->
-  token = parser(buffer, position)
+doneParser = (buffer) ->
+  token = parser(buffer)
   token.name = 'DONE'
   token.event = 'done'
 
   token
 
-doneInProcParser = (buffer, position) ->
-  token = parser(buffer, position)
+doneInProcParser = (buffer) ->
+  token = parser(buffer)
   token.name = 'DONEINPROC'
   token.event = 'doneInProc'
 
   token
 
-doneProcParser = (buffer, position) ->
-  token = parser(buffer, position)
+doneProcParser = (buffer) ->
+  token = parser(buffer)
   token.name = 'DONEPROC'
   token.event = 'doneProc'
 

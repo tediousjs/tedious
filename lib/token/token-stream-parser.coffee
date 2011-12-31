@@ -1,4 +1,4 @@
-require('../buffertools')
+ReadableTrackingBuffer = require('../tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 EventEmitter = require('events').EventEmitter
 TYPE = require('./token').TYPE
 
@@ -26,51 +26,53 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
 ###
 class Parser extends EventEmitter
   constructor: (@debug) ->
-    @buffer = new Buffer(0)
+    @buffer = new ReadableTrackingBuffer(new Buffer(0), 'ucs2')
     @position = 0
 
   addBuffer: (buffer) ->
-    @buffer = new Buffer(@buffer.concat(buffer))
+    @buffer.add(buffer)
 
     while @nextToken()
       'NOOP'
 
-    @buffer = @buffer.slice(@position)
-    @position = 0
+    @buffer.position = @position
 
-  end: ->
-    @buffer.length == 0
+  isEnd: ->
+    @buffer.empty()
 
   nextToken: ->
-    if @position >= @buffer.length
-      return false
+    try
+      type = @buffer.readUInt8()
 
-    type = @buffer.readUInt8(@position)
+      if tokenParsers[type]
+        token = tokenParsers[type](@buffer, @colMetadata)
 
-    if tokenParsers[type]
-      token = tokenParsers[type](@buffer, @position + 1, @colMetadata)
+        if token
+          @debug.token(token)
 
-      if token
-        @debug.token(token)
+          if !token.error
+            @position = @buffer.position
 
-        if !token.error
-          @position += 1 + token.length
+            if token.event
+              @emit(token.event, token)
 
-          if token.event
-            @emit(token.event, token)
-            
-          switch token.name
-            when 'COLMETADATA'
-              @colMetadata = token.columns
+            switch token.name
+              when 'COLMETADATA'
+                @colMetadata = token.columns
 
-          true
+            return true
+          else
+            @emit('error', token)
+            return false
         else
-          @emit('error', token)
-          false
+          return false
+
       else
-        false
-      
-    else
-      false
+        return false
+    catch error
+      if error?.error == 'oob'
+        return false
+      else
+        throw error
 
 exports.Parser = Parser

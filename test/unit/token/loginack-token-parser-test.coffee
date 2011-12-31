@@ -1,5 +1,6 @@
 parser = require('../../../lib/token/loginack-token-parser')
-TYPE = require('../../../lib/token/token').TYPE
+ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.info = (test) ->
   interface = 1
@@ -11,29 +12,24 @@ module.exports.info = (test) ->
     buildNumHi: 3
     buildNumLow: 4
 
-  buffer = new Buffer(1 + 2 + 1 + 4 +
-    1 + (progName.length * 2) + 4)
-  pos = 0;
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
 
-  buffer.writeUInt8(TYPE.LOGINACK, pos); pos++
-  buffer.writeUInt16LE(buffer.length - (1 + 2), pos); pos += 2
-  buffer.writeUInt8(interface, pos); pos++
-  buffer.writeUInt32BE(version, pos); pos += 4
+  buffer.writeUInt16LE(0)         # Length written later
+  buffer.writeUInt8(interface)
+  buffer.writeUInt32BE(version)
+  buffer.writeBVarchar(progName)
+  buffer.writeUInt8(progVersion.major)
+  buffer.writeUInt8(progVersion.minor)
+  buffer.writeUInt8(progVersion.buildNumHi)
+  buffer.writeUInt8(progVersion.buildNumLow)
 
-  buffer.writeUInt8(progName.length, pos); pos++
-  buffer.write(progName, pos, 'ucs-2'); pos += (progName.length * 2)
-
-  buffer.writeUInt8(progVersion.major, pos); pos++
-  buffer.writeUInt8(progVersion.minor, pos); pos++
-  buffer.writeUInt8(progVersion.buildNumHi, pos); pos++
-  buffer.writeUInt8(progVersion.buildNumLow, pos); pos++
-
+  data = buffer.data
+  data.writeUInt16LE(data.length - 2, 0)
   #console.log(buffer)
 
-  token = parser(buffer, 1)
+  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
   #console.log(token)
 
-  test.strictEqual(token.length, buffer.length - 1)
   test.strictEqual(token.interface, 'SQL_TSQL')
   test.strictEqual(token.tdsVersion, '7_2')
   test.strictEqual(token.progName, progName)

@@ -1,21 +1,19 @@
 parser = require('../../../lib/token/done-token-parser').doneParser
-TYPE = require('../../../lib/token/token').TYPE
+ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 parse = (status, curCmd, doneRowCount) ->
   doneRowCountLow = doneRowCount % 0x100000000
   doneRowCountHi = ~~(doneRowCount / 0x100000000)
 
-  buffer = new Buffer(1 + 2 + 2 + 8)
-  pos = 0;
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
 
-  buffer.writeUInt8(TYPE.DONE, pos); pos++
-  buffer.writeUInt16LE(status, pos); pos += 2
-  buffer.writeUInt16LE(curCmd, pos); pos += 2
-  buffer.writeUInt32LE(doneRowCountLow, pos); pos += 4
-  buffer.writeUInt32LE(doneRowCountHi, pos); pos += 4
-  #console.log(buffer)
+  buffer.writeUInt16LE(status)
+  buffer.writeUInt16LE(curCmd)
+  buffer.writeUInt32LE(doneRowCountLow)
+  buffer.writeUInt32LE(doneRowCountHi)
 
-  token = parser(buffer, 1)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
   #console.log(token)
   
   token

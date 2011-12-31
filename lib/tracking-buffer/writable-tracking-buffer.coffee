@@ -96,11 +96,23 @@ class WritableTrackingBuffer
     @buffer.writeInt32BE(value, @position)
     @position += length
 
-  writeString: (value) ->
+  writeString: (value, encoding) ->
+    encoding ||= @encoding
+
     length = Buffer.byteLength(value, @encoding)
     @makeRoomFor(length)
     bytesWritten = @buffer.write(value, @position, @encoding)
     @position += length
+
+    bytesWritten
+
+  writeBVarchar: (value, encoding) ->
+    @writeUInt8(value.length)
+    @writeString(value, encoding)
+
+  writeUsVarchar: (value, encoding) ->
+    @writeUInt16LE(value.length)
+    @writeString(value, encoding)
 
   writeBuffer: (value) ->
     length = value.length
