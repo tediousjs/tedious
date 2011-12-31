@@ -27,7 +27,6 @@ module.exports.int = (test) ->
   test.strictEqual(token.columns[0].flags, 3)
   test.strictEqual(token.columns[0].type.name, 'Int')
   test.strictEqual(token.columns[0].colName, 'name')
-  test.strictEqual(token.columns[0].dataLength, 4)
 
   test.done()
 

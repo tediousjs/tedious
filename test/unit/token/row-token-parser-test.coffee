@@ -3,11 +3,6 @@ dataTypeByName = require('../../../lib/token/data-type').typeByName
 ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
-writeBytes = (buffer, array) ->
-  for b in array
-    do (b) ->
-      buffer.writeUInt8( b )
-
 module.exports.bigint = (test) ->
   colMetaData = [{type: dataTypeByName.BigInt},
                  {type: dataTypeByName.BigInt}]
@@ -25,6 +20,21 @@ module.exports.bigint = (test) ->
 
   test.done()
 
+
+module.exports.null = (test) ->
+  colMetaData = [type: dataTypeByName.Null]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(token.columns[0].isNull)
+  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
 
 module.exports.int = (test) ->
   colMetaData = [type: dataTypeByName.Int]

@@ -12,9 +12,33 @@ parser = (buffer, columnsMetaData) ->
 
     isNull = false
     value = undefined
+    dataLength = undefined
 
     type = columnMetaData.type
+
+    # s2.2.4.2.1
+    switch type.id & 0x30
+      when 0x10 # xx01xxxx - s2.2.4.2.1.1
+        # Zero length
+        dataLength = 0
+      when 0x20 # xx10xxxx - s2.2.4.2.1.3
+        # Variable length
+        switch type.dataLengthLength
+          when 1
+            dataLength = buffer.readUInt8()
+          when 2
+            dataLength = buffer.readUInt16LE()
+          when 4
+            dataLength = buffer.readUInt32LE()
+          else
+            throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+      when 0x30 # xx11xxxx - s2.2.4.2.1.2
+        # Fixed length
+        dataLength = 1 << ((type.id & 0x0C) >> 2)
+
     switch type.name
+      when 'Null'
+        isNull = true
       when 'TinyInt'
         value = buffer.readUInt8()
       when 'Int'
@@ -24,8 +48,6 @@ parser = (buffer, columnsMetaData) ->
       when 'BigInt'
         value = buffer.readAsStringInt64LE()
       when 'IntN'
-        dataLength = buffer.readUInt8()
-
         switch dataLength
           when 0
             isNull = true
@@ -40,24 +62,20 @@ parser = (buffer, columnsMetaData) ->
       when 'Bit'
         value = !!buffer.readUInt8()
       when 'BitN'
-        dataLength = buffer.readUInt8()
-
         switch dataLength
           when 0
             isNull = true
           when 1
             value = !!buffer.readUInt8()
       when 'VarChar', 'Char'
-        {value: value, isNull: isNull} = readChars(buffer, 'ascii')
+        {value: value, isNull: isNull} = readChars(buffer, dataLength, 'ascii')
       when 'NVarChar', 'NChar'
-        {value: value, isNull: isNull} = readChars(buffer, 'ucs2')
+        {value: value, isNull: isNull} = readChars(buffer, dataLength, 'ucs2')
       when 'SmallDateTime'
         value = readSmallDateTime(buffer)
       when 'DateTime'
         value = readDateTime(buffer)
       when 'DateTimeN'
-        dataLength = buffer.readUInt8()
-
         switch dataLength
           when 0
             isNull = true
@@ -66,8 +84,6 @@ parser = (buffer, columnsMetaData) ->
           when 8
             value = readDateTime(buffer)
       when 'NumericN', 'DecimalN'
-        dataLength = buffer.readUInt8()
-
         if dataLength == 0
           isNull = true
         else
@@ -116,9 +132,7 @@ parser = (buffer, columnsMetaData) ->
       event: 'row'
       columns: columns
 
-readChars = (buffer, encoding) ->
-  dataLength = buffer.readUInt16LE()
-
+readChars = (buffer, dataLength, encoding) ->
   if dataLength == NULL
     value: undefined
     isNull: true

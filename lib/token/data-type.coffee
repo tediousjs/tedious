@@ -3,116 +3,83 @@ TYPE =
   0x1F:
     type: 'NULL'
     name: 'Null'
-    fixedLength: true
-    dataLength: 0
   0x30:
     type: 'INT1'
     name: 'TinyInt'
-    fixedLength: true
-    dataLength: 1
   0x32:
     type: 'BIT'
     name: 'Bit'
-    fixedLength: true
-    dataLength: 1
   0x34:
     type: 'INT2'
     name: 'SmallInt'
-    fixedLength: true
-    dataLength: 2
   0x38:
     type: 'INT4'
     name: 'Int'
-    fixedLength: true
-    dataLength: 4
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
-    fixedLength: true
-    dataLength: 4
   0x3B:
     type: 'FLT4'
     name: 'Real'
-    fixedLength: true
-    dataLength: 4
   0x3C:
     type: 'MONEY'
     name: 'Money'
-    fixedLength: true
-    dataLength: 8
   0x3D:
     type: 'DATETIME'
     name: 'DateTime'
-    fixedLength: true
-    dataLength: 8
   0x3E:
     type: 'FLT8'
     name: 'Float'
-    fixedLength: true
-    dataLength: 8
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
-    fixedLength: true
-    dataLength: 4
   0x7F:
     type: 'INT8'
     name: 'BigInt'
-    fixedLength: true
-    dataLength: 8
 
   # Variable-length types
   0x26:
     type: 'INTN'
     name: 'IntN'
-    variableLength: true
     dataLengthLength: 1
   0x68:
     type: 'BITN'
     name: 'BitN'
-    variableLength: true
     dataLengthLength: 1
   0x6A:
     type: 'DECIMALNTYPE'
     name: 'DecimalN'
-    variableLength: true
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
   0x6C:
     type: 'NUMERICNTYPE'
     name: 'NumericN'
-    variableLength: true
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
-    variableLength: true
     dataLengthLength: 1
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
-    variableLength: true
     hasCollation: true
     dataLengthLength: 2
   0xAF:
     type: 'BIGCHAR'
     name: 'Char'
-    variableLength: true
     hasCollation: true
     dataLengthLength: 2
   0xE7:
     type: 'NVARCHAR'
     name: 'NVarChar'
-    variableLength: true
     hasCollation: true
     dataLengthLength: 2
   0xEF:
     type: 'NCHAR'
     name: 'NChar'
-    variableLength: true
     hasCollation: true
     dataLengthLength: 2
 

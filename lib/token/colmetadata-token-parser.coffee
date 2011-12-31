@@ -19,9 +19,9 @@ parser = (buffer) ->
 
     #console.log(type)
 
-    if type.fixedLength
-      dataLength = type.dataLength
-    else if type.variableLength
+    if (type.id & 0x30) == 0x20
+      # xx10xxxx - s2.2.4.2.1.3
+      # Variable length
       switch type.dataLengthLength
         when 1
           dataLength = buffer.readUInt8()
@@ -30,8 +30,9 @@ parser = (buffer) ->
         when 4
           dataLength = buffer.readUInt32LE()
         else
-          error = "Unrecognised dataLengthLength for type #{type}"
-          break
+          throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+    else
+      dataLength = undefined
 
     if type.hasPrecision
       precision = buffer.readUInt8()
