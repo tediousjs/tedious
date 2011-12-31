@@ -1,6 +1,5 @@
 # s2.2.7.17
 
-TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
 NULL = (1 << 16) - 1
