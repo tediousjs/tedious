@@ -167,13 +167,13 @@ readChars = (buffer, dataLength, encoding) ->
     isNull: false
 
 readMaxBinary = (buffer) ->
-  readMax(buffer, (bytesBuffer) ->
-      Array.prototype.slice.call(bytesBuffer, 0, bytesBuffer.length)
+  readMax(buffer, (valueBuffer) ->
+      Array.prototype.slice.call(valueBuffer)
   )
 
 readMaxChars = (buffer, encoding) ->
-  readMax(buffer, (bytesBuffer) ->
-      bytesBuffer.toString(encoding)
+  readMax(buffer, (valueBuffer) ->
+      valueBuffer.toString(encoding)
   )
 
 readMax = (buffer, decodeFunction) ->
@@ -204,13 +204,13 @@ readMax = (buffer, decodeFunction) ->
         throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")
 
     # Assemble all of the chunks in to one Buffer.
-    charBytes = new Buffer(length)
+    valueBuffer = new Buffer(length)
     position = 0
     for chunk in chunks
-      chunk.copy(charBytes, position, 0)
+      chunk.copy(valueBuffer, position, 0)
       position += chunk.length
 
-    value: decodeFunction(charBytes)
+    value: decodeFunction(valueBuffer)
     isNull: false
 
 readSmallDateTime = (buffer) ->
