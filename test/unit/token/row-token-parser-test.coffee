@@ -90,6 +90,101 @@ module.exports.nVarChar = (test) ->
 
   test.done()
 
+module.exports.varCharMaxNull = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    dataLength: 65535
+  ]
+  value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(token.columns[0].isNull)
+  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varCharMaxUnknownLength = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    dataLength: 65535
+  ]
+  value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(0, 3))
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(3, 6))
+  buffer.writeUInt32LE(0)
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varCharMaxKnownLength = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    dataLength: 65535
+  ]
+  value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeUInt64LE(value.length)
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(0, 3))
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(3, 6))
+  buffer.writeUInt32LE(0)
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varCharMaxKnownLengthWrong = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    dataLength: 65535
+  ]
+  value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeUInt64LE(value.length + 1)
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(0, 3))
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(3, 6))
+  buffer.writeUInt32LE(0)
+  #console.log(buffer.data)
+
+  try
+    token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+    test.ok(false)
+  catch exception
+    test.done()
+
 module.exports.intN = (test) ->
   colMetaData = [{type: dataTypeByName.IntN},
                  {type: dataTypeByName.IntN},

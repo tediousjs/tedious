@@ -20,16 +20,11 @@ Buffer.prototype.toByteArray = () ->
   Array.prototype.slice.call(@, 0) 
 
 Buffer.prototype.equals = (other) ->
-  thisArray = @toByteArray()
-  otherArray = other.toByteArray()
-  
-  if thisArray.length != otherArray.length
+  if @.length != other.length
     return false
 
-  for b in thisArray
-    b--
-    
-    if thisArray[b] != otherArray[b]
+  for b, index in @
+    if @[index] != other[index]
       return false
-    
+
   true

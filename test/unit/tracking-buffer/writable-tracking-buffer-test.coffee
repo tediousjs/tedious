@@ -9,13 +9,14 @@ exports.create = (test) ->
   test.done()
 
 exports.writeUnsignedInt = (test) ->
-  buffer = new TrackingBuffer(2)
+  buffer = new TrackingBuffer(20)
 
   buffer.writeUInt8(1)
   buffer.writeUInt16LE(2)
   buffer.writeUInt16BE(3)
   buffer.writeUInt32LE(4)
   buffer.writeUInt32BE(5)
+  buffer.writeUInt64LE(0x600000007)
 
   assertBuffer(test, buffer, [
     0x01
@@ -23,6 +24,7 @@ exports.writeUnsignedInt = (test) ->
     0x00, 0x03
     0x04, 0x00, 0x00, 0x00
     0x00, 0x00, 0x00, 0x05
+    0x07, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00
   ])
 
   test.done()
@@ -61,7 +63,7 @@ exports.writeBVarchar = (test) ->
 
   buffer.writeBVarchar('abc')
 
-  assertBuffer(test, buffer, [0x06, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+  assertBuffer(test, buffer, [0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
 
   test.done()
 
@@ -70,7 +72,7 @@ exports.writeUsVarchar = (test) ->
 
   buffer.writeUsVarchar('abc')
 
-  assertBuffer(test, buffer, [0x06, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+  assertBuffer(test, buffer, [0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
 
   test.done()
 
@@ -82,3 +84,4 @@ assertBuffer = (test, actual, expected) ->
   if (!comparisonResult)
     console.log('actual  ', actual)
     console.log('expected', expected)
+    test.ok(false)

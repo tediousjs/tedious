@@ -60,6 +60,12 @@ class WritableTrackingBuffer
     @buffer.writeUInt32LE(value, @position)
     @position += length
 
+  writeUInt64LE: (value) ->
+    low = value % 0x100000000
+    high = Math.floor(value / 0x100000000)
+    @writeUInt32LE(low)
+    @writeUInt32LE(high)
+
   writeUInt32BE: (value) ->
     length = 4
     @makeRoomFor(length)
