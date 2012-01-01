@@ -20,6 +20,8 @@ class ReadableTrackingBuffer
     @position = 0
 
   assertEnoughLeftFor: (lengthRequired) ->
+    @previousPosition = @position
+
     available = @buffer.length - @position
 
     if available < lengthRequired
@@ -29,6 +31,9 @@ class ReadableTrackingBuffer
 
   empty: ->
     @position == @buffer.length
+
+  rollback: ->
+    @position = @previousPosition
 
   readUInt8: ->
     length = 1

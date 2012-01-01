@@ -63,6 +63,7 @@ exports.readUnsignedInt = (test) ->
     0x00, 0x03
     0x04, 0x00, 0x00, 0x00
     0x00, 0x00, 0x00, 0x05
+    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
   ])
 
   buffer = new TrackingBuffer(data)
@@ -72,6 +73,7 @@ exports.readUnsignedInt = (test) ->
   test.strictEqual(buffer.readUInt16BE(), 3)
   test.strictEqual(buffer.readUInt32LE(), 4)
   test.strictEqual(buffer.readUInt32BE(), 5)
+  test.strictEqual(buffer.readUInt64LE(), 6)
 
   test.done()
 
@@ -133,5 +135,17 @@ exports.readAsStringInt64LE = (test) ->
   buffer = new TrackingBuffer(data)
 
   test.strictEqual(buffer.readAsStringInt64LE(), '513')
+
+  test.done()
+
+exports.readRollback= (test) ->
+  data = new Buffer([0x01, 0x00, 0x02, 0x00, 0x03, 0x00])
+  buffer = new TrackingBuffer(data)
+
+  test.strictEqual(buffer.readUInt16LE(), 1)
+  test.strictEqual(buffer.readUInt16LE(), 2)
+  buffer.rollback()
+  test.strictEqual(buffer.readUInt16LE(), 2)
+  test.strictEqual(buffer.readUInt16LE(), 3)
 
   test.done()
