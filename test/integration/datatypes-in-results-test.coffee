@@ -101,6 +101,12 @@ exports.binary = (test) ->
 exports.binaryNull = (test) ->
   execSql(test, "select cast(null as binary(10))", null)
 
+exports.varbinaryMax = (test) ->
+  execSql(test, "select cast(0x1234 as varbinary(max))", [0x12, 0x34])
+
+exports.varbinaryMaxNull = (test) ->
+  execSql(test, "select cast(null as varbinary(max))", null)
+
 exports.char = (test) ->
   execSql(test, "select cast('abc' as char(5))", 'abc  ')
 

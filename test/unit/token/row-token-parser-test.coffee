@@ -133,7 +133,6 @@ module.exports.varCharMaxNull = (test) ->
     type: dataTypeByName.VarChar
     dataLength: 65535
   ]
-  value = 'abcdef'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
@@ -222,6 +221,52 @@ module.exports.varCharMaxKnownLengthWrong = (test) ->
     test.ok(false)
   catch exception
     test.done()
+
+module.exports.varBinaryMaxNull = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarBinary
+    dataLength: 65535
+  ]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(token.columns[0].isNull)
+  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varBinaryMaxUnknownLength = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarBinary
+    dataLength: 65535
+  ]
+  value = [0x12, 0x34, 0x56, 0x78]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.writeUInt32LE(2)
+  buffer.writeBuffer(new Buffer(value.slice(0, 2)))
+  buffer.writeUInt32LE(2)
+  buffer.writeBuffer(new Buffer(value.slice(2, 4)))
+  buffer.writeUInt32LE(0)
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.deepEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
 
 module.exports.intN = (test) ->
   colMetaData = [{type: dataTypeByName.IntN},
