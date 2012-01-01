@@ -1,5 +1,7 @@
-buildBuffer = require('./build-buffer')
 sprintf = require('sprintf').sprintf
+WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer
+
+optionBufferSize = 20
 
 VERSION = 0x000000001
 SUBBUILD = 0x0001
@@ -71,24 +73,40 @@ class PreloginPayload
     @data.writeUInt8(TOKEN.TERMINATOR, optionOffset)
 
   createVersionOption: () ->
-    token: TOKEN.VERSION,
-    data: buildBuffer('U32', VERSION, 'U16', SUBBUILD)
+    buffer = new WritableTrackingBuffer(optionBufferSize)
+    buffer.writeUInt32BE(VERSION)
+    buffer.writeUInt16BE(SUBBUILD)
+
+    token: TOKEN.VERSION
+    data: buffer.data
 
   createEncryptionOption: () ->
-    token: TOKEN.ENCRYPTION,
-    data: buildBuffer('U8', ENCRYPT.NOT_SUP)
+    buffer = new WritableTrackingBuffer(optionBufferSize)
+    buffer.writeUInt8(ENCRYPT.NOT_SUP)
+
+    token: TOKEN.ENCRYPTION
+    data: buffer.data
 
   createInstanceOption: () ->
-    token: TOKEN.INSTOPT,
-    data: buildBuffer('U8', 0x00)
+    buffer = new WritableTrackingBuffer(optionBufferSize)
+    buffer.writeUInt8(0x00)
+
+    token: TOKEN.INSTOPT
+    data: buffer.data
 
   createThreadIdOption: () ->
-    token: TOKEN.THREADID,
-    data: buildBuffer('U32', 0x00)
+    buffer = new WritableTrackingBuffer(optionBufferSize)
+    buffer.writeUInt32BE(0x00)
+
+    token: TOKEN.THREADID
+    data: buffer.data
 
   createMarsOption: () ->
-    token: TOKEN.MARS,
-    data: buildBuffer('U8', MARS.OFF)
+    buffer = new WritableTrackingBuffer(optionBufferSize)
+    buffer.writeUInt8(MARS.OFF)
+
+    token: TOKEN.MARS
+    data: buffer.data
 
   extractOptions: ->
     offset = 0;
