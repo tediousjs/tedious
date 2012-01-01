@@ -117,13 +117,13 @@ parser = (buffer, columnsMetaData) ->
             when 16
               value = buffer.readUNumeric128LE()
             else
-              error = sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, buffer.position)
+              throw new Error(sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, buffer.position))
               break
 
           value *= sign
           value /= Math.pow(10, columnMetaData.scale)
       else
-        error = sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (buffer.position - 1))
+        throw new Error(sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (buffer.position - 1)))
         break
 
     columns.push(
@@ -140,15 +140,10 @@ parser = (buffer, columnsMetaData) ->
 
     byName
 
-  if error
-    token =
-      name: 'ROW'
-      error: error
-  else
-    token =
-      name: 'ROW'
-      event: 'row'
-      columns: columns
+  # Return token
+  name: 'ROW'
+  event: 'row'
+  columns: columns
 
 readBinary = (buffer, dataLength) ->
   if dataLength == NULL

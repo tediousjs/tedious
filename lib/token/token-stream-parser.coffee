@@ -51,21 +51,17 @@ class Parser extends EventEmitter
         if token
           @debug.token(token)
 
-          if !token.error
-            # Note current position, so that it can be rolled back to if the next token runs out of buffer.
-            @position = @buffer.position
+          # Note current position, so that it can be rolled back to if the next token runs out of buffer.
+          @position = @buffer.position
 
-            if token.event
-              @emit(token.event, token)
+          if token.event
+            @emit(token.event, token)
 
-            switch token.name
-              when 'COLMETADATA'
-                @colMetadata = token.columns
+          switch token.name
+            when 'COLMETADATA'
+              @colMetadata = token.columns
 
-            return true
-          else
-            @emit('error', token)
-            return false
+          return true
         else
           return false
 

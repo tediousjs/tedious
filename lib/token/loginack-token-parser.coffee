@@ -12,12 +12,12 @@ parser = (buffer) ->
   interfaceNumber = buffer.readUInt8()
   interface = interfaces[interfaceNumber]
   if !interface
-    error = "Unknown LOGINACK Interface #{interfaceNumber} at offset #{buffer.position}"
+    throw new Error("Unknown LOGINACK Interface #{interfaceNumber} at offset #{buffer.position}")
 
   tdsVersionNumber = buffer.readUInt32BE()
   tdsVersion = versions[tdsVersionNumber]
   if !tdsVersion
-    error = "Unknown LOGINACK TDSVersion #{tdsVersionNumber} at offset #{buffer.position}"
+    throw new Error("Unknown LOGINACK TDSVersion #{tdsVersionNumber} at offset #{buffer.position}")
 
   progName = buffer.readBVarchar()
 
@@ -27,17 +27,12 @@ parser = (buffer) ->
     buildNumHi: buffer.readUInt8()
     buildNumLow: buffer.readUInt8()
 
-  if error
-    token =
-      name: 'LOGINACK'
-      error: error
-  else
-    token =
-      name: 'LOGINACK'
-      event: 'loginack'
-      interface: interface
-      tdsVersion: tdsVersion
-      progName: progName
-      progVersion: progVersion
+  # Return token
+  name: 'LOGINACK'
+  event: 'loginack'
+  interface: interface
+  tdsVersion: tdsVersion
+  progName: progName
+  progVersion: progVersion
 
 module.exports = parser

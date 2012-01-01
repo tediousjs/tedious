@@ -150,9 +150,6 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('returnStatus', (token) =>
       @procReturnStatusValue = token.value
     )
-    @tokenStreamParser.on('error', (token) =>
-      @fatalError(token.error)
-    )
     @tokenStreamParser.on('done', (token) =>
       state = @state
 

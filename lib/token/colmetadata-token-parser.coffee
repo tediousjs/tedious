@@ -14,8 +14,7 @@ parser = (buffer) ->
     type = TYPE[typeNumber]
 
     if !type
-      error = sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1))
-      break
+      throw new Error(sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1)))
 
     #console.log(type)
 
@@ -30,7 +29,7 @@ parser = (buffer) ->
         when 4
           dataLength = buffer.readUInt32LE()
         else
-          throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+          throw new Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
     else
       dataLength = undefined
 
@@ -62,14 +61,9 @@ parser = (buffer) ->
       dataLength: dataLength
     )
 
-  if error
-    token =
-      name: 'COLMETADATA'
-      error: error
-  else
-    token =
-      name: 'COLMETADATA'
-      event: 'columnMetadata'
-      columns: columns
+  # Return token
+  name: 'COLMETADATA'
+  event: 'columnMetadata'
+  columns: columns
 
 module.exports = parser
