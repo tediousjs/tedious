@@ -55,8 +55,9 @@ module.exports.badType = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 2, 0);
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
-
-  test.ok(token.error)
-
-  test.done()
+  try
+    token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
+    test.ok(false)
+  catch error
+    test.ok(~error.message.indexOf('Unsupported'))
+    test.done()
