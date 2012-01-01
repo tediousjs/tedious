@@ -84,6 +84,8 @@ parser = (buffer, columnsMetaData) ->
           {value: value, isNull: isNull} = readMaxChars(buffer, encoding)
         else
           {value: value, isNull: isNull} = readChars(buffer, dataLength, encoding)
+      when 'VarBinary', 'Binary'
+        {value: value, isNull: isNull} = readBinary(buffer, dataLength)
       when 'SmallDateTime'
         value = readSmallDateTime(buffer)
       when 'DateTime'
@@ -145,10 +147,18 @@ parser = (buffer, columnsMetaData) ->
       event: 'row'
       columns: columns
 
+readBinary = (buffer, dataLength) ->
+  if dataLength == NULL
+      value: undefined
+      isNull: true
+  else
+    value: buffer.readArray(dataLength)
+    isNull: false
+
 readChars = (buffer, dataLength, encoding) ->
   if dataLength == NULL
-    value: undefined
-    isNull: true
+      value: undefined
+      isNull: true
   else
     value: buffer.readString(dataLength, encoding)
     isNull: false

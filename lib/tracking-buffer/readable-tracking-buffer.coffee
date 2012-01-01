@@ -152,6 +152,9 @@ class ReadableTrackingBuffer
     @position += length
     @buffer.slice(@position - length, @position)
 
+  readArray: (length) ->
+    Array.prototype.slice.call(@readBuffer(length), 0, length)
+
   readAsStringBigIntLE: (length) ->
     @assertEnoughLeftFor(length)
     @position += length

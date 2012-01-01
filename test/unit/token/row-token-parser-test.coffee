@@ -90,6 +90,44 @@ module.exports.nVarChar = (test) ->
 
   test.done()
 
+module.exports.varBinary = (test) ->
+  colMetaData = [type: dataTypeByName.VarBinary]
+  value = [0x12, 0x34]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeUInt16LE(value.length)
+  buffer.writeBuffer(new Buffer(value))
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.deepEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.binary = (test) ->
+  colMetaData = [type: dataTypeByName.Binary]
+  value = [0x12, 0x34]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeUInt16LE(value.length)
+  buffer.writeBuffer(new Buffer(value))
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.ok(!token.columns[0].isNull)
+  test.deepEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
 module.exports.varCharMaxNull = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar

@@ -89,6 +89,18 @@ exports.nvarcharMax = (test) ->
 exports.nvarcharMaxNull = (test) ->
   execSql(test, "select cast(null as nvarchar(max))", null)
 
+exports.varbinary = (test) ->
+  execSql(test, "select cast(0x1234 as varbinary(4))", [0x12, 0x34])
+
+exports.varbinaryNull = (test) ->
+  execSql(test, "select cast(null as varbinary(10))", null)
+
+exports.binary = (test) ->
+  execSql(test, "select cast(0x1234 as binary(4))", [0x12, 0x34, 0x00, 0x00])
+
+exports.binaryNull = (test) ->
+  execSql(test, "select cast(null as binary(10))", null)
+
 exports.char = (test) ->
   execSql(test, "select cast('abc' as char(5))", 'abc  ')
 
@@ -115,6 +127,8 @@ execSql = (test, sql, expectedValue) ->
       test.ok(columns[0].isNull)
     else if expectedValue instanceof Date
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
+    else if expectedValue instanceof Array
+      test.deepEqual(columns[0].value, expectedValue)
     else
       test.strictEqual(columns[0].value, expectedValue)
   )

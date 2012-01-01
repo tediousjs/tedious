@@ -62,10 +62,18 @@ TYPE =
     type: 'DATETIMN'
     name: 'DateTimeN'
     dataLengthLength: 1
+  0xA5:
+    type: 'BIGVARBIN'
+    name: 'VarBinary'
+    dataLengthLength: 2
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
     hasCollation: true
+    dataLengthLength: 2
+  0xAD:
+    type: 'BIGBinary'
+    name: 'Binary'
     dataLengthLength: 2
   0xAF:
     type: 'BIGCHAR'
@@ -104,8 +112,6 @@ TYPE =
   BINARYTYPE:           0x2D  # Binary (legacy support)
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
-  BIGVARBINTYPE:        0xA5  # VarBinary
-  BIGBINARYTYPE:        0xAD  # Binary
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   
