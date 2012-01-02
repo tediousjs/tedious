@@ -18,17 +18,26 @@ getConfig = ->
 
   config
 
+exports.badServer = (test) ->
+  config = getConfig()
+  config.server = 'bad-server'
+
+  connection = connectionFactory.createConnection(config)
+
+  connection.on('connection', (err) ->
+      test.ok(err)
+      test.done()
+  )
 exports.badPort = (test) ->
   config = getConfig()
-
   config.options.port = -1
   config.options.connectTimeout = 200
 
   connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
-    test.ok(err)
-    test.done()
+      test.ok(err)
+      test.done()
   )
 
 exports.connect = (test) ->

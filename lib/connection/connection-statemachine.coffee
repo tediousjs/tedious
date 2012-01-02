@@ -26,7 +26,11 @@ connectionStateMachine = (fire, client, config) ->
       entry: ->
         defaultConfig()
         connect()
+        socket.on('error', (error) ->
+          # Need this handler, or else the error action is not fired. Weird.
+        )
         connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
+
         fire.$regEmitter('socket', socket, true);
 
         null
@@ -35,7 +39,12 @@ connectionStateMachine = (fire, client, config) ->
         'socket.connect': ->
           'SentPrelogin'
 
-        'socket.error': '@error'
+        'socket.error': ->
+          client.emit('connection', "failed to connect")
+
+          'Final'
+
+        #'socket.error': '@error'
 
     SentPrelogin:
       entry: ->
@@ -84,8 +93,13 @@ connectionStateMachine = (fire, client, config) ->
 
     Final:
       entry: ->
+        if connectTimer
+          clearTimeout(connectTimer)
+
         if socket
           socket.destroy()
+
+         client.emit('end')
 
         '@exit'
 
