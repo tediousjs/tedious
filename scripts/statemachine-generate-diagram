@@ -4,10 +4,10 @@ COFFEE=node_modules/.bin/coffee
 IGNITE=node_modules/.bin/ignite
 
 GENERATED_DIR=generated
-COFFEE_OUTPUT_DIR=coffee
+COFFEE_OUTPUT_DIR=coffee/lib
 
 DIAGRAM_FILE=$GENERATED_DIR/connection-statemachine.png
-STATEMACHINE_FILE=$COFFEE_OUTPUT_DIR/lib/connection/connection-statemachine.js
+STATEMACHINE_FILE=$COFFEE_OUTPUT_DIR/connection/connection-statemachine.js
 
 mkdir -p $GENERATED_DIR
 
