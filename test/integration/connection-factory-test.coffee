@@ -1,5 +1,9 @@
-Connection = require('../../lib/connection/connection')
+ConnectionFactory = require('../../lib/connection/connection-factory')
 fs = require('fs')
+
+#require('../../lib/tedious').statemachineLogLevel = 5
+
+connectionFactory = new ConnectionFactory()
 
 getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
@@ -20,7 +24,7 @@ exports.badPort = (test) ->
   config.options.port = -1
   config.options.connectTimeout = 200
 
-  connection = new Connection(config)
+  connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
     test.ok(err)
@@ -30,7 +34,7 @@ exports.badPort = (test) ->
 exports.connect = (test) ->
   config = getConfig()
 
-  connection = new Connection(config)
+  connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
       test.ok(!err)
