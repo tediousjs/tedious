@@ -5,19 +5,17 @@ CONNECT_TIMEOUT_DEFAULT = 15 * 1000
 CLIENT_REQUEST_TIMEOUT_DEFAULT = 15 * 1000
 CANCEL_TIMEOUT_DEFAULT = 5 * 1000
 
-connectionStateMachine = (fire, config) ->
+connectionStateMachine = (fire, client, config) ->
   # Used in diagram.
   @name = 'Connection - State Machine'
 
-  connection = undefined
+  socket = undefined
   connectTimer = undefined
 
   @defaults =
     actions:
       'connectTimeout': ->
-        console.log 'connect timeout'
-        if connection
-          connection.destroy()
+        client.emit('connection', "timeout : failed to connect in #{config.options.connectTimeout}ms")
 
         'Final'
 
@@ -27,24 +25,25 @@ connectionStateMachine = (fire, config) ->
     Connecting:
       entry: ->
         defaultConfig()
+        connect()
         connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
-        connection = connect()
-        fire.$regEmitter('connection', connection, true);
+        fire.$regEmitter('socket', socket, true);
 
         null
 
       actions:
-        'connection.connect': ->
+        'socket.connect': ->
           'SentPrelogin'
 
-        'connection.error': '@error'
+        'socket.error': '@error'
 
     SentPrelogin:
       entry: ->
         if connectTimer
           clearTimeout(connectTimer)
+        client.emit('connection')
 
-        null
+        'Final'
 
       actions:
         '.done': 'SentLogin7WithStandardLogin'
@@ -85,7 +84,9 @@ connectionStateMachine = (fire, config) ->
 
     Final:
       entry: ->
-        console.log('done')
+        if socket
+          socket.destroy()
+
         '@exit'
 
   defaultConfig = ->
@@ -96,10 +97,8 @@ connectionStateMachine = (fire, config) ->
     config.options.cancelTimeout ||= CANCEL_TIMEOUT_DEFAULT
 
   connect = ->
-    connection = new Socket({})
-    connection.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
-    connection.connect(config.options.port, config.server)
-
-    connection
+    socket = new Socket({})
+    socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
+    socket.connect(config.options.port, config.server)
 
 module.exports = connectionStateMachine

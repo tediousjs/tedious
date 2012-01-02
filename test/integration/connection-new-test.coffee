@@ -1,36 +1,38 @@
-connectionGF = require('../../lib/connection/connection-statemachine')
-ignite = require('ignite')
+Connection = require('../../lib/connection/connection')
 fs = require('fs')
 
 getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
+
   config.options.debug =
     data: true
     payload: true
     token: true
 
+  config.statemachine =
+    logLevel: 5
+
   config
 
 exports.badPort = (test) ->
-  imports = {}
-  options = {}
-  factory = new ignite.Factory(connectionGF, imports, options)
   config = getConfig()
 
   config.options.port = -1
   config.options.connectTimeout = 200
 
-  factory.spawn(config)
+  connection = new Connection(config)
 
-  #test.done()
+  connection.on('connection', (err) ->
+    test.ok(err)
+    test.done()
+  )
 
 exports.connect = (test) ->
-  imports = {}
-  options =
-    logLevel: 8
-  factory = new ignite.Factory(connectionGF, imports, options)
   config = getConfig()
 
-  factory.spawn(config)
+  connection = new Connection(config)
 
-  #test.done()
+  connection.on('connection', (err) ->
+      test.ok(!err)
+      test.done()
+  )
