@@ -1,18 +1,51 @@
-connectionStateMachine = (fire) ->
+Socket = require('net').Socket
+
+KEEP_ALIVE_INITIAL_DELAY = 30 * 1000
+CONNECT_TIMEOUT_DEFAULT = 15 * 1000
+CLIENT_REQUEST_TIMEOUT_DEFAULT = 15 * 1000
+CANCEL_TIMEOUT_DEFAULT = 5 * 1000
+
+connectionStateMachine = (fire, config) ->
+  # Used in diagram.
   @name = 'Connection - State Machine'
 
-  @startState = 'Initial'
+  connection = undefined
+  connectTimer = undefined
+
+  @defaults =
+    actions:
+      'connectTimeout': ->
+        console.log 'connect timeout'
+        if connection
+          connection.destroy()
+
+        'Final'
+
+  @startState = 'Connecting'
 
   @states =
-    Initial:
+    Connecting:
       entry: ->
-        console.log('init')
-        'SentPrelogin'
+        defaultConfig()
+        connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
+        connection = connect()
+        fire.$regEmitter('connection', connection, true);
+
+        null
+
+      actions:
+        'connection.connect': ->
+          'SentPrelogin'
+
+        'connection.error': '@error'
 
     SentPrelogin:
       entry: ->
-        console.log('sent pl')
+        if connectTimer
+          clearTimeout(connectTimer)
+
         null
+
       actions:
         '.done': 'SentLogin7WithStandardLogin'
         '.err': 'Final'
@@ -55,4 +88,18 @@ connectionStateMachine = (fire) ->
         console.log('done')
         '@exit'
 
-module.exports = connectionStateMachine;
+  defaultConfig = ->
+    config.options ||= {}
+    config.options.port ||= 1433
+    config.options.connectTimeout ||= CONNECT_TIMEOUT_DEFAULT
+    config.options.requestTimeout ||= CLIENT_REQUEST_TIMEOUT_DEFAULT
+    config.options.cancelTimeout ||= CANCEL_TIMEOUT_DEFAULT
+
+  connect = ->
+    connection = new Socket({})
+    connection.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
+    connection.connect(config.options.port, config.server)
+
+    connection
+
+module.exports = connectionStateMachine
