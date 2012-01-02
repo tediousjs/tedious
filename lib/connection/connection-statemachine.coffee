@@ -19,9 +19,6 @@ connectionStateMachine = (fire, client, config) ->
       entry: ->
         defaultConfig()
         connect()
-        socket.on('error', (error) ->
-          # Need this handler, or else the error action is not fired. Weird.
-        )
         connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
 
         fire.$regEmitter('socket', socket, true);
@@ -113,6 +110,10 @@ connectionStateMachine = (fire, client, config) ->
     socket = new Socket({})
     socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
     socket.connect(config.options.port, config.server)
+
+    socket.on('error', (error) ->
+      # Need this listener, or else the error actions are not fired. Weird.
+    )
 
   connectTimeout = ->
     client.emit('connection', "timeout : failed to connect in #{config.options.connectTimeout}ms")
