@@ -12,4 +12,4 @@ STATEMACHINE_FILE=$COFFEE_OUTPUT_DIR/connection/connection-statemachine.js
 mkdir -p $GENERATED_DIR
 
 $COFFEE -b -o $COFFEE_OUTPUT_DIR lib/
-$IGNITE -m draw -T png -o $DIAGRAM_FILE $STATEMACHINE_FILE
+$IGNITE -m draw -T png --level 1 -o $DIAGRAM_FILE $STATEMACHINE_FILE

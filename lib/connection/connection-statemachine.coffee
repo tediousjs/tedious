@@ -12,13 +12,6 @@ connectionStateMachine = (fire, client, config) ->
   socket = undefined
   connectTimer = undefined
 
-  @defaults =
-    actions:
-      'connectTimeout': ->
-        client.emit('connection', "timeout : failed to connect in #{config.options.connectTimeout}ms")
-
-        'Final'
-
   @startState = 'Connecting'
 
   @states =
@@ -41,15 +34,16 @@ connectionStateMachine = (fire, client, config) ->
 
         'socket.error': ->
           client.emit('connection', "failed to connect")
-
           'Final'
+
+        'connectTimeout': ->
+          connectTimeout()
 
         #'socket.error': '@error'
 
     SentPrelogin:
       entry: ->
-        if connectTimer
-          clearTimeout(connectTimer)
+        clearConnectTimer()
         client.emit('connection')
 
         'Final'
@@ -57,6 +51,8 @@ connectionStateMachine = (fire, client, config) ->
       actions:
         '.done': 'SentLogin7WithStandardLogin'
         '.err': 'Final'
+        'connectTimeout': ->
+          connectTimeout()
 
     ###
     SentTlsNegotiation:
@@ -68,6 +64,10 @@ connectionStateMachine = (fire, client, config) ->
       entry: ->
         console.log('sent l7 with standard login')
         null
+
+      actions:
+        'connectTimeout': ->
+          connectTimeout()
 
     ###
     SentLogin7WithSpNego:
@@ -93,8 +93,7 @@ connectionStateMachine = (fire, client, config) ->
 
     Final:
       entry: ->
-        if connectTimer
-          clearTimeout(connectTimer)
+        clearConnectTimer()
 
         if socket
           socket.destroy()
@@ -114,5 +113,13 @@ connectionStateMachine = (fire, client, config) ->
     socket = new Socket({})
     socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
     socket.connect(config.options.port, config.server)
+
+  connectTimeout = ->
+    client.emit('connection', "timeout : failed to connect in #{config.options.connectTimeout}ms")
+    'Final'
+
+  clearConnectTimer = ->
+    if connectTimer
+      clearTimeout(connectTimer)
 
 module.exports = connectionStateMachine
