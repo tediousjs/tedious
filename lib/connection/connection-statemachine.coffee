@@ -99,7 +99,7 @@ connectionStateMachine = (fire, client, config) ->
         if socket
           socket.destroy()
 
-         client.emit('end')
+        client.emit('end')
 
         '@exit'
 
