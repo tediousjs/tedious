@@ -7,5 +7,6 @@ todo
 npm-debug.log
 coffee/*
 README.html
+generated
 
 test/unit/perf-buffer.coffee
