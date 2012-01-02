@@ -65,6 +65,22 @@ parser = (buffer, columnsMetaData) ->
             value = buffer.readInt32LE()
           when 8
             value = buffer.readAsStringInt64LE()
+          else
+            throw new Error("Unsupported dataLength #{dataLength} for IntN")
+      when 'Real'
+        value = buffer.readFloatLE()
+      when 'Float'
+        value = buffer.readDoubleLE()
+      when 'FloatN'
+        switch dataLength
+          when 0
+            isNull = true
+          when 4
+            value = buffer.readFloatLE()
+          when 8
+            value = buffer.readDoubleLE()
+          else
+            throw new Error("Unsupported dataLength #{dataLength} for FloatN")
       when 'Bit'
         value = !!buffer.readUInt8()
       when 'BitN'
@@ -123,7 +139,7 @@ parser = (buffer, columnsMetaData) ->
           value *= sign
           value /= Math.pow(10, columnMetaData.scale)
       else
-        throw new Error(sprintf('Unrecognised column type %s at offset 0x%04X', type.name, (buffer.position - 1)))
+        throw new Error(sprintf('Unrecognised column type %s at offset 0x%04X', type.name, buffer.position))
         break
 
     columns.push(

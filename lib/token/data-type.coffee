@@ -1,8 +1,10 @@
 TYPE =
-  # Fixed-length types
+  # Zero-length types
   0x1F:
     type: 'NULL'
     name: 'Null'
+
+  # Fixed-length types
   0x30:
     type: 'INT1'
     name: 'TinyInt'
@@ -47,17 +49,21 @@ TYPE =
     name: 'BitN'
     dataLengthLength: 1
   0x6A:
-    type: 'DECIMALNTYPE'
+    type: 'DECIMALN'
     name: 'DecimalN'
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
   0x6C:
-    type: 'NUMERICNTYPE'
+    type: 'NUMERICN'
     name: 'NumericN'
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
+  0x6D:
+    type: 'FLTN'
+    name: 'FloatN'
+    dataLengthLength: 1
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
@@ -101,7 +107,6 @@ TYPE =
   GUIDTYPE:             0x24  # UniqueIdentifier
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
-  FLTNTYPE:             0x6D  # (see below)
   MONEYNTYPE:           0x6E  # (see below)
   DATENTYPE:            0x28  # (introduced in TDS 7.3)
   TIMENTYPE:            0x29  # (introduced in TDS 7.3)

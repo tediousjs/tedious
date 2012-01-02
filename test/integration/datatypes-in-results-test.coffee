@@ -29,6 +29,18 @@ exports.int = (test) ->
 exports.intNull = (test) ->
   execSql(test, 'select cast(null as int)', null)
 
+exports.real = (test) ->
+  execSql(test, 'select cast(9.5 as real)', 9.5)
+
+exports.realNull = (test) ->
+  execSql(test, 'select cast(null as real)', null)
+
+exports.float = (test) ->
+  execSql(test, 'select cast(9.5 as float)', 9.5)
+
+exports.floatNull = (test) ->
+  execSql(test, 'select cast(null as float)', null)
+
 exports.bigint = (test) ->
   execSql(test, 'select cast(8 as bigint)', '8')
 

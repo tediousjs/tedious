@@ -95,6 +95,18 @@ class ReadableTrackingBuffer
     @position += length
     @buffer.readInt32BE(@position - length)
 
+  readFloatLE: ->
+    length = 4
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readFloatLE(@position - length)
+
+  readDoubleLE: ->
+    length = 8
+    @assertEnoughLeftFor(length)
+    @position += length
+    @buffer.readDoubleLE(@position - length)
+
   # If value > 53 bits then it will be incorrect (because Javascript uses IEEE_754 for number representation).
   readUInt64LE: ->
     low = @readUInt32LE()
