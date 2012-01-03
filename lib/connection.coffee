@@ -48,7 +48,7 @@ class Connection extends EventEmitter
     @connection.addListener('error', @eventError)
     @connection.addListener('timeout', @eventTimeout)
 
-    @messageIo = new MessageIO(@connection, @debug)
+    @messageIo = new MessageIO(@connection, 4096, @debug)
     @messageIo.on('packet', @eventPacket)
 
     @startRequest('connect/login', callback)
@@ -187,6 +187,7 @@ class Connection extends EventEmitter
       userName: @userName,
       password: @password,
       database: @options.database
+      packetSize: 4096
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
