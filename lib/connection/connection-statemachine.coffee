@@ -33,7 +33,10 @@ connectionStateMachine = (fire, client, config) ->
         null
 
       'client.close': ->
-        'Final'
+        if (!connection.closed)
+          'Final'
+        else
+          null
 
   @states =
     Connecting:
@@ -119,6 +122,7 @@ connectionStateMachine = (fire, client, config) ->
     LoggedIn:
       entry: ->
         #console.log('logged in')
+        null
 
     ###
     SentLogin7WithSpNego:
@@ -140,14 +144,17 @@ connectionStateMachine = (fire, client, config) ->
 
     Final:
       entry: ->
-        clearConnectTimer()
+        if !connection.closed
+          connection.closed = true
 
-        if connection.socket
-          connection.socket.destroy()
+          clearConnectTimer()
 
-        client.emit('end')
+          if connection.socket
+            connection.socket.destroy()
 
-        '@exit'
+          client.emit('end')
+
+          '@exit'
 
   defaultConfig = ->
     config.options ||= {}
