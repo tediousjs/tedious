@@ -5,8 +5,8 @@ packetLength = require('./packet').packetLength
 Packet = require('./packet').Packet
 
 class MessageIO extends EventEmitter
-  constructor: (@connection, @_packetSize, @debug) ->
-    @connection.addListener('data', @eventData)
+  constructor: (@socket, @packetSize, @debug) ->
+    @socket.addListener('data', @eventData)
 
     @packetBuffer = new Buffer(0)
     @payloadBuffer = new Buffer(0)
@@ -27,21 +27,25 @@ class MessageIO extends EventEmitter
 
   packetSize: (packetSize) ->
     if arguments.length > 0
-      @debug.log("Packet size changed from #{@_packetSize} to #{packetSize}")
-      @_packetSize = packetSize
+      @debug.log("Packet size changed from #{@packetSize} to #{packetSize}")
+      @packetSize = packetSize
 
     @_packetSize
 
+  # TODO listen for 'drain' event when socket.write returns false.
   sendMessage: (packetType, payload) ->
-    numberOfPackets = (Math.floor((payload.length - 1) / @_packetSize)) + 1
+    @debug.payload(payload.toString('  '))
+
+    data = payload.data
+    numberOfPackets = (Math.floor((data.length - 1) / @packetSize)) + 1
 
     for packetNumber in [0..numberOfPackets - 1]
-      payloadStart = packetNumber * @_packetSize
+      payloadStart = packetNumber * @packetSize
       if packetNumber < numberOfPackets - 1
-        payloadEnd = payloadStart + @_packetSize
+        payloadEnd = payloadStart + @packetSize
       else
-        payloadEnd = payload.length
-      packetPayload = payload.slice(payloadStart, payloadEnd)
+        payloadEnd = data.length
+      packetPayload = data.slice(payloadStart, payloadEnd)
 
       packet = new Packet(packetType)
       packet.last(packetNumber == numberOfPackets - 1)
@@ -52,7 +56,7 @@ class MessageIO extends EventEmitter
 
   sendPacket: (packet) =>
     @logPacket('Sent', packet);
-    @connection.write(packet.buffer)
+    @socket.write(packet.buffer)
 
   logPacket: (direction, packet) ->
     @debug.packet(direction, packet)

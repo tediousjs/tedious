@@ -9,6 +9,7 @@ getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
 
   config.options.debug =
+    packet: true
     data: true
     payload: true
     token: true
@@ -28,6 +29,7 @@ exports.badServer = (test) ->
       test.ok(err)
       test.done()
   )
+
 exports.badPort = (test) ->
   config = getConfig()
   config.options.port = -1
@@ -48,4 +50,8 @@ exports.connect = (test) ->
   connection.on('connection', (err) ->
       test.ok(!err)
       test.done()
+  )
+
+  connection.on('debug', (text) ->
+    console.log(text)
   )
