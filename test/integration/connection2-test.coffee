@@ -157,5 +157,5 @@ exports.execSimpleSql = (test) ->
   )
 
   connection.on('debug', (text) ->
-    console.log(text)
+    #console.log(text)
   )

@@ -130,10 +130,14 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('columnMetadata', (token) =>
       if @sqlRequest
         @sqlRequest.emit('columnMetadata', token.columns)
+      else
+        throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('row', (token) =>
       if @sqlRequest
         @sqlRequest.emit('row', token.columns)
+      else
+        throw new Error("Received 'row' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('done', (token) =>
       if @sqlRequest
