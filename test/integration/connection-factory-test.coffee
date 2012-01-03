@@ -47,10 +47,10 @@ exports.badPort = (test) ->
   )
 
 exports.badCredentials = (test) ->
+  test.expect(2)
+
   config = getConfig()
   config.password = 'bad-password'
-
-  test.expect(2)
 
   connection = connectionFactory.createConnection(config)
 
@@ -78,6 +78,8 @@ exports.badCredentials = (test) ->
   )
 
 exports.connect = (test) ->
+  test.expect(2)
+
   config = getConfig()
 
   connection = connectionFactory.createConnection(config)
@@ -90,6 +92,10 @@ exports.connect = (test) ->
 
   connection.on('end', (info) ->
     test.done()
+  )
+
+  connection.on('databaseChange', (database) ->
+      test.strictEqual(database, config.options.database)
   )
 
   connection.on('infoMessage', (info) ->

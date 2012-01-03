@@ -31,6 +31,18 @@ connectionStateMachine = (fire, client, config) ->
         client.emit('errorMessage', token)
         null
 
+      'tokenStream.databaseChange': (token) ->
+        client.emit('databaseChange', token.newValue)
+        null
+
+      'tokenStream.languageChange': (token) ->
+        client.emit('languageChange', token.newValue)
+        null
+
+      'tokenStream.charsetChange': (token) ->
+        client.emit('charsetChange', token.newValue)
+        null
+
       'client.close': ->
         if (!connection.closed)
           'Final'
