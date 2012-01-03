@@ -1,7 +1,7 @@
 {
   "author": "Mike D Pilsbury <mike.pilsbury@gmail.com>",
   "contributors": [
-    "Ciaran Jessup"
+    "Ciaran Jessup <ciaranj@gmail.com>"
   ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
