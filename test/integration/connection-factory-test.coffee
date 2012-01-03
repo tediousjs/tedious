@@ -23,8 +23,11 @@ exports.badServer = (test) ->
   connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
-      test.ok(err)
-      test.done()
+    test.ok(err)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
   )
 
 exports.badPort = (test) ->
@@ -35,8 +38,11 @@ exports.badPort = (test) ->
   connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
-      test.ok(err)
-      test.done()
+    test.ok(err)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
   )
 
 exports.connect = (test) ->
@@ -45,14 +51,19 @@ exports.connect = (test) ->
   connection = connectionFactory.createConnection(config)
 
   connection.on('connection', (err) ->
-      test.ok(!err)
-      test.done()
+    test.ok(!err)
+
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    console.log("#{info.number} : #{info.message}")
+    #console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    console.log(text)
+    #console.log(text)
   )

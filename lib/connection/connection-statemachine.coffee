@@ -32,6 +32,9 @@ connectionStateMachine = (fire, client, config) ->
         client.emit('errorMessage', token)
         null
 
+      'client.close': ->
+        'Final'
+
   @states =
     Connecting:
       entry: ->
@@ -41,6 +44,7 @@ connectionStateMachine = (fire, client, config) ->
         connect()
         createConnectTimer()
 
+        fire.$regEmitter('client', client, true);
         fire.$regEmitter('socket', connection.socket, true);
         fire.$regEmitter('messageIo', connection.messageIo, true);
         fire.$regEmitter('tokenStream', connection.tokenStreamParser, true);
@@ -65,13 +69,6 @@ connectionStateMachine = (fire, client, config) ->
     SentPrelogin: ->
       responseBuffer = new Buffer(0)
 
-      entry: ->
-        # TODO move these 2 lines to the state where connection establishment really finished
-        clearConnectTimer()
-        client.emit('connection')
-
-        null
-
       actions:
         'connectTimeout': ->
           connectTimeout()
@@ -94,10 +91,8 @@ connectionStateMachine = (fire, client, config) ->
         console.log('sent tls neg')
     ###
 
-    SentLogin7WithStandardLogin:
-      entry: ->
-        console.log('sent l7 with standard login')
-        null
+    SentLogin7WithStandardLogin: ->
+      loggedIn = false
 
       actions:
         'connectTimeout': ->
@@ -109,11 +104,21 @@ connectionStateMachine = (fire, client, config) ->
           null
 
         'messageIo.message': ->
-          'LoggedIn'
+          if loggedIn
+            clearConnectTimer()
+            client.emit('connection')
+            'LoggedIn'
+          else
+            client.emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
+            'Final'
+
+        'tokenStream.loginack': (token) ->
+          loggedIn = true
+          null
 
     LoggedIn:
       entry: ->
-        console.log('logged in')
+        #console.log('logged in')
 
     ###
     SentLogin7WithSpNego:

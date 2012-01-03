@@ -17,4 +17,7 @@ class Connection extends EventEmitter
   constructor: (factory, config) ->
     factory.spawn(@, config)
 
+  close: ->
+    @emit('close')
+
 module.exports = ConnectionFactory
