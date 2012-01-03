@@ -1,4 +1,5 @@
 Connection = require('../../lib/connection2')
+Request = require('../../lib/request')
 fs = require('fs')
 
 getConfig = ->
@@ -99,7 +100,7 @@ exports.connect = (test) ->
   )
 
   connection.on('databaseChange', (database) ->
-      test.strictEqual(database, config.options.database)
+    test.strictEqual(database, config.options.database)
   )
 
   connection.on('infoMessage', (info) ->
@@ -108,4 +109,53 @@ exports.connect = (test) ->
 
   connection.on('debug', (text) ->
     #console.log(text)
+  )
+
+exports.execSimpleSql = (test) ->
+  test.expect(8)
+
+  config = getConfig()
+
+  request = new Request('select 8 as C1', (err) ->
+    test.ok(!err)
+
+    connection.close()
+  )
+
+  request.on('done', (rowCount) ->
+    test.strictEqual(rowCount, 1)
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(columnsMetadata.length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(columns.length, 1)
+
+    test.strictEqual(columns[0].value, 8)
+
+    test.strictEqual(columns[0].isNull, false)
+
+    test.strictEqual(columns.byName().C1.value, 8)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connection', (err) ->
+    test.ok(!err)
+
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    console.log(text)
   )

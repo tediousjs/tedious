@@ -54,6 +54,14 @@ class Connection extends EventEmitter
           @processLogin7Response()
     LOGGED_IN:
       name: 'LoggedIn'
+    SENT_CLIENT_REQUEST:
+      name: 'SentClientRequest'
+      events:
+        packet: (packet) ->
+          @sendPacketToTokenStreamParser(packet)
+        message: ->
+          @sqlRequest.callback(@sqlRequest.error)
+          @sqlRequest = undefined
     FINAL:
       name: 'Final'
       enter: ->
@@ -101,6 +109,8 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
+      if @sqlRequest
+        @sqlRequest.error = token.message
     )
     @tokenStreamParser.on('databaseChange', (token) =>
       @emit('databaseChange', token.newValue)
@@ -116,6 +126,18 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
       @messageIo.packetSize(token.newValue)
+    )
+    @tokenStreamParser.on('columnMetadata', (token) =>
+      if @sqlRequest
+        @sqlRequest.emit('columnMetadata', token.columns)
+    )
+    @tokenStreamParser.on('row', (token) =>
+      if @sqlRequest
+        @sqlRequest.emit('row', token.columns)
+    )
+    @tokenStreamParser.on('done', (token) =>
+      if @sqlRequest
+        @sqlRequest.emit('done', token.rowCount)
     )
 
   connect: ->
@@ -210,10 +232,25 @@ class Connection extends EventEmitter
   processLogin7Response: ->
     if @loggedIn
       @clearConnectTimer()
-      @emit('connection')
       @transitionTo(@STATE.LOGGED_IN)
+      @emit('connection')
     else
       @emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
       @transitionTo(@STATE.FINAL)
+
+  execSql: (request) ->
+    if @state != @STATE.LOGGED_IN
+      message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
+
+      @debug.log(message)
+      request.callback(message)
+    else
+      @sqlRequest = request
+
+      payload = new SqlBatchPayload(request.sqlText)
+      @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+      @debug.payload(payload.toString('  '))
+
+      @transitionTo(@STATE.SENT_CLIENT_REQUEST)
 
 module.exports = Connection
