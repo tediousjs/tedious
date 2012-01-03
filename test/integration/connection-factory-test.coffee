@@ -13,6 +13,7 @@ getConfig = ->
     data: true
     payload: true
     token: false
+    log: true
 
   config
 

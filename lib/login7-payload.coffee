@@ -68,8 +68,6 @@ FLAGS_3 =
 
 DEFAULT_TDS_VERSION = versions['7_2']
 
-DEFAULT_PACKET_SIZE = 4 * 1024
-
 ###
   s2.2.6.3
 ###
@@ -90,7 +88,7 @@ class Login7Payload
 
   createFixedData: ->
     @tdsVersion = DEFAULT_TDS_VERSION
-    @packetSize = DEFAULT_PACKET_SIZE
+    @packetSize = @loginData.packetSize
     @clientProgVer = 0
     @clientPid = process.pid
     @connectionId = 0

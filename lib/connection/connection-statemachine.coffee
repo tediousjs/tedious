@@ -17,8 +17,7 @@ connectionStateMachine = (fire, client, config) ->
   @name = 'Connection - State Machine'
 
   # All global connection state is mantained in this object.
-  connection =
-    packetSize: DEFAULT_PACKET_SIZE
+  connection = {}
 
   @startState = 'Connecting'
 
@@ -119,6 +118,10 @@ connectionStateMachine = (fire, client, config) ->
           loggedIn = true
           null
 
+        'tokenStream.packetSizeChange': (token) ->
+          connection.messageIo.packetSize(token.newValue)
+          null
+
     LoggedIn:
       entry: ->
         #console.log('logged in')
@@ -162,6 +165,7 @@ connectionStateMachine = (fire, client, config) ->
     config.options.connectTimeout ||= DEFAULT_CONNECT_TIMEOUT
     config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
     config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
+    config.options.packetSize ||= DEFAULT_PACKET_SIZE
 
   createDebug = ->
     connection.debug = new Debug(config.options.debug)
@@ -181,7 +185,7 @@ connectionStateMachine = (fire, client, config) ->
       # Need this listener, or else the error actions are not fired. Weird.
     )
 
-    connection.messageIo = new MessageIO(connection.socket, connection.packetSize, connection.debug)
+    connection.messageIo = new MessageIO(connection.socket, config.options.packetSize, connection.debug)
 
   createConnectTimer = ->
     connection.connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout)
@@ -203,6 +207,7 @@ connectionStateMachine = (fire, client, config) ->
       userName: config.userName
       password: config.password
       database: config.options.database
+      packetSize: config.options.packetSize
 
     payload = new Login7Payload(loginData)
     connection.messageIo.sendMessage(TYPE.LOGIN7, payload.data)
