@@ -51,23 +51,13 @@ class Connection extends EventEmitter
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
         message: ->
-          if @loggedIn
-            @clearConnectTimer()
-            @emit('connection')
-            @transitionTo(@STATE.LOGGED_IN)
-          else
-            @emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
-            @transitionTo(@STATE.FINAL)
+          @processLogin7Response()
     LOGGED_IN:
       name: 'LoggedIn'
     FINAL:
       name: 'Final'
       enter: ->
-        if !@closed
-          @clearConnectTimer()
-          @closeConnection()
-          @emit('end')
-          @closed = true
+        @cleanupConnection()
 
   constructor: (@config) ->
     @defaultConfig()
@@ -82,6 +72,13 @@ class Connection extends EventEmitter
   initialiseConnection: ->
     @connect()
     @createConnectTimer()
+
+  cleanupConnection: ->
+    if !@closed
+      @clearConnectTimer()
+      @closeConnection()
+      @emit('end')
+      @closed = true
 
   defaultConfig: ->
     @config.options ||= {}
@@ -129,8 +126,12 @@ class Connection extends EventEmitter
     @socket.on('connect', @socketConnect)
 
     @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
-    @messageIo.on('packet', @packetReceived)
-    @messageIo.on('message', @messageReceived)
+    @messageIo.on('packet', (packet) =>
+      @dispatchEvent('packet', packet)
+    )
+    @messageIo.on('message', =>
+      @dispatchEvent('message')
+    )
 
   closeConnection: ->
     @socket.destroy()
@@ -177,12 +178,6 @@ class Connection extends EventEmitter
     @debug.log("connected to #{@config.server}:#{@config.options.port}")
     @dispatchEvent('socketConnect')
 
-  packetReceived: (packet) =>
-    @dispatchEvent('packet', packet)
-
-  messageReceived: =>
-    @dispatchEvent('message')
-
   sendPreLogin: ->
     payload = new PreloginPayload()
     @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
@@ -211,5 +206,14 @@ class Connection extends EventEmitter
 
   sendPacketToTokenStreamParser: (packet) ->
     @tokenStreamParser.addBuffer(packet.data())
+
+  processLogin7Response: ->
+    if @loggedIn
+      @clearConnectTimer()
+      @emit('connection')
+      @transitionTo(@STATE.LOGGED_IN)
+    else
+      @emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
+      @transitionTo(@STATE.FINAL)
 
 module.exports = Connection
