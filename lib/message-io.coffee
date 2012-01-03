@@ -33,10 +33,7 @@ class MessageIO extends EventEmitter
     @_packetSize
 
   # TODO listen for 'drain' event when socket.write returns false.
-  sendMessage: (packetType, payload) ->
-    @debug.payload(payload.toString('  '))
-
-    data = payload.data
+  sendMessage: (packetType, data) ->
     numberOfPackets = (Math.floor((data.length - 1) / @packetSize)) + 1
 
     for packetNumber in [0..numberOfPackets - 1]

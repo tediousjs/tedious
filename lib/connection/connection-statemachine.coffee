@@ -15,14 +15,9 @@ connectionStateMachine = (fire, client, config) ->
   # Used in diagram.
   @name = 'Connection - State Machine'
 
+  # All global connection state is mantained in this object.
   state =
     packetSize: DEFAULT_PACKET_SIZE
-
-  #socket = undefined
-  #messageIo = undefined
-  #debug = undefined
-  #connectTimer = undefined
-  #packetSize = DEFAULT_PACKET_SIZE
 
   @startState = 'Connecting'
 
@@ -35,6 +30,7 @@ connectionStateMachine = (fire, client, config) ->
         state.connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
 
         fire.$regEmitter('socket', state.socket, true);
+        fire.$regEmitter('messageIo', state.messageIo, true);
 
         null
 
@@ -52,18 +48,26 @@ connectionStateMachine = (fire, client, config) ->
 
         #'socket.error': '@error'
 
-    SentPrelogin:
+    SentPrelogin: ->
+      responseBuffer = new Buffer(0)
+
       entry: ->
+        # TODO move these 2 lines to the state where connection establishment really finished
         clearConnectTimer()
         client.emit('connection')
 
-        null#'Final'
+        null
 
       actions:
-        '.done': 'SentLogin7WithStandardLogin'
-        '.err': 'Final'
         'connectTimeout': ->
           connectTimeout()
+        'messageIo.packet': (packet) ->
+          responseBuffer = responseBuffer.concat(packet.data())
+          null
+        'messageIo.message': ->
+          preloginPayload = new PreloginPayload(responseBuffer)
+          state.debug.payload(preloginPayload.toString('  '))
+          null
 
     ###
     SentTlsNegotiation:
@@ -147,7 +151,7 @@ connectionStateMachine = (fire, client, config) ->
 
   sendPreLogin = ->
     payload = new PreloginPayload()
-    state.messageIo.sendMessage(TYPE.PRELOGIN, payload)
-    #state.debug.payload(payload.toString('  '))
+    state.messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
+    state.debug.payload(payload.toString('  '))
 
 module.exports = connectionStateMachine
