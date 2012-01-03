@@ -4,6 +4,7 @@ TYPE = require('../packet').TYPE
 PreloginPayload = require('../prelogin-payload')
 Login7Payload = require('../login7-payload')
 MessageIO = require('../message-io')
+TokenStreamParser = require('../token/token-stream-parser').Parser
 
 KEEP_ALIVE_INITIAL_DELAY = 30 * 1000
 DEFAULT_CONNECT_TIMEOUT = 15 * 1000
@@ -16,21 +17,33 @@ connectionStateMachine = (fire, client, config) ->
   @name = 'Connection - State Machine'
 
   # All global connection state is mantained in this object.
-  state =
+  connection =
     packetSize: DEFAULT_PACKET_SIZE
 
   @startState = 'Connecting'
+
+  @defaults =
+    actions:
+      'tokenStream.infoMessage': (token) ->
+        client.emit('infoMessage', token)
+        null
+
+      'tokenStream.errorMessage': (token) ->
+        client.emit('errorMessage', token)
+        null
 
   @states =
     Connecting:
       entry: ->
         defaultConfig()
         createDebug()
+        createTokenStreamParser()
         connect()
-        state.connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout);
+        createConnectTimer()
 
-        fire.$regEmitter('socket', state.socket, true);
-        fire.$regEmitter('messageIo', state.messageIo, true);
+        fire.$regEmitter('socket', connection.socket, true);
+        fire.$regEmitter('messageIo', connection.messageIo, true);
+        fire.$regEmitter('tokenStream', connection.tokenStreamParser, true);
 
         null
 
@@ -45,6 +58,7 @@ connectionStateMachine = (fire, client, config) ->
 
         'connectTimeout': ->
           connectTimeout()
+          'Final'
 
         #'socket.error': '@error'
 
@@ -61,13 +75,18 @@ connectionStateMachine = (fire, client, config) ->
       actions:
         'connectTimeout': ->
           connectTimeout()
+          'Final'
+
         'messageIo.packet': (packet) ->
           responseBuffer = responseBuffer.concat(packet.data())
           null
+
         'messageIo.message': ->
           preloginPayload = new PreloginPayload(responseBuffer)
-          state.debug.payload(preloginPayload.toString('  '))
-          null
+          connection.debug.payload(preloginPayload.toString('  '))
+
+          sendLogin7Packet()
+          'SentLogin7WithStandardLogin'
 
     ###
     SentTlsNegotiation:
@@ -83,15 +102,23 @@ connectionStateMachine = (fire, client, config) ->
       actions:
         'connectTimeout': ->
           connectTimeout()
+          'Final'
+
+        'messageIo.packet': (packet) ->
+          connection.tokenStreamParser.addBuffer(packet.data())
+          null
+
+        'messageIo.message': ->
+          'LoggedIn'
+
+    LoggedIn:
+      entry: ->
+        console.log('logged in')
 
     ###
     SentLogin7WithSpNego:
       entry: ->
         console.log('sent l7 with spnego')
-
-    LoggedIn:
-      entry: ->
-        console.log('logged in')
 
     SentClientRequest:
       entry: ->
@@ -110,8 +137,8 @@ connectionStateMachine = (fire, client, config) ->
       entry: ->
         clearConnectTimer()
 
-        if state.socket
-          state.socket.destroy()
+        if connection.socket
+          connection.socket.destroy()
 
         client.emit('end')
 
@@ -125,33 +152,48 @@ connectionStateMachine = (fire, client, config) ->
     config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
 
   createDebug = ->
-    state.debug = new Debug(config.options.debug)
-    state.debug.on('debug', (message) ->
+    connection.debug = new Debug(config.options.debug)
+    connection.debug.on('debug', (message) ->
       client.emit('debug', message)
     )
 
-  connect = ->
-    state.socket = new Socket({})
-    state.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
-    state.socket.connect(config.options.port, config.server)
+  createTokenStreamParser = ->
+    connection.tokenStreamParser = new TokenStreamParser(connection.debug)
 
-    state.socket.on('error', (error) ->
+  connect = ->
+    connection.socket = new Socket({})
+    connection.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
+    connection.socket.connect(config.options.port, config.server)
+
+    connection.socket.on('error', (error) ->
       # Need this listener, or else the error actions are not fired. Weird.
     )
 
-    state.messageIo = new MessageIO(state.socket, state.packetSize, state.debug)
+    connection.messageIo = new MessageIO(connection.socket, connection.packetSize, connection.debug)
+
+  createConnectTimer = ->
+    connection.connectTimer = setTimeout(fire.$cb('connectTimeout'), config.options.connectTimeout)
 
   connectTimeout = ->
     client.emit('connection', "timeout : failed to connect in #{config.options.connectTimeout}ms")
-    'Final'
 
   clearConnectTimer = ->
-    if state.connectTimer
-      clearTimeout(state.connectTimer)
+    if connection.connectTimer
+      clearTimeout(connection.connectTimer)
 
   sendPreLogin = ->
     payload = new PreloginPayload()
-    state.messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
-    state.debug.payload(payload.toString('  '))
+    connection.messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
+    connection.debug.payload(payload.toString('  '))
+
+  sendLogin7Packet = ->
+    loginData =
+      userName: config.userName
+      password: config.password
+      database: config.options.database
+
+    payload = new Login7Payload(loginData)
+    connection.messageIo.sendMessage(TYPE.LOGIN7, payload.data)
+    connection.debug.payload(payload.toString('  '))
 
 module.exports = connectionStateMachine

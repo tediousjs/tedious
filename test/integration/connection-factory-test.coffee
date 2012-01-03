@@ -1,7 +1,7 @@
 ConnectionFactory = require('../../lib/connection/connection-factory')
 fs = require('fs')
 
-#require('../../lib/tedious').statemachineLogLevel = 5
+#require('../../lib/tedious').statemachineLogLevel = 4
 
 connectionFactory = new ConnectionFactory()
 
@@ -12,10 +12,7 @@ getConfig = ->
     packet: true
     data: true
     payload: true
-    token: true
-
-  config.statemachine =
-    logLevel: 5
+    token: false
 
   config
 
@@ -50,6 +47,10 @@ exports.connect = (test) ->
   connection.on('connection', (err) ->
       test.ok(!err)
       test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
