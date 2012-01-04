@@ -132,11 +132,8 @@ exports.execSimpleSql = (test) ->
 
   request.on('row', (columns) ->
     test.strictEqual(columns.length, 1)
-
     test.strictEqual(columns[0].value, 8)
-
     test.strictEqual(columns[0].isNull, false)
-
     test.strictEqual(columns.byName().C1.value, 8)
   )
 
