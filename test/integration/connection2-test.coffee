@@ -112,7 +112,7 @@ exports.connect = (test) ->
   )
 
 exports.execSimpleSql = (test) ->
-  test.expect(8)
+  test.expect(7)
 
   config = getConfig()
 
@@ -140,8 +140,6 @@ exports.execSimpleSql = (test) ->
   connection = new Connection(config)
 
   connection.on('connection', (err) ->
-    test.ok(!err)
-
     connection.execSql(request)
   )
 
@@ -157,8 +155,42 @@ exports.execSimpleSql = (test) ->
     #console.log(text)
   )
 
+exports.execBadSql = (test) ->
+  test.expect(3)
+
+  config = getConfig()
+
+  request = new Request('bad syntax here', (err) ->
+      test.ok(err)
+
+      connection.close()
+  )
+
+  request.on('done', (rowCount) ->
+      test.ok(!rowCount)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connection', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('errorMessage', (error) ->
+    #console.log("#{info.number} : #{info.message}")
+    test.ok(error)
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.sqlWithMultipleResultSets = (test) ->
-  test.expect(8)
+  test.expect(7)
 
   config = getConfig()
   row = 0
@@ -184,8 +216,6 @@ exports.sqlWithMultipleResultSets = (test) ->
   connection = new Connection(config)
 
   connection.on('connection', (err) ->
-      test.ok(!err)
-
       connection.execSql(request)
   )
 
