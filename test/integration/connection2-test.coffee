@@ -159,3 +159,47 @@ exports.execSimpleSql = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+exports.sqlWithMultipleResultSets = (test) ->
+  test.expect(8)
+
+  config = getConfig()
+  row = 0
+
+  request = new Request('select 1; select 2;', (err) ->
+      test.ok(!err)
+
+      connection.close()
+  )
+
+  request.on('done', (rowCount) ->
+      test.strictEqual(rowCount, 1)
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+      test.strictEqual(columnsMetadata.length, 1)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns[0].value, ++row)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connection', (err) ->
+      test.ok(!err)
+
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
