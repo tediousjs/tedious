@@ -139,9 +139,23 @@ class Connection extends EventEmitter
       else
         throw new Error("Received 'row' when no sqlRequest is in progress")
     )
-    @tokenStreamParser.on('done', (token) =>
+    @tokenStreamParser.on('returnStatus', (token) =>
       if @sqlRequest
-        @sqlRequest.emit('done', token.rowCount)
+        # Keep value for passing in 'doneProc' event.
+        @procReturnStatusValue = token.value
+    )
+    @tokenStreamParser.on('doneProc', (token) =>
+      if @sqlRequest
+        @sqlRequest.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
+        @procReturnStatusValue = undefined
+    )
+    @tokenStreamParser.on('doneInProc', (token) =>
+        if @sqlRequest
+          @sqlRequest.emit('doneInProc', token.rowCount, token.more)
+    )
+    @tokenStreamParser.on('done', (token) =>
+        if @sqlRequest
+          @sqlRequest.emit('done', token.rowCount, token.more)
     )
 
   connect: ->

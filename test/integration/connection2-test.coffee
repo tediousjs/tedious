@@ -111,8 +111,8 @@ exports.connect = (test) ->
     #console.log(text)
   )
 
-exports.execSimpleSql = (test) ->
-  test.expect(7)
+exports.execSql = (test) ->
+  test.expect(8)
 
   config = getConfig()
 
@@ -122,7 +122,8 @@ exports.execSimpleSql = (test) ->
     connection.close()
   )
 
-  request.on('done', (rowCount) ->
+  request.on('done', (rowCount, more) ->
+    test.ok(!more)
     test.strictEqual(rowCount, 1)
   )
 
@@ -156,7 +157,7 @@ exports.execSimpleSql = (test) ->
   )
 
 exports.execBadSql = (test) ->
-  test.expect(3)
+  test.expect(4)
 
   config = getConfig()
 
@@ -166,7 +167,8 @@ exports.execBadSql = (test) ->
       connection.close()
   )
 
-  request.on('done', (rowCount) ->
+  request.on('done', (rowCount, more) ->
+      test.ok(!more)
       test.ok(!rowCount)
   )
 
@@ -181,7 +183,7 @@ exports.execBadSql = (test) ->
   )
 
   connection.on('errorMessage', (error) ->
-    #console.log("#{info.number} : #{info.message}")
+    #console.log("#{error.number} : #{error.message}")
     test.ok(error)
   )
 
@@ -190,7 +192,7 @@ exports.execBadSql = (test) ->
   )
 
 exports.sqlWithMultipleResultSets = (test) ->
-  test.expect(7)
+  test.expect(9)
 
   config = getConfig()
   row = 0
@@ -201,7 +203,12 @@ exports.sqlWithMultipleResultSets = (test) ->
       connection.close()
   )
 
-  request.on('done', (rowCount) ->
+  request.on('done', (rowCount, more) ->
+      switch row
+        when 1
+          test.ok(more)
+        when 2
+          test.ok(!more)
       test.strictEqual(rowCount, 1)
   )
 
@@ -225,6 +232,95 @@ exports.sqlWithMultipleResultSets = (test) ->
 
   connection.on('infoMessage', (info) ->
     #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.execProc = (test) ->
+  test.expect(5)
+
+  config = getConfig()
+
+  request = new Request('exec sp_help int', (err) ->
+      test.ok(!err)
+
+      connection.close()
+  )
+
+  request.on('doneProc', (rowCount, more, returnStatus) ->
+      test.ok(!more)
+      test.strictEqual(returnStatus, 0)
+  )
+
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
+  )
+
+  request.on('row', (columns) ->
+      test.ok(true)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connection', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.execFailedProc = (test) ->
+  test.expect(5)
+
+  config = getConfig()
+
+  request = new Request('exec sp_help bad_object_name', (err) ->
+      test.ok(err)
+
+      connection.close()
+  )
+
+  request.on('doneProc', (rowCount, more, returnStatus) ->
+      test.ok(!more)
+      test.strictEqual(returnStatus, 1)   # Non-zero indicates a failure.
+  )
+
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
+  )
+
+  request.on('row', (columns) ->
+      test.ok(false)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connection', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('errorMessage', (error) ->
+      #console.log("#{error.number} : #{error.message}")
+      test.ok(error)
   )
 
   connection.on('debug', (text) ->
