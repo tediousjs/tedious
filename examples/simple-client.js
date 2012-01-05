@@ -9,7 +9,8 @@ config.options.debug = {
   data: true,
   payload: false,
   token: false,
-  packet: true
+  packet: true,
+  log: true
 }
 
 var connection = new Connection(config);
@@ -44,7 +45,8 @@ function exec(sql) {
 
   request = new Request(sql, statementComplete)
   request.on('columnMetadata', columnMetadata);
-  request.on('row', row);
+    request.on('row', row);
+    request.on('done', requestDone);
 
   connection.execSql(request);
 }
@@ -69,7 +71,7 @@ function infoError(info) {
 }
 
 function debug(message) {
-  console.log(message);
+  //console.log(message);
 }
 
 function columnMetadata(columnsMetadata) {
