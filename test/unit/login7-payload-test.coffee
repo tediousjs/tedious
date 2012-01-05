@@ -3,12 +3,13 @@ Login7Payload = require('../../lib/login7-payload')
 
 exports.create = (test) ->
   loginData =
-    userName: 'user',
-    password: 'pw',
-    appName: 'app',
-    serverName: 'server',
-    language: 'lang',
+    userName: 'user'
+    password: 'pw'
+    appName: 'app'
+    serverName: 'server'
+    language: 'lang'
     database: 'db'
+    packetSize: 1024
 
   #start = new Date().getTime()
   #for c in [1..1000]

@@ -9,206 +9,272 @@ MessageIO = require('./message-io')
 Socket = require('net').Socket
 TokenStreamParser = require('./token/token-stream-parser').Parser
 
-# s3.2.1
-STATE =
-  INITIAL: 0,
-  SENT_PRELOGIN: 1,
-  SENT_LOGIN7: 2,
-  LOGGED_IN: 3,
-  SENT_CLIENT_REQUEST: 4,
-  SENT_ATTENTION: 5,
-  FINAL: 6
+# A rather basic state machine for managing a connection.
+# Implements something approximating s3.2.1.
 
+KEEP_ALIVE_INITIAL_DELAY = 30 * 1000
+DEFAULT_CONNECT_TIMEOUT = 15 * 1000
+DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000
+DEFAULT_CANCEL_TIMEOUT = 5 * 1000
+DEFAULT_PACKET_SIZE = 4 * 1024
+DEFAULT_PORT = 1433
 
 class Connection extends EventEmitter
-  constructor: (@server, @userName, @password, @options, callback) ->
-    @options ||= {}
-    @options.port ||= 1433
-    @options.timeout ||= 10 * 1000
+  STATE:
+    CONNECTING:
+      name: 'Connecting'
+      enter: ->
+        @initialiseConnection()
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
+        socketConnect: ->
+          @sendPreLogin()
+          @transitionTo(@STATE.SENT_PRELOGIN)
 
-    @loggedIn = false
-    @state = STATE.INITIAL
+    SENT_PRELOGIN:
+      name: 'SentPrelogin'
+      enter: ->
+        @emptyMessageBuffer()
+      events:
+        packet: (packet) ->
+          @addToMessageBuffer(packet)
+        message: ->
+          @processPreLoginResponse()
+          @sendLogin7Packet()
+          @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+    SENT_LOGIN7_WITH_STANDARD_LOGIN:
+      name: 'SentLogin7WithStandardLogin'
+      events:
+        packet: (packet) ->
+          @sendPacketToTokenStreamParser(packet)
+        message: ->
+          @processLogin7Response()
+    LOGGED_IN:
+      name: 'LoggedIn'
+    SENT_CLIENT_REQUEST:
+      name: 'SentClientRequest'
+      events:
+        packet: (packet) ->
+          @sendPacketToTokenStreamParser(packet)
+        message: ->
+          @sqlRequest.callback(@sqlRequest.error)
+          @sqlRequest = undefined
+    FINAL:
+      name: 'Final'
+      enter: ->
+        @cleanupConnection()
 
-    @debug = new Debug(@options.debug)
+  constructor: (@config) ->
+    @defaultConfig()
+    @createDebug()
+    @createTokenStreamParser()
+
+    @transitionTo(@STATE.CONNECTING)
+
+  close: ->
+    @transitionTo(@STATE.FINAL)
+
+  initialiseConnection: ->
+    @connect()
+    @createConnectTimer()
+
+  cleanupConnection: ->
+    if !@closed
+      @clearConnectTimer()
+      @closeConnection()
+      @emit('end')
+      @closed = true
+
+  defaultConfig: ->
+    @config.options ||= {}
+    @config.options.port ||= DEFAULT_PORT
+    @config.options.connectTimeout ||= DEFAULT_CONNECT_TIMEOUT
+    @config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
+    @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
+    @config.options.packetSize ||= DEFAULT_PACKET_SIZE
+
+  createDebug: ->
+    @debug = new Debug(@config.options.debug)
     @debug.on('debug', (message) =>
-      if @state != STATE.FINAL
         @emit('debug', message)
     )
 
-    @messagePayloadBuffer = new Buffer(0)
-    @createTokenStreamParser()
-
-    @connection = new Socket({})
-    @connection.setTimeout(options.timeout)
-    @connection.connect(@options.port, @server)
-
-    @connection.addListener('close', @eventClose)
-    @connection.addListener('connect', @eventConnect)
-    @connection.addListener('end', @eventEnd)
-    @connection.addListener('error', @eventError)
-    @connection.addListener('timeout', @eventTimeout)
-
-    @messageIo = new MessageIO(@connection, @debug)
-    @messageIo.on('packet', @eventPacket)
-
-    @startRequest('connect/login', callback)
-
-    @packetBuffer = new Buffer(0)
-
-  execSql: (request) ->
-    @sqlRequest = request
-    @startRequest('execSql', request.callback)
-
-    payload = new SqlBatchPayload(request.sqlText)
-    
-    @state = STATE.SENT_CLIENT_REQUEST
-    @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
-    @debug.payload(payload.toString('  '))
-
-  eventClose: (hadError) =>
-    @emit('closed')
-    @debug.log("connection close, hadError:#{hadError}")
-
-  eventConnect: =>
-    @debug.log('connected')
-    @sendPreLoginPacket()
-
-  eventEnd: =>
-    @debug.log('end')
-
-  eventError: (exception) =>
-    @fatalError(exception)
-    @connection.destroy()
-
-  eventTimeout: =>
-    @emit('timeout')
-    @fatalError('timeout')
-    @connection.destroy()
-
-  eventPacket: (packet) =>
-    switch @state
-      when STATE.SENT_PRELOGIN
-        @buildMessage(packet, @processPreloginResponse)
-      when STATE.SENT_LOGIN7, STATE.SENT_CLIENT_REQUEST
-        @tokenStreamParser.addBuffer(packet.data())
-      else
-        @fatalError("Unexpected packet in state #{@state}: packet type #{packet.type()}")
-
-  # Accumulates packet payloads into a buffer until all of the packets
-  # for a message have been received.
-  #
-  # Only used during some states, when we want to process the complete message.
-  # For other states the payloads are processed for each packet as they arrive.
-  buildMessage: (packet, payloadProcessFunction) ->
-    @messagePayloadBuffer = new Buffer(@messagePayloadBuffer.concat(packet.data()))
-
-    if (packet.isLast())
-      payloadProcessFunction.call(@)
-      @messagePayloadBuffer = new Buffer(0)
-
-  processPreloginResponse: ->
-    preloginPayload = new PreloginPayload(@messagePayloadBuffer)
-    @debug.payload(preloginPayload.toString('  '))
-
-    @sendLogin7Packet()
-
-  # s2.2.2.2
   createTokenStreamParser: ->
     @tokenStreamParser = new TokenStreamParser(@debug)
-
-    @tokenStreamParser.on('loginack', (token) =>
-      @loggedIn = true
-    )
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
     @tokenStreamParser.on('errorMessage', (token) =>
-      @activeRequest.error = token.message
       @emit('errorMessage', token)
+      if @sqlRequest
+        @sqlRequest.error = token.message
+    )
+    @tokenStreamParser.on('databaseChange', (token) =>
+      @emit('databaseChange', token.newValue)
+    )
+    @tokenStreamParser.on('languageChange', (token) =>
+      @emit('languageChange', token.newValue)
+    )
+    @tokenStreamParser.on('charsetChange', (token) =>
+      @emit('charsetChange', token.newValue)
+    )
+    @tokenStreamParser.on('loginack', (token) =>
+      @loggedIn = true
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
       @messageIo.packetSize(token.newValue)
     )
-    @tokenStreamParser.on('databaseChange', (token) =>
-      @_database = token.newValue
-      @emit('databaseChange', @_database)
-    )
-    @tokenStreamParser.on('languageChange', (token) =>
-      @_language = token.newValue
-      @emit('languageChange', @_language)
-    )
-    @tokenStreamParser.on('charsetChange', (token) =>
-      @_charset = token.newValue
-      @emit('charsetChange', @_charset)
-    )
     @tokenStreamParser.on('columnMetadata', (token) =>
-      @sqlRequest.emit('columnMetadata', token.columns)
+      if @sqlRequest
+        @sqlRequest.emit('columnMetadata', token.columns)
+      else
+        throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('row', (token) =>
-      @sqlRequest.emit('row', token.columns)
+      if @sqlRequest
+        @sqlRequest.emit('row', token.columns)
+      else
+        throw new Error("Received 'row' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('returnStatus', (token) =>
-      @procReturnStatusValue = token.value
-    )
-    @tokenStreamParser.on('done', (token) =>
-      state = @state
-
-      if @loggedIn
-        @state = STATE.LOGGED_IN
-
-      if state == STATE.SENT_LOGIN7
-        @activeRequest.callback(@activeRequest.error, @loggedIn)
-      else
-        @activeRequest.callback(@activeRequest.error, token.rowCount)
+      if @sqlRequest
+        # Keep value for passing in 'doneProc' event.
+        @procReturnStatusValue = token.value
     )
     @tokenStreamParser.on('doneProc', (token) =>
-      @state = STATE.LOGGED_IN
-      @activeRequest.callback(@activeRequest.error, @procReturnStatusValue)
-      @procReturnStatusValue = undefined
+      if @sqlRequest
+        @sqlRequest.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
+        @procReturnStatusValue = undefined
+    )
+    @tokenStreamParser.on('doneInProc', (token) =>
+        if @sqlRequest
+          @sqlRequest.emit('doneInProc', token.rowCount, token.more)
+    )
+    @tokenStreamParser.on('done', (token) =>
+        if @sqlRequest
+          @sqlRequest.emit('done', token.rowCount, token.more)
     )
 
-  startRequest: (requestName, callback) =>
-    @activeRequest =
-      requestName: requestName
-      info:
-        infos: []
-        errors: []
-        envChanges: []
-      callback: callback
+  connect: ->
+    @socket = new Socket({})
+    @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
+    @socket.connect(@config.options.port, @config.server)
+    @socket.on('error', @socketError)
+    @socket.on('connect', @socketConnect)
+    @socket.on('close', @socketClose)
+    @socket.on('end', @socketClose)
 
-  sendPreLoginPacket: ->
+    @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
+    @messageIo.on('packet', (packet) =>
+      @dispatchEvent('packet', packet)
+    )
+    @messageIo.on('message', =>
+      @dispatchEvent('message')
+    )
+
+  closeConnection: ->
+    @socket.destroy()
+
+  createConnectTimer: ->
+    @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)
+
+  connectTimeout: =>
+    message = "timeout : failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
+
+    @debug.log(message)
+    @emit('connection', message)
+    @connectTimer = undefined
+    @dispatchEvent('connectTimeout')
+
+  clearConnectTimer: ->
+    if @connectTimer
+      clearTimeout(@connectTimer)
+
+  transitionTo: (newState) ->
+    if @state?.exit
+      @state.exit.apply(@)
+
+    @debug.log("State change: #{@state?.name} -> #{newState.name}")
+    @state = newState
+
+    if @state.enter
+      @state.enter.apply(@)
+
+  dispatchEvent: (eventName, args...) ->
+    if @state.events && @state.events.hasOwnProperty(eventName)
+      eventFunction = @state.events[eventName].apply(@, args)
+    else
+      throw new Error("No event '#{eventName}' in state '#{@state.name}'")
+
+  socketError: (error) =>
+    message = "connection to #{@config.server}:#{@config.options.port} failed"
+
+    @debug.log(message)
+    @emit('connection', message)
+    @dispatchEvent('socketError', error)
+
+  socketConnect: =>
+    @debug.log("connected to #{@config.server}:#{@config.options.port}")
+    @dispatchEvent('socketConnect')
+
+  socketClose: =>
+    @debug.log("connection to #{@config.server}:#{@config.options.port} closed")
+    @transitionTo(@STATE.FINAL)
+
+  sendPreLogin: ->
     payload = new PreloginPayload()
     @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
     @debug.payload(payload.toString('  '))
-    @state = STATE.SENT_PRELOGIN
+
+  emptyMessageBuffer: ->
+    @messageBuffer = new Buffer(0)
+
+  addToMessageBuffer: (packet) ->
+    @messageBuffer = @messageBuffer.concat(packet.data())
+
+  processPreLoginResponse: ->
+    preloginPayload = new PreloginPayload(@messageBuffer)
+    @debug.payload(preloginPayload.toString('  '))
 
   sendLogin7Packet: ->
     loginData =
-      userName: @userName,
-      password: @password,
-      database: @options.database
+      userName: @config.userName
+      password: @config.password
+      database: @config.options.database
+      packetSize: @config.options.packetSize
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
     @debug.payload(payload.toString('  '))
-    @state = STATE.SENT_LOGIN7
 
-  fatalError: (message) ->
-    @debug.log("FATAL ERROR: #{message}")
-    @close()
-    @emit('fatal', message)
+  sendPacketToTokenStreamParser: (packet) ->
+    @tokenStreamParser.addBuffer(packet.data())
 
-  database: ->
-    @_database
+  processLogin7Response: ->
+    if @loggedIn
+      @clearConnectTimer()
+      @transitionTo(@STATE.LOGGED_IN)
+      @emit('connection')
+    else
+      @emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
+      @transitionTo(@STATE.FINAL)
 
-  language: ->
-    @_language
+  execSql: (request) ->
+    if @state != @STATE.LOGGED_IN
+      message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
-  charset: ->
-    @_charset
+      @debug.log(message)
+      request.callback(message)
+    else
+      @sqlRequest = request
 
-  close: ->
-    @connection.end()
-    @state = STATE.FINAL
+      payload = new SqlBatchPayload(request.sqlText)
+      @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+      @debug.payload(payload.toString('  '))
+
+      @transitionTo(@STATE.SENT_CLIENT_REQUEST)
 
 module.exports = Connection

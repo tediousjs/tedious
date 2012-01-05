@@ -14,6 +14,7 @@ class Connection extends EventEmitter
     @emit('packet', packet)
 
 packetType = 2;
+packetSize = 4
 
 exports.sendSmallerThanOnePacket = (test) ->
   payload = new Buffer([1, 2, 3])
@@ -27,8 +28,7 @@ exports.sendSmallerThanOnePacket = (test) ->
     test.done()
   )
 
-  io = new MessageIO(connection, new Debug())
-  io.packetSize(4)
+  io = new MessageIO(connection, packetSize, new Debug())
   io.sendMessage(packetType, payload)
 
 exports.sendExactlyPacket = (test) ->
@@ -43,8 +43,7 @@ exports.sendExactlyPacket = (test) ->
     test.done()
   )
 
-  io = new MessageIO(connection, new Debug())
-  io.packetSize(4)
+  io = new MessageIO(connection, packetSize, new Debug())
   io.sendMessage(packetType, payload)
 
 exports.sendOneLongerThanPacket = (test) ->
@@ -70,20 +69,22 @@ exports.sendOneLongerThanPacket = (test) ->
         test.done()
   )
 
-  io = new MessageIO(connection, new Debug())
-  io.packetSize(4)
+  io = new MessageIO(connection, packetSize, new Debug())
   io.sendMessage(packetType, payload)
 
 exports.receiveOnePacket = (test) ->
+  test.expect(2)
+
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
-  io = new MessageIO(connection, new Debug())
+  io = new MessageIO(connection, packetSize, new Debug())
   io.on('packet', (packet) ->
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
-
-    test.done()
+      test.strictEqual(packet.type(), packetType)
+      test.ok(packet.data().equals(payload))
+  )
+  io.on('message', ->
+      test.done()
   )
 
   packet = new Packet(packetType)
@@ -92,15 +93,18 @@ exports.receiveOnePacket = (test) ->
   connection.emit('data', packet.buffer)
 
 exports.receiveOnePacketInTwoChunks = (test) ->
+  test.expect(2)
+
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
-  io = new MessageIO(connection, new Debug())
+  io = new MessageIO(connection, packetSize, new Debug())
   io.on('packet', (packet) ->
     test.strictEqual(packet.type(), packetType)
     test.ok(packet.data().equals(payload))
-
-    test.done()
+  )
+  io.on('message', ->
+      test.done()
   )
 
   packet = new Packet(packetType)
@@ -110,6 +114,8 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   connection.emit('data', packet.buffer.slice(4))
 
 exports.receiveTwoPackets = (test) ->
+  test.expect(4)
+
   payload = new Buffer([1, 2, 3])
   payload1 = payload.slice(0, 2)
   payload2 = payload.slice(2, 3)
@@ -117,7 +123,7 @@ exports.receiveTwoPackets = (test) ->
   connection = new Connection()
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, new Debug())
+  io = new MessageIO(connection, packetSize, new Debug())
   io.on('packet', (packet) ->
     receivedPacketCount++
 
@@ -128,7 +134,9 @@ exports.receiveTwoPackets = (test) ->
         test.ok(packet.data().equals(payload1))
       when 2
         test.ok(packet.data().equals(payload2))
-        test.done()
+  )
+  io.on('message', ->
+      test.done()
   )
 
   packet = new Packet(packetType)
@@ -141,6 +149,8 @@ exports.receiveTwoPackets = (test) ->
   connection.emit('data', packet.buffer)
 
 exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
+  test.expect(4)
+
   payload = new Buffer([1, 2, 3, 4])
   payload1 = payload.slice(0, 2)
   payload2 = payload.slice(2, 4)
@@ -148,7 +158,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   connection = new Connection()
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, new Debug())
+  io = new MessageIO(connection, packetSize, new Debug())
   io.on('packet', (packet) ->
     receivedPacketCount++
 
@@ -159,7 +169,9 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
         test.ok(packet.data().equals(payload1))
       when 2
         test.ok(packet.data().equals(payload2))
-        test.done()
+  )
+  io.on('message', ->
+      test.done()
   )
 
   packet1 = new Packet(packetType)
@@ -174,6 +186,8 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   connection.emit('data', packet2.buffer.slice(4))
 
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
+  test.expect(6)
+
   payload = new Buffer([1, 2, 3, 4, 5, 6])
   payload1 = payload.slice(0, 2)
   payload2 = payload.slice(2, 4)
@@ -182,7 +196,7 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   connection = new Connection()
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, new Debug())
+  io = new MessageIO(connection, packetSize, new Debug())
   io.on('packet', (packet) ->
     receivedPacketCount++
 
@@ -195,7 +209,9 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
         test.ok(packet.data().equals(payload2))
       when 3
         test.ok(packet.data().equals(payload3))
-        test.done()
+  )
+  io.on('message', ->
+      test.done()
   )
 
   packet1 = new Packet(packetType)
