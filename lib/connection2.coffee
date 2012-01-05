@@ -164,6 +164,8 @@ class Connection extends EventEmitter
     @socket.connect(@config.options.port, @config.server)
     @socket.on('error', @socketError)
     @socket.on('connect', @socketConnect)
+    @socket.on('close', @socketClose)
+    @socket.on('end', @socketClose)
 
     @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
     @messageIo.on('packet', (packet) =>
@@ -217,6 +219,10 @@ class Connection extends EventEmitter
   socketConnect: =>
     @debug.log("connected to #{@config.server}:#{@config.options.port}")
     @dispatchEvent('socketConnect')
+
+  socketClose: =>
+    @debug.log("connection to #{@config.server}:#{@config.options.port} closed")
+    @transitionTo(@STATE.FINAL)
 
   sendPreLogin: ->
     payload = new PreloginPayload()
