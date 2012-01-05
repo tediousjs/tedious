@@ -62,6 +62,7 @@ class Connection extends EventEmitter
         message: ->
           @sqlRequest.callback(@sqlRequest.error)
           @sqlRequest = undefined
+          @transitionTo(@STATE.LOGGED_IN)
     FINAL:
       name: 'Final'
       enter: ->
