@@ -156,7 +156,7 @@ execSql = (test, sql, expectedValue) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     connection.execSql(request)
   )
 

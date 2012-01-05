@@ -185,7 +185,7 @@ class Connection extends EventEmitter
     message = "timeout : failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
 
     @debug.log(message)
-    @emit('connection', message)
+    @emit('connect', message)
     @connectTimer = undefined
     @dispatchEvent('connectTimeout')
 
@@ -213,7 +213,7 @@ class Connection extends EventEmitter
     message = "connection to #{@config.server}:#{@config.options.port} failed"
 
     @debug.log(message)
-    @emit('connection', message)
+    @emit('connect', message)
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
@@ -257,9 +257,9 @@ class Connection extends EventEmitter
     if @loggedIn
       @clearConnectTimer()
       @transitionTo(@STATE.LOGGED_IN)
-      @emit('connection')
+      @emit('connect')
     else
-      @emit('connection', 'Login failed; one or more errorMessage events should have been emitted')
+      @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
       @transitionTo(@STATE.FINAL)
 
   execSql: (request) ->

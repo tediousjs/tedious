@@ -20,7 +20,7 @@ var config = {
 
 var connection = new Connection(config);
 
-connection.on('connection', function(err) {
+connection.on('connect', function(err) {
     // If no error, then good to go...
     executeStatement();
   }

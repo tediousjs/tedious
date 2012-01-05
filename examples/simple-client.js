@@ -14,7 +14,7 @@ config.options.debug = {
 
 var connection = new Connection(config);
 
-connection.on('connection', connected);
+connection.on('connect', connected);
 connection.on('infoMessage', infoError);
 connection.on('errorMessage', infoError);
 connection.on('end', end);

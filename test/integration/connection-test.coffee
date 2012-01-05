@@ -20,7 +20,7 @@ exports.badServer = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     test.ok(err)
   )
 
@@ -39,7 +39,7 @@ exports.badPort = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     test.ok(err)
   )
 
@@ -59,7 +59,7 @@ exports.badCredentials = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     test.ok(err)
 
     connection.close()
@@ -89,7 +89,7 @@ exports.connect = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     test.ok(!err)
 
     connection.close()
@@ -140,7 +140,7 @@ exports.execSql = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
     connection.execSql(request)
   )
 
@@ -174,7 +174,7 @@ exports.execBadSql = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
       connection.execSql(request)
   )
 
@@ -222,7 +222,7 @@ exports.sqlWithMultipleResultSets = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
       connection.execSql(request)
   )
 
@@ -264,7 +264,7 @@ exports.execProc = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
       connection.execSql(request)
   )
 
@@ -306,7 +306,7 @@ exports.execFailedProc = (test) ->
 
   connection = new Connection(config)
 
-  connection.on('connection', (err) ->
+  connection.on('connect', (err) ->
       connection.execSql(request)
   )
 
