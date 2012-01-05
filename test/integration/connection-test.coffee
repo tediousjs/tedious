@@ -1,4 +1,4 @@
-Connection = require('../../lib/connection2')
+Connection = require('../../lib/connection')
 Request = require('../../lib/request')
 fs = require('fs')
 
