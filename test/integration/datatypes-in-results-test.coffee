@@ -1,12 +1,14 @@
-Connection = require('../../lib/connection')
+Connection = require('../../lib/connection2')
 Request = require('../../lib/request')
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
 config.options.debug =
+  packet: true
   data: true
   payload: true
-  token: true
+  token: false
+  log: true
 
 exports.null = (test) ->
   execSql(test, 'select null', null)
@@ -121,11 +123,12 @@ exports.ncharNull = (test) ->
 
 
 execSql = (test, sql, expectedValue) ->
-  test.expect(3)
+  test.expect(2)
 
-  request = new Request(sql, (err, rowCount) ->
+  request = new Request(sql, (err) ->
     test.ok(!err)
-    test.done()
+
+    connection.close()
   )
 
   request.on('row', (columns) ->
@@ -139,14 +142,18 @@ execSql = (test, sql, expectedValue) ->
       test.strictEqual(columns[0].value, expectedValue)
   )
 
-  connection = new Connection(config.server, config.userName, config.password, config.options, (err, loggedIn) ->
-    test.ok(!err)
+  connection = new Connection(config)
 
+  connection.on('connection', (err) ->
     connection.execSql(request)
   )
 
-  connection.on('error', (message) ->
-    console.log(message)
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('errorMessage', (error) ->
+    #console.log("#{error.number} : #{error.message}")
   )
 
   connection.on('debug', (message) ->
