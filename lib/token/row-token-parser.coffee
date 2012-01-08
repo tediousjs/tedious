@@ -15,7 +15,6 @@ parser = (buffer, columnsMetaData) ->
   for columnMetaData in columnsMetaData
     #console.log sprintf('Token @ 0x%02X', buffer.position)
 
-    isNull = false
     value = undefined
     dataLength = undefined
 
@@ -44,7 +43,7 @@ parser = (buffer, columnsMetaData) ->
 
     switch type.name
       when 'Null'
-        isNull = true
+        value = null
       when 'TinyInt'
         value = buffer.readUInt8()
       when 'Int'
@@ -56,7 +55,7 @@ parser = (buffer, columnsMetaData) ->
       when 'IntN'
         switch dataLength
           when 0
-            isNull = true
+            value = null
           when 1
             value = buffer.readInt8()
           when 2
@@ -74,7 +73,7 @@ parser = (buffer, columnsMetaData) ->
       when 'FloatN'
         switch dataLength
           when 0
-            isNull = true
+            value = null
           when 4
             value = buffer.readFloatLE()
           when 8
@@ -86,7 +85,7 @@ parser = (buffer, columnsMetaData) ->
       when 'BitN'
         switch dataLength
           when 0
-            isNull = true
+            value = null
           when 1
             value = !!buffer.readUInt8()
       when 'VarChar', 'Char', 'NVarChar', 'NChar'
@@ -97,14 +96,14 @@ parser = (buffer, columnsMetaData) ->
             encoding = 'ucs2'
 
         if columnMetaData.dataLength == MAX
-          {value: value, isNull: isNull} = readMaxChars(buffer, encoding)
+          value = readMaxChars(buffer, encoding)
         else
-          {value: value, isNull: isNull} = readChars(buffer, dataLength, encoding)
+          value = readChars(buffer, dataLength, encoding)
       when 'VarBinary', 'Binary'
         if columnMetaData.dataLength == MAX
-          {value: value, isNull: isNull} = readMaxBinary(buffer)
+          value = readMaxBinary(buffer)
         else
-          {value: value, isNull: isNull} = readBinary(buffer, dataLength)
+          value = readBinary(buffer, dataLength)
       when 'SmallDateTime'
         value = readSmallDateTime(buffer)
       when 'DateTime'
@@ -112,14 +111,14 @@ parser = (buffer, columnsMetaData) ->
       when 'DateTimeN'
         switch dataLength
           when 0
-            isNull = true
+            value = null
           when 4
             value = readSmallDateTime(buffer)
           when 8
             value = readDateTime(buffer)
       when 'NumericN', 'DecimalN'
         if dataLength == 0
-          isNull = true
+          value = null
         else
           sign = if buffer.readUInt8() == 1 then 1 else -1
 
@@ -144,7 +143,6 @@ parser = (buffer, columnsMetaData) ->
 
     columns.push(
       value: value
-      isNull: isNull,
       metadata: columnMetaData
     )
 
@@ -163,19 +161,15 @@ parser = (buffer, columnsMetaData) ->
 
 readBinary = (buffer, dataLength) ->
   if dataLength == NULL
-      value: undefined
-      isNull: true
+    null
   else
-    value: buffer.readArray(dataLength)
-    isNull: false
+    buffer.readArray(dataLength)
 
 readChars = (buffer, dataLength, encoding) ->
   if dataLength == NULL
-      value: undefined
-      isNull: true
+    null
   else
-    value: buffer.readString(dataLength, encoding)
-    isNull: false
+    buffer.readString(dataLength, encoding)
 
 readMaxBinary = (buffer) ->
   readMax(buffer, (valueBuffer) ->
@@ -190,8 +184,7 @@ readMaxChars = (buffer, encoding) ->
 readMax = (buffer, decodeFunction) ->
   type = buffer.readBuffer(8)
   if (type.equals(PLP_NULL))
-      value: undefined
-      isNull: true
+    null
   else
     if (type.equals(UNKNOWN_PLP_LEN))
       expectedLength = undefined
@@ -221,8 +214,7 @@ readMax = (buffer, decodeFunction) ->
       chunk.copy(valueBuffer, position, 0)
       position += chunk.length
 
-    value: decodeFunction(valueBuffer)
-    isNull: false
+    decodeFunction(valueBuffer)
 
 readSmallDateTime = (buffer) ->
   days = buffer.readUInt16LE()

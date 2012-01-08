@@ -38,7 +38,7 @@ function executeStatement() {
 
   request.on('row', function(columns) {
     columns.forEach(function(column) {
-      if (column.isNull) {
+      if (column.value === null) {
         console.log('NULL');
       } else {
         console.log(column.value);

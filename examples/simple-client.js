@@ -84,7 +84,7 @@ function row(columns) {
   var values = '';
   
   columns.forEach(function(column) {
-    if (column.isNull) {
+    if (column.value === null) {
       value = 'NULL';
     } else {
       value = column.value;

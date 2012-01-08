@@ -144,9 +144,7 @@ execSql = (test, sql, expectedValue) ->
   )
 
   request.on('row', (columns) ->
-    if expectedValue == null
-      test.ok(columns[0].isNull)
-    else if expectedValue instanceof Date
+    if expectedValue instanceof Date
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
     else if expectedValue instanceof Array
       test.deepEqual(columns[0].value, expectedValue)

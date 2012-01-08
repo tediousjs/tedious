@@ -12,8 +12,7 @@ module.exports.null = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(token.columns[0].isNull)
-  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].value, null)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
   test.done()
@@ -29,7 +28,6 @@ module.exports.int = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -63,7 +61,6 @@ module.exports.real = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -80,7 +77,6 @@ module.exports.float = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -98,7 +94,6 @@ module.exports.varChar = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -117,7 +112,6 @@ module.exports.nVarChar = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -136,7 +130,6 @@ module.exports.varBinary = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.deepEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -155,7 +148,6 @@ module.exports.binary = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.deepEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -175,8 +167,7 @@ module.exports.varCharMaxNull = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(token.columns[0].isNull)
-  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].value, null)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
   test.done()
@@ -201,7 +192,6 @@ module.exports.varCharMaxUnknownLength = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -227,7 +217,6 @@ module.exports.varCharMaxKnownLength = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -269,8 +258,7 @@ module.exports.varBinaryMaxNull = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(token.columns[0].isNull)
-  test.ok(!token.columns[0].value)
+  test.strictEqual(token.columns[0].value, null)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
   test.done()
@@ -295,7 +283,6 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.deepEqual(token.columns[0].value, value)
   test.strictEqual(token.columns[0].metadata, colMetaData[0])
 
@@ -337,8 +324,7 @@ module.exports.intN = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 12)
-  test.ok(!token.columns[0].value)
-  test.ok(token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, null)
   test.strictEqual("0", token.columns[1].value)
   test.strictEqual("1", token.columns[2].value)
   test.strictEqual("-1", token.columns[3].value)
@@ -372,8 +358,7 @@ module.exports.floatN = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 3)
-  test.ok(!token.columns[0].value)
-  test.ok(token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, null)
   test.strictEqual(9.5, token.columns[1].value)
   test.strictEqual(9.5, token.columns[2].value)
 
@@ -395,7 +380,6 @@ module.exports.datetime = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
 
   test.done()
@@ -412,8 +396,7 @@ module.exports.datetimeN = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].value)
-  test.ok(token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, null)
 
   test.done()
 
@@ -437,7 +420,6 @@ module.exports.numeric4Bytes = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
 
   test.done()
@@ -462,7 +444,6 @@ module.exports.numeric4BytesNegative = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
 
   test.done()
@@ -488,7 +469,6 @@ module.exports.numeric8Bytes = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
 
   test.done()
@@ -515,7 +495,6 @@ module.exports.numeric12Bytes = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
 
   test.done()
@@ -543,7 +522,6 @@ module.exports.numeric16Bytes = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].isNull)
   test.strictEqual(token.columns[0].value, value)
 
   test.done()
@@ -564,7 +542,6 @@ module.exports.numericNull = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.ok(!token.columns[0].value)
-  test.ok(token.columns[0].isNull)
+  test.strictEqual(token.columns[0].value, null)
 
   test.done()
