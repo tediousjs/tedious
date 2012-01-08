@@ -15,16 +15,20 @@ title: Getting started
 
 {% highlight javascript %}
   var Connection = require('tedious').Connection;
-  var Request = require('tedious').Request;
 
-  var options = {};
-  
-  var connection = new Connection('192.168.1.210', 'test', 'test', options,
-    function(err, loggedIn) {
-      // If no error, then good to go...
+  var config = {
+    userName: 'test',
+    password: 'test',
+    server: '192.168.1.210',
+  };
+
+  var connection = new Connection(config);
+
+  connection.on('connect', function(err) {
+    // If no error, then good to go...
       executeStatement();
     }
-  )
+  );
 {% endhighlight %}
 
 <p>
@@ -39,8 +43,8 @@ title: Getting started
 </p>
 
 <p>
-  The callback is called when either the connection has been established
-  and authentication has succeeded, or an error occured during connection or authentication.
+  The connect event is emitted when either the connection has been established
+  and authentication has succeeded, or an error occurred during connection or authentication.
 </p>
 
 <p>
@@ -48,21 +52,23 @@ title: Getting started
 </p>
 
 {% highlight javascript %}
+  var Request = require('tedious').Request;
+
   function executeStatement() {
-    request = new Request("select 42, 'hello world'", function(err, rowCount) {
-      console.log(rowCount + ' rows returned');
+    request = new Request("select 42, 'hello world'", function(err) {
+      console.log(err);
     });
 
     request.on('row', function(columns) {
       columns.forEach(function(column) {
-        if (column.isNull) {
-          console.log('NULL');
-        } else {
-          console.log(column.value);
-        }
+        console.log(column.value);
       });
     });
-  
+
+    request.on('done', function(rowCount, more) {
+      console.log(rowCount + ' rows returned');
+    });
+
     connection.execSql(request);
   }
 {% endhighlight %}
@@ -75,13 +81,17 @@ title: Getting started
   instance.
   The arguments to <code>Request</code>'s constructor are
   the SQL statement, and a callback function. 
-  The callback is called when the request has completed (either successfully, or with errors).
+  The callback is called if an error occurs.
 </p>
 
 <p>
-  A <code>row</code> event is emmitted for each row returned as a result of executing the statement.
+  A <code>row</code> event is emitted for each row returned as a result of executing the statement.
   An array of columns is the sole parameter to the callback.
   For each column, a value and metadata is provided (although only the value is used in this example).
+</p>
+
+<p>
+  A <code>done</code> event is emitted when the statement in the request is completed.
 </p>
 
 <p>
