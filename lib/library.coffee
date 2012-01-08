@@ -1,2 +1,2 @@
 exports.name = 'Tedious'
-exports.version = '0.0.1'
+exports.version = '0.0.2'
