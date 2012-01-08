@@ -24,3 +24,43 @@ title: ChangeLog
     Many simple data types are supported.
   </li>
 </ul>
+
+<h3>v0.0.2</h3>
+<ul>
+  <li>
+    Changed the API quite a bit, and documented it.
+  </li>
+  <li>
+    Removed dependency on buffer-tools package.
+    This was the only package with C++, so it should be easier to use tedious
+    on Windows now.
+  </li>
+  <li>
+    Added main property to package.json.
+  </li>
+  <li>
+    Added <code>ReadableTrackingBuffer</code> and <code>WritableTrackingBuffer</code>,
+    making a lot of Buffer building and parsing code a lot simpler.
+  </li>
+  <li>
+    Added support for more data types in result sets (Ciaran Jessup):
+    <code>bigint</code>,
+    <code>binary</code>,
+    <code>varbinary</code>,
+    <code>varbinary(max)</code>,
+    <code>varchar(max)</code>,
+    <code>nvarchar(max)</code>,
+    <code>real</code>,
+    <code>float</code>.
+  </li>
+  <li>
+    Simplified error handling for unrecoverable errors.
+  </li>
+  <li>
+    Use a statemachine for connection state
+    (making it much easier to implement the states documented in the TDS specification).
+  </li>
+  <li>
+    Make packet size configurable.
+  </li>
+</ul>
