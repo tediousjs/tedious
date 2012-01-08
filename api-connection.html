@@ -6,5 +6,212 @@ title: API - Connection
 <h2>Connection</h2>
 
 <p>
-  docs coming soon
+  A <code>Connection</code> instance represents a single connection to a database server.
+</p>
+
+<h3>Create</h3>
+{% highlight javascript %}
+var Connection = require('tedious').Connection;
+var config = {...};
+var connection = new Connection(config);
+{% endhighlight %}
+
+<h3>Config</h3>
+<dl>
+  <dt>
+    <code>userName</code>
+  </dt>
+  <dd>
+    User name to use for authentication.
+  </dd>
+
+  <dt>
+    <code>password</code>
+  </dt>
+  <dd>
+    Password to use for authentication.
+  </dd>
+
+  <dt>
+    <code>server</code>
+  </dt>
+  <dd>
+    Hostname to connect to.
+  </dd>
+
+  <dt>
+    <code>options.port</code>
+  </dt>
+  <dd>
+    Port to connect to (default: <code>1433</code>).
+  </dd>
+
+  <dt>
+    <code>options.connectTimeout</code>
+  </dt>
+  <dd>
+    The number of milliseconds before the attempt to connect is considered failed
+    (default: <code>15000</code>).
+  </dd>
+
+  <dt>
+    <code>options.requestTimeout</code>
+  </dt>
+  <dd>
+    The number of milliseconds before a request is considered failed
+    (default: <code>15000</code>).
+  </dd>
+
+  <dt>
+    <code>options.cancelTimeout</code>
+  </dt>
+  <dd>
+    The number of milliseconds before the cancel (abort) of a request is considered failed
+    (default: <code>5000</code>).
+  </dd>
+
+  <dt>
+    <code>options.packetSize</code>
+  </dt>
+  <dd>
+    The size of TDS packets (subject to negotiation with the server).
+    Should be a power of 2.
+    (default: <code>4096</code>).
+  </dd>
+
+  <dt>
+    <code>options.debug.packet</code>
+  </dt>
+  <dd>
+    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet details
+    (default: <code>false</code>).
+  </dd>
+
+  <dt>
+    <code>options.debug.data</code>
+  </dt>
+  <dd>
+    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet data details
+    (default: <code>false</code>).
+  </dd>
+
+  <dt>
+    <code>options.debug.payload</code>
+  </dt>
+  <dd>
+    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet payload details
+    (default: <code>false</code>).
+  </dd>
+
+  <dt>
+    <code>options.debug.token</code>
+  </dt>
+  <dd>
+    A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream tokens
+    (default: <code>false</code>).
+  </dd>
+</dl>
+
+<h3>Event: connect</h3>
+<code>function (err) { }</code>
+<p>
+  The attempt to connect and validate has completed.
+</p>
+<p>
+  If successful, <code>err</code> will be falsey.
+</p>
+<p>
+  If there was a problem (with either connecting or validation), <code>err</code> will be a string
+  with details of the error.
+</p>
+
+<h3>Event: end</h3>
+<code>function () { }</code>
+<p>
+  The connection has ended.
+  This may be as a result of the client calling <code>close()</code>, the server closing the connection, or a network error.
+</p>
+
+<h3>Event: debug</h3>
+<code>function (messageText) { }</code>
+<p>
+  A debug message is available.
+  It may be logged or ignored.
+</p>
+<p>
+  Connection options control what types of debug messages are emitted.
+</p>
+
+<h3>Event: infoMessage</h3>
+<code>function (info) { }</code>
+<p>
+  The server has issued an information message.
+</p>
+
+<p>
+  The <code>info</code> argument is an object with these properties:
+</p>
+<dl>
+  <dt><code>number</code></dt>
+  <dd>Error number</dd>
+</dl>
+<dl>
+  <dt><code>state</code></dt>
+  <dd>The error state, used as a modifier to the error number.</dd>
+</dl>
+<dl>
+  <dt><code>class</code></dt>
+  <dd>The class (severity) of the error. A class of less than 10 indicates an informational message.</dd>
+</dl>
+<dl>
+  <dt><code>message</code></dt>
+  <dd>The message text.</dd>
+</dl>
+<dl>
+  <dt><code>procName</code></dt>
+  <dd>The stored procedure name (if a stored procedure generated the message).</dd>
+</dl>
+<dl>
+  <dt><code>lineNumber</code></dt>
+  <dd>
+    The line number in the SQL batch or stored procedure that caused the error.
+    Line numbers begin at 1; therefore, if the line number is not applicable to the message,
+    the value of LineNumber will be 0.
+  </dd>
+</dl>
+
+<h3>Event: errorMessage</h3>
+<code>function (error) { }</code>
+<p>
+  The server has issued an error message.
+</p>
+
+<p>
+  The <code>error</code> argument is an object with the same properties as.listed for the
+  <code>infoMessage</code> event.
+</p>
+
+<h3>Event: databaseChange</h3>
+<code>function (databaseName) { }</code>
+<p>
+  The active database has changed to <code>databaseName</code>.
+  This may be as a result of a sucessful login, or a <code>use</code> statement.
+</p>
+
+<h3>Event: languageChange</h3>
+<code>function (languageName) { }</code>
+<p>
+  The language has changed to <code>languageName</code>.
+</p>
+
+<h3>Event: charsetChange</h3>
+<code>function (charset) { }</code>
+<p>
+  The character set has changed to <code>charset</code>.
+</p>
+
+<h3>connection.execSql(request)</h3>
+<p>
+  Execute the SQL batch represented by <code>request</code>.
+  See <a href="api-request.html"><code>Request</code></a>.
 </p>
