@@ -141,18 +141,11 @@ parser = (buffer, columnsMetaData) ->
         throw new Error(sprintf('Unrecognised column type %s at offset 0x%04X', type.name, buffer.position))
         break
 
-    columns.push(
+    column =
       value: value
       metadata: columnMetaData
-    )
-
-  columns.byName = ->
-    byName = {}
-
-    for column in columns
-      byName[column.metadata.colName] = column
-
-    byName
+    columns.push(column)
+    columns[columnMetaData.colName] = column
 
   # Return token
   name: 'ROW'
