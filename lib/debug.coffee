@@ -24,9 +24,9 @@ class Debug extends EventEmitter
     if @haveListeners() && @options.data
       @log(packet.dataToString(@indent))
 
-  payload: (payload) ->
+  payload: (generatePayloadText) ->
     if @haveListeners() && @options.payload
-      @log(payload)
+      @log(generatePayloadText())
 
   token: (token) ->
     if @haveListeners() && @options.token

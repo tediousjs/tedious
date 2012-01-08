@@ -35,7 +35,9 @@ exports.payloadEnabled = (test) ->
     test.done()
   )
 
-  debug.payload(payload)
+  debug.payload(->
+    payload
+  )
 
 exports.payloadNotEnabled = (test) ->
   debug = new Debug()

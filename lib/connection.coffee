@@ -235,7 +235,9 @@ class Connection extends EventEmitter
   sendPreLogin: ->
     payload = new PreloginPayload()
     @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
-    @debug.payload(payload.toString('  '))
+    @debug.payload(->
+      payload.toString('  ')
+    )
 
   emptyMessageBuffer: ->
     @messageBuffer = new Buffer(0)
@@ -245,7 +247,9 @@ class Connection extends EventEmitter
 
   processPreLoginResponse: ->
     preloginPayload = new PreloginPayload(@messageBuffer)
-    @debug.payload(preloginPayload.toString('  '))
+    @debug.payload(->
+      preloginPayload.toString('  ')
+    )
 
   sendLogin7Packet: ->
     loginData =
@@ -256,7 +260,9 @@ class Connection extends EventEmitter
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
-    @debug.payload(payload.toString('  '))
+    @debug.payload(->
+      payload.toString('  ')
+    )
 
   sendPacketToTokenStreamParser: (packet) ->
     @tokenStreamParser.addBuffer(packet.data())
@@ -281,7 +287,9 @@ class Connection extends EventEmitter
 
       payload = new SqlBatchPayload(request.sqlText)
       @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
-      @debug.payload(payload.toString('  '))
+      @debug.payload(->
+        payload.toString('  ')
+      )
 
       @transitionTo(@STATE.SENT_CLIENT_REQUEST)
 
