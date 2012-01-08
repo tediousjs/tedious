@@ -6,5 +6,146 @@ title: API - Request
 <h2>Request</h2>
 
 <p>
-  docs coming soon
+  A <code>Request</code> instance represents a request that can be executed on a connection.
+</p>
+
+<h3>new Request(sql, callback)</h3>
+{% highlight javascript %}
+var Request = require('tedious').Request;
+
+request = new Request("select 42, 'hello world'", myErrorFunction);
+connection.execSql(request);
+{% endhighlight %}
+
+<h4><code>sql</code></h4>
+<p>
+  The SQL to be executed.
+</p>
+
+<h4><code>callback(error)</code></h4>
+<p>
+  If an error occurs during execution of the statement(s), then the callback will be called.
+</p>
+
+<h3>Event: columnMetadata</h3>
+<code>function (columns) { }</code>
+<p>
+  This event, describing result set columns, will be emitted before <code>row</code> events are emitted.
+</p>
+<h4><code>columns</code></h4>
+<p>
+  An array like object, where the columns can be accessed either by index or name.
+  Each columns has these properties.
+</p>
+<dl>
+  <dt>
+    <code>colName</code>
+  </dt>
+  <dd>
+    The column's name.
+  </dd>
+
+  <dt>
+    <code>type.name</code>
+  </dt>
+  <dd>
+    The column's type, such as VarChar, Int or Binary.
+  </dd>
+
+  <dt>
+    <code>precision</code>
+  </dt>
+  <dd>
+    The precision. Only applicable to types such as numeric and decimal.
+  </dd>
+
+  <dt>
+    <code>scale</code>
+  </dt>
+  <dd>
+    The scale. Only applicable to types such as numeric and decimal.
+  </dd>
+
+  <dt>
+    <code>dataLength</code>
+  </dt>
+  <dd>
+    The length, for types such as char, varchar, narchar and nvarchar.
+  </dd>
+</dl>
+
+<h3>Event: row</h3>
+<code>function (columns) { }</code>
+<p>
+  A row resulting from execution of the SQL.
+</p>
+<h4><code>columns</code></h4>
+<p>
+  An array like object, where the columns can be accessed either by index or name.
+  Each column has two properties, <code>metadata</code> and <code>value</code>.
+</p>
+<dl>
+  <dt>
+    <code>metadata</code>
+  </dt>
+  <dd>
+    The same data that is exposed in the <code>columnMetadata</code> event.
+  </dd>
+
+  <dt>
+    <code>value</code>
+  </dt>
+  <dd>
+    The column's value.
+    It will be <code>null</code> for a <code>NULL</code>.
+  </dd>
+</dl>
+
+<h3>Event: done</h3>
+<code>function (rowCount, more) { }</code>
+<p>
+  All rows from a result set have been provided (through <code>row</code> events).
+</p>
+<h4><code>rowCount</code></h4>
+<p>
+  The number of result rows.
+</p>
+<h4><code>more</code></h4>
+<p>
+  If there a more results to come (probably because multiple statements are being executed),
+  then <code>true</code>.
+</p>
+
+<h3>Event: doneInProc</h3>
+<code>function (rowCount, more) { }</code>
+<p>
+  All rows from a statement in a stored procedure have been provided (through <code>row</code> events).
+</p>
+<h4><code>rowCount</code></h4>
+<p>
+  The number of result rows.
+</p>
+<h4><code>more</code></h4>
+<p>
+  If there a more result sets to come,
+  then <code>true</code>.
+</p>
+
+<h3>Event: doneProc</h3>
+<code>function (rowCount, more, returnStatus) { }</code>
+</p>
+  A stored procedure has been completed.
+</p>
+<h4><code>rowCount</code></h4>
+<p>
+  The number of result rows.
+</p>
+<h4><code>more</code></h4>
+<p>
+  If there a more result sets to come,
+  then <code>true</code>.
+</p>
+<h4><code>returnStatus</code></h4>
+<p>
+  The value returned from a stored procedure.
 </p>

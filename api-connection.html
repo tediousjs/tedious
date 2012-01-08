@@ -9,14 +9,14 @@ title: API - Connection
   A <code>Connection</code> instance represents a single connection to a database server.
 </p>
 
-<h3>Create</h3>
+<h3>new Coonection(config)</h3>
 {% highlight javascript %}
 var Connection = require('tedious').Connection;
 var config = {...};
 var connection = new Connection(config);
 {% endhighlight %}
 
-<h3>Config</h3>
+<h4><code>config</code></h4>
 <dl>
   <dt>
     <code>userName</code>
