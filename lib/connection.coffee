@@ -39,6 +39,8 @@ class Connection extends EventEmitter
       enter: ->
         @emptyMessageBuffer()
       events:
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
         packet: (packet) ->
           @addToMessageBuffer(packet)
         message: ->
@@ -48,6 +50,8 @@ class Connection extends EventEmitter
     SENT_LOGIN7_WITH_STANDARD_LOGIN:
       name: 'SentLogin7WithStandardLogin'
       events:
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
         message: ->
@@ -67,6 +71,9 @@ class Connection extends EventEmitter
       name: 'Final'
       enter: ->
         @cleanupConnection()
+      events:
+        connectTimeout: ->
+          # Do nothing, as the timer should be cleaned up.
 
   constructor: (@config) ->
     @defaultConfig()
