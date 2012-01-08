@@ -26,6 +26,10 @@ Documentation
 -------------
 More documentation is available at [pekim.github.com/tedious/](http://pekim.github.com/tedious/)
 
+Discussion
+----------
+Google Group - http://groups.google.com/group/node-tedious
+
 Licence
 -------
 (The MIT License)
