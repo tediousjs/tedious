@@ -50,7 +50,7 @@ parser = (buffer) ->
 
     colName = buffer.readBVarchar()
 
-    columns.push(
+    column =
       userType: userType
       flags: flags
       type: type
@@ -59,7 +59,9 @@ parser = (buffer) ->
       precision: precision
       scale: scale
       dataLength: dataLength
-    )
+
+    columns.push(column)
+    columns[column.colName] = column
 
   # Return token
   name: 'COLMETADATA'
