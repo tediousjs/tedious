@@ -212,7 +212,7 @@ class Connection extends EventEmitter
       @state.enter.apply(@)
 
   dispatchEvent: (eventName, args...) ->
-    if @state.events && @state.events.hasOwnProperty(eventName)
+    if @state?.events[eventName]
       eventFunction = @state.events[eventName].apply(@, args)
     else
       throw new Error("No event '#{eventName}' in state '#{@state.name}'")
