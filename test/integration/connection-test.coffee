@@ -117,30 +117,78 @@ exports.execSql = (test) ->
   config = getConfig()
 
   request = new Request('select 8 as C1', (err) ->
-    test.ok(!err)
+      test.ok(!err)
 
-    connection.close()
+      connection.close()
   )
 
   request.on('done', (rowCount, more) ->
-    test.ok(!more)
-    test.strictEqual(rowCount, 1)
+      test.ok(!more)
+      test.strictEqual(rowCount, 1)
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-    test.strictEqual(columnsMetadata.length, 1)
+      test.strictEqual(columnsMetadata.length, 1)
   )
 
   request.on('row', (columns) ->
-    test.strictEqual(columns.length, 1)
-    test.strictEqual(columns[0].value, 8)
-    test.strictEqual(columns.C1.value, 8)
+      test.strictEqual(columns.length, 1)
+      test.strictEqual(columns[0].value, 8)
+      test.strictEqual(columns.C1.value, 8)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    connection.execSql(request)
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.execSqlWithOrder = (test) ->
+  test.expect(9)
+
+  config = getConfig()
+
+  request = new Request("select top 2 * from sys.columns order by 4, 2", (err) ->
+      test.ok(!err)
+
+      connection.close()
+  )
+
+  request.on('done', (rowCount, more) ->
+      test.ok(!more)
+      test.strictEqual(rowCount, 2)
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+      test.strictEqual(columnsMetadata.length, 25)
+  )
+
+  request.on('order', (orderColumns) ->
+      test.strictEqual(orderColumns.length, 2)
+      test.strictEqual(orderColumns[0], 4)
+      test.strictEqual(orderColumns[1], 2)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns.length, 25)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
   )
 
   connection.on('end', (info) ->
@@ -325,3 +373,57 @@ exports.execFailedProc = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+###
+exports.requestInfoErrorMessages = (test) ->
+  test.expect(9)
+
+  config = getConfig()
+  done = 0
+
+  request = new Request("use #{config.options.database}; select 1; select s;", (err) ->
+      test.ok(err)
+
+      connection.close()
+  )
+
+  request.on('done', (rowCount, more) ->
+      switch ++done
+        when 1
+          console.log 1
+          test.ok(more)
+        when 2
+          console.log 2
+          test.ok(more)
+        when 2
+          console.log 3
+          test.ok(!more)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  request.on('row', (columns) ->
+      console.log columns
+  )
+
+  connection.on('infoMessage', (info) ->
+    console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('errorMessage', (error) ->
+    console.log("#{error.number} : #{error.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+###

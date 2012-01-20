@@ -11,6 +11,7 @@ tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser')
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
 tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser')
+tokenParsers[TYPE.ORDER] = require('./order-token-parser')
 tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser')
 tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
@@ -66,7 +67,7 @@ class Parser extends EventEmitter
           return false
 
       else
-        return false
+        throw new Error("Unrecognised token #{type}")
     catch error
       if error?.error == 'oob'
         # There was an attempt to read past the end of the buffer.

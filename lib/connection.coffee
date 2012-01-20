@@ -136,10 +136,16 @@ class Connection extends EventEmitter
       @messageIo.packetSize(token.newValue)
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
-      if @sqlRequest
-        @sqlRequest.emit('columnMetadata', token.columns)
-      else
-        throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
+        if @sqlRequest
+          @sqlRequest.emit('columnMetadata', token.columns)
+        else
+          throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
+    )
+    @tokenStreamParser.on('order', (token) =>
+        if @sqlRequest
+          @sqlRequest.emit('order', token.orderColumns)
+        else
+          throw new Error("Received 'order' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('row', (token) =>
       if @sqlRequest
