@@ -20,9 +20,21 @@ title: API - Datatypes
     <li>Char, VarChar, Varchar(max)</li>
     <li>NChar, NVarChar, NVarChar(max)</li>
     <li>Binary, VarBinary, VarBinary(max)</li>
+    <li>UniqueIdentifier</li>
   </ul>
 </code>
 
+<h3>UniqueIdentifier</h3>
+<p>
+  Values are returned as a 16 byte array of integer values.
+</p>
+<p>
+  Note that the order of bytes is not the same as the character representation.
+  See <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
+  for an example of the different ordering of bytes.
+</p>
+
+<h3>Other datatypes</h3>
 <p>
   Any other types are likely to fail until support is added for them.
 </p>
