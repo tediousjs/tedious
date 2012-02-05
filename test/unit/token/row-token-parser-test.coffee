@@ -339,6 +339,28 @@ module.exports.intN = (test) ->
 
   test.done()
 
+module.exports.guidN = (test) ->
+  colMetaData = [
+    {type: dataTypeByName.UniqueIdentifierN}
+    {type: dataTypeByName.UniqueIdentifierN}
+  ]
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([
+    0,
+    16, 0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef
+  ]))
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 2)
+  test.strictEqual(token.columns[0].value, null)
+  test.deepEqual([0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef], token.columns[1].value)
+
+  test.done()
+
 module.exports.floatN = (test) ->
   colMetaData = [
     {type: dataTypeByName.FloatN}

@@ -133,6 +133,14 @@ exports.nchar = (test) ->
 exports.ncharNull = (test) ->
   execSql(test, "select cast(null as nchar(5))", null)
 
+exports.guid = (test) ->
+  execSql(test, "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)", [
+    0x67, 0x45, 0x23, 0x01, 0xAB, 0x89, 0xEF, 0xCD,
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
+  ])
+
+exports.guidNull = (test) ->
+  execSql(test, "select cast(null as uniqueidentifier)", null)
 
 execSql = (test, sql, expectedValue) ->
   test.expect(2)

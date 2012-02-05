@@ -40,6 +40,10 @@ TYPE =
     name: 'BigInt'
 
   # Variable-length types
+  0x24:
+    type: 'GUIDN'
+    name: 'UniqueIdentifierN'
+    dataLengthLength: 1
   0x26:
     type: 'INTN'
     name: 'IntN'
@@ -99,11 +103,6 @@ TYPE =
 
   ###
   # Variable-length types
-  GUIDTYPE:
-    id: 0x24
-    variableLength: true
-    name: 'UniqueIdentifier'
-    dataLengthLength: 1
   GUIDTYPE:             0x24  # UniqueIdentifier
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)

@@ -137,6 +137,14 @@ parser = (buffer, columnsMetaData) ->
 
           value *= sign
           value /= Math.pow(10, columnMetaData.scale)
+      when 'UniqueIdentifierN'
+        switch dataLength
+          when 0
+            value = null
+          when 0x10
+            value = buffer.readArray(0x10)
+          else
+            throw new Error(sprintf('Unsupported guid size %d at offset 0x%04X', dataLength - 1, buffer.position))
       else
         throw new Error(sprintf('Unrecognised column type %s at offset 0x%04X', type.name, buffer.position))
         break
