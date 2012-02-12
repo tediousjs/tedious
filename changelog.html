@@ -64,3 +64,22 @@ title: ChangeLog
     Make packet size configurable.
   </li>
 </ul>
+
+<h3>v0.0.3</h3>
+<ul>
+  <li>
+    Added support for Order tokens, meaning that select statements with an order clause can now be used.
+  </li>
+  <li>
+    Added support for more data types in result sets:
+    <code>uniqueidentifier</code>,
+    <code>text</code>,
+    <code>ntext</code>,
+    <code>image</code>,
+    <code>smallmoney</code>,
+    <code>money</code>,
+  </li>
+  <li>
+    Fixed bug that prevented new Requests from being initiated from a Request's completion callback.
+  </li>
+</ul>
