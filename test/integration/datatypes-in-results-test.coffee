@@ -7,7 +7,7 @@ config.options.debug =
   packet: true
   data: true
   payload: true
-  token: false
+  token: true
   log: true
 
 exports.null = (test) ->
@@ -132,6 +132,24 @@ exports.nchar = (test) ->
 
 exports.ncharNull = (test) ->
   execSql(test, "select cast(null as nchar(5))", null)
+
+exports.text = (test) ->
+  execSql(test, "select cast('abc' as text) as text", 'abc')
+
+exports.textNull = (test) ->
+  execSql(test, "select cast(null as text) as text", null)
+
+exports.ntext = (test) ->
+  execSql(test, "select cast('abc' as ntext) as text", 'abc')
+
+exports.ntextNull = (test) ->
+  execSql(test, "select cast(null as ntext) as text", null)
+
+exports.image = (test) ->
+  execSql(test, "select cast(0x1234 as image)", [0x12, 0x34])
+
+exports.imageNull = (test) ->
+  execSql(test, "select cast(null as image)", null)
 
 exports.guid = (test) ->
   execSql(test, "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)", [

@@ -40,6 +40,19 @@ TYPE =
     name: 'BigInt'
 
   # Variable-length types
+  0x22:
+    type: 'IMAGE'
+    name: 'Image'
+    hasTableName: true
+    hasTextPointerAndTimestamp: true
+    dataLengthLength: 4
+  0x23:
+    type: 'TEXT'
+    name: 'Text'
+    hasCollation: true
+    hasTableName: true
+    hasTextPointerAndTimestamp: true
+    dataLengthLength: 4
   0x24:
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
@@ -48,6 +61,13 @@ TYPE =
     type: 'INTN'
     name: 'IntN'
     dataLengthLength: 1
+  0x63:
+    type: 'NTEXT'
+    name: 'NText'
+    hasCollation: true
+    hasTableName: true
+    hasTextPointerAndTimestamp: true
+    dataLengthLength: 4
   0x68:
     type: 'BITN'
     name: 'BitN'
@@ -103,7 +123,6 @@ TYPE =
 
   ###
   # Variable-length types
-  GUIDTYPE:             0x24  # UniqueIdentifier
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
   MONEYNTYPE:           0x6E  # (see below)
@@ -119,9 +138,6 @@ TYPE =
   XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
   
-  TEXTTYPE:             0x23  # Text
-  IMAGETYPE:            0x22  # Image
-  NTEXTTYPE:            0x63  # NText
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)
 ###
 

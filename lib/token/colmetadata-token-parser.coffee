@@ -48,6 +48,13 @@ parser = (buffer) ->
     else
       collation = undefined
 
+    if type.hasTableName
+      numberOfTableNameParts = buffer.readUInt8()
+      tableName = for part in [1..numberOfTableNameParts]
+        buffer.readUsVarchar('ucs2')
+    else
+      tableName = undefined
+
     colName = buffer.readBVarchar()
 
     column =
@@ -59,6 +66,7 @@ parser = (buffer) ->
       precision: precision
       scale: scale
       dataLength: dataLength
+      tableName: tableName
 
     columns.push(column)
     columns[column.colName] = column

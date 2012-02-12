@@ -20,26 +20,36 @@ parser = (buffer, columnsMetaData) ->
 
     type = columnMetaData.type
 
-    # s2.2.4.2.1
-    switch type.id & 0x30
-      when 0x10 # xx01xxxx - s2.2.4.2.1.1
-        # Zero length
+    if type.hasTextPointerAndTimestamp
+      # Appear to be dummy values, so consume and discard them.
+      textPointerLength = buffer.readUInt8()
+      if textPointerLength != 0
+        buffer.readBuffer(textPointerLength)
+        buffer.readBuffer(8)
+      else
         dataLength = 0
-      when 0x20 # xx10xxxx - s2.2.4.2.1.3
-        # Variable length
-        if columnMetaData.dataLength != MAX
-          switch type.dataLengthLength
-            when 1
-              dataLength = buffer.readUInt8()
-            when 2
-              dataLength = buffer.readUInt16LE()
-            when 4
-              dataLength = buffer.readUInt32LE()
-            else
-              throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
-      when 0x30 # xx11xxxx - s2.2.4.2.1.2
-        # Fixed length
-        dataLength = 1 << ((type.id & 0x0C) >> 2)
+
+    if !dataLength && dataLength != 0
+      # s2.2.4.2.1
+      switch type.id & 0x30
+        when 0x10 # xx01xxxx - s2.2.4.2.1.1
+          # Zero length
+          dataLength = 0
+        when 0x20 # xx10xxxx - s2.2.4.2.1.3
+          # Variable length
+          if columnMetaData.dataLength != MAX
+            switch type.dataLengthLength
+              when 1
+                dataLength = buffer.readUInt8()
+              when 2
+                dataLength = buffer.readUInt16LE()
+              when 4
+                dataLength = buffer.readUInt32LE()
+              else
+                throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+        when 0x30 # xx11xxxx - s2.2.4.2.1.2
+          # Fixed length
+          dataLength = 1 << ((type.id & 0x0C) >> 2)
 
     switch type.name
       when 'Null'
@@ -102,6 +112,21 @@ parser = (buffer, columnsMetaData) ->
       when 'VarBinary', 'Binary'
         if columnMetaData.dataLength == MAX
           value = readMaxBinary(buffer)
+        else
+          value = readBinary(buffer, dataLength)
+      when 'Text'
+        if dataLength == 0
+          value = null
+        else
+          value = readChars(buffer, dataLength, 'ascii')
+      when 'NText'
+        if dataLength == 0
+          value = null
+        else
+          value = readChars(buffer, dataLength, 'ucs2')
+      when 'Image'
+        if dataLength == 0
+          value = null
         else
           value = readBinary(buffer, dataLength)
       when 'SmallDateTime'
