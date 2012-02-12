@@ -6,6 +6,7 @@ require('../buffertools')
 NULL = (1 << 16) - 1
 MAX = (1 << 16) - 1
 THREE_AND_A_THIRD = 3 + (1 / 3)
+MONEY_DIVISOR = 10000
 
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 UNKNOWN_PLP_LEN = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE])
@@ -90,6 +91,19 @@ parser = (buffer, columnsMetaData) ->
             value = buffer.readDoubleLE()
           else
             throw new Error("Unsupported dataLength #{dataLength} for FloatN")
+      when 'Money', 'SmallMoney', 'MoneyN'
+        switch dataLength
+          when 0
+            value = null
+          when 4
+            value = buffer.readInt32LE() / MONEY_DIVISOR
+          when 8
+            high = buffer.readInt32LE()
+            low = buffer.readUInt32LE()
+            value = low + (0x100000000 * high)
+            value /= MONEY_DIVISOR
+          else
+            throw new Error("Unsupported dataLength #{dataLength} for MoneyN")
       when 'Bit'
         value = !!buffer.readUInt8()
       when 'BitN'

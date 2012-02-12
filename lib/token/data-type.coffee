@@ -88,6 +88,10 @@ TYPE =
     type: 'FLTN'
     name: 'FloatN'
     dataLengthLength: 1
+  0x6E:
+    type: 'MONEYN'
+    name: 'MoneyN'
+    dataLengthLength: 1
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
@@ -121,11 +125,10 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
 
-  ###
-  # Variable-length types
+# Types not (yet) supported
+###
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
-  MONEYNTYPE:           0x6E  # (see below)
   DATENTYPE:            0x28  # (introduced in TDS 7.3)
   TIMENTYPE:            0x29  # (introduced in TDS 7.3)
   DATETIME2NTYPE:       0x2A  # (introduced in TDS 7.3)

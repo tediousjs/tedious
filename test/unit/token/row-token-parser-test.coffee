@@ -82,6 +82,39 @@ module.exports.float = (test) ->
 
   test.done()
 
+module.exports.money = (test) ->
+  colMetaData = [
+    {type: dataTypeByName.SmallMoney}
+    {type: dataTypeByName.Money}
+    {type: dataTypeByName.MoneyN}
+    {type: dataTypeByName.MoneyN}
+    {type: dataTypeByName.MoneyN}
+    {type: dataTypeByName.MoneyN}
+  ]
+  value = 123.456
+  valueLarge = 123456789012345.11
+
+  buffer = new WritableTrackingBuffer(0)
+  buffer.writeBuffer(new Buffer([0x80, 0xd6, 0x12, 0x00]))
+  buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x80, 0xd6, 0x12, 0x00]))
+  buffer.writeBuffer(new Buffer([0x00]))
+  buffer.writeBuffer(new Buffer([0x04, 0x80, 0xd6, 0x12, 0x00]))
+  buffer.writeBuffer(new Buffer([0x08, 0x00, 0x00, 0x00, 0x00, 0x80, 0xd6, 0x12, 0x00]))
+  buffer.writeBuffer(new Buffer([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d]))
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 6)
+  test.strictEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[1].value, value)
+  test.strictEqual(token.columns[2].value, null)
+  test.strictEqual(token.columns[3].value, value)
+  test.strictEqual(token.columns[4].value, value)
+  test.strictEqual(token.columns[5].value, valueLarge)
+
+  test.done()
+
 module.exports.varChar = (test) ->
   colMetaData = [type: dataTypeByName.VarChar]
   value = 'abc'

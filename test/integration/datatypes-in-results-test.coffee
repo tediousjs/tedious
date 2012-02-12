@@ -79,6 +79,30 @@ exports.numericExtremelyLargeValue = (test) ->
 exports.numericNull = (test) ->
   execSql(test, "select cast(null as numeric(3,2))", null)
 
+exports.smallMoney = (test) ->
+  execSql(test, "select cast(1.22229 as smallmoney)", 1.2223)
+
+exports.smallMoneyNegative = (test) ->
+  execSql(test, "select cast(-1.22229 as smallmoney)", -1.2223)
+
+exports.smallMoneyN = (test) ->
+  execSql(test, "select cast(null as smallmoney)", null)
+
+exports.money = (test) ->
+  execSql(test, "select cast(1.22229 as money)", 1.2223)
+
+exports.moneyNegative = (test) ->
+  execSql(test, "select cast(-1.22229 as money)", -1.2223)
+
+exports.moneyLarge = (test) ->
+  execSql(test, "select cast(123456789012345.11 as money)", 123456789012345.11)
+
+exports.moneyLargeNegative = (test) ->
+  execSql(test, "select cast(-123456789012345.11 as money)", -123456789012345.11)
+
+exports.moneyN = (test) ->
+  execSql(test, "select cast(null as money)", null)
+
 exports.varchar = (test) ->
   execSql(test, "select cast('abc' as varchar(10))", 'abc')
 
