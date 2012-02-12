@@ -203,6 +203,53 @@ exports.execSqlWithOrder = (test) ->
     #console.log(text)
   )
 
+exports.execSqlMultipleTimes = (test) ->
+  test.expect(15)
+
+  requestsToMake = 5;
+  config = getConfig()
+
+  makeRequest = ->
+    if requestsToMake == 0
+      connection.close()
+      return
+
+    request = new Request('select 8 as C1', (err) ->
+        test.ok(!err)
+
+        requestsToMake--
+        makeRequest()
+    )
+
+    request.on('done', (rowCount, more) ->
+        test.strictEqual(rowCount, 1)
+        #makeRequest()
+    )
+
+    request.on('row', (columns) ->
+        test.strictEqual(columns.length, 1)
+    )
+
+    connection.execSql(request)
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    makeRequest()
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.execBadSql = (test) ->
   test.expect(4)
 

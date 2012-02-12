@@ -64,9 +64,11 @@ class Connection extends EventEmitter
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
         message: ->
-          @sqlRequest.callback(@sqlRequest.error)
-          @sqlRequest = undefined
           @transitionTo(@STATE.LOGGED_IN)
+
+          sqlRequest = @sqlRequest
+          @sqlRequest = undefined
+          sqlRequest.callback(sqlRequest.error)
     FINAL:
       name: 'Final'
       enter: ->
