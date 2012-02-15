@@ -160,7 +160,7 @@ exports.execSqlWithOrder = (test) ->
 
   config = getConfig()
 
-  request = new Request("select top 2 * from sys.columns order by 4, 2", (err) ->
+  request = new Request("select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id", (err) ->
       test.ok(!err)
 
       connection.close()
@@ -172,17 +172,17 @@ exports.execSqlWithOrder = (test) ->
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 25)
+      test.strictEqual(columnsMetadata.length, 4)
   )
 
   request.on('order', (orderColumns) ->
       test.strictEqual(orderColumns.length, 2)
-      test.strictEqual(orderColumns[0], 4)
-      test.strictEqual(orderColumns[1], 2)
+      test.strictEqual(orderColumns[0], 2)
+      test.strictEqual(orderColumns[1], 4)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 25)
+      test.strictEqual(columns.length, 4)
   )
 
   connection = new Connection(config)
