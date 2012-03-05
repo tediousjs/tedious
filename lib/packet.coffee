@@ -176,3 +176,4 @@ exports.OFFSET = OFFSET
 exports.TYPE = TYPE
 exports.isPacketComplete = isPacketComplete
 exports.packetLength = packetLength
+exports.HEADER_LENGTH = HEADER_LENGTH

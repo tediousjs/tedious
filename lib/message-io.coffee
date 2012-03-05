@@ -2,13 +2,14 @@ require('./buffertools')
 EventEmitter = require('events').EventEmitter
 isPacketComplete = require('./packet').isPacketComplete
 packetLength = require('./packet').packetLength
+packetHeaderLength = require('./packet').HEADER_LENGTH
 Packet = require('./packet').Packet
 
 class MessageIO extends EventEmitter
   constructor: (@socket, @_packetSize, @debug) ->
     @socket.addListener('data', @eventData)
 
-    @packetDataSize = @_packetSize - 8
+    @packetDataSize = @_packetSize - packetHeaderLength
     @packetBuffer = new Buffer(0)
     @payloadBuffer = new Buffer(0)
 
@@ -30,7 +31,7 @@ class MessageIO extends EventEmitter
     if arguments.length > 0
       @debug.log("Packet size changed from #{@_packetSize} to #{packetSize}")
       @_packetSize = packetSize
-      @packetDataSize = @_packetSize - 8
+      @packetDataSize = @_packetSize - packetHeaderLength
 
     @_packetSize
 
