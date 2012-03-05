@@ -3,7 +3,6 @@ Request = require('../../lib/request')
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
-config.options.textsize = 4 * 1024;
 config.options.textsize = 8 * 1024;
 config.options.debug =
   packet: true
