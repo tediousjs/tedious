@@ -46,7 +46,7 @@ class MessageIO extends EventEmitter
 
       packet = new Packet(packetType)
       packet.last(packetNumber == numberOfPackets - 1)
-      packet.packetId(packetNumber)
+      packet.packetId(packetNumber + 1)
       packet.addData(packetPayload)
 
       @sendPacket(packet)
