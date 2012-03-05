@@ -58,6 +58,10 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
+        loggedIn: ->
+          @transitionTo(@STATE.LOGGED_IN)
+        loginFailed: ->
+          @transitionTo(@STATE.FINAL)
         message: ->
           @processLogin7Response()
     LOGGED_IN:
@@ -286,11 +290,11 @@ class Connection extends EventEmitter
   processLogin7Response: ->
     if @loggedIn
       @clearConnectTimer()
-      @transitionTo(@STATE.LOGGED_IN)
+      @dispatchEvent('loggedIn')
       @emit('connect')
     else
       @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
-      @transitionTo(@STATE.FINAL)
+      @dispatchEvent('loginFailed')
 
   execSql: (request) ->
     if @state != @STATE.LOGGED_IN
