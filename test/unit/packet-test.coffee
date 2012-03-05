@@ -8,7 +8,7 @@ exports.createEmpty = (test) ->
   packet = new Packet(TYPE.PRELOGIN)
 
   test.ok(packet)
-  test.ok(packet.buffer.equals(new Buffer([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 0, 0])))
+  test.ok(packet.buffer.equals(new Buffer([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0])))
 
   test.done()
 
@@ -25,7 +25,7 @@ exports.last = (test) ->
 
 exports.packetId = (test) ->
   packet = new Packet(TYPE.PRELOGIN)
-  test.strictEqual(packet.packetId(), 0)
+  test.strictEqual(packet.packetId(), 1)
 
   packet.packetId(2)
   test.strictEqual(packet.packetId(), 2)
