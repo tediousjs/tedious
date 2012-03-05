@@ -32,6 +32,7 @@ class Parser extends EventEmitter
 
   addBuffer: (buffer) ->
     @buffer.add(buffer)
+    @position = @buffer.position
 
     while @nextToken()
       'NOOP'
@@ -67,7 +68,7 @@ class Parser extends EventEmitter
           return false
 
       else
-        throw new Error("Unrecognised token #{type}")
+        throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
     catch error
       if error?.error == 'oob'
         # There was an attempt to read past the end of the buffer.

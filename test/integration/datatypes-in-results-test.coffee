@@ -3,12 +3,15 @@ Request = require('../../lib/request')
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
+config.options.textsize = 4 * 1024;
+config.options.textsize = 8 * 1024;
 config.options.debug =
   packet: true
   data: true
   payload: true
   token: true
   log: true
+config.options.debug = {}
 
 exports.null = (test) ->
   execSql(test, 'select null', null)
@@ -115,6 +118,20 @@ exports.varcharMax = (test) ->
 exports.varcharMaxNull = (test) ->
   execSql(test, "select cast(null as varchar(max))", null)
 
+exports.varcharMaxLongAsTextSize = (test) ->
+  longString = ''
+  for i in [1..config.options.textsize]
+    longString += 'x'
+
+  execSql(test, "select cast('#{longString}' as varchar(max))", longString)
+
+exports.varcharMaxLargerThanTextSize = (test) ->
+  longString = ''
+  for i in [1..config.options.textsize + 10]
+    longString += 'x'
+
+  execSql(test, "select cast('#{longString}' as varchar(max))", longString.slice(0, config.options.textsize))
+
 exports.nvarchar = (test) ->
   execSql(test, "select cast('abc' as nvarchar(10))", 'abc')
 
@@ -205,7 +222,10 @@ execSql = (test, sql, expectedValue) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    connection.execSql(request)
+    if (err)
+      console.log err
+    else
+      connection.execSql(request)
   )
 
   connection.on('end', (info) ->
@@ -213,7 +233,7 @@ execSql = (test, sql, expectedValue) ->
   )
 
   connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
+    console.log("#{error.number} : #{error.message}")
   )
 
   connection.on('debug', (message) ->

@@ -17,6 +17,7 @@ DEFAULT_CONNECT_TIMEOUT = 15 * 1000
 DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000
 DEFAULT_CANCEL_TIMEOUT = 5 * 1000
 DEFAULT_PACKET_SIZE = 4 * 1024
+DEFAULT_TEXTSIZE = '2147483647'
 DEFAULT_PORT = 1433
 
 class Connection extends EventEmitter
@@ -59,11 +60,21 @@ class Connection extends EventEmitter
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
         loggedIn: ->
-          @transitionTo(@STATE.LOGGED_IN)
+          @transitionTo(@STATE.LOGGED_IN_SENDING_INITIAL_SQL)
         loginFailed: ->
           @transitionTo(@STATE.FINAL)
         message: ->
           @processLogin7Response()
+    LOGGED_IN_SENDING_INITIAL_SQL:
+      name: 'LoggedInSendingInitialSql'
+      enter: ->
+        @sendInitialSql()
+      events:
+        packet: (packet) ->
+          @sendPacketToTokenStreamParser(packet)
+        message: (error) ->
+          @transitionTo(@STATE.LOGGED_IN)
+          @processedInitialSql()
     LOGGED_IN:
       name: 'LoggedIn'
       events:
@@ -116,6 +127,7 @@ class Connection extends EventEmitter
   defaultConfig: ->
     @config.options ||= {}
     @config.options.port ||= DEFAULT_PORT
+    @config.options.textsize ||= DEFAULT_TEXTSIZE
     @config.options.connectTimeout ||= DEFAULT_CONNECT_TIMEOUT
     @config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
     @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
@@ -289,17 +301,24 @@ class Connection extends EventEmitter
   sendPacketToTokenStreamParser: (packet) ->
     @tokenStreamParser.addBuffer(packet.data())
 
+  sendInitialSql: ->
+    payload = new SqlBatchPayload('set textsize ' + @config.options.textsize)
+    @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+
+  processedInitialSql: ->
+      @clearConnectTimer()
+      @emit('connect')
+
   processLogin7Response: ->
     if @loggedIn
-      @clearConnectTimer()
       @dispatchEvent('loggedIn')
-      @emit('connect')
     else
       @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
       @dispatchEvent('loginFailed')
 
   execSql: (request) ->
     if @state != @STATE.LOGGED_IN
+      console.trace()
       message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
       @debug.log(message)
