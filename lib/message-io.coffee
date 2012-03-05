@@ -8,6 +8,7 @@ class MessageIO extends EventEmitter
   constructor: (@socket, @_packetSize, @debug) ->
     @socket.addListener('data', @eventData)
 
+    @packetDataSize = @_packetSize - 8
     @packetBuffer = new Buffer(0)
     @payloadBuffer = new Buffer(0)
 
@@ -29,17 +30,18 @@ class MessageIO extends EventEmitter
     if arguments.length > 0
       @debug.log("Packet size changed from #{@_packetSize} to #{packetSize}")
       @_packetSize = packetSize
+      @packetDataSize = @_packetSize - 8
 
     @_packetSize
 
   # TODO listen for 'drain' event when socket.write returns false.
   sendMessage: (packetType, data) ->
-    numberOfPackets = (Math.floor((data.length - 1) / @_packetSize)) + 1
+    numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
 
     for packetNumber in [0..numberOfPackets - 1]
-      payloadStart = packetNumber * @_packetSize
+      payloadStart = packetNumber * @packetDataSize
       if packetNumber < numberOfPackets - 1
-        payloadEnd = payloadStart + @_packetSize
+        payloadEnd = payloadStart + @packetDataSize
       else
         payloadEnd = data.length
       packetPayload = data.slice(payloadStart, payloadEnd)
