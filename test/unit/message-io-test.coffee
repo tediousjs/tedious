@@ -21,7 +21,6 @@ exports.sendSmallerThanOnePacket = (test) ->
 
   connection = new Connection()
   connection.on('packet', (packet) ->
-    console.log(packet.headerToString())
     test.ok(packet.last())
     test.strictEqual(packet.type(), packetType)
     test.ok(packet.data().equals(payload))
