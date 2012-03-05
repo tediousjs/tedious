@@ -13,14 +13,15 @@ class Connection extends EventEmitter
     packet = new Packet(data)
     @emit('packet', packet)
 
-packetType = 2;
-packetSize = 4
+packetType = 2
+packetSize = 8 + 4
 
 exports.sendSmallerThanOnePacket = (test) ->
   payload = new Buffer([1, 2, 3])
 
   connection = new Connection()
   connection.on('packet', (packet) ->
+    console.log(packet.headerToString())
     test.ok(packet.last())
     test.strictEqual(packet.type(), packetType)
     test.ok(packet.data().equals(payload))
@@ -59,11 +60,11 @@ exports.sendOneLongerThanPacket = (test) ->
     switch packetNumber
       when 1
         test.ok(!packet.last())
-        test.strictEqual(packet.packetId(), packetNumber - 1)
+        test.strictEqual(packet.packetId(), packetNumber)
         test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])))
       when 2
         test.ok(packet.last())
-        test.strictEqual(packet.packetId(), packetNumber - 1)
+        test.strictEqual(packet.packetId(), packetNumber)
         test.ok(packet.data().equals(new Buffer([5])))
 
         test.done()
