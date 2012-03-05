@@ -87,6 +87,8 @@ class Connection extends EventEmitter
       enter: ->
         @cleanupConnection()
       events:
+        loginFailed: ->
+          # Do nothing. The connection was probably closed by the client code.
         connectTimeout: ->
           # Do nothing, as the timer should be cleaned up.
 
