@@ -39,6 +39,8 @@ class Connection extends EventEmitter
       enter: ->
         @emptyMessageBuffer()
       events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         packet: (packet) ->
@@ -50,6 +52,8 @@ class Connection extends EventEmitter
     SENT_LOGIN7_WITH_STANDARD_LOGIN:
       name: 'SentLogin7WithStandardLogin'
       events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         packet: (packet) ->
@@ -58,9 +62,14 @@ class Connection extends EventEmitter
           @processLogin7Response()
     LOGGED_IN:
       name: 'LoggedIn'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
     SENT_CLIENT_REQUEST:
       name: 'SentClientRequest'
       events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
         packet: (packet) ->
           @sendPacketToTokenStreamParser(packet)
         message: ->
@@ -226,10 +235,9 @@ class Connection extends EventEmitter
       throw new Error("No event '#{eventName}' in state '#{@state.name}'")
 
   socketError: (error) =>
-    message = "connection to #{@config.server}:#{@config.options.port} failed"
+    message = "connection to #{@config.server}:#{@config.options.port} - failed #{error}"
 
     @debug.log(message)
-    @emit('connect', message)
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
