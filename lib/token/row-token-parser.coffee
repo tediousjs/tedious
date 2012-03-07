@@ -115,7 +115,7 @@ parser = (buffer, columnsMetaData) ->
       when 'VarChar', 'Char', 'NVarChar', 'NChar'
         switch type.name
           when 'VarChar', 'Char'
-            encoding = 'ascii'
+            encoding = 'binary'
           when 'NVarChar', 'NChar'
             encoding = 'ucs2'
 
@@ -132,7 +132,7 @@ parser = (buffer, columnsMetaData) ->
         if dataLength == 0
           value = null
         else
-          value = readChars(buffer, dataLength, 'ascii')
+          value = readChars(buffer, dataLength, 'binary')
       when 'NText'
         if dataLength == 0
           value = null
