@@ -9,6 +9,10 @@ title: API - Connection
   A <code>Connection</code> instance represents a single connection to a database server.
 </p>
 
+<p>
+  Only one request at a time may be executed on a connection.
+</p>
+
 <h3>new Connection(config)</h3>
 {% highlight javascript %}
 var Connection = require('tedious').Connection;
