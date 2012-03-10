@@ -1,5 +1,6 @@
 parser = require('../../../lib/token/row-token-parser')
 dataTypeByName = require('../../../lib/token/data-type').typeByName
+Iconv  = require('iconv').Iconv
 ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
@@ -115,9 +116,34 @@ module.exports.money = (test) ->
 
   test.done()
 
-module.exports.varChar = (test) ->
-  colMetaData = [type: dataTypeByName.VarChar]
-  value = 'abc'
+module.exports.varCharWithoutCodepage = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    collation:
+      iconv: undefined
+  ]
+  value = 'abcde'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeUsVarchar(value)
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.strictEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varCharWithCodepage = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    collation:
+      iconv: new Iconv('WINDOWS-1252', 'UTF-8')
+  ]
+  value = 'abcdé'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUsVarchar(value)
@@ -190,6 +216,8 @@ module.exports.varCharMaxNull = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar
     dataLength: 65535
+    collation:
+      iconv: undefined
   ]
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -209,6 +237,8 @@ module.exports.varCharMaxUnknownLength = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar
     dataLength: 65535
+    collation:
+      iconv: undefined
   ]
   value = 'abcdef'
 
@@ -234,8 +264,37 @@ module.exports.varCharMaxKnownLength = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar
     dataLength: 65535
+    collation:
+      iconv: undefined
   ]
   value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ascii')
+  buffer.writeUInt64LE(value.length)
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(0, 3))
+  buffer.writeUInt32LE(3)
+  buffer.writeString(value.slice(3, 6))
+  buffer.writeUInt32LE(0)
+  #console.log(buffer.data)
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.strictEqual(token.columns[0].value, value)
+  test.strictEqual(token.columns[0].metadata, colMetaData[0])
+
+  test.done()
+
+module.exports.varCharMaxWithCodepage = (test) ->
+  colMetaData = [
+    type: dataTypeByName.VarChar
+    dataLength: 65535
+    collation:
+      iconv: new Iconv('WINDOWS-1252', 'UTF-8')
+  ]
+  value = 'abcdéf'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUInt64LE(value.length)

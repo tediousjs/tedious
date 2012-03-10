@@ -115,14 +115,22 @@ parser = (buffer, columnsMetaData) ->
       when 'VarChar', 'Char', 'NVarChar', 'NChar'
         switch type.name
           when 'VarChar', 'Char'
+            iconv = columnMetaData.collation.iconv
             encoding = 'ascii'
           when 'NVarChar', 'NChar'
+            iconv = undefined
             encoding = 'ucs2'
 
         if columnMetaData.dataLength == MAX
-          value = readMaxChars(buffer, encoding)
+          if iconv
+            value = readMaxChars(buffer, iconv)
+          else
+            value = readMaxChars(buffer, encoding)
         else
-          value = readChars(buffer, dataLength, encoding)
+          if iconv
+            value = readChars(buffer, dataLength, iconv)
+          else
+            value = readChars(buffer, dataLength, encoding)
       when 'VarBinary', 'Binary'
         if columnMetaData.dataLength == MAX
           value = readMaxBinary(buffer)
@@ -132,7 +140,10 @@ parser = (buffer, columnsMetaData) ->
         if dataLength == 0
           value = null
         else
-          value = readChars(buffer, dataLength, 'ascii')
+          if columnMetaData.collation.iconv
+            value = readChars(buffer, dataLength, columnMetaData.collation.iconv)
+          else
+            value = readChars(buffer, dataLength, 'ascii')
       when 'NText'
         if dataLength == 0
           value = null
@@ -205,20 +216,30 @@ readBinary = (buffer, dataLength) ->
   else
     buffer.readArray(dataLength)
 
-readChars = (buffer, dataLength, encoding) ->
+readChars = (buffer, dataLength, encodingOrIconv) ->
   if dataLength == NULL
     null
   else
-    buffer.readString(dataLength, encoding)
+    if typeof encodingOrIconv == 'string'
+      encoding = encodingOrIconv
+      buffer.readString(dataLength, encoding)
+    else
+      iconv = encodingOrIconv
+      iconv.convert(buffer.readBuffer(dataLength)).toString()
 
 readMaxBinary = (buffer) ->
   readMax(buffer, (valueBuffer) ->
-      Array.prototype.slice.call(valueBuffer)
+    Array.prototype.slice.call(valueBuffer)
   )
 
-readMaxChars = (buffer, encoding) ->
+readMaxChars = (buffer, encodingOrIconv) ->
   readMax(buffer, (valueBuffer) ->
+    if typeof encodingOrIconv == 'string'
+      encoding = encodingOrIconv
       valueBuffer.toString(encoding)
+    else
+      iconv = encodingOrIconv
+      iconv.convert(valueBuffer).toString()
   )
 
 readMax = (buffer, decodeFunction) ->

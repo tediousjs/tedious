@@ -36,7 +36,7 @@ module.exports.varchar = (test) ->
   userType = 2
   flags = 3
   length = 3
-  collation = new Buffer([1,2,3,4,5])
+  collation = new Buffer([0x09, 0x04, 0x50, 0x78, 0x9a])
   columnName = 'name'
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
@@ -58,7 +58,11 @@ module.exports.varchar = (test) ->
   test.strictEqual(token.columns[0].userType, 2)
   test.strictEqual(token.columns[0].flags, 3)
   test.strictEqual(token.columns[0].type.name, 'VarChar')
-  test.ok(token.columns[0].collation.equals(collation))
+  test.strictEqual(token.columns[0].collation.lcid, 0x0409)
+  test.strictEqual(token.columns[0].collation.codepage, 'WINDOWS-1252')
+  test.strictEqual(token.columns[0].collation.flags, 0x57)
+  test.strictEqual(token.columns[0].collation.version, 0x8)
+  test.strictEqual(token.columns[0].collation.sortId, 0x9a)
   test.strictEqual(token.columns[0].colName, 'name')
   test.strictEqual(token.columns.name.colName, 'name')
   test.strictEqual(token.columns[0].dataLength, length)

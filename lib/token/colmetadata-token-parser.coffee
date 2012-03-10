@@ -1,5 +1,8 @@
 # s2.2.7.4
 
+codepageByLcid = require('../collation').codepageByLcid
+iconvByLcid = require('../collation').iconvByLcid
+
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
@@ -44,7 +47,25 @@ parser = (buffer) ->
       scale = undefined
 
     if type.hasCollation
-      collation = buffer.readBuffer(5)
+      # s2.2.5.1.2
+      collationData = buffer.readBuffer(5)
+      collation = {}
+
+      collation.lcid = (collationData[2] & 0x0F) << 16
+      collation.lcid |= collationData[1] << 8
+      collation.lcid |= collationData[0]
+      
+      collation.codepage = codepageByLcid[collation.lcid]
+      collation.iconv = iconvByLcid[collation.lcid]
+
+      # This may not be extracting the correct nibbles in the correct order.
+      collation.flags = collationData[3] >> 4
+      collation.flags |= collationData[2] & 0xF0
+
+      # This may not be extracting the correct nibble.
+      collation.version = collationData[3] & 0x0F
+
+      collation.sortId = collationData[4]
     else
       collation = undefined
 

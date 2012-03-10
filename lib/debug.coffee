@@ -1,4 +1,5 @@
 EventEmitter = require('events').EventEmitter
+util = require('util')
 
 class Debug extends EventEmitter
   ###
@@ -31,7 +32,7 @@ class Debug extends EventEmitter
 
   token: (token) ->
     if @haveListeners() && @options.token
-      @log(token)
+      @log(util.inspect(token, false, 5, true))
 
   # Only incur the overhead of producing formatted messages when necessary.
   haveListeners: ->

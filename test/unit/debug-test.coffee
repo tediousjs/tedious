@@ -72,7 +72,7 @@ exports.dataNotEnabled = (test) ->
 exports.tokenEnabled = (test) ->
   debug = new Debug({token: true})
   debug.on('debug', (token) ->
-    test.strictEqual(token.name, 'test')
+    test.ok(token.indexOf('test') != 0)
 
     test.done()
   )

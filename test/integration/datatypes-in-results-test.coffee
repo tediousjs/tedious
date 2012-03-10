@@ -2,15 +2,20 @@ Connection = require('../../lib/connection')
 Request = require('../../lib/request')
 fs = require('fs')
 
+debug = false
+
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
-config.options.textsize = 8 * 1024;
-config.options.debug =
-  packet: true
-  data: true
-  payload: true
-  token: true
-  log: true
-config.options.debug = {}
+config.options.textsize = 8 * 1024
+
+if (debug)
+  config.options.debug =
+    packet: true
+    data: true
+    payload: true
+    token: true
+    log: true
+else
+  config.options.debug = {}
 
 exports.null = (test) ->
   execSql(test, 'select null', null)
@@ -236,5 +241,6 @@ execSql = (test, sql, expectedValue) ->
   )
 
   connection.on('debug', (message) ->
-    #console.log(message)
+    if (debug)
+      console.log(message)
   )
