@@ -92,7 +92,7 @@ exports.smallMoney = (test) ->
 exports.smallMoneyNegative = (test) ->
   execSql(test, "select cast(-1.22229 as smallmoney)", -1.2223)
 
-exports.smallMoneyN = (test) ->
+exports.smallMoneyNull = (test) ->
   execSql(test, "select cast(null as smallmoney)", null)
 
 exports.money = (test) ->
@@ -107,7 +107,7 @@ exports.moneyLarge = (test) ->
 exports.moneyLargeNegative = (test) ->
   execSql(test, "select cast(-123456789012345.11 as money)", -123456789012345.11)
 
-exports.moneyN = (test) ->
+exports.moneyNull = (test) ->
   execSql(test, "select cast(null as money)", null)
 
 exports.varchar = (test) ->
