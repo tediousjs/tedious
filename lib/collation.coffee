@@ -1,7 +1,7 @@
 try
   Iconv = require('iconv').Iconv
 catch exception
-  # Do nothing, as Iconv is an optional dependency.
+  Iconv = undefined
 
 exports.codepageByLcid =
   1025: 'WINDOWS-1256'

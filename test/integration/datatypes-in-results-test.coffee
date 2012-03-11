@@ -111,7 +111,7 @@ exports.moneyN = (test) ->
   execSql(test, "select cast(null as money)", null)
 
 exports.varchar = (test) ->
-  execSql(test, "select cast('abc' as varchar(10))", 'abc')
+  execSql(test, "select cast('abcdé' as varchar(10))", 'abcdé')
 
 exports.varcharNull = (test) ->
   execSql(test, "select cast(null as varchar(10))", null)

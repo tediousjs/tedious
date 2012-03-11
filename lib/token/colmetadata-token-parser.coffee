@@ -57,8 +57,6 @@ parser = (buffer) ->
       
       collation.codepage = codepageByLcid[collation.lcid]
       collation.iconv = iconvByLcid[collation.lcid]
-      if !collation.iconv
-        throw new Error("No codepage for LCID #{collation.lcid}")
 
       # This may not be extracting the correct nibbles in the correct order.
       collation.flags = collationData[3] >> 4
