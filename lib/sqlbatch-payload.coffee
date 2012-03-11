@@ -1,4 +1,5 @@
-createAllHeaders = require('./all-headers')
+WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer
+writeAllHeaders = require('./all-headers').writeToTrackingBuffer
 
 ###
   s2.2.6.6
@@ -8,13 +9,11 @@ class SqlBatchPayload
     txnDescriptor = 0
     outstandingRequestCount = 1
 
-    allHeaders = createAllHeaders(txnDescriptor, outstandingRequestCount)
-
-    buffer = new Buffer(allHeaders.length + (2 * @sqlText.length))
-    allHeaders.copy(buffer)
-    buffer.write(@sqlText, allHeaders.length, 'ucs2')
+    buffer = new WritableTrackingBuffer(100 + (2 * @sqlText.length), 'ucs2')
+    writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
+    buffer.writeString(@sqlText, 'ucs2')
     
-    @data = buffer
+    @data = buffer.data
 
   toString: (indent) ->
     indent ||= ''

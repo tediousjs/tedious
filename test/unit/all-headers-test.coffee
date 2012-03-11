@@ -1,6 +1,6 @@
+WritableTrackingBuffer = require('../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 require('../../lib/buffertools')
-
-makeBuffer = require('../../lib/all-headers')
+writeAllHeaders = require('../../lib/all-headers').writeToTrackingBuffer
 
 exports.headers = (test) ->
   expected = new Buffer([
@@ -10,8 +10,10 @@ exports.headers = (test) ->
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x01, 0x00, 0x00, 0x00
   ])
-  buffer = makeBuffer(0, 1);
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  writeAllHeaders(buffer, 0, 1);
    
-  test.ok(buffer.equals(expected))
+  test.ok(buffer.data.equals(expected))
   
   test.done()

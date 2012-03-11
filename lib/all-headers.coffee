@@ -12,9 +12,7 @@ TYPE =
 TXNDESCRIPTOR_HEADER_DATA_LEN = 4 + 8
 TXNDESCRIPTOR_HEADER_LEN = 4 + 2 + TXNDESCRIPTOR_HEADER_DATA_LEN
 
-module.exports = (txnDescriptor, outstandingRequestCount) ->
-  buffer = new WritableTrackingBuffer(50)
-
+exports.writeToTrackingBuffer = (buffer, txnDescriptor, outstandingRequestCount) ->
   buffer.writeUInt32LE(0)                             # Will write buffer length in here later.
   buffer.writeUInt32LE(TXNDESCRIPTOR_HEADER_LEN)
   buffer.writeUInt16LE(TYPE.TXN_DESCRIPTOR)
@@ -27,4 +25,4 @@ module.exports = (txnDescriptor, outstandingRequestCount) ->
   # Write deferred buffer length.
   data.writeUInt32LE(data.length, 0)
 
-  data
+  buffer
