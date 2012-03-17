@@ -182,7 +182,7 @@ exports.execSqlWithOrder = (test) ->
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 4)
+    test.strictEqual(columns.length, 4)
   )
 
   connection = new Connection(config)
@@ -197,6 +197,10 @@ exports.execSqlWithOrder = (test) ->
 
   connection.on('infoMessage', (info) ->
     #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('errorMessage', (error) ->
+    #console.log("#{error.number} : #{error.message}")
   )
 
   connection.on('debug', (text) ->
@@ -368,53 +372,6 @@ exports.execProcAsSql = (test) ->
 
   connection.on('infoMessage', (info) ->
     #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execFailedProc = (test) ->
-  test.expect(5)
-
-  config = getConfig()
-
-  request = new Request('exec sp_help bad_object_name', (err) ->
-      test.ok(err)
-
-      connection.close()
-  )
-
-  request.on('doneProc', (rowCount, more, returnStatus) ->
-      test.ok(!more)
-      test.strictEqual(returnStatus, 1)   # Non-zero indicates a failure.
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-  )
-
-  request.on('row', (columns) ->
-      test.ok(false)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('errorMessage', (error) ->
-      #console.log("#{error.number} : #{error.message}")
-      test.ok(error)
   )
 
   connection.on('debug', (text) ->

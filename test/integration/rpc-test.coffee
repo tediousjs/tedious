@@ -56,11 +56,11 @@ exports.execProc = (test) ->
   )
 
   connection.on('debug', (text) ->
-    console.log(text)
+    #console.log(text)
   )
 
-exports.execFailedProc = (test) ->
-  test.expect(5)
+exports.execProcWithBadName = (test) ->
+  test.expect(3)
 
   config = getConfig()
 
@@ -69,6 +69,54 @@ exports.execFailedProc = (test) ->
 
     connection.close()
   )
+
+  request.on('doneProc', (rowCount, more, returnStatus) ->
+    test.ok(!more)
+  )
+
+  request.on('doneInProc', (rowCount, more) ->
+    test.ok(more)
+  )
+
+  request.on('row', (columns) ->
+    test.ok(false)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.callProcedure(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('errorMessage', (error) ->
+    #console.log("#{error.number} : #{error.message}")
+    test.ok(error)
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.execFailedProc = (test) ->
+  test.expect(5)
+
+  config = getConfig()
+
+  request = new Request('sp_help', (err) ->
+    test.ok(err)
+
+    connection.close()
+  )
+
+  request.addParameter(TYPES.NVarChar, 'objname', 'bad')
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)
