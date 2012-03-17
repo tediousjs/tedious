@@ -16,8 +16,8 @@ exports.writeToTrackingBuffer = (buffer, txnDescriptor, outstandingRequestCount)
   buffer.writeUInt32LE(0)                             # Will write buffer length in here later.
   buffer.writeUInt32LE(TXNDESCRIPTOR_HEADER_LEN)
   buffer.writeUInt16LE(TYPE.TXN_DESCRIPTOR)
-  buffer.writeUInt32LE(txnDescriptor % 0x100000000)
-  buffer.writeUInt32LE(txnDescriptor / 0x100000000)
+  buffer.writeUInt32LE(txnDescriptor & 0xFFFFFFFF)
+  buffer.writeUInt32LE(txnDescriptor >> 32)
   buffer.writeUInt32LE(outstandingRequestCount)
 
   data = buffer.data

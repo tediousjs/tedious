@@ -119,6 +119,15 @@ TYPE =
     name: 'NVarChar'
     hasCollation: true
     dataLengthLength: 2
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(@.id)
+      buffer.writeUInt16LE(2 * parameter.value.length)
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+
+      # ParamLenData
+      buffer.writeUInt16LE(2 * parameter.value.length)
+      buffer.writeString(parameter.value, 'ucs2')
   0xEF:
     type: 'NCHAR'
     name: 'NChar'

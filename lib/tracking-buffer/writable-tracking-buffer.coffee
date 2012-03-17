@@ -48,6 +48,9 @@ class WritableTrackingBuffer
     @buffer.writeUInt16LE(value, @position)
     @position += length
 
+  writeUShort: (value) ->
+    writeUInt16LE(value)
+
   writeUInt16BE: (value) ->
     length = 2
     @makeRoomFor(length)

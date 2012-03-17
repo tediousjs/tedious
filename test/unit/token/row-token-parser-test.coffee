@@ -1,5 +1,5 @@
 parser = require('../../../lib/token/row-token-parser')
-dataTypeByName = require('../../../lib/token/data-type').typeByName
+dataTypeByName = require('../../../lib/data-type').typeByName
 Iconv  = require('iconv').Iconv
 ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer

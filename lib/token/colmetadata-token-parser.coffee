@@ -3,7 +3,7 @@
 codepageByLcid = require('../collation').codepageByLcid
 iconvByLcid = require('../collation').iconvByLcid
 
-TYPE = require('./data-type').TYPE
+TYPE = require('../data-type').TYPE
 sprintf = require('sprintf').sprintf
 
 parser = (buffer) ->

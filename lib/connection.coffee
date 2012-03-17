@@ -4,6 +4,7 @@ EventEmitter = require('events').EventEmitter
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
+RpcRequestPayload = require('./rpcrequest-payload')
 SqlBatchPayload = require('./sqlbatch-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
@@ -90,8 +91,8 @@ class Connection extends EventEmitter
         message: ->
           @transitionTo(@STATE.LOGGED_IN)
 
-          sqlRequest = @sqlRequest
-          @sqlRequest = undefined
+          sqlRequest = @request
+          @request = undefined
           sqlRequest.callback(sqlRequest.error)
     FINAL:
       name: 'Final'
@@ -146,8 +147,8 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
-      if @sqlRequest
-        @sqlRequest.error = token.message
+      if @request
+        @request.error = token.message
     )
     @tokenStreamParser.on('databaseChange', (token) =>
       @emit('databaseChange', token.newValue)
@@ -165,40 +166,40 @@ class Connection extends EventEmitter
       @messageIo.packetSize(token.newValue)
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
-        if @sqlRequest
-          @sqlRequest.emit('columnMetadata', token.columns)
+        if @request
+          @request.emit('columnMetadata', token.columns)
         else
           throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('order', (token) =>
-        if @sqlRequest
-          @sqlRequest.emit('order', token.orderColumns)
+        if @request
+          @request.emit('order', token.orderColumns)
         else
           throw new Error("Received 'order' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('row', (token) =>
-      if @sqlRequest
-        @sqlRequest.emit('row', token.columns)
+      if @request
+        @request.emit('row', token.columns)
       else
         throw new Error("Received 'row' when no sqlRequest is in progress")
     )
     @tokenStreamParser.on('returnStatus', (token) =>
-      if @sqlRequest
+      if @request
         # Keep value for passing in 'doneProc' event.
         @procReturnStatusValue = token.value
     )
     @tokenStreamParser.on('doneProc', (token) =>
-      if @sqlRequest
-        @sqlRequest.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
+      if @request
+        @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
         @procReturnStatusValue = undefined
     )
     @tokenStreamParser.on('doneInProc', (token) =>
-        if @sqlRequest
-          @sqlRequest.emit('doneInProc', token.rowCount, token.more)
+        if @request
+          @request.emit('doneInProc', token.rowCount, token.more)
     )
     @tokenStreamParser.on('done', (token) =>
-        if @sqlRequest
-          @sqlRequest.emit('done', token.rowCount, token.more)
+        if @request
+          @request.emit('done', token.rowCount, token.more)
     )
 
   connect: ->
@@ -317,6 +318,12 @@ class Connection extends EventEmitter
       @dispatchEvent('loginFailed')
 
   execSql: (request) ->
+      @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure))
+
+  callProcedure: (request) ->
+      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+
+  makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
       console.trace()
       message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
@@ -324,10 +331,9 @@ class Connection extends EventEmitter
       @debug.log(message)
       request.callback(message)
     else
-      @sqlRequest = request
+      @request = request
 
-      payload = new SqlBatchPayload(request.sqlText)
-      @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+      @messageIo.sendMessage(packetType, payload.data)
       @debug.payload(->
         payload.toString('  ')
       )

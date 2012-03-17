@@ -332,7 +332,7 @@ exports.sqlWithMultipleResultSets = (test) ->
     #console.log(text)
   )
 
-exports.execProc = (test) ->
+exports.execProcAsSql = (test) ->
   test.expect(5)
 
   config = getConfig()
