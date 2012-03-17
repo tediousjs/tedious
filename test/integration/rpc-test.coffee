@@ -21,7 +21,6 @@ exports.execProc = (test) ->
   config = getConfig()
 
   request = new Request('sp_help', (err) ->
-    console.log err
     test.ok(!err)
 
     connection.close()
