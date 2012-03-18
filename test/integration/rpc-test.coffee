@@ -15,6 +15,12 @@ getConfig = ->
 
   config
 
+exports.execProcVarChar = (test) ->
+  testProc(test, TYPES.VarChar, 'varchar(10)', 'test')
+
+exports.execProcVarCharNull = (test) ->
+  testProc(test, TYPES.VarChar, 'varchar(10)', null)
+
 exports.execProcNVarChar = (test) ->
   testProc(test, TYPES.NVarChar, 'nvarchar(10)', 'test')
 

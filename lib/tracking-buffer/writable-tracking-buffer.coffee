@@ -108,9 +108,9 @@ class WritableTrackingBuffer
   writeString: (value, encoding) ->
     encoding ||= @encoding
 
-    length = Buffer.byteLength(value, @encoding)
+    length = Buffer.byteLength(value, encoding)
     @makeRoomFor(length)
-    bytesWritten = @buffer.write(value, @position, @encoding)
+    bytesWritten = @buffer.write(value, @position, encoding)
     @position += length
 
     bytesWritten

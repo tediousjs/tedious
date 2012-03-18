@@ -17,21 +17,21 @@ STATUS =
   s2.2.6.5
 ###
 class RpcRequestPayload
-  constructor: (@request, @procedure) ->
+  constructor: (@request) ->
     buffer = new WritableTrackingBuffer(500, 'ucs2')
 
-    procedure = @request.sqlTextOrProcedure
+    @procedure = @request.sqlTextOrProcedure
 
     txnDescriptor = 0
     outstandingRequestCount = 1
     writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
 
     # NameLenProcID
-    if typeof procedure == 'string'
-      buffer.writeUsVarchar(procedure)   # ProcName
+    if typeof @procedure == 'string'
+      buffer.writeUsVarchar(@procedure)   # ProcName
     else
-      buffer.writeUShort(0xFFFF)         # ProcIDSwitch
-      buffer.writeUShort(procedure)      # ProcID
+      buffer.writeUShort(0xFFFF)          # ProcIDSwitch
+      buffer.writeUShort(@procedure)      # ProcID
 
     # OptionFlags
     optionFlags = 0

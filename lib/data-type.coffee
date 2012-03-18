@@ -140,6 +140,21 @@ TYPE =
     name: 'VarChar'
     hasCollation: true
     dataLengthLength: 2
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(@.id)
+      if parameter.value
+        buffer.writeUInt16LE(parameter.value.length)
+      else
+        buffer.writeUInt16LE(1)   # Can't declare length less than 1 character.
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+
+      # ParamLenData
+      if parameter.value
+        buffer.writeUInt16LE(parameter.value.length)
+        buffer.writeString(parameter.value, 'ascii')
+      else
+        buffer.writeUInt16LE(NULL)
   0xAD:
     type: 'BIGBinary'
     name: 'Binary'
@@ -160,7 +175,7 @@ TYPE =
       if parameter.value
         buffer.writeUInt16LE(2 * parameter.value.length)
       else
-        buffer.writeUInt16LE(2)   # Can't declare lenght less than 1 character.
+        buffer.writeUInt16LE(2)   # Can't declare length less than 1 character.
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
