@@ -4,6 +4,7 @@ fs = require('fs')
 
 getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
+  instanceName = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
 
   config.options.debug =
     packet: true
@@ -13,6 +14,9 @@ getConfig = ->
     log: true
 
   config
+
+getInstanceName = ->
+  JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
 
 exports.badServer = (test) ->
   config = getConfig()
@@ -82,10 +86,41 @@ exports.badCredentials = (test) ->
     #console.log(text)
   )
 
-exports.connect = (test) ->
+exports.connectByPort = (test) ->
   test.expect(2)
 
   config = getConfig()
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ok(!err)
+
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('databaseChange', (database) ->
+    test.strictEqual(database, config.options.database)
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.connectByInstanceName = (test) ->
+  test.expect(2)
+
+  config = getConfig()
+  delete config.options.port
+  config.options.instanceName = getInstanceName()
 
   connection = new Connection(config)
 

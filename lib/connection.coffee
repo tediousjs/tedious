@@ -1,6 +1,7 @@
 require('./buffertools')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
+instanceLookup = require('./instance-lookup')
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
@@ -127,12 +128,17 @@ class Connection extends EventEmitter
 
   defaultConfig: ->
     @config.options ||= {}
-    @config.options.port ||= DEFAULT_PORT
     @config.options.textsize ||= DEFAULT_TEXTSIZE
     @config.options.connectTimeout ||= DEFAULT_CONNECT_TIMEOUT
     @config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
     @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
+
+    if !@config.options.port && !@config.options.instanceName
+      @config.options.port = DEFAULT_PORT
+    else if @config.options.port && @config.options.instanceName
+      throw new Error("Port and instanceName are mutually exclusive, but #{config.options.port} and #{config.options.instanceName} provided")
+
 
   createDebug: ->
     @debug = new Debug(@config.options.debug)
@@ -207,9 +213,20 @@ class Connection extends EventEmitter
     )
 
   connect: ->
+    if (@config.options.port)
+      @connectOnPort(@config.options.port)
+    else
+      instanceLookup(@config.server, @config.options.instanceName, (err, port) =>
+        if err
+          throw new Error(err)
+        else
+          @connectOnPort(port)
+      )
+
+  connectOnPort: (port) ->
     @socket = new Socket({})
     @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
-    @socket.connect(@config.options.port, @config.server)
+    @socket.connect(port, @config.server)
     @socket.on('error', @socketError)
     @socket.on('connect', @socketConnect)
     @socket.on('close', @socketClose)
