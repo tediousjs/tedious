@@ -18,6 +18,15 @@ getConfig = ->
 exports.execProcNVarChar = (test) ->
   testProc(test, TYPES.NVarChar, 'nvarchar(10)', 'test')
 
+exports.execProcTinyInt = (test) ->
+  testProc(test, TYPES.TinyInt, 'tinyint', 3)
+
+exports.execProcSmallInt = (test) ->
+  testProc(test, TYPES.SmallInt, 'smallint', 3)
+
+exports.execProcInt = (test) ->
+  testProc(test, TYPES.Int, 'int', 3)
+
 exports.execProcWithBadName = (test) ->
   test.expect(3)
 
