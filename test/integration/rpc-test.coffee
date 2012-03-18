@@ -18,14 +18,26 @@ getConfig = ->
 exports.execProcNVarChar = (test) ->
   testProc(test, TYPES.NVarChar, 'nvarchar(10)', 'test')
 
+exports.execProcNVarCharNull = (test) ->
+  testProc(test, TYPES.NVarChar, 'nvarchar(10)', null)
+
 exports.execProcTinyInt = (test) ->
   testProc(test, TYPES.TinyInt, 'tinyint', 3)
+
+exports.execProcTinyIntNull = (test) ->
+  testProc(test, TYPES.TinyInt, 'tinyint', null)
 
 exports.execProcSmallInt = (test) ->
   testProc(test, TYPES.SmallInt, 'smallint', 3)
 
+exports.execProcSmallIntNull = (test) ->
+  testProc(test, TYPES.SmallInt, 'smallint', null)
+
 exports.execProcInt = (test) ->
   testProc(test, TYPES.Int, 'int', 3)
+
+exports.execProcIntNull = (test) ->
+  testProc(test, TYPES.Int, 'int', null)
 
 exports.execProcWithBadName = (test) ->
   test.expect(3)

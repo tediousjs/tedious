@@ -1,3 +1,5 @@
+NULL = (1 << 16) - 1
+
 TYPE =
   # Zero-length types
   0x1F:
@@ -8,15 +10,48 @@ TYPE =
   0x30:
     type: 'INT1'
     name: 'TinyInt'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.IntN.id)
+      buffer.writeUInt8(1)
+
+      # ParamLenData
+      if parameter.value
+        buffer.writeUInt8(1)
+        buffer.writeInt8(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x32:
     type: 'BIT'
     name: 'Bit'
   0x34:
     type: 'INT2'
     name: 'SmallInt'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.IntN.id)
+      buffer.writeUInt8(2)
+
+      # ParamLenData
+      if parameter.value
+        buffer.writeUInt8(2)
+        buffer.writeInt16LE(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x38:
     type: 'INT4'
     name: 'Int'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.IntN.id)
+      buffer.writeUInt8(4)
+
+      # ParamLenData
+      if parameter.value
+        buffer.writeUInt8(4)
+        buffer.writeInt32LE(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
@@ -122,12 +157,18 @@ TYPE =
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      buffer.writeUInt16LE(2 * parameter.value.length)
+      if parameter.value
+        buffer.writeUInt16LE(2 * parameter.value.length)
+      else
+        buffer.writeUInt16LE(2)   # Can't declare lenght less than 1 character.
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
-      buffer.writeUInt16LE(2 * parameter.value.length)
-      buffer.writeString(parameter.value, 'ucs2')
+      if parameter.value
+        buffer.writeUInt16LE(2 * parameter.value.length)
+        buffer.writeString(parameter.value, 'ucs2')
+      else
+        buffer.writeUInt16LE(NULL)
   0xEF:
     type: 'NCHAR'
     name: 'NChar'
