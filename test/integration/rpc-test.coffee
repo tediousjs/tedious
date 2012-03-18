@@ -4,7 +4,7 @@ TYPES = require('../../lib/data-type').typeByName
 fs = require('fs')
 
 getConfig = ->
-  config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
+  config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
   config.options.debug =
     packet: true
