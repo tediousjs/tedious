@@ -141,17 +141,20 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value
+        length = parameter.value.length
+      else length = 1         # Can't declare length less than 1 character.
+
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      if parameter.value
-        buffer.writeUInt16LE(parameter.value.length)
-      else
-        buffer.writeUInt16LE(1)   # Can't declare length less than 1 character.
+      buffer.writeUInt16LE(length)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
       if parameter.value
-        buffer.writeUInt16LE(parameter.value.length)
+        buffer.writeUInt16LE(length)
         buffer.writeString(parameter.value, 'ascii')
       else
         buffer.writeUInt16LE(NULL)
@@ -170,17 +173,20 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = 2 * parameter.length
+      else if parameter.value
+        length = 2 * parameter.value.length
+      else length = 2             # Can't declare length less than 1 character.
+
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      if parameter.value
-        buffer.writeUInt16LE(2 * parameter.value.length)
-      else
-        buffer.writeUInt16LE(2)   # Can't declare length less than 1 character.
+      buffer.writeUInt16LE(length)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
       if parameter.value
-        buffer.writeUInt16LE(2 * parameter.value.length)
+        buffer.writeUInt16LE(length)
         buffer.writeString(parameter.value, 'ucs2')
       else
         buffer.writeUInt16LE(NULL)

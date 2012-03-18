@@ -40,6 +40,8 @@ class RpcRequestPayload
     # *ParameterData
     for parameter in @request.parameters
       statusFlags = 0
+      if parameter.output
+        statusFlags |= STATUS.BY_REF_VALUE
 
       # ParamMetaData (less TYPE_INFO)
       buffer.writeBVarchar('@' + parameter.name)

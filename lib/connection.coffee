@@ -188,6 +188,10 @@ class Connection extends EventEmitter
         # Keep value for passing in 'doneProc' event.
         @procReturnStatusValue = token.value
     )
+    @tokenStreamParser.on('returnValue', (token) =>
+        if @request
+          @request.emit('returnValue', token.paramName, token.value, token.metadata)
+    )
     @tokenStreamParser.on('doneProc', (token) =>
       if @request
         @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)

@@ -10,7 +10,7 @@ getConfig = ->
     packet: true
     data: true
     payload: true
-    token: false
+    token: true
     log: true
 
   config
@@ -44,6 +44,36 @@ exports.execProcInt = (test) ->
 
 exports.execProcIntNull = (test) ->
   testProc(test, TYPES.Int, 'int', null)
+
+exports.execProcOutputVarChar = (test) ->
+  testProcOutput(test, TYPES.VarChar, 'varchar(10)', 'test')
+
+exports.execProcOutputVarCharNull = (test) ->
+  testProcOutput(test, TYPES.VarChar, 'varchar(10)', null)
+
+exports.execProcOutputNVarChar = (test) ->
+  testProcOutput(test, TYPES.NVarChar, 'varchar(10)', 'test')
+
+exports.execProcOutputNVarCharNull = (test) ->
+  testProcOutput(test, TYPES.NVarChar, 'varchar(10)', null)
+
+exports.execProcOutputTinyInt = (test) ->
+  testProcOutput(test, TYPES.TinyInt, 'tinyint', 3)
+
+exports.execProcOutputTinyIntNull = (test) ->
+  testProcOutput(test, TYPES.TinyInt, 'tinyint', null)
+
+exports.execProcOutputSmallInt = (test) ->
+  testProcOutput(test, TYPES.SmallInt, 'smallint', 3)
+
+exports.execProcOutputSmallIntNull = (test) ->
+  testProcOutput(test, TYPES.SmallInt, 'smallint', null)
+
+exports.execProcOutputInt = (test) ->
+  testProcOutput(test, TYPES.Int, 'int', 3)
+
+exports.execProcOutputIntNull = (test) ->
+  testProcOutput(test, TYPES.Int, 'int', null)
 
 exports.execProcWithBadName = (test) ->
   test.expect(3)
@@ -186,6 +216,69 @@ testProc = (test, type, typeAsString, value) ->
           @param #{typeAsString}
         AS
           select @param
+      ",
+      ->
+        connection.callProcedure(request)
+    )
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('errorMessage', (error) ->
+    console.log("#{error.number} : #{error.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+testProcOutput = (test, type, typeAsString, value) ->
+  test.expect(7)
+
+  config = getConfig()
+
+  request = new Request('#test_proc', (err) ->
+    test.ok(!err)
+
+    connection.close()
+  )
+
+  request.addParameter(type, 'paramIn', value)
+  request.addOutputParameter(type, 'paramOut',
+    length: 10
+  )
+
+  request.on('doneProc', (rowCount, more, returnStatus) ->
+    test.ok(!more)
+    test.strictEqual(returnStatus, 0)
+  )
+
+  request.on('doneInProc', (rowCount, more) ->
+    test.ok(more)
+  )
+
+  request.on('returnValue', (name, returnValue, metadata) ->
+    test.strictEqual(name, 'paramOut')
+    test.strictEqual(returnValue, value)
+    test.ok(metadata)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    execSql(test, connection,
+      "
+        CREATE PROCEDURE #test_proc
+          @paramIn #{typeAsString},
+          @paramOut #{typeAsString} output
+        AS
+          set @paramOut = @paramIn
       ",
       ->
         connection.callProcedure(request)

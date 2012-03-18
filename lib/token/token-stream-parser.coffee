@@ -13,6 +13,7 @@ tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser
 tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser')
 tokenParsers[TYPE.ORDER] = require('./order-token-parser')
 tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser')
+tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser')
 tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
 ###
