@@ -64,18 +64,14 @@ exports.execProcWithBadName = (test) ->
     #console.log(text)
   )
 
-exports.execFailedProc = (test) ->
-  test.expect(5)
+exports.procReturnValue = (test) ->
+  test.expect(3)
 
   config = getConfig()
 
-  request = new Request('sp_help', (err) ->
-    test.ok(err)
-
+  request = new Request('#test_proc', (err) ->
     connection.close()
   )
-
-  request.addParameter(TYPES.NVarChar, 'objname', 'bad')
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)
@@ -86,14 +82,18 @@ exports.execFailedProc = (test) ->
     test.ok(more)
   )
 
-  request.on('row', (columns) ->
-    test.ok(false)
-  )
-
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    connection.callProcedure(request)
+    execSql(test, connection,
+      "
+        CREATE PROCEDURE #test_proc
+        AS
+          return 1
+      ",
+      ->
+        connection.callProcedure(request)
+    )
   )
 
   connection.on('end', (info) ->
