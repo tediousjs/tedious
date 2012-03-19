@@ -8,6 +8,12 @@ getConfig = ->
 exports.goodInstance = (test) ->
   config = getConfig()
 
+  if !config.instanceName
+    # Config says don't do this test (probably because SQL Server Browser is not available).
+    console.log('Skipping goodInstance test')
+    test.done()
+    return
+
   callback = (err, port) ->
     test.ok(!err)
     test.ok(port)
