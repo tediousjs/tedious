@@ -1,6 +1,8 @@
 fs = require('fs')
 instanceLookup = require('../../lib/instance-lookup')
 
+RESERVED_IP_ADDRESS = '192.0.2.0'     # Can never be used, so guaranteed to fail.
+
 getConfig = ->
   server: JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config.server
   instanceName: JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
@@ -42,4 +44,4 @@ exports.badServer = (test) ->
 
     test.done()
 
-  instanceLookup('badServer', config.instanceName, callback, 100, 1)
+  instanceLookup(RESERVED_IP_ADDRESS, config.instanceName, callback, 100, 1)
