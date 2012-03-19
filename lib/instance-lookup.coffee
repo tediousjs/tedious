@@ -4,8 +4,9 @@ SQL_SERVER_BROWSER_PORT = 1434
 TIMEOUT = 2 * 1000
 RETRIES = 3
 
-module.exports = (server, instanceName, callback) ->
-  retriesLeft = RETRIES
+module.exports = (server, instanceName, callback, timeout, retries) ->
+  timeout = timeout || TIMEOUT
+  retriesLeft = retries || RETRIES
   timer = undefined
   socket = undefined
 
@@ -46,7 +47,7 @@ module.exports = (server, instanceName, callback) ->
 
     callback("Failed to lookup instance on #{server} : #{err}")
 
-  timeout = () ->
+  timedOut = () ->
     timer = undefined
     socket.close()
     makeAttempt()
@@ -63,7 +64,7 @@ module.exports = (server, instanceName, callback) ->
 
       socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server)
 
-      timer = setTimeout(timeout, TIMEOUT)
+      timer = setTimeout(timedOut, timeout)
     else
       callback("Failed to get response from SQL Server Browser on #{server}")
 

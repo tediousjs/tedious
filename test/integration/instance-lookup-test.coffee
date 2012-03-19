@@ -31,7 +31,7 @@ exports.badInstance = (test) ->
 
     test.done()
 
-  instanceLookup(config.server, 'badInstanceName', callback)
+  instanceLookup(config.server, 'badInstanceName', callback, 100, 1)
 
 exports.badServer = (test) ->
   config = getConfig()
@@ -42,4 +42,4 @@ exports.badServer = (test) ->
 
     test.done()
 
-  instanceLookup('badServer', config.instanceName, callback)
+  instanceLookup('badServer', config.instanceName, callback, 100, 1)
