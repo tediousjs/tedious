@@ -4,7 +4,11 @@ SQL_SERVER_BROWSER_PORT = 1434
 TIMEOUT = 2 * 1000
 RETRIES = 3
 
-module.exports = (server, instanceName, callback, timeout, retries) ->
+# There are three bytes at the start of the response, whose purpose is unknown.
+MYSTERY_HEADER_LENGTH = 3
+
+# Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
+exports.instanceLookup = (server, instanceName, callback, timeout, retries) ->
   timeout = timeout || TIMEOUT
   retriesLeft = retries || RETRIES
   timer = undefined
@@ -15,21 +19,8 @@ module.exports = (server, instanceName, callback, timeout, retries) ->
       clearTimeout(timer)
       timer = undefined
 
-    message = message.toString('ascii', 3)
-    parts = message.split(';')
-
-    for p in [0..parts.length - 1] by 2
-      name = parts[p]
-      value = parts[p + 1]
-
-      if (name == 'tcp' && getPort)
-        port = parseInt(value, 10)
-
-      if name == 'InstanceName'
-        if value.toUpperCase() == instanceName.toUpperCase()
-          getPort = true
-        else
-          getPort = false
+    message = message.toString('ascii', MYSTERY_HEADER_LENGTH)
+    port = parseBrowserResponse(message, instanceName)
 
     socket.close()
 
@@ -70,3 +61,26 @@ module.exports = (server, instanceName, callback, timeout, retries) ->
 
   makeAttempt()
 
+parseBrowserResponse = (response, instanceName) ->
+  instances = response.split(';;')
+
+  for instance in instances
+    parts = instance.split(';')
+
+    for p in [0..parts.length - 1] by 2
+      name = parts[p]
+      value = parts[p + 1]
+
+      if (name == 'tcp' && getPort)
+        port = parseInt(value, 10)
+        return port
+
+      if name == 'InstanceName'
+        if value.toUpperCase() == instanceName.toUpperCase()
+          getPort = true
+        else
+          getPort = false
+
+  undefined
+
+exports.parseBrowserResponse = parseBrowserResponse

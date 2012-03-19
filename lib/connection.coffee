@@ -1,7 +1,7 @@
 require('./buffertools')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
-instanceLookup = require('./instance-lookup')
+instanceLookup = require('./instance-lookup').instanceLookup
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
