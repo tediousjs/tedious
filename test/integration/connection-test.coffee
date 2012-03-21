@@ -118,7 +118,7 @@ exports.connectByPort = (test) ->
 exports.connectByInstanceName = (test) ->
   if !getInstanceName()
     # Config says don't do this test (probably because SQL Server Browser is not available).
-    console.log('Skipping goodInstance test')
+    console.log('Skipping connectByInstanceName test')
     test.done()
     return
 
