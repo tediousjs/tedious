@@ -45,6 +45,8 @@ class Request extends EventEmitter
         paramsParameter += ', '
       paramsParameter += "@#{parameter.name} "
       paramsParameter += parameter.type.declaration()
+      if parameter.output
+        paramsParameter += ' OUTPUT'
 
     modifiedParameters.push
       type: TYPES.NVarChar

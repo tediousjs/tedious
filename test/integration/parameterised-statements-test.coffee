@@ -15,16 +15,16 @@ getConfig = ->
 
   config
 
-exports.tinyint = (test) ->
+exports.tinyInt = (test) ->
   execSql(test, TYPES.TinyInt, 8)
 
-exports.tinyintNull = (test) ->
+exports.tinyIntNull = (test) ->
   execSql(test, TYPES.TinyInt, null)
 
-exports.smallint = (test) ->
+exports.smallInt = (test) ->
   execSql(test, TYPES.SmallInt, 8)
 
-exports.smallintNull = (test) ->
+exports.smallIntNull = (test) ->
   execSql(test, TYPES.SmallInt, null)
 
 exports.int = (test) ->
@@ -33,17 +33,86 @@ exports.int = (test) ->
 exports.intNull = (test) ->
   execSql(test, TYPES.Int, null)
 
-exports.varchar = (test) ->
+exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
-exports.varcharNull = (test) ->
+exports.varCharNull = (test) ->
   execSql(test, TYPES.VarChar, null)
 
-exports.nvarchar = (test) ->
+exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
 
-exports.nvarcharNull = (test) ->
+exports.nVarCharNull = (test) ->
   execSql(test, TYPES.NVarChar, null)
+
+exports.outputTinyInt = (test) ->
+  execSqlOutput(test, TYPES.TinyInt, 3)
+
+exports.outputTinyIntNull = (test) ->
+  execSqlOutput(test, TYPES.TinyInt, null)
+
+exports.outputSmallInt = (test) ->
+  execSqlOutput(test, TYPES.SmallInt, 3)
+
+exports.outputSmallIntNull = (test) ->
+  execSqlOutput(test, TYPES.SmallInt, null)
+
+exports.outputInt = (test) ->
+  execSqlOutput(test, TYPES.Int, 3)
+
+exports.outputIntNull = (test) ->
+  execSqlOutput(test, TYPES.Int, null)
+
+exports.outputVarChar = (test) ->
+  execSqlOutput(test, TYPES.VarChar, 'qwerty')
+
+exports.outputVarCharNull = (test) ->
+  execSqlOutput(test, TYPES.VarChar, null)
+
+exports.outputNVarChar = (test) ->
+  execSqlOutput(test, TYPES.NVarChar, 'qwerty')
+
+exports.outputNVarCharNull = (test) ->
+  execSqlOutput(test, TYPES.NVarChar, null)
+
+exports.multipleParameters = (test) ->
+  test.expect(6)
+
+  config = getConfig()
+
+  request = new Request('select @param1, @param2', (err) ->
+      test.ok(!err)
+
+      connection.close()
+  )
+
+  request.addParameter(TYPES.Int, 'param1', 3)
+  request.addParameter(TYPES.VarChar, 'param2', 'qwerty')
+
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
+      test.strictEqual(rowCount, 1)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns.length, 2)
+      test.strictEqual(columns[0].value, 3)
+      test.strictEqual(columns[1].value, 'qwerty')
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
 
 execSql = (test, type, value) ->
   test.expect(5)
@@ -66,6 +135,45 @@ execSql = (test, type, value) ->
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
       test.strictEqual(columns[0].value, value)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+execSqlOutput = (test, type, value) ->
+  test.expect(6)
+
+  config = getConfig()
+
+  request = new Request('set @paramOut = @paramIn', (err) ->
+      test.ok(!err)
+
+      connection.close()
+  )
+
+  request.addParameter(type, 'paramIn', value)
+  request.addOutputParameter(type, 'paramOut')
+
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
+      test.strictEqual(rowCount, 1)
+  )
+
+  request.on('returnValue', (name, returnValue, metadata) ->
+    test.strictEqual(name, 'paramOut')
+    test.strictEqual(returnValue, value)
+    test.ok(metadata)
   )
 
   connection = new Connection(config)
