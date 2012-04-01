@@ -140,12 +140,13 @@ TYPE =
     name: 'VarChar'
     hasCollation: true
     dataLengthLength: 2
+    maximumLength: 8000
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = parameter.length
       else if parameter.value
         length = parameter.value.length
-      else length = 1         # Can't declare length less than 1 character.
+      else length = @.maximumLength
 
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
@@ -172,12 +173,13 @@ TYPE =
     name: 'NVarChar'
     hasCollation: true
     dataLengthLength: 2
+    maximumLength: 4000
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value
         length = 2 * parameter.value.length
-      else length = 2             # Can't declare length less than 1 character.
+      else length = @maximumLength
 
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)

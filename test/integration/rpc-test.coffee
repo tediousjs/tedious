@@ -250,9 +250,7 @@ testProcOutput = (test, type, typeAsString, value) ->
   )
 
   request.addParameter(type, 'paramIn', value)
-  request.addOutputParameter(type, 'paramOut',
-    length: 10
-  )
+  request.addOutputParameter(type, 'paramOut')
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)
