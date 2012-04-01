@@ -10,6 +10,8 @@ TYPE =
   0x30:
     type: 'INT1'
     name: 'TinyInt'
+    declaration: () ->
+      'tinyint'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
@@ -27,6 +29,8 @@ TYPE =
   0x34:
     type: 'INT2'
     name: 'SmallInt'
+    declaration: () ->
+      'smallint'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
@@ -42,7 +46,7 @@ TYPE =
     type: 'INT4'
     name: 'Int'
     declaration: () ->
-      'Int'
+      'int'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
@@ -178,6 +182,8 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 4000
+    declaration: () ->
+      "nvarchar(#{@.maximumLength})"
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = 2 * parameter.length
