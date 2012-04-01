@@ -229,7 +229,7 @@ execSql = (test, sql, expectedValue) ->
     if (err)
       console.log err
     else
-      connection.execSql(request)
+      connection.execSqlBatch(request)
   )
 
   connection.on('end', (info) ->

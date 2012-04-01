@@ -142,7 +142,7 @@ exports.procReturnValue = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    execSql(test, connection,
+    execSqlBatch(test, connection,
       "
         CREATE PROCEDURE #test_proc
         AS
@@ -170,7 +170,7 @@ exports.procReturnValue = (test) ->
     #console.log(text)
   )
 
-execSql = (test, connection, sql, doneCallback) ->
+execSqlBatch = (test, connection, sql, doneCallback) ->
   request = new Request(sql, (err) ->
     if err
       console.log err
@@ -179,7 +179,7 @@ execSql = (test, connection, sql, doneCallback) ->
     doneCallback()
   )
 
-  connection.execSql(request)
+  connection.execSqlBatch(request)
 
 testProc = (test, type, typeAsString, value) ->
   test.expect(5)
@@ -210,7 +210,7 @@ testProc = (test, type, typeAsString, value) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    execSql(test, connection,
+    execSqlBatch(test, connection,
       "
         CREATE PROCEDURE #test_proc
           @param #{typeAsString}
@@ -270,7 +270,7 @@ testProcOutput = (test, type, typeAsString, value) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    execSql(test, connection,
+    execSqlBatch(test, connection,
       "
         CREATE PROCEDURE #test_proc
           @paramIn #{typeAsString},
