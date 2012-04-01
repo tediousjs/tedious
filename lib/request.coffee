@@ -1,4 +1,5 @@
 EventEmitter = require('events').EventEmitter
+TYPES = require('./data-type').typeByName
 
 class Request extends EventEmitter
   constructor: (@sqlTextOrProcedure, @callback) ->
@@ -29,5 +30,32 @@ class Request extends EventEmitter
     options.output = true
 
     @addParameter(type, name, value, options)
+
+  transformIntoExecuteSqlRpc: () ->
+    modifiedParameters = []
+
+    modifiedParameters.push
+      type: TYPES.NVarChar
+      name: 'statement'
+      value: @sqlTextOrProcedure
+
+    paramsParameter = ''
+    for parameter in @parameters
+      if paramsParameter.length > 0
+        paramsParameter += ', '
+      paramsParameter += "@#{parameter.name} "
+      paramsParameter += parameter.type.declaration()
+
+    modifiedParameters.push
+      type: TYPES.NVarChar
+      name: 'params'
+      value: paramsParameter
+
+    for parameter in @parameters
+      modifiedParameters.push(parameter)
+
+    @parameters = modifiedParameters
+
+    @sqlTextOrProcedure = 'sp_executesql'
 
 module.exports = Request

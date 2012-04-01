@@ -41,6 +41,8 @@ TYPE =
   0x38:
     type: 'INT4'
     name: 'Int'
+    declaration: () ->
+      'Int'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
@@ -141,6 +143,8 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 8000
+    declaration: () ->
+      "varchar(#{@.maximumLength})"
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = parameter.length

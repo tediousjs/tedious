@@ -339,7 +339,9 @@ class Connection extends EventEmitter
       @dispatchEvent('loginFailed')
 
   execSql: (request) ->
-      @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure))
+      #@makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure))
+      request.transformIntoExecuteSqlRpc()
+      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
   callProcedure: (request) ->
       @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))

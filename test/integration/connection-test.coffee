@@ -163,8 +163,8 @@ exports.execSql = (test) ->
       connection.close()
   )
 
-  request.on('done', (rowCount, more) ->
-      test.ok(!more)
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
       test.strictEqual(rowCount, 1)
   )
 
@@ -207,8 +207,8 @@ exports.execSqlWithOrder = (test) ->
       connection.close()
   )
 
-  request.on('done', (rowCount, more) ->
-      test.ok(!more)
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok(more)
       test.strictEqual(rowCount, 2)
   )
 
@@ -266,7 +266,7 @@ exports.execSqlMultipleTimes = (test) ->
         makeRequest()
     )
 
-    request.on('done', (rowCount, more) ->
+    request.on('doneInProc', (rowCount, more) ->
         test.strictEqual(rowCount, 1)
         #makeRequest()
     )
@@ -296,7 +296,7 @@ exports.execSqlMultipleTimes = (test) ->
   )
 
 exports.execBadSql = (test) ->
-  test.expect(4)
+  test.expect(2)
 
   config = getConfig()
 
@@ -304,11 +304,6 @@ exports.execBadSql = (test) ->
       test.ok(err)
 
       connection.close()
-  )
-
-  request.on('done', (rowCount, more) ->
-      test.ok(!more)
-      test.ok(!rowCount)
   )
 
   connection = new Connection(config)
@@ -331,7 +326,7 @@ exports.execBadSql = (test) ->
   )
 
 exports.sqlWithMultipleResultSets = (test) ->
-  test.expect(9)
+  test.expect(7)
 
   config = getConfig()
   row = 0
@@ -342,12 +337,7 @@ exports.sqlWithMultipleResultSets = (test) ->
       connection.close()
   )
 
-  request.on('done', (rowCount, more) ->
-      switch row
-        when 1
-          test.ok(more)
-        when 2
-          test.ok(!more)
+  request.on('doneInProc', (rowCount, more) ->
       test.strictEqual(rowCount, 1)
   )
 
@@ -378,7 +368,7 @@ exports.sqlWithMultipleResultSets = (test) ->
   )
 
 exports.execProcAsSql = (test) ->
-  test.expect(5)
+  test.expect(6)
 
   config = getConfig()
 
