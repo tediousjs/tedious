@@ -1,6 +1,6 @@
 body {
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 90%;
+  font-size: 100%;
 }
 
 em {
@@ -39,26 +39,35 @@ p {
 code,
 .code {
   font-family: monospace;
+  line-height: 1.3;
 }
 
-pre.code {
+.function {
+  font-family: monospace;
+  line-height: 1.8;
+  /*background: #f0f0f0;*/
+  padding: 0.3em;
+  border: 1px solid lightgray;
+}
+
+/*
+pre .code {
   background-color: lightgray;
   border: 1px solid darkgray;
   padding: 0.5em;
   margin-bottom: 1em;
 }
+*/
 
 code li {
   margin: 0.5em 0 0.5em 1em;
 }
 
 #content {
-  max-width: 45em;
-  margin: 3em 3em 2em 17em;
+  max-width: 48em;
+  margin: 2em 3em 3em 15em;
   padding: 1em;
-  background-color: #f2f2f2;
   border-left: 1px solid darkgray;
-  border-right: 1px solid darkgray;
 }
 
 #content .licence-text {
@@ -106,8 +115,24 @@ code li {
   width: 10em;
 }
 
+#navigation .heading {
+  font-family: 'The Girl Next Door';
+  font-size: 250%;
+}
+
+#navigation .heading a,
+#navigation .heading a:hover,
+#navigation .heading a:visited {
+  color: #aa0000;
+  text-decoration: none;
+}
+
 #navigation ul li {
   margin-bottom: 0.4em;
+}
+
+#navigation ul li code {
+  line-height: 1;
 }
 
 #navigation ul ul {
@@ -126,17 +151,23 @@ code li {
   text-align: center;
 }
 
-h1, h2 {
-  font-family: 'The Girl Next Door';
+.toc {
+  font-family: monospace;
+  margin: 1em inherit;
 }
 
 h1 {
-  font-size: 200%;
+  font-family: 'The Girl Next Door';
+  font-size: 250%;
+  font-weight: bold;
+  margin-bottom: 0.5em;
 }
 
 h2 {
-    font-size: 200%;
-    margin-bottom: 0.5em;
+    font-size: 150%;
+    font-weight: bold;
+    margin-top: 0.8em;
+    margin-bottom: 0.3em;
 }
 
 h3 {
@@ -144,12 +175,6 @@ h3 {
     font-weight: bold;
     margin-top: 0.8em;
     margin-bottom: 0.3em;
-}
-
-h4 {
-    font-size: 100%;
-    font-weight: bold;
-    margin-bottom: 0.2em;
 }
 
 h1 a,
@@ -164,8 +189,21 @@ h1 a:visited {
     margin: 0.5em;
 }
 
-dl {
+.argument {
+  font-size: 100%;
+}
 
+.argument .name {
+  font-family: monospace;
+  font-weight: bold;
+  margin-bottom: 0.2em;
+}
+
+.argument .description {
+  margin-left: 2em;
+}
+
+dl {
 }
 
 dt {

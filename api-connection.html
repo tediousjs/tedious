@@ -3,7 +3,7 @@ layout: default
 title: API - Connection
 ---
 
-<h2>Connection</h2>
+<h1>Connection</h1>
 
 <p>
   A <code>Connection</code> instance represents a single connection to a database server.
@@ -13,216 +13,285 @@ title: API - Connection
   Only one request at a time may be executed on a connection.
 </p>
 
-<h3>new Connection(config)</h3>
+<ul class="toc">
+  <li><a href="#function_newConnection">new Connection(config)</a></li>
+  <li><a href="#event_connect">Event: 'connect'</a></li>
+  <li><a href="#event_end">Event: 'end'</a></li>
+  <li><a href="#event_debug">Event: 'debug'</a></li>
+  <li><a href="#event_infoMessage">Event: 'infoMessage'</a></li>
+  <li><a href="#event_errorMessage">Event: 'errorMessage'</a></li>
+  <li><a href="#event_databaseChange">Event: 'databaseChange'</a></li>
+  <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
+  <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
+  <li><a href="#function_execSql">connection.execSql(request)</a></li>
+</ul>
+
+<h2 id="function_newConnection">new Connection(config)</h2>
 {% highlight javascript %}
 var Connection = require('tedious').Connection;
 var config = {...};
 var connection = new Connection(config);
 {% endhighlight %}
 
-<h4><code>config</code></h4>
-<dl>
-  <dt>
-    <code>userName</code>
-  </dt>
-  <dd>
-    User name to use for authentication.
-  </dd>
+<div class="argument">
+  <div class="name">config</div>
+  <div class="description">
+    <dl>
+      <dt>
+        <code>userName</code>
+      </dt>
+      <dd>
+        User name to use for authentication.
+      </dd>
 
-  <dt>
-    <code>password</code>
-  </dt>
-  <dd>
-    Password to use for authentication.
-  </dd>
+      <dt>
+        <code>password</code>
+      </dt>
+      <dd>
+        Password to use for authentication.
+      </dd>
 
-  <dt>
-    <code>server</code>
-  </dt>
-  <dd>
-    Hostname to connect to.
-  </dd>
+      <dt>
+        <code>server</code>
+      </dt>
+      <dd>
+        Hostname to connect to.
+      </dd>
 
-  <dt>
-    <code>options.port</code>
-  </dt>
-  <dd>
-    Port to connect to (default: <code>1433</code>).
-  </dd>
+      <dt>
+        <code>options.port</code>
+      </dt>
+      <dd>
+        Port to connect to (default: <code>1433</code>).
+      </dd>
 
-  <dt>
-    <code>options.database</code>
-  </dt>
-  <dd>
-    Database to connect to (default: dependent on server configuration).
-  </dd>
+      <dt>
+        <code>options.database</code>
+      </dt>
+      <dd>
+        Database to connect to (default: dependent on server configuration).
+      </dd>
 
-  <dt>
-    <code>options.connectTimeout</code>
-  </dt>
-  <dd>
-    The number of milliseconds before the attempt to connect is considered failed
-    (default: <code>15000</code>).
-  </dd>
+      <dt>
+        <code>options.connectTimeout</code>
+      </dt>
+      <dd>
+        The number of milliseconds before the attempt to connect is considered failed
+        (default: <code>15000</code>).
+      </dd>
 
-  <dt>
-    <code>options.requestTimeout</code>
-  </dt>
-  <dd>
-    The number of milliseconds before a request is considered failed
-    (default: <code>15000</code>).
-  </dd>
+      <dt>
+        <code>options.requestTimeout</code>
+      </dt>
+      <dd>
+        The number of milliseconds before a request is considered failed
+        (default: <code>15000</code>).
+      </dd>
 
-  <dt>
-    <code>options.cancelTimeout</code>
-  </dt>
-  <dd>
-    The number of milliseconds before the cancel (abort) of a request is considered failed
-    (default: <code>5000</code>).
-  </dd>
+      <dt>
+        <code>options.cancelTimeout</code>
+      </dt>
+      <dd>
+        The number of milliseconds before the cancel (abort) of a request is considered failed
+        (default: <code>5000</code>).
+      </dd>
 
-  <dt>
-    <code>options.packetSize</code>
-  </dt>
-  <dd>
-    The size of TDS packets (subject to negotiation with the server).
-    Should be a power of 2.
-    (default: <code>4096</code>).
-  </dd>
+      <dt>
+        <code>options.packetSize</code>
+      </dt>
+      <dd>
+        The size of TDS packets (subject to negotiation with the server).
+        Should be a power of 2.
+        (default: <code>4096</code>).
+      </dd>
 
-  <dt>
-    <code>options.debug.packet</code>
-  </dt>
-  <dd>
-    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet details
-    (default: <code>false</code>).
-  </dd>
+      <dt>
+        <code>options.debug.packet</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet details
+        (default: <code>false</code>).
+      </dd>
 
-  <dt>
-    <code>options.debug.data</code>
-  </dt>
-  <dd>
-    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet data details
-    (default: <code>false</code>).
-  </dd>
+      <dt>
+        <code>options.debug.data</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet data details
+        (default: <code>false</code>).
+      </dd>
 
-  <dt>
-    <code>options.debug.payload</code>
-  </dt>
-  <dd>
-    A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet payload details
-    (default: <code>false</code>).
-  </dd>
+      <dt>
+        <code>options.debug.payload</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet payload details
+        (default: <code>false</code>).
+      </dd>
 
-  <dt>
-    <code>options.debug.token</code>
-  </dt>
-  <dd>
-    A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream tokens
-    (default: <code>false</code>).
-  </dd>
-</dl>
+      <dt>
+        <code>options.debug.token</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream tokens
+        (default: <code>false</code>).
+      </dd>
+    </dl>
+  </div>
+</div>
 
-<h3>Event: connect</h3>
-<code>function (err) { }</code>
+<h2 id="event_connect">Event: 'connect'</h2>
+<span class="function">function (err) { }</span>
 <p>
   The attempt to connect and validate has completed.
 </p>
-<p>
-  If successful, <code>err</code> will be falsey.
-</p>
-<p>
-  If there was a problem (with either connecting or validation), <code>err</code> will be a string
-  with details of the error.
-</p>
+<div class="argument">
+  <div class="name">err</div>
+  <div class="description">
+    <p>
+      If successfully connected, will be falsey.
+    </p>
+    <p>
+      If there was a problem (with either connecting or validation), will be a string
+      with details of the error.
+    </p>
+  </div>
+</div>
 
-<h3>Event: end</h3>
-<code>function () { }</code>
+<h2 id="event_end">Event: 'end'</h2>
+<span class="function">function () { }</span>
 <p>
   The connection has ended.
   This may be as a result of the client calling <code>close()</code>, the server closing the connection, or a network error.
 </p>
 
-<h3>Event: debug</h3>
-<code>function (messageText) { }</code>
+<h2 id="event_debug">Event: 'debug'</h2>
+<span class="function">function (messageText) { }</span>
 <p>
   A debug message is available.
   It may be logged or ignored.
 </p>
-<p>
-  Connection options control what types of debug messages are emitted.
-</p>
+<div class="argument">
+  <div class="name">messageText</div>
+  <div class="description">
+    <p>
+      The debug message.
+    </p>
+  </div>
+</div>
 
-<h3>Event: infoMessage</h3>
-<code>function (info) { }</code>
+<h2 id="event_infoMessage">Event: 'infoMessage'</h2>
+<span class="function">function (info) { }</span>
 <p>
   The server has issued an information message.
 </p>
+<div class="argument">
+  <div class="name">info</div>
+  <div class="description">
+    <p>
+      An object with these properties:
+    </p>
+    <dl>
+      <dt><code>number</code></dt>
+      <dd>Error number</dd>
+    </dl>
+    <dl>
+      <dt><code>state</code></dt>
+      <dd>The error state, used as a modifier to the error number.</dd>
+    </dl>
+    <dl>
+      <dt><code>class</code></dt>
+      <dd>The class (severity) of the error. A class of less than 10 indicates an informational message.</dd>
+    </dl>
+    <dl>
+      <dt><code>message</code></dt>
+      <dd>The message text.</dd>
+    </dl>
+    <dl>
+      <dt><code>procName</code></dt>
+      <dd>The stored procedure name (if a stored procedure generated the message).</dd>
+    </dl>
+    <dl>
+      <dt><code>lineNumber</code></dt>
+      <dd>
+        The line number in the SQL batch or stored procedure that caused the error.
+        Line numbers begin at 1; therefore, if the line number is not applicable to the message,
+        the value of LineNumber will be 0.
+      </dd>
+    </dl>
+  </div>
+</div>
 
-<p>
-  The <code>info</code> argument is an object with these properties:
-</p>
-<dl>
-  <dt><code>number</code></dt>
-  <dd>Error number</dd>
-</dl>
-<dl>
-  <dt><code>state</code></dt>
-  <dd>The error state, used as a modifier to the error number.</dd>
-</dl>
-<dl>
-  <dt><code>class</code></dt>
-  <dd>The class (severity) of the error. A class of less than 10 indicates an informational message.</dd>
-</dl>
-<dl>
-  <dt><code>message</code></dt>
-  <dd>The message text.</dd>
-</dl>
-<dl>
-  <dt><code>procName</code></dt>
-  <dd>The stored procedure name (if a stored procedure generated the message).</dd>
-</dl>
-<dl>
-  <dt><code>lineNumber</code></dt>
-  <dd>
-    The line number in the SQL batch or stored procedure that caused the error.
-    Line numbers begin at 1; therefore, if the line number is not applicable to the message,
-    the value of LineNumber will be 0.
-  </dd>
-</dl>
-
-<h3>Event: errorMessage</h3>
-<code>function (error) { }</code>
+<h2 id="event_errorMessage">Event: 'errorMessage'</h2>
+<span class="function">function (error) { }</span>
 <p>
   The server has issued an error message.
 </p>
+<div class="argument">
+  <div class="name">error</div>
+  <div class="description">
+    <p>
+      An object with the same properties as.listed for the
+      <code>infoMessage</code> event.
+    </p>
+  </div>
+</div>
 
-<p>
-  The <code>error</code> argument is an object with the same properties as.listed for the
-  <code>infoMessage</code> event.
-</p>
 
-<h3>Event: databaseChange</h3>
-<code>function (databaseName) { }</code>
+<h2 id="event_databaseChange">Event: 'databaseChange'</h2>
+<span class="function">function (databaseName) { }</span>
 <p>
-  The active database has changed to <code>databaseName</code>.
+  The server has reported that the active database has changed.
   This may be as a result of a sucessful login, or a <code>use</code> statement.
 </p>
+<div class="argument">
+  <div class="name">databaseName</div>
+  <div class="description">
+    <p>
+      The name of the new active database
+    </p>
+  </div>
+</div>
 
-<h3>Event: languageChange</h3>
-<code>function (languageName) { }</code>
+<h2 id="event_languageChange">Event: 'languageChange'</h2>
+<span class="function">function (languageName) { }</span>
 <p>
-  The language has changed to <code>languageName</code>.
+  The server has reported that the language has changed.
 </p>
+<div class="argument">
+  <div class="name">languageName</div>
+  <div class="description">
+    <p>
+      The newly active language.
+    </p>
+  </div>
+</div>
 
-<h3>Event: charsetChange</h3>
-<code>function (charset) { }</code>
+<h2 id="event_charsetChange">Event: 'charsetChange'</h2>
+<span class="function">function (charset) { }</span>
 <p>
-  The character set has changed to <code>charset</code>.
+  The server has reported that the charset has changed.
 </p>
+<div class="argument">
+  <div class="name">charset</div>
+  <div class="description">
+    <p>
+      The new charset.
+    </p>
+  </div>
+</div>
 
-<h3>connection.execSql(request)</h3>
+<h2 id="function_execSql">connection.execSql(request)</h2>
 <p>
   Execute the SQL batch represented by <code>request</code>.
   See <a href="api-request.html"><code>Request</code></a>.
 </p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+    </p>
+  </div>
+</div>
