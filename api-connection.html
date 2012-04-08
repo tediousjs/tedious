@@ -23,7 +23,9 @@ title: API - Connection
   <li><a href="#event_databaseChange">Event: 'databaseChange'</a></li>
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
+  <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
+  <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
 </ul>
 
 <h2 id="function_newConnection">new Connection(config)</h2>
@@ -281,10 +283,47 @@ var connection = new Connection(config);
   </div>
 </div>
 
+<h2 id="function_callProcedure">connection.callProcedure(request)</h2>
+<p>
+  Call a stored procedure represented by <code>request</code>.
+</p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+    </p>
+  </div>
+</div>
+
 <h2 id="function_execSql">connection.execSql(request)</h2>
 <p>
+  Execute the SQL represented by <code>request</code>.
+</p>
+<p>
+  As <code>sp_executesql</code> is used to execute the SQL,
+  is the same SQL is executed multiples times using this function,
+  the SQL Server query optimizer is likely to reuse the execution plan it generates for the first execution.
+</p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_execSqlBatch">connection.execSqlBatch(request)</h2>
+<p>
   Execute the SQL batch represented by <code>request</code>.
-  See <a href="api-request.html"><code>Request</code></a>.
+  There is no param support, and unlike <code>execSql</code>,
+  it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+</p>
+<p>
+  In almost all cases, <code>execSql</code> will be a better choice.
 </p>
 <div class="argument">
   <div class="name">request</div>
