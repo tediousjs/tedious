@@ -2,7 +2,7 @@
 
 versions = require('../tds-versions').versionsByValue
 
-interfaces =
+interfaceTypes =
   0: 'SQL_DFLT'
   1: 'SQL_TSQL'
 
@@ -10,8 +10,8 @@ parser = (buffer) ->
   length = buffer.readUInt16LE()
 
   interfaceNumber = buffer.readUInt8()
-  interface = interfaces[interfaceNumber]
-  if !interface
+  interfaceType = interfaceTypes[interfaceNumber]
+  if !interfaceType
     throw new Error("Unknown LOGINACK Interface #{interfaceNumber} at offset #{buffer.position}")
 
   tdsVersionNumber = buffer.readUInt32BE()
@@ -30,7 +30,7 @@ parser = (buffer) ->
   # Return token
   name: 'LOGINACK'
   event: 'loginack'
-  interface: interface
+  interface: interfaceType
   tdsVersion: tdsVersion
   progName: progName
   progVersion: progVersion

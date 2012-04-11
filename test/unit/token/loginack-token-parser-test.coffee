@@ -3,7 +3,7 @@ ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer')
 WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.info = (test) ->
-  interface = 1
+  interfaceType = 1
   version = 0x72090002
   progName = 'prog'
   progVersion =
@@ -15,7 +15,7 @@ module.exports.info = (test) ->
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
   buffer.writeUInt16LE(0)         # Length written later
-  buffer.writeUInt8(interface)
+  buffer.writeUInt8(interfaceType)
   buffer.writeUInt32BE(version)
   buffer.writeBVarchar(progName)
   buffer.writeUInt8(progVersion.major)
