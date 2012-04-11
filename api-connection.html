@@ -65,6 +65,21 @@ var connection = new Connection(config);
       </dt>
       <dd>
         Port to connect to (default: <code>1433</code>).
+        <br/>
+        Mutually exclusive with <code>options.instanceName</code>.
+      </dd>
+
+      <dt>
+        <code>options.instanceName</code>
+      </dt>
+      <dd>
+        The instance name to connect to.
+        The SQL Server Browser service must be running on the database server,
+        and UDP port 1444 on the database server must be reachable.
+        <br/>
+        (no default)
+        <br/>
+        Mutually exclusive with <code>options.port</code>.
       </dd>
 
       <dt>
