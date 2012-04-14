@@ -71,6 +71,12 @@ exports.datetime = (test) ->
 exports.datetimeNull = (test) ->
   execSql(test, "select cast(null as datetime)", null)
 
+exports.smallDatetime = (test) ->
+  execSql(test, "select cast('2011-12-4 10:04:23' as smalldatetime)", new Date('December 4, 2011 10:04:00'))
+
+exports.smallDatetimeNull = (test) ->
+  execSql(test, "select cast(null as smalldatetime)", null)
+
 exports.numericSmallValue = (test) ->
   execSql(test, "select cast(9.3 as numeric(3,2))", 9.3)
 
