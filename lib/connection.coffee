@@ -94,7 +94,7 @@ class Connection extends EventEmitter
 
           sqlRequest = @request
           @request = undefined
-          sqlRequest.callback(sqlRequest.error)
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount)
     FINAL:
       name: 'Final'
       enter: ->
@@ -185,6 +185,7 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('row', (token) =>
       if @request
+        @request.rowCount++
         @request.emit('row', token.columns)
       else
         throw new Error("Received 'row' when no sqlRequest is in progress")
@@ -357,6 +358,7 @@ class Connection extends EventEmitter
       request.callback(message)
     else
       @request = request
+      @request.rowCount = 0
 
       @messageIo.sendMessage(packetType, payload.data)
       @debug.payload(->

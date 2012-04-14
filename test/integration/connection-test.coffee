@@ -153,12 +153,13 @@ exports.connectByInstanceName = (test) ->
   )
 
 exports.execSql = (test) ->
-  test.expect(7)
+  test.expect(8)
 
   config = getConfig()
 
-  request = new Request('select 8 as C1', (err) ->
+  request = new Request('select 8 as C1', (err, rowCount) ->
       test.ok(!err)
+      test.strictEqual(rowCount, 1)
 
       connection.close()
   )
@@ -197,12 +198,14 @@ exports.execSql = (test) ->
   )
 
 exports.execSqlWithOrder = (test) ->
-  test.expect(9)
+  test.expect(10)
 
   config = getConfig()
 
-  request = new Request("select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id", (err) ->
+  sql = "select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id"
+  request = new Request(sql, (err, rowCount) ->
       test.ok(!err)
+      test.strictEqual(rowCount, 2)
 
       connection.close()
   )
@@ -249,7 +252,7 @@ exports.execSqlWithOrder = (test) ->
   )
 
 exports.execSqlMultipleTimes = (test) ->
-  test.expect(15)
+  test.expect(20)
 
   requestsToMake = 5;
   config = getConfig()
@@ -259,8 +262,9 @@ exports.execSqlMultipleTimes = (test) ->
       connection.close()
       return
 
-    request = new Request('select 8 as C1', (err) ->
+    request = new Request('select 8 as C1', (err, rowCount) ->
         test.ok(!err)
+        test.strictEqual(rowCount, 1)
 
         requestsToMake--
         makeRequest()
@@ -326,13 +330,14 @@ exports.execBadSql = (test) ->
   )
 
 exports.sqlWithMultipleResultSets = (test) ->
-  test.expect(7)
+  test.expect(8)
 
   config = getConfig()
   row = 0
 
-  request = new Request('select 1; select 2;', (err) ->
+  request = new Request('select 1; select 2;', (err, rowCount) ->
       test.ok(!err)
+      test.strictEqual(rowCount, 2)
 
       connection.close()
   )
@@ -368,12 +373,13 @@ exports.sqlWithMultipleResultSets = (test) ->
   )
 
 exports.execProcAsSql = (test) ->
-  test.expect(6)
+  test.expect(7)
 
   config = getConfig()
 
-  request = new Request('exec sp_help int', (err) ->
+  request = new Request('exec sp_help int', (err, rowCount) ->
       test.ok(!err)
+      test.strictEqual(rowCount, 1)
 
       connection.close()
   )
