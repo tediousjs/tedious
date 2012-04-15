@@ -5,27 +5,52 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
-<h3>v0.0.1</h3>
-<p>
-  The initial release.
-</p>
-
+<h3>v0.0.4 <span class="date">2012-04-15</span></h3>
 <ul>
   <li>
-    Tedious is just about useable for simple statements.
+    On successful connection, set textsize (by default, to 2147483647).
+    This allows long values to be
+    returned for varchar(max), nvarchar(max), varbinary(max), text, ntext, and image datatypes.
   </li>
   <li>
-    Session establishment and authentication work.
+    Honour the defined locale for char, varchar and text datatypes.
+    iconv is used to perform the conversion, and is included as an optional dependency.
+    If it is not available, then ascii is used as fallback when converting the buffers to strings.
   </li>
   <li>
-    Sending SQL statements (in a SQL_BATCH packet) works for some simple statements.
+    Added support for executing parameterised statements.
   </li>
   <li>
-    Many simple data types are supported.
+    Added support for calling procedures with parameters.
+  </li>
+  <li>
+    Support connecting by instance name (instead of port).
+  </li>
+  <li>
+    Expose the total number of rows returned, in Request's completion callback.
   </li>
 </ul>
 
-<h3>v0.0.2</h3>
+<h3>v0.0.3 <span class="date">2012-02-12</span></h3>
+<ul>
+  <li>
+    Added support for Order tokens, meaning that select statements with an order clause can now be used.
+  </li>
+  <li>
+    Added support for more data types in result sets:
+    <code>uniqueidentifier</code>,
+    <code>text</code>,
+    <code>ntext</code>,
+    <code>image</code>,
+    <code>smallmoney</code>,
+    <code>money</code>,
+  </li>
+  <li>
+    Fixed bug that prevented new Requests from being initiated from a Request's completion callback.
+  </li>
+</ul>
+
+<h3>v0.0.2 <span class="date">2012-01-08</span></h3>
 <ul>
   <li>
     Changed the API quite a bit, and documented it.
@@ -65,21 +90,22 @@ title: ChangeLog
   </li>
 </ul>
 
-<h3>v0.0.3</h3>
+<h3>v0.0.1 <span class="date">2011-12-04</span></h3>
+<p>
+  The initial release.
+</p>
+
 <ul>
   <li>
-    Added support for Order tokens, meaning that select statements with an order clause can now be used.
+    Tedious is just about useable for simple statements.
   </li>
   <li>
-    Added support for more data types in result sets:
-    <code>uniqueidentifier</code>,
-    <code>text</code>,
-    <code>ntext</code>,
-    <code>image</code>,
-    <code>smallmoney</code>,
-    <code>money</code>,
+    Session establishment and authentication work.
   </li>
   <li>
-    Fixed bug that prevented new Requests from being initiated from a Request's completion callback.
+    Sending SQL statements (in a SQL_BATCH packet) works for some simple statements.
+  </li>
+  <li>
+    Many simple data types are supported.
   </li>
 </ul>
