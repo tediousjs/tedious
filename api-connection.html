@@ -11,6 +11,12 @@ title: API - Connection
 
 <p>
   Only one request at a time may be executed on a connection.
+
+  Once a <a href="api-request.html"><code>Request</code></a> has been initiated
+  (with <a href="#function_callProcedure"><code>callProcedure</code></a>,
+  <a href="#function_execSql"><code>execSql</code></a>, or
+  <a href="#function_execSqlBatch"><code>execSqlBatch</code></a>),
+  another should not be initiated until the <code>Request</code>'s completion callback is called.
 </p>
 
 <ul class="toc">
