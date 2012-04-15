@@ -192,7 +192,7 @@ testProc = (test, type, typeAsString, value) ->
     connection.close()
   )
 
-  request.addParameter(type, 'param', value)
+  request.addParameter('param', type, value)
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)
@@ -249,8 +249,8 @@ testProcOutput = (test, type, typeAsString, value) ->
     connection.close()
   )
 
-  request.addParameter(type, 'paramIn', value)
-  request.addOutputParameter(type, 'paramOut')
+  request.addParameter('paramIn', type, value)
+  request.addOutputParameter('paramOut', type)
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)

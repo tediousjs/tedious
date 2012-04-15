@@ -86,8 +86,8 @@ exports.multipleParameters = (test) ->
       connection.close()
   )
 
-  request.addParameter(TYPES.Int, 'param1', 3)
-  request.addParameter(TYPES.VarChar, 'param2', 'qwerty')
+  request.addParameter('param1', TYPES.Int, 3)
+  request.addParameter('param2', TYPES.VarChar, 'qwerty')
 
   request.on('doneInProc', (rowCount, more) ->
       test.ok(more)
@@ -125,7 +125,7 @@ execSql = (test, type, value) ->
       connection.close()
   )
 
-  request.addParameter(type, 'param', value)
+  request.addParameter('param', type, value)
 
   request.on('doneInProc', (rowCount, more) ->
       test.ok(more)
@@ -162,8 +162,8 @@ execSqlOutput = (test, type, value) ->
       connection.close()
   )
 
-  request.addParameter(type, 'paramIn', value)
-  request.addOutputParameter(type, 'paramOut')
+  request.addParameter('paramIn', type, value)
+  request.addOutputParameter('paramOut', type)
 
   request.on('doneInProc', (rowCount, more) ->
       test.ok(more)

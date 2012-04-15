@@ -5,7 +5,7 @@ class Request extends EventEmitter
   constructor: (@sqlTextOrProcedure, @callback) ->
     @parameters = []
 
-  addParameter: (type, name, value, options) ->
+  addParameter: (name, type, value, options) ->
     if arguments.length < 4
       if typeof value == 'object'
         options = value
@@ -20,7 +20,7 @@ class Request extends EventEmitter
       output: options.output ||= false
       length: options.length
 
-  addOutputParameter: (type, name, value, options) ->
+  addOutputParameter: (name, type, value, options) ->
     if arguments.length < 4
       if typeof value == 'object'
         options = value
@@ -29,7 +29,7 @@ class Request extends EventEmitter
     options ||= {}
     options.output = true
 
-    @addParameter(type, name, value, options)
+    @addParameter(name, type, value, options)
 
   transformIntoExecuteSqlRpc: () ->
     modifiedParameters = []
