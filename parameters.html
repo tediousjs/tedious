@@ -1,0 +1,94 @@
+---
+layout: default
+title: Using Parameters
+---
+
+<h1>Using Parameters</h1>
+
+<p>
+  There is support for parameterised statements, and using parameters when calling procedures.
+</p>
+
+<p>
+  Input parameters are added to a Request using
+  <a href="api-request.html#function_addParameter">Request.addParameter()</a>,
+  and output parameters are added using
+  <a href="api-request.html#function_addOutputParameter">Request.addOutputParameter()</a>
+</p>
+
+<h2>Parameter names</h2>
+<p>
+  In T-SQL, parameter names are identified by being prefixed with an '@'.
+</p>
+
+{% highlight sql %}
+  select id from address where first_name = @name and age > @age
+{% endhighlight %}
+
+<p>
+  The parameters names used in this API do not include the '@'.
+</p>
+{% highlight javascript %}
+  request.addParameter(..., 'name', ...);
+  request.addParameter(..., 'age', ...);
+{% endhighlight %}
+
+<h2>Input Parameters</h2>
+<p>
+  This is how input parameters might be used when executing a statement.
+</p>
+
+{% highlight javascript %}
+  var TYPES = require('tedious').TYPES;
+
+  var sql = 'select id from address where first_name = @name and age > @age';
+  var request = new Request(sql, function(err) {
+    ....
+  });
+
+  request.addParameter(TYPES.VarChar, 'name', 'Fred');
+  request.addParameter(TYPES.Int, 'age', 42);
+
+  connection.execSql(request);
+{% endhighlight %}
+
+<p>
+  Calling a stored procedure with parameters works in a similar way.
+</p>
+
+{% highlight javascript %}
+  var TYPES = require('tedious').TYPES;
+
+  var request = new Request('get_addresses', function(err) {
+    ....
+  });
+
+  request.addParameter(TYPES.VarChar, 'name', 'Fred');
+  request.addParameter(TYPES.Int, 'age', 42);
+
+  connection.callProcedure(request);
+{% endhighlight %}
+
+<h2>Output Parameters</h2>
+<p>
+  The values for output parameters provided with emitted
+  <a href="api-request.html#event_returnValue">returnValue</a> events.
+</p>
+
+{% highlight javascript %}
+  var TYPES = require('tedious').TYPES;
+
+  var request = new Request("select @number=42, @string='qaz'", function(err) {
+    ....
+  });
+
+  request.addOutputParameter(TYPES.Int, 'number');
+  request.addOutputParameter(TYPES.VarChar, 'string');
+
+  request.on('returnValue', function(parameterName, value, metadata) {
+    console.log(parameterName + ' = ' + value);      // number = 42
+                                                     // string = qaz
+  });
+
+  connection.execSql(request);
+{% endhighlight %}

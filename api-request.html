@@ -16,6 +16,9 @@ title: API - Request
   <li><a href="#event_done">Event: 'done'</a></li>
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
   <li><a href="#event_doneProc">Event: 'doneProc'</a></li>
+  <li><a href="#event_returnValue">Event: 'returnValue'</a></li>
+  <li><a href="#function_addParameter">request.addParameter(name, type, value)</a></li>
+  <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type)</a></li>
 </ul>
 
 <h2 id="function_newRequest">new Request(sql, callback)</h3>
@@ -222,6 +225,114 @@ connection.execSql(request);
   <div class="description">
     <p>
       The value returned from a stored procedure.
+    </p>
+  </div>
+</div>
+
+<h2 id="event_returnValue">Event: returnValue</h2>
+<code>function (parameterName, value, metadata) { }</code>
+<p>
+  A value for an output parameter
+  (that was added to the request with
+  <a href="#function_addOutputParameter">addOutputParameter(...)</a>).
+</p>
+<p>
+  See also <a href="parameters.html"><code>Using Parameters</code></a>.
+</p>
+<div class="argument">
+  <div class="name">parameterName</div>
+  <div class="description">
+    <p>
+      The parameter name.
+      (Does not start with '@'.)
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">value</div>
+  <div class="description">
+    <p>
+      The parameter's output value.
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">metadata</div>
+  <div class="description">
+    <p>
+      The same data that is exposed in the <code>columnMetadata</code> event.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_addParameter">request.addParameter(name, type, value)</h2>
+<p>
+  Add an input parameter to the request.
+</p>
+{% highlight javascript %}
+request.addParameter('city', TYPES.VarChar, 'London');
+{% endhighlight %}
+<p>
+  See also <a href="parameters.html"><code>Using Parameters</code></a>.
+</p>
+<div class="argument">
+  <div class="name">name</div>
+  <div class="description">
+    <p>
+      The parameter name.
+      This should correspond to a parameter in the SQL,
+      or a parameter that a called procedure expects.
+    </p>
+    <p>
+      The name should not start '@'.
+    </p>
+  </div>
+
+  <div class="name">type</div>
+  <div class="description">
+    <p>
+      One of the supported <a href="api-datatypes.html"><code>data types</code></a>.
+    </p>
+  </div>
+
+  <div class="name">value</div>
+  <div class="description">
+    <p>
+      The value that the parameter is to be given.
+      The Javascript type of the argument should match
+      that documented for <a href="api-datatypes.html"><code>data types</code></a>.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_addOutputParameter">request.addOutputParameter(name, type)</h2>
+<p>
+  Add an output parameter to the request.
+</p>
+{% highlight javascript %}
+request.addOutputParameter('id', TYPES.Int);
+{% endhighlight %}
+<p>
+  The parameter's value will be provide by an emitted
+  <a href="#event_returnValue"><code>returnValue</code></a> event.
+</p>
+<p>
+  See also <a href="parameters.html"><code>Using Parameters</code></a>.
+</p>
+<div class="argument">
+  <div class="name">name</div>
+  <div class="description">
+    <p>
+      The parameter name.
+      This should correspond to a parameter in the SQL,
+      or a parameter that a called procedure expects.
+    </p>
+  </div>
+
+  <div class="name">type</div>
+  <div class="description">
+    <p>
+      One of the supported <a href="api-datatypes.html"><code>data types</code></a>.
     </p>
   </div>
 </div>
