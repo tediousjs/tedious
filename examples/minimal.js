@@ -2,7 +2,7 @@ var Connection = require('../lib/tedious').Connection;
 var Request = require('../lib/tedious').Request;
 
 var config = {
-  server: '192.168.1.210',
+  server: '192.168.1.212',
   userName: 'test',
   password: 'test'
   /*
@@ -32,7 +32,13 @@ connection.on('debug', function(text) {
 );
 
 function executeStatement() {
-  request = new Request("select 42, 'hello world'", function(err) {
+  request = new Request("select 42, 'hello world'", function(err, rowCount) {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log(rowCount + ' rows');
+    }
+
     connection.close();
   });
 

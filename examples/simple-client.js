@@ -2,9 +2,9 @@ var Connection = require('../lib/tedious').Connection;
 var Request = require('../lib/tedious').Request;
 var fs = require('fs');
 
-var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8'))
+var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
 
-config.options.timeout = 30 * 1000;
+config.options.requestTimeout = 30 * 1000;
 config.options.debug = {
   data: true,
   payload: false,
@@ -26,15 +26,15 @@ function connected(err) {
     console.log(err);
     process.exit(1);
   }
-  
+
   //console.log('connected');
 
   process.stdin.resume();
-  
+
   process.stdin.on('data', function (chunk) {
     exec(chunk);
   });
-  
+
   process.stdin.on('end', function () {
     process.exit(0);
   });
@@ -52,12 +52,14 @@ function exec(sql) {
 }
 
 function requestDone(rowCount, more) {
-  console.log(rowCount + ' rows');
+  //console.log(rowCount + ' rows');
 }
 
-function statementComplete(err) {
+function statementComplete(err, rowCount) {
   if (err) {
-    //console.log('Statement failed: ' + err);
+    console.log('Statement failed: ' + err);
+  } else {
+    console.log(rowCount + ' rows');
   }
 }
 
@@ -82,14 +84,14 @@ function columnMetadata(columnsMetadata) {
 
 function row(columns) {
   var values = '';
-  
+
   columns.forEach(function(column) {
     if (column.value === null) {
       value = 'NULL';
     } else {
       value = column.value;
     }
-    
+
     values += value + '\t';
   });
 
