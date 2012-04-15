@@ -11,16 +11,26 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Current version: v0.0.3
+Current version: v0.0.4
 
-Tedious is useable if your requirements are modest.
+Coming soon
+-----------
+Although subject to change, this is the rough plan for the next few versions.
 
-There's plenty that needs doing (but nothing that should stop successful simple usage).
 
-- Decoding of column metadata flags.
-- Decoding of collation data.
-- Ability to cancel a request.
-- Support for transactions.
+### v0.0.5 ###
+- prepared statements
+
+### v0.0.6 ###
+- transaction management
+
+### v0.0.7 ###
+- secure connections
+
+### unplanned ###
+- decoding of column metadata flags
+- full decoding of collation data
+- ability to cancel a request
 
 Documentation
 -------------
