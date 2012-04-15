@@ -9,6 +9,7 @@ title: API - Datatypes
   <tr>
     <th>Type</th>
     <th>Constant<span class="footnote">1</span></th>
+    <th>JavaScript</th>
     <th>Result set</th>
     <th>Parameter</th>
   </tr>
@@ -19,54 +20,63 @@ title: API - Datatypes
   <tr>
     <td class="code">bit</td>
     <td class="code">TYPES.Bit</td>
+    <td class="code">Boolean</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">tinyint</td>
     <td class="code">TYPES.TinyInt</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">smallint</td>
     <td class="code">TYPES.SmallInt</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">int</td>
     <td class="code">TYPES.Int</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">bigint<span class="footnote">2</span></td>
     <td class="code">TYPES.BigInt</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">numeric</td>
     <td class="code">TYPES.Numeric</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">decimal</td>
     <td class="code">TYPES.Decimal</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">smallmoney</td>
     <td class="code">TYPES.SmallMoney</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">money</td>
     <td class="code">TYPES.Money</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -77,12 +87,14 @@ title: API - Datatypes
   <tr>
     <td class="code">float</td>
     <td class="code">TYPES.Float</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">real</td>
     <td class="code">TYPES.real</td>
+    <td class="code">Numeric</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -93,12 +105,14 @@ title: API - Datatypes
   <tr>
     <td class="code">smalldatetime</td>
     <td class="code">TYPES.SmallDateTime</td>
+    <td class="code">Date</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">datetime</td>
     <td class="code">TYPES.DateTime</td>
+    <td class="code">Date</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -109,18 +123,21 @@ title: API - Datatypes
   <tr>
     <td class="code">char</td>
     <td class="code">TYPES.Char</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">varchar<span class="footnote">3</span></td>
     <td class="code">TYPES.VarChar</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">text</td>
     <td class="code">TYPES.Text</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -131,40 +148,46 @@ title: API - Datatypes
   <tr>
     <td class="code">nchar</td>
     <td class="code">TYPES.NChar</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
-    <td class="code">nvarchar</td>
-    <td class="code">TYPES.NVarChar<span class="footnote">4</span></td>
+    <td class="code">nvarchar<span class="footnote">4</span></td>
+    <td class="code">TYPES.NVarChar</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">ntext</td>
     <td class="code">TYPES.NText</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
 
   <tr class="group-heading">
-    <td colspan="4">Binary Strings</td>
+    <td colspan="4">Binary Strings<span class="footnote">5</span></td>
   </tr>
   <tr>
     <td class="code">binary</td>
     <td class="code">TYPES.Binary</td>
+    <td class="code">[Numeric]</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">varbinary</td>
-    <td class="code">TYPES.VarBinary<span class="footnote">4</span></td>
+    <td class="code">TYPES.VarBinary</td>
+    <td class="code">[Numeric]</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
     <td class="code">image</td>
     <td class="code">TYPES.Image</td>
+    <td class="code">[Numeric]</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -175,12 +198,14 @@ title: API - Datatypes
   <tr>
     <td class="code">null</td>
     <td class="code">TYPES.Null</td>
+    <td class="code">null</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
   <tr>
-    <td class="code">uniqueidentifier<span class="footnote">5</span></td>
+    <td class="code">uniqueidentifier<span class="footnote">6</span></td>
     <td class="code">TYPES.UniqueIdentifier</td>
+    <td class="code">[Numeric]</td>
     <td class="supported">&#10003;</td>
     <td class="supported">-</td>
   </tr>
@@ -208,7 +233,12 @@ var TYPES = require('tedious').TYPES
   <code>varchar(max)</code> and <code>nvarchar(max)</code> are also supported.
 </p>
 
-<h3><span class="footnote">5</span>UniqueIdentifier</h3>
+<h3><span class="footnote">5</span>Binary Strings</h3>
+<p>
+  Values are represented as arrays of integer values.
+</p>
+
+<h3><span class="footnote">6</span>UniqueIdentifier</h3>
 <p>
   Values are returned as a 16 byte array of integer values.
 </p>
