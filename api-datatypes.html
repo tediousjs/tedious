@@ -5,35 +5,210 @@ title: API - Datatypes
 
 <h1>Supported datatypes</h1>
 
+<table>
+  <tr>
+    <th>Type</th>
+    <th>Constant<span class="footnote">1</span></th>
+    <th>Result set</th>
+    <th>Parameter</th>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Exact numerics</td>
+  </tr>
+  <tr>
+    <td class="code">bit</td>
+    <td class="code">TYPES.Bit</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">tinyint</td>
+    <td class="code">TYPES.TinyInt</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">smallint</td>
+    <td class="code">TYPES.SmallInt</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">int</td>
+    <td class="code">TYPES.Int</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">bigint<span class="footnote">2</span></td>
+    <td class="code">TYPES.BigInt</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">numeric</td>
+    <td class="code">TYPES.Numeric</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">decimal</td>
+    <td class="code">TYPES.Decimal</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">smallmoney</td>
+    <td class="code">TYPES.SmallMoney</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">money</td>
+    <td class="code">TYPES.Money</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Approximate numerics</td>
+  </tr>
+  <tr>
+    <td class="code">float</td>
+    <td class="code">TYPES.Float</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">real</td>
+    <td class="code">TYPES.real</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Date and Time</td>
+  </tr>
+  <tr>
+    <td class="code">smalldatetime</td>
+    <td class="code">TYPES.SmallDateTime</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">datetime</td>
+    <td class="code">TYPES.DateTime</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Character Strings</td>
+  </tr>
+  <tr>
+    <td class="code">char</td>
+    <td class="code">TYPES.Char</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">varchar<span class="footnote">3</span></td>
+    <td class="code">TYPES.VarChar</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">text</td>
+    <td class="code">TYPES.Text</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Unicode Strings</td>
+  </tr>
+  <tr>
+    <td class="code">nchar</td>
+    <td class="code">TYPES.NChar</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">nvarchar</td>
+    <td class="code">TYPES.NVarChar<span class="footnote">4</span></td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">ntext</td>
+    <td class="code">TYPES.NText</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Binary Strings</td>
+  </tr>
+  <tr>
+    <td class="code">binary</td>
+    <td class="code">TYPES.Binary</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">varbinary</td>
+    <td class="code">TYPES.VarBinary<span class="footnote">4</span></td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">image</td>
+    <td class="code">TYPES.Image</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+
+  <tr class="group-heading">
+    <td colspan="4">Other Data Types</td>
+  </tr>
+  <tr>
+    <td class="code">null</td>
+    <td class="code">TYPES.Null</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">uniqueidentifier<span class="footnote">5</span></td>
+    <td class="code">TYPES.UniqueIdentifier</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+</table>
+
+<h2>Notes</h2>
+
+<h3><span class="footnote">1</span>Constants</h3>
 <p>
-  The following datatypes are supported in result sets.
+  The <code>TYPES</code> value used in the constants column can be obtained like this.
 </p>
+{% highlight javascript %}
+var TYPES = require('tedious').TYPES
+{% endhighlight %}
 
-<code>
-  <ul>
-    <li>Null</li>
-    <li>TinyInt, SmallInt, Int, BigInt</li>
-    <li>Bit</li>
-    <li>SmallDateTime, DateTime</li>
-    <li>Numeric, Decimal</li>
-    <li>Real, Float</li>
-    <li>SmallMoney, Money</li>
-    <li>Char, VarChar, Varchar(max)</li>
-    <li>NChar, NVarChar, NVarChar(max)</li>
-    <li>Binary, VarBinary, VarBinary(max)</li>
-    <li>Text, NText, Image</li>
-    <li>UniqueIdentifier</li>
-  </ul>
-</code>
-
-<h3>BigInt</h3>
+<h3><span class="footnote">2</span>BigInt</h3>
 <p>
   Values are returned as a string.
   This is because values can exceed 53 bits of significant data, which is great than a
   Javascript Number type can represent as an integer.
 </p>
 
-<h3>UniqueIdentifier</h3>
+<h3><span class="footnote">3,4</span>VarChar, NVarChar</h3>
+<p>
+  <code>varchar(max)</code> and <code>nvarchar(max)</code> are also supported.
+</p>
+
+<h3><span class="footnote">5</span>UniqueIdentifier</h3>
 <p>
   Values are returned as a 16 byte array of integer values.
 </p>
@@ -41,9 +216,4 @@ title: API - Datatypes
   Note that the order of bytes is not the same as the character representation.
   See <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
   for an example of the different ordering of bytes.
-</p>
-
-<h3>Other datatypes</h3>
-<p>
-  Any other types are likely to fail until support is added for them.
 </p>

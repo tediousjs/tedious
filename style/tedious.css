@@ -214,3 +214,46 @@ dd {
   margin: 0.2em 0 0.3em 2em;
   line-height: 1.3em;
 }
+
+table {
+    border: none;
+    border-collapse: collapse;
+    background-color: white;
+}
+
+table th,
+table td {
+    border-width: 1px;
+    padding: 4px;
+    border-style: solid;
+    border-color: gray;
+    background-color: white;
+}
+
+table td.supported {
+    text-align: center;
+}
+
+table th {
+    font-weight: bold;
+    text-align: left;
+    border-width: 2px;
+}
+
+table tr.group-heading {
+    font-size: 90%;
+}
+
+table tr.group-heading td {
+    padding-top: 0.7em;
+}
+
+table tr.group-heading td {
+    border-left: none;
+    border-right: none;
+}
+
+.footnote {
+    font-size: 70%;
+    vertical-align: super;
+}
