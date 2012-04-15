@@ -55,18 +55,18 @@ title: Getting started
   var Request = require('tedious').Request;
 
   function executeStatement() {
-    request = new Request("select 42, 'hello world'", function(err) {
-      console.log(err);
+    request = new Request("select 42, 'hello world'", function(err, rowCount) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(rowCount + ' rows');
+      }
     });
 
     request.on('row', function(columns) {
       columns.forEach(function(column) {
         console.log(column.value);
       });
-    });
-
-    request.on('done', function(rowCount, more) {
-      console.log(rowCount + ' rows returned');
     });
 
     connection.execSql(request);
@@ -91,11 +91,12 @@ title: Getting started
 </p>
 
 <p>
-  A <code>done</code> event is emitted when the statement in the request is completed.
+  When the request is complete, the callback is called.
 </p>
 
 <p>
-  To execute the statement, the <code>Connection</code>'s <code>execute</code> must be called.
+  To execute the statement, the <code>Connection</code>'s
+  <a href="api-connection.html#function_execSql"><code>execSql</code></a> must be called.
 </p>
 
 <p>
