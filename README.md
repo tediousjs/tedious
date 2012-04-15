@@ -19,6 +19,7 @@ Although subject to change, this is the rough plan for the next few versions.
 
 
 ### v0.0.5 ###
+- support for more data types for parameters
 - prepared statements
 
 ### v0.0.6 ###
