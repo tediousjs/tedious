@@ -24,6 +24,9 @@ types =
     name: 'COMMIT_TXN'
   10:
     name: 'ROLLBACK_TXN'
+  13:
+    name: 'REALTIME_LOG_SHIPPING'
+    event: 'mirrorStateChange'
   17:
     name: 'TXN_ENDED'
 
@@ -43,6 +46,10 @@ module.exports = (buffer) ->
 
         valueLength = buffer.readUInt8()
         oldValue = buffer.readBuffer(valueLength)
+      when 'REALTIME_LOG_SHIPPING'
+        newValue = buffer.readBVarchar()
+        oldValue = buffer.readBVarchar()
+        console.log(newValue)
       else
         throw new Error("Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}")
 
