@@ -49,7 +49,6 @@ module.exports = (buffer) ->
       when 'REALTIME_LOG_SHIPPING'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
-        console.log(newValue)
       else
         throw new Error("Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}")
 
