@@ -34,7 +34,7 @@
     "nodeunit": "0.7.4"
   },
   "scripts": {
-    "test": "scripts/tests-unit"
+    "test": "scripts/tests-unit",
     "prepublish": "scripts/build"
   }
 }
