@@ -1,7 +1,7 @@
-Connection = require('../../lib/connection')
-Request = require('../../lib/request')
+Connection = require('../../src/connection')
+Request = require('../../src/request')
 fs = require('fs')
-TYPES = require('../../lib/data-type').typeByName
+TYPES = require('../../src/data-type').typeByName
 
 getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config

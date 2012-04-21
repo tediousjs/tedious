@@ -1,5 +1,5 @@
-require('../../lib/buffertools')
-Login7Payload = require('../../lib/login7-payload')
+require('../../src/buffertools')
+Login7Payload = require('../../src/login7-payload')
 
 exports.create = (test) ->
   loginData =

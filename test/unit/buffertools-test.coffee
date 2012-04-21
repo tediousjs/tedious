@@ -1,4 +1,4 @@
-require('../../lib/buffertools')
+require('../../src/buffertools')
 
 exports.concatOneArgument = (test) ->
   buffer1 = new Buffer([1, 2])

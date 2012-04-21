@@ -1,6 +1,6 @@
-parser = require('../../../lib/token/env-change-token-parser')
-ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+parser = require('../../../src/token/env-change-token-parser')
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.database = (test) ->
   oldDb = 'old'

@@ -1,4 +1,4 @@
-convertLEBytesToString = require('../../../lib/tracking-buffer/bigint').convertLEBytesToString
+convertLEBytesToString = require('../../../src/tracking-buffer/bigint').convertLEBytesToString
 
 module.exports.zero = (test) ->
   test.strictEqual('0', convertLEBytesToString(new Buffer([0, 0, 0, 0, 0, 0, 0, 0])))

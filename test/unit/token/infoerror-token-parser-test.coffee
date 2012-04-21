@@ -1,6 +1,6 @@
-infoParser = require('../../../lib/token/infoerror-token-parser').infoParser
-ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+infoParser = require('../../../src/token/infoerror-token-parser').infoParser
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.info = (test) ->
   number = 3

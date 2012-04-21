@@ -1,5 +1,7 @@
 # s2.2.7.8
 
+EventEmitter = require('events').EventEmitter
+
 types =
   1:
     name: 'DATABASE'
@@ -32,7 +34,7 @@ module.exports = (buffer) ->
 
   if type
     switch type.name
-      when 'DATABASE', 'LANGUAGE', 'CHARSET'
+      when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
       when 'SQL_COLLATION'
@@ -41,11 +43,12 @@ module.exports = (buffer) ->
 
         valueLength = buffer.readUInt8()
         oldValue = buffer.readBuffer(valueLength)
-      when 'PACKET_SIZE'
-        newValue = parseInt(buffer.readBVarchar())
-        oldValue = parseInt(buffer.readBVarchar())
       else
         throw new Error("Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}")
+
+    if type.name == 'PACKET_SIZE'
+      newValue = parseInt(newValue)
+      oldValue = parseInt(oldValue)
   else
     throw new Error("Unsupported ENVCHANGE type #{typeNumber} at offset #{buffer.position - 1}")
 

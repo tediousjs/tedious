@@ -1,7 +1,7 @@
-parser = require('../../../lib/token/colmetadata-token-parser')
-dataTypeByName = require('../../../lib/data-type').typeByName
-ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+parser = require('../../../src/token/colmetadata-token-parser')
+dataTypeByName = require('../../../src/data-type').typeByName
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.int = (test) ->
   numberOfColumns = 1

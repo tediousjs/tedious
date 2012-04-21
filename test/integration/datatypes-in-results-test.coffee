@@ -1,5 +1,5 @@
-Connection = require('../../lib/connection')
-Request = require('../../lib/request')
+Connection = require('../../src/connection')
+Request = require('../../src/request')
 fs = require('fs')
 
 debug = false

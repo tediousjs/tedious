@@ -1,6 +1,6 @@
-WritableTrackingBuffer = require('../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
-require('../../lib/buffertools')
-writeAllHeaders = require('../../lib/all-headers').writeToTrackingBuffer
+WritableTrackingBuffer = require('../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+require('../../src/buffertools')
+writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer
 
 exports.headers = (test) ->
   expected = new Buffer([

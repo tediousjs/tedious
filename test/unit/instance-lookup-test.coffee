@@ -1,4 +1,4 @@
-parse = require('../../lib/instance-lookup').parseBrowserResponse
+parse = require('../../src/instance-lookup').parseBrowserResponse
 
 exports.oneInstanceFound = (test) ->
   response = 'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;'

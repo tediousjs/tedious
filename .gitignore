@@ -5,8 +5,8 @@ node_modules/*
 todo
 *sublime*
 npm-debug.log
-coffee/*
 README.html
 generated
+lib/
 
 test/unit/perf-buffer.coffee

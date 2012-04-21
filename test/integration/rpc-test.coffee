@@ -1,6 +1,6 @@
-Connection = require('../../lib/connection')
-Request = require('../../lib/request')
-TYPES = require('../../lib/data-type').typeByName
+Connection = require('../../src/connection')
+Request = require('../../src/request')
+TYPES = require('../../src/data-type').typeByName
 fs = require('fs')
 
 getConfig = ->

@@ -1,5 +1,5 @@
-TYPES = require('../../lib/tedious').TYPES
-Connection = require('../../lib/tedious').Connection
+TYPES = require('../../src/tedious').TYPES
+Connection = require('../../src/tedious').Connection
 
 exports.types = function(test) {
   test.ok(TYPES)

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+rm -fr lib/
+node_modules/.bin/coffee -b -c -o lib/ src/

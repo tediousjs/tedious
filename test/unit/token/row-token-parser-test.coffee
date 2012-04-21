@@ -1,8 +1,8 @@
-parser = require('../../../lib/token/row-token-parser')
-dataTypeByName = require('../../../lib/data-type').typeByName
+parser = require('../../../src/token/row-token-parser')
+dataTypeByName = require('../../../src/data-type').typeByName
 Iconv  = require('iconv').Iconv
-ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.null = (test) ->
   colMetaData = [type: dataTypeByName.Null]

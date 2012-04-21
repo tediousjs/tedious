@@ -1,4 +1,4 @@
-Debug = require('../../lib/debug')
+Debug = require('../../src/debug')
 
 payload = 'payload'
 

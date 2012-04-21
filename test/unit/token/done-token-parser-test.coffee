@@ -1,6 +1,6 @@
-parser = require('../../../lib/token/done-token-parser').doneParser
-ReadableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+parser = require('../../../src/token/done-token-parser').doneParser
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 parse = (status, curCmd, doneRowCount) ->
   doneRowCountLow = doneRowCount % 0x100000000

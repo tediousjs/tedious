@@ -1,4 +1,4 @@
-coffee/
+src/
 todo
 .git*
 .project

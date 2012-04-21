@@ -1,7 +1,7 @@
-Debug = require('../../../lib/debug')
-Parser = require('../../../lib/token/token-stream-parser').Parser
-TYPE = require('../../../lib/token/token').TYPE
-WritableTrackingBuffer = require('../../../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+Debug = require('../../../src/debug')
+Parser = require('../../../src/token/token-stream-parser').Parser
+TYPE = require('../../../src/token/token').TYPE
+WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 debug = new Debug({token: true})
 

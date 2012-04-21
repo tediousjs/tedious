@@ -1,5 +1,3 @@
-require('coffee-script')
-
 exports.statemachineLogLevel = 0
 
 exports.Connection = require('./connection')

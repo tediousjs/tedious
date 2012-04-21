@@ -1,5 +1,5 @@
 fs = require('fs')
-instanceLookup = require('../../lib/instance-lookup').instanceLookup
+instanceLookup = require('../../src/instance-lookup').instanceLookup
 
 RESERVED_IP_ADDRESS = '192.0.2.0'     # Can never be used, so guaranteed to fail.
 

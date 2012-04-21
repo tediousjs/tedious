@@ -1,8 +1,8 @@
-require('../../lib/buffertools')
+require('../../src/buffertools')
 
-Packet = require('../../lib/packet').Packet
-TYPE = require('../../lib/packet').TYPE
-isPacketComplete = require('../../lib/packet').isPacketComplete
+Packet = require('../../src/packet').Packet
+TYPE = require('../../src/packet').TYPE
+isPacketComplete = require('../../src/packet').isPacketComplete
 
 exports.createEmpty = (test) ->
   packet = new Packet(TYPE.PRELOGIN)
