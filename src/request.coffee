@@ -4,6 +4,7 @@ TYPES = require('./data-type').typeByName
 class Request extends EventEmitter
   constructor: (@sqlTextOrProcedure, @callback) ->
     @parameters = []
+    @parametersByName = {}
 
   addParameter: (name, type, value, options) ->
     if arguments.length < 4
@@ -13,12 +14,15 @@ class Request extends EventEmitter
 
     options ||= {}
 
-    @parameters.push
+    parameter =
       type: type
       name: name
       value: value
       output: options.output ||= false
       length: options.length
+
+    @parameters.push(parameter)
+    @parametersByName[name] = parameter
 
   addOutputParameter: (name, type, value, options) ->
     if arguments.length < 4
@@ -31,16 +35,9 @@ class Request extends EventEmitter
 
     @addParameter(name, type, value, options)
 
-  transformIntoExecuteSqlRpc: () ->
-    modifiedParameters = []
-
-    modifiedParameters.push
-      type: TYPES.NVarChar
-      name: 'statement'
-      value: @sqlTextOrProcedure
-
+  makeParamsParameter: (parameters) ->
     paramsParameter = ''
-    for parameter in @parameters
+    for parameter in parameters
       if paramsParameter.length > 0
         paramsParameter += ', '
       paramsParameter += "@#{parameter.name} "
@@ -48,16 +45,52 @@ class Request extends EventEmitter
       if parameter.output
         paramsParameter += ' OUTPUT'
 
-    modifiedParameters.push
-      type: TYPES.NVarChar
-      name: 'params'
-      value: paramsParameter
+    paramsParameter
 
-    for parameter in @parameters
-      modifiedParameters.push(parameter)
+  transformIntoExecuteSqlRpc: () ->
+    @originalParameters = @parameters
+    @parameters = []
 
-    @parameters = modifiedParameters
+    @addParameter('statement', TYPES.NVarChar, @sqlTextOrProcedure)
+    @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
+
+    for parameter in @originalParameters
+      @parameters.push(parameter)
 
     @sqlTextOrProcedure = 'sp_executesql'
+
+  transformIntoPrepareRpc: () ->
+    @originalParameters = @parameters
+    @parameters = []
+
+    @addOutputParameter('handle', TYPES.Int)
+    @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
+    @addParameter('stmt', TYPES.NVarChar, @sqlTextOrProcedure)
+
+    @sqlTextOrProcedure = 'sp_prepare'
+
+    @on('returnValue', (name, value, metadata) ->
+      if (name == 'handle')
+        @handle = value
+      else
+        throw new Error("Unexpected output parameter #{name} from sp_prepare")
+    )
+
+  transformIntoUnprepareRpc: (parameters) ->
+    @parameters = []
+    @addParameter('handle', TYPES.Int, @handle)
+
+    @sqlTextOrProcedure = 'sp_unprepare'
+
+  transformIntoExecuteRpc: (parameters) ->
+    @parameters = []
+
+    @addParameter('handle', TYPES.Int, @handle)
+
+    for parameter in @originalParameters
+      parameter.value = parameters[parameter.name]
+      @parameters.push(parameter)
+
+    @sqlTextOrProcedure = 'sp_execute'
 
 module.exports = Request

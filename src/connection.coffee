@@ -346,6 +346,18 @@ class Connection extends EventEmitter
       request.transformIntoExecuteSqlRpc()
       @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
+  prepare: (request) ->
+      request.transformIntoPrepareRpc()
+      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+
+  unprepare: (request) ->
+      request.transformIntoUnprepareRpc()
+      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+
+  execute: (request, parameters) ->
+      request.transformIntoExecuteRpc(parameters)
+      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+
   callProcedure: (request) ->
       @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
