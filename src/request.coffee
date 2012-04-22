@@ -6,6 +6,14 @@ class Request extends EventEmitter
     @parameters = []
     @parametersByName = {}
 
+    @userCallback = @callback
+    @callback = ->
+      if @preparing
+        @emit('prepared')
+        @preparing = false
+      else
+        @userCallback.apply(@, arguments)
+
   addParameter: (name, type, value, options) ->
     if arguments.length < 4
       if typeof value == 'object'
@@ -68,6 +76,8 @@ class Request extends EventEmitter
     @addParameter('stmt', TYPES.NVarChar, @sqlTextOrProcedure)
 
     @sqlTextOrProcedure = 'sp_prepare'
+
+    @preparing = true
 
     @on('returnValue', (name, value, metadata) ->
       if (name == 'handle')
