@@ -2,7 +2,7 @@
 
 # For now, only the "Transaction Descriptor" header (s2.2.5.3.2) is supported.
 
-WritableTrackingBuffer = require('../lib/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 TYPE =
   QUERY_NOTIFICATIONS: 1
