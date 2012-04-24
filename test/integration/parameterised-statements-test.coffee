@@ -18,17 +18,26 @@ getConfig = ->
 exports.tinyInt = (test) ->
   execSql(test, TYPES.TinyInt, 8)
 
+exports.tinyIntZero = (test) ->
+  execSql(test, TYPES.TinyInt, 0)
+
 exports.tinyIntNull = (test) ->
   execSql(test, TYPES.TinyInt, null)
 
 exports.smallInt = (test) ->
   execSql(test, TYPES.SmallInt, 8)
 
+exports.smallIntZero = (test) ->
+  execSql(test, TYPES.SmallInt, 0)
+
 exports.smallIntNull = (test) ->
   execSql(test, TYPES.SmallInt, null)
 
 exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
+
+exports.intZero = (test) ->
+  execSql(test, TYPES.Int, 0)
 
 exports.intNull = (test) ->
   execSql(test, TYPES.Int, null)
