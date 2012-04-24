@@ -18,11 +18,11 @@ TYPE =
       buffer.writeUInt8(1)
 
       # ParamLenData
-      if typeof parameter.value == 'undefined' || parameter == null
-        buffer.writeUInt8(0)
-      else
+      if parameter.value?
         buffer.writeUInt8(1)
         buffer.writeInt8(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x32:
     type: 'BIT'
     name: 'Bit'
@@ -37,11 +37,11 @@ TYPE =
       buffer.writeUInt8(2)
 
       # ParamLenData
-      if typeof parameter.value == 'undefined' || parameter == null
-        buffer.writeUInt8(0)
-      else
+      if parameter.value?
         buffer.writeUInt8(2)
         buffer.writeInt16LE(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x38:
     type: 'INT4'
     name: 'Int'
@@ -53,11 +53,11 @@ TYPE =
       buffer.writeUInt8(4)
 
       # ParamLenData
-      if typeof parameter.value == 'undefined' || parameter == null
-        buffer.writeUInt8(0)
-      else
+      if parameter.value?
         buffer.writeUInt8(4)
         buffer.writeInt32LE(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
