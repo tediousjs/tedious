@@ -29,8 +29,8 @@ title: Using Parameters
   The parameters names used in this API do not include the '@'.
 </p>
 {% highlight javascript %}
-  request.addParameter(..., 'name', ...);
-  request.addParameter(..., 'age', ...);
+  request.addParameter('name', ..., ...);
+  request.addParameter('age', ..., ...);
 {% endhighlight %}
 
 <h2>Input Parameters</h2>
@@ -46,8 +46,8 @@ title: Using Parameters
     ....
   });
 
-  request.addParameter(TYPES.VarChar, 'name', 'Fred');
-  request.addParameter(TYPES.Int, 'age', 42);
+  request.addParameter('name', TYPES.VarChar, 'Fred');
+  request.addParameter('age', TYPES.Int, 42);
 
   connection.execSql(request);
 {% endhighlight %}
@@ -63,8 +63,8 @@ title: Using Parameters
     ....
   });
 
-  request.addParameter(TYPES.VarChar, 'name', 'Fred');
-  request.addParameter(TYPES.Int, 'age', 42);
+  request.addParameter('name', TYPES.VarChar, 'Fred');
+  request.addParameter('age', TYPES.Int, 42);
 
   connection.callProcedure(request);
 {% endhighlight %}
@@ -82,8 +82,8 @@ title: Using Parameters
     ....
   });
 
-  request.addOutputParameter(TYPES.Int, 'number');
-  request.addOutputParameter(TYPES.VarChar, 'string');
+  request.addOutputParameter('number', TYPES.Int);
+  request.addOutputParameter('string', TYPES.VarChar);
 
   request.on('returnValue', function(parameterName, value, metadata) {
     console.log(parameterName + ' = ' + value);      // number = 42
