@@ -24,6 +24,9 @@ types =
     name: 'COMMIT_TXN'
   10:
     name: 'ROLLBACK_TXN'
+  13:
+    name: 'DATABASE_MIRRORING_PARTNER'
+    event: 'partnerNode'
   17:
     name: 'TXN_ENDED'
 
@@ -34,7 +37,7 @@ module.exports = (buffer) ->
 
   if type
     switch type.name
-      when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE'
+      when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
       when 'SQL_COLLATION'
