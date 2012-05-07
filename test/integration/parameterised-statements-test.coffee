@@ -69,6 +69,12 @@ exports.smallDateTime = (test) ->
 exports.smallDateTimeNull = (test) ->
   execSql(test, TYPES.SmallDateTime, null)
 
+exports.dateTime = (test) ->
+  execSql(test, TYPES.DateTime, new Date('December 4, 2011 10:04:23'))
+
+exports.dateTimeNull = (test) ->
+  execSql(test, TYPES.DateTime, null)
+
 exports.outputBitTrue = (test) ->
   execSqlOutput(test, TYPES.Bit, true)
 
@@ -113,6 +119,12 @@ exports.outputSmallDateTime = (test) ->
 
 exports.outputSmallDateTimeNull = (test) ->
   execSqlOutput(test, TYPES.SmallDateTime, null)
+
+exports.outputDateTime = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('December 4, 2011 10:04:23'))
+
+exports.outputDateTimeNull = (test) ->
+  execSqlOutput(test, TYPES.DateTime, null)
 
 exports.multipleParameters = (test) ->
   test.expect(6)
