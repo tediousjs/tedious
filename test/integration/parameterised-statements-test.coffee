@@ -63,6 +63,12 @@ exports.nVarChar = (test) ->
 exports.nVarCharNull = (test) ->
   execSql(test, TYPES.NVarChar, null)
 
+exports.smallDateTime = (test) ->
+  execSql(test, TYPES.SmallDateTime, new Date('December 4, 2011 10:04:00'))
+
+exports.smallDateTimeNull = (test) ->
+  execSql(test, TYPES.SmallDateTime, null)
+
 exports.outputBitTrue = (test) ->
   execSqlOutput(test, TYPES.Bit, true)
 
@@ -101,6 +107,12 @@ exports.outputNVarChar = (test) ->
 
 exports.outputNVarCharNull = (test) ->
   execSqlOutput(test, TYPES.NVarChar, null)
+
+exports.outputSmallDateTime = (test) ->
+  execSqlOutput(test, TYPES.SmallDateTime, new Date('December 4, 2011 10:04:00'))
+
+exports.outputSmallDateTimeNull = (test) ->
+  execSqlOutput(test, TYPES.SmallDateTime, null)
 
 exports.multipleParameters = (test) ->
   test.expect(6)
@@ -161,7 +173,11 @@ execSql = (test, type, value) ->
 
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, value)
+
+      if (value instanceof Date)
+        test.strictEqual(columns[0].value.getTime(), value.getTime())
+      else
+        test.strictEqual(columns[0].value, value)
   )
 
   connection = new Connection(config)
@@ -203,7 +219,12 @@ execSqlOutput = (test, type, value) ->
 
   request.on('returnValue', (name, returnValue, metadata) ->
     test.strictEqual(name, 'paramOut')
-    test.strictEqual(returnValue, value)
+
+    if (value instanceof Date)
+      test.strictEqual(returnValue.getTime(), value.getTime())
+    else
+      test.strictEqual(returnValue, value)
+
     test.ok(metadata)
   )
 

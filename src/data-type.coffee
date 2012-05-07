@@ -1,4 +1,5 @@
 NULL = (1 << 16) - 1
+EPOCH_DATE = new Date(1900, 0, 1)
 
 TYPE =
   # Zero-length types
@@ -74,6 +75,24 @@ TYPE =
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
+    declaration: () ->
+      'smalldatetime'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.DateTimeN.id)
+      buffer.writeUInt8(4)
+
+      # ParamLenData
+      if parameter.value?
+        days = (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+        days = Math.floor(days)
+        minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
+
+        buffer.writeUInt8(4)
+        buffer.writeUInt16LE(days)
+        buffer.writeUInt16LE(minutes)
+      else
+        buffer.writeUInt8(0)
   0x3B:
     type: 'FLT4'
     name: 'Real'

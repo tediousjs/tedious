@@ -16,7 +16,7 @@ class Request extends EventEmitter
 
   addParameter: (name, type, value, options) ->
     if arguments.length < 4
-      if typeof value == 'object'
+      if typeof value == 'object' && !(value instanceof Date)
         options = value
         value = undefined
 
@@ -34,7 +34,7 @@ class Request extends EventEmitter
 
   addOutputParameter: (name, type, value, options) ->
     if arguments.length < 4
-      if typeof value == 'object'
+      if typeof value == 'object' && !(value instanceof Date)
         options = value
         value = undefined
 
