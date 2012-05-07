@@ -26,6 +26,19 @@ TYPE =
   0x32:
     type: 'BIT'
     name: 'Bit'
+    declaration: () ->
+      'bit'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.BitN.id)
+      buffer.writeUInt8(1)
+
+      # ParamLenData
+      if typeof parameter.value == 'undefined' || parameter.value == null
+        buffer.writeUInt8(0)
+      else
+        buffer.writeUInt8(1)
+        buffer.writeUInt8(if parameter.value then 1 else 0)
   0x34:
     type: 'INT2'
     name: 'SmallInt'

@@ -15,6 +15,15 @@ getConfig = ->
 
   config
 
+exports.bitTrue = (test) ->
+  execSql(test, TYPES.Bit, true)
+
+exports.bitFalse = (test) ->
+  execSql(test, TYPES.Bit, false)
+
+exports.bitNull = (test) ->
+  execSql(test, TYPES.Bit, null)
+
 exports.tinyInt = (test) ->
   execSql(test, TYPES.TinyInt, 8)
 
@@ -53,6 +62,15 @@ exports.nVarChar = (test) ->
 
 exports.nVarCharNull = (test) ->
   execSql(test, TYPES.NVarChar, null)
+
+exports.outputBitTrue = (test) ->
+  execSqlOutput(test, TYPES.Bit, true)
+
+exports.outputBitFalse = (test) ->
+  execSqlOutput(test, TYPES.Bit, false)
+
+exports.outputBitNull = (test) ->
+  execSqlOutput(test, TYPES.Bit, null)
 
 exports.outputTinyInt = (test) ->
   execSqlOutput(test, TYPES.TinyInt, 3)
@@ -154,6 +172,10 @@ execSql = (test, type, value) ->
 
   connection.on('end', (info) ->
       test.done()
+  )
+
+  connection.on('errorMessage', (error) ->
+    console.log("#{error.number} : #{error.message}")
   )
 
   connection.on('debug', (text) ->
