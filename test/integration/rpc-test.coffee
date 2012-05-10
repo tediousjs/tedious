@@ -45,6 +45,18 @@ exports.execProcInt = (test) ->
 exports.execProcIntNull = (test) ->
   testProc(test, TYPES.Int, 'int', null)
 
+exports.execProcSmallDateTime = (test) ->
+  testProc(test, TYPES.SmallDateTime, 'smalldatetime', new Date('December 4, 2011 10:04:00'))
+
+exports.execProcSmallDateTimeNull = (test) ->
+  testProc(test, TYPES.SmallDateTime, 'smalldatetime', null)
+
+exports.execProcDateTime = (test) ->
+  testProc(test, TYPES.DateTime, 'datetime', new Date('December 4, 2011 10:04:23'))
+
+exports.execProcDateTimeNull = (test) ->
+  testProc(test, TYPES.DateTime, 'datetime', null)
+
 exports.execProcOutputVarChar = (test) ->
   testProcOutput(test, TYPES.VarChar, 'varchar(10)', 'test')
 
@@ -74,6 +86,18 @@ exports.execProcOutputInt = (test) ->
 
 exports.execProcOutputIntNull = (test) ->
   testProcOutput(test, TYPES.Int, 'int', null)
+
+exports.execProcOutputSmallDateTime = (test) ->
+  testProcOutput(test, TYPES.SmallDateTime, 'smalldatetime', new Date('December 4, 2011 10:04:00'))
+
+exports.execProcOutputSmallDateTimeNull = (test) ->
+  testProcOutput(test, TYPES.SmallDateTime, 'smalldatetime', null)
+
+exports.execProcOutputDateTime = (test) ->
+  testProcOutput(test, TYPES.DateTime, 'datetime', new Date('December 4, 2011 10:04:23'))
+
+exports.execProcOutputDateTimeNull = (test) ->
+  testProcOutput(test, TYPES.DateTime, 'datetime', null)
 
 exports.execProcWithBadName = (test) ->
   test.expect(3)
@@ -204,7 +228,10 @@ testProc = (test, type, typeAsString, value) ->
   )
 
   request.on('row', (columns) ->
-    test.strictEqual(columns[0].value, value)
+      if (value instanceof Date)
+        test.strictEqual(columns[0].value.getTime(), value.getTime())
+      else
+        test.strictEqual(columns[0].value, value)
   )
 
   connection = new Connection(config)
@@ -263,7 +290,10 @@ testProcOutput = (test, type, typeAsString, value) ->
 
   request.on('returnValue', (name, returnValue, metadata) ->
     test.strictEqual(name, 'paramOut')
-    test.strictEqual(returnValue, value)
+    if (value instanceof Date)
+      test.strictEqual(returnValue.getTime(), value.getTime())
+    else
+      test.strictEqual(returnValue, value)
     test.ok(metadata)
   )
 
