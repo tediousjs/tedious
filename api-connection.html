@@ -327,6 +327,12 @@ var connection = new Connection(config);
   is the same SQL is executed multiples times using this function,
   the SQL Server query optimizer is likely to reuse the execution plan it generates for the first execution.
 </p>
+<p>
+  Beware of the way that scoping rules apply, and how they may
+  <a href="http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx">affect local temp tables</a>.
+  If you're running in to scoping issues, then <code>execSqlBatch</code> may be a better choice.
+  See also <a href="https://github.com/pekim/tedious/issues/24">issue #24</a>.
+</p>
 <div class="argument">
   <div class="name">request</div>
   <div class="description">
