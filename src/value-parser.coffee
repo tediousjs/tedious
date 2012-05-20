@@ -1,3 +1,4 @@
+iconv = require('iconv-lite')
 sprintf = require('sprintf').sprintf
 require('./buffertools')
 
@@ -106,25 +107,17 @@ parse = (buffer, metaData) ->
           value = null
         when 1
           value = !!buffer.readUInt8()
-    when 'VarChar', 'Char', 'NVarChar', 'NChar'
-      switch type.name
-        when 'VarChar', 'Char'
-          iconv = metaData.collation.iconv
-          encoding = 'ascii'
-        when 'NVarChar', 'NChar'
-          iconv = undefined
-          encoding = 'ucs2'
-
+    when 'VarChar', 'Char'
+      codepage = metaData.collation.codepage
       if metaData.dataLength == MAX
-        if iconv
-          value = readMaxChars(buffer, iconv)
-        else
-          value = readMaxChars(buffer, encoding)
+        value = readMaxChars(buffer, codepage)
       else
-        if iconv
-          value = readChars(buffer, dataLength, iconv)
-        else
-          value = readChars(buffer, dataLength, encoding)
+        value = readChars(buffer, dataLength, codepage)
+    when 'NVarChar', 'NChar'
+      if metaData.dataLength == MAX
+        value = readMaxNChars(buffer)
+      else
+        value = readNChars(buffer, dataLength)
     when 'VarBinary', 'Binary'
       if metaData.dataLength == MAX
         value = readMaxBinary(buffer)
@@ -134,15 +127,12 @@ parse = (buffer, metaData) ->
       if dataLength == 0
         value = null
       else
-        if metaData.collation.iconv
-          value = readChars(buffer, dataLength, metaData.collation.iconv)
-        else
-          value = readChars(buffer, dataLength, 'ascii')
+        value = readChars(buffer, dataLength, metaData.collation.codepage)
     when 'NText'
       if dataLength == 0
         value = null
       else
-        value = readChars(buffer, dataLength, 'ucs2')
+        value = readNChars(buffer, dataLength)
     when 'Image'
       if dataLength == 0
         value = null
@@ -201,30 +191,31 @@ readBinary = (buffer, dataLength) ->
   else
     buffer.readArray(dataLength)
 
-readChars = (buffer, dataLength, encodingOrIconv) ->
+readChars = (buffer, dataLength, codepage) ->
   if dataLength == NULL
     null
   else
-    if typeof encodingOrIconv == 'string'
-      encoding = encodingOrIconv
-      buffer.readString(dataLength, encoding)
-    else
-      iconv = encodingOrIconv
-      iconv.convert(buffer.readBuffer(dataLength)).toString()
+    iconv.decode(buffer.readBuffer(dataLength), codepage)
+
+readNChars = (buffer, dataLength) ->
+  if dataLength == NULL
+    null
+  else
+    buffer.readString(dataLength, 'ucs2')
 
 readMaxBinary = (buffer) ->
   readMax(buffer, (valueBuffer) ->
     Array.prototype.slice.call(valueBuffer)
   )
 
-readMaxChars = (buffer, encodingOrIconv) ->
+readMaxChars = (buffer, codepage) ->
   readMax(buffer, (valueBuffer) ->
-    if typeof encodingOrIconv == 'string'
-      encoding = encodingOrIconv
-      valueBuffer.toString(encoding)
-    else
-      iconv = encodingOrIconv
-      iconv.convert(valueBuffer).toString()
+    iconv.decode(valueBuffer, codepage)
+  )
+
+readMaxNChars = (buffer) ->
+  readMax(buffer, (valueBuffer) ->
+    valueBuffer.toString('ucs2')
   )
 
 readMax = (buffer, decodeFunction) ->

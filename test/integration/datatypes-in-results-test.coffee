@@ -117,10 +117,19 @@ exports.moneyNull = (test) ->
   execSql(test, "select cast(null as money)", null)
 
 exports.varchar = (test) ->
-  execSql(test, "select cast('abcdé' as varchar(10))", 'abcdé')
+  execSql(test, "select cast('abcde' as varchar(10))", 'abcde')
 
 exports.varcharNull = (test) ->
   execSql(test, "select cast(null as varchar(10))", null)
+
+exports.varcharCollation = (test) ->
+  # The codepage used is WINDOWS-1251.
+  sql = """
+    create table #tab1 (col1 nvarchar(10) collate Cyrillic_General_CS_AS);
+    insert into #tab1 values(N'abcdШ');
+    select cast(col1 as varchar(10)) from #tab1
+    """
+  execSql(test, sql, 'abcdШ')
 
 exports.varcharMax = (test) ->
   execSql(test, "select cast('abc' as varchar(max))", 'abc')

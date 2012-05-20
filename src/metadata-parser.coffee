@@ -1,5 +1,4 @@
 codepageByLcid = require('./collation').codepageByLcid
-iconvByLcid = require('./collation').iconvByLcid
 
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
@@ -48,9 +47,8 @@ parse = (buffer) ->
     collation.lcid = (collationData[2] & 0x0F) << 16
     collation.lcid |= collationData[1] << 8
     collation.lcid |= collationData[0]
-    
+
     collation.codepage = codepageByLcid[collation.lcid]
-    collation.iconv = iconvByLcid[collation.lcid]
 
     # This may not be extracting the correct nibbles in the correct order.
     collation.flags = collationData[3] >> 4

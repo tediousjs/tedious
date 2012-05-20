@@ -1,8 +1,3 @@
-try
-  Iconv = require('iconv').Iconv
-catch exception
-  Iconv = undefined
-
 exports.codepageByLcid =
   1025: 'WINDOWS-1256'
   1029: 'WINDOWS-1250'
@@ -35,10 +30,3 @@ exports.codepageByLcid =
   66574: 'WINDOWS-1250'
   66615: 'WINDOWS-1252'
   133124: 'WINDOWS-936'
-
-exports.iconvByLcid = {}
-for lcid, codepage of exports.codepageByLcid
-  if Iconv
-    exports.iconvByLcid[lcid] = new Iconv(codepage, 'UTF-8')
-  else
-    exports.iconvByLcid[lcid] = undefined

@@ -1,6 +1,5 @@
 parser = require('../../../src/token/row-token-parser')
 dataTypeByName = require('../../../src/data-type').typeByName
-Iconv  = require('iconv').Iconv
 ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
@@ -120,7 +119,7 @@ module.exports.varCharWithoutCodepage = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar
     collation:
-      iconv: undefined
+      codepage: undefined
   ]
   value = 'abcde'
 
@@ -141,7 +140,7 @@ module.exports.varCharWithCodepage = (test) ->
   colMetaData = [
     type: dataTypeByName.VarChar
     collation:
-      iconv: new Iconv('WINDOWS-1252', 'UTF-8')
+      codepage: 'WINDOWS-1252'
   ]
   value = 'abcdé'
 
@@ -217,7 +216,7 @@ module.exports.varCharMaxNull = (test) ->
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
-      iconv: undefined
+      codepage: undefined
   ]
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -238,7 +237,7 @@ module.exports.varCharMaxUnknownLength = (test) ->
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
-      iconv: undefined
+      codepage: undefined
   ]
   value = 'abcdef'
 
@@ -265,7 +264,7 @@ module.exports.varCharMaxKnownLength = (test) ->
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
-      iconv: undefined
+      codepage: undefined
   ]
   value = 'abcdef'
 
@@ -292,7 +291,7 @@ module.exports.varCharMaxWithCodepage = (test) ->
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
-      iconv: new Iconv('WINDOWS-1252', 'UTF-8')
+      codepage: 'WINDOWS-1252'
   ]
   value = 'abcdéf'
 
