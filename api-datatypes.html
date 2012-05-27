@@ -200,7 +200,7 @@ title: API - Datatypes
     <td class="code">TYPES.Null</td>
     <td class="code">null</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;<span class="footnote">7</span></td>
   </tr>
   <tr>
     <td class="code">uniqueidentifier<span class="footnote">6</span></td>
@@ -246,4 +246,9 @@ var TYPES = require('tedious').TYPES
   Note that the order of bytes is not the same as the character representation.
   See <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
   for an example of the different ordering of bytes.
+</p>
+
+<h3><span class="footnote">7</span>Null parameter value</h3>
+<p>
+  The value for a parameter of any supported data type may be <code>null</code>.
 </p>
