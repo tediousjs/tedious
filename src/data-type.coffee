@@ -1,5 +1,6 @@
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
+MAX = (1 << 16) - 1
 
 TYPE =
   # Zero-length types
@@ -11,7 +12,7 @@ TYPE =
   0x30:
     type: 'INT1'
     name: 'TinyInt'
-    declaration: () ->
+    declaration: (parameter) ->
       'tinyint'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -27,7 +28,7 @@ TYPE =
   0x32:
     type: 'BIT'
     name: 'Bit'
-    declaration: () ->
+    declaration: (parameter) ->
       'bit'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -43,7 +44,7 @@ TYPE =
   0x34:
     type: 'INT2'
     name: 'SmallInt'
-    declaration: () ->
+    declaration: (parameter) ->
       'smallint'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -59,7 +60,7 @@ TYPE =
   0x38:
     type: 'INT4'
     name: 'Int'
-    declaration: () ->
+    declaration: (parameter) ->
       'int'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -75,7 +76,7 @@ TYPE =
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
-    declaration: () ->
+    declaration: (parameter) ->
       'smalldatetime'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -102,7 +103,7 @@ TYPE =
   0x3D:
     type: 'DATETIME'
     name: 'DateTime'
-    declaration: () ->
+    declaration: (parameter) ->
       'datetime'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
@@ -203,7 +204,7 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 8000
-    declaration: () ->
+    declaration: (parameter) ->
       "varchar(#{@.maximumLength})"
     writeParameterData: (buffer, parameter) ->
       if parameter.length
@@ -238,24 +239,47 @@ TYPE =
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 4000
-    declaration: () ->
-      "nvarchar(#{@.maximumLength})"
+    declaration: (parameter) ->
+      if parameter.length
+        length = 2 * parameter.length
+      else if parameter.value
+        length = 2 * parameter.value.length
+      else
+        length = @maximumLength
+
+      if length <= @maximumLength
+        "nvarchar(#{@.maximumLength})"
+      else
+        "nvarchar(max)"
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value
         length = 2 * parameter.value.length
-      else length = @maximumLength
+      else
+        length = @maximumLength
 
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      buffer.writeUInt16LE(length)
-      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+      if length <= @maximumLength
+        buffer.writeUInt16LE(length)
+      else
+        buffer.writeUInt16LE(MAX)
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00])) # Collation
 
       # ParamLenData
       if parameter.value
-        buffer.writeUInt16LE(length)
-        buffer.writeString(parameter.value, 'ucs2')
+        if length <= @maximumLength
+          buffer.writeUInt16LE(length)
+          buffer.writeString(parameter.value, 'ucs2')
+        else
+          # Length of all chunks.
+          buffer.writeUInt64LE(length)
+          # One chunk.
+          buffer.writeUInt32LE(length)
+          buffer.writeString(parameter.value, 'ucs2')
+          # PLP_TERMINATOR (no more chunks).
+          buffer.writeUInt32LE(0)
       else
         buffer.writeUInt16LE(NULL)
   0xEF:

@@ -49,7 +49,7 @@ class Request extends EventEmitter
       if paramsParameter.length > 0
         paramsParameter += ', '
       paramsParameter += "@#{parameter.name} "
-      paramsParameter += parameter.type.declaration()
+      paramsParameter += parameter.type.declaration(parameter)
       if parameter.output
         paramsParameter += ' OUTPUT'
 

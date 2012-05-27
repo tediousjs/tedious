@@ -7,11 +7,11 @@ getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
   config.options.debug =
-    packet: true
-    data: true
-    payload: true
+    packet: false
+    data: false
+    payload: false
     token: false
-    log: true
+    log: false
 
   config
 
@@ -62,6 +62,13 @@ exports.nVarChar = (test) ->
 
 exports.nVarCharNull = (test) ->
   execSql(test, TYPES.NVarChar, null)
+
+exports.nVarCharMax = (test) ->
+  longString = ''
+  for i in [1..(10 * 1000)]
+    longString += 'x'
+
+  execSql(test, TYPES.NVarChar, longString)
 
 exports.smallDateTime = (test) ->
   execSql(test, TYPES.SmallDateTime, new Date('December 4, 2011 10:04:00'))
