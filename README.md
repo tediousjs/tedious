@@ -18,14 +18,15 @@ Coming soon
 Although subject to change, this is the rough plan for the next few versions.
 
 
-### v0.0.5 ###
-- support for more data types for parameters
-- prepared statements
-
 ### v0.0.6 ###
+- support for more data types for parameters
 - transaction management
 
 ### v0.0.7 ###
+- support for more data types for parameters
+- support for varchar(max), nvarchar(max) and varbinary(max) as streams
+
+### v0.0.8 ###
 - secure connections
 
 ### unplanned ###
