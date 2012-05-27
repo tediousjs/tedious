@@ -205,23 +205,46 @@ TYPE =
     dataLengthLength: 2
     maximumLength: 8000
     declaration: (parameter) ->
-      "varchar(#{@.maximumLength})"
+      if parameter.length
+        length = parameter.length
+      else if parameter.value
+        length = parameter.value.length
+      else
+        length = @.maximumLength
+
+      if length <= @maximumLength
+        "varchar(#{@.maximumLength})"
+      else
+        "varchar(max)"
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = parameter.length
       else if parameter.value
         length = parameter.value.length
-      else length = @.maximumLength
+      else
+        length = @.maximumLength
 
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      buffer.writeUInt16LE(length)
+      if length <= @maximumLength
+        buffer.writeUInt16LE(length)
+      else
+        buffer.writeUInt16LE(MAX)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
       if parameter.value
-        buffer.writeUInt16LE(length)
-        buffer.writeString(parameter.value, 'ascii')
+        if length <= @maximumLength
+          buffer.writeUInt16LE(length)
+          buffer.writeString(parameter.value, 'ascii')
+        else
+          # Length of all chunks.
+          buffer.writeUInt64LE(length)
+          # One chunk.
+          buffer.writeUInt32LE(length)
+          buffer.writeString(parameter.value, 'ascii')
+          # PLP_TERMINATOR (no more chunks).
+          buffer.writeUInt32LE(0)
       else
         buffer.writeUInt16LE(NULL)
   0xAD:

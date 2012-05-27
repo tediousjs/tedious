@@ -57,6 +57,13 @@ exports.varChar = (test) ->
 exports.varCharNull = (test) ->
   execSql(test, TYPES.VarChar, null)
 
+exports.varCharMax = (test) ->
+  longString = ''
+  for i in [1..(10 * 1000)]
+    longString += 'x'
+
+  execSql(test, TYPES.VarChar, longString)
+
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
 
