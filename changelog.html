@@ -5,15 +5,52 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
+<h3>v0.0.5 <span class="date">2012-05-27</span></h3>
+<ul>
+  <li>
+    Instead of publishing CoffeeScript files and compiling them at runtime,
+    the CoffeeScript is compiled before publishing.
+    Only Javascript files are pubslished and installed.
+  </li>
+  <li>
+    Support for preparing and executing SQL.
+  </li>
+  <li>
+    When the value of
+    <code>tinyint</code>, <code>smallint</code> or <code>int</code>
+    parameters are 0, do not send their value as null.
+    (Issue <a href="https://github.com/pekim/tedious/issues/25">#25</a>)
+  </li>
+  <li>
+    Support for <code>DATABASE_MIRRORING_PARTNER</code> environment change notification.
+    (Issue <a href="https://github.com/pekim/tedious/issues/22">#22</a>)
+  </li>
+  <li>
+    Support for using
+    <code>bit</code>, <code>smalldatetime</code> and <code>datetime</code>
+    types in parameterised statements.
+  </li>
+  <li>
+    Support for using <code>varchar(max)</code> and <code>nvarchar(max)</code> in parameterised statements.
+    (Issue <a href="https://github.com/pekim/tedious/issues/32">#32</a>)
+  </li>
+  <li>
+    Use iconv-lite instead of iconv.
+    This means that tedious is back to pure Javascript, including its dependencies.
+  </li>
+</ul>
+
 <h3>v0.0.4 <span class="date">2012-04-15</span></h3>
 <ul>
   <li>
     On successful connection, set textsize (by default, to 2147483647).
     This allows long values to be
-    returned for varchar(max), nvarchar(max), varbinary(max), text, ntext, and image datatypes.
+    returned for <code>varchar(max)</code>, <code>nvarchar(max)</code>, <code>varbinary(max)</code>,
+    <code>text</code>, <code>ntext</code>, and <code>image</code> datatypes.
   </li>
   <li>
-    Honour the defined locale for char, varchar and text datatypes.
+    Honour the defined locale for
+    <code>char</code>, <code>varchar</code> and <code>text</code> datatypes.
     iconv is used to perform the conversion, and is included as an optional dependency.
     If it is not available, then ascii is used as fallback when converting the buffers to strings.
   </li>
