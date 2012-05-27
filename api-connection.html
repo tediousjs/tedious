@@ -32,6 +32,9 @@ title: API - Connection
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
   <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
+  <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
+  <li><a href="#function_prepare">connection.prepare(request)</a></li>
+  <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
 </ul>
 
 <h2 id="function_newConnection">new Connection(config)</h2>
@@ -358,6 +361,62 @@ var connection = new Connection(config);
     <p>
       A <a href="api-request.html"><code>Request</code></a>
       object representing the request.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_execute">connection.execute(request, parameters)</h2>
+<p>
+  Execute previously prepared SQL, using the supplied parameters.
+</p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A previously prepared <a href="api-request.html"><code>Request</code></a>.
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">parameters</div>
+  <div class="description">
+    <p>
+      An object whose names correspond to the names of parameters that were added to the
+      <code>request</code> before it was prepared.
+      The object's values are passed as the parameters' values when the request is executed.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_prepare">connection.prepare(request)</h2>
+<p>
+  Prepare the SQL represented by the request.
+  The request can then be used in subsequent calls to
+  <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
+</p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+    </p>
+    <p>
+      Parameters only require a name and type.
+      Parameter values are ignored.
+    </p>
+  </div>
+</div>
+
+<h2 id="function_unprepare">connection.unprepare(request)</h2>
+<p>
+  Release the SQL Server resources associated with a previously prepared request.
+</p>
+<div class="argument">
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      The request to be unprepared.
     </p>
   </div>
 </div>
