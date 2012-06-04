@@ -14,7 +14,7 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "0.0.5",
+  "version": "0.0.6",
   "main" : "./lib/tedious.js",
   "repository": {
     "type": "git",
@@ -33,7 +33,6 @@
   },
   "scripts": {
     "test": "scripts/tests-unit",
-    "postinstall": "scripts/build",
     "publish": "scripts/build"
   }
 }
