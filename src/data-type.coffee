@@ -207,7 +207,7 @@ TYPE =
     declaration: (parameter) ->
       if parameter.length
         length = parameter.length
-      else if parameter.value
+      else if parameter.value?
         length = parameter.value.length
       else
         length = @.maximumLength
@@ -219,7 +219,7 @@ TYPE =
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = parameter.length
-      else if parameter.value
+      else if parameter.value?
         length = parameter.value.length
       else
         length = @.maximumLength
@@ -227,13 +227,13 @@ TYPE =
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
       if length <= @maximumLength
-        buffer.writeUInt16LE(length)
+        buffer.writeUInt16LE(@maximumLength)
       else
         buffer.writeUInt16LE(MAX)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
       # ParamLenData
-      if parameter.value
+      if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
           buffer.writeString(parameter.value, 'ascii')
@@ -265,7 +265,7 @@ TYPE =
     declaration: (parameter) ->
       if parameter.length
         length = 2 * parameter.length
-      else if parameter.value
+      else if parameter.value?
         length = 2 * parameter.value.length
       else
         length = @maximumLength
@@ -277,7 +277,7 @@ TYPE =
     writeParameterData: (buffer, parameter) ->
       if parameter.length
         length = 2 * parameter.length
-      else if parameter.value
+      else if parameter.value?
         length = 2 * parameter.value.length
       else
         length = @maximumLength
@@ -285,13 +285,13 @@ TYPE =
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
       if length <= @maximumLength
-        buffer.writeUInt16LE(length)
+        buffer.writeUInt16LE(@maximumLength)
       else
         buffer.writeUInt16LE(MAX)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00])) # Collation
 
       # ParamLenData
-      if parameter.value
+      if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
           buffer.writeString(parameter.value, 'ucs2')
