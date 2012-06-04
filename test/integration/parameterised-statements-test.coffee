@@ -9,7 +9,7 @@ getConfig = ->
   config.options.debug =
     packet: false
     data: false
-    payload: false
+    payload: true
     token: false
     log: false
 
@@ -54,6 +54,9 @@ exports.intNull = (test) ->
 exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
+exports.varCharEmptyString = (test) ->
+  execSql(test, TYPES.VarChar, '')
+
 exports.varCharNull = (test) ->
   execSql(test, TYPES.VarChar, null)
 
@@ -66,6 +69,9 @@ exports.varCharMax = (test) ->
 
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
+
+exports.nVarCharEmptyString = (test) ->
+  execSql(test, TYPES.NVarChar, '')
 
 exports.nVarCharNull = (test) ->
   execSql(test, TYPES.NVarChar, null)
@@ -183,6 +189,7 @@ execSql = (test, type, value) ->
   test.expect(5)
 
   config = getConfig()
+  #config.options.packetSize = 32768
 
   request = new Request('select @param', (err) ->
       test.ok(!err)
