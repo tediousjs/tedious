@@ -14,7 +14,10 @@ class MessageIO extends EventEmitter
     @payloadBuffer = new Buffer(0)
 
   eventData: (data) =>
-    @packetBuffer = new Buffer(@packetBuffer.concat(data))
+    if (@packetBuffer.length > 0)
+      @packetBuffer = new Buffer(@packetBuffer.concat(data))
+    else
+      @packetBuffer = data
 
     while isPacketComplete(@packetBuffer)
       length = packetLength(@packetBuffer)
