@@ -111,9 +111,21 @@ class ReadableTrackingBuffer
 
     @read(1, readValueFunction, callback)
 
+  readInt8: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt8(@position)
+
+    @read(1, readValueFunction, callback)
+
   readUInt16LE: (callback) ->
     readValueFunction = ->
       @buffer.readUInt16LE(@position)
+
+    @read(2, readValueFunction, callback)
+
+  readInt16LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt16LE(@position)
 
     @read(2, readValueFunction, callback)
 
@@ -123,15 +135,33 @@ class ReadableTrackingBuffer
 
     @read(2, readValueFunction, callback)
 
+  readInt16BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt16BE(@position)
+
+    @read(2, readValueFunction, callback)
+
   readUInt32LE: (callback) ->
     readValueFunction = ->
       @buffer.readUInt32LE(@position)
 
     @read(4, readValueFunction, callback)
 
+  readInt32LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt32LE(@position)
+
+    @read(4, readValueFunction, callback)
+
   readUInt32BE: (callback) ->
     readValueFunction = ->
       @buffer.readUInt32BE(@position)
+
+    @read(4, readValueFunction, callback)
+
+  readInt32BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt32BE(@position)
 
     @read(4, readValueFunction, callback)
 

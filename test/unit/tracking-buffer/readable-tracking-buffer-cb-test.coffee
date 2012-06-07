@@ -181,6 +181,71 @@ exports.readUInt64LE = (test) ->
     test.done()
   )
 
+exports.readInt8 = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0xFE]))
+  buffer.readInt8((value) ->
+    test.strictEqual(value, 0x12)
+
+    buffer.readInt8((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt16LE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0xFE, 0xFF]))
+  buffer.readInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+
+    buffer.readInt16LE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt16BE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0xFF, 0xFE]))
+  buffer.readInt16BE((value) ->
+    test.strictEqual(value, 0x1234)
+
+    buffer.readInt16BE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt32LE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0xFE, 0xFF, 0xFF, 0xFF]))
+  buffer.readInt32LE((value) ->
+    test.strictEqual(value, 0x78563412)
+
+    buffer.readInt32LE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt32BE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.readInt32BE((value) ->
+    test.strictEqual(value, 0x12345678)
+
+    buffer.readInt32BE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
 exports.readBuffer = (test) ->
   test.expect(1)
 
