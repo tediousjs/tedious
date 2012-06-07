@@ -1,178 +1,265 @@
+require('../buffertools')
 convertLEBytesToString= require('./bigint').convertLEBytesToString
 
 ###
   A Buffer-like class that tracks position.
-
   As values are read, the position advances by the size of the read data.
-  When reading, if the read would pass the end of the buffer, an error object is thrown.
+
+  The read data is passed to a callback. If there is sufficient data buffered, then
+  the callback is called immediately. If there is insufficient data, the callback
+  is not called until there is enough data.
 ###
 class ReadableTrackingBuffer
-  constructor: (@buffer, @encoding) ->
+  constructor: (@buffer) ->
     if !buffer
       @buffer = new Buffer(0)
-      @encoding = undefined
 
-    @encoding ||= 'utf8'
-    @position = 0    
-
-  add: (buffer) ->
-    @buffer = @buffer.slice(@position).concat(buffer)
     @position = 0
+    @available = @buffer.length
+    @buffers = []
 
-  assertEnoughLeftFor: (lengthRequired) ->
-    @previousPosition = @position
+  ###
+    Add a Buffer to the buffer.
+    This may trigger a deferred read to be satisfied.
+  ###
+  add: (buffer) ->
+    @buffers.push(buffer)
+    @available += buffer.length
 
-    available = @buffer.length - @position
+    # If sufficient data is now available to satisify a deferred read, perform the read.
+    if @deferred && @available >= @deferred.length
+      @useBuffers()
 
-    if available < lengthRequired
-      throw
-        error: 'oob'
-        message: "required : #{lengthRequired}, available : #{available}"
+      @read.apply(@, @deferred.readArguments)
 
-  empty: ->
-    @position == @buffer.length
+  useBuffers: ->
+      @buffer = @buffer.slice(@position)
+      @buffer = @buffer.concat(@buffers)
+      @position = 0
+      @buffers = []
 
-  rollback: ->
-    @position = @previousPosition
+  ###
+    If there is sufficent data, read the value, and call the callback with the value.
+    If there is not enough data, defere the reading of the value until there is
+    sufficient data.
+  ###
+  read: (length, readValueFunction, callback) ->
+    if @available >= length
+      if @buffer.length - @position < length
+        @useBuffers()
 
-  readUInt8: ->
-    length = 1
-    @assertEnoughLeftFor(length)
-    @position += length
-    value = @buffer.readUInt8(@position - length)
+      value = readValueFunction.call(@)
+      @position += length
+      @available -= length
+      @deferred = undefined
+      callback(value)
+    else
+      if @deferred
+        throw new Error('Already a deferred read pending from buffer')
+      @deferred =
+        length: length
+        readArguments: arguments
 
-  readUInt16LE: ->
-    length = 2
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readUInt16LE(@position - length)
+  ###
+    Read multiple values, then pass them all in an object as an argument
+    to a callback.
 
-  readUInt16BE: ->
-    length = 2
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readUInt16BE(@position - length)
+    reads     : An object.
+                The keys are used as keys in the object passed to the callback.
+                The values are either functions or arrays.
+                  Function values : The functions are read... functions of this class.
+                  Array values :    The first array element is a function as above.
+                                    The second element is an array, of arguments, that are passed to
+                                    the function.
+    callback :  A function that is called when all of the values have been read.
+                A single argument, an object, is passed. The keys are the keys from the
+                'reads' argument, and the values are the values read from the read... functions.
+  ###
+  readMultiple: (reads, callback) ->
+    values = {}
+    names = Object.keys(reads)
+    name = undefined
+    nameNumber = 0
 
-  readUInt32LE: ->
-    length = 4
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readUInt32LE(@position - length)
+    valueCallback = (value) ->
+      values[name] = value
 
-  readUInt32BE: ->
-    length = 4
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readUInt32BE(@position - length)
+      if (nameNumber == names.length)
+        callback(values)
+      else
+        readOne()
 
-  readInt8: ->
-    length = 1
-    @assertEnoughLeftFor(length)
-    @position += length
-    value = @buffer.readInt8(@position - length)
+    # Read a value, then read another, until there are no more to read.
+    readOne = =>
+      name = names[nameNumber]
+      nameNumber++
 
-  readInt16LE: ->
-    length = 2
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readInt16LE(@position - length)
+      if Array.isArray(reads[name])
+        readFunction = reads[name][0]
+        args = reads[name][1]
+      else
+        readFunction = reads[name]
+        args = []
 
-  readInt16BE: ->
-    length = 2
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readInt16BE(@position - length)
+      args.push(valueCallback)
+      readFunction.apply(@, args)
 
-  readInt32LE: ->
-    length = 4
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readInt32LE(@position - length)
+    readOne()
 
-  readInt32BE: ->
-    length = 4
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readInt32BE(@position - length)
+  readUInt8: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt8(@position)
 
-  readFloatLE: ->
-    length = 4
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readFloatLE(@position - length)
+    @read(1, readValueFunction, callback)
 
-  readDoubleLE: ->
-    length = 8
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.readDoubleLE(@position - length)
+  readInt8: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt8(@position)
 
-  # If value > 53 bits then it will be incorrect (because Javascript uses IEEE_754 for number representation).
-  readUInt64LE: ->
-    low = @readUInt32LE()
-    high = @readUInt32LE()
-    if (high >= (2 << (53 - 32)))
-      console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
+    @read(1, readValueFunction, callback)
 
-    low + (0x100000000 * high)
+  readUInt16LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt16LE(@position)
 
-  readUNumeric64LE: ->
-    low = @readUInt32LE()
-    high = @readUInt32LE()
+    @read(2, readValueFunction, callback)
 
-    low + (0x100000000 * high)
+  readInt16LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt16LE(@position)
 
+    @read(2, readValueFunction, callback)
 
-  readUNumeric96LE: ->
-    dword1 = @readUInt32LE()
-    dword2 = @readUInt32LE()
-    dword3 = @readUInt32LE()
+  readUInt16BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt16BE(@position)
 
-    dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3)
+    @read(2, readValueFunction, callback)
 
-  readUNumeric128LE: ->
-    dword1 = @readUInt32LE()
-    dword2 = @readUInt32LE()
-    dword3 = @readUInt32LE()
-    dword4 = @readUInt32LE()
+  readInt16BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt16BE(@position)
 
-    dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4)
+    @read(2, readValueFunction, callback)
 
-  readString: (length, encoding) ->
-    encoding ||= @encoding
+  readUInt32LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt32LE(@position)
 
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.toString(encoding, @position - length, @position)
+    @read(4, readValueFunction, callback)
 
-  readBVarchar: (encoding) ->
-    encoding ||= @encoding
+  readInt32LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt32LE(@position)
 
-    multiplier = if encoding = 'ucs2' then 2 else 1
-    length = @readUInt8() * multiplier
-    @readString(length, encoding)
+    @read(4, readValueFunction, callback)
 
-  readUsVarchar: (encoding) ->
-    encoding ||= @encoding
+  readUInt32BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt32BE(@position)
 
-    multiplier = if encoding = 'ucs2' then 2 else 1
-    length = @readUInt16LE() * multiplier
-    @readString(length, encoding)
+    @read(4, readValueFunction, callback)
 
-  readBuffer: (length) ->
-    @assertEnoughLeftFor(length)
-    @position += length
-    @buffer.slice(@position - length, @position)
+  readInt32BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readInt32BE(@position)
 
-  readArray: (length) ->
-    Array.prototype.slice.call(@readBuffer(length), 0, length)
+    @read(4, readValueFunction, callback)
 
-  readAsStringBigIntLE: (length) ->
-    @assertEnoughLeftFor(length)
-    @position += length
-    convertLEBytesToString(@buffer.slice(@position - length, @position))
+  readUInt64LE: (callback) ->
+    readValueFunction = ->
+      low = @buffer.readUInt32LE(@position)
+      high = @buffer.readUInt32LE(@position + 4)
+      if (high >= (2 << (53 - 32)))
+        console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
 
-  readAsStringInt64LE: (length) ->
-    @readAsStringBigIntLE(8)
+      low + (0x100000000 * high)
+
+    @read(8, readValueFunction, callback)
+
+  readUNumeric64LE: (callback) ->
+    readValueFunction = ->
+      low = @buffer.readUInt32LE(@position)
+      high = @buffer.readUInt32LE(@position + 4)
+      low + (0x100000000 * high)
+
+    @read(8, readValueFunction, callback)
+
+  readUNumeric96LE: (callback) ->
+    readValueFunction = ->
+      dword1 = @buffer.readUInt32LE(@position)
+      dword2 = @buffer.readUInt32LE(@position + 4)
+      dword3 = @buffer.readUInt32LE(@position + 8)
+      dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3)
+
+    @read(12, readValueFunction, callback)
+
+  readUNumeric128LE: (callback) ->
+    readValueFunction = ->
+      dword1 = @buffer.readUInt32LE(@position)
+      dword2 = @buffer.readUInt32LE(@position + 4)
+      dword3 = @buffer.readUInt32LE(@position + 8)
+      dword4 = @buffer.readUInt32LE(@position + 12)
+      dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4)
+
+    @read(16, readValueFunction, callback)
+
+  readFloatLE: (callback) ->
+    readValueFunction = ->
+      @buffer.readFloatLE(@position)
+
+    @read(4, readValueFunction, callback)
+
+  readDoubleLE: (callback) ->
+    readValueFunction = ->
+      @buffer.readDoubleLE(@position)
+
+    @read(8, readValueFunction, callback)
+
+  readBuffer: (length, callback) ->
+    readValueFunction = ->
+      @buffer.slice(@position, @position + length)
+
+    @read(length, readValueFunction, callback)
+
+  readArray: (length, callback) ->
+    @readBuffer(length, (value) =>
+      array = Array.prototype.slice.call(value, 0, length)
+      callback(array)
+    )
+
+  readString: (length, encoding, callback) ->
+    readValueFunction = ->
+      @buffer.toString(encoding, @position, @position + length)
+
+    @read(length, readValueFunction, callback)
+
+  readBVarchar: (encoding, callback) ->
+    @readUInt8((length) =>
+      multiplier = if encoding == 'ucs2' then 2 else 1
+      length = multiplier * length
+      @readString(length, encoding, callback)
+    )
+
+  readUsVarchar: (encoding, callback) ->
+    @readUInt16LE((length) =>
+      multiplier = if encoding == 'ucs2' then 2 else 1
+      length = multiplier * length
+      @readString(length, encoding, callback)
+    )
+
+  readBBuffer: (callback) ->
+    @readUInt8((length) =>
+      @readBuffer(length, callback)
+    )
+
+  readAsStringBigIntLE: (length, callback) ->
+    @readBuffer(length, (buffer) =>
+      string = convertLEBytesToString(buffer)
+      callback(string)
+    )
+
+  readAsStringInt64LE: (callback) ->
+    @readAsStringBigIntLE(8, callback)
 
 module.exports = ReadableTrackingBuffer

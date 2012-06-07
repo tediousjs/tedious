@@ -1,151 +1,402 @@
-TrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+TrackingBuffer = require('../../../src/tracking-buffer/readable-tracking-buffer')
 
 exports.createNoArgs = (test) ->
   buffer = new TrackingBuffer()
-  
+
   test.strictEqual(buffer.buffer.length, 0)
-  test.strictEqual(buffer.encoding, 'utf8')
 
   test.done()
 
 exports.createWithBuffer = (test) ->
   inputBuffer = new Buffer([1 ,2, 3])
   buffer = new TrackingBuffer(inputBuffer)
-  
+
   test.strictEqual(buffer.buffer, inputBuffer)
-  test.strictEqual(buffer.encoding, 'utf8')
+  test.done()
+
+exports.notEnoughData = (test) ->
+  buffer = new TrackingBuffer(new Buffer([0x12]))
+  buffer.readUInt16LE((value) ->
+    test.ok(false, 'callback should not be called')
+  )
 
   test.done()
 
-exports.createWithEncoding = (test) ->
-  inputBuffer = new Buffer([1 ,2, 3])
-  buffer = new TrackingBuffer(inputBuffer, 'ucs2')
-  
-  test.strictEqual(buffer.buffer, inputBuffer)
-  test.strictEqual(buffer.encoding, 'ucs2')
+exports.notEnoughDataInitiallyThenSatisfiedWithOneAdd = (test) ->
+  buffer = new TrackingBuffer(new Buffer([0x12]))
+  buffer.readUInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+    test.done()
+  )
+  buffer.add(new Buffer([0x34]))
 
-  test.done()
+exports.notEnoughDataInitiallyThenSatisfiedWithMultipleAdds = (test) ->
+  test.expect(3)
 
-exports.notEnoughLeft = (test) ->
-  inputBuffer = new Buffer([1])
-  buffer = new TrackingBuffer(inputBuffer)
+  done = false
+  data = new Buffer([0x12, 0x34, 0x56, 0x78]);
 
-  try
-    buffer.readUInt16LE()
-    test.ok(false)
-  catch error
-    test.strictEqual(error.error, 'oob')
-
-  test.done()
-
-exports.addBuffer = (test) ->
-  data = new Buffer([
-    0x04, 0x00, 0x00, 0x00
-  ])
-
-  buffer = new TrackingBuffer(data.slice(0, 2))
-
-  try
-    buffer.readUInt32LE()
-    test.ok(false)
-  catch error
-    test.strictEqual(error.error, 'oob')
-
+  buffer = new TrackingBuffer()
+  buffer.readBuffer(data.length, (value) ->
+    test.deepEqual(value, data)
+    done = true
+    test.done()
+  )
+  buffer.add(data.slice(0, 1))
+  test.ok(!done, 'not enough data yet')
+  buffer.add(data.slice(1, 2))
+  test.ok(!done, 'not enough data yet')
   buffer.add(data.slice(2, 4))
-  test.strictEqual(buffer.readUInt32LE(), 4)
 
-  test.done()
+exports.valuesSpanBuffers = (test) ->
+  test.expect(3)
 
-exports.readUnsignedInt = (test) ->
-  data = new Buffer([
-    0x01
-    0x02, 0x00
-    0x00, 0x03
-    0x04, 0x00, 0x00, 0x00
-    0x00, 0x00, 0x00, 0x05
-    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  ])
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
 
+  buffer = new TrackingBuffer()
+  buffer.readUInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+    buffer.readUInt16LE((value) ->
+      test.strictEqual(value, 0x7856)
+      buffer.readUInt16LE((value) ->
+        test.strictEqual(value, 0xbc9a)
+        test.done()
+      )
+    )
+  )
+  buffer.add(data.slice(0, 1))
+  buffer.add(data.slice(1, 3))
+  buffer.add(data.slice(3, 5))
+  buffer.add(data.slice(5, 6))
+
+exports.valuesSpanBuffersAlwaysDeferred = (test) ->
+  test.expect(3)
+
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
+
+  buffer = new TrackingBuffer()
+  buffer.readUInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+
+    buffer.readUInt16LE((value) ->
+      test.strictEqual(value, 0x7856)
+
+      buffer.readUInt16LE((value) ->
+        test.strictEqual(value, 0xbc9a)
+        test.done()
+      )
+      buffer.add(data.slice(5, 6))
+    )
+    buffer.add(data.slice(3, 5))
+  )
+  buffer.add(data.slice(0, 1))
+  buffer.add(data.slice(1, 3))
+
+exports.readMultiple = (test) ->
+  test.expect(3)
+
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
   buffer = new TrackingBuffer(data)
+  buffer.readMultiple(
+      int1: buffer.readUInt16LE,
+      buffer: [buffer.readBuffer, [2]],
+      int2: buffer.readUInt16LE
+    , (values) ->
+      test.strictEqual(values.int1, 0x3412)
+      test.deepEqual(values.buffer, data.slice(2, 4))
+      test.strictEqual(values.int2, 0xbc9a)
+      test.done()
+  )
 
-  test.strictEqual(buffer.readUInt8(), 1)
-  test.strictEqual(buffer.readUInt16LE(), 2)
-  test.strictEqual(buffer.readUInt16BE(), 3)
-  test.strictEqual(buffer.readUInt32LE(), 4)
-  test.strictEqual(buffer.readUInt32BE(), 5)
-  test.strictEqual(buffer.readUInt64LE(), 6)
+exports.readMultipleNotEnoughData = (test) ->
+  test.expect(3)
 
-  test.done()
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
+  buffer = new TrackingBuffer()
+  buffer.readMultiple(
+      int1: buffer.readUInt16LE,
+      buffer: [buffer.readBuffer, [2]],
+      int2: buffer.readUInt16LE
+    , (values) ->
+      test.strictEqual(values.int1, 0x3412)
+      test.deepEqual(values.buffer, data.slice(2, 4))
+      test.strictEqual(values.int2, 0xbc9a)
+      test.done()
+  )
 
-exports.readSignedInt = (test) ->
-  data = new Buffer([
-    0xFF
-    0xFE, 0xFF
-    0xFF, 0xFD
-    0xFC, 0xFF, 0xFF, 0xFF
-    0xFF, 0xFF, 0xFF, 0xFB
-  ])
+  buffer.add(data.slice(0, 3))
+  buffer.add(data.slice(3, 6))
 
-  buffer = new TrackingBuffer(data)
+exports.readUInt8 = (test) ->
+  test.expect(1)
 
-  test.strictEqual(buffer.readInt8(), -1)
+  buffer = new TrackingBuffer(new Buffer([0x12]))
+  buffer.readUInt8((value) ->
+    test.strictEqual(value, 0x12)
+    test.done()
+  )
 
-  test.strictEqual(buffer.readInt16LE(), -2)
-  test.strictEqual(buffer.readInt16BE(), -3)
-  test.strictEqual(buffer.readInt32LE(), -4)
-  test.strictEqual(buffer.readInt32BE(), -5)
+exports.readUInt16LE = (test) ->
+  test.expect(1)
 
-  test.done()
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34]))
+  buffer.readUInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+    test.done()
+  )
 
-exports.readString = (test) ->
-  data = new Buffer([0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
-  buffer = new TrackingBuffer(data, 'ucs2')
+exports.readUInt16BE = (test) ->
+  test.expect(1)
 
-  test.strictEqual(buffer.readString(data.length), 'abc')
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34]))
+  buffer.readUInt16BE((value) ->
+    test.strictEqual(value, 0x1234)
+    test.done()
+  )
 
-  test.done()
+exports.readUInt32LE = (test) ->
+  test.expect(1)
 
-exports.readBVarchar = (test) ->
-  data = new Buffer([0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
-  buffer = new TrackingBuffer(data, 'ucs2')
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78]))
+  buffer.readUInt32LE((value) ->
+    test.strictEqual(value, 0x78563412)
+    test.done()
+  )
 
-  test.strictEqual(buffer.readBVarchar(), 'abc')
+exports.readUInt32BE = (test) ->
+  test.expect(1)
 
-  test.done()
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78]))
+  buffer.readUInt32BE((value) ->
+    test.strictEqual(value, 0x12345678)
+    test.done()
+  )
 
-exports.readUsVarchar = (test) ->
-  data = new Buffer([0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
-  buffer = new TrackingBuffer(data, 'ucs2')
+exports.readUInt64LE = (test) ->
+  test.expect(1)
 
-  test.strictEqual(buffer.readUsVarchar(), 'abc')
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00]))
+  buffer.readUInt64LE((value) ->
+    test.strictEqual(value, 0xbc9a78563412)
+    test.done()
+  )
 
-  test.done()
+exports.readInt8 = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0xFE]))
+  buffer.readInt8((value) ->
+    test.strictEqual(value, 0x12)
+
+    buffer.readInt8((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt16LE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0xFE, 0xFF]))
+  buffer.readInt16LE((value) ->
+    test.strictEqual(value, 0x3412)
+
+    buffer.readInt16LE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt16BE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0xFF, 0xFE]))
+  buffer.readInt16BE((value) ->
+    test.strictEqual(value, 0x1234)
+
+    buffer.readInt16BE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt32LE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0xFE, 0xFF, 0xFF, 0xFF]))
+  buffer.readInt32LE((value) ->
+    test.strictEqual(value, 0x78563412)
+
+    buffer.readInt32LE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readInt32BE = (test) ->
+  test.expect(2)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.readInt32BE((value) ->
+    test.strictEqual(value, 0x12345678)
+
+    buffer.readInt32BE((value) ->
+      test.strictEqual(value, -2)
+      test.done()
+    )
+  )
+
+exports.readUNumeric64LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00]))
+  buffer.readUNumeric64LE((value) ->
+    test.strictEqual(value, 0xbc9a78563412)
+    test.done()
+  )
+
+exports.readUNumeric96LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00]))
+  buffer.readUNumeric96LE((value) ->
+    test.strictEqual(value, 1.208925819822001e+24)
+    test.done()
+  )
+
+exports.readUNumeric128LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00]))
+  buffer.readUNumeric128LE((value) ->
+    test.strictEqual(value, 5.192296859743753e+33)
+    test.done()
+  )
+
+exports.readFloatLE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x00, 0x00, 0x90, 0x3F]))
+  buffer.readFloatLE((value) ->
+    test.strictEqual(value, 1.125)
+    test.done()
+  )
+
+exports.readDoubleLE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x02, 0x24, 0xFE, 0x40]))
+  buffer.readDoubleLE((value) ->
+    test.strictEqual(value, 123456.125)
+    test.done()
+  )
 
 exports.readBuffer = (test) ->
-  data = new Buffer([0x01, 0x02, 0x03, 0x04])
+  test.expect(1)
+
+  data = new Buffer([0x12, 0x34, 0x56, 0x78]);
+
   buffer = new TrackingBuffer(data)
+  buffer.readBuffer(data.length, (value) ->
+    test.deepEqual(value, data)
+    test.done()
+  )
 
-  buffer.readInt8()
-  test.ok(buffer.readBuffer(2).equals(new Buffer([0x02, 0x03])))
+exports.readArray = (test) ->
+  test.expect(1)
 
-  test.done()
+  data = [0x12, 0x34, 0x56, 0x78];
+
+  buffer = new TrackingBuffer(new Buffer(data))
+  buffer.readArray(data.length, (value) ->
+    test.deepEqual(value, data)
+    test.done()
+  )
+
+exports.readStringUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readString(data.length, 'ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readStringAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readString(data.length, 'ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readBVarcharUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readBVarchar('ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readBVarcharAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readBVarchar('ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readUsVarcharUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readUsVarchar('ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readUsVarcharAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x00, 0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readUsVarchar('ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readBBuffer = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x01, 0x02, 0x03])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readBBuffer((value) ->
+    test.deepEqual(value, data.slice(1))
+    test.done()
+  )
 
 exports.readAsStringInt64LE = (test) ->
+  test.expect(1)
+
   data = new Buffer([0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+
   buffer = new TrackingBuffer(data)
-
-  test.strictEqual(buffer.readAsStringInt64LE(), '513')
-
-  test.done()
-
-exports.readRollback= (test) ->
-  data = new Buffer([0x01, 0x00, 0x02, 0x00, 0x03, 0x00])
-  buffer = new TrackingBuffer(data)
-
-  test.strictEqual(buffer.readUInt16LE(), 1)
-  test.strictEqual(buffer.readUInt16LE(), 2)
-  buffer.rollback()
-  test.strictEqual(buffer.readUInt16LE(), 2)
-  test.strictEqual(buffer.readUInt16LE(), 3)
-
-  test.done()
+  buffer.readAsStringInt64LE((value) ->
+    test.strictEqual(value, '513')
+    test.done()
+  )
