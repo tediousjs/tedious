@@ -71,7 +71,7 @@ class Parser extends EventEmitter
       else
         throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
     catch error
-      if error?.error == 'oob'
+      if error?.error == 'oob' || type == 0
         # There was an attempt to read past the end of the buffer.
         # In other words, we've run out of buffer.
         return false
