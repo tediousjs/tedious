@@ -92,6 +92,41 @@ exports.valuesSpanBuffersAlwaysDeferred = (test) ->
   buffer.add(data.slice(0, 1))
   buffer.add(data.slice(1, 3))
 
+exports.readMultiple = (test) ->
+  test.expect(3)
+
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
+  buffer = new TrackingBuffer(data)
+  buffer.readMultiple(
+      int1: buffer.readUInt16LE,
+      buffer: [buffer.readBuffer, [2]],
+      int2: buffer.readUInt16LE
+    , (values) ->
+      test.strictEqual(values.int1, 0x3412)
+      test.ok(values.buffer.equals(data.slice(2, 4)))
+      test.strictEqual(values.int2, 0xbc9a)
+      test.done()
+  )
+
+exports.readMultipleNotEnoughData = (test) ->
+  test.expect(3)
+
+  data = new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc]);
+  buffer = new TrackingBuffer()
+  buffer.readMultiple(
+      int1: buffer.readUInt16LE,
+      buffer: [buffer.readBuffer, [2]],
+      int2: buffer.readUInt16LE
+    , (values) ->
+      test.strictEqual(values.int1, 0x3412)
+      test.ok(values.buffer.equals(data.slice(2, 4)))
+      test.strictEqual(values.int2, 0xbc9a)
+      test.done()
+  )
+
+  buffer.add(data.slice(0, 3))
+  buffer.add(data.slice(3, 6))
+
 exports.readUInt16LE = (test) ->
   test.expect(1)
 

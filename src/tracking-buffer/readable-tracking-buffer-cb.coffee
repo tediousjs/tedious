@@ -56,6 +56,37 @@ class ReadableTrackingBuffer
         length: length
         readArguments: arguments
 
+  readMultiple: (reads, callback) ->
+    values = {}
+    names = Object.keys(reads)
+    name = undefined
+    nameNumber = 0
+
+    valueCallback = (value) ->
+      values[name] = value
+
+      if (nameNumber == names.length)
+        callback(values)
+      else
+        readOne()
+
+    # Read a value, then read another, until there are no more to read.
+    readOne = =>
+      name = names[nameNumber]
+      nameNumber++
+
+      if Array.isArray(reads[name])
+        readFunction = reads[name][0]
+        args = reads[name][1]
+      else
+        readFunction = reads[name]
+        args = []
+
+      args.push(valueCallback)
+      readFunction.apply(@, args)
+
+    readOne()
+
   readUInt16LE: (callback) ->
     length = 2
     readValueFunction = ->
