@@ -105,12 +105,46 @@ class ReadableTrackingBuffer
 
     readOne()
 
+  readUInt8: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt8(@position)
+
+    @read(1, readValueFunction, callback)
+
   readUInt16LE: (callback) ->
-    length = 2
     readValueFunction = ->
       @buffer.readUInt16LE(@position)
 
-    @read(length, readValueFunction, callback)
+    @read(2, readValueFunction, callback)
+
+  readUInt16BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt16BE(@position)
+
+    @read(2, readValueFunction, callback)
+
+  readUInt32LE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt32LE(@position)
+
+    @read(4, readValueFunction, callback)
+
+  readUInt32BE: (callback) ->
+    readValueFunction = ->
+      @buffer.readUInt32BE(@position)
+
+    @read(4, readValueFunction, callback)
+
+  readUInt64LE: (callback) ->
+    readValueFunction = ->
+      low = @buffer.readUInt32LE(@position)
+      high = @buffer.readUInt32LE(@position + 4)
+      if (high >= (2 << (53 - 32)))
+        console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
+
+      low + (0x100000000 * high)
+
+    @read(8, readValueFunction, callback)
 
   readBuffer: (length, callback) ->
     readValueFunction = ->

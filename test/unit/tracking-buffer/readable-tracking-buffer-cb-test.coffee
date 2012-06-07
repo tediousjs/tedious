@@ -127,12 +127,57 @@ exports.readMultipleNotEnoughData = (test) ->
   buffer.add(data.slice(0, 3))
   buffer.add(data.slice(3, 6))
 
+exports.readUInt8 = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12]))
+  buffer.readUInt8((value) ->
+    test.strictEqual(value, 0x12)
+    test.done()
+  )
+
 exports.readUInt16LE = (test) ->
   test.expect(1)
 
   buffer = new TrackingBuffer(new Buffer([0x12, 0x34]))
   buffer.readUInt16LE((value) ->
     test.strictEqual(value, 0x3412)
+    test.done()
+  )
+
+exports.readUInt16BE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34]))
+  buffer.readUInt16BE((value) ->
+    test.strictEqual(value, 0x1234)
+    test.done()
+  )
+
+exports.readUInt32LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78]))
+  buffer.readUInt32LE((value) ->
+    test.strictEqual(value, 0x78563412)
+    test.done()
+  )
+
+exports.readUInt32BE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78]))
+  buffer.readUInt32BE((value) ->
+    test.strictEqual(value, 0x12345678)
+    test.done()
+  )
+
+exports.readUInt64LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00]))
+  buffer.readUInt64LE((value) ->
+    test.strictEqual(value, 0xbc9a78563412)
     test.done()
   )
 
