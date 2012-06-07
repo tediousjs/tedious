@@ -2,7 +2,6 @@ require('../buffertools')
 
 ###
   A Buffer-like class that tracks position.
-
   As values are read, the position advances by the size of the read data.
 
   The read data is passed to a callback. If there is sufficient data buffered, then
@@ -18,6 +17,10 @@ class ReadableTrackingBuffer
     @available = @buffer.length
     @buffers = []
 
+  ###
+    Add a Buffer to the buffer.
+    This may trigger a deferred read to be satisfied.
+  ###
   add: (buffer) ->
     @buffers.push(buffer)
     @available += buffer.length
@@ -56,6 +59,21 @@ class ReadableTrackingBuffer
         length: length
         readArguments: arguments
 
+  ###
+    Read multiple values, then pass them all in an object as an argument
+    to a callback.
+
+    reads     : An object.
+                The keys are used as keys in the object passed to the callback.
+                The values are either functions or arrays.
+                  Function values : The functions are read... functions of this class.
+                  Array values :    The first array element is a function as above.
+                                    The remaining elements are arguments that are passed to
+                                    the function.
+    callback :  A function that is called when all of the values have been read.
+                A single argument, an object, is passed. The keys are the keys from the
+                'reads' argument, and the values are the values read from the read... functions.
+  ###
   readMultiple: (reads, callback) ->
     values = {}
     names = Object.keys(reads)
