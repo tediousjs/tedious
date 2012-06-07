@@ -21,6 +21,17 @@ exports.concatTwoArguments = (test) ->
 
   test.done()
 
+exports.concatArrayOfBuffer = (test) ->
+  buffer1 = new Buffer([1, 2])
+  buffer2 = new Buffer([3, 4])
+  buffer3 = new Buffer([5, 6])
+
+  buffer123 = buffer1.concat([buffer2, buffer3])
+
+  test.ok(bufferEqual(buffer123, [1, 2, 3, 4, 5, 6]))
+
+  test.done()
+
 exports.toByteArray = (test) ->
   buffer = new Buffer([1, 2, 3])
   array = buffer.toByteArray();
