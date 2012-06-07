@@ -256,3 +256,69 @@ exports.readBuffer = (test) ->
     test.ok(value.equals(data), 'buffer value')
     test.done()
   )
+
+exports.readStringUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readString(data.length, 'ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readStringAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readString(data.length, 'ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readBVarcharUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readBVarchar('ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readBVarcharAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readBVarchar('ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readUsVarcharUcs2 = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readUsVarchar('ucs2', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readUsVarcharAscii = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x03, 0x00, 0x61, 0x62, 0x63])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readUsVarchar('ascii', (value) ->
+    test.strictEqual(value, 'abc')
+    test.done()
+  )

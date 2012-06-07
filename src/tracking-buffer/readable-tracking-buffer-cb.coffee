@@ -182,4 +182,24 @@ class ReadableTrackingBuffer
 
     @read(length, readValueFunction, callback)
 
+  readString: (length, encoding, callback) ->
+    readValueFunction = ->
+      @buffer.toString(encoding, @position, @position + length)
+
+    @read(length, readValueFunction, callback)
+
+  readBVarchar: (encoding, callback) ->
+    @readUInt8((length) =>
+      multiplier = if encoding == 'ucs2' then 2 else 1
+      length = multiplier * length
+      @readString(length, encoding, callback)
+    )
+
+  readUsVarchar: (encoding, callback) ->
+    @readUInt16LE((length) =>
+      multiplier = if encoding == 'ucs2' then 2 else 1
+      length = multiplier * length
+      @readString(length, encoding, callback)
+    )
+
 module.exports = ReadableTrackingBuffer
