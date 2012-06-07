@@ -165,6 +165,44 @@ class ReadableTrackingBuffer
 
     @read(4, readValueFunction, callback)
 
+  readUInt64LE: (callback) ->
+    readValueFunction = ->
+      low = @buffer.readUInt32LE(@position)
+      high = @buffer.readUInt32LE(@position + 4)
+      if (high >= (2 << (53 - 32)))
+        console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
+
+      low + (0x100000000 * high)
+
+    @read(8, readValueFunction, callback)
+
+  readUNumeric64LE: (callback) ->
+    readValueFunction = ->
+      low = @buffer.readUInt32LE(@position)
+      high = @buffer.readUInt32LE(@position + 4)
+      low + (0x100000000 * high)
+
+    @read(8, readValueFunction, callback)
+
+  readUNumeric96LE: (callback) ->
+    readValueFunction = ->
+      dword1 = @buffer.readUInt32LE(@position)
+      dword2 = @buffer.readUInt32LE(@position + 4)
+      dword3 = @buffer.readUInt32LE(@position + 8)
+      dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3)
+
+    @read(12, readValueFunction, callback)
+
+  readUNumeric128LE: (callback) ->
+    readValueFunction = ->
+      dword1 = @buffer.readUInt32LE(@position)
+      dword2 = @buffer.readUInt32LE(@position + 4)
+      dword3 = @buffer.readUInt32LE(@position + 8)
+      dword4 = @buffer.readUInt32LE(@position + 12)
+      dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4)
+
+    @read(16, readValueFunction, callback)
+
   readFloatLE: (callback) ->
     readValueFunction = ->
       @buffer.readFloatLE(@position)
@@ -174,17 +212,6 @@ class ReadableTrackingBuffer
   readDoubleLE: (callback) ->
     readValueFunction = ->
       @buffer.readDoubleLE(@position)
-
-    @read(8, readValueFunction, callback)
-
-  readUInt64LE: (callback) ->
-    readValueFunction = ->
-      low = @buffer.readUInt32LE(@position)
-      high = @buffer.readUInt32LE(@position + 4)
-      if (high >= (2 << (53 - 32)))
-        console.warn("Read UInt64LE > 53 bits : high=#{high}, low=#{low}")
-
-      low + (0x100000000 * high)
 
     @read(8, readValueFunction, callback)
 

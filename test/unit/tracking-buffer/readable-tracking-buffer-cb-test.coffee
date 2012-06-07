@@ -246,6 +246,33 @@ exports.readInt32BE = (test) ->
     )
   )
 
+exports.readUNumeric64LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00]))
+  buffer.readUNumeric64LE((value) ->
+    test.strictEqual(value, 0xbc9a78563412)
+    test.done()
+  )
+
+exports.readUNumeric96LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00]))
+  buffer.readUNumeric96LE((value) ->
+    test.strictEqual(value, 1.208925819822001e+24)
+    test.done()
+  )
+
+exports.readUNumeric128LE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00]))
+  buffer.readUNumeric128LE((value) ->
+    test.strictEqual(value, 5.192296859743753e+33)
+    test.done()
+  )
+
 exports.readFloatLE = (test) ->
   test.expect(1)
 
