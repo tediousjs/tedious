@@ -1,8 +1,9 @@
 infoParser = require('../../../src/token/infoerror-token-parser').infoParser
+errorParser = require('../../../src/token/infoerror-token-parser').errorParser
 ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
-module.exports.info = (test) ->
+testParser = (test, parser, name, event) ->
   number = 3
   state = 4
   class_ = 5
@@ -26,15 +27,24 @@ module.exports.info = (test) ->
   data.writeUInt16LE(data.length - 2, 0)
   #console.log(buffer)
 
-  token = infoParser(new ReadableTrackingBuffer(data, 'ucs2'))
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(data), (token) ->
+    #console.log(token)
 
-  test.strictEqual(token.number, number)
-  test.strictEqual(token.state, state)
-  test.strictEqual(token.class, class_)
-  test.strictEqual(token.message, message)
-  test.strictEqual(token.serverName, serverName)
-  test.strictEqual(token.procName, procName)
-  test.strictEqual(token.lineNumber, lineNumber)
+    test.strictEqual(token.name, name)
+    test.strictEqual(token.event, event)
+    test.strictEqual(token.number, number)
+    test.strictEqual(token.state, state)
+    test.strictEqual(token.class, class_)
+    test.strictEqual(token.message, message)
+    test.strictEqual(token.serverName, serverName)
+    test.strictEqual(token.procName, procName)
+    test.strictEqual(token.lineNumber, lineNumber)
 
-  test.done()
+    test.done()
+  )
+
+module.exports.info = (test) ->
+  testParser(test, infoParser, 'INFO', 'infoMessage')
+
+module.exports.error = (test) ->
+  testParser(test, errorParser, 'ERROR', 'errorMessage')

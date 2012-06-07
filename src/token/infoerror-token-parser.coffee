@@ -1,37 +1,33 @@
 # s2.2.7.9, s2.2.7.10
 
-parser = (buffer) ->
-  length = buffer.readUInt16LE()
-  number = buffer.readUInt32LE()
-  state = buffer.readUInt8()
-  class_ = buffer.readUInt8()
-  message = buffer.readUsVarchar()
-  serverName = buffer.readBVarchar()
-  procName = buffer.readBVarchar()
-  lineNumber = buffer.readUInt32LE()
+parser = (buffer, callback) ->
+  buffer.readMultiple(
+    length: buffer.readUInt16LE
+    number: buffer.readUInt32LE
+    state: buffer.readUInt8
+    "class": buffer.readUInt8
+    message: [buffer.readUsVarchar, ['ucs2']]
+    serverName: [buffer.readBVarchar, ['ucs2']]
+    procName: [buffer.readBVarchar, ['ucs2']]
+    lineNumber: buffer.readUInt32LE
+    , callback
+  )
 
-  token =
-    number: number
-    state: state
-    class: class_
-    message: message
-    serverName: serverName
-    procName: procName
-    lineNumber: lineNumber
+infoParser = (buffer, callback) ->
+  parser(buffer, (token) ->
+    token.name = 'INFO'
+    token.event = 'infoMessage'
 
-infoParser = (buffer) ->
-  token = parser(buffer)
-  token.name = 'INFO'
-  token.event = 'infoMessage'
+    callback(token)
+  )
 
-  token
+errorParser = (buffer, callback) ->
+  parser(buffer, (token) ->
+    token.name = 'ERROR'
+    token.event = 'errorMessage'
 
-errorParser = (buffer) ->
-  token = parser(buffer)
-  token.name = 'ERROR'
-  token.event = 'errorMessage'
-
-  token
+    callback(token)
+  )
 
 exports.infoParser = infoParser
 exports.errorParser = errorParser
