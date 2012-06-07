@@ -3,6 +3,8 @@ ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.database = (test) ->
+  test.expect(3)
+
   oldDb = 'old'
   newDb = 'new'
 
@@ -16,15 +18,17 @@ module.exports.database = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 2, 0)
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
+  parser(new ReadableTrackingBuffer(data), (token) ->
+    test.strictEqual(token.type, 'DATABASE')
+    test.strictEqual(token.oldValue, 'old')
+    test.strictEqual(token.newValue, 'new')
 
-  test.strictEqual(token.type, 'DATABASE')
-  test.strictEqual(token.oldValue, 'old')
-  test.strictEqual(token.newValue, 'new')
-
-  test.done()
+    test.done()
+  )
 
 module.exports.packetSize = (test) ->
+  test.expect(3)
+
   oldSize = '1024'
   newSize = '2048'
 
@@ -38,26 +42,10 @@ module.exports.packetSize = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 2, 0)
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
+  parser(new ReadableTrackingBuffer(data), (token) ->
+    test.strictEqual(token.type, 'PACKET_SIZE')
+    test.strictEqual(token.oldValue, 1024)
+    test.strictEqual(token.newValue, 2048)
 
-  test.strictEqual(token.type, 'PACKET_SIZE')
-  test.strictEqual(token.oldValue, 1024)
-  test.strictEqual(token.newValue, 2048)
-
-  test.done()
-
-module.exports.badType = (test) ->
-  buffer = new WritableTrackingBuffer(50, 'ucs2')
-
-  buffer.writeUInt16LE(0)                 # Length written later
-  buffer.writeUInt8(0xFF)                 # Bad type
-
-  data = buffer.data
-  data.writeUInt16LE(data.length - 2, 0);
-
-  try
-    token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
-    test.ok(false)
-  catch error
-    test.ok(~error.message.indexOf('Unsupported'))
     test.done()
+  )

@@ -30,34 +30,49 @@ types =
   17:
     name: 'TXN_ENDED'
 
-module.exports = (buffer) ->
-  length = buffer.readUInt16LE()
-  typeNumber = buffer.readUInt8()
-  type = types[typeNumber]
+module.exports = (buffer, callback) ->
+  type = undefined
 
-  if type
-    switch type.name
-      when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
-        newValue = buffer.readBVarchar()
-        oldValue = buffer.readBVarchar()
-      when 'SQL_COLLATION'
-        valueLength = buffer.readUInt8()
-        newValue = buffer.readBuffer(valueLength)
-
-        valueLength = buffer.readUInt8()
-        oldValue = buffer.readBuffer(valueLength)
-      else
-        throw new Error("Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}")
-
+  returnValues = (values) ->
     if type.name == 'PACKET_SIZE'
-      newValue = parseInt(newValue)
-      oldValue = parseInt(oldValue)
-  else
-    throw new Error("Unsupported ENVCHANGE type #{typeNumber} at offset #{buffer.position - 1}")
+      newValue = parseInt(values.newValue)
+      oldValue = parseInt(values.oldValue)
+    else
+      newValue = values.newValue
+      oldValue = values.oldValue
 
-  # Return token
-  name: 'ENVCHANGE'
-  type: type.name
-  event: type.event
-  oldValue: oldValue
-  newValue: newValue
+    token =
+      name: 'ENVCHANGE'
+      type: type.name
+      event: type.event
+      oldValue: oldValue
+      newValue: newValue
+
+    callback(token)
+
+  readValues = (typeValues) ->
+      type = types[typeValues.typeNumber]
+
+      if type
+        switch type.name
+          when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
+            buffer.readMultiple(
+              newValue: [buffer.readBVarchar, ['ucs2']]
+              oldValue: [buffer.readBVarchar, ['ucs2']]
+              , returnValues
+            )
+          when 'SQL_COLLATION'
+            buffer.readMultiple(
+              newValue: buffer.readBBuffer
+              oldValue: buffer.readBBuffer
+              , returnValues
+            )
+          else
+            throw new Error("Unsupported ENVCHANGE type #{typeValues.typeNumber} #{type.name} at offset #{buffer.position - 1}")
+      else
+        throw new Error("Unsupported ENVCHANGE type #{typeValues.typeNumber} at offset #{buffer.position - 1}")
+
+  buffer.readMultiple(
+    length: buffer.readUInt16LE
+    typeNumber: buffer.readUInt8
+    , readValues)
