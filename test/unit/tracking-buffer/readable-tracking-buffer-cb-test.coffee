@@ -246,6 +246,24 @@ exports.readInt32BE = (test) ->
     )
   )
 
+exports.readFloatLE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x00, 0x00, 0x90, 0x3F]))
+  buffer.readFloatLE((value) ->
+    test.strictEqual(value, 1.125)
+    test.done()
+  )
+
+exports.readDoubleLE = (test) ->
+  test.expect(1)
+
+  buffer = new TrackingBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x02, 0x24, 0xFE, 0x40]))
+  buffer.readDoubleLE((value) ->
+    test.strictEqual(value, 123456.125)
+    test.done()
+  )
+
 exports.readBuffer = (test) ->
   test.expect(1)
 

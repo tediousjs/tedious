@@ -165,6 +165,18 @@ class ReadableTrackingBuffer
 
     @read(4, readValueFunction, callback)
 
+  readFloatLE: (callback) ->
+    readValueFunction = ->
+      @buffer.readFloatLE(@position)
+
+    @read(4, readValueFunction, callback)
+
+  readDoubleLE: (callback) ->
+    readValueFunction = ->
+      @buffer.readDoubleLE(@position)
+
+    @read(8, readValueFunction, callback)
+
   readUInt64LE: (callback) ->
     readValueFunction = ->
       low = @buffer.readUInt32LE(@position)
