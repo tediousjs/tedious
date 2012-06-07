@@ -1,4 +1,5 @@
 require('../buffertools')
+convertLEBytesToString= require('./bigint').convertLEBytesToString
 
 ###
   A Buffer-like class that tracks position.
@@ -221,6 +222,12 @@ class ReadableTrackingBuffer
 
     @read(length, readValueFunction, callback)
 
+  readArray: (length, callback) ->
+    @readBuffer(length, (value) =>
+      array = Array.prototype.slice.call(value, 0, length)
+      callback(array)
+    )
+
   readString: (length, encoding, callback) ->
     readValueFunction = ->
       @buffer.toString(encoding, @position, @position + length)
@@ -240,5 +247,14 @@ class ReadableTrackingBuffer
       length = multiplier * length
       @readString(length, encoding, callback)
     )
+
+  readAsStringBigIntLE: (length, callback) ->
+    @readBuffer(length, (buffer) =>
+      string = convertLEBytesToString(buffer)
+      callback(string)
+    )
+
+  readAsStringInt64LE: (callback) ->
+    @readAsStringBigIntLE(8, callback)
 
 module.exports = ReadableTrackingBuffer

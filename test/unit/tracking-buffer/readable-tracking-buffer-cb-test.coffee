@@ -38,7 +38,7 @@ exports.notEnoughDataInitiallyThenSatisfiedWithMultipleAdds = (test) ->
 
   buffer = new TrackingBuffer()
   buffer.readBuffer(data.length, (value) ->
-    test.ok(value.equals(data), 'buffer value')
+    test.deepEqual(value, data)
     done = true
     test.done()
   )
@@ -103,7 +103,7 @@ exports.readMultiple = (test) ->
       int2: buffer.readUInt16LE
     , (values) ->
       test.strictEqual(values.int1, 0x3412)
-      test.ok(values.buffer.equals(data.slice(2, 4)))
+      test.deepEqual(values.buffer, data.slice(2, 4))
       test.strictEqual(values.int2, 0xbc9a)
       test.done()
   )
@@ -119,7 +119,7 @@ exports.readMultipleNotEnoughData = (test) ->
       int2: buffer.readUInt16LE
     , (values) ->
       test.strictEqual(values.int1, 0x3412)
-      test.ok(values.buffer.equals(data.slice(2, 4)))
+      test.deepEqual(values.buffer, data.slice(2, 4))
       test.strictEqual(values.int2, 0xbc9a)
       test.done()
   )
@@ -298,7 +298,18 @@ exports.readBuffer = (test) ->
 
   buffer = new TrackingBuffer(data)
   buffer.readBuffer(data.length, (value) ->
-    test.ok(value.equals(data), 'buffer value')
+    test.deepEqual(value, data)
+    test.done()
+  )
+
+exports.readArray = (test) ->
+  test.expect(1)
+
+  data = [0x12, 0x34, 0x56, 0x78];
+
+  buffer = new TrackingBuffer(new Buffer(data))
+  buffer.readArray(data.length, (value) ->
+    test.deepEqual(value, data)
     test.done()
   )
 
@@ -365,5 +376,16 @@ exports.readUsVarcharAscii = (test) ->
   buffer = new TrackingBuffer(data)
   buffer.readUsVarchar('ascii', (value) ->
     test.strictEqual(value, 'abc')
+    test.done()
+  )
+
+exports.readAsStringInt64LE = (test) ->
+  test.expect(1)
+
+  data = new Buffer([0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+
+  buffer = new TrackingBuffer(data)
+  buffer.readAsStringInt64LE((value) ->
+    test.strictEqual(value, '513')
     test.done()
   )
