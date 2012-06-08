@@ -14,13 +14,14 @@ module.exports.oneColumn = (test) ->
   buffer.writeUInt16LE(column)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), (token) ->
+    #console.log(token)
 
-  test.strictEqual(token.orderColumns.length, 1)
-  test.strictEqual(token.orderColumns[0], column)
+    test.strictEqual(token.orderColumns.length, 1)
+    test.strictEqual(token.orderColumns[0], column)
 
-  test.done()
+    test.done()
+  )
 
 module.exports.twoColumns = (test) ->
   numberOfColumns = 2
@@ -35,11 +36,12 @@ module.exports.twoColumns = (test) ->
   buffer.writeUInt16LE(column2)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), (token) ->
+    #console.log(token)
 
-  test.strictEqual(token.orderColumns.length, 2)
-  test.strictEqual(token.orderColumns[0], column1)
-  test.strictEqual(token.orderColumns[1], column2)
+    test.strictEqual(token.orderColumns.length, 2)
+    test.strictEqual(token.orderColumns[0], column1)
+    test.strictEqual(token.orderColumns[1], column2)
 
-  test.done()
+    test.done()
+  )
