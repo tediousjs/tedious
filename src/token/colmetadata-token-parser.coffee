@@ -2,39 +2,65 @@
 
 metadataParse = require('../metadata-parser')
 
-parser = (buffer) ->
-  columnCount = buffer.readUInt16LE()
+parser = (buffer, callback) ->
+  token =
+    name: 'COLMETADATA'
+    event: 'columnMetadata'
+    columns: []
 
-  columns = []
-  for c in [1..columnCount]
-    metadata = metadataParse(buffer)
+  columnCount = undefined
+  c = 0
 
-    if metadata.type.hasTableName
-      numberOfTableNameParts = buffer.readUInt8()
-      tableName = for part in [1..numberOfTableNameParts]
-        buffer.readUsVarchar('ucs2')
+  readTableName = (callback) ->
+    buffer.readUInt8((numberOfTableNameParts) ->
+      requestValues = {}
+      for partNumber in [1..numberOfTableNameParts]
+        requestValues["part#{partNumber}"] = [buffer.readUsVarchar, ['ucs2']]
+      buffer.readMultiple(requestValues, (partValues) ->
+        tableName = for partNumber in [1..numberOfTableNameParts]
+          partValues["part#{partNumber}"]
+
+        callback(tableName)
+      )
+    )
+
+  readColumn = ->
+    if c == columnCount
+      callback(token)
     else
-      tableName = undefined
+      metadataParse(buffer, (metadata) ->
+        readColumnName = ->
+          buffer.readBVarchar('ucs2', (columnName) ->
+            column.colName = columnName
+            token.columns.push(column)
+            token.columns[column.colName] = column
 
-    colName = buffer.readBVarchar()
+            c++
+            readColumn()
+          )
 
-    column =
-      userType: metadata.userType
-      flags: metadata.flags
-      type: metadata.type
-      colName: colName
-      collation: metadata.collation
-      precision: metadata.precision
-      scale: metadata.scale
-      dataLength: metadata.dataLength
-      tableName: tableName
+        column =
+          userType: metadata.userType
+          flags: metadata.flags
+          type: metadata.type
+          collation: metadata.collation
+          precision: metadata.precision
+          scale: metadata.scale
+          dataLength: metadata.dataLength
 
-    columns.push(column)
-    columns[column.colName] = column
+        if metadata.type.hasTableName
+          readTableName((tableName) ->
+            column.tableName = tableName
+            readColumnName()
+          )
+        else
+          readColumnName()
+      )
 
-  # Return token
-  name: 'COLMETADATA'
-  event: 'columnMetadata'
-  columns: columns
+
+  buffer.readUInt16LE((value) ->
+    columnCount = value
+    readColumn()
+  )
 
 module.exports = parser

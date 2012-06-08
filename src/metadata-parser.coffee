@@ -3,71 +3,82 @@ codepageByLcid = require('./collation').codepageByLcid
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parse = (buffer) ->
-  userType = buffer.readUInt32LE()
-  flags = buffer.readUInt16LE()
-  typeNumber = buffer.readUInt8()
-  type = TYPE[typeNumber]
+parse = (buffer, callback) ->
+  metadata = {}
 
-  if !type
-    throw new Error(sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1)))
+  buffer.readMultiple(
+    userType: buffer.readUInt32LE
+    flags: buffer.readUInt16LE
+    typeNumber: buffer.readUInt8
+    , (values) ->
+      metadata.userType = values.userType
+      metadata.flags = values.flags
+      metadata.type = TYPE[values.typeNumber]
 
-  #console.log(type)
+      if !metadata.type
+        throw new Error(sprintf('Unrecognised data type 0x%02X at offset 0x%04X', values.typeNumber, (buffer.position - 1)))
+      #console.log(type)
 
-  if (type.id & 0x30) == 0x20
-    # xx10xxxx - s2.2.4.2.1.3
-    # Variable length
-    switch type.dataLengthLength
-      when 1
-        dataLength = buffer.readUInt8()
-      when 2
-        dataLength = buffer.readUInt16LE()
-      when 4
-        dataLength = buffer.readUInt32LE()
+      requestValues = {}
+
+      if (metadata.type.id & 0x30) == 0x20
+        # xx10xxxx - s2.2.4.2.1.3
+        # Variable length
+        switch metadata.type.dataLengthLength
+          when 1
+            requestValues.dataLength = buffer.readUInt8
+          when 2
+            requestValues.dataLength = buffer.readUInt16LE
+          when 4
+            requestValues.dataLength = buffer.readUInt32LE
+          else
+            throw new Error("Unsupported dataLengthLength #{metadata.type.dataLengthLength} for data type #{metadata.type.name}")
+
+      if metadata.type.hasPrecision
+        requestValues.precision = buffer.readUInt8
+
+      if metadata.type.hasScale
+        requestValues.scale = buffer.readUInt8
+
+      if metadata.type.hasCollation
+        requestValues.collationData = [buffer.readBuffer, [5]]
+
+      if Object.keys(requestValues).length
+        buffer.readMultiple(requestValues, (optionalValues) ->
+          if requestValues.dataLength
+            metadata.dataLength = optionalValues.dataLength
+
+          if requestValues.precision
+            metadata.precision = optionalValues.precision
+
+          if requestValues.scale
+            metadata.scale = optionalValues.scale
+
+          if requestValues.collationData
+            # s2.2.5.1.2
+            collation = {}
+
+            collation.lcid = (optionalValues.collationData[2] & 0x0F) << 16
+            collation.lcid |= optionalValues.collationData[1] << 8
+            collation.lcid |= optionalValues.collationData[0]
+
+            collation.codepage = codepageByLcid[collation.lcid]
+
+            # This may not be extracting the correct nibbles in the correct order.
+            collation.flags = optionalValues.collationData[3] >> 4
+            collation.flags |= optionalValues.collationData[2] & 0xF0
+
+            # This may not be extracting the correct nibble.
+            collation.version = optionalValues.collationData[3] & 0x0F
+
+            collation.sortId = optionalValues.collationData[4]
+
+            metadata.collation = collation
+
+          callback(metadata)
+        )
       else
-        throw new Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
-  else
-    dataLength = undefined
-
-  if type.hasPrecision
-    precision = buffer.readUInt8()
-  else
-    precision = undefined
-
-  if type.hasScale
-    scale = buffer.readUInt8()
-  else
-    scale = undefined
-
-  if type.hasCollation
-    # s2.2.5.1.2
-    collationData = buffer.readBuffer(5)
-    collation = {}
-
-    collation.lcid = (collationData[2] & 0x0F) << 16
-    collation.lcid |= collationData[1] << 8
-    collation.lcid |= collationData[0]
-
-    collation.codepage = codepageByLcid[collation.lcid]
-
-    # This may not be extracting the correct nibbles in the correct order.
-    collation.flags = collationData[3] >> 4
-    collation.flags |= collationData[2] & 0xF0
-
-    # This may not be extracting the correct nibble.
-    collation.version = collationData[3] & 0x0F
-
-    collation.sortId = collationData[4]
-  else
-    collation = undefined
-
-  metadata =
-    userType: userType
-    flags: flags
-    type: type
-    collation: collation
-    precision: precision
-    scale: scale
-    dataLength: dataLength
+        callback(metadata)
+  )
 
 module.exports = parse
