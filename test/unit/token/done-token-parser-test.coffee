@@ -2,7 +2,7 @@ parser = require('../../../src/token/done-token-parser').doneParser
 ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
-parse = (status, curCmd, doneRowCount) ->
+parse = (status, curCmd, doneRowCount, callback) ->
   doneRowCountLow = doneRowCount % 0x100000000
   doneRowCountHi = ~~(doneRowCount / 0x100000000)
 
@@ -13,46 +13,46 @@ parse = (status, curCmd, doneRowCount) ->
   buffer.writeUInt32LE(doneRowCountLow)
   buffer.writeUInt32LE(doneRowCountHi)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
-  #console.log(token)
-  
-  token
+  token = parser(new ReadableTrackingBuffer(buffer.data), (token) ->
+    #console.log(token)
+    callback(token)
+  )
 
 module.exports.done = (test) ->
   status = 0x0000
   curCmd = 1
   doneRowCount = 2
 
-  token = parse(status, curCmd, doneRowCount)
+  token = parse(status, curCmd, doneRowCount, (token) ->
+    test.ok(!token.more)
+    test.strictEqual(token.curCmd, curCmd)
+    test.ok(!token.rowCount)
 
-  test.ok(!token.more)
-  test.strictEqual(token.curCmd, curCmd)
-  test.ok(!token.rowCount)
-
-  test.done()
+    test.done()
+  )
 
 module.exports.more = (test) ->
   status = 0x0001
   curCmd = 1
   doneRowCount = 2
 
-  token = parse(status, curCmd, doneRowCount)
+  token = parse(status, curCmd, doneRowCount, (token) ->
+    test.ok(token.more)
+    test.strictEqual(token.curCmd, curCmd)
+    test.ok(!token.rowCount)
 
-  test.ok(token.more)
-  test.strictEqual(token.curCmd, curCmd)
-  test.ok(!token.rowCount)
-
-  test.done()
+    test.done()
+  )
 
 module.exports.doneRowCount = (test) ->
   status = 0x0010
   curCmd = 1
   doneRowCount = 0x1200000034
 
-  token = parse(status, curCmd, doneRowCount)
+  token = parse(status, curCmd, doneRowCount, (token) ->
+    test.ok(!token.more)
+    test.strictEqual(token.curCmd, 1)
+    test.strictEqual(token.rowCount, doneRowCount)
 
-  test.ok(!token.more)
-  test.strictEqual(token.curCmd, 1)
-  test.strictEqual(token.rowCount, doneRowCount)
-
-  test.done()
+    test.done()
+  )
