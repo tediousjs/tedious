@@ -27,12 +27,13 @@ module.exports.info = (test) ->
   data.writeUInt16LE(data.length - 2, 0)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
-  #console.log(token)
+  token = parser(new ReadableTrackingBuffer(data), (token) ->
+    #console.log(token)
 
-  test.strictEqual(token.interface, 'SQL_TSQL')
-  test.strictEqual(token.tdsVersion, '7_2')
-  test.strictEqual(token.progName, progName)
-  test.deepEqual(token.progVersion, progVersion)
+    test.strictEqual(token.interface, 'SQL_TSQL')
+    test.strictEqual(token.tdsVersion, '7_2')
+    test.strictEqual(token.progName, progName)
+    test.deepEqual(token.progVersion, progVersion)
 
-  test.done()
+    test.done()
+  )
