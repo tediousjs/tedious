@@ -1,3 +1,4 @@
+async = require('async')
 iconv = require('iconv-lite')
 sprintf = require('sprintf').sprintf
 require('./buffertools')
@@ -14,7 +15,56 @@ parse = (buffer, metaData, callback) ->
   dataLength = undefined
   type = metaData.type
 
-  readValue = () ->
+  readTextPointerAndTimestamp = (callback) ->
+    if type.hasTextPointerAndTimestamp
+      # Appear to be dummy values, so consume and discard them.
+      buffer.readUInt8((textPointerLength) ->
+        if textPointerLength != 0
+          buffer.readMultiple(
+            textPointer: [buffer.readBuffer, [textPointerLength]]
+            something: [buffer.readBuffer, [8]]
+            , (values) ->
+              callback()
+          )
+        else
+          dataLength = 0
+          callback()
+      )
+    else
+      callback()
+
+  readDataLength = (callback) ->
+    if !dataLength && dataLength != 0
+      # s2.2.4.2.1
+      switch type.id & 0x30
+        when 0x10 # xx01xxxx - s2.2.4.2.1.1
+          # Zero length
+          dataLength = 0
+          callback()
+        when 0x20 # xx10xxxx - s2.2.4.2.1.3
+          # Variable length
+          if metaData.dataLength != MAX
+            switch type.dataLengthLength
+              when 1
+                readIntFunction = buffer.readUInt8
+              when 2
+                readIntFunction = buffer.readUInt16LE
+              when 4
+                readIntFunction = buffer.readUInt32LE
+              else
+                throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+            readIntFunction.call(buffer, (value) ->
+              dataLength = value
+              callback()
+            )
+        when 0x30 # xx11xxxx - s2.2.4.2.1.2
+          # Fixed length
+          dataLength = 1 << ((type.id & 0x0C) >> 2)
+          callback()
+    else
+      callback()
+
+  readValue = (callback) ->
     switch type.name
       when 'Null'
         callback(null)
@@ -161,56 +211,15 @@ parse = (buffer, metaData, callback) ->
         throw new Error(sprintf('Unrecognised type %s at offset 0x%04X', type.name, buffer.position))
         break
 
-  readDataLength = () ->
-    if !dataLength && dataLength != 0
-      # s2.2.4.2.1
-      switch type.id & 0x30
-        when 0x10 # xx01xxxx - s2.2.4.2.1.1
-          # Zero length
-          dataLength = 0
-          readValue()
-        when 0x20 # xx10xxxx - s2.2.4.2.1.3
-          # Variable length
-          if metaData.dataLength != MAX
-            switch type.dataLengthLength
-              when 1
-                readIntFunction = buffer.readUInt8
-              when 2
-                readIntFunction = buffer.readUInt16LE
-              when 4
-                readIntFunction = buffer.readUInt32LE
-              else
-                throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
-            readIntFunction.call(buffer, (value) ->
-              dataLength = value
-              readValue()
-            )
-        when 0x30 # xx11xxxx - s2.2.4.2.1.2
-          # Fixed length
-          dataLength = 1 << ((type.id & 0x0C) >> 2)
-          readValue()
-    else
-      readValue()
-
-  readTextPointerAndTimestamp = () ->
-    if type.hasTextPointerAndTimestamp
-      # Appear to be dummy values, so consume and discard them.
-      buffer.readUInt8((textPointerLength) ->
-        if textPointerLength != 0
-          buffer.readMultiple(
-            textPointer: [buffer.readBuffer, [textPointerLength]]
-            something: [buffer.readBuffer, [8]]
-            , (values) ->
-              readDataLength()
-          )
-        else
-          dataLength = 0
-          readDataLength()
-      )
-    else
-      readDataLength()
-
-  readTextPointerAndTimestamp()
+  async.series(
+    [
+      readTextPointerAndTimestamp
+      readDataLength
+      readValue
+    ],
+    (value) ->
+      callback(value)
+  )
 
 readBinary = (buffer, dataLength) ->
   if dataLength == NULL

@@ -24,6 +24,7 @@
     "node": "0.6 || 0.7"
   },
   "dependencies": {
+    "async": "0.1.22",
     "iconv-lite": "0.2.0",
     "sprintf": "0.1.1"
   },
