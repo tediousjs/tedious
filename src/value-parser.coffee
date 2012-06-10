@@ -141,38 +141,38 @@ parse = (buffer, metaData, callback) ->
       when 'VarChar', 'Char'
         codepage = metaData.collation.codepage
         if metaData.dataLength == MAX
-          value = readMaxChars(buffer, codepage)
+          readMaxChars(codepage)
         else
-          readChars(buffer, dataLength, codepage)
+          readChars(dataLength, codepage)
       when 'NVarChar', 'NChar'
         if metaData.dataLength == MAX
-          value = readMaxNChars(buffer)
+          readMaxNChars()
         else
-          value = readNChars(buffer, dataLength)
+          readNChars(dataLength)
       when 'VarBinary', 'Binary'
         if metaData.dataLength == MAX
-          value = readMaxBinary(buffer)
+          value = readMaxBinary()
         else
-          value = readBinary(buffer, dataLength)
+          readBinary(dataLength)
       when 'Text'
         if dataLength == 0
-          value = null
+          callback(null)
         else
-          value = readChars(buffer, dataLength, metaData.collation.codepage)
+          readChars(dataLength, metaData.collation.codepage)
       when 'NText'
         if dataLength == 0
-          value = null
+          callback(null)
         else
-          value = readNChars(buffer, dataLength)
+          readNChars(dataLength)
       when 'Image'
         if dataLength == 0
-          value = null
+          callback(null)
         else
-          value = readBinary(buffer, dataLength)
+          readBinary(dataLength)
       when 'SmallDateTime'
-        value = readSmallDateTime()
+        readSmallDateTime()
       when 'DateTime'
-        value = readDateTime()
+        readDateTime()
       when 'DateTimeN'
         switch dataLength
           when 0
@@ -183,7 +183,7 @@ parse = (buffer, metaData, callback) ->
             readDateTime()
       when 'NumericN', 'DecimalN'
         if dataLength == 0
-          value = null
+          callback(null)
         else
           sign = if buffer.readUInt8() == 1 then 1 else -1
 
@@ -214,13 +214,13 @@ parse = (buffer, metaData, callback) ->
         throw new Error(sprintf('Unrecognised type %s at offset 0x%04X', type.name, buffer.position))
         break
 
-  readBinary = (buffer, dataLength) ->
+  readBinary = (dataLength) ->
     if dataLength == NULL
       callback(null)
     else
       buffer.readArray(dataLength, callback)
 
-  readChars = (buffer, dataLength, codepage) ->
+  readChars = (dataLength, codepage) ->
     if dataLength == NULL
       callback(null)
     else
@@ -228,28 +228,28 @@ parse = (buffer, metaData, callback) ->
         callback(iconv.decode(value, codepage))
       )
 
-  readNChars = (buffer, dataLength) ->
+  readNChars = (dataLength) ->
     if dataLength == NULL
       callback(null)
     else
       buffer.readString(dataLength, 'ucs2', callback)
 
-  readMaxBinary = (buffer) ->
-    readMax(buffer, (valueBuffer) ->
+  readMaxBinary = () ->
+    readMax((valueBuffer) ->
       callback(Array.prototype.slice.call(valueBuffer))
     )
 
-  readMaxChars = (buffer, codepage) ->
-    readMax(buffer, (valueBuffer) ->
+  readMaxChars = (codepage) ->
+    readMax((valueBuffer) ->
       callback(iconv.decode(valueBuffer, codepage))
     )
 
-  readMaxNChars = (buffer) ->
-    readMax(buffer, (valueBuffer) ->
+  readMaxNChars = () ->
+    readMax((valueBuffer) ->
       callback(valueBuffer.toString('ucs2'))
     )
 
-  readMax = (buffer, decodeFunction) ->
+  readMax = (decodeFunction) ->
     readChunks = (expectedLength) ->
       chunkLength = undefined
       length = 0
