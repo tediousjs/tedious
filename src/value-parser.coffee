@@ -205,9 +205,9 @@ parse = (buffer, metaData, callback) ->
       when 'UniqueIdentifierN'
         switch dataLength
           when 0
-            value = null
+            callback(null)
           when 0x10
-            value = buffer.readArray(0x10)
+            buffer.readArray(0x10, callback)
           else
             throw new Error(sprintf('Unsupported guid size %d at offset 0x%04X', dataLength - 1, buffer.position))
       else

@@ -419,29 +419,33 @@ module.exports.intN64bit = (test) ->
     test.done()
   )
 
-###
 module.exports.guidN = (test) ->
-  colMetaData = [
-    {type: dataTypeByName.UniqueIdentifierN}
-    {type: dataTypeByName.UniqueIdentifierN}
-  ]
+  metaData =
+    type: dataTypeByName.UniqueIdentifierN
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([
-    0,
     16, 0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef
   ]))
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.deepEqual(parsedValue, [0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef])
+    test.done()
+  )
 
-  test.strictEqual(token.columns.length, 2)
-  test.strictEqual(token.columns[0].value, null)
-  test.deepEqual([0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef], token.columns[1].value)
+module.exports.guidNull = (test) ->
+  metaData =
+    type: dataTypeByName.UniqueIdentifierN
 
-  test.done()
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0]))
 
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
+
+###
 module.exports.floatN = (test) ->
   colMetaData = [
     {type: dataTypeByName.FloatN}
