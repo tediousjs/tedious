@@ -345,58 +345,81 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
     test.done()
   )
 
-###
-module.exports.intN = (test) ->
-  colMetaData = [
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-    {type: dataTypeByName.IntN}
-  ]
+module.exports.intNNull = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-  buffer.writeBuffer(new Buffer([
-    0,
-    8, 0,0,0,0,0,0,0,0,
-    8, 1,0,0,0,0,0,0,0,
-    8, 255,255,255,255,255,255,255,255,
-    8, 2,0,0,0,0,0,0,0,
-    8, 254,255,255,255,255,255,255,255,
-    8, 255,255,255,255,255,255,255,127,
-    8, 0,0,0,0,0,0,0,128,
-    8, 10,0,0,0,0,0,0,0,
-    8, 100,0,0,0,0,0,0,0,
-    8, 232,3,0,0,0,0,0,0,
-    8, 16,39,0,0,0,0,0,0]))
-  #console.log(buffer.data)
+  buffer.writeBuffer(new Buffer([0]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
 
-  test.strictEqual(token.columns.length, 12)
-  test.strictEqual(token.columns[0].value, null)
-  test.strictEqual("0", token.columns[1].value)
-  test.strictEqual("1", token.columns[2].value)
-  test.strictEqual("-1", token.columns[3].value)
-  test.strictEqual("2", token.columns[4].value)
-  test.strictEqual("-2", token.columns[5].value)
-  test.strictEqual("9223372036854775807", token.columns[6].value)
-  test.strictEqual("-9223372036854775808", token.columns[7].value)
-  test.strictEqual("10", token.columns[8].value)
-  test.strictEqual("100", token.columns[9].value)
-  test.strictEqual("1000", token.columns[10].value)
-  test.strictEqual("10000", token.columns[11].value)
+module.exports.intNNull = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
 
-  test.done()
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0]))
 
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
+
+module.exports.intN8bit = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
+  value = 42
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([1, value]))
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
+
+module.exports.intN16bit = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([2, 42, 0]))
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, 42)
+    test.done()
+  )
+
+module.exports.intN32bit = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([4, 42, 0, 0, 0]))
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, 42)
+    test.done()
+  )
+
+module.exports.intN64bit = (test) ->
+  metaData =
+    type: dataTypeByName.IntN
+  value = 42
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([8, 255,255,255,255,255,255,255,127,]))
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, '9223372036854775807')
+    test.done()
+  )
+
+###
 module.exports.guidN = (test) ->
   colMetaData = [
     {type: dataTypeByName.UniqueIdentifierN}
