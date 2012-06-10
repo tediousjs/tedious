@@ -54,6 +54,7 @@ parse = (buffer, metaData, callback) ->
                 readIntFunction = buffer.readUInt32LE
               else
                 throw Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
+
             readIntFunction.call(buffer, (value) ->
               dataLength = value
               callback()
@@ -185,23 +186,28 @@ parse = (buffer, metaData, callback) ->
         if dataLength == 0
           callback(null)
         else
-          sign = if buffer.readUInt8() == 1 then 1 else -1
+          buffer.readUInt8((sign) ->
+            sign = if sign == 1 then 1 else -1
 
-          switch dataLength - 1
-            when 4
-              value = buffer.readUInt32LE()
-            when 8
-              value = buffer.readUNumeric64LE()
-            when 12
-              value = buffer.readUNumeric96LE()
-            when 16
-              value = buffer.readUNumeric128LE()
-            else
-              throw new Error(sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, buffer.position))
-              break
+            switch dataLength - 1
+              when 4
+                readNumericFunction = buffer.readUInt32LE
+              when 8
+                readNumericFunction = buffer.readUNumeric64LE
+              when 12
+                readNumericFunction = buffer.readUNumeric96LE
+              when 16
+                readNumericFunction = buffer.readUNumeric128LE
+              else
+                throw new Error(sprintf('Unsupported numeric size %d at offset 0x%04X', dataLength - 1, buffer.position))
+                break
 
-          value *= sign
-          value /= Math.pow(10, metaData.scale)
+            readNumericFunction.call(buffer, (value) ->
+              value *= sign
+              value /= Math.pow(10, metaData.scale)
+              callback(value)
+            )
+          )
       when 'UniqueIdentifierN'
         switch dataLength
           when 0

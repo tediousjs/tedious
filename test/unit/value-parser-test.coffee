@@ -540,150 +540,112 @@ module.exports.datetimeNDatetime = (test) ->
     test.done()
   )
 
-###
 module.exports.numeric4Bytes = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 3
     scale: 1
-  ]
 
   value = 9.3
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(1 + 4)
   buffer.writeUInt8(1)      # positive
   buffer.writeUInt32LE(93)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.numeric4BytesNegative = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 3
     scale: 1
-  ]
 
   value = -9.3
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(1 + 4)
   buffer.writeUInt8(0)      # negative
   buffer.writeUInt32LE(93)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.numeric8Bytes = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 13
     scale: 1
-  ]
 
   value = (0x100000000 + 93) / 10
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(1 + 8)
   buffer.writeUInt8(1)      # positive
   buffer.writeUInt32LE(93)
   buffer.writeUInt32LE(1)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.numeric12Bytes = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 23
     scale: 1
-  ]
 
   value = ((0x100000000 * 0x100000000) + 0x200000000 + 93) / 10
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(1 + 12)
   buffer.writeUInt8(1)      # positive
   buffer.writeUInt32LE(93)
   buffer.writeUInt32LE(2)
   buffer.writeUInt32LE(1)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.numeric16Bytes = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 33
     scale: 1
-  ]
 
   value = ((0x100000000 * 0x100000000 * 0x100000000) + (0x200000000 * 0x100000000) + 0x300000000 + 93) / 10
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(1 + 16)
   buffer.writeUInt8(1)      # positive
   buffer.writeUInt32LE(93)
   buffer.writeUInt32LE(3)
   buffer.writeUInt32LE(2)
   buffer.writeUInt32LE(1)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.numericNull = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.NumericN
     precision: 3
     scale: 1
-  ]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeUInt8(0)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, null)
-
-  test.done()
-###
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
