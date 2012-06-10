@@ -122,51 +122,40 @@ module.exports.moneyN8bytes = (test) ->
     test.done()
   )
 
-###
 module.exports.varCharWithoutCodepage = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     collation:
       codepage: undefined
-  ]
   value = 'abcde'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.varCharWithCodepage = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     collation:
       codepage: 'WINDOWS-1252'
-  ]
   value = 'abcdé'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.nVarChar = (test) ->
-  colMetaData = [type: dataTypeByName.NVarChar]
+  metaData = type: dataTypeByName.NVarChar
   value = 'abc'
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
@@ -174,15 +163,12 @@ module.exports.nVarChar = (test) ->
   buffer.writeString(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
-
+###
 module.exports.varBinary = (test) ->
   colMetaData = [type: dataTypeByName.VarBinary]
   value = [0x12, 0x34]

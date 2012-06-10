@@ -140,7 +140,7 @@ parse = (buffer, metaData, callback) ->
         if metaData.dataLength == MAX
           value = readMaxChars(buffer, codepage)
         else
-          value = readChars(buffer, dataLength, codepage)
+          readChars(buffer, dataLength, codepage)
       when 'NVarChar', 'NChar'
         if metaData.dataLength == MAX
           value = readMaxNChars(buffer)
@@ -211,6 +211,95 @@ parse = (buffer, metaData, callback) ->
         throw new Error(sprintf('Unrecognised type %s at offset 0x%04X', type.name, buffer.position))
         break
 
+  readBinary = (buffer, dataLength) ->
+    if dataLength == NULL
+      callback(null)
+    else
+      buffer.readArray(dataLength, callback)
+
+  readChars = (buffer, dataLength, codepage) ->
+    if dataLength == NULL
+      callback(null)
+    else
+      buffer.readBuffer(dataLength, (value) ->
+        callback(iconv.decode(value, codepage))
+      )
+
+  readNChars = (buffer, dataLength) ->
+    if dataLength == NULL
+      callback(null)
+    else
+      buffer.readString(dataLength, 'ucs2', callback)
+
+  readMaxBinary = (buffer) ->
+    readMax(buffer, (valueBuffer) ->
+      Array.prototype.slice.call(valueBuffer)
+    )
+
+  readMaxChars = (buffer, codepage) ->
+    readMax(buffer, (valueBuffer) ->
+      iconv.decode(valueBuffer, codepage)
+    )
+
+  readMaxNChars = (buffer) ->
+    readMax(buffer, (valueBuffer) ->
+      valueBuffer.toString('ucs2')
+    )
+
+  readMax = (buffer, decodeFunction) ->
+    type = buffer.readBuffer(8)
+    if (type.equals(PLP_NULL))
+      null
+    else
+      if (type.equals(UNKNOWN_PLP_LEN))
+        expectedLength = undefined
+      else
+        buffer.rollback()
+        expectedLength = buffer.readUInt64LE()
+
+      length = 0
+      chunks = []
+
+      # Read, and accumulate, chunks from buffer.
+      chunkLength = buffer.readUInt32LE()
+      while (chunkLength != 0)
+        length += chunkLength
+        chunks.push(buffer.readBuffer(chunkLength))
+
+        chunkLength = buffer.readUInt32LE()
+
+      if expectedLength
+        if length != expectedLength
+          throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")
+
+      # Assemble all of the chunks in to one Buffer.
+      valueBuffer = new Buffer(length)
+      position = 0
+      for chunk in chunks
+        chunk.copy(valueBuffer, position, 0)
+        position += chunk.length
+
+      decodeFunction(valueBuffer)
+
+  readSmallDateTime = (buffer) ->
+    days = buffer.readUInt16LE()
+    minutes = buffer.readUInt16LE()
+
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMinutes(value.getMinutes() + minutes)
+    value
+
+  readDateTime = (buffer) ->
+    days = buffer.readInt32LE()
+    threeHundredthsOfSecond = buffer.readUInt32LE()
+    milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
+
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMilliseconds(value.getMilliseconds() + milliseconds)
+    value
+
   async.series(
     [
       readTextPointerAndTimestamp
@@ -220,92 +309,5 @@ parse = (buffer, metaData, callback) ->
     (value) ->
       callback(value)
   )
-
-readBinary = (buffer, dataLength) ->
-  if dataLength == NULL
-    null
-  else
-    buffer.readArray(dataLength)
-
-readChars = (buffer, dataLength, codepage) ->
-  if dataLength == NULL
-    null
-  else
-    iconv.decode(buffer.readBuffer(dataLength), codepage)
-
-readNChars = (buffer, dataLength) ->
-  if dataLength == NULL
-    null
-  else
-    buffer.readString(dataLength, 'ucs2')
-
-readMaxBinary = (buffer) ->
-  readMax(buffer, (valueBuffer) ->
-    Array.prototype.slice.call(valueBuffer)
-  )
-
-readMaxChars = (buffer, codepage) ->
-  readMax(buffer, (valueBuffer) ->
-    iconv.decode(valueBuffer, codepage)
-  )
-
-readMaxNChars = (buffer) ->
-  readMax(buffer, (valueBuffer) ->
-    valueBuffer.toString('ucs2')
-  )
-
-readMax = (buffer, decodeFunction) ->
-  type = buffer.readBuffer(8)
-  if (type.equals(PLP_NULL))
-    null
-  else
-    if (type.equals(UNKNOWN_PLP_LEN))
-      expectedLength = undefined
-    else
-      buffer.rollback()
-      expectedLength = buffer.readUInt64LE()
-
-    length = 0
-    chunks = []
-
-    # Read, and accumulate, chunks from buffer.
-    chunkLength = buffer.readUInt32LE()
-    while (chunkLength != 0)
-      length += chunkLength
-      chunks.push(buffer.readBuffer(chunkLength))
-
-      chunkLength = buffer.readUInt32LE()
-
-    if expectedLength
-      if length != expectedLength
-        throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")
-
-    # Assemble all of the chunks in to one Buffer.
-    valueBuffer = new Buffer(length)
-    position = 0
-    for chunk in chunks
-      chunk.copy(valueBuffer, position, 0)
-      position += chunk.length
-
-    decodeFunction(valueBuffer)
-
-readSmallDateTime = (buffer) ->
-  days = buffer.readUInt16LE()
-  minutes = buffer.readUInt16LE()
-
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMinutes(value.getMinutes() + minutes)
-  value
-
-readDateTime = (buffer) ->
-  days = buffer.readInt32LE()
-  threeHundredthsOfSecond = buffer.readUInt32LE()
-  milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
-
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMilliseconds(value.getMilliseconds() + milliseconds)
-  value
 
 module.exports = parse
