@@ -1,44 +1,47 @@
 Debug = require('../../../src/debug')
 Parser = require('../../../src/token/token-stream-parser').Parser
 TYPE = require('../../../src/token/token').TYPE
+ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 debug = new Debug({token: true})
 
-module.exports.envChange = (test) ->
-  test.expect(2)
+module.exports.oneToken = (test) ->
+  test.expect(1)
 
-  buffer = createDbChangeBuffer()
+  dbChangeTokenBuffer = createDbChangeTokenBuffer()
 
-  parser = new Parser(debug)
+  buffer = new ReadableTrackingBuffer()
+
+  parser = new Parser(debug, buffer, dbChangeTokenBuffer.length, ->
+    test.done()
+  )
+
   parser.on('databaseChange', (event) ->
     test.ok(event)
   )
 
-  parser.addBuffer(buffer)
+  buffer.add(dbChangeTokenBuffer)
 
-  test.ok(parser.isEnd())
-
-  test.done()
-
-module.exports.tokenSplitAcrossBuffers = (test) ->
+module.exports.twoTokens = (test) ->
   test.expect(2)
 
-  buffer = createDbChangeBuffer()
+  dbChangeTokenBuffer = createDbChangeTokenBuffer()
 
-  parser = new Parser(debug)
-  parser.on('databaseChange', (event) ->
-      test.ok(event)
+  buffer = new ReadableTrackingBuffer()
+
+  parser = new Parser(debug, buffer, 2 * dbChangeTokenBuffer.length, ->
+    test.done()
   )
 
-  parser.addBuffer(buffer.slice(0,6))
-  parser.addBuffer(buffer.slice(6))
+  parser.on('databaseChange', (event) ->
+    test.ok(event)
+  )
 
-  test.ok(parser.isEnd())
+  buffer.add(dbChangeTokenBuffer)
+  buffer.add(dbChangeTokenBuffer)
 
-  test.done()
-
-createDbChangeBuffer = ->
+createDbChangeTokenBuffer = ->
   oldDb = 'old'
   newDb = 'new'
   buffer = new WritableTrackingBuffer(50, 'ucs2')

@@ -1,3 +1,4 @@
+async = require('async')
 ReadableTrackingBuffer = require('../tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 EventEmitter = require('events').EventEmitter
 TYPE = require('./token').TYPE
@@ -18,7 +19,7 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
-  Tokens are parsed from the buffer until there are no more tokens in 
+  Tokens are parsed from the buffer until there are no more tokens in
   the buffer, or there is just a partial token left.
   If there is a partial token left over, then it is kept until another
   buffer is added, which should contain the remainder of the partial
@@ -27,55 +28,44 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
   parsing resumes.
 ###
 class Parser extends EventEmitter
-  constructor: (@debug) ->
-    @buffer = new ReadableTrackingBuffer(new Buffer(0), 'ucs2')
-    @position = 0
+  constructor: (@debug, @buffer, @streamLength, @callback) ->
+    @endOfStreamBytesRead = @buffer.bytesRead() + @streamLength
+    @colMetadata = undefined
 
-  addBuffer: (buffer) ->
-    @buffer.add(buffer)
-    @position = @buffer.position
+    async.whilst(
+      =>
+        @buffer.bytesRead() < @endOfStreamBytesRead
 
-    while @nextToken()
-      'NOOP'
+      ,@nextToken
 
-    # Position to the end of the last successfully parsed token.
-    @buffer.position = @position
+      , =>
+        @callback()
+    )
 
-  isEnd: ->
-    @buffer.empty()
-
-  nextToken: ->
-    try
-      type = @buffer.readUInt8()
-
+  nextToken: (callback) =>
+    @buffer.readUInt8((type) =>
       if tokenParsers[type]
-        token = tokenParsers[type](@buffer, @colMetadata)
-
-        if token
-          @debug.token(token)
-
-          # Note current position, so that it can be rolled back to if the next token runs out of buffer.
-          @position = @buffer.position
-
-          if token.event
-            @emit(token.event, token)
-
-          switch token.name
-            when 'COLMETADATA'
-              @colMetadata = token.columns
-
-          return true
+        if type == TYPE.ROW
+          tokenParsers[type](@buffer, @colMetadata, (token) =>
+            @postParse(token)
+            callback()
+          )
         else
-          return false
-
+          tokenParsers[type](@buffer, (token) =>
+            @postParse(token)
+            callback()
+          )
       else
         throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
-    catch error
-      if error?.error == 'oob'
-        # There was an attempt to read past the end of the buffer.
-        # In other words, we've run out of buffer.
-        return false
-      else
-        throw error
+    )
+
+  postParse: (token) =>
+    @debug.token(token)
+
+    if token.event
+      @emit(token.event, token)
+
+    if token.name == 'COLMETADATA'
+        @colMetadata = token.columns
 
 exports.Parser = Parser
