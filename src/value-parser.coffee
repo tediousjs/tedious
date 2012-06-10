@@ -263,7 +263,7 @@ parse = (buffer, metaData, callback) ->
 
       # Read, and accumulate, chunks from buffer.
       async.whilst(
-        () ->
+        ->
           chunkLength != 0
 
         , (callback) ->
@@ -279,7 +279,7 @@ parse = (buffer, metaData, callback) ->
               callback()
           )
 
-        , () ->
+        , ->
           if expectedLength
             if length != expectedLength
               throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")

@@ -1,25 +1,37 @@
-# s2.2.7.17
-
+async = require('async')
 valueParse = require('../value-parser')
 sprintf = require('sprintf').sprintf
 
-parser = (buffer, columnsMetaData) ->
+# s2.2.7.17
+parser = (buffer, columnsMetaData, callback) ->
   columns = []
-  for columnMetaData in columnsMetaData
-    #console.log sprintf('Token @ 0x%02X', buffer.position)
+  columnNumber = 0
 
-    value = valueParse(buffer, columnMetaData)
+  async.whilst(
+    ->
+      columnNumber < columnsMetaData.length
 
-    column =
-      value: value
-      metadata: columnMetaData
+    , (callback) ->
+      columnMetaData = columnsMetaData[columnNumber]
 
-    columns.push(column)
-    columns[columnMetaData.colName] = column
+      valueParse(buffer, columnMetaData, (value) ->
+        column =
+          value: value
+          metadata: columnMetaData
 
-  # Return token
-  name: 'ROW'
-  event: 'row'
-  columns: columns
+        columns.push(column)
+        columns[columnMetaData.colName] = column
+
+        columnNumber++
+        callback()
+      )
+
+    , ->
+      callback(
+        name: 'ROW'
+        event: 'row'
+        columns: columns
+      )
+  )
 
 module.exports = parser
