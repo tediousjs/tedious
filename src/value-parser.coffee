@@ -102,9 +102,9 @@ parse = (buffer, metaData, callback) ->
           when 0
             callback(null)
           when 4
-            buffer.readFloatLE()
+            buffer.readFloatLE(callback)
           when 8
-            buffer.readDoubleLE()
+            buffer.readDoubleLE(callback)
           else
             throw new Error("Unsupported dataLength #{dataLength} for FloatN")
       when 'Money', 'SmallMoney', 'MoneyN'

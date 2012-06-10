@@ -445,51 +445,57 @@ module.exports.guidNull = (test) ->
     test.done()
   )
 
-###
-module.exports.floatN = (test) ->
-  colMetaData = [
-    {type: dataTypeByName.FloatN}
-    {type: dataTypeByName.FloatN}
-    {type: dataTypeByName.FloatN}
-  ]
+module.exports.floatNFloat = (test) ->
+  metaData =
+    type: dataTypeByName.FloatN
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-  buffer.writeBuffer(new Buffer([
-    0,
-    4, 0x00, 0x00, 0x18, 0x41,
-    8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40
-  ]))
-  #console.log(buffer.data)
+  buffer.writeBuffer(new Buffer([4, 0x00, 0x00, 0x18, 0x41]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, 9.5)
+    test.done()
+  )
 
-  test.strictEqual(token.columns.length, 3)
-  test.strictEqual(token.columns[0].value, null)
-  test.strictEqual(9.5, token.columns[1].value)
-  test.strictEqual(9.5, token.columns[2].value)
+module.exports.floatNDouble = (test) ->
+  metaData =
+    type: dataTypeByName.FloatN
 
-  test.done()
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40]))
 
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, 9.5)
+    test.done()
+  )
+
+module.exports.floatNNull = (test) ->
+  metaData =
+    type: dataTypeByName.FloatN
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0]))
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
+
+###
 module.exports.datetime = (test) ->
-  colMetaData = [type: dataTypeByName.DateTime]
+  metaData = type: dataTypeByName.DateTime
 
   days = 2                                        # 3rd January 1900
   threeHundredthsOfSecond = 45 * 300              # 45 seconds
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-
   buffer.writeInt32LE(days)
   buffer.writeUInt32LE(threeHundredthsOfSecond)
-  #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, new Date('January 3, 1900 00:00:45').getTime())
+    test.done()
+  )
 
 module.exports.datetimeN = (test) ->
   colMetaData = [type: dataTypeByName.DateTimeN]
