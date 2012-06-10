@@ -48,6 +48,23 @@ exports.notEnoughDataInitiallyThenSatisfiedWithMultipleAdds = (test) ->
   test.ok(!done, 'not enough data yet')
   buffer.add(data.slice(2, 4))
 
+exports.bytesRead = (test) ->
+  data = new Buffer([0x12, 0x34, 0x56, 0x78]);
+
+  buffer = new TrackingBuffer()
+  buffer.readUInt16LE((value) ->
+    test.strictEqual(buffer.bytesRead(), 2)
+
+    buffer.readUInt16LE((value) ->
+      test.strictEqual(buffer.bytesRead(), 4)
+      test.done()
+    )
+  )
+
+  buffer.add(data.slice(0, 1))
+  buffer.add(data.slice(1, 3))
+  buffer.add(data.slice(3, 4))
+
 exports.valuesSpanBuffers = (test) ->
   test.expect(3)
 

@@ -14,6 +14,7 @@ class ReadableTrackingBuffer
     if !buffer
       @buffer = new Buffer(0)
 
+    @_bytesRead = 0
     @position = 0
     @available = @buffer.length
     @buffers = []
@@ -38,6 +39,9 @@ class ReadableTrackingBuffer
       @position = 0
       @buffers = []
 
+  bytesRead: ->
+    @_bytesRead
+
   ###
     If there is sufficent data, read the value, and call the callback with the value.
     If there is not enough data, defere the reading of the value until there is
@@ -51,6 +55,7 @@ class ReadableTrackingBuffer
       value = readValueFunction.call(@)
       @position += length
       @available -= length
+      @_bytesRead += length
       @deferred = undefined
       callback(value)
     else
