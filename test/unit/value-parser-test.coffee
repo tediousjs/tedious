@@ -131,7 +131,6 @@ module.exports.varCharWithoutCodepage = (test) ->
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUsVarchar(value)
-  #console.log(buffer.data)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
     test.strictEqual(parsedValue, value)
@@ -147,7 +146,6 @@ module.exports.varCharWithCodepage = (test) ->
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeUsVarchar(value)
-  #console.log(buffer.data)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
     test.strictEqual(parsedValue, value)
@@ -161,7 +159,6 @@ module.exports.nVarChar = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length * 2)
   buffer.writeString(value)
-  #console.log(buffer.data)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
     test.strictEqual(parsedValue, value)
@@ -175,7 +172,6 @@ module.exports.varBinary = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
   buffer.writeBuffer(new Buffer(value))
-  #console.log(buffer.data)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
     test.deepEqual(parsedValue, value)
@@ -189,42 +185,33 @@ module.exports.binary = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
   buffer.writeBuffer(new Buffer(value))
-  #console.log(buffer.data)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
     test.deepEqual(parsedValue, value)
     test.done()
   )
 
-###
 module.exports.varCharMaxNull = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
       codepage: undefined
-  ]
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, null)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
 
 module.exports.varCharMaxUnknownLength = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
       codepage: undefined
-  ]
   value = 'abcdef'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -234,24 +221,18 @@ module.exports.varCharMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(3)
   buffer.writeString(value.slice(3, 6))
   buffer.writeUInt32LE(0)
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.varCharMaxKnownLength = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
       codepage: undefined
-  ]
   value = 'abcdef'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -261,24 +242,18 @@ module.exports.varCharMaxKnownLength = (test) ->
   buffer.writeUInt32LE(3)
   buffer.writeString(value.slice(3, 6))
   buffer.writeUInt32LE(0)
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.varCharMaxWithCodepage = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     dataLength: 65535
     collation:
       codepage: 'WINDOWS-1252'
-  ]
   value = 'abcdéf'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -288,22 +263,18 @@ module.exports.varCharMaxWithCodepage = (test) ->
   buffer.writeUInt32LE(3)
   buffer.writeString(value.slice(3, 6))
   buffer.writeUInt32LE(0)
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
 
 module.exports.varCharMaxKnownLengthWrong = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarChar
     dataLength: 65535
-  ]
+    collation:
+      codepage: undefined
   value = 'abcdef'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
@@ -313,38 +284,52 @@ module.exports.varCharMaxKnownLengthWrong = (test) ->
   buffer.writeUInt32LE(3)
   buffer.writeString(value.slice(3, 6))
   buffer.writeUInt32LE(0)
-  #console.log(buffer.data)
 
   try
-    token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-    test.ok(false)
+    parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+      test.ok(false)
+    )
   catch exception
     test.done()
 
+module.exports.nVarCharMax = (test) ->
+  metaData =
+    type: dataTypeByName.NVarChar
+    dataLength: 65535
+    collation:
+      codepage: undefined
+  value = 'abcdef'
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.writeUInt32LE(6)
+  buffer.writeString(value.slice(0, 3))
+  buffer.writeUInt32LE(6)
+  buffer.writeString(value.slice(3, 6))
+  buffer.writeUInt32LE(0)
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, value)
+    test.done()
+  )
+
 module.exports.varBinaryMaxNull = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarBinary
     dataLength: 65535
-  ]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, null)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
 
 module.exports.varBinaryMaxUnknownLength = (test) ->
-  colMetaData = [
+  metaData =
     type: dataTypeByName.VarBinary
     dataLength: 65535
-  ]
   value = [0x12, 0x34, 0x56, 0x78]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
@@ -354,17 +339,13 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(2)
   buffer.writeBuffer(new Buffer(value.slice(2, 4)))
   buffer.writeUInt32LE(0)
-  #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.deepEqual(parsedValue, value)
+    test.done()
+  )
 
-  test.strictEqual(token.columns.length, 1)
-  test.deepEqual(token.columns[0].value, value)
-  test.strictEqual(token.columns[0].metadata, colMetaData[0])
-
-  test.done()
-
+###
 module.exports.intN = (test) ->
   colMetaData = [
     {type: dataTypeByName.IntN}

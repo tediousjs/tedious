@@ -2,6 +2,7 @@ async = require('async')
 iconv = require('iconv-lite')
 sprintf = require('sprintf').sprintf
 require('./buffertools')
+ReadableTrackingBuffer = require('./tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 
 NULL = (1 << 16) - 1
 MAX = (1 << 16) - 1
@@ -57,6 +58,8 @@ parse = (buffer, metaData, callback) ->
               dataLength = value
               callback()
             )
+          else
+            callback()
         when 0x30 # xx11xxxx - s2.2.4.2.1.2
           # Fixed length
           dataLength = 1 << ((type.id & 0x0C) >> 2)
@@ -233,53 +236,70 @@ parse = (buffer, metaData, callback) ->
 
   readMaxBinary = (buffer) ->
     readMax(buffer, (valueBuffer) ->
-      Array.prototype.slice.call(valueBuffer)
+      callback(Array.prototype.slice.call(valueBuffer))
     )
 
   readMaxChars = (buffer, codepage) ->
     readMax(buffer, (valueBuffer) ->
-      iconv.decode(valueBuffer, codepage)
+      callback(iconv.decode(valueBuffer, codepage))
     )
 
   readMaxNChars = (buffer) ->
     readMax(buffer, (valueBuffer) ->
-      valueBuffer.toString('ucs2')
+      callback(valueBuffer.toString('ucs2'))
     )
 
   readMax = (buffer, decodeFunction) ->
-    type = buffer.readBuffer(8)
-    if (type.equals(PLP_NULL))
-      null
-    else
-      if (type.equals(UNKNOWN_PLP_LEN))
-        expectedLength = undefined
-      else
-        buffer.rollback()
-        expectedLength = buffer.readUInt64LE()
-
+    readChunks = (expectedLength) ->
+      chunkLength = undefined
       length = 0
       chunks = []
 
       # Read, and accumulate, chunks from buffer.
-      chunkLength = buffer.readUInt32LE()
-      while (chunkLength != 0)
-        length += chunkLength
-        chunks.push(buffer.readBuffer(chunkLength))
+      async.whilst(
+        () ->
+          chunkLength != 0
 
-        chunkLength = buffer.readUInt32LE()
+        , (callback) ->
+          buffer.readUInt32LE((value) ->
+            chunkLength = value
+            if chunkLength != 0
+              length += chunkLength
+              buffer.readBuffer(chunkLength, (chunk) ->
+                chunks.push(chunk)
+                callback()
+              )
+            else
+              callback()
+          )
 
-      if expectedLength
-        if length != expectedLength
-          throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")
+        , () ->
+          if expectedLength
+            if length != expectedLength
+              throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected #{expectedLength}, but got #{length} bytes")
 
-      # Assemble all of the chunks in to one Buffer.
-      valueBuffer = new Buffer(length)
-      position = 0
-      for chunk in chunks
-        chunk.copy(valueBuffer, position, 0)
-        position += chunk.length
+          # Assemble all of the chunks in to one Buffer.
+          valueBuffer = new Buffer(length)
+          position = 0
+          for chunk in chunks
+            chunk.copy(valueBuffer, position, 0)
+            position += chunk.length
 
-      decodeFunction(valueBuffer)
+          decodeFunction(valueBuffer)
+      )
+
+    buffer.readBuffer(8, (typeOrExpectedLength) ->
+      if (typeOrExpectedLength.equals(PLP_NULL))
+        callback(null)
+      else
+        if (typeOrExpectedLength.equals(UNKNOWN_PLP_LEN))
+          readChunks()
+        else
+          expectedLengthBuffer = new ReadableTrackingBuffer(typeOrExpectedLength)
+          expectedLengthBuffer.readUInt64LE((expectedLength) ->
+            readChunks(expectedLength)
+          )
+    )
 
   readSmallDateTime = (buffer) ->
     days = buffer.readUInt16LE()
