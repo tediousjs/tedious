@@ -481,38 +481,66 @@ module.exports.floatNNull = (test) ->
     test.done()
   )
 
-###
-module.exports.datetime = (test) ->
-  metaData = type: dataTypeByName.DateTime
+module.exports.smalldatetime = (test) ->
+  metaData = type: dataTypeByName.SmallDateTime
+
+  days = 2                                        # 3rd January 1900
+  minutes = (14 * 60) + 17                        # 14:17
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeInt16LE(days)
+  buffer.writeUInt16LE(minutes)
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.deepEqual(parsedValue, new Date('January 3, 1900 14:17:00'))
+    test.done()
+  )
+
+
+module.exports.datetimeNNull = (test) ->
+  metaData = type: dataTypeByName.DateTimeN
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeInt8(0)
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.strictEqual(parsedValue, null)
+    test.done()
+  )
+
+module.exports.datetimeNSmalldatetime = (test) ->
+  metaData = type: dataTypeByName.DateTimeN
+
+  days = 2                                        # 3rd January 1900
+  minutes = (14 * 60) + 17                        # 14:17
+
+  buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeInt8(4)
+  buffer.writeInt16LE(days)
+  buffer.writeUInt16LE(minutes)
+
+  parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
+    test.deepEqual(parsedValue, new Date('January 3, 1900 14:17:00'))
+    test.done()
+  )
+
+module.exports.datetimeNDatetime = (test) ->
+  metaData = type: dataTypeByName.DateTimeN
 
   days = 2                                        # 3rd January 1900
   threeHundredthsOfSecond = 45 * 300              # 45 seconds
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
+  buffer.writeInt8(8)
   buffer.writeInt32LE(days)
   buffer.writeUInt32LE(threeHundredthsOfSecond)
 
   parser(new ReadableTrackingBuffer(buffer.data), metaData, (parsedValue) ->
-    test.strictEqual(parsedValue, new Date('January 3, 1900 00:00:45').getTime())
+    test.deepEqual(parsedValue, new Date('January 3, 1900 00:00:45'))
     test.done()
   )
 
-module.exports.datetimeN = (test) ->
-  colMetaData = [type: dataTypeByName.DateTimeN]
-
-  buffer = new WritableTrackingBuffer(0, 'ucs2')
-
-  buffer.writeUInt8(0)
-  #console.log(buffer)
-
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
-  #console.log(token)
-
-  test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value, null)
-
-  test.done()
-
+###
 module.exports.numeric4Bytes = (test) ->
   colMetaData = [
     type: dataTypeByName.NumericN

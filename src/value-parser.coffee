@@ -170,17 +170,17 @@ parse = (buffer, metaData, callback) ->
         else
           value = readBinary(buffer, dataLength)
       when 'SmallDateTime'
-        value = readSmallDateTime(buffer)
+        value = readSmallDateTime()
       when 'DateTime'
-        value = readDateTime(buffer)
+        value = readDateTime()
       when 'DateTimeN'
         switch dataLength
           when 0
-            value = null
+            callback(null)
           when 4
-            value = readSmallDateTime(buffer)
+            readSmallDateTime()
           when 8
-            value = readDateTime(buffer)
+            readDateTime()
       when 'NumericN', 'DecimalN'
         if dataLength == 0
           value = null
@@ -301,24 +301,29 @@ parse = (buffer, metaData, callback) ->
           )
     )
 
-  readSmallDateTime = (buffer) ->
-    days = buffer.readUInt16LE()
-    minutes = buffer.readUInt16LE()
+  readSmallDateTime = () ->
+    buffer.readMultiple(
+      days: buffer.readInt16LE
+      minutes: buffer.readUInt16LE
+      , (values) ->
+        value = new Date(1900, 0, 1)
+        value.setDate(value.getDate() + values.days)
+        value.setMinutes(value.getMinutes() + values.minutes)
+        callback(value)
+    )
 
-    value = new Date(1900, 0, 1)
-    value.setDate(value.getDate() + days)
-    value.setMinutes(value.getMinutes() + minutes)
-    value
+  readDateTime = () ->
+    buffer.readMultiple(
+      days: buffer.readInt32LE
+      threeHundredthsOfSecond: buffer.readUInt32LE
+      , (values) ->
+        milliseconds = values.threeHundredthsOfSecond * THREE_AND_A_THIRD
 
-  readDateTime = (buffer) ->
-    days = buffer.readInt32LE()
-    threeHundredthsOfSecond = buffer.readUInt32LE()
-    milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
-
-    value = new Date(1900, 0, 1)
-    value.setDate(value.getDate() + days)
-    value.setMilliseconds(value.getMilliseconds() + milliseconds)
-    value
+        value = new Date(1900, 0, 1)
+        value.setDate(value.getDate() + values.days)
+        value.setMilliseconds(value.getMilliseconds() + milliseconds)
+        callback(value)
+    )
 
   async.series(
     [
