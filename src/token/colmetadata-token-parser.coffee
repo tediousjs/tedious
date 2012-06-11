@@ -2,12 +2,12 @@
 
 metadataParse = require('../metadata-parser')
 
-parser = (buffer) ->
+parser = (buffer, colMetadata, tdsVersion) ->
   columnCount = buffer.readUInt16LE()
 
   columns = []
   for c in [1..columnCount]
-    metadata = metadataParse(buffer)
+    metadata = metadataParse(buffer, tdsVersion)
 
     if metadata.type.hasTableName
       numberOfTableNameParts = buffer.readUInt8()

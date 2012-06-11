@@ -162,10 +162,12 @@ class PreloginPayload
           @version.patch,
           @version.trivial,
           @version.subbuild,
-          @encryption, @encryptionString,
-          @instance,
+          if @encryption then @encryption else 0, 
+          if @encryptionString then @encryptionString else 0,
+          if @instance then @instance else 0,
           if @threadId then @threadId else 0,
-          @mars, @marsString
+          if @mars then @mars else 0, 
+          if @marsString then @marsString else 0
       )
 
 module.exports = PreloginPayload

@@ -21,6 +21,7 @@ DEFAULT_CANCEL_TIMEOUT = 5 * 1000
 DEFAULT_PACKET_SIZE = 4 * 1024
 DEFAULT_TEXTSIZE = '2147483647'
 DEFAULT_PORT = 1433
+DEFAULT_TDS_VERSION = '7_2'
 
 class Connection extends EventEmitter
   STATE:
@@ -133,6 +134,7 @@ class Connection extends EventEmitter
     @config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
     @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
+    @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -147,7 +149,7 @@ class Connection extends EventEmitter
     )
 
   createTokenStreamParser: ->
-    @tokenStreamParser = new TokenStreamParser(@debug)
+    @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options.tdsVersion)
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
@@ -314,6 +316,7 @@ class Connection extends EventEmitter
       password: @config.password
       database: @config.options.database
       packetSize: @config.options.packetSize
+      tdsVersion: @config.options.tdsVersion
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
