@@ -3,8 +3,11 @@ codepageByLcid = require('./collation').codepageByLcid
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parse = (buffer) ->
-  userType = buffer.readUInt32LE()
+parse = (buffer, tdsVersion) ->
+  if tdsVersion < "7_2"
+    userType = buffer.readUInt16LE()
+  else
+    userType = buffer.readUInt32LE()
   flags = buffer.readUInt16LE()
   typeNumber = buffer.readUInt8()
   type = TYPE[typeNumber]
