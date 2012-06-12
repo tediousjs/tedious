@@ -30,6 +30,7 @@ title: API - Connection
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
+  <li><a href="#function_close">connection.close()</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
   <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
   <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
@@ -320,6 +321,14 @@ var connection = new Connection(config);
     </p>
   </div>
 </div>
+
+<h2 id="function_close">connection.close()</h2>
+<p>
+  Closes the connection to the database.
+</p>
+<p>
+  The <a href="#event_end"><code>end</code></a> will be emmited once the connection has been closed.
+</p>
 
 <h2 id="function_execSql">connection.execSql(request)</h2>
 <p>
