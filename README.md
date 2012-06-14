@@ -11,22 +11,26 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Current version: v0.0.4
+Current version: v0.0.6
 
 Coming soon
 -----------
 Although subject to change, this is the rough plan for the next few versions.
 
 
-### v0.0.6 ###
+### v0.0.7 ###
+- overhaul of how incoming data is read and buffered
+
+### v0.0.8 ###
 - support for more data types for parameters
+- some support for TDS 7.1
 - transaction management
 
-### v0.0.7 ###
+### v0.0.9 ###
 - support for more data types for parameters
 - support for varchar(max), nvarchar(max) and varbinary(max) as streams
 
-### v0.0.8 ###
+### v0.0.10 ###
 - secure connections
 
 ### unplanned ###
