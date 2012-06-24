@@ -7,30 +7,20 @@ WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
 debug = new Debug({token: true})
 
 module.exports.oneToken = (test) ->
-  test.expect(1)
-
-  dbChangeTokenBuffer = createDbChangeTokenBuffer()
-
   buffer = new ReadableTrackingBuffer()
 
-  parser = new Parser(debug, buffer, dbChangeTokenBuffer.length, ->
+  parser = new Parser(debug, buffer, ->
     test.done()
   )
 
-  parser.on('databaseChange', (event) ->
-    test.ok(event)
-  )
-
-  buffer.add(dbChangeTokenBuffer)
+  buffer.add(createDoneTokenBuffer())
 
 module.exports.twoTokens = (test) ->
-  test.expect(2)
-
-  dbChangeTokenBuffer = createDbChangeTokenBuffer()
+  test.expect(1)
 
   buffer = new ReadableTrackingBuffer()
 
-  parser = new Parser(debug, buffer, 2 * dbChangeTokenBuffer.length, ->
+  parser = new Parser(debug, buffer, ->
     test.done()
   )
 
@@ -38,8 +28,37 @@ module.exports.twoTokens = (test) ->
     test.ok(event)
   )
 
-  buffer.add(dbChangeTokenBuffer)
-  buffer.add(dbChangeTokenBuffer)
+  buffer.add(createDbChangeTokenBuffer())
+  buffer.add(createDoneTokenBuffer())
+
+module.exports.doneWithMore = (test) ->
+  buffer = new ReadableTrackingBuffer()
+
+  parser = new Parser(debug, buffer, ->
+    test.done()
+  )
+
+  buffer.add(createDoneWithMoreTokenBuffer())
+  buffer.add(createDoneTokenBuffer())
+
+createDoneTokenBuffer = (more) ->
+  more ||= false
+  buffer = new WritableTrackingBuffer(50, 'ucs2')
+
+  if more
+    status = 0x0001
+  else
+    status = 0
+
+  buffer.writeUInt8(TYPE.DONE)
+  buffer.writeUInt16LE(status)            # status
+  buffer.writeUInt16LE(0)                 # rowCount
+  buffer.writeUInt64LE(0)                 # curCmd
+
+  buffer.data
+
+createDoneWithMoreTokenBuffer = ->
+  createDoneTokenBuffer(true)
 
 createDbChangeTokenBuffer = ->
   oldDb = 'old'

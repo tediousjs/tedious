@@ -18,13 +18,13 @@ tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser')
 tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
 class Parser extends EventEmitter
-  constructor: (@debug, @buffer, @streamLength, @callback) ->
-    @endOfStreamBytesRead = @buffer.bytesRead() + @streamLength
+  constructor: (@debug, @buffer, @callback) ->
+    @done = false
     @colMetadata = undefined
 
     async.whilst(
       =>
-        @buffer.bytesRead() < @endOfStreamBytesRead
+        !@done
 
       ,@nextToken
 
@@ -55,7 +55,10 @@ class Parser extends EventEmitter
     if token.event
       @emit(token.event, token)
 
-    if token.name == 'COLMETADATA'
+    switch token.name
+      when 'COLMETADATA'
         @colMetadata = token.columns
+      when 'DONE', 'DONEINPROC', 'DONEPROC'
+        @done = !token.more
 
 exports.Parser = Parser
