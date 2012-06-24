@@ -1,4 +1,6 @@
-PreloginPayload = require('../../src/prelogin-payload')
+PreloginPayload = require('../../src/prelogin-payload').PreloginPayload
+parsePrelogin = require('../../src/prelogin-payload').parsePrelogin
+ReadableTrackingBuffer = require('../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 
 exports.createFromScratch = (test) ->
   payload = new PreloginPayload()
@@ -8,12 +10,20 @@ exports.createFromScratch = (test) ->
   test.done()
 
 exports.createFromBuffer = (test) ->
+  buffer = new ReadableTrackingBuffer()
+  parsePrelogin(buffer, (prelogin) ->
+    assertPayload(test, payload)
+    test.done()
+  )
+
   payload = new PreloginPayload()
-  new PreloginPayload(payload.data)
 
-  assertPayload(test, payload)
+  #new PreloginPayload(buffer, (payload) ->
+  #  assertPayload(test, payload)
+  #  test.done()
+  #)
 
-  test.done()
+  buffer.add(payload.toBuffer())
 
 assertPayload = (test, payload) ->
   test.strictEqual(payload.version.major, 0)

@@ -1,6 +1,10 @@
 sprintf = require('sprintf').sprintf
 WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
+###
+  s2.2.6.4
+###
+
 optionBufferSize = 20
 
 VERSION = 0x000000001
@@ -32,19 +36,113 @@ marsByValue = {}
 for name, value of MARS
   marsByValue[value] = name
 
-###
-  s2.2.6.4
-###
+parsePrelogin = (buffer, callback) ->
+  tokens = {}
+  startPosition = buffer.bytesRead()
+
+  nextToken = () ->
+    buffer.readUInt8((tokenType) ->
+      if tokenType == TOKEN.TERMINATOR
+        readTokensData()
+      else
+        buffer.readMultiple(
+          offset: buffer.readUInt16BE
+          length: buffer.readUInt16BE
+          , (tokenMetadata) ->
+            tokenMetadata.endOfData = tokenMetadata.offset + tokenMetadata.length
+
+            switch tokenType
+              when TOKEN.VERSION
+                tokens.version = tokenMetadata
+              when TOKEN.ENCRYPTION
+                tokens.encryption = tokenMetadata
+              when TOKEN.INSTOPT
+                tokens.instance = tokenMetadata
+              when TOKEN.THREADID
+                tokens.threadId = tokenMetadata
+              when TOKEN.MARS
+                tokens.mars = tokenMetadata
+
+            nextToken()
+        )
+    )
+
+  readTokensData = () ->
+    buffer.readBuffer(dataBufferLength(), (tokenDataBuffer) ->
+      extractVersion = ->
+        tokens.version =
+          major: tokenDataBuffer.readUInt8(tokens.version.offset + 0)
+          minor: tokenDataBuffer.readUInt8(tokens.version.offset + 1)
+          patch: tokenDataBuffer.readUInt8(tokens.version.offset + 2)
+          trivial: tokenDataBuffer.readUInt8(tokens.version.offset + 3)
+          subbuild: tokenDataBuffer.readUInt16BE(tokens.version.offset + 4)
+
+      extractEncryption = ->
+        tokens.encryption = tokenDataBuffer.readUInt8(tokens.encryption.offset)
+        tokens.encryptionString = encryptByValue[tokens.encryption]
+
+      extractInstance = ->
+        tokens.instance = tokenDataBuffer.readUInt8(tokens.instance.offset)
+
+      extractThreadId = ->
+        if tokens.threadId.length > 0
+          tokens.threadId = tokenDataBuffer.readUInt32BE(tokens.threadId.offset)
+        else
+          delete tokens.threadId
+
+      extractMars = ->
+        tokens.mars = tokenDataBuffer.readUInt8(tokens.mars.offset)
+        tokens.marsString = marsByValue[tokens.mars]
+
+      if tokens.version then extractVersion()
+      if tokens.encryption then extractEncryption()
+      if tokens.instance then extractInstance()
+      if tokens.threadId then extractThreadId()
+      if tokens.mars then extractMars()
+
+      callback(new PreloginPayload(tokens))
+    )
+
+   dataBufferLength = () ->
+    currentPosition = buffer.bytesRead() - startPosition
+    endOfTokensData = currentPosition
+
+    for tokenName, token of tokens
+      if token.endOfData > endOfTokensData
+        endOfTokensData = token.endOfData
+        token.offset -= currentPosition
+
+    endOfTokensData - currentPosition
+
+  nextToken()
+
 class PreloginPayload
-  constructor: (buffer) ->
-    if buffer instanceof Buffer
+  constructor: (tokens) ->
+    if tokens
+      @version = tokens.version
+      @encryption = tokens.encryption
+      @encryptionString = tokens.encryptionString
+      @instance = tokens.instance
+      @threadId = tokens.threadId
+      @mars = tokens.mars
+      @marsString = tokens.marsString
+      buffer = tokens
       @data = buffer
     else
-      @createOptions()
+      @version =
+        major: 0,
+        minor: 0
+        patch: 0
+        trivial: 1,
+        subbuild: 1
+      @encryption = ENCRYPT.NOT_SUP
+      @encryptionString = encryptByValue[@encryption]
+      @instance = 0
+      @threadId = 0
+      @mars = MARS.OFF
+      @marsString = marsByValue[@mars]
 
-    @extractOptions()
-
-  createOptions: ->
+  toBuffer: ->
     options = [
       @createVersionOption(),
       @createEncryptionOption(),
@@ -71,6 +169,8 @@ class PreloginPayload
       optionDataOffset += option.data.length
 
     @data.writeUInt8(TOKEN.TERMINATOR, optionOffset)
+
+    @data
 
   createVersionOption: () ->
     buffer = new WritableTrackingBuffer(optionBufferSize)
@@ -108,50 +208,6 @@ class PreloginPayload
     token: TOKEN.MARS
     data: buffer.data
 
-  extractOptions: ->
-    offset = 0;
-    while @data[offset] != TOKEN.TERMINATOR
-      dataOffset = @data.readUInt16BE(offset + 1)
-      dataLength = @data.readUInt16BE(offset + 3)
-
-      switch @data[offset]
-        when TOKEN.VERSION
-          @extractVersion(dataOffset)
-        when TOKEN.ENCRYPTION
-          @extractEncryption(dataOffset)
-        when TOKEN.INSTOPT
-          @extractInstance(dataOffset)
-        when TOKEN.THREADID
-          if (dataLength > 0)
-            @extractThreadId(dataOffset)
-        when TOKEN.MARS
-          @extractMars(dataOffset)
-
-      offset += 5
-      dataOffset += dataLength
-
-  extractVersion: (offset) ->
-    @version =
-      major: @data.readUInt8(offset + 0),
-      minor: @data.readUInt8(offset + 1),
-      patch: @data.readUInt8(offset + 2),
-      trivial: @data.readUInt8(offset + 3),
-      subbuild: @data.readUInt16BE(offset + 4)
-
-  extractEncryption: (offset) ->
-    @encryption = @data.readUInt8(offset)
-    @encryptionString = encryptByValue[@encryption]
-
-  extractInstance: (offset) ->
-    @instance = @data.readUInt8(offset)
-
-  extractThreadId: (offset) ->
-    @threadId = @data.readUInt32BE(offset)
-
-  extractMars: (offset) ->
-    @mars = @data.readUInt8(offset)
-    @marsString = marsByValue[@mars]
-
   toString: (indent) ->
     indent ||= ''
 
@@ -168,4 +224,5 @@ class PreloginPayload
           @mars, @marsString
       )
 
-module.exports = PreloginPayload
+exports.PreloginPayload = PreloginPayload
+exports.parsePrelogin = parsePrelogin
