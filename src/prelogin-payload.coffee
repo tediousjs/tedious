@@ -1,4 +1,5 @@
 sprintf = require('sprintf').sprintf
+tediousVersion = require('./tedious').version
 WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 ###
@@ -130,11 +131,11 @@ class PreloginPayload
       @data = buffer
     else
       @version =
-        major: 0,
-        minor: 0
-        patch: 0
-        trivial: 1,
-        subbuild: 1
+        major: tediousVersion.major
+        minor: tediousVersion.minor
+        patch: tediousVersion.patch
+        trivial: 0
+        subbuild: 0
       @encryption = ENCRYPT.NOT_SUP
       @encryptionString = encryptByValue[@encryption]
       @instance = 0

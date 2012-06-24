@@ -1,6 +1,7 @@
 PreloginPayload = require('../../src/prelogin-payload').PreloginPayload
 parsePrelogin = require('../../src/prelogin-payload').parsePrelogin
 ReadableTrackingBuffer = require('../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+tediousVersion = require('../../src/tedious').version
 
 exports.createFromScratch = (test) ->
   payload = new PreloginPayload()
@@ -26,11 +27,11 @@ exports.createFromBuffer = (test) ->
   buffer.add(payload.toBuffer())
 
 assertPayload = (test, payload) ->
-  test.strictEqual(payload.version.major, 0)
-  test.strictEqual(payload.version.minor, 0)
-  test.strictEqual(payload.version.patch, 0)
-  test.strictEqual(payload.version.trivial, 1)
-  test.strictEqual(payload.version.subbuild, 1)
+  test.strictEqual(payload.version.major, tediousVersion.major)
+  test.strictEqual(payload.version.minor, tediousVersion.minor)
+  test.strictEqual(payload.version.patch, tediousVersion.patch)
+  test.strictEqual(payload.version.trivial, 0)
+  test.strictEqual(payload.version.subbuild, 0)
 
   test.strictEqual(payload.encryptionString, 'NOT_SUP')
   test.strictEqual(payload.instance, 0)
