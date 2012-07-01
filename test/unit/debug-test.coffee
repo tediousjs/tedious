@@ -9,6 +9,7 @@ class Packet
   dataToString: ->
     'data'
 
+###
 exports.packet = (test) ->
   emitCount = 0;
 
@@ -88,3 +89,4 @@ exports.payloadNotEnabled = (test) ->
   debug.token({name: 'test'})
 
   test.done()
+###

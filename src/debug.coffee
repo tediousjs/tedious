@@ -1,6 +1,8 @@
 EventEmitter = require('events').EventEmitter
 util = require('util')
 
+packetHeaderToString = require('./packet').headerToString
+
 class Debug extends EventEmitter
   ###
     @options    Which debug details should be sent.
@@ -16,15 +18,16 @@ class Debug extends EventEmitter
 
     @indent = '  '
 
-  packet: (direction, packet) ->
+  packetHeader: (direction, header) ->
     if @haveListeners() && @options.packet
       @log('')
       @log(direction)
-      @log(packet.headerToString(@indent))
+      @log(packetHeaderToString(header, @indent))
 
   data: (packet) ->
     if @haveListeners() && @options.data
-      @log(packet.dataToString(@indent))
+      console.log packet
+      #@log(packet.dataToString(@indent))
 
   payload: (generatePayloadText) ->
     if @haveListeners() && @options.payload

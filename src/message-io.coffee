@@ -25,7 +25,7 @@ class MessageIO extends EventEmitter
         break
       @advanceReceived(packetHeaderLength)
 
-      @processReceivedPacket(header.payloadLength)
+      @processReceivedPacket(header, header.payloadLength)
 
       if header.endOfMessage
         @emit('message')
@@ -46,7 +46,8 @@ class MessageIO extends EventEmitter
         @receivedBuffers[0] = @receivedBuffers[0].slice(length)
         length = 0
 
-  processReceivedPacket: (length) ->
+  processReceivedPacket: (header, length) ->
+    @debug.packetHeader('Received', header)
     @receivedAvailable -= length
 
     while length
@@ -92,11 +93,12 @@ class MessageIO extends EventEmitter
       @sendPacket(header, packetPayload)
 
   sendPacket: (header, payload) =>
-    #@logPacket('Sent', packet);
+    @logPacket('Sent', header, payload);
     @socket.write(header.concat(payload))
 
-  logPacket: (direction, packet) ->
-    @debug.packet(direction, packet)
+  logPacket: (direction, header, packet) ->
+    header = decodePacketHeader(header)
+    @debug.packetHeader(direction, header)
     @debug.data(packet)
 
 module.exports = MessageIO
