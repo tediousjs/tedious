@@ -212,6 +212,7 @@ class PreloginPayload
   toString: (indent) ->
     indent ||= ''
 
+    console.log @
     indent + 'PreLogin - ' +
       sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
           @version.major,

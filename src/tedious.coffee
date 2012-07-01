@@ -2,9 +2,9 @@ require('pkginfo')(module)
 
 versionParts = module.exports.version.match(/(\d+)\.(\d+)\.(\d+)/)
 version =
-  major: versionParts[1]
-  minor: versionParts[2]
-  patch: versionParts[3]
+  major: parseInt(versionParts[1])
+  minor: parseInt(versionParts[2])
+  patch: parseInt(versionParts[3])
 
 exports.statemachineLogLevel = 0
 
