@@ -3,11 +3,13 @@ Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 instanceLookup = require('./instance-lookup').instanceLookup
 TYPE = require('./packet').TYPE
-PreloginPayload = require('./prelogin-payload')
+parsePrelogin = require('./prelogin-payload').parsePrelogin
+PreloginPayload = require('./prelogin-payload').PreloginPayload
 Login7Payload = require('./login7-payload')
 RpcRequestPayload = require('./rpcrequest-payload')
 SqlBatchPayload = require('./sqlbatch-payload')
 MessageIO = require('./message-io')
+ReadableBuffer = require('./tracking-buffer/readable-tracking-buffer')
 Socket = require('net').Socket
 TokenStreamParser = require('./token/token-stream-parser').Parser
 
@@ -41,6 +43,7 @@ class Connection extends EventEmitter
       name: 'SentPrelogin'
       enter: ->
         @emptyMessageBuffer()
+        @processPreLoginResponse()
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
@@ -106,9 +109,10 @@ class Connection extends EventEmitter
           # Do nothing, as the timer should be cleaned up.
 
   constructor: (@config) ->
+    @incommingDataBuffer = new ReadableBuffer()
     @defaultConfig()
     @createDebug()
-    @createTokenStreamParser()
+    #@createTokenStreamParser()
 
     @transitionTo(@STATE.CONNECTING)
 
@@ -147,7 +151,9 @@ class Connection extends EventEmitter
     )
 
   createTokenStreamParser: ->
-    @tokenStreamParser = new TokenStreamParser(@debug)
+    @tokenStreamParser = new TokenStreamParser(@debug, @incommingDataBuffer, ->
+      console.log 'token stream parsed'
+    )
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
@@ -233,7 +239,7 @@ class Connection extends EventEmitter
     @socket.on('close', @socketClose)
     @socket.on('end', @socketClose)
 
-    @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
+    @messageIo = new MessageIO(@socket, @incommingDataBuffer, @config.options.packetSize, @debug)
     @messageIo.on('packet', (packet) =>
       @dispatchEvent('packet', packet)
     )
@@ -291,7 +297,7 @@ class Connection extends EventEmitter
 
   sendPreLogin: ->
     payload = new PreloginPayload()
-    @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
+    @messageIo.sendMessage(TYPE.PRELOGIN, payload.toBuffer())
     @debug.payload(->
       payload.toString('  ')
     )
@@ -303,9 +309,10 @@ class Connection extends EventEmitter
     @messageBuffer = @messageBuffer.concat(packet.data())
 
   processPreLoginResponse: ->
-    preloginPayload = new PreloginPayload(@messageBuffer)
-    @debug.payload(->
-      preloginPayload.toString('  ')
+    parsePrelogin(@incommingDataBuffer, (prelogin) =>
+      @debug.payload(->
+        prelogin.toString('  ')
+      )
     )
 
   sendLogin7Packet: ->

@@ -112,7 +112,7 @@ exports.connectByPort = (test) ->
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+    console.log(text)
   )
 
 exports.connectByInstanceName = (test) ->
