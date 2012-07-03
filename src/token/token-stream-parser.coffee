@@ -18,7 +18,7 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
-  Tokens are parsed from the buffer until there are no more tokens in 
+  Tokens are parsed from the buffer until there are no more tokens in
   the buffer, or there is just a partial token left.
   If there is a partial token left over, then it is kept until another
   buffer is added, which should contain the remainder of the partial

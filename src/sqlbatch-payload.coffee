@@ -12,7 +12,7 @@ class SqlBatchPayload
     buffer = new WritableTrackingBuffer(100 + (2 * @sqlText.length), 'ucs2')
     writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
     buffer.writeString(@sqlText, 'ucs2')
-    
+
     @data = buffer.data
 
   toString: (indent) ->
