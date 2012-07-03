@@ -28,7 +28,7 @@ class MessageIO extends EventEmitter
       if (packet.isLast())
         @emit('message')
 
-      @packetBuffer = new Buffer(@packetBuffer.slice(length))
+      @packetBuffer = @packetBuffer.slice(length)
 
   packetSize: (packetSize) ->
     if arguments.length > 0
