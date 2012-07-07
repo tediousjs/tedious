@@ -8,49 +8,49 @@ versions = require('./tds-versions').versions
 FLAGS_1 =
   ENDIAN_LITTLE: 0x00,
   ENDIAN_BIG: 0x01,
-  
+
   CHARSET_ASCII: 0x00,
   CHARSET_EBCDIC: 0x02,
-  
+
   FLOAT_IEEE_754: 0x00,
   FLOAT_VAX: 0x04,
   FLOAT_ND5000: 0x08,
-  
+
   BCP_DUMPLOAD_ON: 0x00,
   BCP_DUMPLOAD_OFF: 0x10,
-  
+
   USE_DB_ON: 0x00,
   USE_DB_OFF: 0x20,
-  
+
   INIT_DB_WARN: 0x00,
   INIT_DB_FATAL: 0x40,
-  
+
   SET_LANG_WARN_OFF: 0x00,
   SET_LANG_WARN_ON: 0x80,
 
-FLAGS_2 = 
+FLAGS_2 =
   INIT_LANG_WARN: 0x00,
   INIT_LANG_FATAL: 0x01,
 
   ODBC_OFF: 0x00,
   ODBC_ON: 0x02,
-  
+
   F_TRAN_BOUNDARY: 0x04,          # Removed in TDS 7.2
-  
+
   F_CACHE_CONNECT: 0x08,          # Removed in TDS 7.2
-  
+
   USER_NORMAL: 0x00,
-  USER_SERVER: 0x10, 
-  USER_REMUSER: 0x20, 
-  USER_SQLREPL: 0x40, 
-  
+  USER_SERVER: 0x10,
+  USER_REMUSER: 0x20,
+  USER_SQLREPL: 0x40,
+
   INTEGRATED_SECURITY_OFF: 0x00,
   INTEGRATED_SECURITY_ON: 0x80
 
 TYPE_FLAGS =
   SQL_DFLT: 0x00,
   SQL_TSQL: 0x01,
-  
+
   OLEDB_OFF: 0x00,
   OLEDB_ON: 0x02,                 # Introduced in TDS 7.2
 
@@ -59,9 +59,9 @@ TYPE_FLAGS =
 FLAGS_3 =
   CHANGE_PASSWORD_NO: 0x00,
   CHANGE_PASSWORD_YES: 0x01,      # Introduced in TDS 7.2
-  
+
   BINARY_XML: 0x02,               # Introduced in TDS 7.2
-  
+
   SPAWN_USER_INSTANCE: 0x04,      # Introduced in TDS 7.2
 
   UNKNOWN_COLLATION_HANDLING: 0x08  # Introduced in TDS 7.3
@@ -128,7 +128,7 @@ class Login7Payload
     buffer.writeUInt8(@flags3)
     buffer.writeInt32LE(@clientTimeZone)
     buffer.writeUInt32LE(@clientLcid)
-    
+
     buffer.data
 
   createVariableData: (offset) ->
@@ -140,13 +140,13 @@ class Login7Payload
       offsetsAndLengths: new WritableTrackingBuffer(200)
       data: new WritableTrackingBuffer(200, 'ucs2')
       offset: offset + @variableLengthsLength
-    
+
     @hostname = os.hostname()
 
     @loginData = @loginData || {}
     @loginData.appName = @loginData.appName || 'Tedious'
     @libraryName = libraryName
-    
+
     # Client ID, should be MAC address or other randomly generated GUID like value.
     @clientId = new Buffer([1, 2, 3, 4, 5, 6])
 

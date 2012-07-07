@@ -10,6 +10,7 @@ exports.create = (test) ->
     language: 'lang'
     database: 'db'
     packetSize: 1024
+    tdsVersion: '7_2'
 
   #start = new Date().getTime()
   #for c in [1..1000]
@@ -36,7 +37,7 @@ exports.create = (test) ->
     2 + 2 + (2 * payload.changePassword.length) +
     4                                                 # cbSSPILong
 
-  test.strictEqual(payload.data.length, expectedLength)    
+  test.strictEqual(payload.data.length, expectedLength)
 
   passwordStart = payload.data.readUInt16LE(4 + 32 + (2 * 4))
   passwordEnd = passwordStart + (2 * loginData.password.length)
