@@ -66,8 +66,6 @@ FLAGS_3 =
 
   UNKNOWN_COLLATION_HANDLING: 0x08  # Introduced in TDS 7.3
 
-DEFAULT_TDS_VERSION = versions['7_2']
-
 ###
   s2.2.6.3
 ###
@@ -87,7 +85,7 @@ class Login7Payload
     @data = data.data
 
   createFixedData: ->
-    @tdsVersion = DEFAULT_TDS_VERSION
+    @tdsVersion = versions[@loginData.tdsVersion]
     @packetSize = @loginData.packetSize
     @clientProgVer = 0
     @clientPid = process.pid
@@ -134,10 +132,14 @@ class Login7Payload
     buffer.data
 
   createVariableData: (offset) ->
+    @variableLengthsLength = ((9 * 4) + 6 + (3 * 4) + 4)
+    if @loginData.tdsVersion == '7_1'
+      @variableLengthsLength = ((9 * 4) + 6 + (2 * 4))
+
     variableData =
       offsetsAndLengths: new WritableTrackingBuffer(200)
       data: new WritableTrackingBuffer(200, 'ucs2')
-      offset: offset + ((9 * 4) + 6 + (3 * 4) + 4)
+      offset: offset + @variableLengthsLength
     
     @hostname = os.hostname()
 
@@ -165,8 +167,9 @@ class Login7Payload
     variableData.offsetsAndLengths.writeBuffer(@clientId)
     @addVariableDataString(variableData, @sspi)
     @addVariableDataString(variableData, @attachDbFile)
-    @addVariableDataString(variableData, @changePassword)           # Introduced in TDS 7.2
-    variableData.offsetsAndLengths.writeUInt32LE(@sspiLong)         # Introduced in TDS 7.2
+    if @loginData.tdsVersion > '7_1'
+      @addVariableDataString(variableData, @changePassword)           # Introduced in TDS 7.2
+      variableData.offsetsAndLengths.writeUInt32LE(@sspiLong)         # Introduced in TDS 7.2
 
     variableData.offsetsAndLengths.data.concat(variableData.data.data)
 

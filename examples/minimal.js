@@ -56,5 +56,6 @@ function executeStatement() {
     console.log(rowCount + ' rows returned');
   });
 
+  // In SQL Server 2000 you may need: connection.execSqlBatch(request);
   connection.execSql(request);
 }

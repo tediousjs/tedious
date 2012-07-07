@@ -1,6 +1,6 @@
 # s2.2.7.9, s2.2.7.10
 
-parser = (buffer) ->
+parser = (buffer, tdsVersion) ->
   length = buffer.readUInt16LE()
   number = buffer.readUInt32LE()
   state = buffer.readUInt8()
@@ -8,7 +8,10 @@ parser = (buffer) ->
   message = buffer.readUsVarchar()
   serverName = buffer.readBVarchar()
   procName = buffer.readBVarchar()
-  lineNumber = buffer.readUInt32LE()
+  if tdsVersion < '7_2'
+    lineNumber = buffer.readUInt16LE()
+  else
+    lineNumber = buffer.readUInt32LE()
 
   token =
     number: number
@@ -19,15 +22,15 @@ parser = (buffer) ->
     procName: procName
     lineNumber: lineNumber
 
-infoParser = (buffer) ->
-  token = parser(buffer)
+infoParser = (buffer, colMetadata, tdsVersion) ->
+  token = parser(buffer, tdsVersion)
   token.name = 'INFO'
   token.event = 'infoMessage'
 
   token
 
-errorParser = (buffer) ->
-  token = parser(buffer)
+errorParser = (buffer, colMetadata, tdsVersion) ->
+  token = parser(buffer, tdsVersion)
   token.name = 'ERROR'
   token.event = 'errorMessage'
 

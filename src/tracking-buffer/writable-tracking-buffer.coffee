@@ -49,7 +49,7 @@ class WritableTrackingBuffer
     @position += length
 
   writeUShort: (value) ->
-    writeUInt16LE(value)
+    @writeUInt16LE(value)
 
   writeUInt16BE: (value) ->
     length = 2
