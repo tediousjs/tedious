@@ -5,7 +5,13 @@
   ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
-  "keywords": ["sql", "database", "mssql", "sqlserver", "tds"],
+  "keywords": [
+    "sql",
+    "database",
+    "mssql",
+    "sqlserver",
+    "tds"
+  ],
   "homepage": "https://github.com/pekim/tedious",
   "bugs": "https://github.com/pekim/tedious/issues",
   "licenses": [
@@ -15,7 +21,7 @@
     }
   ],
   "version": "0.0.6",
-  "main" : "./lib/tedious.js",
+  "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/pekim/tedious.git"
@@ -25,11 +31,11 @@
   },
   "dependencies": {
     "async": "0.1.22",
-    "iconv-lite": "0.2.0",
+    "iconv-lite": "0.2.1",
     "sprintf": "0.1.1"
   },
   "devDependencies": {
-    "coffee-script": "1.3.1",
+    "coffee-script": "1.3.3",
     "nodeunit": "0.7.4"
   },
   "scripts": {
