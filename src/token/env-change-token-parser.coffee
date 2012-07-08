@@ -43,7 +43,7 @@ module.exports = (buffer) ->
       when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
-      when 'SQL_COLLATION', 'BEGIN_TXN'
+      when 'SQL_COLLATION', 'BEGIN_TXN', 'COMMIT_TXN', 'ROLLBACK_TXN'
         valueLength = buffer.readUInt8()
         newValue = buffer.readBuffer(valueLength)
 

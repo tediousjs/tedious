@@ -1,8 +1,9 @@
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
+async = require('async')
 
-debug = true
+debug = false
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
@@ -16,22 +17,40 @@ if (debug)
 else
   config.options.debug = {}
 
-exports.beginTransaction = (test) ->
-  test.expect(2)
-
-  request = new Request('select 3', (err) ->
-    test.ok(!err)
-    console.log('request complete')
-  )
+exports.beginCommitTransaction = (test) ->
+  test.expect(3)
 
   connection = new Connection(config)
 
-  connection.on('connect', (err) ->
+  beginTransaction = (callback) ->
     connection.beginTransaction((err) ->
       test.ok(!err)
-
-      connection.execSql(request)
+      callback(err)
     , 'abc')
+
+  select = (callback) ->
+    request = new Request('select 3', (err) ->
+      test.ok(!err)
+      callback(err)
+    )
+
+    connection.execSql(request)
+
+  commitTransaction = (callback) ->
+    connection.commitTransaction((err) ->
+      test.ok(!err)
+      connection.close()
+      callback(err)
+    )
+
+  connection.on('connect', (err) ->
+    async.series([
+        beginTransaction
+        select
+        commitTransaction
+        () ->
+          connection.close()
+    ]);
   )
 
   connection.on('end', (info) ->

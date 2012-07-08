@@ -115,7 +115,7 @@ class Connection extends EventEmitter
     @createTokenStreamParser()
 
     @transactions = []
-    @transactionDescriptor = 0
+    @transactionDescriptors = [0]
 
     @transitionTo(@STATE.CONNECTING)
 
@@ -181,11 +181,13 @@ class Connection extends EventEmitter
       @messageIo.packetSize(token.newValue)
     )
     @tokenStreamParser.on('beginTransaction', (token) =>
-      if @transactions.length > 0
-        @transactionDescriptor = token.newValue
-        @transactions[@transactions.length - 1].descriptor = @transactionDescriptor
-      else
-        throw new Error('Received beginTransaction event, but no transaction known to be in progress.')
+      @transactionDescriptors.push(token.newValue)
+    )
+    @tokenStreamParser.on('commitTransaction', (token) =>
+      @transactionDescriptors.pop()
+    )
+    @tokenStreamParser.on('rollbackTransaction', (token) =>
+      @transactionDescriptors.pop()
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
         if @request
@@ -357,37 +359,46 @@ class Connection extends EventEmitter
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->
-    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @transactionDescriptor))
+    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @currentTransactionDescriptor()))
 
   execSql: (request) ->
     request.transformIntoExecuteSqlRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @transactionDescriptor))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   prepare: (request) ->
     request.transformIntoPrepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @transactionDescriptor))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   unprepare: (request) ->
     request.transformIntoUnprepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @transactionDescriptor))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   execute: (request, parameters) ->
     request.transformIntoExecuteRpc(parameters)
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @transactionDescriptor))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   callProcedure: (request) ->
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @transactionDescriptor))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   beginTransaction: (callback, name, isolationLevel) ->
     name ||= ''
     isolationLevel ||= @config.options.isolationLevel
 
-    transaction = new Transaction(@transactionDescriptor, name, isolationLevel)
+    transaction = new Transaction(name, isolationLevel)
     @transactions.push(transaction)
 
     request = new Request(undefined, callback)
 
-    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload())
+    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(@currentTransactionDescriptor()))
+
+  commitTransaction: (callback) ->
+    if @transactions.length == 0
+      throw new Error('No transaction in progress')
+    transaction = @transactions.pop()
+
+    request = new Request(undefined, callback)
+
+    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(@currentTransactionDescriptor()))
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
@@ -405,5 +416,8 @@ class Connection extends EventEmitter
       )
 
       @transitionTo(@STATE.SENT_CLIENT_REQUEST)
+
+  currentTransactionDescriptor: ->
+    @transactionDescriptors[@transactionDescriptors.length - 1]
 
 module.exports = Connection

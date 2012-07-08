@@ -27,12 +27,12 @@ for name, value of ISOLATION_LEVEL
   isolationLevelByValue[value] = name
 
 class Transaction
-  constructor: (@txnDescriptor, @name, @isolationLevel) ->
+  constructor: (@name, @isolationLevel) ->
     @outstandingRequestCount = 1
 
-  beginPayload: ->
+  beginPayload: (txnDescriptor) ->
     buffer = new WritableTrackingBuffer(100, 'ucs2')
-    writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
+    writeAllHeaders(buffer, txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_BEGIN_XACT)
     buffer.writeUInt8(@isolationLevel)
     buffer.writeUInt8(@name.length * 2)
@@ -43,19 +43,22 @@ class Transaction
       toString: =>
         "Begin Transaction: name=#{@name}, isolationLevel=#{isolationLevelByValue[@isolationLevel]}"
 
-  commitPayload: ->
+  commitPayload: (txnDescriptor) ->
     buffer = new WritableTrackingBuffer(100, 'ascii')
-    writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
+    writeAllHeaders(buffer, txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_COMMIT_XACT)
     buffer.writeUInt8(@name.length * 2)
     buffer.writeString(@name, 'ucs2')
     buffer.writeUInt8(0)         # No fBeginXact flag, so no new transaction is started.
 
-    buffer.data
+    payload =
+      data: buffer.data
+      toString: =>
+        "Commit Transaction: name=#{@name}"
 
-  rollbackPayload: ->
+  rollbackPayload: (txnDescriptor) ->
     buffer = new WritableTrackingBuffer(100, 'ascii')
-    writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
+    writeAllHeaders(buffer, txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_ROLLBACK_XACT)
     buffer.writeUInt8(@name.length * 2)
     buffer.writeString(@name, 'ucs2')
