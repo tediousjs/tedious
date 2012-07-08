@@ -20,10 +20,13 @@ types =
     event: 'sqlCollationChange'
   8:
     name: 'BEGIN_TXN'
+    event: 'beginTransaction'
   9:
     name: 'COMMIT_TXN'
+    event: 'commitTransaction'
   10:
     name: 'ROLLBACK_TXN'
+    event: 'rollbackTransaction'
   13:
     name: 'DATABASE_MIRRORING_PARTNER'
     event: 'partnerNode'
@@ -40,7 +43,7 @@ module.exports = (buffer) ->
       when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
-      when 'SQL_COLLATION'
+      when 'SQL_COLLATION', 'BEGIN_TXN'
         valueLength = buffer.readUInt8()
         newValue = buffer.readBuffer(valueLength)
 

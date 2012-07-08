@@ -5,8 +5,7 @@ writeAllHeaders = require('./all-headers').writeToTrackingBuffer
   s2.2.6.6
 ###
 class SqlBatchPayload
-  constructor: (@sqlText) ->
-    txnDescriptor = 0
+  constructor: (@sqlText, txnDescriptor) ->
     outstandingRequestCount = 1
 
     buffer = new WritableTrackingBuffer(100 + (2 * @sqlText.length), 'ucs2')

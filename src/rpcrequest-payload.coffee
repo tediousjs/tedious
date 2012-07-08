@@ -17,12 +17,11 @@ STATUS =
   s2.2.6.5
 ###
 class RpcRequestPayload
-  constructor: (@request) ->
-    buffer = new WritableTrackingBuffer(500, 'ucs2')
+  constructor: (@request, txnDescriptor) ->
+    buffer = new WritableTrackingBuffer(500)
 
     @procedure = @request.sqlTextOrProcedure
 
-    txnDescriptor = 0
     outstandingRequestCount = 1
     writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
 

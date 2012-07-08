@@ -1,4 +1,5 @@
 Connection = require('../../src/connection')
+Request = require('../../src/request')
 fs = require('fs')
 
 debug = true
@@ -16,14 +17,21 @@ else
   config.options.debug = {}
 
 exports.beginTransaction = (test) ->
-  test.expect(1)
+  test.expect(2)
+
+  request = new Request('select 3', (err) ->
+    test.ok(!err)
+    console.log('request complete')
+  )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
     connection.beginTransaction((err) ->
       test.ok(!err)
-    )
+
+      connection.execSql(request)
+    , 'abc')
   )
 
   connection.on('end', (info) ->

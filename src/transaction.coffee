@@ -27,16 +27,16 @@ for name, value of ISOLATION_LEVEL
   isolationLevelByValue[value] = name
 
 class Transaction
-  constructor: (@name, @isolationLevel) ->
+  constructor: (@txnDescriptor, @name, @isolationLevel) ->
     @outstandingRequestCount = 1
-    @txnDescriptor = 0
 
   beginPayload: ->
-    buffer = new WritableTrackingBuffer(100, 'ascii')
+    buffer = new WritableTrackingBuffer(100, 'ucs2')
     writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_BEGIN_XACT)
     buffer.writeUInt8(@isolationLevel)
-    buffer.writeBVarchar(@name)
+    buffer.writeUInt8(@name.length * 2)
+    buffer.writeString(@name, 'ucs2')
 
     payload =
       data: buffer.data
@@ -47,7 +47,8 @@ class Transaction
     buffer = new WritableTrackingBuffer(100, 'ascii')
     writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_COMMIT_XACT)
-    buffer.writeBVarchar(@name)
+    buffer.writeUInt8(@name.length * 2)
+    buffer.writeString(@name, 'ucs2')
     buffer.writeUInt8(0)         # No fBeginXact flag, so no new transaction is started.
 
     buffer.data
@@ -56,7 +57,8 @@ class Transaction
     buffer = new WritableTrackingBuffer(100, 'ascii')
     writeAllHeaders(buffer, @txnDescriptor, @outstandingRequestCount)
     buffer.writeUShort(OPERATION_TYPE.TM_ROLLBACK_XACT)
-    buffer.writeBVarchar(@name)
+    buffer.writeUInt8(@name.length * 2)
+    buffer.writeString(@name, 'ucs2')
     buffer.writeUInt8(0)         # No fBeginXact flag, so no new transaction is started.
 
     buffer.data

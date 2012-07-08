@@ -8,7 +8,7 @@ buffertools = require('../buffertools')
 ###
 class WritableTrackingBuffer
   constructor: (@sizeIncrement, @encoding) ->
-    @encoding ||= 'utf8'
+    @encoding ||= 'ucs2'
 
     @buffer = new Buffer(@sizeIncrement)
     @position = 0
