@@ -15,7 +15,7 @@ class MessageIO extends EventEmitter
 
   eventData: (data) =>
     if (@packetBuffer.length > 0)
-      @packetBuffer = new Buffer(@packetBuffer.concat(data))
+      @packetBuffer = Buffer.concat([@packetBuffer, data])
     else
       @packetBuffer = data
 

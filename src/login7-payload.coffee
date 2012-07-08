@@ -171,7 +171,8 @@ class Login7Payload
       @addVariableDataString(variableData, @changePassword)           # Introduced in TDS 7.2
       variableData.offsetsAndLengths.writeUInt32LE(@sspiLong)         # Introduced in TDS 7.2
 
-    variableData.offsetsAndLengths.data.concat(variableData.data.data)
+    variableData.offsetsAndLengths.data =
+      Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data])
 
   addVariableDataBuffer: (variableData, buffer) ->
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset)

@@ -302,7 +302,7 @@ class Connection extends EventEmitter
     @messageBuffer = new Buffer(0)
 
   addToMessageBuffer: (data) ->
-    @messageBuffer = @messageBuffer.concat(data)
+    @messageBuffer = Buffer.concat([@messageBuffer, data])
 
   processPreLoginResponse: ->
     preloginPayload = new PreloginPayload(@messageBuffer)

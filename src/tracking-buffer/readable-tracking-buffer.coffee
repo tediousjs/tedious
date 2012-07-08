@@ -13,10 +13,10 @@ class ReadableTrackingBuffer
       @encoding = undefined
 
     @encoding ||= 'utf8'
-    @position = 0    
+    @position = 0
 
   add: (buffer) ->
-    @buffer = @buffer.slice(@position).concat(buffer)
+    @buffer = Buffer.concat([@buffer.slice(@position), buffer])
     @position = 0
 
   assertEnoughLeftFor: (lengthRequired) ->

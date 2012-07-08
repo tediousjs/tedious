@@ -25,11 +25,11 @@ class WritableTrackingBuffer
 
   newBuffer: (size) ->
     size ||= @sizeIncrement
-    
+
     buffer = @buffer.slice(0, @position)
-    
+
     if @compositeBuffer
-      @compositeBuffer = @compositeBuffer.concat(buffer)
+      @compositeBuffer = Buffer.concat([@compositeBuffer, buffer])
     else
       @compositeBuffer = buffer
 

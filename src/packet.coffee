@@ -68,7 +68,7 @@ class Packet
         status &= 0xFF - STATUS.EOM
 
       @buffer.writeUInt8(status, OFFSET.Status)
-    
+
     @isLast()
 
   isLast: ->
@@ -81,7 +81,7 @@ class Packet
     @buffer.readUInt8(OFFSET.PacketID)
 
   addData: (data) ->
-    @buffer = new Buffer(@buffer.concat(data))
+    @buffer = Buffer.concat([@buffer, data])
     @setLength()
     @
 
@@ -96,7 +96,7 @@ class Packet
     statuses = for name, value of STATUS
       if status & value
         name
-    statuses.join(' ').trim() 
+    statuses.join(' ').trim()
 
   headerToString: (indent) ->
     indent ||= ''

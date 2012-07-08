@@ -1,5 +1,6 @@
 Debug = require('../../src/debug')
 EventEmitter = require('events').EventEmitter
+require('../../src/buffertools')
 MessageIO = require('../../src/message-io')
 Packet = require('../../src/packet').Packet
 require('../../src/buffertools')
@@ -176,7 +177,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   packet2.addData(payload.slice(2, 4))
 
   connection.emit('data', packet1.buffer.slice(0, 6))
-  connection.emit('data', packet1.buffer.slice(6).concat(packet2.buffer.slice(0, 4)))
+  connection.emit('data', Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)]))
   connection.emit('data', packet2.buffer.slice(4))
 
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
@@ -192,7 +193,7 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
 
   io = new MessageIO(connection, packetSize, new Debug())
   io.on('data', (data) ->
-    receivedData = receivedData.concat(data)
+    receivedData = Buffer.concat([receivedData, data])
   )
 
   io.on('message', ->
@@ -210,7 +211,7 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   packet3.last(true)
   packet3.addData(payload.slice(4, 6))
 
-  allData = new Buffer(packet1.buffer.concat(packet2.buffer, packet3.buffer))
+  allData = Buffer.concat([packet1.buffer, packet2.buffer, packet3.buffer])
   data1 = allData.slice(0, 5)
   data2 = allData.slice(5)
 

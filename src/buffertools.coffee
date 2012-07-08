@@ -1,23 +1,20 @@
+if !Buffer.concat
+  Buffer.concat = (buffers) ->
+    length = 0
+    for buffer in buffers
+      length += buffer.length
 
-Buffer.prototype.concat = () ->
-  length = @length
+    result = new Buffer(length);
 
-  for buffer in arguments
-    length += buffer.length
+    position = 0
+    for buffer in buffers
+      buffer.copy(result, position, 0)
+      position += buffer.length
 
-  result = new Buffer(length);
-  
-  @copy(result, 0, 0)
-  position = @length
-
-  for buffer in arguments
-    buffer.copy(result, position, 0)
-    position += buffer.length
-
-  result
+    result
 
 Buffer.prototype.toByteArray = () ->
-  Array.prototype.slice.call(@, 0) 
+  Array.prototype.slice.call(@, 0)
 
 Buffer.prototype.equals = (other) ->
   if @.length != other.length
