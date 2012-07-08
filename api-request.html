@@ -35,7 +35,9 @@ connection.execSql(request);
   <div class="name">sql</div>
   <div class="description">
     <p>
-      The SQL to be executed.
+      The SQL to be executed
+      (or a procedure name, if the request is to be used with
+      <a href="api-connection.html#function_callProcedure"><code>connection.callProcedure</code></a>).
     </p>
   </div>
 </div>
@@ -234,7 +236,7 @@ connection.execSql(request);
 <p>
   A value for an output parameter
   (that was added to the request with
-  <a href="#function_addOutputParameter">addOutputParameter(...)</a>).
+  <a href="#function_addOutputParameter"><code>addOutputParameter(...)</code></a>).
 </p>
 <p>
   See also <a href="parameters.html"><code>Using Parameters</code></a>.
