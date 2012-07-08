@@ -148,14 +148,14 @@ class ReadableTrackingBuffer
   readBVarchar: (encoding) ->
     encoding ||= @encoding
 
-    multiplier = if encoding = 'ucs2' then 2 else 1
+    multiplier = if encoding == 'ucs2' then 2 else 1
     length = @readUInt8() * multiplier
     @readString(length, encoding)
 
   readUsVarchar: (encoding) ->
     encoding ||= @encoding
 
-    multiplier = if encoding = 'ucs2' then 2 else 1
+    multiplier = if encoding == 'ucs2' then 2 else 1
     length = @readUInt16LE() * multiplier
     @readString(length, encoding)
 

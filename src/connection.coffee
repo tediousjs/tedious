@@ -5,11 +5,14 @@ instanceLookup = require('./instance-lookup').instanceLookup
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
+Request = require('./request')
 RpcRequestPayload = require('./rpcrequest-payload')
 SqlBatchPayload = require('./sqlbatch-payload')
 MessageIO = require('./message-io')
 Socket = require('net').Socket
 TokenStreamParser = require('./token/token-stream-parser').Parser
+Transaction = require('./transaction').Transaction
+ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL
 
 # A rather basic state machine for managing a connection.
 # Implements something approximating s3.2.1.
@@ -135,6 +138,7 @@ class Connection extends EventEmitter
     @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
     @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
+    @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_UNCOMMITTED
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -343,30 +347,37 @@ class Connection extends EventEmitter
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->
-      @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure))
+    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure))
 
   execSql: (request) ->
-      request.transformIntoExecuteSqlRpc()
-      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+    request.transformIntoExecuteSqlRpc()
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
   prepare: (request) ->
-      request.transformIntoPrepareRpc()
-      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+    request.transformIntoPrepareRpc()
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
   unprepare: (request) ->
-      request.transformIntoUnprepareRpc()
-      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+    request.transformIntoUnprepareRpc()
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
   execute: (request, parameters) ->
-      request.transformIntoExecuteRpc(parameters)
-      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+    request.transformIntoExecuteRpc(parameters)
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
 
   callProcedure: (request) ->
-      @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request))
+
+  beginTransaction: (callback, name, isolationLevel) ->
+    name ||= ''
+    isolationLevel ||= @config.options.isolationLevel
+    transaction = new Transaction(name, isolationLevel)
+    request = new Request(undefined, callback)
+
+    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload())
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
-      console.trace()
       message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
       @debug.log(message)
