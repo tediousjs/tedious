@@ -115,7 +115,7 @@ class Connection extends EventEmitter
     @createTokenStreamParser()
 
     @transactions = []
-    @transactionDescriptors = [0]
+    @transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])]
 
     @transitionTo(@STATE.CONNECTING)
 
@@ -344,7 +344,7 @@ class Connection extends EventEmitter
     @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
-    payload = new SqlBatchPayload('set textsize ' + @config.options.textsize)
+    payload = new SqlBatchPayload('set textsize ' + @config.options.textsize, @currentTransactionDescriptor())
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   processedInitialSql: ->
