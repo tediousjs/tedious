@@ -64,7 +64,10 @@ class Transaction
     buffer.writeString(@name, 'ucs2')
     buffer.writeUInt8(0)         # No fBeginXact flag, so no new transaction is started.
 
-    buffer.data
+    payload =
+      data: buffer.data
+      toString: =>
+        "Rollback Transaction: name=#{@name}"
 
 exports.Transaction = Transaction
 exports.ISOLATION_LEVEL = ISOLATION_LEVEL

@@ -400,6 +400,15 @@ class Connection extends EventEmitter
 
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(@currentTransactionDescriptor()))
 
+  rollbackTransaction: (callback) ->
+    if @transactions.length == 0
+      throw new Error('No transaction in progress')
+    transaction = @transactions.pop()
+
+    request = new Request(undefined, callback)
+
+    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(@currentTransactionDescriptor()))
+
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
       message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
