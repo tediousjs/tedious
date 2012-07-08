@@ -19,16 +19,24 @@ class MessageIO extends EventEmitter
     else
       @packetBuffer = data
 
+    packetsData = []
+    endOfMessage = false
+
     while isPacketComplete(@packetBuffer)
       length = packetLength(@packetBuffer)
       packet = new Packet(@packetBuffer.slice(0, length))
       @logPacket('Received', packet);
 
-      @emit('packet', packet)
+      packetsData.push(packet.data())
       if (packet.isLast())
-        @emit('message')
+        endOfMessage = true
 
       @packetBuffer = @packetBuffer.slice(length)
+
+    if packetsData.length > 0
+      @emit('data', Buffer.concat(packetsData))
+      if endOfMessage
+        @emit('message')
 
   packetSize: (packetSize) ->
     if arguments.length > 0

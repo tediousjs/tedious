@@ -6,18 +6,40 @@ async = require('async')
 getConfig = ->
   JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
-exports.lotsOfRows = (test) ->
-  test.expect(2)
+exports.smallRows = (test) ->
   rows = 50000
 
   createTableSql = 'create table #many_rows (id int, first_name varchar(20), last_name varchar(20))'
+  insertRowSql = """
+      insert into #many_rows (id, first_name, last_name) values(@count, 'MyFirstName', 'YourLastName')
+    """
+
+  createInsertSelect(test, rows, createTableSql, insertRowSql)
+
+exports.mediumRows = (test) ->
+  rows = 2000
+
+  medium = ''
+  for i in [1..8000]
+    medium += 'x'
+
+  createTableSql = 'create table #many_rows (id int, first_name varchar(20), last_name varchar(20), medium varchar(8000))'
+  insertRowSql = """
+      insert into #many_rows (id, first_name, last_name, medium) values(@count, 'MyFirstName', 'YourLastName', '#{medium}')
+    """
+
+  createInsertSelect(test, rows, createTableSql, insertRowSql)
+
+createInsertSelect = (test, rows, createTableSql, insertRowSql) ->
+  test.expect(2)
+
   insertRowsSql = """
     declare @count int
     set @count = #{rows}
 
     while @count > 0
     begin
-      insert into #many_rows (id, first_name, last_name) values(@count, 'MyFirstName', 'YourLastName')
+      #{insertRowSql}
       set @count = @count - 1
     end
     """
@@ -50,6 +72,7 @@ exports.lotsOfRows = (test) ->
       durationMillis = Date.now() - start
       console.log "Took #{durationMillis / 1000}s"
       console.log "#{rows / (durationMillis / 1000)} rows/sec"
+      console.log "#{(rows * insertRowSql.length) / (durationMillis / 1000)} bytes/sec"
 
       callback(err)
     )

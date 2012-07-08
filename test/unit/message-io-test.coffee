@@ -73,15 +73,14 @@ exports.sendOneLongerThanPacket = (test) ->
   io.sendMessage(packetType, payload)
 
 exports.receiveOnePacket = (test) ->
-  test.expect(2)
+  test.expect(1)
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('packet', (packet) ->
-      test.strictEqual(packet.type(), packetType)
-      test.ok(packet.data().equals(payload))
+  io.on('data', (data) ->
+      test.ok(data.equals(payload))
   )
   io.on('message', ->
       test.done()
@@ -93,15 +92,14 @@ exports.receiveOnePacket = (test) ->
   connection.emit('data', packet.buffer)
 
 exports.receiveOnePacketInTwoChunks = (test) ->
-  test.expect(2)
+  test.expect(1)
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('packet', (packet) ->
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
+  io.on('data', (data) ->
+    test.ok(data.equals(payload))
   )
   io.on('message', ->
       test.done()
@@ -114,7 +112,7 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   connection.emit('data', packet.buffer.slice(4))
 
 exports.receiveTwoPackets = (test) ->
-  test.expect(4)
+  test.expect(2)
 
   payload = new Buffer([1, 2, 3])
   payload1 = payload.slice(0, 2)
@@ -124,16 +122,14 @@ exports.receiveTwoPackets = (test) ->
   receivedPacketCount = 0
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('packet', (packet) ->
+  io.on('data', (data) ->
     receivedPacketCount++
-
-    test.strictEqual(packet.type(), packetType)
 
     switch receivedPacketCount
       when 1
-        test.ok(packet.data().equals(payload1))
+        test.ok(data.equals(payload1))
       when 2
-        test.ok(packet.data().equals(payload2))
+        test.ok(data.equals(payload2))
   )
   io.on('message', ->
       test.done()
@@ -149,7 +145,7 @@ exports.receiveTwoPackets = (test) ->
   connection.emit('data', packet.buffer)
 
 exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
-  test.expect(4)
+  test.expect(2)
 
   payload = new Buffer([1, 2, 3, 4])
   payload1 = payload.slice(0, 2)
@@ -159,16 +155,14 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   receivedPacketCount = 0
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('packet', (packet) ->
+  io.on('data', (data) ->
     receivedPacketCount++
-
-    test.strictEqual(packet.type(), packetType)
 
     switch receivedPacketCount
       when 1
-        test.ok(packet.data().equals(payload1))
+        test.ok(data.equals(payload1))
       when 2
-        test.ok(packet.data().equals(payload2))
+        test.ok(data.equals(payload2))
   )
   io.on('message', ->
       test.done()
@@ -186,7 +180,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   connection.emit('data', packet2.buffer.slice(4))
 
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
-  test.expect(6)
+  test.expect(1)
 
   payload = new Buffer([1, 2, 3, 4, 5, 6])
   payload1 = payload.slice(0, 2)
@@ -194,23 +188,15 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   payload3 = payload.slice(4, 6)
 
   connection = new Connection()
-  receivedPacketCount = 0
+  receivedData = new Buffer(0)
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('packet', (packet) ->
-    receivedPacketCount++
-
-    test.strictEqual(packet.type(), packetType)
-
-    switch receivedPacketCount
-      when 1
-        test.ok(packet.data().equals(payload1))
-      when 2
-        test.ok(packet.data().equals(payload2))
-      when 3
-        test.ok(packet.data().equals(payload3))
+  io.on('data', (data) ->
+    receivedData = receivedData.concat(data)
   )
+
   io.on('message', ->
+      test.deepEqual(payload, receivedData)
       test.done()
   )
 
@@ -223,7 +209,7 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   packet3 = new Packet(packetType)
   packet3.last(true)
   packet3.addData(payload.slice(4, 6))
-  
+
   allData = new Buffer(packet1.buffer.concat(packet2.buffer, packet3.buffer))
   data1 = allData.slice(0, 5)
   data2 = allData.slice(5)

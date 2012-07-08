@@ -47,8 +47,8 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
-        packet: (packet) ->
-          @addToMessageBuffer(packet)
+        data: (data) ->
+          @addToMessageBuffer(data)
         message: ->
           @processPreLoginResponse()
           @sendLogin7Packet()
@@ -60,8 +60,8 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
-        packet: (packet) ->
-          @sendPacketToTokenStreamParser(packet)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
         loggedIn: ->
           @transitionTo(@STATE.LOGGED_IN_SENDING_INITIAL_SQL)
         loginFailed: ->
@@ -73,8 +73,8 @@ class Connection extends EventEmitter
       enter: ->
         @sendInitialSql()
       events:
-        packet: (packet) ->
-          @sendPacketToTokenStreamParser(packet)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
         message: (error) ->
           @transitionTo(@STATE.LOGGED_IN)
           @processedInitialSql()
@@ -88,8 +88,8 @@ class Connection extends EventEmitter
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
-        packet: (packet) ->
-          @sendPacketToTokenStreamParser(packet)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
         message: ->
           @transitionTo(@STATE.LOGGED_IN)
 
@@ -236,8 +236,8 @@ class Connection extends EventEmitter
     @socket.on('end', @socketClose)
 
     @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
-    @messageIo.on('packet', (packet) =>
-      @dispatchEvent('packet', packet)
+    @messageIo.on('data', (data) =>
+      @dispatchEvent('data', data)
     )
     @messageIo.on('message', =>
       @dispatchEvent('message')
@@ -301,8 +301,8 @@ class Connection extends EventEmitter
   emptyMessageBuffer: ->
     @messageBuffer = new Buffer(0)
 
-  addToMessageBuffer: (packet) ->
-    @messageBuffer = @messageBuffer.concat(packet.data())
+  addToMessageBuffer: (data) ->
+    @messageBuffer = @messageBuffer.concat(data)
 
   processPreLoginResponse: ->
     preloginPayload = new PreloginPayload(@messageBuffer)
@@ -324,8 +324,8 @@ class Connection extends EventEmitter
       payload.toString('  ')
     )
 
-  sendPacketToTokenStreamParser: (packet) ->
-    @tokenStreamParser.addBuffer(packet.data())
+  sendDataToTokenStreamParser: (data) ->
+    @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
     payload = new SqlBatchPayload('set textsize ' + @config.options.textsize)
