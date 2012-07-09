@@ -387,7 +387,9 @@ class Connection extends EventEmitter
     transaction = new Transaction(name, isolationLevel)
     @transactions.push(transaction)
 
-    request = new Request(undefined, callback)
+    request = new Request(undefined, (err) =>
+      callback(err, @currentTransactionDescriptor())
+    )
 
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(@currentTransactionDescriptor()))
 

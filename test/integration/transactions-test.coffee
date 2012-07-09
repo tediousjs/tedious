@@ -18,13 +18,14 @@ else
   config.options.debug = {}
 
 exports.beginCommitTransaction = (test) ->
-  test.expect(3)
+  test.expect(4)
 
   connection = new Connection(config)
 
   beginTransaction = (callback) ->
-    connection.beginTransaction((err) ->
+    connection.beginTransaction((err, transactionDescriptor) ->
       test.ok(!err)
+      test.ok(transactionDescriptor)
       callback(err)
     , 'abc')
 
