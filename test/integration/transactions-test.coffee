@@ -42,6 +42,31 @@ class Tester
 
     @connection.execSqlBatch(request)
 
+  createProc: (callback) =>
+    request = new Request('''
+      CREATE PROCEDURE #proc
+      AS
+        SET NOCOUNT ON;
+
+        begin transaction
+        insert into #temp (id) values(1)
+        commit transaction
+      GO'''
+    , (err) =>
+      @test.ok(!err)
+      callback(err)
+    )
+
+    @connection.execSqlBatch(request)
+
+  execProc: (callback) =>
+    request = new Request('exec #proc', (err) =>
+      @test.ok(!err)
+      callback(err)
+    )
+
+    @connection.execSqlBatch(request)
+
   insert: (callback) =>
     request = new Request('insert into #temp (id) values(1)', (err) =>
       @test.ok(!err)
@@ -69,13 +94,19 @@ class Tester
   selectExpectOneRow: (callback) =>
     @select(callback, 1)
 
-  beginTransaction: (callback) =>
+  beginTransaction: (callback, transactionName) =>
     @connection.beginTransaction((err, transactionDescriptor) =>
       @test.ok(!err)
       @test.ok(transactionDescriptor)
 
       callback(err)
-    , 'abc')
+    , transactionName)
+
+  beginTransaction1: (callback) =>
+    @beginTransaction(callback, 'one')
+
+  beginTransaction2: (callback) =>
+    @beginTransaction(callback, 'two')
 
   commitTransaction: (callback) =>
     @connection.commitTransaction((err) =>
@@ -99,27 +130,85 @@ class Tester
       async.series(actions)
     )
 
-exports.beginCommit = (test) ->
+exports.transactionCommit = (test) ->
   test.expect(8)
 
   tester = new Tester(test)
   tester.run([
     tester.createTable
-    tester.beginTransaction
+    tester.beginTransaction1
     tester.insert
     tester.commitTransaction
     tester.selectExpectOneRow
     tester.close
   ])
 
-exports.beginRollback = (test) ->
+exports.transactionRollback = (test) ->
   test.expect(7)
 
   tester = new Tester(test)
   tester.run([
     tester.createTable
-    tester.beginTransaction
+    tester.beginTransaction1
     tester.insert
+    tester.rollbackTransaction
+    tester.selectExpectZeroRows
+    tester.close
+  ])
+
+exports.nestedTransactionCommit = (test) ->
+  test.expect(11)
+
+  tester = new Tester(test)
+  tester.run([
+    tester.createTable
+    tester.beginTransaction1
+    tester.beginTransaction2
+    tester.insert
+    tester.commitTransaction
+    tester.commitTransaction
+    tester.selectExpectOneRow
+    tester.close
+  ])
+
+exports.nestedTransactionRollbackOuter = (test) ->
+  test.expect(10)
+
+  tester = new Tester(test)
+  tester.run([
+    tester.createTable
+    tester.beginTransaction1
+    tester.beginTransaction2
+    tester.insert
+    tester.commitTransaction
+    tester.rollbackTransaction
+    tester.selectExpectZeroRows
+    tester.close
+  ])
+
+exports.nestedTransactionInProcCommit = (test) ->
+  test.expect(9)
+
+  tester = new Tester(test)
+  tester.run([
+    tester.createTable
+    tester.createProc
+    tester.beginTransaction1
+    tester.execProc
+    tester.commitTransaction
+    tester.selectExpectOneRow
+    tester.close
+  ])
+
+exports.nestedTransactionInProcRollbackOuter = (test) ->
+  test.expect(8)
+
+  tester = new Tester(test)
+  tester.run([
+    tester.createTable
+    tester.createProc
+    tester.beginTransaction1
+    tester.execProc
     tester.rollbackTransaction
     tester.selectExpectZeroRows
     tester.close
