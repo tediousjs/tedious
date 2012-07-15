@@ -176,11 +176,11 @@ exports.encrypt = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    console.log("#{info.number} : #{info.message}")
+    #console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    console.log(text)
+    #console.log(text)
   )
 
 exports.execSql = (test) ->

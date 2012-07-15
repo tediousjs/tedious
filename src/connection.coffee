@@ -1,3 +1,5 @@
+#process.env.NODE_DEBUG = 'tls'
+
 require('./buffertools')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
@@ -74,10 +76,13 @@ class Connection extends EventEmitter
         data: (data) ->
           @securePair.encrypted.write(data)
         tlsNegotiated: ->
-          @sendLogin7Packet()
-          @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+          @encryptAllFutureTraffic()
+          @tlsNegotiationComplete = true
         message: ->
-          # Do nothing.
+          if  @tlsNegotiationComplete
+            @sendLogin7Packet()
+            @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+          else
 
     SENT_LOGIN7_WITH_STANDARD_LOGIN:
       name: 'SentLogin7WithStandardLogin'
@@ -378,13 +383,20 @@ class Connection extends EventEmitter
     @securePair = tls.createSecurePair(credentials)
 
     @securePair.on('secure', =>
-      @debug.log('TLS negotiated')
+      cipher = @securePair.cleartext.getCipher()
+      @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
+      #console.log @securePair.cleartext.getPeerCertificate()
+
       @dispatchEvent('tlsNegotiated')
     )
 
     @securePair.encrypted.on('data', (data) =>
       @messageIo.sendMessage(TYPE.PRELOGIN, data)
     )
+
+  encryptAllFutureTraffic: ->
+    @securePair.encrypted.removeAllListeners()
+    @messageIo.encryptAllFutureTraffic(@securePair)
 
   sendDataToTokenStreamParser: (data) ->
     @tokenStreamParser.addBuffer(data)

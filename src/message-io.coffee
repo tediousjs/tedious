@@ -46,6 +46,17 @@ class MessageIO extends EventEmitter
 
     @_packetSize
 
+  encryptAllFutureTraffic: (securePair) ->
+    @securePair = securePair
+
+    @socket.removeAllListeners('data')
+    @securePair.encrypted.removeAllListeners('data')
+
+    @socket.pipe(@securePair.encrypted)
+    @securePair.encrypted.pipe(@socket)
+
+    @securePair.cleartext.addListener('data', @eventData)
+
   # TODO listen for 'drain' event when socket.write returns false.
   sendMessage: (packetType, data) ->
     numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
@@ -67,7 +78,11 @@ class MessageIO extends EventEmitter
 
   sendPacket: (packet) =>
     @logPacket('Sent', packet);
-    @socket.write(packet.buffer)
+
+    if (@securePair)
+      @securePair.cleartext.write(packet.buffer)
+    else
+      @socket.write(packet.buffer)
 
   logPacket: (direction, packet) ->
     @debug.packet(direction, packet)
