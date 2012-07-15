@@ -142,6 +142,7 @@ class Connection extends EventEmitter
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
     @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_UNCOMMITTED
+    @config.options.encrypt ||= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -308,7 +309,7 @@ class Connection extends EventEmitter
     @transitionTo(@STATE.FINAL)
 
   sendPreLogin: ->
-    payload = new PreloginPayload()
+    payload = new PreloginPayload({encrypt: @config.options.encrypt})
     @messageIo.sendMessage(TYPE.PRELOGIN, payload.data)
     @debug.payload(->
       payload.toString('  ')

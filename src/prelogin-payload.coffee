@@ -36,10 +36,11 @@ for name, value of MARS
   s2.2.6.4
 ###
 class PreloginPayload
-  constructor: (buffer) ->
-    if buffer instanceof Buffer
-      @data = buffer
+  constructor: (bufferOrOptions) ->
+    if bufferOrOptions instanceof Buffer
+      @data = bufferOrOptions
     else
+      @options = bufferOrOptions || {}
       @createOptions()
 
     @extractOptions()
@@ -82,7 +83,10 @@ class PreloginPayload
 
   createEncryptionOption: () ->
     buffer = new WritableTrackingBuffer(optionBufferSize)
-    buffer.writeUInt8(ENCRYPT.NOT_SUP)
+    if @options.encrypt
+      buffer.writeUInt8(ENCRYPT.ON)
+    else
+      buffer.writeUInt8(ENCRYPT.NOT_SUP)
 
     token: TOKEN.ENCRYPTION
     data: buffer.data
@@ -162,11 +166,11 @@ class PreloginPayload
           @version.patch,
           @version.trivial,
           @version.subbuild,
-          if @encryption then @encryption else 0, 
+          if @encryption then @encryption else 0,
           if @encryptionString then @encryptionString else 0,
           if @instance then @instance else 0,
           if @threadId then @threadId else 0,
-          if @mars then @mars else 0, 
+          if @mars then @mars else 0,
           if @marsString then @marsString else 0
       )
 
