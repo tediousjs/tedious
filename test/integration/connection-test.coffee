@@ -152,6 +152,37 @@ exports.connectByInstanceName = (test) ->
     #console.log(text)
   )
 
+
+exports.encrypt = (test) ->
+  test.expect(2)
+
+  config = getConfig()
+  config.options.encrypt = true
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ok(!err)
+
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('databaseChange', (database) ->
+    test.strictEqual(database, config.options.database)
+  )
+
+  connection.on('infoMessage', (info) ->
+    console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    console.log(text)
+  )
+
 exports.execSql = (test) ->
   test.expect(8)
 

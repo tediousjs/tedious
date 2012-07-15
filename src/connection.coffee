@@ -13,6 +13,8 @@ Socket = require('net').Socket
 TokenStreamParser = require('./token/token-stream-parser').Parser
 Transaction = require('./transaction').Transaction
 ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL
+crypto = require('crypto')
+tls = require('tls')
 
 # A rather basic state machine for managing a connection.
 # Implements something approximating s3.2.1.
@@ -54,8 +56,29 @@ class Connection extends EventEmitter
           @addToMessageBuffer(data)
         message: ->
           @processPreLoginResponse()
+        noTls: ->
           @sendLogin7Packet()
           @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+        tls: ->
+          @initiateTlsSslHandshake()
+          @transitionTo(@STATE.SENT_TLSSSLNEGOTIATION)
+
+    SENT_TLSSSLNEGOTIATION:
+      name: 'SentTLSSSLNegotiation'
+      enter: ->
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @securePair.encrypted.write(data)
+        tlsNegotiated: ->
+          @sendLogin7Packet()
+          @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+        message: ->
+          # Do nothing.
+
     SENT_LOGIN7_WITH_STANDARD_LOGIN:
       name: 'SentLogin7WithStandardLogin'
       events:
@@ -71,6 +94,7 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         message: ->
           @processLogin7Response()
+
     LOGGED_IN_SENDING_INITIAL_SQL:
       name: 'LoggedInSendingInitialSql'
       enter: ->
@@ -81,11 +105,13 @@ class Connection extends EventEmitter
         message: (error) ->
           @transitionTo(@STATE.LOGGED_IN)
           @processedInitialSql()
+
     LOGGED_IN:
       name: 'LoggedIn'
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
+
     SENT_CLIENT_REQUEST:
       name: 'SentClientRequest'
       events:
@@ -99,6 +125,7 @@ class Connection extends EventEmitter
           sqlRequest = @request
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount)
+
     FINAL:
       name: 'Final'
       enter: ->
@@ -327,6 +354,11 @@ class Connection extends EventEmitter
       preloginPayload.toString('  ')
     )
 
+    if preloginPayload.encryptionString == 'ON'
+      @dispatchEvent('tls')
+    else
+      @dispatchEvent('noTls')
+
   sendLogin7Packet: ->
     loginData =
       userName: @config.userName
@@ -339,6 +371,19 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
     @debug.payload(->
       payload.toString('  ')
+    )
+
+  initiateTlsSslHandshake: ->
+    credentials = crypto.createCredentials()
+    @securePair = tls.createSecurePair(credentials)
+
+    @securePair.on('secure', =>
+      @debug.log('TLS negotiated')
+      @dispatchEvent('tlsNegotiated')
+    )
+
+    @securePair.encrypted.on('data', (data) =>
+      @messageIo.sendMessage(TYPE.PRELOGIN, data)
     )
 
   sendDataToTokenStreamParser: (data) ->
