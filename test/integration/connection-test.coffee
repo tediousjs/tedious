@@ -154,7 +154,7 @@ exports.connectByInstanceName = (test) ->
 
 
 exports.encrypt = (test) ->
-  test.expect(2)
+  test.expect(5)
 
   config = getConfig()
   config.options.encrypt = true
@@ -173,6 +173,12 @@ exports.encrypt = (test) ->
 
   connection.on('databaseChange', (database) ->
     test.strictEqual(database, config.options.database)
+  )
+
+  connection.on('secure', (cleartext) ->
+    test.ok(cleartext)
+    test.ok(cleartext.getCipher())
+    test.ok(cleartext.getPeerCertificate())
   )
 
   connection.on('infoMessage', (info) ->

@@ -388,6 +388,7 @@ class Connection extends EventEmitter
       @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
       #console.log @securePair.cleartext.getPeerCertificate()
 
+      @emit('secure', @securePair.cleartext)
       @dispatchEvent('tlsNegotiated')
     )
 
