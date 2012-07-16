@@ -175,6 +175,7 @@ class Connection extends EventEmitter
     @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_UNCOMMITTED
     @config.options.encrypt ||= false
+    @config.options.cryptoCredentialsDetails ||= {}
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -379,7 +380,7 @@ class Connection extends EventEmitter
     )
 
   initiateTlsSslHandshake: ->
-    credentials = crypto.createCredentials()
+    credentials = crypto.createCredentials(@config.options.cryptoCredentialsDetails)
     @securePair = tls.createSecurePair(credentials)
 
     @securePair.on('secure', =>
