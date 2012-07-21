@@ -17,17 +17,9 @@ Coming soon
 -----------
 Although subject to change, this is the rough plan for the next few versions.
 
-
-### v0.0.7 ###
-- some support for TDS 7.1
-- transaction management
-
 ### v0.0.8 ###
 - support for more data types for parameters
 - support for varchar(max), nvarchar(max) and varbinary(max) as streams
-
-### v0.0.9 ###
-- secure connections
 
 ### unplanned ###
 - decoding of column metadata flags
