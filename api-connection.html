@@ -29,6 +29,7 @@ title: API - Connection
   <li><a href="#event_databaseChange">Event: 'databaseChange'</a></li>
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
+  <li><a href="#event_secure">Event: 'secure'</a></li>
   <li><a href="#function_beginTransaction">connection.beginTransaction(callback, name, isolationLevel)</a></li>
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
   <li><a href="#function_close">connection.close()</a></li>
@@ -182,6 +183,26 @@ var connection = new Connection(config);
         </ul>
         (default: <code>READ_UNCOMMITED</code>).
       </dd>
+
+      <dt>
+        <code>options.encrypt</code>
+      </dt>
+      <dd>
+        A boolean determining whether or not the connection will be encrypted.
+        (default: <code>false</code>).
+        <br/>
+        Encryption support is experimental.
+      </dd>
+
+      <dt>
+        <code>options.cryptoCredentialsDetails</code>
+      </dt>
+      <dd>
+        When encryption is used, an object may be supplied that will be used
+        for the first argument when calling
+        <a href="http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized">tls.createSecurePair</a>
+        (default: <code>{}</code>).
+      </dd>
     </dl>
   </div>
 </div>
@@ -323,6 +344,27 @@ var connection = new Connection(config);
   <div class="description">
     <p>
       The new charset.
+    </p>
+  </div>
+</div>
+
+<h2 id="event_secure">Event: 'secure'</h2>
+<span class="function">function (cleartext) { }</span>
+<p>
+  A secure connection has been established.
+</p>
+<div class="argument">
+  <div class="name">cleartext</div>
+  <div class="description">
+    <p>
+      The
+      <a href="http://nodejs.org/docs/latest/api/tls.html#tls_class_tls_cleartextstream">
+        <code>cleartext</code>
+      </a>
+      stream of a tls SecurePair.
+      The <a href="http://nodejs.org/docs/latest/api/tls.html#tls_cleartextstream_getcipher">cipher</a>
+      and <a href="http://nodejs.org/docs/latest/api/tls.html#tls_cleartextstream_getpeercertificate">peer certificate</a>
+      (server certificate) may be inspected if desired.
     </p>
   </div>
 </div>
