@@ -29,12 +29,15 @@ title: API - Connection
   <li><a href="#event_databaseChange">Event: 'databaseChange'</a></li>
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
+  <li><a href="#function_beginTransaction">connection.beginTransaction(callback, name, isolationLevel)</a></li>
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
   <li><a href="#function_close">connection.close()</a></li>
+  <li><a href="#function_commitTransaction">connection.commitTransaction(callback)</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
   <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
   <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
   <li><a href="#function_prepare">connection.prepare(request)</a></li>
+  <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback)</a></li>
   <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
 </ul>
 
@@ -162,6 +165,22 @@ var connection = new Connection(config);
       <dd>
         A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream tokens
         (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.isolationLevel</code>
+      </dt>
+      <dd>
+        The default isolation level that transactions will be run with.
+        The isolation levels are available from <code>require('tedious').ISOLATON_LEVEL</code> .
+        <ul>
+          <li><code>READ_UNCOMMITTED</code></li>
+          <li><code>READ_COMMITTED</code></li>
+          <li><code>REPEATABLE_READ</code></li>
+          <li><code>SERIALIZABLE</code></li>
+          <li><code>SNAPSHOT</code></li>
+        </ul>
+        (default: <code>READ_UNCOMMITED</code>).
       </dd>
     </dl>
   </div>
@@ -308,6 +327,65 @@ var connection = new Connection(config);
   </div>
 </div>
 
+<h2 id="function_beginTransaction">connection.beginTransaction(callback, name, isolationLevel)</h2>
+<p>
+  Start a transaction.
+</p>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the request to start the transaction has completed,
+      either successfully or with an error.
+      If an error occured then <code>err</code> will describe the error.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occured, a string with details of the error.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">name</div>
+  <div class="description">
+    <p>
+      A string representing a name to associate with the transaction.
+    </p>
+    <p>
+      Optional, and defaults to an empty string.
+      Required when <code>isolationLevel</code> is present.
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">isolationLevel</div>
+  <div class="description">
+    <p>
+      The isolation level that the transaction is to be run with.
+      The isolation levels are available from <code>require('tedious').ISOLATON_LEVEL</code> .
+      <ul>
+        <li><code>READ_UNCOMMITTED</code></li>
+        <li><code>READ_COMMITTED</code></li>
+        <li><code>REPEATABLE_READ</code></li>
+        <li><code>SERIALIZABLE</code></li>
+        <li><code>SNAPSHOT</code></li>
+      </ul>
+    </p>
+    <p>
+      Optional, and defaults to the Connection's isolation level.
+    </p>
+  </div>
+</div>
+
 <h2 id="function_callProcedure">connection.callProcedure(request)</h2>
 <p>
   Call a stored procedure represented by <code>request</code>.
@@ -352,6 +430,38 @@ var connection = new Connection(config);
       A <a href="api-request.html"><code>Request</code></a>
       object representing the request.
     </p>
+  </div>
+</div>
+
+<h2 id="function_commitTransaction">connection.commitTransaction(callback)</h2>
+<p>
+  Commit a transaction.
+</p>
+<p>
+  There should be an active transaction.
+  That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+</p>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the request to commit the transaction has completed,
+      either successfully or with an error.
+      If an error occured then <code>err</code> will describe the error.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occured, a string with details of the error.
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -414,6 +524,38 @@ var connection = new Connection(config);
       Parameters only require a name and type.
       Parameter values are ignored.
     </p>
+  </div>
+</div>
+
+<h2 id="function_rollbackTransaction">connection.rollbackTransaction(callback)</h2>
+<p>
+  Rollback a transaction.
+</p>
+<p>
+  There should be an active transaction.
+  That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+</p>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the request to rollback the transaction has completed,
+      either successfully or with an error.
+      If an error occured then <code>err</code> will describe the error.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occured, a string with details of the error.
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 
