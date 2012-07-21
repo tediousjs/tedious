@@ -203,6 +203,21 @@ var connection = new Connection(config);
         <a href="http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized">tls.createSecurePair</a>
         (default: <code>{}</code>).
       </dd>
+
+      <dt>
+        <code>options.tdsVersion</code>
+      </dt>
+      <dd>
+        The version of TDS to use.
+        The version are available from <code>require('tedious').TDS_VERSION</code> .
+        <ul>
+          <li><code>7_1</code> (limited support)</li>
+          <li><code>7_2</code></li>
+          <li><code>7_3_A</code> (future use)</li>
+          <li><code>7_3_B</code> (future use)</li>
+        </ul>
+        (default: <code>7_2</code>).
+      </dd>
     </dl>
   </div>
 </div>
