@@ -21,14 +21,14 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "0.0.6",
+  "version": "0.0.7",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/pekim/tedious.git"
   },
   "engines": {
-    "node": "0.6 || 0.7"
+    "node": "0.6 || 0.7 || 0.8"
   },
   "dependencies": {
     "async": "0.1.22",
