@@ -130,12 +130,10 @@ class Connection extends EventEmitter
         data: (data) ->
           @sendDataToTokenStreamParser(data)
         message: ->
-#          @transitionTo(@STATE.LOGGED_IN)
-
           sqlRequest = @request
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount)
-          console.log("coucou")
+          
           @transitionTo(@STATE.LOGGED_IN)
 
     FINAL:
@@ -263,7 +261,6 @@ class Connection extends EventEmitter
       if @request
         @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
         @procReturnStatusValue = undefined
-#        @emit('reusable')
     )
     @tokenStreamParser.on('doneInProc', (token) =>
         if @request

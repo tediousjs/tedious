@@ -26,7 +26,7 @@ class ConnectionPooler
   execSql: (request) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.execSql(request)
     )
@@ -34,7 +34,7 @@ class ConnectionPooler
   execSqlBatch: (request) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.execSqlBatch(request)
     )
@@ -42,7 +42,7 @@ class ConnectionPooler
   execute: (request, parameters) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.execute(request, parameters)
     )
@@ -50,7 +50,7 @@ class ConnectionPooler
   prepare: (request) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.prepare(request)
     )
@@ -58,7 +58,7 @@ class ConnectionPooler
   unprepare: (request) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.unprepare(request)
     )
@@ -66,7 +66,7 @@ class ConnectionPooler
   callProcedure: (request) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.callProcedure(request)
     )
@@ -74,7 +74,7 @@ class ConnectionPooler
   beginTransaction: (callback, name, isolationLevel) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.beginTransaction(callback, name, isolationLevel)
     )
@@ -82,7 +82,7 @@ class ConnectionPooler
   commitTransaction: (callback) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.commitTransaction(callback)
     )
@@ -90,7 +90,7 @@ class ConnectionPooler
   rollbackTransaction: (callback) ->
     @pool.acquire((err, connection) ->
       if(err)
-        console.log(connection.id + " " +err)
+        console.log(err)
       else
         connection.rollbackTransaction(callback)
     )  
