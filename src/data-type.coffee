@@ -130,27 +130,7 @@ TYPE =
   0x3E:
     type: 'FLT8'
     name: 'Float'
-    declaration: (parameter) ->
-      'float'
-    writeParameterData: (buffer, parameter) ->
-      # ParamMetaData (TYPE_INFO)
-      buffer.writeUInt8(typeByName.FloatN.id)
-      buffer.writeUInt8(8)
-
-      # ParamLenData
-      if parameter.value?
-        buffer.writeUInt8(8)
-        bigNumber = parameter.value;
-        high32bits = 0;
-        for i in [63..31]
-          if(bigNumber - Math.pow(2, i) < 0)
-          else
-            bigNumber -= Math.pow(2, i);
-            high32bits += Math.pow(2, i - 32);
-        buffer.writeUInt32LE(bigNumber)
-        buffer.writeUInt32LE(high32bits)
-      else
-        buffer.writeUInt8(0)
+   
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
@@ -167,10 +147,8 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(8)
-        bigNumber = parameter.value;
-        high32bits = 0;
-        buffer.writeUInt32LE(bigNumber%4294967296)
-        buffer.writeUInt32LE(Math.floor(bigNumber/4294967296))
+        buffer.writeUInt32LE(parameter.value%4294967296)
+        buffer.writeUInt32LE(Math.floor(parameter.value/4294967296))
       else
         buffer.writeUInt8(0)
 		
