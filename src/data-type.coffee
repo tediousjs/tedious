@@ -23,7 +23,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(1)
-        buffer.writeInt8(parameter.value)
+        buffer.writeInt8(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x32:
@@ -55,7 +55,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(2)
-        buffer.writeInt16LE(parameter.value)
+        buffer.writeInt16LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x38:
@@ -71,7 +71,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(4)
-        buffer.writeInt32LE(parameter.value)
+        buffer.writeInt32LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x3A:
@@ -113,7 +113,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(4)
-        buffer.writeFloatLE(parameter.value)
+        buffer.writeFloatLE(parseFloat(parameter.value))
       else
         buffer.writeUInt8(0)
       ###
@@ -160,7 +160,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(8)
-        buffer.writeDoubleLE(parameter.value)
+        buffer.writeDoubleLE(parseFloat(parameter.value))
       else
         buffer.writeUInt8(0)
   0x7A:
@@ -179,8 +179,10 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(parameter.value%4294967296)
-        buffer.writeUInt32LE(Math.floor(parameter.value/4294967296))
+        buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
+        buffer.writeUInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
+        # might need to sign the high value not sure
+        # buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
       else
         buffer.writeUInt8(0)
 		
@@ -268,7 +270,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.length
+        length = parameter.value.toString().length
       else
         length = @.maximumLength
 
@@ -280,7 +282,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.length
+        length = parameter.value.toString().length
       else
         length = @.maximumLength
 
@@ -296,13 +298,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value, 'ascii')
+          buffer.writeString(parameter.value.toString(), 'ascii')
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value, 'ascii')
+          buffer.writeString(parameter.value.toString(), 'ascii')
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
@@ -326,7 +328,7 @@ TYPE =
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.length
+        length = 2 * parameter.value.toString().length
       else
         length = @maximumLength
 
@@ -338,7 +340,7 @@ TYPE =
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.length
+        length = 2 * parameter.value.toString().length
       else
         length = @maximumLength
 
@@ -354,13 +356,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value, 'ucs2')
+          buffer.writeString(parameter.value.toString(), 'ucs2')
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value, 'ucs2')
+          buffer.writeString(parameter.value.toString(), 'ucs2')
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
