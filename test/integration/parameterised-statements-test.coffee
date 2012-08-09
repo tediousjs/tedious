@@ -46,10 +46,13 @@ exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
   
 exports.bigint = (test) ->
-  execSql(test, TYPES.BigInt, 5294967296)
+  execSql(test, TYPES.BigInt, 67553994410557440)
   
 exports.bigintsmall = (test) ->
   execSql(test, TYPES.BigInt, 8)
+  
+# exports.bigintsmall = (test) ->
+#  execSql(test, TYPES.Float, 8.5)
 
 exports.intZero = (test) ->
   execSql(test, TYPES.Int, 0)
