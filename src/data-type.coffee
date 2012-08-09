@@ -136,7 +136,28 @@ TYPE =
   0x7F:
     type: 'INT8'
     name: 'BigInt'
+    declaration: (parameter) ->
+      'bigint'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.IntN.id)
+      buffer.writeUInt8(8)
 
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(8)
+        bigNumber = parameter.value;
+        high32bits = 0;
+        for i in [63..31]
+          if(bigNumber - Math.pow(2, i) < 0)
+          else
+            bigNumber -= Math.pow(2, i);
+            high32bits += Math.pow(2, i - 32);
+        buffer.writeUInt32LE(bigNumber)
+        buffer.writeUInt32LE(high32bits)
+      else
+        buffer.writeUInt8(0)
+		
   # Variable-length types
   0x22:
     type: 'IMAGE'

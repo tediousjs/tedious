@@ -44,6 +44,12 @@ exports.smallIntNull = (test) ->
 
 exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
+  
+exports.bigint = (test) ->
+  execSql(test, TYPES.BigInt, 5294967296)
+  
+exports.bigintsmall = (test) ->
+  execSql(test, TYPES.BigInt, 8)
 
 exports.intZero = (test) ->
   execSql(test, TYPES.Int, 0)
@@ -118,6 +124,12 @@ exports.outputSmallIntNull = (test) ->
 
 exports.outputInt = (test) ->
   execSqlOutput(test, TYPES.Int, 3)
+  
+exports.outputBigInt = (test) ->
+  execSqlOutput(test, TYPES.BigInt, 5294967296)
+
+exports.outputBigIntSmall = (test) ->
+  execSqlOutput(test, TYPES.BigInt, 8)
 
 exports.outputIntNull = (test) ->
   execSqlOutput(test, TYPES.Int, null)
@@ -209,6 +221,8 @@ execSql = (test, type, value) ->
 
       if (value instanceof Date)
         test.strictEqual(columns[0].value.getTime(), value.getTime())
+      else if (type == TYPES.BigInt)
+         test.strictEqual(columns[0].value, value.toString())
       else
         test.strictEqual(columns[0].value, value)
   )
@@ -255,6 +269,8 @@ execSqlOutput = (test, type, value) ->
 
     if (value instanceof Date)
       test.strictEqual(returnValue.getTime(), value.getTime())
+    else if (type == TYPES.BigInt)
+      test.strictEqual(returnValue, value.toString())
     else
       test.strictEqual(returnValue, value)
 
