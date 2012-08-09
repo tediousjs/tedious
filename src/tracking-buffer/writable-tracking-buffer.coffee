@@ -104,6 +104,18 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeInt32BE(value, @position)
     @position += length
+	
+  writeFloatLE: (value) ->
+    length = 4
+    @makeRoomFor(length)
+    @buffer.writeFloatLE(value, @position)
+    @position += length
+	
+  writeDoubleLE: (value) ->
+    length = 8
+    @makeRoomFor(length)
+    @buffer.writeDoubleLE(value, @position)
+    @position += length
 
   writeString: (value, encoding) ->
     encoding ||= @encoding

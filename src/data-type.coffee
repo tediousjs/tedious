@@ -1,3 +1,4 @@
+guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
 MAX = (1 << 16) - 1
@@ -97,6 +98,25 @@ TYPE =
   0x3B:
     type: 'FLT4'
     name: 'Real'
+    # Had some weired rounding issues not sure what was going on
+    ###
+    declaration: (parameter) ->
+      'real'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      
+      # Some issues with rounding
+
+      buffer.writeUInt8(typeByName.FloatN.id)
+      buffer.writeUInt8(4)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(4)
+        buffer.writeFloatLE(parameter.value)
+      else
+        buffer.writeUInt8(0)
+      ###
   0x3C:
     type: 'MONEY'
     name: 'Money'
@@ -130,7 +150,19 @@ TYPE =
   0x3E:
     type: 'FLT8'
     name: 'Float'
-   
+    declaration: (parameter) ->
+      'float'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.FloatN.id)
+      buffer.writeUInt8(8)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(8)
+        buffer.writeDoubleLE(parameter.value)
+      else
+        buffer.writeUInt8(0)
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
@@ -170,6 +202,19 @@ TYPE =
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
     dataLengthLength: 1
+    declaration: (parameter) ->
+      'uniqueidentifier'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.UniqueIdentifierN.id)
+      buffer.writeUInt8(0x10)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(0x10)
+        buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)))
+      else
+        buffer.writeUInt8(0)
   0x26:
     type: 'INTN'
     name: 'IntN'
