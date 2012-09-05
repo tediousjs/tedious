@@ -179,7 +179,10 @@ TYPE =
       # ParamLenData
       if parameter.value
         buffer.writeUInt8(8)
-        buffer.writeInt32LE(parseInt(parameter.value) % 0x100000000)
+        if parseInt(parameter.value) > 0x100000000 # 4294967296
+          buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
+        else
+          buffer.writeInt32LE(parseInt(parameter.value) % 0x100000000)
         buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
       else
         buffer.writeUInt8(0)
