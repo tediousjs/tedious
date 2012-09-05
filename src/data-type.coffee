@@ -177,12 +177,10 @@ TYPE =
       buffer.writeUInt8(8)
 
       # ParamLenData
-      if parameter.value?
+      if parameter.value
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
-        buffer.writeUInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
-        # might need to sign the high value not sure
-        # buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
+        buffer.writeInt32LE(parseInt(parameter.value) % 0x100000000)
+        buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
       else
         buffer.writeUInt8(0)
 		

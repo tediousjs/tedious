@@ -50,7 +50,7 @@ exports.bigint = (test) ->
   execSql(test, TYPES.BigInt, 18014402804449279)
   
 exports.bigintsmall = (test) ->
-  execSql(test, TYPES.BigInt, 8)
+  execSql(test, TYPES.BigInt, -8)
   
 exports.float = (test) ->
   execSql(test, TYPES.Float, 9654.2546456567565767644)
