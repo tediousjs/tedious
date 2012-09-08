@@ -1,3 +1,4 @@
+guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
 MAX = (1 << 16) - 1
@@ -22,7 +23,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(1)
-        buffer.writeInt8(parameter.value)
+        buffer.writeInt8(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x32:
@@ -54,7 +55,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(2)
-        buffer.writeInt16LE(parameter.value)
+        buffer.writeInt16LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x38:
@@ -70,7 +71,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(4)
-        buffer.writeInt32LE(parameter.value)
+        buffer.writeInt32LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x3A:
@@ -97,6 +98,25 @@ TYPE =
   0x3B:
     type: 'FLT4'
     name: 'Real'
+    # Had some weired rounding issues not sure what was going on
+    ###
+    declaration: (parameter) ->
+      'real'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      
+      # Some issues with rounding
+
+      buffer.writeUInt8(typeByName.FloatN.id)
+      buffer.writeUInt8(4)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(4)
+        buffer.writeFloatLE(parseFloat(parameter.value))
+      else
+        buffer.writeUInt8(0)
+      ###
   0x3C:
     type: 'MONEY'
     name: 'Money'
@@ -130,13 +150,43 @@ TYPE =
   0x3E:
     type: 'FLT8'
     name: 'Float'
+    declaration: (parameter) ->
+      'float'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.FloatN.id)
+      buffer.writeUInt8(8)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(8)
+        buffer.writeDoubleLE(parseFloat(parameter.value))
+      else
+        buffer.writeUInt8(0)
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
   0x7F:
     type: 'INT8'
     name: 'BigInt'
+    declaration: (parameter) ->
+      'bigint'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.IntN.id)
+      buffer.writeUInt8(8)
 
+      # ParamLenData
+      if parameter.value
+        buffer.writeUInt8(8)
+        if parseInt(parameter.value) > 0x100000000 # 4294967296
+          buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
+        else
+          buffer.writeInt32LE(parseInt(parameter.value) % 0x100000000)
+        buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
+      else
+        buffer.writeUInt8(0)
+		
   # Variable-length types
   0x22:
     type: 'IMAGE'
@@ -155,6 +205,19 @@ TYPE =
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
     dataLengthLength: 1
+    declaration: (parameter) ->
+      'uniqueidentifier'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.UniqueIdentifierN.id)
+      buffer.writeUInt8(0x10)
+
+      # ParamLenData
+      if parameter.value?
+        buffer.writeUInt8(0x10)
+        buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)))
+      else
+        buffer.writeUInt8(0)
   0x26:
     type: 'INTN'
     name: 'IntN'
@@ -208,7 +271,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.length
+        length = parameter.value.toString().length
       else
         length = @.maximumLength
 
@@ -220,7 +283,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.length
+        length = parameter.value.toString().length
       else
         length = @.maximumLength
 
@@ -236,13 +299,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value, 'ascii')
+          buffer.writeString(parameter.value.toString(), 'ascii')
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value, 'ascii')
+          buffer.writeString(parameter.value.toString(), 'ascii')
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
@@ -266,7 +329,7 @@ TYPE =
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.length
+        length = 2 * parameter.value.toString().length
       else
         length = @maximumLength
 
@@ -278,7 +341,7 @@ TYPE =
       if parameter.length
         length = 2 * parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.length
+        length = 2 * parameter.value.toString().length
       else
         length = @maximumLength
 
@@ -294,13 +357,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value, 'ucs2')
+          buffer.writeString(parameter.value.toString(), 'ucs2')
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value, 'ucs2')
+          buffer.writeString(parameter.value.toString(), 'ucs2')
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
