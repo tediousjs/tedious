@@ -23,76 +23,12 @@ class ConnectionPooler
       idleTimeoutMillis : config.idleTimeoutMillis
     @pool = PoolModule.Pool(param);
 
-  execSql: (request) ->
+  execute: (callback) ->
     @pool.acquire((err, connection) ->
       if(err)
         console.log(err)
       else
-        connection.execSql(request)
+        callback(connection)
     )
-
-  execSqlBatch: (request) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.execSqlBatch(request)
-    )
-
-  execute: (request, parameters) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.execute(request, parameters)
-    )
-
-  prepare: (request) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.prepare(request)
-    )
-
-  unprepare: (request) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.unprepare(request)
-    )
-
-  callProcedure: (request) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.callProcedure(request)
-    )
-
-  beginTransaction: (callback, name, isolationLevel) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.beginTransaction(callback, name, isolationLevel)
-    )
-
-  commitTransaction: (callback) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.commitTransaction(callback)
-    )
-
-  rollbackTransaction: (callback) ->
-    @pool.acquire((err, connection) ->
-      if(err)
-        console.log(err)
-      else
-        connection.rollbackTransaction(callback)
-    )  
 
 module.exports = ConnectionPooler
