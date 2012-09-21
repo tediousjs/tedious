@@ -1,6 +1,7 @@
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
+guidParser = require('../../src/guid-parser')
 TYPES = require('../../src/data-type').typeByName
 
 getConfig = ->
@@ -44,6 +45,24 @@ exports.smallIntNull = (test) ->
 
 exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
+  
+exports.bigint = (test) ->
+  execSql(test, TYPES.BigInt, 9007199254740992)
+  
+exports.bigint1 = (test) ->
+  execSql(test, TYPES.BigInt, 1)
+  
+exports.bigintsmall = (test) ->
+  execSql(test, TYPES.BigInt, -9007199254740992)
+  
+exports.bigintsmall1 = (test) ->
+  execSql(test, TYPES.BigInt, -1)
+  
+exports.float = (test) ->
+  execSql(test, TYPES.Float, 9654.2546456567565767644)
+  
+exports.uniqueIdentifierN = (test) ->
+  execSql(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
 exports.intZero = (test) ->
   execSql(test, TYPES.Int, 0)
@@ -118,6 +137,24 @@ exports.outputSmallIntNull = (test) ->
 
 exports.outputInt = (test) ->
   execSqlOutput(test, TYPES.Int, 3)
+  
+exports.outputBigInt = (test) ->
+  execSqlOutput(test, TYPES.BigInt, 9007199254740992)
+  
+exports.outputBigInt1 = (test) ->
+  execSqlOutput(test, TYPES.BigInt, 1)
+
+exports.outputBigIntSmall = (test) ->
+  execSqlOutput(test, TYPES.BigInt, -9007199254740992)
+  
+exports.outputBigIntSmall1 = (test) ->
+  execSqlOutput(test, TYPES.BigInt, -1)
+  
+exports.outputFloat = (test) ->
+  execSqlOutput(test, TYPES.Float, 9654.2546456567565767644)
+  
+exports.outputUniqueIdentifierN = (test) ->
+  execSqlOutput(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
 exports.outputIntNull = (test) ->
   execSqlOutput(test, TYPES.Int, null)
@@ -209,6 +246,10 @@ execSql = (test, type, value) ->
 
       if (value instanceof Date)
         test.strictEqual(columns[0].value.getTime(), value.getTime())
+      else if (type == TYPES.BigInt)
+        test.strictEqual(columns[0].value, value.toString())
+      else if (type == TYPES.UniqueIdentifierN)
+        test.deepEqual(columns[0].value, guidParser.guidToArray(value))
       else
         test.strictEqual(columns[0].value, value)
   )
@@ -255,6 +296,10 @@ execSqlOutput = (test, type, value) ->
 
     if (value instanceof Date)
       test.strictEqual(returnValue.getTime(), value.getTime())
+    else if (type == TYPES.BigInt)
+      test.strictEqual(returnValue, value.toString())
+    else if (type == TYPES.UniqueIdentifierN)
+      test.deepEqual(returnValue, guidParser.guidToArray(value))
     else
       test.strictEqual(returnValue, value)
 
