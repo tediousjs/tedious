@@ -113,23 +113,28 @@ class Connection extends EventEmitter
 
     LOGGED_IN:
       name: 'LoggedIn'
+      enter: ->
+        if @reusable
+          @emit('reusable')
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
 
     SENT_CLIENT_REQUEST:
       name: 'SentClientRequest'
+      exit:->
+        @reusable = true
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
         data: (data) ->
           @sendDataToTokenStreamParser(data)
         message: ->
-          @transitionTo(@STATE.LOGGED_IN)
-
           sqlRequest = @request
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount)
+          
+          @transitionTo(@STATE.LOGGED_IN)
 
     FINAL:
       name: 'Final'
@@ -142,6 +147,7 @@ class Connection extends EventEmitter
           # Do nothing, as the timer should be cleaned up.
 
   constructor: (@config) ->
+    @reusable = false
     @defaultConfig()
     @createDebug()
     @createTokenStreamParser()

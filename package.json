@@ -33,7 +33,8 @@
   "dependencies": {
     "async": "0.1.22",
     "iconv-lite": "0.2.1",
-    "sprintf": "0.1.1"
+    "sprintf": "0.1.1",
+    "generic-pool": "2.0.1"
   },
   "devDependencies": {
     "coffee-script": "1.3.3",
