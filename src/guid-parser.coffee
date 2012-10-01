@@ -22,3 +22,34 @@ guidToArray = (guid) ->
     
     final
 exports.guidToArray = guidToArray
+
+formatHex = (number) ->
+    hex = number.toString(16)
+    if hex.length == 1
+        hex = '0' + hex
+    return hex
+
+arrayToGuid = (array) ->
+    guid = formatHex(array[3]) +
+        formatHex(array[2]) +
+        formatHex(array[1]) +
+        formatHex(array[0]) +
+        '-' +
+        formatHex(array[5]) +
+        formatHex(array[4]) +
+        '-' +
+        formatHex(array[7]) +
+        formatHex(array[6]) +
+        '-' +
+        formatHex(array[8]) +
+        formatHex(array[9]) +
+        '-' +
+        formatHex(array[10]) +
+        formatHex(array[11]) +
+        formatHex(array[12]) +
+        formatHex(array[13]) +
+        formatHex(array[14]) +
+        formatHex(array[15])
+    guid
+
+exports.arrayToGuid = arrayToGuid
