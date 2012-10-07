@@ -234,7 +234,7 @@ exports.execSql = (test) ->
     #console.log(text)
   )
 
-exports.execSqlMultipleTime = (test) ->
+exports.execSqlMultipleTimes = (test) ->
   timesToExec = 5
   sqlExecCount = 0
 
