@@ -1,0 +1,13 @@
+{
+  "config": {
+    "server": "pzkhzqgfrs.database.windows.net",
+    "userName": "API@pzkhzqgfrs.database.windows.net",
+    "password": "MDMC@A@pi!007",
+    "options": {
+      "database": "MDM",
+      "encrypt": true,
+      "port": 1433,
+      "connectTimeout": 1000
+    }
+  }
+}

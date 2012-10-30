@@ -249,7 +249,7 @@ execSql = (test, type, value) ->
       else if (type == TYPES.BigInt)
         test.strictEqual(columns[0].value, value.toString())
       else if (type == TYPES.UniqueIdentifierN)
-        test.deepEqual(columns[0].value, guidParser.guidToArray(value))
+        test.deepEqual(columns[0].value, value)
       else
         test.strictEqual(columns[0].value, value)
   )
@@ -299,7 +299,8 @@ execSqlOutput = (test, type, value) ->
     else if (type == TYPES.BigInt)
       test.strictEqual(returnValue, value.toString())
     else if (type == TYPES.UniqueIdentifierN)
-      test.deepEqual(returnValue, guidParser.guidToArray(value))
+
+      test.deepEqual(returnValue, value)
     else
       test.strictEqual(returnValue, value)
 
