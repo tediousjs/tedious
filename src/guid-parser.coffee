@@ -50,6 +50,6 @@ arrayToGuid = (array) ->
         formatHex(array[13]) +
         formatHex(array[14]) +
         formatHex(array[15])
-    guid
+    guid.toUpperCase()
 
 exports.arrayToGuid = arrayToGuid
