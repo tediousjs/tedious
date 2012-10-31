@@ -1,5 +1,6 @@
 iconv = require('iconv-lite')
 sprintf = require('sprintf').sprintf
+guidParser = require('./guid-parser')
 require('./buffertools')
 
 NULL = (1 << 16) - 1
@@ -176,7 +177,7 @@ parse = (buffer, metaData) ->
         when 0
           value = null
         when 0x10
-          value = buffer.readArray(0x10)
+          value = guidParser.arrayToGuid( buffer.readArray(0x10) )
         else
           throw new Error(sprintf('Unsupported guid size %d at offset 0x%04X', dataLength - 1, buffer.position))
     else
