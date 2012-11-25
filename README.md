@@ -17,7 +17,6 @@ Coming soon
 -----------
 Although subject to change, this is the rough plan for the next few versions.
 
-### v0.0.8 ###
 - support for more data types for parameters
 - possible support for varchar(max), nvarchar(max) and varbinary(max) as streams
 
