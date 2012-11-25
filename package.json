@@ -2,7 +2,10 @@
   "author": "Mike D Pilsbury <mike.pilsbury@gmail.com>",
   "contributors": [
     "Ciaran Jessup <ciaranj@gmail.com>",
-    "Phil Dodderidge <pdodde@poyntz.com>"
+    "Cort Fritz <cfritz@caa.com>",
+    "lastonesky",
+    "Phil Dodderidge <pdodde@poyntz.com>",
+    "Zach Aller"
   ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
@@ -21,7 +24,7 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "0.0.7",
+  "version": "0.1.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
