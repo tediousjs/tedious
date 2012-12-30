@@ -234,6 +234,45 @@ exports.execSql = (test) ->
     #console.log(text)
   )
 
+exports.numericColumnName = (test) ->
+  test.expect(5)
+
+  config = getConfig()
+
+  request = new Request('select 8 as [123]', (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, 1)
+
+      connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+      test.strictEqual(columnsMetadata.length, 1)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns.length, 1)
+      test.strictEqual(columns[0].value, 8)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.execSqlMultipleTimes = (test) ->
   timesToExec = 5
   sqlExecCount = 0

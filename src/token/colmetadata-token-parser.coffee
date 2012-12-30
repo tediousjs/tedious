@@ -2,6 +2,8 @@
 
 metadataParse = require('../metadata-parser')
 
+DIGITS_REGEX = /^\d+$/
+
 parser = (buffer, colMetadata, tdsVersion) ->
   columnCount = buffer.readUInt16LE()
 
@@ -30,7 +32,9 @@ parser = (buffer, colMetadata, tdsVersion) ->
       tableName: tableName
 
     columns.push(column)
-    columns[column.colName] = column
+
+    if !(DIGITS_REGEX.test(column.colName))
+      columns[column.colName] = column
 
   # Return token
   name: 'COLMETADATA'

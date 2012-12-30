@@ -3,6 +3,8 @@
 valueParse = require('../value-parser')
 sprintf = require('sprintf').sprintf
 
+DIGITS_REGEX = /^\d+$/
+
 parser = (buffer, columnsMetaData) ->
   columns = []
   for columnMetaData in columnsMetaData
@@ -15,7 +17,9 @@ parser = (buffer, columnsMetaData) ->
       metadata: columnMetaData
 
     columns.push(column)
-    columns[columnMetaData.colName] = column
+
+    if !(DIGITS_REGEX.test(columnMetaData.colName))
+      columns[columnMetaData.colName] = column
 
   # Return token
   name: 'ROW'
