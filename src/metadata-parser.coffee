@@ -64,6 +64,16 @@ parse = (buffer, tdsVersion) ->
   else
     collation = undefined
 
+  schema = undefined
+  if type.hasSchemaPresent
+    schemaPresent = buffer.readUInt8()
+
+    if schemaPresent == 0x01
+      schema =
+        dbname: buffer.readBVarchar()
+        owningSchema: buffer.readBVarchar()
+        xmlSchemaCollection: buffer.readUsVarchar()
+
   metadata =
     userType: userType
     flags: flags
@@ -72,5 +82,6 @@ parse = (buffer, tdsVersion) ->
     precision: precision
     scale: scale
     dataLength: dataLength
+    schema: schema
 
 module.exports = parse

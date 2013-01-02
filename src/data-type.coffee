@@ -104,7 +104,7 @@ TYPE =
       'real'
     writeParameterData: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
-      
+
       # Some issues with rounding
 
       buffer.writeUInt8(typeByName.FloatN.id)
@@ -186,7 +186,7 @@ TYPE =
         buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
       else
         buffer.writeUInt8(0)
-		
+
   # Variable-length types
   0x22:
     type: 'IMAGE'
@@ -373,6 +373,10 @@ TYPE =
     name: 'NChar'
     hasCollation: true
     dataLengthLength: 2
+  0xF1:
+    type: 'XML'
+    name: 'Xml'
+    hasSchemaPresent: true
 
 # Types not (yet) supported
 ###
@@ -387,7 +391,6 @@ TYPE =
   BINARYTYPE:           0x2D  # Binary (legacy support)
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
 
-  XMLTYPE:              0xF1  # XML (introduced in TDS 7.2)
   UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
 
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)

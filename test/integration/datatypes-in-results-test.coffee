@@ -1,3 +1,4 @@
+async = require('async')
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
@@ -214,9 +215,43 @@ exports.imageNull = (test) ->
 exports.guid = (test) ->
   execSql(test, "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)", '01234567-89AB-CDEF-0123-456789ABCDEF')
 
-
 exports.guidNull = (test) ->
   execSql(test, "select cast(null as uniqueidentifier)", null)
+
+exports.xml = (test) ->
+  xml = '<root><child attr="attr-value"/></root>'
+  execSql(test, "select cast('#{xml}' as xml)", xml)
+
+exports.xmlNull = (test) ->
+  execSql(test, "select cast(null as xml)", null)
+
+exports.xmlWithSchema = (test) ->
+  # Cannot use temp tables, as schema collections as not available to them.
+
+  xml = '<root/>'
+
+  schemaName = 'test_tedious_schema'
+  schema = '''
+    <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+      <xsd:element name="root">
+      </xsd:element>
+    </xsd:schema>'''
+
+  dropSchema = """
+    begin try
+      drop xml schema collection #{schemaName}
+    end try begin catch end catch;
+  """
+
+  createSchema = "create xml schema collection #{schemaName} as N'#{schema}';"
+
+  tableName = 'test_tedious_table'
+  dropTable = "drop table #{tableName};"
+  createTable = "create table #{tableName} (xml XML (#{schemaName}));"
+  insert = "insert into #{tableName} (xml) values('#{xml}');"
+  select = "select xml from #{tableName};"
+
+  execSql(test, "#{dropTable} #{dropSchema} #{createSchema} #{createTable} #{insert} #{select}", xml)
 
 execSql = (test, sql, expectedValue) ->
   test.expect(2)

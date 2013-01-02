@@ -9,7 +9,7 @@ THREE_AND_A_THIRD = 3 + (1 / 3)
 MONEY_DIVISOR = 10000
 
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
-UNKNOWN_PLP_LEN = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE])
+UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 
 parse = (buffer, metaData) ->
   value = undefined
@@ -139,6 +139,8 @@ parse = (buffer, metaData) ->
         value = null
       else
         value = readBinary(buffer, dataLength)
+    when 'Xml'
+      value = readMaxNChars(buffer)
     when 'SmallDateTime'
       value = readSmallDateTime(buffer)
     when 'DateTime'

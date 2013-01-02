@@ -242,7 +242,7 @@ module.exports.varCharMaxUnknownLength = (test) ->
   value = 'abcdef'
 
   buffer = new WritableTrackingBuffer(0, 'ascii')
-  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.writeBuffer(new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   buffer.writeUInt32LE(3)
   buffer.writeString(value.slice(0, 3))
   buffer.writeUInt32LE(3)
@@ -362,7 +362,7 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
   value = [0x12, 0x34, 0x56, 0x78]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
-  buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE]))
+  buffer.writeBuffer(new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   buffer.writeUInt32LE(2)
   buffer.writeBuffer(new Buffer(value.slice(0, 2)))
   buffer.writeUInt32LE(2)
