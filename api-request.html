@@ -82,6 +82,10 @@ connection.execSql(request);
   <div class="description">
     <p>
       An array like object, where the columns can be accessed either by index or name.
+      Columns with a name that is an integer are not accessible by name,
+      as it would be interpreted as an array index.
+    </p>
+    <p>
       Each column has these properties.
     </p>
     <dl>
