@@ -11,7 +11,7 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Current version: v0.1.0
+Current version: v0.1.2
 
 Coming soon
 -----------
