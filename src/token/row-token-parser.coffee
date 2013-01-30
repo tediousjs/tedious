@@ -19,11 +19,20 @@ parser = (buffer, columnsMetaData) ->
     columns.push(column)
 
     if !(DIGITS_REGEX.test(columnMetaData.colName))
-      columns[columnMetaData.colName] = column
+      saveColumn(columnMetaData.colName, columns, column)
 
   # Return token
   name: 'ROW'
   event: 'row'
   columns: columns
+
+saveColumn = (columnName, columns, value) ->
+  entry = columns[columnName]
+  if !entry
+    columns[columnName] = value;
+  else if Array.isArray(entry)
+    entry.push(value)
+  else
+    columns[columnName] = [entry, value]
 
 module.exports = parser
