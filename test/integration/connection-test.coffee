@@ -273,6 +273,52 @@ exports.numericColumnName = (test) ->
     #console.log(text)
   )
 
+exports.duplicateColumnNames = (test) ->
+  test.expect(10)
+
+  config = getConfig()
+
+  request = new Request('select 1 as abc, 2 as xyz, 3 as abc', (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, 1)
+
+      connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+      test.strictEqual(columnsMetadata.length, 3)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns.length, 3)
+
+      test.strictEqual(columns[0].value, 1)
+      test.strictEqual(columns[1].value, 2)
+      test.strictEqual(columns[2].value, 3)
+
+      test.strictEqual(columns.abc[0].value, 1)
+      test.strictEqual(columns.abc[1].value, 3)
+      test.strictEqual(columns.xyz.value, 2)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.execSqlMultipleTimes = (test) ->
   timesToExec = 5
   sqlExecCount = 0
