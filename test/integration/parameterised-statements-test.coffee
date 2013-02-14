@@ -102,6 +102,20 @@ exports.nVarCharMax = (test) ->
 
   execSql(test, TYPES.NVarChar, longString)
 
+exports.textNull = (test) ->
+  execSql(test, TYPES.Text, null)
+  
+exports.textEmpty = (test) ->
+  execSql(test, TYPES.Text, '')
+  
+exports.textSmall = (test) ->
+  execSql(test, TYPES.Text, 'small')
+
+exports.textLarge = (test) ->
+  dBuf = new Buffer(5000000)
+  dBuf.fill('x')
+  execSql(test, TYPES.Text, dBuf.toString())
+
 exports.smallDateTime = (test) ->
   execSql(test, TYPES.SmallDateTime, new Date('December 4, 2011 10:04:00'))
 
@@ -299,7 +313,6 @@ execSqlOutput = (test, type, value) ->
     else if (type == TYPES.BigInt)
       test.strictEqual(returnValue, value.toString())
     else if (type == TYPES.UniqueIdentifierN)
-
       test.deepEqual(returnValue, value)
     else
       test.strictEqual(returnValue, value)
@@ -318,5 +331,5 @@ execSqlOutput = (test, type, value) ->
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+    # console.log(text)
   )
