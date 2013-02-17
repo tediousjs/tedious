@@ -120,6 +120,9 @@ exports.moneyNull = (test) ->
 exports.varchar = (test) ->
   execSql(test, "select cast('abcde' as varchar(10))", 'abcde')
 
+exports.varcharEmpty = (test) ->
+  execSql(test, "select cast('' as varchar(10))", '')
+
 exports.varcharNull = (test) ->
   execSql(test, "select cast(null as varchar(10))", null)
 
@@ -197,11 +200,17 @@ exports.ncharNull = (test) ->
 exports.text = (test) ->
   execSql(test, "select cast('abc' as text) as text", 'abc')
 
+exports.textEmpty = (test) ->
+  execSql(test, "select cast('' as text) as text", '')
+
 exports.textNull = (test) ->
   execSql(test, "select cast(null as text) as text", null)
 
 exports.ntext = (test) ->
   execSql(test, "select cast('abc' as ntext) as text", 'abc')
+
+exports.ntextEmpty = (test) ->
+  execSql(test, "select cast('' as ntext) as text", '')
 
 exports.ntextNull = (test) ->
   execSql(test, "select cast(null as ntext) as text", null)

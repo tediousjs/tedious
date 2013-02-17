@@ -14,6 +14,7 @@ UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 parse = (buffer, metaData) ->
   value = undefined
   dataLength = undefined
+  textPointerNull = undefined
 
   type = metaData.type
 
@@ -25,6 +26,7 @@ parse = (buffer, metaData) ->
       buffer.readBuffer(8)
     else
       dataLength = 0
+      textPointerNull = true
 
   if !dataLength && dataLength != 0
     # s2.2.4.2.1
@@ -125,17 +127,17 @@ parse = (buffer, metaData) ->
       else
         value = readBinary(buffer, dataLength)
     when 'Text'
-      if dataLength == 0
+      if textPointerNull
         value = null
       else
         value = readChars(buffer, dataLength, metaData.collation.codepage)
     when 'NText'
-      if dataLength == 0
+      if textPointerNull
         value = null
       else
         value = readNChars(buffer, dataLength)
     when 'Image'
-      if dataLength == 0
+      if textPointerNull
         value = null
       else
         value = readBinary(buffer, dataLength)
