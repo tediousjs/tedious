@@ -5,13 +5,15 @@ Tedious (node implementation of TDS)
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server.
 
+It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
+
 Name
 ----
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
 Status
 ------
-Current version: v0.1.2
+Current version: v0.1.3
 
 Coming soon
 -----------
