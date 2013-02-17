@@ -151,8 +151,13 @@ connection.execSql(request);
         <code>value</code>
       </dt>
       <dd>
-        The column's value.
-        It will be <code>null</code> for a <code>NULL</code>.
+        <p>
+          The column's value.
+          It will be <code>null</code> for a <code>NULL</code>.
+        </p>
+        <p>
+          If there are multiple columns with the same name, then this will be an array of the values.
+	</p>
       </dd>
     </dl>
   </div>
