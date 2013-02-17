@@ -201,6 +201,29 @@ TYPE =
     hasTableName: true
     hasTextPointerAndTimestamp: true
     dataLengthLength: 4
+    declaration: (parameter) ->
+      'text'
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.toString().length
+      else
+        length = -1
+        
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.Text.id)
+      buffer.writeInt32LE(length)
+      
+      # Collation
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+      
+      # ParamLenData
+      if parameter.value?
+        buffer.writeInt32LE(length)
+        buffer.writeString(parameter.value.toString(), 'ascii')
+      else
+        buffer.writeInt32LE(length)
   0x24:
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
