@@ -140,6 +140,10 @@ class Connection extends EventEmitter
           # Do nothing. The connection was probably closed by the client code.
         connectTimeout: ->
           # Do nothing, as the timer should be cleaned up.
+        message: ->
+          # Do nothing
+        socketError: ->
+          # Do nothing
 
   constructor: (@config) ->
     @defaultConfig()
