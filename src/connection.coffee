@@ -373,7 +373,7 @@ class Connection extends EventEmitter
     loginData =
       userName: @config.userName
       password: @config.password
-      database: @config.options.database
+      database: @config.database
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
 
