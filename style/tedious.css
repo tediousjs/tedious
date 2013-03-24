@@ -262,3 +262,11 @@ table tr.group-heading td {
     font-size: 70%;
     vertical-align: super;
 }
+
+em {
+    font-style: italic;
+}
+
+strong {
+    font-weight: bold;
+}

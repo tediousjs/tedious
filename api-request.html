@@ -164,6 +164,11 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_done">Event: done</h2>
+<p>
+  <em>This is a relatively low-level event, driven by the receipt of a TDS Done token.
+  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
+  know when the request has completed.</em>
+</p>
 <code>function (rowCount, more) { }</code>
 <p>
   All rows from a result set have been provided (through <code>row</code> events).
@@ -173,6 +178,7 @@ connection.execSql(request);
   <div class="description">
     <p>
       The number of result rows.
+      May be <code>undefined</code> if not available.
     </p>
   </div>
 </div>
@@ -187,6 +193,11 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneInProc">Event: doneInProc</h2>
+<p>
+  <em>This is a relatively low-level event, driven by the receipt of a TDS DoneInProc token.
+  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
+  know when the request has completed.</em>
+</p>
 <code>function (rowCount, more) { }</code>
 <p>
   All rows from a statement in a stored procedure have been provided (through <code>row</code> events).
@@ -196,6 +207,7 @@ connection.execSql(request);
   <div class="description">
     <p>
       The number of result rows.
+      May be <code>undefined</code> if not available.
     </p>
   </div>
 </div>
@@ -210,6 +222,11 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneProc">Event: doneProc</h2>
+<p>
+  <em>This is a relatively low-level event, driven by the receipt of a TDS DoneProc token.
+  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
+  know when the request has completed.</em>
+</p>
 <code>function (rowCount, more, returnStatus) { }</code>
 </p>
   A stored procedure has been completed.
@@ -219,6 +236,7 @@ connection.execSql(request);
   <div class="description">
     <p>
       The number of result rows.
+      May be <code>undefined</code> if not available.
     </p>
   </div>
 </div>
