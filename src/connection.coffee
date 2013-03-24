@@ -67,7 +67,6 @@ class Connection extends EventEmitter
 
     SENT_TLSSSLNEGOTIATION:
       name: 'SentTLSSSLNegotiation'
-      enter: ->
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
@@ -124,6 +123,8 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         data: (data) ->
           @sendDataToTokenStreamParser(data)
+        requestTimeout: ->
+          @transitionTo(@STATE.FINAL)
         message: ->
           @transitionTo(@STATE.LOGGED_IN)
 
@@ -139,7 +140,9 @@ class Connection extends EventEmitter
         loginFailed: ->
           # Do nothing. The connection was probably closed by the client code.
         connectTimeout: ->
-          # Do nothing, as the timer should be cleaned up.
+          # Do nothing, as the connect timer should be cleaned up.
+        requestTimeout: ->
+          # Do nothing, as the request timer should be cleaned up.
         message: ->
           # Do nothing
         socketError: ->
@@ -165,6 +168,7 @@ class Connection extends EventEmitter
   cleanupConnection: ->
     if !@closed
       @clearConnectTimer()
+      @clearRequestTimer()
       @closeConnection()
       @emit('end')
       @closed = true
@@ -303,6 +307,10 @@ class Connection extends EventEmitter
   createConnectTimer: ->
     @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)
 
+  createRequestTimer: ->
+    if @config.options.requestTimeout > 0
+      @requestTimer = setTimeout(@requestTimeout, @config.options.requestTimeout)
+
   connectTimeout: =>
     message = "timeout : failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
 
@@ -311,9 +319,22 @@ class Connection extends EventEmitter
     @connectTimer = undefined
     @dispatchEvent('connectTimeout')
 
+  requestTimeout: =>
+    message = "timeout: request failed to complete on #{@config.server}:#{@config.options.port} in #{@config.options.requestTimeout}ms"
+
+    @debug.log(message)
+    @emit('requestTimeout', message)
+    @requestTimer = undefined
+    @dispatchEvent('requestTimeout')
+
   clearConnectTimer: ->
     if @connectTimer
       clearTimeout(@connectTimer)
+
+  clearRequestTimer: ->
+    if @requestTimer
+      clearTimeout(@requstTimer)
+      @requestTimer = undefined
 
   transitionTo: (newState) ->
     if @state?.exit
@@ -499,6 +520,8 @@ set transaction isolation level read committed'''
     else
       @request = request
       @request.rowCount = 0
+
+      @createRequestTimer()
 
       @messageIo.sendMessage(packetType, payload.data)
       @debug.payload(->

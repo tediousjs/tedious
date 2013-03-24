@@ -592,3 +592,40 @@ exports.execProcAsSql = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+exports.requestTimeout = (test) ->
+  test.expect(1)
+
+  config = getConfig()
+  config.options.requestTimeout = 100
+
+  request = new Request("waitfor delay '00:00:02'; select 1;", (err, rowCount) ->
+      connection.close()
+  )
+
+  request.on('row', (columns) ->
+      # No rows should return. The request should have timed out.
+      test.ok(false)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('requestTimeout', (err) ->
+      test.ok(err)
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
