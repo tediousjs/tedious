@@ -32,6 +32,9 @@ types =
     event: 'partnerNode'
   17:
     name: 'TXN_ENDED'
+  18:
+    name: 'RESET_CONNECTION'
+    event: 'resetConnection'
 
 module.exports = (buffer) ->
   length = buffer.readUInt16LE()
@@ -43,7 +46,7 @@ module.exports = (buffer) ->
       when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
         newValue = buffer.readBVarchar()
         oldValue = buffer.readBVarchar()
-      when 'SQL_COLLATION', 'BEGIN_TXN', 'COMMIT_TXN', 'ROLLBACK_TXN'
+      when 'SQL_COLLATION', 'BEGIN_TXN', 'COMMIT_TXN', 'ROLLBACK_TXN', 'RESET_CONNECTION'
         valueLength = buffer.readUInt8()
         newValue = buffer.readBuffer(valueLength)
 

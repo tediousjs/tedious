@@ -1,5 +1,3 @@
-#process.env.NODE_DEBUG = 'tls'
-
 require('./buffertools')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
@@ -280,6 +278,9 @@ class Connection extends EventEmitter
         if @config.options.rowCollectionOnDone
           @request.rows = []
     )
+    @tokenStreamParser.on('resetConnection', (token) =>
+      @emit('resetConnection')
+    )
 
   connect: ->
     if (@config.options.port)
@@ -420,7 +421,11 @@ class Connection extends EventEmitter
     @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
-    initialSql = 'set textsize ' + @config.options.textsize + '''
+    payload = new SqlBatchPayload(@getInitialSql(), @currentTransactionDescriptor())
+    @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
+
+  getInitialSql: ->
+    'set textsize ' + @config.options.textsize + '''
 set quoted_identifier on
 set arithabort off
 set numeric_roundabort off
@@ -434,9 +439,6 @@ set language us_english
 set dateformat mdy
 set datefirst 7
 set transaction isolation level read committed'''
-
-    payload = new SqlBatchPayload(initialSql, @currentTransactionDescriptor())
-    @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   processedInitialSql: ->
       @clearConnectTimer()
@@ -513,12 +515,21 @@ set transaction isolation level read committed'''
       @request.rowCount = 0
       @request.rows = []
 
-      @messageIo.sendMessage(packetType, payload.data)
+      @messageIo.sendMessage(packetType, payload.data, @resetConnectionOnNextRequest)
+      @resetConnectionOnNextRequest = false
       @debug.payload(->
         payload.toString('  ')
       )
 
       @transitionTo(@STATE.SENT_CLIENT_REQUEST)
+
+  reset: (callback) =>
+    request = new Request(@getInitialSql(), (err, rowCount, rows) ->
+      callback(err)
+    )
+
+    @resetConnectionOnNextRequest = true
+    @execSqlBatch(request)
 
   currentTransactionDescriptor: ->
     @transactionDescriptors[@transactionDescriptors.length - 1]

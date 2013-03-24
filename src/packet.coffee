@@ -59,6 +59,16 @@ class Packet
   length: ->
     @buffer.readUInt16BE(OFFSET.Length)
 
+  resetConnection: (reset) ->
+    status = @buffer.readUInt8(OFFSET.Status)
+
+    if reset
+      status |= STATUS.RESETCONNECTION
+    else
+      status &= 0xFF - STATUS.RESETCONNECTION
+
+    @buffer.writeUInt8(status, OFFSET.Status)
+
   last: (last) ->
     status = @buffer.readUInt8(OFFSET.Status)
 

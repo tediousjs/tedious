@@ -58,7 +58,7 @@ class MessageIO extends EventEmitter
     @securePair.cleartext.addListener('data', @eventData)
 
   # TODO listen for 'drain' event when socket.write returns false.
-  sendMessage: (packetType, data) ->
+  sendMessage: (packetType, data, resetConnection) ->
     numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
 
     for packetNumber in [0..numberOfPackets - 1]
@@ -71,6 +71,7 @@ class MessageIO extends EventEmitter
 
       packet = new Packet(packetType)
       packet.last(packetNumber == numberOfPackets - 1)
+      packet.resetConnection(resetConnection)
       packet.packetId(packetNumber + 1)
       packet.addData(packetPayload)
 

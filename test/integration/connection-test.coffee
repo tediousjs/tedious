@@ -1,3 +1,4 @@
+async = require('async')
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
@@ -660,6 +661,67 @@ exports.execProcAsSql = (test) ->
 
   connection.on('end', (info) ->
       test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.resetConnection = (test) ->
+  test.expect(4)
+
+  config = getConfig()
+
+  testAnsiNullsOptionOn = (callback) ->
+    testAnsiNullsOption(true, callback)
+
+  testAnsiNullsOptionOff = (callback) ->
+    testAnsiNullsOption(false, callback)
+
+  testAnsiNullsOption = (expectedOptionOn, callback) ->
+    request = new Request('select @@options & 32', (err, rowCount) ->
+      callback(err)
+    )
+
+    request.on('row', (columns) ->
+      optionOn = columns[0].value == 32
+      test.strictEqual(optionOn, expectedOptionOn)
+    )
+
+    connection.execSql(request)
+
+  setAnsiNullsOptionOff = (callback) ->
+    request = new Request('set ansi_nulls off', (err, rowCount) ->
+      callback(err)
+    )
+
+    connection.execSqlBatch(request)
+
+  connection = new Connection(config)
+
+  connection.on('resetConnection', ->
+    test.ok(true)
+  )
+
+  connection.on('connect', (err) ->
+    async.series([
+      testAnsiNullsOptionOn,
+      setAnsiNullsOptionOff,
+      testAnsiNullsOptionOff,
+      connection.reset,
+      testAnsiNullsOptionOn,
+      (callback) ->
+        connection.close()
+        callback()
+    ])
+  )
+
+  connection.on('end', (info) ->
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
