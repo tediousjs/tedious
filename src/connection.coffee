@@ -129,7 +129,7 @@ class Connection extends EventEmitter
 
           sqlRequest = @request
           @request = undefined
-          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount)
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows)
 
     FINAL:
       name: 'Final'
@@ -241,6 +241,9 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('row', (token) =>
       if @request
+        if @config.options.rowCollectionOnRequestCompletion || @config.options.rowCollectionOnDone
+          @request.rows.push token.columns
+
         @request.rowCount++
         @request.emit('row', token.columns)
       else
@@ -257,16 +260,25 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('doneProc', (token) =>
       if @request
-        @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue)
+        @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue, @request.rows)
         @procReturnStatusValue = undefined
+
+        if @config.options.rowCollectionOnDone
+          @request.rows = []
     )
     @tokenStreamParser.on('doneInProc', (token) =>
-        if @request
-          @request.emit('doneInProc', token.rowCount, token.more)
+      if @request
+        @request.emit('doneInProc', token.rowCount, token.more, @request.rows)
+
+        if @config.options.rowCollectionOnDone
+          @request.rows = []
     )
     @tokenStreamParser.on('done', (token) =>
-        if @request
-          @request.emit('done', token.rowCount, token.more)
+      if @request
+        @request.emit('done', token.rowCount, token.more, @request.rows)
+
+        if @config.options.rowCollectionOnDone
+          @request.rows = []
     )
 
   connect: ->
@@ -408,7 +420,7 @@ class Connection extends EventEmitter
     @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
-    initialSql = 'set textsize ' + @config.options.textsize + ''' 
+    initialSql = 'set textsize ' + @config.options.textsize + '''
 set quoted_identifier on
 set arithabort off
 set numeric_roundabort off
@@ -499,6 +511,7 @@ set transaction isolation level read committed'''
     else
       @request = request
       @request.rowCount = 0
+      @request.rows = []
 
       @messageIo.sendMessage(packetType, payload.data)
       @debug.payload(->

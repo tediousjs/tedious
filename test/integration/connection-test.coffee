@@ -550,6 +550,83 @@ exports.sqlWithMultipleResultSets = (test) ->
     #console.log(text)
   )
 
+exports.rowCollectionOnRequestCompletion = (test) ->
+  test.expect(5)
+
+  config = getConfig()
+  config.options.rowCollectionOnRequestCompletion = true
+
+  request = new Request('select 1 as a; select 2 as b;', (err, rowCount, rows) ->
+    test.strictEqual(rows.length, 2)
+
+    test.strictEqual(rows[0][0].metadata.colName, 'a')
+    test.strictEqual(rows[0][0].value, 1)
+    test.strictEqual(rows[1][0].metadata.colName, 'b')
+    test.strictEqual(rows[1][0].value, 2)
+
+    connection.close()
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.rowCollectionOnDone = (test) ->
+  test.expect(6)
+
+  config = getConfig()
+  config.options.rowCollectionOnDone = true
+
+  doneCount = 0
+
+  request = new Request('select 1 as a; select 2 as b;', (err, rowCount, rows) ->
+    connection.close()
+  )
+
+  request.on('doneInProc', (rowCount, more, rows) ->
+    test.strictEqual(rows.length, 1)
+
+    switch ++doneCount
+      when 1
+        test.strictEqual(rows[0][0].metadata.colName, 'a')
+        test.strictEqual(rows[0][0].value, 1)
+      when 2
+        test.strictEqual(rows[0][0].metadata.colName, 'b')
+        test.strictEqual(rows[0][0].value, 2)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.execProcAsSql = (test) ->
   test.expect(7)
 
