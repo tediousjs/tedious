@@ -103,6 +103,8 @@ class Connection extends EventEmitter
       enter: ->
         @sendInitialSql()
       events:
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
         data: (data) ->
           @sendDataToTokenStreamParser(data)
         message: (error) ->
