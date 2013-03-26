@@ -61,6 +61,7 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
         tls: ->
           @initiateTlsSslHandshake()
+          @sendLogin7Packet()
           @transitionTo(@STATE.SENT_TLSSSLNEGOTIATION)
 
     SENT_TLSSSLNEGOTIATION:
@@ -74,11 +75,9 @@ class Connection extends EventEmitter
         data: (data) ->
           @securePair.encrypted.write(data)
         tlsNegotiated: ->
-          @encryptAllFutureTraffic()
           @tlsNegotiationComplete = true
         message: ->
           if  @tlsNegotiationComplete
-            @sendLogin7Packet()
             @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
           else
 
@@ -399,15 +398,19 @@ class Connection extends EventEmitter
     )
 
   initiateTlsSslHandshake: ->
+    @config.options.cryptoCredentialsDetails.ciphers ||= 'RC4-MD5'
+
     credentials = crypto.createCredentials(@config.options.cryptoCredentialsDetails)
     @securePair = tls.createSecurePair(credentials)
 
     @securePair.on('secure', =>
       cipher = @securePair.cleartext.getCipher()
       @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
-      #console.log @securePair.cleartext.getPeerCertificate()
+      # console.log cipher
+      # console.log @securePair.cleartext.getPeerCertificate()
 
       @emit('secure', @securePair.cleartext)
+      @messageIo.encryptAllFutureTraffic()
       @dispatchEvent('tlsNegotiated')
     )
 
@@ -415,9 +418,7 @@ class Connection extends EventEmitter
       @messageIo.sendMessage(TYPE.PRELOGIN, data)
     )
 
-  encryptAllFutureTraffic: ->
-    @securePair.encrypted.removeAllListeners()
-    @messageIo.encryptAllFutureTraffic(@securePair)
+    @messageIo.tlsNegotiationStarting(@securePair)
 
   sendDataToTokenStreamParser: (data) ->
     @tokenStreamParser.addBuffer(data)

@@ -4,6 +4,7 @@ isPacketComplete = require('./packet').isPacketComplete
 packetLength = require('./packet').packetLength
 packetHeaderLength = require('./packet').HEADER_LENGTH
 Packet = require('./packet').Packet
+TYPE = require('./packet').TYPE
 
 class MessageIO extends EventEmitter
   constructor: (@socket, @_packetSize, @debug) ->
@@ -46,9 +47,11 @@ class MessageIO extends EventEmitter
 
     @_packetSize
 
-  encryptAllFutureTraffic: (securePair) ->
+  tlsNegotiationStarting: (securePair) ->
     @securePair = securePair
+    @tlsNegotiationInProgress = true;
 
+  encryptAllFutureTraffic: () ->
     @socket.removeAllListeners('data')
     @securePair.encrypted.removeAllListeners('data')
 
@@ -56,6 +59,8 @@ class MessageIO extends EventEmitter
     @securePair.encrypted.pipe(@socket)
 
     @securePair.cleartext.addListener('data', @eventData)
+
+    @tlsNegotiationInProgress = false;
 
   # TODO listen for 'drain' event when socket.write returns false.
   sendMessage: (packetType, data, resetConnection) ->
@@ -75,15 +80,21 @@ class MessageIO extends EventEmitter
       packet.packetId(packetNumber + 1)
       packet.addData(packetPayload)
 
-      @sendPacket(packet)
+      @sendPacket(packet, packetType)
 
-  sendPacket: (packet) =>
+  sendPacket: (packet, packetType) =>
     @logPacket('Sent', packet);
 
-    if (@securePair)
+    if @tlsNegotiationInProgress && packetType != TYPE.PRELOGIN
+      # LOGIN7 packet.
+      #   Something written to cleartext stream will initiate TLS handshake.
+      #   Will not emerge from the encrypted stream until after negotiation has completed.
       @securePair.cleartext.write(packet.buffer)
     else
-      @socket.write(packet.buffer)
+      if (@securePair && !@tlsNegotiationInProgress)
+        @securePair.cleartext.write(packet.buffer)
+      else
+        @socket.write(packet.buffer)
 
   logPacket: (direction, packet) ->
     @debug.packet(direction, packet)
