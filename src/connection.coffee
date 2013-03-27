@@ -388,6 +388,7 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
+      appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
 
