@@ -34,13 +34,13 @@
     "node": "0.6 || 0.7 || 0.8 || 0.9"
   },
   "dependencies": {
-    "async": "0.2.5",
+    "async": "0.2.6",
     "iconv-lite": "0.2.7",
     "sprintf": "0.1.1"
   },
   "devDependencies": {
-    "coffee-script": "1.4.0",
-    "nodeunit": "0.7.4"
+    "coffee-script": "1.6.2",
+    "nodeunit": "0.8.0"
   },
   "scripts": {
     "test": "scripts/tests-unit",
