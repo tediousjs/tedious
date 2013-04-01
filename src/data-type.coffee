@@ -98,25 +98,19 @@ TYPE =
   0x3B:
     type: 'FLT4'
     name: 'Real'
-      # Had some weired rounding issues not sure what was going on
-      ###
-      declaration: (parameter) ->
-        'real'
-      writeParameterData: (buffer, parameter) ->
-        # ParamMetaData (TYPE_INFO)
+    declaration: (parameter) ->
+      'real'
+    writeParameterData: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8(typeByName.FloatN.id)
+      buffer.writeUInt8(4)
 
-        # Some issues with rounding
-
-        buffer.writeUInt8(typeByName.FloatN.id)
+      # ParamLenData
+      if parameter.value?
         buffer.writeUInt8(4)
-
-        # ParamLenData
-        if parameter.value?
-          buffer.writeUInt8(4)
-          buffer.writeFloatLE(parseFloat(parameter.value))
-        else
-          buffer.writeUInt8(0)
-      ###
+        buffer.writeFloatLE(parseFloat(parameter.value))
+      else
+        buffer.writeUInt8(0)
   0x3C:
     type: 'MONEY'
     name: 'Money'

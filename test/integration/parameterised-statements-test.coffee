@@ -45,22 +45,25 @@ exports.smallIntNull = (test) ->
 
 exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
-  
+
 exports.bigint = (test) ->
   execSql(test, TYPES.BigInt, 9007199254740992)
-  
+
 exports.bigint1 = (test) ->
   execSql(test, TYPES.BigInt, 1)
-  
+
 exports.bigintsmall = (test) ->
   execSql(test, TYPES.BigInt, -9007199254740992)
-  
+
 exports.bigintsmall1 = (test) ->
   execSql(test, TYPES.BigInt, -1)
-  
+
+exports.real = (test) ->
+  execSql(test, TYPES.Real, 9654.2529296875)
+
 exports.float = (test) ->
   execSql(test, TYPES.Float, 9654.2546456567565767644)
-  
+
 exports.uniqueIdentifierN = (test) ->
   execSql(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
@@ -104,10 +107,10 @@ exports.nVarCharMax = (test) ->
 
 exports.textNull = (test) ->
   execSql(test, TYPES.Text, null)
-  
+
 exports.textEmpty = (test) ->
   execSql(test, TYPES.Text, '')
-  
+
 exports.textSmall = (test) ->
   execSql(test, TYPES.Text, 'small')
 
@@ -151,22 +154,22 @@ exports.outputSmallIntNull = (test) ->
 
 exports.outputInt = (test) ->
   execSqlOutput(test, TYPES.Int, 3)
-  
+
 exports.outputBigInt = (test) ->
   execSqlOutput(test, TYPES.BigInt, 9007199254740992)
-  
+
 exports.outputBigInt1 = (test) ->
   execSqlOutput(test, TYPES.BigInt, 1)
 
 exports.outputBigIntSmall = (test) ->
   execSqlOutput(test, TYPES.BigInt, -9007199254740992)
-  
+
 exports.outputBigIntSmall1 = (test) ->
   execSqlOutput(test, TYPES.BigInt, -1)
-  
+
 exports.outputFloat = (test) ->
   execSqlOutput(test, TYPES.Float, 9654.2546456567565767644)
-  
+
 exports.outputUniqueIdentifierN = (test) ->
   execSqlOutput(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
