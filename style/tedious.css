@@ -139,6 +139,11 @@ code li {
   margin-left: 1em;
 }
 
+#search input[type=text] {
+  width: 10em;
+  padding: 0.2em;
+}
+
 #footer {
   position: fixed;
   bottom: 0;
