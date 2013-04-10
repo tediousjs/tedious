@@ -29,7 +29,7 @@ Although subject to change, this is the rough plan for the next few versions.
 
 Documentation
 -------------
-More documentation is available at [pekim.github.com/tedious/](http://pekim.github.com/tedious/)
+More documentation is available at [pekim.github.io/tedious/](http://pekim.github.io/tedious/)
 
 Discussion
 ----------
