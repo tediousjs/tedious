@@ -243,7 +243,6 @@ class Connection extends EventEmitter
         if @config.options.rowCollectionOnRequestCompletion || @config.options.rowCollectionOnDone
           @request.rows.push token.columns
 
-        @request.rowCount++
         @request.emit('row', token.columns)
       else
         throw new Error("Received 'row' when no sqlRequest is in progress")
@@ -262,6 +261,9 @@ class Connection extends EventEmitter
         @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue, @request.rows)
         @procReturnStatusValue = undefined
 
+        if token.rowCount != undefined
+          @request.rowCount += token.rowCount
+
         if @config.options.rowCollectionOnDone
           @request.rows = []
     )
@@ -269,12 +271,18 @@ class Connection extends EventEmitter
       if @request
         @request.emit('doneInProc', token.rowCount, token.more, @request.rows)
 
+        if token.rowCount != undefined
+          @request.rowCount += token.rowCount
+
         if @config.options.rowCollectionOnDone
           @request.rows = []
     )
     @tokenStreamParser.on('done', (token) =>
       if @request
         @request.emit('done', token.rowCount, token.more, @request.rows)
+
+        if token.rowCount != undefined
+          @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
           @request.rows = []

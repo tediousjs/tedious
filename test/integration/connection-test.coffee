@@ -551,6 +551,44 @@ exports.sqlWithMultipleResultSets = (test) ->
     #console.log(text)
   )
 
+exports.rowCountForUpdate = (test) ->
+  test.expect(2)
+
+  config = getConfig()
+  row = 0
+
+  setupSql = """
+    create table #tab1 (id int, name nvarchar(10));
+    insert into #tab1 values(1, N'a1');
+    insert into #tab1 values(2, N'a2');
+    insert into #tab1 values(3, N'b1');
+    update #tab1 set name = 'a3' where name like 'a%'
+  """
+
+  request = new Request(setupSql, (err, rowCount) ->
+      test.ok(!err)
+      test.strictEqual(rowCount, 5)
+      connection.close()
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.rowCollectionOnRequestCompletion = (test) ->
   test.expect(5)
 
@@ -635,7 +673,7 @@ exports.execProcAsSql = (test) ->
 
   request = new Request('exec sp_help int', (err, rowCount) ->
       test.ok(!err)
-      test.strictEqual(rowCount, 1)
+      test.strictEqual(rowCount, 0)
 
       connection.close()
   )
