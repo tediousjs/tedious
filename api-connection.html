@@ -38,6 +38,7 @@ title: API - Connection
   <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
   <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
   <li><a href="#function_prepare">connection.prepare(request)</a></li>
+  <li><a href="#function_reset">connection.reset(callback)</a></li>
   <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback)</a></li>
   <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
 </ul>
@@ -601,22 +602,51 @@ var connection = new Connection(config);
 
 <h2 id="function_prepare">connection.prepare(request)</h2>
 <p>
-  Prepare the SQL represented by the request.
-  The request can then be used in subsequent calls to
-  <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
+    Prepare the SQL represented by the request.
+    The request can then be used in subsequent calls to
+    <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
 </p>
 <div class="argument">
-  <div class="name">request</div>
-  <div class="description">
-    <p>
-      A <a href="api-request.html"><code>Request</code></a>
-      object representing the request.
-    </p>
-    <p>
-      Parameters only require a name and type.
-      Parameter values are ignored.
-    </p>
-  </div>
+    <div class="name">request</div>
+    <div class="description">
+        <p>
+            A <a href="api-request.html"><code>Request</code></a>
+            object representing the request.
+        </p>
+        <p>
+            Parameters only require a name and type.
+            Parameter values are ignored.
+        </p>
+    </div>
+</div>
+
+<h2 id="function_reset">connection.reset(callback)</h2>
+<p>
+    Reset the connection to its initial state.
+    Can be useful for connection pool implementations.
+</p>
+<div class="argument">
+    <div class="name">callback</div>
+    <div class="description">
+        <span class="function">function (err) { }</span>
+        <p>
+            The callback is called when the connection reset has completed,
+            either successfully or with an error.
+            If an error occured then <code>err</code> will describe the error.
+        </p>
+        <p>
+            As only one request at a time may be executed on a connection, another request should not
+            be initiated until this callback is called.
+        </p>
+        <div class="argument">
+            <div class="name">err</div>
+            <div class="description">
+                <p>
+                    If an error occured, a string with details of the error.
+                </p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <h2 id="function_rollbackTransaction">connection.rollbackTransaction(callback)</h2>
