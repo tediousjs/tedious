@@ -209,6 +209,36 @@ var connection = new Connection(config);
         (default: <code>{}</code>).
       </dd>
 
+        <dt>
+            <code>options.rowCollectionOnDone</code>
+        </dt>
+        <dd>
+            A boolean, that when true will expose received rows in Requests' <code>done*</code> events.
+            See <a href="api-request.html#event_done">done</a>,
+            <a href="api-request.html#event_doneInProc">doneInProc</a>
+            and <a href="api-request.html#event_doneProc">doneProc</a>.
+            (default: <code>false</code>)
+
+            <p>
+                Caution: If many row are received, enabling this option could result in
+                excessive memory usage.
+            </p>
+        </dd>
+
+      <dt>
+          <code>options.rowCollectionOnRequestCompletion</code>
+      </dt>
+      <dd>
+          A boolean, that when true will expose received rows in Requests' completion callback.
+          See <a href="api-request.html#function_newRequest">new Request</a>.
+          (default: <code>false</code>)
+
+          <p>
+              Caution: If many row are received, enabling this option could result in
+              excessive memory usage.
+          </p>
+      </dd>
+
       <dt>
         <code>options.tdsVersion</code>
       </dt>
