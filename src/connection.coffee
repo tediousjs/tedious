@@ -357,6 +357,10 @@ class Connection extends EventEmitter
     message = "connection to #{@config.server}:#{@config.options.port} - failed #{error}"
 
     @debug.log(message)
+    if @state == @STATE.CONNECTING
+      @emit('connect', message)
+    else
+      @emit('errorMessage', message)
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
