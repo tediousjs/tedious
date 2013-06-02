@@ -13,6 +13,7 @@ class Request extends EventEmitter
         @preparing = false
       else
         @userCallback.apply(@, arguments)
+        @emit('requestCompleted')
 
   addParameter: (name, type, value, options) ->
     if arguments.length < 4
