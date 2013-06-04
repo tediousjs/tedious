@@ -31,7 +31,7 @@
     "url": "git://github.com/pekim/tedious.git"
   },
   "engines": {
-    "node": "0.6 || 0.7 || 0.8 || 0.9"
+    "node": "0.6 || 0.7 || 0.8 || 0.9 || 0.10"
   },
   "dependencies": {
     "async": "0.2.6",
