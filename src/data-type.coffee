@@ -293,7 +293,7 @@ TYPE =
         length = @.maximumLength
 
       if length <= @maximumLength
-        "varchar(#{@.maximumLength})"
+        "varchar(#{length})"
       else
         "varchar(max)"
     writeParameterData: (buffer, parameter) ->
@@ -351,7 +351,7 @@ TYPE =
         length = @maximumLength
 
       if length <= @maximumLength
-        "nvarchar(#{@.maximumLength})"
+        "nvarchar(#{length})"
       else
         "nvarchar(max)"
     writeParameterData: (buffer, parameter) ->
