@@ -13,7 +13,7 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 Status
 ------
-Current version: v0.1.3
+Current version: v0.1.4
 
 Coming soon
 -----------
