@@ -344,9 +344,9 @@ TYPE =
     maximumLength: 4000
     declaration: (parameter) ->
       if parameter.length
-        length = 2 * parameter.length
+        length = parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.toString().length
+        length = parameter.value.toString().length
       else
         length = @maximumLength
 
