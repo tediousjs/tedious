@@ -289,6 +289,8 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.toString().length
+      else if parameter.value is null
+        length = 1
       else
         length = @.maximumLength
 
@@ -347,6 +349,8 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.toString().length
+      else if parameter.value is null
+        length = 1
       else
         length = @maximumLength
 
