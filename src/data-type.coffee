@@ -289,11 +289,13 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.toString().length
+      else if parameter.value is null
+        length = 1
       else
         length = @.maximumLength
 
       if length <= @maximumLength
-        "varchar(#{@.maximumLength})"
+        "varchar(#{length})"
       else
         "varchar(max)"
     writeParameterData: (buffer, parameter) ->
@@ -344,14 +346,16 @@ TYPE =
     maximumLength: 4000
     declaration: (parameter) ->
       if parameter.length
-        length = 2 * parameter.length
+        length = parameter.length
       else if parameter.value?
-        length = 2 * parameter.value.toString().length
+        length = parameter.value.toString().length
+      else if parameter.value is null
+        length = 1
       else
         length = @maximumLength
 
       if length <= @maximumLength
-        "nvarchar(#{@.maximumLength})"
+        "nvarchar(#{length})"
       else
         "nvarchar(max)"
     writeParameterData: (buffer, parameter) ->
