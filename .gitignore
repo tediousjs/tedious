@@ -11,3 +11,6 @@ lib/
 .DS_Store
 
 test/unit/perf-buffer.coffee
+
+src-coffee/
+test-coffee/
