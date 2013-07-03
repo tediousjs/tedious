@@ -91,7 +91,7 @@ TYPE =
         minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
 
         buffer.writeUInt8(4)
-        buffer.writeUInt16LE(days)
+        buffer.writeInt16LE(days)
         buffer.writeUInt16LE(minutes)
       else
         buffer.writeUInt8(0)
@@ -137,7 +137,7 @@ TYPE =
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(days)
+        buffer.writeInt32LE(days)
         buffer.writeUInt32LE(threeHundredthsOfSecond)
       else
         buffer.writeUInt8(0)
