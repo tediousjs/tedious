@@ -129,10 +129,10 @@ TYPE =
         days = (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
         days = Math.floor(days)
 
-        seconds = parameter.value.getHours() * 60 * 60
-        seconds += parameter.value.getMinutes() * 60
-        seconds += parameter.value.getSeconds()
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds()
+        seconds = parameter.value.getUTCHours() * 60 * 60
+        seconds += parameter.value.getUTCMinutes() * 60
+        seconds += parameter.value.getUTCSeconds()
+        milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds()
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3))
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
