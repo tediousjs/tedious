@@ -1,6 +1,6 @@
 guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
-EPOCH_DATE = new Date(1900, 0, 1)
+EPOCH_DATE = new Date('January 1, 1900 00:00:00 GMT')
 MAX = (1 << 16) - 1
 
 TYPE =
@@ -137,7 +137,7 @@ TYPE =
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(days)
+        buffer.writeInt32LE(days)
         buffer.writeUInt32LE(threeHundredthsOfSecond)
       else
         buffer.writeUInt8(0)
