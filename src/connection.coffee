@@ -487,6 +487,7 @@ set transaction isolation level read committed'''
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   callProcedure: (request) ->
+    request.parametersCodepage = @config.options.parametersCodepage
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
 
   beginTransaction: (callback, name, isolationLevel) ->
