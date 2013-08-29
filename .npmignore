@@ -1,4 +1,6 @@
 src/
 todo
-.git*
-.project
+.*
+test
+examples
+scripts

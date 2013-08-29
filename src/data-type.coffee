@@ -288,7 +288,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.toString().length
+        length = parameter.value.toString().length || 1
       else if parameter.value is null
         length = 1
       else
@@ -348,7 +348,7 @@ TYPE =
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.toString().length
+        length = parameter.value.toString().length || 1
       else if parameter.value is null
         length = 1
       else
