@@ -42,6 +42,8 @@ class RpcRequestPayload
       if parameter.output
         statusFlags |= STATUS.BY_REF_VALUE
 
+      parameter.codepage ?= @request.parametersCodepage
+
       # ParamMetaData (less TYPE_INFO)
       buffer.writeBVarchar('@' + parameter.name)
       buffer.writeUInt8(statusFlags)

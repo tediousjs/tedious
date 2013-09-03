@@ -1,4 +1,5 @@
 guidParser = require('./guid-parser')
+iconv = require('iconv-lite')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
 MAX = (1 << 16) - 1
@@ -171,7 +172,7 @@ TYPE =
       buffer.writeUInt8(8)
 
       # ParamLenData
-      if parameter.value
+      if parameter.value?
         buffer.writeUInt8(8)
         if parseInt(parameter.value) > 0x100000000 # 4294967296
           buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
@@ -198,10 +199,12 @@ TYPE =
     declaration: (parameter) ->
       'text'
     writeParameterData: (buffer, parameter) ->
+      valueBuffer = iconv.encode(parameter.value, parameter.codepage ? 'ascii')
+      
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.toString().length
+        length = valueBuffer.length
       else
         length = -1
 
@@ -215,7 +218,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeInt32LE(length)
-        buffer.writeString(parameter.value.toString(), 'ascii')
+        buffer.writeBuffer(valueBuffer)
       else
         buffer.writeInt32LE(length)
   0x24:
@@ -299,10 +302,12 @@ TYPE =
       else
         "varchar(max)"
     writeParameterData: (buffer, parameter) ->
+      valueBuffer = iconv.encode(parameter.value, parameter.codepage ? 'ascii')
+      
       if parameter.length
         length = parameter.length
       else if parameter.value?
-        length = parameter.value.toString().length
+        length = valueBuffer.length
       else
         length = @.maximumLength
 
@@ -318,13 +323,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value.toString(), 'ascii')
+          buffer.writeBuffer(valueBuffer)
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value.toString(), 'ascii')
+          buffer.writeBuffer(valueBuffer)
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
