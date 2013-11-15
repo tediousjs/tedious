@@ -183,7 +183,7 @@ class Connection extends EventEmitter
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
     else if @config.options.port && @config.options.instanceName
-      throw new Error("Port and instanceName are mutually exclusive, but #{config.options.port} and #{config.options.instanceName} provided")
+      throw new Error("Port and instanceName are mutually exclusive, but #{@config.options.port} and #{@config.options.instanceName} provided")
 
 
   createDebug: ->
