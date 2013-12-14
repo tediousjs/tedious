@@ -1,6 +1,6 @@
 guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
-EPOCH_DATE = new Date(1900, 0, 1)
+EPOCH_DATE = new Date('January 1, 1900 00:00:00 GMT')
 MAX = (1 << 16) - 1
 
 TYPE =
@@ -129,15 +129,15 @@ TYPE =
         days = (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
         days = Math.floor(days)
 
-        seconds = parameter.value.getHours() * 60 * 60
-        seconds += parameter.value.getMinutes() * 60
-        seconds += parameter.value.getSeconds()
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds()
+        seconds = parameter.value.getUTCHours() * 60 * 60
+        seconds += parameter.value.getUTCMinutes() * 60
+        seconds += parameter.value.getUTCSeconds()
+        milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds()
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3))
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(days)
+        buffer.writeInt32LE(days)
         buffer.writeUInt32LE(threeHundredthsOfSecond)
       else
         buffer.writeUInt8(0)
@@ -295,7 +295,7 @@ TYPE =
         length = @.maximumLength
 
       if length <= @maximumLength
-        "varchar(#{length})"
+        "varchar(#{Math.max(length,1)})"
       else
         "varchar(max)"
     writeParameterData: (buffer, parameter) ->
@@ -355,7 +355,7 @@ TYPE =
         length = @maximumLength
 
       if length <= @maximumLength
-        "nvarchar(#{length})"
+        "nvarchar(#{Math.max(length,1)})"
       else
         "nvarchar(max)"
     writeParameterData: (buffer, parameter) ->

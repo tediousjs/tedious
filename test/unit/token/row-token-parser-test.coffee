@@ -493,7 +493,7 @@ module.exports.datetime = (test) ->
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
+  test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45 GMT').getTime())
 
   test.done()
 

@@ -7,6 +7,9 @@ NULL = (1 << 16) - 1
 MAX = (1 << 16) - 1
 THREE_AND_A_THIRD = 3 + (1 / 3)
 MONEY_DIVISOR = 10000
+DAYS_TO_MILLISECOND = 86400000
+MINUTES_TO_MILLISECOND = 60000
+TDS_EPOCH_TO_JS_EPOCH = -2208988800000
 
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
@@ -262,9 +265,7 @@ readSmallDateTime = (buffer) ->
   days = buffer.readUInt16LE()
   minutes = buffer.readUInt16LE()
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMinutes(value.getMinutes() + minutes)
+  value = new Date(TDS_EPOCH_TO_JS_EPOCH + (days * DAYS_TO_MILLISECOND) + (minutes * MINUTES_TO_MILLISECOND));
   value
 
 readDateTime = (buffer) ->
@@ -272,9 +273,7 @@ readDateTime = (buffer) ->
   threeHundredthsOfSecond = buffer.readUInt32LE()
   milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMilliseconds(value.getMilliseconds() + milliseconds)
+  value = new Date(TDS_EPOCH_TO_JS_EPOCH + milliseconds + (days * DAYS_TO_MILLISECOND))
   value
 
 module.exports = parse
