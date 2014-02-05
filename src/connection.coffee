@@ -130,6 +130,11 @@ class Connection extends EventEmitter
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows)
 
+          if @config.options.useQueue and @queue.length > 0
+            next = @queue.shift()
+            @debug.log("Processing queued SQL request {#{next.request},#{next.packetType},#{next.payload}}.")
+            @makeRequest(next.request, next.packetType, next.payload)
+
     FINAL:
       name: 'Final'
       enter: ->
@@ -150,6 +155,7 @@ class Connection extends EventEmitter
     @createTokenStreamParser()
 
     @transactions = []
+    @queue = []
     @transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])]
 
     @transitionTo(@STATE.CONNECTING)
@@ -179,6 +185,7 @@ class Connection extends EventEmitter
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_UNCOMMITTED
     @config.options.encrypt ||= false
     @config.options.cryptoCredentialsDetails ||= {}
+    @config.options.useQueue ||= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -522,6 +529,12 @@ set transaction isolation level read committed'''
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
+
+      if @config.options.useQueue == true
+        @debug.log("Queued SQL request {#{request},#{packetType},#{payload}}.")
+        @queue.push({request: request, packetType: packetType, payload: payload})
+        return
+
       message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
       @debug.log(message)
