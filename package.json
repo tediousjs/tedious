@@ -14,7 +14,8 @@
     "database",
     "mssql",
     "sqlserver",
-    "tds"
+    "tds",
+    "msnodesql"
   ],
   "homepage": "https://github.com/pekim/tedious",
   "bugs": "https://github.com/pekim/tedious/issues",
@@ -34,13 +35,13 @@
     "node": "0.6 || 0.7 || 0.8 || 0.9 || 0.10 || 0.11"
   },
   "dependencies": {
-    "async": "0.2.6",
+    "async": "0.2.10",
     "iconv-lite": "0.2.7",
     "sprintf": "0.1.1"
   },
   "devDependencies": {
-    "coffee-script": "1.6.2",
-    "nodeunit": "0.8.0"
+    "coffee-script": "1.6.3",
+    "nodeunit": "0.8.4"
   },
   "scripts": {
     "test": "scripts/tests-unit",
