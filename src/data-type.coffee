@@ -188,6 +188,27 @@ TYPE =
     hasTableName: true
     hasTextPointerAndTimestamp: true
     dataLengthLength: 4
+    declaration: (parameter) ->
+      'image'
+      
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.length
+      else
+        length = -1
+
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 @id
+      buffer.writeInt32LE length
+
+      if parameter.value?
+        buffer.writeInt32LE length
+        buffer.writeBuffer parameter.value
+      else
+        buffer.writeInt32LE length
+      
   0x23:
     type: 'TEXT'
     name: 'Text'
@@ -278,6 +299,53 @@ TYPE =
     type: 'BIGVARBIN'
     name: 'VarBinary'
     dataLengthLength: 2
+    maximumLength: 8000
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.length || 1
+      else if parameter.value is null
+        length = 1
+      else
+        length = @maximumLength
+
+      if length <= @maximumLength
+        "varbinary(#{length})"
+      else
+        "varbinary(max)"
+        
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.length
+      else
+        length = @maximumLength
+
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 @id
+    
+      if length <= @maximumLength
+        buffer.writeUInt16LE @maximumLength
+      else
+        buffer.writeUInt16LE MAX
+
+      if parameter.value?
+        if length <= @maximumLength
+          buffer.writeUInt16LE length
+          buffer.writeBuffer parameter.value
+        else
+          # Length of all chunks.
+          buffer.writeUInt64LE length
+          # One chunk.
+          buffer.writeUInt32LE length
+          buffer.writeBuffer parameter.value
+          # PLP_TERMINATOR (no more chunks).
+          buffer.writeUInt32LE 0
+      else
+        buffer.writeUInt16LE NULL
+        
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
@@ -333,6 +401,28 @@ TYPE =
     type: 'BIGBinary'
     name: 'Binary'
     dataLengthLength: 2
+    maximumLength: 8000
+    declaration: (parameter) ->
+      'binary'
+      
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.length
+      else
+        length = @maximumLength
+
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 @id
+      buffer.writeUInt16LE length
+    
+      if parameter.value?
+        buffer.writeUInt16LE length
+        buffer.writeBuffer parameter.value.slice 0, Math.min(length, @maximumLength)
+      else
+        buffer.writeUInt16LE NULL
+      
   0xAF:
     type: 'BIGCHAR'
     name: 'Char'
