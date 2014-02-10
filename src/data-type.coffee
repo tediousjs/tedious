@@ -171,7 +171,7 @@ TYPE =
       buffer.writeUInt8(8)
 
       # ParamLenData
-      if parameter.value
+      if parameter.value?
         buffer.writeUInt8(8)
         if parseInt(parameter.value) > 0x100000000 # 4294967296
           buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
