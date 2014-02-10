@@ -91,7 +91,7 @@ TYPE =
         minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
 
         buffer.writeUInt8(4)
-        buffer.writeUInt16LE(days)
+        buffer.writeInt16LE(days)
         buffer.writeUInt16LE(minutes)
       else
         buffer.writeUInt8(0)
