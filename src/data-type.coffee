@@ -137,7 +137,7 @@ TYPE =
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
         buffer.writeUInt8(8)
-        buffer.writeUInt32LE(days)
+        buffer.writeInt32LE(days)
         buffer.writeUInt32LE(threeHundredthsOfSecond)
       else
         buffer.writeUInt8(0)
