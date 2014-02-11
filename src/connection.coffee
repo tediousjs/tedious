@@ -176,7 +176,7 @@ class Connection extends EventEmitter
     @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
     @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
-    @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_UNCOMMITTED
+    @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
     @config.options.encrypt ||= false
     @config.options.cryptoCredentialsDetails ||= {}
 
