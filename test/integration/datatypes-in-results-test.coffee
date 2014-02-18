@@ -24,6 +24,9 @@ exports.null = (test) ->
 exports.tinyint = (test) ->
   execSql(test, 'select cast(8 as tinyint)', 8)
 
+exports.tinyintLarge = (test) ->
+  execSql(test, 'select cast(252 as tinyint)', 252)
+
 exports.tinyintNull = (test) ->
   execSql(test, 'select cast(null as tinyint)', null)
 

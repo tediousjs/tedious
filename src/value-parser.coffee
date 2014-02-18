@@ -66,7 +66,7 @@ parse = (buffer, metaData) ->
         when 0
           value = null
         when 1
-          value = buffer.readInt8()
+          value = buffer.readUInt8()
         when 2
           value = buffer.readInt16LE()
         when 4

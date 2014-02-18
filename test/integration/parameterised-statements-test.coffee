@@ -31,6 +31,9 @@ exports.tinyInt = (test) ->
 exports.tinyIntZero = (test) ->
   execSql(test, TYPES.TinyInt, 0)
 
+exports.tinyIntLarge = (test) ->
+  execSql(test, TYPES.TinyInt, 252)
+
 exports.tinyIntNull = (test) ->
   execSql(test, TYPES.TinyInt, null)
 
@@ -142,6 +145,9 @@ exports.outputBitNull = (test) ->
 
 exports.outputTinyInt = (test) ->
   execSqlOutput(test, TYPES.TinyInt, 3)
+
+exports.outputTinyIntLarge = (test) ->
+  execSqlOutput(test, TYPES.TinyInt, 252)
 
 exports.outputTinyIntNull = (test) ->
   execSqlOutput(test, TYPES.TinyInt, null)

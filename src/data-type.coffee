@@ -23,7 +23,7 @@ TYPE =
       # ParamLenData
       if parameter.value?
         buffer.writeUInt8(1)
-        buffer.writeInt8(parseInt(parameter.value))
+        buffer.writeUInt8(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
   0x32:
