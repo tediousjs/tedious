@@ -15,6 +15,7 @@ tokenParsers[TYPE.ORDER] = require('./order-token-parser')
 tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser')
 tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser')
 tokenParsers[TYPE.ROW] = require('./row-token-parser')
+tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
