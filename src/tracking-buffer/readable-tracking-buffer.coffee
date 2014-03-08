@@ -25,9 +25,9 @@ class ReadableTrackingBuffer
     available = @buffer.length - @position
 
     if available < lengthRequired
-      throw
-        error: 'oob'
-        message: "required : #{lengthRequired}, available : #{available}"
+      e = new Error "required : #{lengthRequired}, available : #{available}"
+      e.code = 'oob'
+      throw e
 
   empty: ->
     @position == @buffer.length

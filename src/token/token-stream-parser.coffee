@@ -46,6 +46,10 @@ class Parser extends EventEmitter
 
   nextToken: ->
     try
+      # check if we have available bytes
+      unless @buffer.buffer.length > @buffer.position
+        return false
+
       type = @buffer.readUInt8()
 
       if tokenParsers[type]
@@ -71,7 +75,8 @@ class Parser extends EventEmitter
       else
         throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
     catch error
-      if error?.error == 'oob'
+      if error?.code == 'oob'
+        console.error "OOB ERROR", type, error.stack
         # There was an attempt to read past the end of the buffer.
         # In other words, we've run out of buffer.
         return false
