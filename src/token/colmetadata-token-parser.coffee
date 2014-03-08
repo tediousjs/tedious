@@ -28,6 +28,7 @@ parser = (buffer, colMetadata, tdsVersion) ->
       collation: metadata.collation
       precision: metadata.precision
       scale: metadata.scale
+      udtInfo: metadata.udtInfo
       dataLength: metadata.dataLength
       tableName: tableName
 

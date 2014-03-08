@@ -177,7 +177,7 @@ module.exports.nVarChar = (test) ->
 
 module.exports.varBinary = (test) ->
   colMetaData = [type: dataTypeByName.VarBinary]
-  value = [0x12, 0x34]
+  value = new Buffer [0x12, 0x34]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
@@ -195,7 +195,7 @@ module.exports.varBinary = (test) ->
 
 module.exports.binary = (test) ->
   colMetaData = [type: dataTypeByName.Binary]
-  value = [0x12, 0x34]
+  value = new Buffer [0x12, 0x34]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
@@ -359,7 +359,7 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
     type: dataTypeByName.VarBinary
     dataLength: 65535
   ]
-  value = [0x12, 0x34, 0x56, 0x78]
+  value = new Buffer [0x12, 0x34, 0x56, 0x78]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
