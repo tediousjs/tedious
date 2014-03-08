@@ -1,6 +1,7 @@
 guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
+YEAR_ONE = Date.UTC(2000, 0, -730118)
 MAX = (1 << 16) - 1
 
 TYPE =
@@ -488,15 +489,188 @@ TYPE =
     type: 'XML'
     name: 'Xml'
     hasSchemaPresent: true
+  0x29:
+    type: 'TIMEN'
+    name: 'TimeN'
+    hasScale: true
+    dataLengthLength: 0
+    dataLengthFromScale: (scale) ->
+      switch scale
+        when 0, 1, 2 then 3
+        when 3, 4 then 4
+        when 5, 6, 7 then 5
+        else throw new Error "Unsupported scale '#{scale}'"
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      "time(#{length})"
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      buffer.writeUInt8 @id
+      buffer.writeUInt8 length # precision
+
+      if parameter.value?
+        parameter.value.setUTCFullYear 1970
+        parameter.value.setUTCMonth 0
+        parameter.value.setUTCDate 1
+
+        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+
+        # seconds since midnight
+        switch length
+          when 0, 1, 2
+            buffer.writeUInt8 3
+            buffer.writeUInt24LE time
+          when 3, 4
+            buffer.writeUInt8 4
+            buffer.writeUInt32LE time
+          when 5, 6, 7
+            buffer.writeUInt8 5
+            buffer.writeUInt40LE time
+      else
+        buffer.writeUInt8 0
+        
+  0x28:
+    type: 'DATEN'
+    name: 'DateN'
+    dataLengthLength: 0
+    declaration: (parameter) ->
+      "date"
+    writeParameterData: (buffer, parameter) ->
+      buffer.writeUInt8(@id)
+
+      if parameter.value?
+        buffer.writeUInt8 3
+        # days since 1-1-1
+        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+      else
+        buffer.writeUInt8 0
+  0x2A:
+    type: 'DATETIME2N'
+    name: 'DateTime2N'
+    hasScale: true
+    dataLengthLength: 0
+    dataLengthFromScale: (scale) ->
+      switch scale
+        when 0, 1, 2 then 3
+        when 3, 4 then 4
+        when 5, 6, 7 then 5
+        else throw new Error "Unsupported scale '#{scale}'"
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      "datetime2(#{length})"
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      buffer.writeUInt8 @id
+      buffer.writeUInt8 length # precision
+
+      if parameter.value?
+        time = new Date(+parameter.value)
+        time.setUTCFullYear 1970
+        time.setUTCMonth 0
+        time.setUTCDate 1
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+
+        # seconds since midnight
+        switch length
+          when 0, 1, 2
+            buffer.writeUInt8 6
+            buffer.writeUInt24LE time
+          when 3, 4
+            buffer.writeUInt8 7
+            buffer.writeUInt32LE time
+          when 5, 6, 7
+            buffer.writeUInt8 8
+            buffer.writeUInt40LE time
+        # days since 1-1-1
+        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+      else
+        buffer.writeUInt8 0
+  0x2B:
+    type: 'DATETIMEOFFSETN'
+    name: 'DateTimeOffsetN'
+    hasScale: true
+    dataLengthLength: 0
+    dataLengthFromScale: (scale) ->
+      switch scale
+        when 0, 1, 2 then 3
+        when 3, 4 then 4
+        when 5, 6, 7 then 5
+        else throw new Error "Unsupported scale '#{scale}'"
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      "datetimeoffset(#{length})"
+    writeParameterData: (buffer, parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value is null
+        length = 0
+      else
+        length = 7
+
+      buffer.writeUInt8 @id
+      buffer.writeUInt8 length # precision
+
+      if parameter.value?
+        time = new Date(+parameter.value)
+        time.setUTCFullYear 1970
+        time.setUTCMonth 0
+        time.setUTCDate 1
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+        
+        offset = -parameter.value.getTimezoneOffset()
+        
+        # seconds since midnight
+        switch length
+          when 0, 1, 2
+            buffer.writeUInt8 8
+            buffer.writeUInt24LE time
+          when 3, 4
+            buffer.writeUInt8 9
+            buffer.writeUInt32LE time
+          when 5, 6, 7
+            buffer.writeUInt8 10
+            buffer.writeUInt40LE time
+        # days since 1-1-1
+        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+        # offset
+        buffer.writeInt16LE offset
+      else
+        buffer.writeUInt8 0
 
 # Types not (yet) supported
 ###
   DECIMALTYPE:          0x37  # Decimal (legacy support)
   NUMERICTYPE:          0x3F  # Numeric (legacy support)
-  DATENTYPE:            0x28  # (introduced in TDS 7.3)
-  TIMENTYPE:            0x29  # (introduced in TDS 7.3)
-  DATETIME2NTYPE:       0x2A  # (introduced in TDS 7.3)
-  DATETIMEOFFSETNTYPE:  0x2B  # (introduced in TDS 7.3)
   CHARTYPE:             0x2F  # Char (legacy support)
   VARCHARTYPE:          0x27  # VarChar (legacy support)
   BINARYTYPE:           0x2D  # Binary (legacy support)

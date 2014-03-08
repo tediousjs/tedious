@@ -21,6 +21,8 @@ parse = (buffer, tdsVersion) ->
     # xx10xxxx - s2.2.4.2.1.3
     # Variable length
     switch type.dataLengthLength
+      when 0
+        dataLength = undefined
       when 1
         dataLength = buffer.readUInt8()
       when 2
@@ -39,6 +41,9 @@ parse = (buffer, tdsVersion) ->
 
   if type.hasScale
     scale = buffer.readUInt8()
+  
+    if type.dataLengthFromScale
+      dataLength = type.dataLengthFromScale scale
   else
     scale = undefined
 
