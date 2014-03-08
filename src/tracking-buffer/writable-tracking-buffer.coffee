@@ -56,6 +56,14 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeUInt16BE(value, @position)
     @position += length
+  
+  writeUInt24LE: (value) ->
+    length = 3
+    @makeRoomFor(length)
+    @buffer[@position + 2] = (value >>> 16) & 0xff;
+    @buffer[@position + 1] = (value >>> 8) & 0xff;
+    @buffer[@position] = value & 0xff;
+    @position += length
 
   writeUInt32LE: (value) ->
     length = 4
@@ -74,6 +82,14 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeUInt32BE(value, @position)
     @position += length
+  
+  writeUInt40LE: (value) ->
+    # inspred by https://github.com/dpw/node-buffer-more-ints
+    SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
+    SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
+    
+    @writeInt32LE value & -1
+    @writeUInt8 Math.floor(value * SHIFT_RIGHT_32)
 
   writeInt8: (value) ->
     length = 1
