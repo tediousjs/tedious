@@ -34,7 +34,7 @@ exports.notEnoughLeft = (test) ->
     buffer.readUInt16LE()
     test.ok(false)
   catch error
-    test.strictEqual(error.error, 'oob')
+    test.strictEqual(error.code, 'oob')
 
   test.done()
 
@@ -49,7 +49,7 @@ exports.addBuffer = (test) ->
     buffer.readUInt32LE()
     test.ok(false)
   catch error
-    test.strictEqual(error.error, 'oob')
+    test.strictEqual(error.code, 'oob')
 
   buffer.add(data.slice(2, 4))
   test.strictEqual(buffer.readUInt32LE(), 4)
