@@ -668,7 +668,7 @@ TYPE =
         buffer.writeUInt8 0
   0xF0:
     type: 'UDTTYPE'
-    name: 'UserDefinedType'
+    name: 'UDT'
     hasUDTInfo: true
 
 # Types not (yet) supported

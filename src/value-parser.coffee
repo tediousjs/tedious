@@ -206,7 +206,7 @@ parse = (buffer, metaData) ->
           value = guidParser.arrayToGuid( buffer.readArray(0x10) )
         else
           throw new Error(sprintf('Unsupported guid size %d at offset 0x%04X', dataLength - 1, buffer.position))
-    when 'UserDefinedType'
+    when 'UDT'
       value = readMaxBinary(buffer)
     else
       throw new Error(sprintf('Unrecognised type %s at offset 0x%04X', type.name, buffer.position))
