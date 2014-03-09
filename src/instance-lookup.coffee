@@ -36,7 +36,7 @@ exports.instanceLookup = (server, instanceName, callback, timeout, retries) ->
 
     socket.close()
 
-    callback("Failed to lookup instance on #{server} : #{err}")
+    callback("Failed to lookup instance on #{server} - #{err.message}")
 
   timedOut = () ->
     timer = undefined

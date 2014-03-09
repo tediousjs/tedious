@@ -16,6 +16,8 @@ ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL
 crypto = require('crypto')
 tls = require('tls')
 
+{ConnectionError, RequestError} = require('./errors')
+
 # A rather basic state machine for managing a connection.
 # Implements something approximating s3.2.1.
 
@@ -167,6 +169,8 @@ class Connection extends EventEmitter
       @closeConnection()
       @emit('end')
       @closed = true
+      @loggedIn = false
+      @loginError = null
 
   defaultConfig: ->
     @config.options ||= {}
@@ -184,7 +188,9 @@ class Connection extends EventEmitter
       @config.options.port = DEFAULT_PORT
     else if @config.options.port && @config.options.instanceName
       throw new Error("Port and instanceName are mutually exclusive, but #{@config.options.port} and #{@config.options.instanceName} provided")
-
+    else if @config.options.port
+      if @config.options.port < 0 or @config.options.port > 65536
+        throw new RangeError "Port should be > 0 and < 65536"
 
   createDebug: ->
     @debug = new Debug(@config.options.debug)
@@ -199,8 +205,11 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
-      if @request
-        @request.error = token.message
+      if @loggedIn
+        if @request
+          @request.error = RequestError token.message, 'EREQUEST'
+      else
+        @loginError = ConnectionError token.message, 'ELOGIN'
     )
     @tokenStreamParser.on('databaseChange', (token) =>
       @emit('databaseChange', token.newValue)
@@ -297,7 +306,7 @@ class Connection extends EventEmitter
     else
       instanceLookup(@config.server, @config.options.instanceName, (err, port) =>
         if err
-          throw new Error(err)
+          @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
         else
           @connectOnPort(port)
       )
@@ -326,10 +335,10 @@ class Connection extends EventEmitter
     @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)
 
   connectTimeout: =>
-    message = "timeout : failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
+    message = "Failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
 
     @debug.log(message)
-    @emit('connect', message)
+    @emit('connect', ConnectionError(message, 'ETIMEOUT'))
     @connectTimer = undefined
     @dispatchEvent('connectTimeout')
 
@@ -354,11 +363,11 @@ class Connection extends EventEmitter
       throw new Error("No event '#{eventName}' in state '#{@state.name}'")
 
   socketError: (error) =>
-    message = "connection to #{@config.server}:#{@config.options.port} - failed #{error}"
+    message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"
 
     @debug.log(message)
     if @state == @STATE.CONNECTING
-      @emit('connect', message)
+      @emit('connect', ConnectionError(message, 'ESOCKET'))
     else
       @emit('errorMessage', message)
     @dispatchEvent('socketError', error)
@@ -464,7 +473,10 @@ set transaction isolation level read committed'''
     if @loggedIn
       @dispatchEvent('loggedIn')
     else
-      @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->
@@ -504,7 +516,7 @@ set transaction isolation level read committed'''
 
   commitTransaction: (callback) ->
     if @transactions.length == 0
-      throw new Error('No transaction in progress')
+      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
     transaction = @transactions.pop()
 
     request = new Request(undefined, callback)
@@ -513,7 +525,7 @@ set transaction isolation level read committed'''
 
   rollbackTransaction: (callback) ->
     if @transactions.length == 0
-      throw new Error('No transaction in progress')
+      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
     transaction = @transactions.pop()
 
     request = new Request(undefined, callback)
@@ -522,10 +534,10 @@ set transaction isolation level read committed'''
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
-      message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
+      message = "Requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
       @debug.log(message)
-      request.callback(message)
+      request.callback RequestError message, 'EINVALIDSTATE'
     else
       @request = request
       @request.rowCount = 0

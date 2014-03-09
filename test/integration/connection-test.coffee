@@ -42,19 +42,12 @@ exports.badPort = (test) ->
   config.options.port = -1
   config.options.connectTimeout = 200
 
-  connection = new Connection(config)
+  connection = null
 
-  connection.on('connect', (err) ->
-    test.ok(err)
-  )
+  test.throws ->
+    connection = new Connection(config)
 
-  connection.on('end', (info) ->
-    test.done()
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+  test.done()
 
 exports.badCredentials = (test) ->
   test.expect(2)
