@@ -22,6 +22,13 @@ Current version: 0.1.5
 - Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error
 - Minor fixes
 
+### Upgrade from 0.1.5 to 0.2.0
+
+- Time values are now passed/received in UTC instead of local time. You can disable this by `options.useUTC = false`.
+- There was a change in default transaction isolationLevel from `READ_UNCOMMITED` to `READ_COMMITED`. You can disable this by `options.isolationLevel = require('tedious').ISOLATION_LEVEL.READ_UNCOMMITTED`.
+- Binary values are now returned in Buffers.
+- All error values are no longer strings, but instances of Error.
+
 <a name="documentation" />
 ## Documentation
 More documentation is available at [pekim.github.io/tedious/](http://pekim.github.io/tedious/)
