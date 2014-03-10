@@ -71,13 +71,13 @@ exports.bitNull = (test) ->
   execSql(test, "select cast(null as bit)", null)
 
 exports.datetime = (test) ->
-  execSql(test, "select cast('2011-12-4 10:04:23' as datetime)", new Date('December 4, 2011 10:04:23'))
+  execSql(test, "select cast('2011-12-4 10:04:23' as datetime)", new Date('December 4, 2011 10:04:23 GMT'))
 
 exports.datetimeNull = (test) ->
   execSql(test, "select cast(null as datetime)", null)
 
 exports.smallDatetime = (test) ->
-  execSql(test, "select cast('2011-12-4 10:04:23' as smalldatetime)", new Date('December 4, 2011 10:04:00'))
+  execSql(test, "select cast('2011-12-4 10:04:23' as smalldatetime)", new Date('December 4, 2011 10:04:00 GMT'))
 
 exports.smallDatetimeNull = (test) ->
   execSql(test, "select cast(null as smalldatetime)", null)

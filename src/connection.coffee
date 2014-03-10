@@ -183,6 +183,7 @@ class Connection extends EventEmitter
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
     @config.options.encrypt ||= false
     @config.options.cryptoCredentialsDetails ||= {}
+    @config.options.useUTC ?= true
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -199,7 +200,7 @@ class Connection extends EventEmitter
     )
 
   createTokenStreamParser: ->
-    @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options.tdsVersion)
+    @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options)
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
@@ -480,26 +481,26 @@ set transaction isolation level read committed'''
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->
-    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @currentTransactionDescriptor(), @config.options))
 
   execSql: (request) ->
     request.transformIntoExecuteSqlRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   prepare: (request) ->
     request.transformIntoPrepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   unprepare: (request) ->
     request.transformIntoUnprepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   execute: (request, parameters) ->
     request.transformIntoExecuteRpc(parameters)
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   callProcedure: (request) ->
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   beginTransaction: (callback, name, isolationLevel) ->
     name ||= ''

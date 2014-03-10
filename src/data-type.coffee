@@ -1,6 +1,7 @@
 guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
+UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1))
 YEAR_ONE = Date.UTC(2000, 0, -730118)
 MAX = (1 << 16) - 1
 
@@ -80,16 +81,19 @@ TYPE =
     name: 'SmallDateTime'
     declaration: (parameter) ->
       'smalldatetime'
-    writeParameterData: (buffer, parameter) ->
+    writeParameterData: (buffer, parameter, options) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.DateTimeN.id)
       buffer.writeUInt8(4)
 
       # ParamLenData
       if parameter.value?
-        days = (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
-        days = Math.floor(days)
-        minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
+        if options.useUTC
+          days = Math.floor (parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes()
+        else
+          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
 
         buffer.writeUInt8(4)
         buffer.writeUInt16LE(days)
@@ -120,20 +124,26 @@ TYPE =
     name: 'DateTime'
     declaration: (parameter) ->
       'datetime'
-    writeParameterData: (buffer, parameter) ->
+    writeParameterData: (buffer, parameter, options) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.DateTimeN.id)
       buffer.writeUInt8(8)
 
       # ParamLenData
       if parameter.value?
-        days = (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
-        days = Math.floor(days)
-
-        seconds = parameter.value.getHours() * 60 * 60
-        seconds += parameter.value.getMinutes() * 60
-        seconds += parameter.value.getSeconds()
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds()
+        if options.useUTC
+          days = Math.floor (parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          seconds = parameter.value.getUTCHours() * 60 * 60
+          seconds += parameter.value.getUTCMinutes() * 60
+          seconds += parameter.value.getUTCSeconds()
+          milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds()
+        else
+          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          seconds = parameter.value.getHours() * 60 * 60
+          seconds += parameter.value.getMinutes() * 60
+          seconds += parameter.value.getSeconds()
+          milliseconds = (seconds * 1000) + parameter.value.getMilliseconds()
+        
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3))
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 

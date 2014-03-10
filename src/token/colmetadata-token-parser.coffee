@@ -4,12 +4,12 @@ metadataParse = require('../metadata-parser')
 
 DIGITS_REGEX = /^\d+$/
 
-parser = (buffer, colMetadata, tdsVersion) ->
+parser = (buffer, colMetadata, options) ->
   columnCount = buffer.readUInt16LE()
 
   columns = []
   for c in [1..columnCount]
-    metadata = metadataParse(buffer, tdsVersion)
+    metadata = metadataParse(buffer, options)
 
     if metadata.type.hasTableName
       numberOfTableNameParts = buffer.readUInt8()

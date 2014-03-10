@@ -11,7 +11,7 @@ MONEY_DIVISOR = 10000
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 
-parse = (buffer, metaData) ->
+parse = (buffer, metaData, options) ->
   value = undefined
   dataLength = undefined
   textPointerNull = undefined
@@ -146,17 +146,17 @@ parse = (buffer, metaData) ->
     when 'Xml'
       value = readMaxNChars(buffer)
     when 'SmallDateTime'
-      value = readSmallDateTime(buffer)
+      value = readSmallDateTime(buffer, options.useUTC)
     when 'DateTime'
-      value = readDateTime(buffer)
+      value = readDateTime(buffer, options.useUTC)
     when 'DateTimeN'
       switch dataLength
         when 0
           value = null
         when 4
-          value = readSmallDateTime(buffer)
+          value = readSmallDateTime(buffer, options.useUTC)
         when 8
-          value = readDateTime(buffer)
+          value = readDateTime(buffer, options.useUTC)
     when 'TimeN'
       if (dataLength = buffer.readUInt8()) == 0
         value = null
@@ -282,23 +282,35 @@ readMax = (buffer, decodeFunction) ->
 
     decodeFunction(valueBuffer)
 
-readSmallDateTime = (buffer) ->
+readSmallDateTime = (buffer, useUTC) ->
   days = buffer.readUInt16LE()
   minutes = buffer.readUInt16LE()
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMinutes(value.getMinutes() + minutes)
+  if useUTC
+    value = new Date(Date.UTC(1900, 0, 1))
+    value.setUTCDate(value.getUTCDate() + days)
+    value.setUTCMinutes(value.getUTCMinutes() + minutes)
+  else
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMinutes(value.getMinutes() + minutes)
+    
   value
 
-readDateTime = (buffer) ->
+readDateTime = (buffer, useUTC) ->
   days = buffer.readInt32LE()
   threeHundredthsOfSecond = buffer.readUInt32LE()
   milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMilliseconds(value.getMilliseconds() + milliseconds)
+  if useUTC
+    value = new Date(Date.UTC(1900, 0, 1))
+    value.setUTCDate(value.getUTCDate() + days)
+    value.setUTCMilliseconds(value.getUTCMilliseconds() + milliseconds)
+  else
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMilliseconds(value.getMilliseconds() + milliseconds)
+    
   value
 
 readTime = (buffer, dataLength, scale) ->

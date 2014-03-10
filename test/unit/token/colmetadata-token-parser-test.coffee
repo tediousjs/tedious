@@ -18,7 +18,7 @@ module.exports.int = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
   #console.log(token)
 
   test.ok(!token.error)
@@ -50,7 +50,7 @@ module.exports.varchar = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
   #console.log(token)
 
   test.ok(!token.error)

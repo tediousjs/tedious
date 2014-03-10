@@ -28,7 +28,7 @@ tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser')
   parsing resumes.
 ###
 class Parser extends EventEmitter
-  constructor: (@debug, @colMetadata, @tdsVersion) ->
+  constructor: (@debug, @colMetadata, @options) ->
     @buffer = new ReadableTrackingBuffer(new Buffer(0), 'ucs2')
     @position = 0
 
@@ -54,7 +54,7 @@ class Parser extends EventEmitter
       type = @buffer.readUInt8()
 
       if tokenParsers[type]
-        token = tokenParsers[type](@buffer, @colMetadata, @tdsVersion)
+        token = tokenParsers[type](@buffer, @colMetadata, @options)
 
         if token
           @debug.token(token)

@@ -17,7 +17,7 @@ STATUS =
   s2.2.6.5
 ###
 class RpcRequestPayload
-  constructor: (@request, txnDescriptor) ->
+  constructor: (@request, txnDescriptor, options) ->
     buffer = new WritableTrackingBuffer(500)
 
     @procedure = @request.sqlTextOrProcedure
@@ -46,7 +46,7 @@ class RpcRequestPayload
       buffer.writeBVarchar('@' + parameter.name)
       buffer.writeUInt8(statusFlags)
 
-      parameter.type.writeParameterData(buffer, parameter)
+      parameter.type.writeParameterData(buffer, parameter, options)
 
     @data = buffer.data
 

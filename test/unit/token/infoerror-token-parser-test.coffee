@@ -26,7 +26,7 @@ module.exports.info = (test) ->
   data.writeUInt16LE(data.length - 2, 0)
   #console.log(buffer)
 
-  token = infoParser(new ReadableTrackingBuffer(data, 'ucs2'))
+  token = infoParser(new ReadableTrackingBuffer(data, 'ucs2'), null, {})
   #console.log(token)
 
   test.strictEqual(token.number, number)

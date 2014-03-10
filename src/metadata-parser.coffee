@@ -3,8 +3,8 @@ codepageByLcid = require('./collation').codepageByLcid
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parse = (buffer, tdsVersion) ->
-  if tdsVersion < "7_2"
+parse = (buffer, options) ->
+  if options.tdsVersion < "7_2"
     userType = buffer.readUInt16LE()
   else
     userType = buffer.readUInt32LE()

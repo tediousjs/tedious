@@ -5,7 +5,7 @@ sprintf = require('sprintf').sprintf
 
 DIGITS_REGEX = /^\d+$/
 
-parser = (buffer, columnsMetaData) ->
+parser = (buffer, columnsMetaData, options) ->
   length = Math.ceil columnsMetaData.length / 8
   bytes = buffer.readBuffer length
   bitmap = []
@@ -21,7 +21,7 @@ parser = (buffer, columnsMetaData) ->
     if bitmap[index]
       value = null
     else
-      value = valueParse(buffer, columnMetaData)
+      value = valueParse(buffer, columnMetaData, options)
 
     column =
       value: value
