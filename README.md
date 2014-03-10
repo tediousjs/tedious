@@ -1,45 +1,45 @@
-Tedious (node implementation of TDS)
-====================================
-[![Build Status](https://secure.travis-ci.org/pekim/tedious.png)](http://travis-ci.org/pekim/tedious)
+# Tedious (node implementation of TDS)
+[![Dependency Status](https://david-dm.org/pekim/tedious.png)](https://david-dm.org/pekim/tedious) [![NPM version](https://badge.fury.io/js/tedious.png)](http://badge.fury.io/js/mssql) [![Build Status](https://secure.travis-ci.org/pekim/tedious.png)](http://travis-ci.org/pekim/tedious)
 
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
-which is used to interact with instances of Microsoft's SQL Server.
+which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
-It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
+<a name="status" />
+## Status
+Current version: 0.1.5
 
-Name
-----
-_Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
+### Coming soon in 0.2.0
 
-Status
-------
-Current version: v0.1.5
+- Added support for TDS 7.4
+- Added support for UDT, Time, Date, DateTime2 and DateTimeOffset data types
+- Added option to choose whether to pass/receive times in UTC or local time (`useUTC`)
+- Binary, VarBinary and Image are now supported as input parameters
+- Binary, VarBinary and Image types are now returned as Buffer (was Array)
+- Connection errors are now correctly propagated to `connect` event.
+- Errors are now instanceof Error / ConnectionError / RequestError (was plain text)
+- Transaction isolationLevel default is now `READ_COMMITED` (was `READ_UNCOMMITED`)
+- Fixed issue when zero value was casted as null when using BigInt as input parameter
+- Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error
+- Minor fixes
 
-Coming soon
------------
-Although subject to change, this is the rough plan for the next few versions.
-
-- support for more data types for parameters
-- possible support for varchar(max), nvarchar(max) and varbinary(max) as streams
-
-### unplanned ###
-- decoding of column metadata flags
-- full decoding of collation data
-- ability to cancel a request
-
-Documentation
--------------
+<a name="documentation" />
+## Documentation
 More documentation is available at [pekim.github.io/tedious/](http://pekim.github.io/tedious/)
 
-Discussion
-----------
+<a name="discussion" />
+## Discussion
 Google Group - http://groups.google.com/group/node-tedious
 
-Licence
--------
-(The MIT License)
+<a name="name" />
+## Name
+_Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
-Copyright (c) 2010-2012 Mike D Pilsbury
+<a name="license" />
+## Licence
+
+Copyright (c) 2010-2014 Mike D Pilsbury
+
+The MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
