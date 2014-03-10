@@ -4,6 +4,14 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
+### Supported TDS versions
+
+- TDS 7.4 (SQL Server 2012)
+- TDS 7.3.A (SQL Server 2008 R2)
+- TDS 7.3.B (SQL Server 2008)
+- TDS 7.2 (SQL Server 2005)
+- TDS 7.1 (SQL Server 2000)
+
 <a name="status" />
 ## Status
 Current version: 0.1.5
@@ -20,6 +28,7 @@ Current version: 0.1.5
 - Transaction isolationLevel default is now `READ_COMMITED` (was `READ_UNCOMMITED`)
 - Fixed issue when zero value was casted as null when using BigInt as input parameter
 - Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error
+- Fixed compatibility with TDS 7.1 (SQL Server 2000)
 - Minor fixes
 
 ### Upgrade from 0.1.5 to 0.2.0

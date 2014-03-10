@@ -5,11 +5,13 @@ writeAllHeaders = require('./all-headers').writeToTrackingBuffer
   s2.2.6.6
 ###
 class SqlBatchPayload
-  constructor: (@sqlText, txnDescriptor) ->
-    outstandingRequestCount = 1
-
+  constructor: (@sqlText, txnDescriptor, options) ->
     buffer = new WritableTrackingBuffer(100 + (2 * @sqlText.length), 'ucs2')
-    writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
+    
+    if options.tdsVersion >= '7_2'
+      outstandingRequestCount = 1
+      writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
+    
     buffer.writeString(@sqlText, 'ucs2')
 
     @data = buffer.data

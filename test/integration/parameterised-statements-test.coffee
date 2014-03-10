@@ -90,7 +90,7 @@ exports.varCharMax = (test) ->
   for i in [1..(10 * 1000)]
     longString += 'x'
 
-  execSql(test, TYPES.VarChar, longString)
+  execSql(test, TYPES.VarChar, longString, '7_2')
 
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
@@ -106,7 +106,7 @@ exports.nVarCharMax = (test) ->
   for i in [1..(10 * 1000)]
     longString += 'x'
 
-  execSql(test, TYPES.NVarChar, longString)
+  execSql(test, TYPES.NVarChar, longString, '7_2')
 
 exports.textNull = (test) ->
   execSql(test, TYPES.Text, null)
@@ -245,11 +245,14 @@ exports.multipleParameters = (test) ->
     #console.log(text)
   )
 
-execSql = (test, type, value) ->
-  test.expect(5)
-
+execSql = (test, type, value, tdsVersion) ->
   config = getConfig()
   #config.options.packetSize = 32768
+  
+  if tdsVersion and tdsVersion > config.options.tdsVersion
+  	return test.done()
+  	
+  test.expect(5)
 
   request = new Request('select @param', (err) ->
       test.ok(!err)

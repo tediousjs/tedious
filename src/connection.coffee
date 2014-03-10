@@ -448,7 +448,7 @@ class Connection extends EventEmitter
     @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
-    payload = new SqlBatchPayload(@getInitialSql(), @currentTransactionDescriptor())
+    payload = new SqlBatchPayload(@getInitialSql(), @currentTransactionDescriptor(), @config.options)
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
@@ -507,6 +507,9 @@ set transaction isolation level read committed'''
     name ||= ''
     isolationLevel ||= @config.options.isolationLevel
 
+    if @config.options.tdsVersion < "7_2"
+      return callback RequestError "Transactions are not supported on TDS 7.1."
+      
     transaction = new Transaction(name, isolationLevel)
     @transactions.push(transaction)
 

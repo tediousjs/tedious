@@ -12,9 +12,12 @@ parser = (buffer, colMetadata, options) ->
     metadata = metadataParse(buffer, options)
 
     if metadata.type.hasTableName
-      numberOfTableNameParts = buffer.readUInt8()
-      tableName = for part in [1..numberOfTableNameParts]
-        buffer.readUsVarchar('ucs2')
+      if options.tdsVersion >= '7_2'
+        numberOfTableNameParts = buffer.readUInt8()
+        tableName = for part in [1..numberOfTableNameParts]
+          buffer.readUsVarchar('ucs2')
+      else
+        tableName = buffer.readUsVarchar('ucs2')
     else
       tableName = undefined
 

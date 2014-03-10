@@ -21,9 +21,10 @@ class RpcRequestPayload
     buffer = new WritableTrackingBuffer(500)
 
     @procedure = @request.sqlTextOrProcedure
-
-    outstandingRequestCount = 1
-    writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
+    
+    if options.tdsVersion >= '7_2'
+      outstandingRequestCount = 1
+      writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount)
 
     # NameLenProcID
     if typeof @procedure == 'string'

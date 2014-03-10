@@ -743,7 +743,13 @@ exports.resetConnection = (test) ->
       testAnsiNullsOptionOn,
       setAnsiNullsOptionOff,
       testAnsiNullsOptionOff,
-      connection.reset,
+      (callback) ->
+        connection.reset (err) ->
+          if connection.config.options.tdsVersion < '7_2'
+            # TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
+            test.ok(true)
+           
+          callback err
       testAnsiNullsOptionOn,
       (callback) ->
         connection.close()
