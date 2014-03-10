@@ -222,6 +222,7 @@ class Connection extends EventEmitter
       @emit('charsetChange', token.newValue)
     )
     @tokenStreamParser.on('loginack', (token) =>
+      @config.options.tdsVersion = token.tdsVersion
       @loggedIn = true
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
