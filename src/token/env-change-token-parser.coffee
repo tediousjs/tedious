@@ -53,13 +53,17 @@ module.exports = (buffer) ->
         valueLength = buffer.readUInt8()
         oldValue = buffer.readBuffer(valueLength)
       else
-        throw new Error("Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}")
+        console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}"
+        buffer.readBuffer length - 1 # skip unknown bytes
+        return
 
     if type.name == 'PACKET_SIZE'
       newValue = parseInt(newValue)
       oldValue = parseInt(oldValue)
   else
-    throw new Error("Unsupported ENVCHANGE type #{typeNumber} at offset #{buffer.position - 1}")
+    console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber} at offset #{buffer.position - 1}"
+    buffer.readBuffer length - 1 # skip unknown bytes
+    return
 
   # Return token
   name: 'ENVCHANGE'

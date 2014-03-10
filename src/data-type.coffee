@@ -509,7 +509,6 @@ TYPE =
         when 0, 1, 2 then 3
         when 3, 4 then 4
         when 5, 6, 7 then 5
-        else throw new Error "Unsupported scale '#{scale}'"
     declaration: (parameter) ->
       if parameter.length
         length = parameter.length
@@ -576,7 +575,6 @@ TYPE =
         when 0, 1, 2 then 3
         when 3, 4 then 4
         when 5, 6, 7 then 5
-        else throw new Error "Unsupported scale '#{scale}'"
     declaration: (parameter) ->
       if parameter.length
         length = parameter.length
@@ -629,7 +627,6 @@ TYPE =
         when 0, 1, 2 then 3
         when 3, 4 then 4
         when 5, 6, 7 then 5
-        else throw new Error "Unsupported scale '#{scale}'"
     declaration: (parameter) ->
       if parameter.length
         length = parameter.length

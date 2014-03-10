@@ -11,14 +11,8 @@ parser = (buffer) ->
 
   interfaceNumber = buffer.readUInt8()
   interfaceType = interfaceTypes[interfaceNumber]
-  if !interfaceType
-    throw new Error("Unknown LOGINACK Interface #{interfaceNumber} at offset #{buffer.position}")
-
   tdsVersionNumber = buffer.readUInt32BE()
   tdsVersion = versions[tdsVersionNumber]
-  if !tdsVersion
-    throw new Error("Unknown LOGINACK TDSVersion #{tdsVersionNumber} at offset #{buffer.position}")
-
   progName = buffer.readBVarchar()
 
   progVersion =

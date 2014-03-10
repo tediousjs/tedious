@@ -1,6 +1,8 @@
 EventEmitter = require('events').EventEmitter
 TYPES = require('./data-type').typeByName
 
+{RequestError} = require('./errors')
+
 class Request extends EventEmitter
   constructor: (@sqlTextOrProcedure, @callback) ->
     @parameters = []
@@ -80,11 +82,11 @@ class Request extends EventEmitter
 
     @preparing = true
 
-    @on('returnValue', (name, value, metadata) ->
+    @on('returnValue', (name, value, metadata) =>
       if (name == 'handle')
         @handle = value
       else
-        throw new Error("Unexpected output parameter #{name} from sp_prepare")
+        @error = RequestError "Tedious > Unexpected output parameter #{name} from sp_prepare"
     )
 
   transformIntoUnprepareRpc: (parameters) ->

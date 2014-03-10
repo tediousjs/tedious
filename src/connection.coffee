@@ -222,6 +222,19 @@ class Connection extends EventEmitter
       @emit('charsetChange', token.newValue)
     )
     @tokenStreamParser.on('loginack', (token) =>
+      unless token.tdsVersion
+        # unsupported TDS version
+        @loginError = ConnectionError "Server responded with unknown TDS version."
+        @loggedIn = false
+        return
+      
+      unless token.interface
+        # unsupported interface
+        @loginError = ConnectionError "Server responded with unsupported interface."
+        @loggedIn = false
+        return
+        
+      # use negotiated version
       @config.options.tdsVersion = token.tdsVersion
       @loggedIn = true
     )
@@ -241,13 +254,15 @@ class Connection extends EventEmitter
         if @request
           @request.emit('columnMetadata', token.columns)
         else
-          throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
+          @emit 'errorMessage', "Received 'columnMetadata' when no sqlRequest is in progress"
+          @close()
     )
     @tokenStreamParser.on('order', (token) =>
         if @request
           @request.emit('order', token.orderColumns)
         else
-          throw new Error("Received 'order' when no sqlRequest is in progress")
+          @emit 'errorMessage', "Received 'order' when no sqlRequest is in progress"
+          @close()
     )
     @tokenStreamParser.on('row', (token) =>
       if @request
@@ -256,7 +271,8 @@ class Connection extends EventEmitter
 
         @request.emit('row', token.columns)
       else
-        throw new Error("Received 'row' when no sqlRequest is in progress")
+        @emit 'errorMessage', "Received 'row' when no sqlRequest is in progress"
+        @close()
     )
     @tokenStreamParser.on('returnStatus', (token) =>
       if @request
@@ -300,6 +316,10 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
+    )
+    @tokenStreamParser.on('tokenStreamError', (message) =>
+      @emit 'errorMessage', message
+      @close()
     )
 
   connect: ->
@@ -362,7 +382,8 @@ class Connection extends EventEmitter
     if @state?.events[eventName]
       eventFunction = @state.events[eventName].apply(@, args)
     else
-      throw new Error("No event '#{eventName}' in state '#{@state.name}'")
+      @emit 'errorMessage', "No event '#{eventName}' in state '#{@state.name}'"
+      @close()
 
   socketError: (error) =>
     message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"

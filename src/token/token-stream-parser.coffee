@@ -74,7 +74,9 @@ class Parser extends EventEmitter
           return false
 
       else
-        throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
+        @emit 'tokenStreamError', "Unrecognized token #{type} at offset #{@buffer.position}"
+        return false
+
     catch error
       if error?.code == 'oob'
         #console.error "OOB ERROR", type, error.stack
@@ -82,6 +84,7 @@ class Parser extends EventEmitter
         # In other words, we've run out of buffer.
         return false
       else
-        throw error
+        @emit 'tokenStreamError', error.message
+        return false
 
 exports.Parser = Parser
