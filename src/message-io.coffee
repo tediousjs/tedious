@@ -64,7 +64,10 @@ class MessageIO extends EventEmitter
 
   # TODO listen for 'drain' event when socket.write returns false.
   sendMessage: (packetType, data, resetConnection) ->
-    numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
+    if data.length < 0
+      numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
+    else
+      numberOfPackets = 1
 
     for packetNumber in [0..numberOfPackets - 1]
       payloadStart = packetNumber * @packetDataSize
