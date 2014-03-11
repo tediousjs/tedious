@@ -132,6 +132,23 @@ class Connection extends EventEmitter
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows)
 
+    SENT_ATTENTION:
+      name: 'SentAttention'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
+        message: ->
+          if @request.canceled
+            @transitionTo(@STATE.LOGGED_IN)
+
+            sqlRequest = @request
+            @request = undefined
+            sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
+          
+          # else: skip all messages, now we are only interested about cancel acknowledgement (2.2.1.6)
+
     FINAL:
       name: 'Final'
       enter: ->
@@ -307,12 +324,15 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('done', (token) =>
       if @request
         @request.emit('done', token.rowCount, token.more, @request.rows)
-
+        
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
           @request.rows = []
+        
+        if token.attention
+          @request.canceled = true
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
@@ -576,6 +596,17 @@ set transaction isolation level read committed'''
       )
 
       @transitionTo(@STATE.SENT_CLIENT_REQUEST)
+  
+  cancel: ->
+    if @state != @STATE.SENT_CLIENT_REQUEST
+      message = "Requests can only be canceled in the #{@STATE.SENT_CLIENT_REQUEST.name} state, not the #{@state.name} state"
+
+      @debug.log(message)
+      false
+    else
+      @messageIo.sendMessage(TYPE.ATTENTION)
+      @transitionTo(@STATE.SENT_ATTENTION)
+      true
 
   reset: (callback) =>
     request = new Request(@getInitialSql(), (err, rowCount, rows) ->

@@ -4,6 +4,9 @@ TYPES = require('./data-type').typeByName
 {RequestError} = require('./errors')
 
 class Request extends EventEmitter
+  error: null
+  canceled: false
+  
   constructor: (@sqlTextOrProcedure, @callback) ->
     @parameters = []
     @parametersByName = {}

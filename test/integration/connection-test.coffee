@@ -11,7 +11,7 @@ getConfig = ->
     packet: true
     data: true
     payload: true
-    token: false
+    token: true
     log: true
 
   config
@@ -759,6 +759,59 @@ exports.resetConnection = (test) ->
 
   connection.on('end', (info) ->
     test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
+exports.cancelRequest = (test) ->
+  test.expect(8)
+
+  config = getConfig()
+
+  request = new Request('select 1 as C1;waitfor delay \'00:00:05\';select 2 as C2', (err, rowCount, rows) ->
+      test.strictEqual err.message, 'Canceled.'
+
+      connection.close()
+  )
+
+  request.on('doneInProc', (rowCount, more) ->
+      test.ok false
+  )
+
+  request.on('doneProc', (rowCount, more) ->
+      test.ok !rowCount
+      test.strictEqual more, false
+  )
+
+  request.on('done', (rowCount, more, rows) ->
+      test.ok !rowCount
+      test.strictEqual more, false
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+      test.strictEqual(columnsMetadata.length, 1)
+  )
+
+  request.on('row', (columns) ->
+      test.strictEqual(columns.length, 1)
+      test.strictEqual(columns.C1.value, 1)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      connection.execSql(request)
+      connection.cancel()
+  )
+
+  connection.on('end', (info) ->
+      test.done()
   )
 
   connection.on('infoMessage', (info) ->

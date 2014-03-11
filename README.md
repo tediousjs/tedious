@@ -19,6 +19,7 @@ Current version: 0.1.5
 ### Coming soon in 0.2.0
 
 - Added support for TDS 7.4
+- Added request cancelation
 - Added support for UDT, Time, Date, DateTime2 and DateTimeOffset data types
 - Added option to choose whether to pass/receive times in UTC or local time (`useUTC`)
 - Binary, VarBinary and Image are now supported as input parameters
