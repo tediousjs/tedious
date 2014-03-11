@@ -7,6 +7,7 @@ TYPE =
   SQL_BATCH: 0x01
   RPC_REQUEST: 0x03
   TABULAR_RESULT: 0x04
+  ATTENTION: 0x06
   TRANSACTION_MANAGER: 0x0E
   LOGIN7: 0x10
   PRELOGIN: 0x12
@@ -147,7 +148,7 @@ class Packet
       else
         chars += String.fromCharCode(data[offset])
 
-      dataDump += sprintf('%02X', data[offset]);
+      dataDump += sprintf('%02X', data[offset] || 0);
 
       if ((offset + 1) % BYTES_PER_GROUP == 0) && !((offset + 1) % BYTES_PER_LINE == 0)
         # Inter-group space.

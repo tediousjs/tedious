@@ -130,6 +130,20 @@ class Connection extends EventEmitter
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows)
 
+    SENT_ATTENTION:
+      name: 'SentAttention'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
+        message: ->
+          @transitionTo(@STATE.LOGGED_IN)
+
+          sqlRequest = @request
+          @request = undefined
+          sqlRequest.callback(new Error("Request canceled"), sqlRequest.rowCount, sqlRequest.rows)
+
     FINAL:
       name: 'Final'
       enter: ->
@@ -261,6 +275,9 @@ class Connection extends EventEmitter
         @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue, @request.rows)
         @procReturnStatusValue = undefined
 
+        if token.attention
+          @request.error ||= new Error("Request was canceled")
+
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
@@ -271,6 +288,9 @@ class Connection extends EventEmitter
       if @request
         @request.emit('doneInProc', token.rowCount, token.more, @request.rows)
 
+        if token.attention
+          @request.error ||= new Error("Request was canceled")
+
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
@@ -280,6 +300,9 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('done', (token) =>
       if @request
         @request.emit('done', token.rowCount, token.more, @request.rows)
+
+        if token.attention
+          @request.error ||= new Error("Request was canceled")
 
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
@@ -519,6 +542,16 @@ set transaction isolation level read committed'''
     request = new Request(undefined, callback)
 
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(@currentTransactionDescriptor()))
+
+  cancel: () ->
+    if @state != @STATE.SENT_CLIENT_REQUEST
+      message = "Invalid state; requests can only be canceled in the #{@STATE.SENT_CLIENT_REQUEST.name} state, not the #{@state.name} state"
+      @debug.log(message)
+    else
+      console.log("Sending attention")
+      @messageIo.sendMessage(TYPE.ATTENTION, new Buffer(''))
+      console.log("Switching to SENT_ATTENTION")
+      @transitionTo(@STATE.SENT_ATTENTION)
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
