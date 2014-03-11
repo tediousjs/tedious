@@ -6,7 +6,7 @@ which is used to interact with instances of Microsoft's SQL Server. It is intend
 
 ### Supported TDS versions
 
-- TDS 7.4 (SQL Server 2012)
+- TDS 7.4 (SQL Server 2012/2014)
 - TDS 7.3.A (SQL Server 2008 R2)
 - TDS 7.3.B (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
