@@ -156,7 +156,7 @@ exports.procReturnValue = (test) ->
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
     test.ok(!more)
-    test.strictEqual(returnStatus, 1)   # Non-zero indicates a failure.
+    test.strictEqual(returnStatus, -1)   # Non-zero indicates a failure.
   )
 
   request.on('doneInProc', (rowCount, more) ->
@@ -170,7 +170,7 @@ exports.procReturnValue = (test) ->
       "
         CREATE PROCEDURE #test_proc
         AS
-          return 1
+          return -1
       ",
       ->
         connection.callProcedure(request)
