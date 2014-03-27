@@ -468,13 +468,13 @@ TYPE =
       if parameter.value?
         if length <= @maximumLength
           buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value.toString(), 'ucs2')
+          buffer.writeString(parameter.value.toString())
         else
           # Length of all chunks.
           buffer.writeUInt64LE(length)
           # One chunk.
           buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value.toString(), 'ucs2')
+          buffer.writeString(parameter.value.toString())
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
