@@ -84,7 +84,7 @@ class Parser extends EventEmitter
         # In other words, we've run out of buffer.
         return false
       else
-        @emit 'tokenStreamError', error.message
+        @emit 'tokenStreamError', error
         return false
 
 exports.Parser = Parser

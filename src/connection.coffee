@@ -271,14 +271,14 @@ class Connection extends EventEmitter
         if @request
           @request.emit('columnMetadata', token.columns)
         else
-          @emit 'errorMessage', "Received 'columnMetadata' when no sqlRequest is in progress"
+          @emit 'error', new Error "Received 'columnMetadata' when no sqlRequest is in progress"
           @close()
     )
     @tokenStreamParser.on('order', (token) =>
         if @request
           @request.emit('order', token.orderColumns)
         else
-          @emit 'errorMessage', "Received 'order' when no sqlRequest is in progress"
+          @emit 'error', new Error "Received 'order' when no sqlRequest is in progress"
           @close()
     )
     @tokenStreamParser.on('row', (token) =>
@@ -288,7 +288,7 @@ class Connection extends EventEmitter
 
         @request.emit('row', token.columns)
       else
-        @emit 'errorMessage', "Received 'row' when no sqlRequest is in progress"
+        @emit 'error', new Error "Received 'row' when no sqlRequest is in progress"
         @close()
     )
     @tokenStreamParser.on('returnStatus', (token) =>
@@ -337,8 +337,8 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
     )
-    @tokenStreamParser.on('tokenStreamError', (message) =>
-      @emit 'errorMessage', message
+    @tokenStreamParser.on('tokenStreamError', (error) =>
+      @emit 'error', error
       @close()
     )
 
@@ -402,7 +402,7 @@ class Connection extends EventEmitter
     if @state?.events[eventName]
       eventFunction = @state.events[eventName].apply(@, args)
     else
-      @emit 'errorMessage', "No event '#{eventName}' in state '#{@state.name}'"
+      @emit 'error', new Error "No event '#{eventName}' in state '#{@state.name}'"
       @close()
 
   socketError: (error) =>
@@ -412,7 +412,7 @@ class Connection extends EventEmitter
     if @state == @STATE.CONNECTING
       @emit('connect', ConnectionError(message, 'ESOCKET'))
     else
-      @emit('errorMessage', message)
+      @emit('error', ConnectionError message)
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
