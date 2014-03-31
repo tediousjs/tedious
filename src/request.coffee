@@ -20,31 +20,20 @@ class Request extends EventEmitter
         @userCallback.apply(@, arguments)
         @emit('requestCompleted')
 
-  addParameter: (name, type, value, options) ->
-    if arguments.length < 4
-      if typeof value == 'object' && !(value instanceof Date)
-        options = value
-        value = undefined
-
-    options ||= {}
-
+  addParameter: (name, type, value, options = {}) ->
     parameter =
       type: type
       name: name
       value: value
       output: options.output ||= false
       length: options.length
+      precision: options.precision
+      scale: options.scale
 
     @parameters.push(parameter)
     @parametersByName[name] = parameter
 
-  addOutputParameter: (name, type, value, options) ->
-    if arguments.length < 4
-      if typeof value == 'object' && !(value instanceof Date)
-        options = value
-        value = undefined
-
-    options ||= {}
+  addOutputParameter: (name, type, value, options = {}) ->
     options.output = true
 
     @addParameter(name, type, value, options)

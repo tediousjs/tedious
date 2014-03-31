@@ -17,12 +17,12 @@ TYPE =
     name: 'TinyInt'
     declaration: (parameter) ->
       'tinyint'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
       buffer.writeUInt8(1)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(1)
         buffer.writeUInt8(parseInt(parameter.value))
@@ -33,12 +33,12 @@ TYPE =
     name: 'Bit'
     declaration: (parameter) ->
       'bit'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.BitN.id)
       buffer.writeUInt8(1)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if typeof parameter.value == 'undefined' || parameter.value == null
         buffer.writeUInt8(0)
       else
@@ -49,12 +49,12 @@ TYPE =
     name: 'SmallInt'
     declaration: (parameter) ->
       'smallint'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
       buffer.writeUInt8(2)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(2)
         buffer.writeInt16LE(parseInt(parameter.value))
@@ -65,12 +65,12 @@ TYPE =
     name: 'Int'
     declaration: (parameter) ->
       'int'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
       buffer.writeUInt8(4)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(4)
         buffer.writeInt32LE(parseInt(parameter.value))
@@ -81,12 +81,12 @@ TYPE =
     name: 'SmallDateTime'
     declaration: (parameter) ->
       'smalldatetime'
-    writeParameterData: (buffer, parameter, options) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.DateTimeN.id)
       buffer.writeUInt8(4)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter, options) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         if options.useUTC
           days = Math.floor (parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
@@ -105,12 +105,12 @@ TYPE =
     name: 'Real'
     declaration: (parameter) ->
       'real'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.FloatN.id)
       buffer.writeUInt8(4)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(4)
         buffer.writeFloatLE(parseFloat(parameter.value))
@@ -124,12 +124,12 @@ TYPE =
     name: 'DateTime'
     declaration: (parameter) ->
       'datetime'
-    writeParameterData: (buffer, parameter, options) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.DateTimeN.id)
       buffer.writeUInt8(8)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter, options) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         if options.useUTC
           days = Math.floor (parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
@@ -157,12 +157,12 @@ TYPE =
     name: 'Float'
     declaration: (parameter) ->
       'float'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.FloatN.id)
       buffer.writeUInt8(8)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(8)
         buffer.writeDoubleLE(parseFloat(parameter.value))
@@ -176,12 +176,12 @@ TYPE =
     name: 'BigInt'
     declaration: (parameter) ->
       'bigint'
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.IntN.id)
       buffer.writeUInt8(8)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(8)
         if parseInt(parameter.value) > 0x100000000 # 4294967296
@@ -201,24 +201,22 @@ TYPE =
     dataLengthLength: 4
     declaration: (parameter) ->
       'image'
-      
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value?
-        length = parameter.value.length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        parameter.value.length
       else
-        length = -1
-
+        -1
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeInt32LE length
-
+      buffer.writeInt32LE parameter.length
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        buffer.writeInt32LE length
+        buffer.writeInt32LE parameter.length
         buffer.writeBuffer parameter.value
       else
-        buffer.writeInt32LE length
+        buffer.writeInt32LE parameter.length
       
   0x23:
     type: 'TEXT'
@@ -229,39 +227,39 @@ TYPE =
     dataLengthLength: 4
     declaration: (parameter) ->
       'text'
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value?
-        length = parameter.value.toString().length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        parameter.value.length
       else
-        length = -1
-
+        -1
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.Text.id)
-      buffer.writeInt32LE(length)
-
+      buffer.writeInt32LE(parameter.length)
+    writeParameterData: (buffer, parameter) ->
       # Collation
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
 
-      # ParamLenData
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        buffer.writeInt32LE(length)
+        buffer.writeInt32LE(parameter.length)
         buffer.writeString(parameter.value.toString(), 'ascii')
       else
-        buffer.writeInt32LE(length)
+        buffer.writeInt32LE(parameter.length)
   0x24:
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
     dataLengthLength: 1
     declaration: (parameter) ->
       'uniqueidentifier'
-    writeParameterData: (buffer, parameter) ->
+    resolveLength: (parameter) ->
+      16
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(typeByName.UniqueIdentifierN.id)
       buffer.writeUInt8(0x10)
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8(0x10)
         buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)))
@@ -325,32 +323,30 @@ TYPE =
         "varbinary(#{length})"
       else
         "varbinary(max)"
-        
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value?
-        length = parameter.value.length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        parameter.value.length
       else
-        length = @maximumLength
-
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
     
-      if length <= @maximumLength
+      if parameter.length <= @maximumLength
         buffer.writeUInt16LE @maximumLength
       else
         buffer.writeUInt16LE MAX
-
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        if length <= @maximumLength
-          buffer.writeUInt16LE length
+        if parameter.length <= @maximumLength
+          buffer.writeUInt16LE parameter.length
           buffer.writeBuffer parameter.value
         else
           # Length of all chunks.
-          buffer.writeUInt64LE length
+          buffer.writeUInt64LE parameter.length
           # One chunk.
-          buffer.writeUInt32LE length
+          buffer.writeUInt32LE parameter.length
           buffer.writeBuffer parameter.value
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE 0
@@ -371,39 +367,46 @@ TYPE =
       else if parameter.value is null
         length = 1
       else
-        length = @.maximumLength
+        length = @maximumLength
 
       if length <= @maximumLength
         "varchar(#{length})"
       else
         "varchar(max)"
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value?
-        length = parameter.value.toString().length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        if Buffer.isBuffer parameter.value
+          parameter.value.length || 1
+        else
+          parameter.value.toString().length || 1
       else
-        length = @.maximumLength
-
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      if length <= @maximumLength
+      if parameter.length <= @maximumLength
         buffer.writeUInt16LE(@maximumLength)
       else
         buffer.writeUInt16LE(MAX)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        if length <= @maximumLength
-          buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value.toString(), 'ascii')
+        if parameter.length <= @maximumLength
+          if Buffer.isBuffer parameter.value
+            buffer.writeUInt16LE parameter.length
+            buffer.writeBuffer parameter.value
+          else
+            buffer.writeUsVarbyte parameter.value.toString(), 'ascii'
         else
           # Length of all chunks.
-          buffer.writeUInt64LE(length)
+          buffer.writeUInt64LE(parameter.length)
           # One chunk.
-          buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value.toString(), 'ascii')
+          if Buffer.isBuffer parameter.value
+            buffer.writeUInt32LE parameter.length
+            buffer.writeBuffer parameter.value
+          else
+            buffer.writeLVarbyte parameter.value.toString(), 'ascii'
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
@@ -415,22 +418,20 @@ TYPE =
     maximumLength: 8000
     declaration: (parameter) ->
       'binary'
-      
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value?
-        length = parameter.value.length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        parameter.value.length
       else
-        length = @maximumLength
-
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt16LE length
-    
+      buffer.writeUInt16LE parameter.length
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        buffer.writeUInt16LE length
-        buffer.writeBuffer parameter.value.slice 0, Math.min(length, @maximumLength)
+        buffer.writeUInt16LE parameter.length
+        buffer.writeBuffer parameter.value.slice 0, Math.min(parameter.length, @maximumLength)
       else
         buffer.writeUInt16LE NULL
       
@@ -459,33 +460,40 @@ TYPE =
         "nvarchar(#{length})"
       else
         "nvarchar(max)"
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = 2 * parameter.length
-      else if parameter.value?
-        length = 2 * parameter.value.toString().length
+    resolveLength: (parameter) ->
+      if parameter.value?
+        if Buffer.isBuffer parameter.value
+          (parameter.value.length / 2) || 1
+        else
+          parameter.value.toString().length || 1
       else
-        length = @maximumLength
-
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@.id)
-      if length <= @maximumLength
-        buffer.writeUInt16LE(@maximumLength)
+      if parameter.length <= @maximumLength
+        buffer.writeUInt16LE parameter.length * 2
       else
         buffer.writeUInt16LE(MAX)
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00])) # Collation
-
-      # ParamLenData
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        if length <= @maximumLength
-          buffer.writeUInt16LE(length)
-          buffer.writeString(parameter.value.toString(), 'ucs2')
+        if parameter.length <= @maximumLength
+          if Buffer.isBuffer parameter.value
+            buffer.writeUInt16LE parameter.length * 2
+            buffer.writeBuffer parameter.value
+          else
+            buffer.writeUsVarbyte parameter.value.toString(), 'ucs2'
         else
           # Length of all chunks.
-          buffer.writeUInt64LE(length)
+          buffer.writeUInt64LE parameter.length * 2
           # One chunk.
-          buffer.writeUInt32LE(length)
-          buffer.writeString(parameter.value.toString(), 'ucs2')
+          if Buffer.isBuffer parameter.value
+            buffer.writeUInt32LE parameter.length * 2
+            buffer.writeBuffer parameter.value
+          else
+            buffer.writeLVarbyte parameter.value.toString(), 'ucs2'
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
@@ -510,34 +518,29 @@ TYPE =
         when 3, 4 then 4
         when 5, 6, 7 then 5
     declaration: (parameter) ->
-      if parameter.length
-        length = parameter.length
+      "time(#{@resolveScale(parameter)})"
+    resolveScale: (parameter) ->
+      if parameter.scale?
+        parameter.scale
       else if parameter.value is null
-        length = 0
+        0
       else
-        length = 7
-
-      "time(#{length})"
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value is null
-        length = 0
-      else
-        length = 7
-
+        7
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 length # precision
-
+      buffer.writeUInt8 parameter.scale
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         parameter.value.setUTCFullYear 1970
         parameter.value.setUTCMonth 0
         parameter.value.setUTCDate 1
 
-        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
 
         # seconds since midnight
-        switch length
+        switch parameter.scale
           when 0, 1, 2
             buffer.writeUInt8 3
             buffer.writeUInt24LE time
@@ -556,9 +559,11 @@ TYPE =
     dataLengthLength: 0
     declaration: (parameter) ->
       "date"
-    writeParameterData: (buffer, parameter) ->
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@id)
-
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8 3
         # days since 1-1-1
@@ -576,34 +581,30 @@ TYPE =
         when 3, 4 then 4
         when 5, 6, 7 then 5
     declaration: (parameter) ->
-      if parameter.length
-        length = parameter.length
+      "datetime2(#{@resolveScale(parameter)})"
+    resolveScale: (parameter) ->
+      if parameter.scale?
+        parameter.scale
       else if parameter.value is null
-        length = 0
+        0
       else
-        length = 7
-
-      "datetime2(#{length})"
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value is null
-        length = 0
-      else
-        length = 7
-
+        7
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 length # precision
-
+      buffer.writeUInt8 parameter.scale
+      
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         time = new Date(+parameter.value)
         time.setUTCFullYear 1970
         time.setUTCMonth 0
         time.setUTCDate 1
-        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
 
         # seconds since midnight
-        switch length
+        switch parameter.scale
           when 0, 1, 2
             buffer.writeUInt8 6
             buffer.writeUInt24LE time
@@ -628,36 +629,32 @@ TYPE =
         when 3, 4 then 4
         when 5, 6, 7 then 5
     declaration: (parameter) ->
-      if parameter.length
-        length = parameter.length
+      "datetimeoffset(#{@resolveScale(parameter)})"
+    resolveScale: (parameter) ->
+      if parameter.scale?
+        parameter.scale
       else if parameter.value is null
-        length = 0
+        0
       else
-        length = 7
-
-      "datetimeoffset(#{length})"
-    writeParameterData: (buffer, parameter) ->
-      if parameter.length
-        length = parameter.length
-      else if parameter.value is null
-        length = 0
-      else
-        length = 7
-
+        7
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 length # precision
-
+      buffer.writeUInt8 parameter.scale
+      
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         time = new Date(+parameter.value)
         time.setUTCFullYear 1970
         time.setUTCMonth 0
         time.setUTCDate 1
-        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, length
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
         
         offset = -parameter.value.getTimezoneOffset()
         
         # seconds since midnight
-        switch length
+        switch parameter.scale
           when 0, 1, 2
             buffer.writeUInt8 8
             buffer.writeUInt24LE time
@@ -673,10 +670,61 @@ TYPE =
         buffer.writeInt16LE offset
       else
         buffer.writeUInt8 0
+  # ---
   0xF0:
     type: 'UDTTYPE'
     name: 'UDT'
     hasUDTInfo: true
+  0xF3:
+    type: 'TVPTYPE'
+    name: 'TVP'
+    declaration: (parameter) ->
+      "#{parameter.value.name} readonly"
+    writeTypeInfo: (buffer, parameter) ->
+      buffer.writeUInt8 @id
+
+      # TVP_TYPENAME
+      buffer.writeBVarchar "" # DbName (always emtpty string)
+      buffer.writeBVarchar parameter.value?.schema ? "" # OwningSchema
+      buffer.writeBVarchar parameter.value?.name ? "" # TypeName
+      
+    writeParameterData: (buffer, parameter, options) ->
+      unless parameter.value?
+        buffer.writeUInt16LE 0xFFFF
+        buffer.writeUInt8 0x00
+        buffer.writeUInt8 0x00
+        return
+      
+      # Columns count
+      buffer.writeUInt16LE parameter.value.columns.length
+      
+      # *TVP_COLMETADATA
+      for column in parameter.value.columns
+        buffer.writeUInt32LE 0x00000000 # UserType
+        buffer.writeUInt16LE 0x0000
+        
+        column.type.writeTypeInfo buffer, column
+        
+        buffer.writeBVarchar "" # ColName
+      
+      # TVP_NULL_TOKEN
+      buffer.writeUInt8 0x00
+      
+      # *TVP_ROW
+      for row in parameter.value.rows
+        buffer.writeUInt8 0x01 # TVP_ROW_TOKEN
+        
+        for value, index in row
+          param =
+            value: value
+            length: parameter.value.columns[index].length
+            scale: parameter.value.columns[index].scale
+            precision: parameter.value.columns[index].precision
+            
+          parameter.value.columns[index].type.writeParameterData buffer, param, options
+
+      # TVP_NULL_TOKEN
+      buffer.writeUInt8 0x00
 
 # Types not (yet) supported
 ###
@@ -686,8 +734,6 @@ TYPE =
   VARCHARTYPE:          0x27  # VarChar (legacy support)
   BINARYTYPE:           0x2D  # Binary (legacy support)
   VARBINARYTYPE:        0x25  # VarBinary (legacy support)
-
-  UDTTYPE:              0xF0  # CLR-UDT (introduced in TDS 7.2)
 
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)
 ###

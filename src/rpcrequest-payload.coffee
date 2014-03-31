@@ -46,8 +46,21 @@ class RpcRequestPayload
       # ParamMetaData (less TYPE_INFO)
       buffer.writeBVarchar('@' + parameter.name)
       buffer.writeUInt8(statusFlags)
+      
+      param =
+        value: parameter.value
+      
+      if (parameter.type.id & 0x30) == 0x20 # Variable length
+        param.length = parameter.length ? parameter.type.resolveLength? parameter
+      
+      if parameter.type.hasScale
+        param.scale = parameter.scale ? parameter.type.resolveScale? parameter
+      
+      if parameter.type.hasPrecision
+        param.precision = parameter.precision ? parameter.type.resolvePrecision? parameter
 
-      parameter.type.writeParameterData(buffer, parameter, options)
+      parameter.type.writeTypeInfo(buffer, param, options)
+      parameter.type.writeParameterData(buffer, param, options)
 
     @data = buffer.data
 
