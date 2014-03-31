@@ -351,7 +351,12 @@ TYPE =
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE 0
       else
-        buffer.writeUInt16LE NULL
+        if parameter.length <= @maximumLength
+          buffer.writeUInt16LE NULL
+        else
+          # PLP_NULL
+          buffer.writeUInt32LE(0xFFFFFFFF)
+          buffer.writeUInt32LE(0xFFFFFFFF)
         
   0xA7:
     type: 'BIGVARCHR'
@@ -410,7 +415,12 @@ TYPE =
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
-        buffer.writeUInt16LE(NULL)
+        if parameter.length <= @maximumLength
+          buffer.writeUInt16LE(NULL)
+        else
+          # PLP_NULL
+          buffer.writeUInt32LE(0xFFFFFFFF)
+          buffer.writeUInt32LE(0xFFFFFFFF)
   0xAD:
     type: 'BIGBinary'
     name: 'Binary'
@@ -497,7 +507,12 @@ TYPE =
           # PLP_TERMINATOR (no more chunks).
           buffer.writeUInt32LE(0)
       else
-        buffer.writeUInt16LE(NULL)
+        if parameter.length <= @maximumLength
+          buffer.writeUInt16LE(NULL)
+        else
+          # PLP_NULL
+          buffer.writeUInt32LE(0xFFFFFFFF)
+          buffer.writeUInt32LE(0xFFFFFFFF)
   0xEF:
     type: 'NCHAR'
     name: 'NChar'
