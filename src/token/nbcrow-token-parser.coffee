@@ -3,8 +3,6 @@
 valueParse = require('../value-parser')
 sprintf = require('sprintf').sprintf
 
-DIGITS_REGEX = /^\d+$/
-
 parser = (buffer, columnsMetaData, options) ->
   length = Math.ceil columnsMetaData.length / 8
   bytes = buffer.readBuffer length
@@ -14,7 +12,7 @@ parser = (buffer, columnsMetaData, options) ->
     for i in [0..7]
       bitmap.push if byte & (1 << i) then true else false
 
-  columns = []
+  columns = if options.useColumnNames then {} else []
   for columnMetaData, index in columnsMetaData
     #console.log sprintf('Token @ 0x%02X', buffer.position)
 
@@ -27,23 +25,15 @@ parser = (buffer, columnsMetaData, options) ->
       value: value
       metadata: columnMetaData
 
-    columns.push(column)
-
-    if !(DIGITS_REGEX.test(columnMetaData.colName))
-      saveColumn(columnMetaData.colName, columns, column)
+    if options.useColumnNames
+      unless columns[columnMetaData.colName]?
+        columns[columnMetaData.colName] = column
+    else
+      columns.push(column)
 
   # Return token
   name: 'NBCROW'
   event: 'row'
   columns: columns
-
-saveColumn = (columnName, columns, value) ->
-  entry = columns[columnName]
-  if !entry
-    columns[columnName] = value;
-  else if Array.isArray(entry)
-    entry.push(value)
-  else
-    columns[columnName] = [entry, value]
 
 module.exports = parser

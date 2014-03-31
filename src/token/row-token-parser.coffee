@@ -3,10 +3,8 @@
 valueParse = require('../value-parser')
 sprintf = require('sprintf').sprintf
 
-DIGITS_REGEX = /^\d+$/
-
 parser = (buffer, columnsMetaData, options) ->
-  columns = []
+  columns = if options.useColumnNames then {} else []
   for columnMetaData in columnsMetaData
     #console.log sprintf('Token @ 0x%02X', buffer.position)
 
@@ -15,24 +13,16 @@ parser = (buffer, columnsMetaData, options) ->
     column =
       value: value
       metadata: columnMetaData
-
-    columns.push(column)
-
-    if !(DIGITS_REGEX.test(columnMetaData.colName))
-      saveColumn(columnMetaData.colName, columns, column)
+    
+    if options.useColumnNames
+      unless columns[columnMetaData.colName]?
+        columns[columnMetaData.colName] = column
+    else
+      columns.push(column)
 
   # Return token
   name: 'ROW'
   event: 'row'
   columns: columns
-
-saveColumn = (columnName, columns, value) ->
-  entry = columns[columnName]
-  if !entry
-    columns[columnName] = value;
-  else if Array.isArray(entry)
-    entry.push(value)
-  else
-    columns[columnName] = [entry, value]
 
 module.exports = parser

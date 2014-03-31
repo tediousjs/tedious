@@ -201,6 +201,7 @@ class Connection extends EventEmitter
     @config.options.encrypt ||= false
     @config.options.cryptoCredentialsDetails ||= {}
     @config.options.useUTC ?= true
+    @config.options.useColumnNames ?= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -269,7 +270,13 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
         if @request
-          @request.emit('columnMetadata', token.columns)
+          if @config.options.useColumnNames
+            columns = {}
+            columns[col.colName] = col for col in token.columns when not columns[col.colName]?
+          else
+            columns = token.columns
+            
+          @request.emit('columnMetadata', columns)
         else
           @emit 'error', new Error "Received 'columnMetadata' when no sqlRequest is in progress"
           @close()

@@ -184,7 +184,7 @@ exports.encrypt = (test) ->
   )
 
 exports.execSql = (test) ->
-  test.expect(8)
+  test.expect(7)
 
   config = getConfig()
 
@@ -207,7 +207,6 @@ exports.execSql = (test) ->
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
       test.strictEqual(columns[0].value, 8)
-      test.strictEqual(columns.C1.value, 8)
   )
 
   connection = new Connection(config)
@@ -232,6 +231,7 @@ exports.numericColumnName = (test) ->
   test.expect(5)
 
   config = getConfig()
+  config.options.useColumnNames = true
 
   request = new Request('select 8 as [123]', (err, rowCount) ->
       test.ok(!err)
@@ -241,12 +241,12 @@ exports.numericColumnName = (test) ->
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
+      test.strictEqual(Object.keys(columnsMetadata).length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 8)
+      test.strictEqual(Object.keys(columns).length, 1)
+      test.strictEqual(columns[123].value, 8)
   )
 
   connection = new Connection(config)
@@ -268,11 +268,12 @@ exports.numericColumnName = (test) ->
   )
 
 exports.duplicateColumnNames = (test) ->
-  test.expect(10)
+  test.expect(6)
 
   config = getConfig()
+  config.options.useColumnNames = true
 
-  request = new Request('select 1 as abc, 2 as xyz, 3 as abc', (err, rowCount) ->
+  request = new Request('select 1 as abc, 2 as xyz, \'3\' as abc', (err, rowCount) ->
       test.ok(!err)
       test.strictEqual(rowCount, 1)
 
@@ -280,18 +281,13 @@ exports.duplicateColumnNames = (test) ->
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 3)
+      test.strictEqual(Object.keys(columnsMetadata).length, 2)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 3)
+      test.strictEqual(Object.keys(columns).length, 2)
 
-      test.strictEqual(columns[0].value, 1)
-      test.strictEqual(columns[1].value, 2)
-      test.strictEqual(columns[2].value, 3)
-
-      test.strictEqual(columns.abc[0].value, 1)
-      test.strictEqual(columns.abc[1].value, 3)
+      test.strictEqual(columns.abc.value, 1)
       test.strictEqual(columns.xyz.value, 2)
   )
 
@@ -317,7 +313,7 @@ exports.execSqlMultipleTimes = (test) ->
   timesToExec = 5
   sqlExecCount = 0
 
-  test.expect(timesToExec * 8)
+  test.expect(timesToExec * 7)
 
   config = getConfig()
 
@@ -346,7 +342,6 @@ exports.execSqlMultipleTimes = (test) ->
     request.on('row', (columns) ->
         test.strictEqual(columns.length, 1)
         test.strictEqual(columns[0].value, 8)
-        test.strictEqual(columns.C1.value, 8)
     )
 
     connection.execSql(request)
@@ -800,7 +795,7 @@ exports.cancelRequest = (test) ->
 
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
-      test.strictEqual(columns.C1.value, 1)
+      test.strictEqual(columns[0].value, 1)
   )
 
   connection = new Connection(config)

@@ -27,7 +27,6 @@ module.exports.int = (test) ->
   test.strictEqual(token.columns[0].flags, 3)
   test.strictEqual(token.columns[0].type.name, 'Int')
   test.strictEqual(token.columns[0].colName, 'name')
-  test.strictEqual(token.columns.name.colName, 'name')
 
   test.done()
 
@@ -64,7 +63,6 @@ module.exports.varchar = (test) ->
   test.strictEqual(token.columns[0].collation.version, 0x8)
   test.strictEqual(token.columns[0].collation.sortId, 0x9a)
   test.strictEqual(token.columns[0].colName, 'name')
-  test.strictEqual(token.columns.name.colName, 'name')
   test.strictEqual(token.columns[0].dataLength, length)
 
   test.done()

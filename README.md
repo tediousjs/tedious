@@ -24,7 +24,8 @@ Current version: 0.1.5
 - Added option to choose whether to pass/receive times in UTC or local time (`useUTC`)
 - Binary, VarBinary and Image are now supported as input parameters
 - Binary, VarBinary and Image types are now returned as Buffer (was Array)
-- Connection errors are now correctly propagated to `connect` event.
+- Connection errors are now correctly propagated to `connect` event
+- Better support for numeric column names and columns with same name
 - Errors are now instanceof Error / ConnectionError / RequestError (was plain text)
 - Transaction isolationLevel default is now `READ_COMMITED` (was `READ_UNCOMMITED`)
 - Fixed issue when zero value was casted as null when using BigInt as input parameter
@@ -38,6 +39,7 @@ Current version: 0.1.5
 - There was a change in default transaction isolationLevel from `READ_UNCOMMITED` to `READ_COMMITED`. You can disable this by `options.isolationLevel = require('tedious').ISOLATION_LEVEL.READ_UNCOMMITTED`.
 - Binary values are now returned in Buffers.
 - All error values are no longer strings, but instances of Error.
+- Results (rows and column metadata) are now simple arrays. You can change this to key-value collections by `options.useColumnNames = true`.
 
 <a name="documentation" />
 ## Documentation
