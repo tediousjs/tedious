@@ -314,7 +314,7 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.length || 1
-      else if parameter.value is null
+      else if parameter.value is null and not parameter.output
         length = 1
       else
         length = @maximumLength
@@ -363,7 +363,7 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.toString().length || 1
-      else if parameter.value is null
+      else if parameter.value is null and not parameter.output
         length = 1
       else
         length = @maximumLength
@@ -443,7 +443,7 @@ TYPE =
         length = parameter.length
       else if parameter.value?
         length = parameter.value.toString().length || 1
-      else if parameter.value is null
+      else if parameter.value is null and not parameter.output
         length = 1
       else
         length = @maximumLength
