@@ -340,16 +340,10 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         if parameter.length <= @maximumLength
-          buffer.writeUInt16LE parameter.length
-          buffer.writeBuffer parameter.value
+          buffer.writeUsVarbyte parameter.value
         else
-          # Length of all chunks.
-          buffer.writeUInt64LE parameter.length
-          # One chunk.
-          buffer.writeUInt32LE parameter.length
-          buffer.writeBuffer parameter.value
-          # PLP_TERMINATOR (no more chunks).
-          buffer.writeUInt32LE 0
+          # PLP_BODY
+          buffer.writePLPBody parameter.value
       else
         if parameter.length <= @maximumLength
           buffer.writeUInt16LE NULL
@@ -398,22 +392,10 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         if parameter.length <= @maximumLength
-          if Buffer.isBuffer parameter.value
-            buffer.writeUInt16LE parameter.length
-            buffer.writeBuffer parameter.value
-          else
-            buffer.writeUsVarbyte parameter.value.toString(), 'ascii'
+          buffer.writeUsVarbyte parameter.value, 'ascii'
         else
-          # Length of all chunks.
-          buffer.writeUInt64LE(parameter.length)
-          # One chunk.
-          if Buffer.isBuffer parameter.value
-            buffer.writeUInt32LE parameter.length
-            buffer.writeBuffer parameter.value
-          else
-            buffer.writeLVarbyte parameter.value.toString(), 'ascii'
-          # PLP_TERMINATOR (no more chunks).
-          buffer.writeUInt32LE(0)
+          # PLP_BODY
+          buffer.writePLPBody parameter.value, 'ascii'
       else
         if parameter.length <= @maximumLength
           buffer.writeUInt16LE(NULL)
@@ -490,22 +472,10 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         if parameter.length <= @maximumLength
-          if Buffer.isBuffer parameter.value
-            buffer.writeUInt16LE parameter.length * 2
-            buffer.writeBuffer parameter.value
-          else
-            buffer.writeUsVarbyte parameter.value.toString(), 'ucs2'
+          buffer.writeUsVarbyte parameter.value, 'ucs2'
         else
-          # Length of all chunks.
-          buffer.writeUInt64LE parameter.length * 2
-          # One chunk.
-          if Buffer.isBuffer parameter.value
-            buffer.writeUInt32LE parameter.length * 2
-            buffer.writeBuffer parameter.value
-          else
-            buffer.writeLVarbyte parameter.value.toString(), 'ucs2'
-          # PLP_TERMINATOR (no more chunks).
-          buffer.writeUInt32LE(0)
+          # PLP_BODY
+          buffer.writePLPBody parameter.value, 'ucs2'
       else
         if parameter.length <= @maximumLength
           buffer.writeUInt16LE(NULL)

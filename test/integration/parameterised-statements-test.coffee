@@ -79,6 +79,9 @@ exports.intNull = (test) ->
 exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
+exports.varCharN = (test) ->
+  execSql(test, TYPES.VarChar, 'qaz', null, {length: 8001})
+
 exports.varCharEmptyString = (test) ->
   execSql(test, TYPES.VarChar, '')
 
@@ -94,6 +97,9 @@ exports.varCharMax = (test) ->
 
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
+
+exports.nVarCharN = (test) ->
+  execSql(test, TYPES.NVarChar, 'qaz', null, {length: 4001})
 
 exports.nVarCharEmptyString = (test) ->
   execSql(test, TYPES.NVarChar, '')
@@ -245,7 +251,7 @@ exports.multipleParameters = (test) ->
     #console.log(text)
   )
 
-execSql = (test, type, value, tdsVersion) ->
+execSql = (test, type, value, tdsVersion, options) ->
   config = getConfig()
   #config.options.packetSize = 32768
   
@@ -260,7 +266,7 @@ execSql = (test, type, value, tdsVersion) ->
       connection.close()
   )
 
-  request.addParameter('param', type, value)
+  request.addParameter('param', type, value, options)
 
   request.on('doneInProc', (rowCount, more) ->
       test.ok(more)

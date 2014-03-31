@@ -152,22 +152,43 @@ class WritableTrackingBuffer
     @writeString(value, encoding)
   
   writeUsVarbyte: (value, encoding = @encoding) ->
-    length = Buffer.byteLength(value, encoding)
-    @writeUInt16LE(length)
-    @makeRoomFor(length)
-    bytesWritten = @buffer.write(value, @position, encoding)
-    @position += length
+    if Buffer.isBuffer value
+      length = value.length
+    else
+      value = value.toString()
+      length = Buffer.byteLength value, encoding
+      
+    @writeUInt16LE length
+    
+    if Buffer.isBuffer value
+      @writeBuffer value
+    else
+      @makeRoomFor length
+      @buffer.write(value, @position, encoding)
+      @position += length
 
-    bytesWritten
-  
-  writeLVarbyte: (value, encoding = @encoding) ->
-    length = Buffer.byteLength(value, encoding)
-    @writeUInt32LE(length)
-    @makeRoomFor(length)
-    bytesWritten = @buffer.write(value, @position, encoding)
-    @position += length
+  writePLPBody: (value, encoding = @encoding) ->
+    if Buffer.isBuffer value
+      length = value.length
+    else
+      value = value.toString()
+      length = Buffer.byteLength value, encoding
+    
+    # Length of all chunks.
+    @writeUInt64LE length
+    
+    # One chunk.
+    @writeUInt32LE length
+    
+    if Buffer.isBuffer value
+      @writeBuffer value
+    else
+      @makeRoomFor length
+      @buffer.write value, @position, encoding
+      @position += length
 
-    bytesWritten
+    # PLP_TERMINATOR (no more chunks).
+    @writeUInt32LE(0)
 
   writeBuffer: (value) ->
     length = value.length
