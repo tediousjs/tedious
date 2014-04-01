@@ -1,6 +1,7 @@
 #!/bin/sh
 
 node_modules/nodeunit/bin/nodeunit  \
+  test/register-coffee.js           \
   test/unit/                        \
   test/unit/token/                  \
   test/unit/tracking-buffer         \
