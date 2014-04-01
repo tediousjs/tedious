@@ -92,3 +92,32 @@ title: Using Parameters
 
   connection.execSql(request);
 {% endhighlight %}
+
+<h2>Table-Valued Parameters</h2>
+<p>
+  TVP are only supported when using <a href="api-connection.html#unction_callProcedure"><code>callProcedure</code></a>.
+</p>
+
+{% highlight javascript %}
+  var TYPES = require('tedious').TYPES;
+  
+  var table = {
+    columns: [
+      {name: 'user_id', type: TYPES.Int},
+      {name: 'user_name', type: TYPES.VarChar, length: 500},
+      {name: 'user_enabled', type: TYPES.Bit}
+    ],
+    rows: [
+      [15, 'Eric', true],
+      [16, 'John', false]
+    ]
+  };
+
+  var request = new Request("my_stored_procedure_name", function(err) {
+    ....
+  });
+
+  request.addParameter('tvp', TYPES.TVP, table);
+
+  connection.callProcedure(request);
+{% endhighlight %}

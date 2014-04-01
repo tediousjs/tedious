@@ -17,8 +17,8 @@ title: API - Request
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
   <li><a href="#event_doneProc">Event: 'doneProc'</a></li>
   <li><a href="#event_returnValue">Event: 'returnValue'</a></li>
-  <li><a href="#function_addParameter">request.addParameter(name, type, value)</a></li>
-  <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type)</a></li>
+  <li><a href="#function_addParameter">request.addParameter(name, type, value, [options])</a></li>
+  <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type, [value], [options])</a></li>
 </ul>
 
 <h2 id="function_newRequest">new Request(sql, callback)</h3>
@@ -57,7 +57,7 @@ connection.execSql(request);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occured, an error object.
         </p>
       </div>
     </div>
@@ -120,21 +120,21 @@ connection.execSql(request);
         <code>precision</code>
       </dt>
       <dd>
-        The precision. Only applicable to types such as numeric and decimal.
+        The precision. Only applicable to numeric and decimal.
       </dd>
 
       <dt>
         <code>scale</code>
       </dt>
       <dd>
-        The scale. Only applicable to types such as numeric and decimal.
+        The scale. Only applicable to numeric, decimal, time, datetime2 and datetimeoffset.
       </dd>
 
       <dt>
         <code>dataLength</code>
       </dt>
       <dd>
-        The length, for types such as char, varchar, narchar and nvarchar.
+        The length, for char, varchar, nvarchar and varbinary.
       </dd>
     </dl>
   </div>
@@ -346,7 +346,7 @@ connection.execSql(request);
   </div>
 </div>
 
-<h2 id="function_addParameter">request.addParameter(name, type, value)</h2>
+<h2 id="function_addParameter">request.addParameter(name, type, value, [options])</h2>
 <p>
   Add an input parameter to the request.
 </p>
@@ -384,9 +384,21 @@ request.addParameter('city', TYPES.VarChar, 'London');
       that documented for <a href="api-datatypes.html"><code>data types</code></a>.
     </p>
   </div>
+
+  <div class="name">options</div>
+  <div class="description">
+    <p>
+      Additional type options. Optional.
+      <ul>
+        <li><code>length</code> for VarChar, NVarChar, VarBinary</li>
+        <li><code>precision</code> for Numeric, Decimal</li>
+        <li><code>scale</code> for Numeric, Decimal, Time, DateTime2, DateTimeOffset</li>
+      </ul>
+    </p>
+  </div>
 </div>
 
-<h2 id="function_addOutputParameter">request.addOutputParameter(name, type)</h2>
+<h2 id="function_addOutputParameter">request.addOutputParameter(name, type, [value], [options])</h2>
 <p>
   Add an output parameter to the request.
 </p>
@@ -414,6 +426,27 @@ request.addOutputParameter('id', TYPES.Int);
   <div class="description">
     <p>
       One of the supported <a href="api-datatypes.html"><code>data types</code></a>.
+    </p>
+  </div>
+
+  <div class="name">value</div>
+  <div class="description">
+    <p>
+      The value that the parameter is to be given.
+      The Javascript type of the argument should match
+      that documented for <a href="api-datatypes.html"><code>data types</code></a>. Optional.
+    </p>
+  </div>
+
+  <div class="name">options</div>
+  <div class="description">
+    <p>
+      Additional type options. Optional.
+      <ul>
+        <li><code>length</code> for VarChar, NVarChar, VarBinary</li>
+        <li><code>precision</code> for Numeric, Decimal</li>
+        <li><code>scale</code> for Numeric, Decimal, Time, DateTime2, DateTimeOffset</li>
+      </ul>
     </p>
   </div>
 </div>

@@ -23,6 +23,7 @@ title: API - Connection
   <li><a href="#function_newConnection">new Connection(config)</a></li>
   <li><a href="#event_connect">Event: 'connect'</a></li>
   <li><a href="#event_end">Event: 'end'</a></li>
+  <li><a href="#event_error">Event: 'error'</a></li>
   <li><a href="#event_debug">Event: 'debug'</a></li>
   <li><a href="#event_infoMessage">Event: 'infoMessage'</a></li>
   <li><a href="#event_errorMessage">Event: 'errorMessage'</a></li>
@@ -30,8 +31,9 @@ title: API - Connection
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
   <li><a href="#event_secure">Event: 'secure'</a></li>
-  <li><a href="#function_beginTransaction">connection.beginTransaction(callback, name, isolationLevel)</a></li>
+  <li><a href="#function_beginTransaction">connection.beginTransaction(callback, [name], [isolationLevel])</a></li>
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
+  <li><a href="#function_cancel">connection.cancel()</a></li>
   <li><a href="#function_close">connection.close()</a></li>
   <li><a href="#function_commitTransaction">connection.commitTransaction(callback)</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
@@ -143,6 +145,22 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.useUTC</code>
+      </dt>
+      <dd>
+        A boolean determining whether to pass time values in UTC or local time.
+        (default: <code>true</code>).
+      </dd>
+
+      <dt>
+        <code>options.useColumnNames</code>
+      </dt>
+      <dd>
+        A boolean determining whether to return rows as arrays or key-value collections.
+        (default: <code>true</code>).
+      </dd>
+
+      <dt>
         <code>options.debug.packet</code>
       </dt>
       <dd>
@@ -187,7 +205,7 @@ var connection = new Connection(config);
           <li><code>SERIALIZABLE</code></li>
           <li><code>SNAPSHOT</code></li>
         </ul>
-        (default: <code>READ_UNCOMMITED</code>).
+        (default: <code>READ_COMMITED</code>).
       </dd>
 
       <dt>
@@ -244,15 +262,16 @@ var connection = new Connection(config);
         <code>options.tdsVersion</code>
       </dt>
       <dd>
-        The version of TDS to use.
-        The version are available from <code>require('tedious').TDS_VERSION</code> .
+        The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
+        The versions are available from <code>require('tedious').TDS_VERSION</code>.
         <ul>
-          <li><code>7_1</code> (limited support)</li>
+          <li><code>7_1</code></li>
           <li><code>7_2</code></li>
-          <li><code>7_3_A</code> (future use)</li>
-          <li><code>7_3_B</code> (future use)</li>
+          <li><code>7_3_A</code></li>
+          <li><code>7_3_B</code></li>
+          <li><code>7_4</code></li>
         </ul>
-        (default: <code>7_2</code>).
+        (default: <code>7_4</code>).
       </dd>
     </dl>
   </div>
@@ -270,8 +289,7 @@ var connection = new Connection(config);
       If successfully connected, will be falsey.
     </p>
     <p>
-      If there was a problem (with either connecting or validation), will be a string
-      with details of the error.
+      If there was a problem (with either connecting or validation), will be an error object.
     </p>
   </div>
 </div>
@@ -281,6 +299,12 @@ var connection = new Connection(config);
 <p>
   The connection has ended.
   This may be as a result of the client calling <code>close()</code>, the server closing the connection, or a network error.
+</p>
+
+<h2 id="event_error">Event: 'error'</h2>
+<span class="function">function (err) { }</span>
+<p>
+  Internal error occurs.
 </p>
 
 <h2 id="event_debug">Event: 'debug'</h2>
@@ -420,7 +444,7 @@ var connection = new Connection(config);
   </div>
 </div>
 
-<h2 id="function_beginTransaction">connection.beginTransaction(callback, name, isolationLevel)</h2>
+<h2 id="function_beginTransaction">connection.beginTransaction(callback, [name], [isolationLevel])</h2>
 <p>
   Start a transaction.
 </p>
@@ -492,6 +516,11 @@ var connection = new Connection(config);
     </p>
   </div>
 </div>
+
+<h2 id="function_cancel">connection.cancel()</h2>
+<p>
+  Cancel currently executed request.
+</p>
 
 <h2 id="function_close">connection.close()</h2>
 <p>

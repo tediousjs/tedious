@@ -27,58 +27,58 @@ title: API - Datatypes
   <tr>
     <td class="code">tinyint</td>
     <td class="code">TYPES.TinyInt</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">smallint</td>
     <td class="code">TYPES.SmallInt</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">int</td>
     <td class="code">TYPES.Int</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">bigint<span class="footnote">2</span></td>
     <td class="code">TYPES.BigInt</td>
-    <td class="code">Numeric</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
-    <td class="code">numeric</td>
+    <td class="code">numeric<span class="footnote">3</span></td>
     <td class="code">TYPES.Numeric</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
   <tr>
-    <td class="code">decimal</td>
+    <td class="code">decimal<span class="footnote">3</span></td>
     <td class="code">TYPES.Decimal</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">smallmoney</td>
     <td class="code">TYPES.SmallMoney</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">money</td>
     <td class="code">TYPES.Money</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
 
   <tr class="group-heading">
@@ -87,14 +87,14 @@ title: API - Datatypes
   <tr>
     <td class="code">float</td>
     <td class="code">TYPES.Float</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">real</td>
     <td class="code">TYPES.Real</td>
-    <td class="code">Numeric</td>
+    <td class="code">Number</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
@@ -116,6 +116,27 @@ title: API - Datatypes
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
+  <tr>
+    <td class="code">datetime2</td>
+    <td class="code">TYPES.DateTime2</td>
+    <td class="code">Date</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">datetimeoffset</td>
+    <td class="code">TYPES.DateTimeOffset</td>
+    <td class="code">Date</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">time</td>
+    <td class="code">TYPES.Time</td>
+    <td class="code">Date</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">&#10003;</td>
+  </tr>
 
   <tr class="group-heading">
     <td colspan="4">Character Strings</td>
@@ -128,7 +149,7 @@ title: API - Datatypes
     <td class="supported">-</td>
   </tr>
   <tr>
-    <td class="code">varchar<span class="footnote">3</span></td>
+    <td class="code">varchar<span class="footnote">4</span></td>
     <td class="code">TYPES.VarChar</td>
     <td class="code">String</td>
     <td class="supported">&#10003;</td>
@@ -173,23 +194,23 @@ title: API - Datatypes
   <tr>
     <td class="code">binary</td>
     <td class="code">TYPES.Binary</td>
-    <td class="code">[Numeric]</td>
+    <td class="code">Buffer</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">varbinary</td>
     <td class="code">TYPES.VarBinary</td>
-    <td class="code">[Numeric]</td>
+    <td class="code">Buffer</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
   <tr>
     <td class="code">image</td>
     <td class="code">TYPES.Image</td>
-    <td class="code">[Numeric]</td>
+    <td class="code">Buffer</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
   </tr>
 
   <tr class="group-heading">
@@ -200,12 +221,26 @@ title: API - Datatypes
     <td class="code">TYPES.Null</td>
     <td class="code">null</td>
     <td class="supported">&#10003;</td>
-    <td class="supported">&#10003;<span class="footnote">7</span></td>
+    <td class="supported">&#10003;<span class="footnote">6</span></td>
   </tr>
   <tr>
-    <td class="code">uniqueidentifier<span class="footnote">6</span></td>
+    <td class="code">TVP</td>
+    <td class="code">TYPES.TVP</td>
+    <td class="code">Object</td>
+    <td class="supported">-</td>
+    <td class="supported">&#10003;</td>
+  </tr>
+  <tr>
+    <td class="code">UDT</td>
+    <td class="code">TYPES.UDT</td>
+    <td class="code">Buffer</td>
+    <td class="supported">&#10003;</td>
+    <td class="supported">-</td>
+  </tr>
+  <tr>
+    <td class="code">uniqueidentifier<span class="footnote">5</span></td>
     <td class="code">TYPES.UniqueIdentifier</td>
-    <td class="code">[Numeric]</td>
+    <td class="code">String</td>
     <td class="supported">&#10003;</td>
     <td class="supported">&#10003;</td>
   </tr>
@@ -235,19 +270,19 @@ var TYPES = require('tedious').TYPES
   Javascript Number type can represent as an integer.
 </p>
 
-<h3><span class="footnote">3,4</span>VarChar, NVarChar</h3>
+<h3><span class="footnote">3</span>Numeric, Decimal</h3>
+<p>
+  For input parameters, default precision is 18 and default scale is 0. Maximum supported precision is 19 atm.
+</p>
+
+<h3><span class="footnote">4</span>VarChar, NVarChar</h3>
 <p>
   <code>varchar(max)</code> and <code>nvarchar(max)</code> are also supported.
 </p>
 
-<h3><span class="footnote">5</span>Binary Strings</h3>
+<h3><span class="footnote">5</span>UniqueIdentifier</h3>
 <p>
-  Values are represented as arrays of integer values.
-</p>
-
-<h3><span class="footnote">6</span>UniqueIdentifier</h3>
-<p>
-  Values are returned as a 16 byte array of integer values.
+  Values are returned as a 16 byte hexadecimal string.
 </p>
 <p>
   Note that the order of bytes is not the same as the character representation.
@@ -255,7 +290,7 @@ var TYPES = require('tedious').TYPES
   for an example of the different ordering of bytes.
 </p>
 
-<h3><span class="footnote">7</span>Null parameter value</h3>
+<h3><span class="footnote">6</span>Null parameter value</h3>
 <p>
   The value for a parameter of any supported data type may be <code>null</code>.
 </p>
