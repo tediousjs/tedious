@@ -20,7 +20,7 @@ Current version: 0.1.5
 
 - Added support for TDS 7.4
 - Added request cancelation
-- Added support for UDT, TVP, Time, Date, DateTime2 and DateTimeOffset data types
+- Added support for UDT, TVP, Time, Date, DateTime2 and DateTimeOffset, Numeric, Decimal data types
 - Added option to choose whether to pass/receive times in UTC or local time (`useUTC`)
 - Binary, VarBinary and Image are now supported as input parameters
 - Binary, VarBinary and Image types are now returned as Buffer (was Array)

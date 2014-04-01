@@ -1,5 +1,8 @@
 buffertools = require('../buffertools')
 
+SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
+SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
+
 ###
   A Buffer-like class that tracks position.
 
@@ -85,12 +88,13 @@ class WritableTrackingBuffer
   
   writeUInt40LE: (value) ->
     # inspred by https://github.com/dpw/node-buffer-more-ints
-    SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
-    SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
-    
     @writeInt32LE value & -1
     @writeUInt8 Math.floor(value * SHIFT_RIGHT_32)
-
+  
+  writeUInt64LE: (value) ->
+    @writeInt32LE value & -1
+    @writeUInt32LE Math.floor(value * SHIFT_RIGHT_32)
+  
   writeInt8: (value) ->
     length = 1
     @makeRoomFor(length)

@@ -67,6 +67,18 @@ exports.real = (test) ->
 exports.float = (test) ->
   execSql(test, TYPES.Float, 9654.2546456567565767644)
 
+exports.numeric = (test) ->
+  execSql(test, TYPES.Numeric, 5555)
+
+exports.numericLargeValue = (test) ->
+  execSql(test, TYPES.Numeric, 5.555555555555553333, null, {precision: 19, scale: 18})
+
+exports.decimal = (test) ->
+  execSql(test, TYPES.Decimal, 5555)
+
+exports.decimalLargeValue = (test) ->
+  execSql(test, TYPES.Decimal, 5.555555555555553333, null, {precision: 19, scale: 18})
+
 exports.uniqueIdentifierN = (test) ->
   execSql(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 

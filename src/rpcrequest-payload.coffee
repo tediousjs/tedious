@@ -53,11 +53,11 @@ class RpcRequestPayload
       if (parameter.type.id & 0x30) == 0x20 # Variable length
         param.length = parameter.length ? parameter.type.resolveLength? parameter
       
-      if parameter.type.hasScale
-        param.scale = parameter.scale ? parameter.type.resolveScale? parameter
-      
       if parameter.type.hasPrecision
         param.precision = parameter.precision ? parameter.type.resolvePrecision? parameter
+      
+      if parameter.type.hasScale
+        param.scale = parameter.scale ? parameter.type.resolveScale? parameter
 
       parameter.type.writeTypeInfo(buffer, param, options)
       parameter.type.writeParameterData(buffer, param, options)

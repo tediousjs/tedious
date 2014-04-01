@@ -16,6 +16,9 @@ getConfig = ->
 
   config
 
+process.on 'uncaughtException', (err) ->
+  console.error err.stack
+
 getInstanceName = ->
   JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
 

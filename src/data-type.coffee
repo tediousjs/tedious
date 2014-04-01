@@ -168,6 +168,128 @@ TYPE =
         buffer.writeDoubleLE(parseFloat(parameter.value))
       else
         buffer.writeUInt8(0)
+  0x37:
+    type: 'DECIMAL'
+    name: 'Decimal'
+    hasPrecision: true
+    hasScale: true
+    declaration: (parameter) ->
+      "decimal(#{@resolvePrecision(parameter)}, #{@resolveScale(parameter)})"
+    resolvePrecision: (parameter) ->
+      if parameter.precision?
+        parameter.precision
+      else if parameter.value is null
+        1
+      else
+        18
+    resolveScale: (parameter) ->
+      if parameter.scale?
+        parameter.scale
+      else
+        0
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 typeByName.DecimalN.id
+      
+      if parameter.precision <= 9
+        buffer.writeUInt8 5
+      else if parameter.precision <= 19
+        buffer.writeUInt8 9
+      else if parameter.precision <= 28
+        buffer.writeUInt8 13
+      else
+        buffer.writeUInt8 17
+      
+      buffer.writeUInt8 parameter.precision
+      buffer.writeUInt8 parameter.scale
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
+      if parameter.value?
+        sign = if parameter.value < 0 then 0 else 1
+        value = parameter.value * Math.pow 10, parameter.scale
+        
+        if parameter.precision <= 9
+          buffer.writeUInt8 5
+          buffer.writeUInt8 sign
+          buffer.writeUInt32LE value
+        else if parameter.precision <= 19
+          buffer.writeUInt8 9
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+        else if parameter.precision <= 28
+          buffer.writeUInt8 13
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+          buffer.writeUInt32LE 0x00000000
+        else
+          buffer.writeUInt8 17
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+          buffer.writeUInt32LE 0x00000000
+          buffer.writeUInt32LE 0x00000000
+      else
+        buffer.writeUInt8 0
+  0x3F:
+    type: 'NUMERIC'
+    name: 'Numeric'
+    hasPrecision: true
+    hasScale: true
+    declaration: (parameter) ->
+      "numeric(#{@resolvePrecision(parameter)}, #{@resolveScale(parameter)})"
+    resolvePrecision: (parameter) ->
+      if parameter.precision?
+        parameter.precision
+      else if parameter.value is null
+        1
+      else
+        18
+    resolveScale: (parameter) ->
+      if parameter.scale?
+        parameter.scale
+      else
+        0
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 typeByName.NumericN.id
+      
+      if parameter.precision <= 9
+        buffer.writeUInt8 5
+      else if parameter.precision <= 19
+        buffer.writeUInt8 9
+      else if parameter.precision <= 28
+        buffer.writeUInt8 13
+      else
+        buffer.writeUInt8 17
+      
+      buffer.writeUInt8 parameter.precision
+      buffer.writeUInt8 parameter.scale
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
+      if parameter.value?
+        sign = if parameter.value < 0 then 0 else 1
+        value = parameter.value * Math.pow 10, parameter.scale
+        
+        if parameter.precision <= 9
+          buffer.writeUInt8 5
+          buffer.writeUInt8 sign
+          buffer.writeUInt32LE value
+        else if parameter.precision <= 19
+          buffer.writeUInt8 9
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+        else if parameter.precision <= 28
+          buffer.writeUInt8 13
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+          buffer.writeUInt32LE 0x00000000
+        else
+          buffer.writeUInt8 17
+          buffer.writeUInt8 sign
+          buffer.writeUInt64LE value
+          buffer.writeUInt32LE 0x00000000
+          buffer.writeUInt32LE 0x00000000
+      else
+        buffer.writeUInt8 0
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
@@ -324,7 +446,9 @@ TYPE =
       else
         "varbinary(max)"
     resolveLength: (parameter) ->
-      if parameter.value?
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
         parameter.value.length
       else
         @maximumLength
@@ -373,7 +497,9 @@ TYPE =
       else
         "varchar(max)"
     resolveLength: (parameter) ->
-      if parameter.value?
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
         if Buffer.isBuffer parameter.value
           parameter.value.length || 1
         else
@@ -453,7 +579,9 @@ TYPE =
       else
         "nvarchar(max)"
     resolveLength: (parameter) ->
-      if parameter.value?
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
         if Buffer.isBuffer parameter.value
           (parameter.value.length / 2) || 1
         else
