@@ -119,6 +119,19 @@ TYPE =
   0x3C:
     type: 'MONEY'
     name: 'Money'
+    declaration: (parameter) ->
+      "money"
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 typeByName.MoneyN.id
+      buffer.writeUInt8 8
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
+      if parameter.value?
+        buffer.writeUInt8 8
+        buffer.writeMoney parameter.value * 10000
+      else
+        buffer.writeUInt8 0
   0x3D:
     type: 'DATETIME'
     name: 'DateTime'
@@ -293,6 +306,19 @@ TYPE =
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
+    declaration: (parameter) ->
+      "smallmoney"
+    writeTypeInfo: (buffer, parameter) ->
+      # ParamMetaData (TYPE_INFO)
+      buffer.writeUInt8 typeByName.MoneyN.id
+      buffer.writeUInt8 4
+    writeParameterData: (buffer, parameter) ->
+      # ParamLenData (TYPE_VARBYTE)
+      if parameter.value?
+        buffer.writeUInt8 4
+        buffer.writeInt32LE parameter.value * 10000
+      else
+        buffer.writeUInt8 0
   0x7F:
     type: 'INT8'
     name: 'BigInt'
@@ -841,8 +867,6 @@ TYPE =
 
 # Types not (yet) supported
 ###
-  DECIMALTYPE:          0x37  # Decimal (legacy support)
-  NUMERICTYPE:          0x3F  # Numeric (legacy support)
   CHARTYPE:             0x2F  # Char (legacy support)
   VARCHARTYPE:          0x27  # VarChar (legacy support)
   BINARYTYPE:           0x2D  # Binary (legacy support)

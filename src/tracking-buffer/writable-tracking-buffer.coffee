@@ -199,5 +199,9 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     value.copy(@buffer, @position)
     @position += length
+  
+  writeMoney: (value) ->
+    @writeInt32LE Math.floor(value * SHIFT_RIGHT_32)
+    @writeInt32LE value & -1
 
 module.exports = WritableTrackingBuffer

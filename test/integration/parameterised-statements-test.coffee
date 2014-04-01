@@ -79,6 +79,12 @@ exports.decimal = (test) ->
 exports.decimalLargeValue = (test) ->
   execSql(test, TYPES.Decimal, 5.555555555555553333, null, {precision: 19, scale: 18})
 
+exports.smallMoney = (test) ->
+  execSql(test, TYPES.SmallMoney, 9842.4566)
+
+exports.money = (test) ->
+  execSql(test, TYPES.Money, 956455842.4566)
+
 exports.uniqueIdentifierN = (test) ->
   execSql(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
