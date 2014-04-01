@@ -353,8 +353,8 @@ class Connection extends EventEmitter
     if (@config.options.port)
       @connectOnPort(@config.options.port)
     else
-      instanceLookup(@config.server, @config.options.instanceName, (err, port) =>
-        if err
+      instanceLookup(@config.server, @config.options.instanceName, (message, port) =>
+        if message
           @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
         else
           @connectOnPort(port)
@@ -378,7 +378,7 @@ class Connection extends EventEmitter
     )
 
   closeConnection: ->
-    @socket.destroy()
+    @socket?.destroy()
 
   createConnectTimer: ->
     @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)

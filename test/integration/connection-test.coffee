@@ -149,6 +149,39 @@ exports.connectByInstanceName = (test) ->
     #console.log(text)
   )
 
+exports.connectByInvalidInstanceName = (test) ->
+  if !getInstanceName()
+    # Config says don't do this test (probably because SQL Server Browser is not available).
+    console.log('Skipping connectByInvalidInstanceName test')
+    test.done()
+    return
+
+  test.expect(1)
+
+  config = getConfig()
+  delete config.options.port
+  config.options.instanceName = "#{getInstanceName()}X"
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ok(err)
+
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 
 exports.encrypt = (test) ->
   test.expect(5)
