@@ -4,6 +4,7 @@
     "Ciaran Jessup <ciaranj@gmail.com>",
     "Cort Fritz <cfritz@caa.com>",
     "lastonesky",
+    "Patrik Simek <patrik@patriksimek.cz>",
     "Phil Dodderidge <pdodde@poyntz.com>",
     "Zach Aller"
   ],
@@ -25,7 +26,7 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "0.1.5",
+  "version": "0.2.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
