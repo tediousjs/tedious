@@ -4,7 +4,7 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
-## What's new in 0.2.0
+## What's new in 0.2
 
 - Added support for TDS 7.4
 - Added request cancelation
@@ -22,7 +22,7 @@ which is used to interact with instances of Microsoft's SQL Server. It is intend
 - Fixed compatibility with TDS 7.1 (SQL Server 2000)
 - Minor fixes
 
-### Upgrade from 0.1.5 to 0.2.0
+### Upgrade from 0.1.5 to 0.2
 
 - Time values are now passed/received in UTC instead of local time. You can disable this by `options.useUTC = false`.
 - There was a change in default transaction isolationLevel from `READ_UNCOMMITED` to `READ_COMMITED`. You can disable this by `options.isolationLevel = require('tedious').ISOLATION_LEVEL.READ_UNCOMMITTED`.
