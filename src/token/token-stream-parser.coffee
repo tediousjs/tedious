@@ -15,6 +15,7 @@ tokenParsers[TYPE.ORDER] = require('./order-token-parser')
 tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser')
 tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser')
 tokenParsers[TYPE.ROW] = require('./row-token-parser')
+tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser')
 
 ###
   Buffers are thrown at the parser (by calling addBuffer).
@@ -27,7 +28,7 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
   parsing resumes.
 ###
 class Parser extends EventEmitter
-  constructor: (@debug, @colMetadata, @tdsVersion) ->
+  constructor: (@debug, @colMetadata, @options) ->
     @buffer = new ReadableTrackingBuffer(new Buffer(0), 'ucs2')
     @position = 0
 
@@ -46,10 +47,14 @@ class Parser extends EventEmitter
 
   nextToken: ->
     try
+      # check if we have available bytes
+      unless @buffer.buffer.length > @buffer.position
+        return false
+
       type = @buffer.readUInt8()
 
       if tokenParsers[type]
-        token = tokenParsers[type](@buffer, @colMetadata, @tdsVersion)
+        token = tokenParsers[type](@buffer, @colMetadata, @options)
 
         if token
           @debug.token(token)
@@ -69,13 +74,17 @@ class Parser extends EventEmitter
           return false
 
       else
-        throw new Error("Unrecognised token #{type} at offset #{@buffer.position}")
+        @emit 'tokenStreamError', "Unrecognized token #{type} at offset #{@buffer.position}"
+        return false
+
     catch error
-      if error?.error == 'oob'
+      if error?.code == 'oob'
+        #console.error "OOB ERROR", type, error.stack
         # There was an attempt to read past the end of the buffer.
         # In other words, we've run out of buffer.
         return false
       else
-        throw error
+        @emit 'tokenStreamError', error
+        return false
 
 exports.Parser = Parser

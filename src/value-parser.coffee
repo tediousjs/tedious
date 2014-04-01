@@ -11,7 +11,7 @@ MONEY_DIVISOR = 10000
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 
-parse = (buffer, metaData) ->
+parse = (buffer, metaData, options) ->
   value = undefined
   dataLength = undefined
   textPointerNull = undefined
@@ -38,6 +38,8 @@ parse = (buffer, metaData) ->
         # Variable length
         if metaData.dataLength != MAX
           switch type.dataLengthLength
+            when 0
+              dataLength = undefined
             when 1
               dataLength = buffer.readUInt8()
             when 2
@@ -144,17 +146,37 @@ parse = (buffer, metaData) ->
     when 'Xml'
       value = readMaxNChars(buffer)
     when 'SmallDateTime'
-      value = readSmallDateTime(buffer)
+      value = readSmallDateTime(buffer, options.useUTC)
     when 'DateTime'
-      value = readDateTime(buffer)
+      value = readDateTime(buffer, options.useUTC)
     when 'DateTimeN'
       switch dataLength
         when 0
           value = null
         when 4
-          value = readSmallDateTime(buffer)
+          value = readSmallDateTime(buffer, options.useUTC)
         when 8
-          value = readDateTime(buffer)
+          value = readDateTime(buffer, options.useUTC)
+    when 'TimeN'
+      if (dataLength = buffer.readUInt8()) == 0
+        value = null
+      else
+        value = readTime buffer, dataLength, metaData.scale
+    when 'DateN'
+      if (dataLength = buffer.readUInt8()) == 0
+        value = null
+      else
+        value = readDate buffer
+    when 'DateTime2N'
+      if (dataLength = buffer.readUInt8()) == 0
+        value = null
+      else
+        value = readDateTime2 buffer, dataLength, metaData.scale
+    when 'DateTimeOffsetN'
+      if (dataLength = buffer.readUInt8()) == 0
+        value = null
+      else
+        value = readDateTimeOffset buffer, dataLength, metaData.scale
     when 'NumericN', 'DecimalN'
       if dataLength == 0
         value = null
@@ -184,6 +206,8 @@ parse = (buffer, metaData) ->
           value = guidParser.arrayToGuid( buffer.readArray(0x10) )
         else
           throw new Error(sprintf('Unsupported guid size %d at offset 0x%04X', dataLength - 1, buffer.position))
+    when 'UDT'
+      value = readMaxBinary(buffer)
     else
       throw new Error(sprintf('Unrecognised type %s at offset 0x%04X', type.name, buffer.position))
       break
@@ -194,7 +218,7 @@ readBinary = (buffer, dataLength) ->
   if dataLength == NULL
     null
   else
-    buffer.readArray(dataLength)
+    buffer.readBuffer(dataLength)
 
 readChars = (buffer, dataLength, codepage) ->
   if dataLength == NULL
@@ -210,7 +234,7 @@ readNChars = (buffer, dataLength) ->
 
 readMaxBinary = (buffer) ->
   readMax(buffer, (valueBuffer) ->
-    Array.prototype.slice.call(valueBuffer)
+    valueBuffer
   )
 
 readMaxChars = (buffer, codepage) ->
@@ -258,23 +282,79 @@ readMax = (buffer, decodeFunction) ->
 
     decodeFunction(valueBuffer)
 
-readSmallDateTime = (buffer) ->
+readSmallDateTime = (buffer, useUTC) ->
   days = buffer.readUInt16LE()
   minutes = buffer.readUInt16LE()
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMinutes(value.getMinutes() + minutes)
+  if useUTC
+    value = new Date(Date.UTC(1900, 0, 1))
+    value.setUTCDate(value.getUTCDate() + days)
+    value.setUTCMinutes(value.getUTCMinutes() + minutes)
+  else
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMinutes(value.getMinutes() + minutes)
+    
   value
 
-readDateTime = (buffer) ->
+readDateTime = (buffer, useUTC) ->
   days = buffer.readInt32LE()
   threeHundredthsOfSecond = buffer.readUInt32LE()
   milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD
 
-  value = new Date(1900, 0, 1)
-  value.setDate(value.getDate() + days)
-  value.setMilliseconds(value.getMilliseconds() + milliseconds)
+  if useUTC
+    value = new Date(Date.UTC(1900, 0, 1))
+    value.setUTCDate(value.getUTCDate() + days)
+    value.setUTCMilliseconds(value.getUTCMilliseconds() + milliseconds)
+  else
+    value = new Date(1900, 0, 1)
+    value.setDate(value.getDate() + days)
+    value.setMilliseconds(value.getMilliseconds() + milliseconds)
+    
   value
+
+readTime = (buffer, dataLength, scale) ->
+  switch dataLength
+    when 3 then value = buffer.readUInt24LE()
+    when 4 then value = buffer.readUInt32LE()
+    when 5 then value = buffer.readUInt40LE()
+
+  if scale < 7
+	  value *= 10 for i in [scale+1..7]
+  
+  date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000))
+  Object.defineProperty date, "nanosecondsDelta",
+    enumerable: false
+    value: (value % 10000) / Math.pow(10, 7)
+
+  date
+
+readDate = (buffer) ->
+  days = buffer.readUInt24LE()
+  
+  new Date(Date.UTC(2000, 0, days - 730118))
+
+readDateTime2 = (buffer, dataLength, scale) ->
+  time = readTime buffer, dataLength - 3, scale
+  days = buffer.readUInt24LE()
+
+  date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time))
+  Object.defineProperty date, "nanosecondsDelta",
+    enumerable: false
+    value: time.nanosecondsDelta
+    
+  date
+
+readDateTimeOffset = (buffer, dataLength, scale) ->
+  time = readTime buffer, dataLength - 5, scale
+  days = buffer.readUInt24LE()
+  offset = buffer.readInt16LE()
+
+  date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time))
+  Object.defineProperty date, "nanosecondsDelta",
+    enumerable: false
+    value: time.nanosecondsDelta
+    
+  date
 
 module.exports = parse

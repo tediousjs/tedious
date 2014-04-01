@@ -25,9 +25,9 @@ class ReadableTrackingBuffer
     available = @buffer.length - @position
 
     if available < lengthRequired
-      throw
-        error: 'oob'
-        message: "required : #{lengthRequired}, available : #{available}"
+      e = new Error "required : #{lengthRequired}, available : #{available}"
+      e.code = 'oob'
+      throw e
 
   empty: ->
     @position == @buffer.length
@@ -106,7 +106,21 @@ class ReadableTrackingBuffer
     @assertEnoughLeftFor(length)
     @position += length
     @buffer.readDoubleLE(@position - length)
-
+  
+  readUInt24LE: ->
+    length = 3
+    @assertEnoughLeftFor(length)
+    val |= @buffer[@position + 1] << 8;
+    val |= @buffer[@position];
+    val = val + (@buffer[@position + 2] << 16 >>> 0);
+    @position += length
+    val
+  
+  readUInt40LE: ->
+    low = @readBuffer(4).readUInt32LE 0
+    high = Buffer.concat([@readBuffer(1), new Buffer [0x00, 0x00, 0x00]]).readUInt32LE 0
+    low + (0x100000000 * high)
+  
   # If value > 53 bits then it will be incorrect (because Javascript uses IEEE_754 for number representation).
   readUInt64LE: ->
     low = @readUInt32LE()

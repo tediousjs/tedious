@@ -63,8 +63,13 @@ class MessageIO extends EventEmitter
     @tlsNegotiationInProgress = false;
 
   # TODO listen for 'drain' event when socket.write returns false.
+  # TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage: (packetType, data, resetConnection) ->
-    numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
+    if data
+      numberOfPackets = (Math.floor((data.length - 1) / @packetDataSize)) + 1
+    else
+      numberOfPackets = 1
+      data = new Buffer 0
 
     for packetNumber in [0..numberOfPackets - 1]
       payloadStart = packetNumber * @packetDataSize

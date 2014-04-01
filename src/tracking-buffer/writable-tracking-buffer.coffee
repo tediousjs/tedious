@@ -1,5 +1,8 @@
 buffertools = require('../buffertools')
 
+SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
+SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
+
 ###
   A Buffer-like class that tracks position.
 
@@ -56,6 +59,14 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeUInt16BE(value, @position)
     @position += length
+  
+  writeUInt24LE: (value) ->
+    length = 3
+    @makeRoomFor(length)
+    @buffer[@position + 2] = (value >>> 16) & 0xff;
+    @buffer[@position + 1] = (value >>> 8) & 0xff;
+    @buffer[@position] = value & 0xff;
+    @position += length
 
   writeUInt32LE: (value) ->
     length = 4
@@ -74,7 +85,16 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeUInt32BE(value, @position)
     @position += length
-
+  
+  writeUInt40LE: (value) ->
+    # inspred by https://github.com/dpw/node-buffer-more-ints
+    @writeInt32LE value & -1
+    @writeUInt8 Math.floor(value * SHIFT_RIGHT_32)
+  
+  writeUInt64LE: (value) ->
+    @writeInt32LE value & -1
+    @writeUInt32LE Math.floor(value * SHIFT_RIGHT_32)
+  
   writeInt8: (value) ->
     length = 1
     @makeRoomFor(length)
@@ -134,11 +154,54 @@ class WritableTrackingBuffer
   writeUsVarchar: (value, encoding) ->
     @writeUInt16LE(value.length)
     @writeString(value, encoding)
+  
+  writeUsVarbyte: (value, encoding = @encoding) ->
+    if Buffer.isBuffer value
+      length = value.length
+    else
+      value = value.toString()
+      length = Buffer.byteLength value, encoding
+      
+    @writeUInt16LE length
+    
+    if Buffer.isBuffer value
+      @writeBuffer value
+    else
+      @makeRoomFor length
+      @buffer.write(value, @position, encoding)
+      @position += length
+
+  writePLPBody: (value, encoding = @encoding) ->
+    if Buffer.isBuffer value
+      length = value.length
+    else
+      value = value.toString()
+      length = Buffer.byteLength value, encoding
+    
+    # Length of all chunks.
+    @writeUInt64LE length
+    
+    # One chunk.
+    @writeUInt32LE length
+    
+    if Buffer.isBuffer value
+      @writeBuffer value
+    else
+      @makeRoomFor length
+      @buffer.write value, @position, encoding
+      @position += length
+
+    # PLP_TERMINATOR (no more chunks).
+    @writeUInt32LE(0)
 
   writeBuffer: (value) ->
     length = value.length
     @makeRoomFor(length)
     value.copy(@buffer, @position)
     @position += length
+  
+  writeMoney: (value) ->
+    @writeInt32LE Math.floor(value * SHIFT_RIGHT_32)
+    @writeInt32LE value & -1
 
 module.exports = WritableTrackingBuffer

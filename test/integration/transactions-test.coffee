@@ -6,6 +6,9 @@ async = require('async')
 debug = false
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
+if config.options.tdsVersion < '7_2'
+  console.log "Transactions are not supported on TDS 7.1."
+  return
 
 if (debug)
   config.options.debug =

@@ -3,8 +3,8 @@ codepageByLcid = require('./collation').codepageByLcid
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parse = (buffer, tdsVersion) ->
-  if tdsVersion < "7_2"
+parse = (buffer, options) ->
+  if options.tdsVersion < "7_2"
     userType = buffer.readUInt16LE()
   else
     userType = buffer.readUInt32LE()
@@ -15,12 +15,12 @@ parse = (buffer, tdsVersion) ->
   if !type
     throw new Error(sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1)))
 
-  #console.log(type)
-
   if (type.id & 0x30) == 0x20
     # xx10xxxx - s2.2.4.2.1.3
     # Variable length
     switch type.dataLengthLength
+      when 0
+        dataLength = undefined
       when 1
         dataLength = buffer.readUInt8()
       when 2
@@ -39,6 +39,9 @@ parse = (buffer, tdsVersion) ->
 
   if type.hasScale
     scale = buffer.readUInt8()
+  
+    if type.dataLengthFromScale
+      dataLength = type.dataLengthFromScale scale
   else
     scale = undefined
 
@@ -66,6 +69,7 @@ parse = (buffer, tdsVersion) ->
 
   schema = undefined
   if type.hasSchemaPresent
+    # s2.2.5.5.3
     schemaPresent = buffer.readUInt8()
 
     if schemaPresent == 0x01
@@ -73,6 +77,16 @@ parse = (buffer, tdsVersion) ->
         dbname: buffer.readBVarchar()
         owningSchema: buffer.readBVarchar()
         xmlSchemaCollection: buffer.readUsVarchar()
+  
+  udtInfo = undefined
+  if type.hasUDTInfo
+    # s2.2.5.5.2
+    udtInfo =
+      maxByteSize: buffer.readUInt16LE()
+      dbname: buffer.readBVarchar()
+      owningSchema: buffer.readBVarchar()
+      typeName: buffer.readBVarchar()
+      assemblyName: buffer.readUsVarchar()
 
   metadata =
     userType: userType
@@ -83,5 +97,6 @@ parse = (buffer, tdsVersion) ->
     scale: scale
     dataLength: dataLength
     schema: schema
+    udtInfo: udtInfo
 
 module.exports = parse

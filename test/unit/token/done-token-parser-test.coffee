@@ -13,7 +13,7 @@ parse = (status, curCmd, doneRowCount) ->
   buffer.writeUInt32LE(doneRowCountLow)
   buffer.writeUInt32LE(doneRowCountHi)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
   #console.log(token)
   
   token

@@ -16,6 +16,8 @@ ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL
 crypto = require('crypto')
 tls = require('tls')
 
+{ConnectionError, RequestError} = require('./errors')
+
 # A rather basic state machine for managing a connection.
 # Implements something approximating s3.2.1.
 
@@ -26,7 +28,7 @@ DEFAULT_CANCEL_TIMEOUT = 5 * 1000
 DEFAULT_PACKET_SIZE = 4 * 1024
 DEFAULT_TEXTSIZE = '2147483647'
 DEFAULT_PORT = 1433
-DEFAULT_TDS_VERSION = '7_2'
+DEFAULT_TDS_VERSION = '7_4'
 
 class Connection extends EventEmitter
   STATE:
@@ -130,6 +132,23 @@ class Connection extends EventEmitter
           @request = undefined
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows)
 
+    SENT_ATTENTION:
+      name: 'SentAttention'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
+        message: ->
+          if @request.canceled
+            @transitionTo(@STATE.LOGGED_IN)
+
+            sqlRequest = @request
+            @request = undefined
+            sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
+          
+          # else: skip all messages, now we are only interested about cancel acknowledgement (2.2.1.6)
+
     FINAL:
       name: 'Final'
       enter: ->
@@ -167,6 +186,8 @@ class Connection extends EventEmitter
       @closeConnection()
       @emit('end')
       @closed = true
+      @loggedIn = false
+      @loginError = null
 
   defaultConfig: ->
     @config.options ||= {}
@@ -179,12 +200,16 @@ class Connection extends EventEmitter
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
     @config.options.encrypt ||= false
     @config.options.cryptoCredentialsDetails ||= {}
+    @config.options.useUTC ?= true
+    @config.options.useColumnNames ?= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
     else if @config.options.port && @config.options.instanceName
       throw new Error("Port and instanceName are mutually exclusive, but #{@config.options.port} and #{@config.options.instanceName} provided")
-
+    else if @config.options.port
+      if @config.options.port < 0 or @config.options.port > 65536
+        throw new RangeError "Port should be > 0 and < 65536"
 
   createDebug: ->
     @debug = new Debug(@config.options.debug)
@@ -193,14 +218,17 @@ class Connection extends EventEmitter
     )
 
   createTokenStreamParser: ->
-    @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options.tdsVersion)
+    @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options)
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
     )
     @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
-      if @request
-        @request.error = token.message
+      if @loggedIn
+        if @request
+          @request.error = RequestError token.message, 'EREQUEST'
+      else
+        @loginError = ConnectionError token.message, 'ELOGIN'
     )
     @tokenStreamParser.on('databaseChange', (token) =>
       @emit('databaseChange', token.newValue)
@@ -212,6 +240,20 @@ class Connection extends EventEmitter
       @emit('charsetChange', token.newValue)
     )
     @tokenStreamParser.on('loginack', (token) =>
+      unless token.tdsVersion
+        # unsupported TDS version
+        @loginError = ConnectionError "Server responded with unknown TDS version."
+        @loggedIn = false
+        return
+      
+      unless token.interface
+        # unsupported interface
+        @loginError = ConnectionError "Server responded with unsupported interface."
+        @loggedIn = false
+        return
+        
+      # use negotiated version
+      @config.options.tdsVersion = token.tdsVersion
       @loggedIn = true
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
@@ -228,15 +270,23 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('columnMetadata', (token) =>
         if @request
-          @request.emit('columnMetadata', token.columns)
+          if @config.options.useColumnNames
+            columns = {}
+            columns[col.colName] = col for col in token.columns when not columns[col.colName]?
+          else
+            columns = token.columns
+            
+          @request.emit('columnMetadata', columns)
         else
-          throw new Error("Received 'columnMetadata' when no sqlRequest is in progress")
+          @emit 'error', new Error "Received 'columnMetadata' when no sqlRequest is in progress"
+          @close()
     )
     @tokenStreamParser.on('order', (token) =>
         if @request
           @request.emit('order', token.orderColumns)
         else
-          throw new Error("Received 'order' when no sqlRequest is in progress")
+          @emit 'error', new Error "Received 'order' when no sqlRequest is in progress"
+          @close()
     )
     @tokenStreamParser.on('row', (token) =>
       if @request
@@ -245,7 +295,8 @@ class Connection extends EventEmitter
 
         @request.emit('row', token.columns)
       else
-        throw new Error("Received 'row' when no sqlRequest is in progress")
+        @emit 'error', new Error "Received 'row' when no sqlRequest is in progress"
+        @close()
     )
     @tokenStreamParser.on('returnStatus', (token) =>
       if @request
@@ -280,15 +331,22 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('done', (token) =>
       if @request
         @request.emit('done', token.rowCount, token.more, @request.rows)
-
+        
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
           @request.rows = []
+        
+        if token.attention
+          @request.canceled = true
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
+    )
+    @tokenStreamParser.on('tokenStreamError', (error) =>
+      @emit 'error', error
+      @close()
     )
 
   connect: ->
@@ -297,7 +355,7 @@ class Connection extends EventEmitter
     else
       instanceLookup(@config.server, @config.options.instanceName, (err, port) =>
         if err
-          throw new Error(err)
+          @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
         else
           @connectOnPort(port)
       )
@@ -326,10 +384,10 @@ class Connection extends EventEmitter
     @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)
 
   connectTimeout: =>
-    message = "timeout : failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
+    message = "Failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
 
     @debug.log(message)
-    @emit('connect', message)
+    @emit('connect', ConnectionError(message, 'ETIMEOUT'))
     @connectTimer = undefined
     @dispatchEvent('connectTimeout')
 
@@ -351,16 +409,17 @@ class Connection extends EventEmitter
     if @state?.events[eventName]
       eventFunction = @state.events[eventName].apply(@, args)
     else
-      throw new Error("No event '#{eventName}' in state '#{@state.name}'")
+      @emit 'error', new Error "No event '#{eventName}' in state '#{@state.name}'"
+      @close()
 
   socketError: (error) =>
-    message = "connection to #{@config.server}:#{@config.options.port} - failed #{error}"
+    message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"
 
     @debug.log(message)
     if @state == @STATE.CONNECTING
-      @emit('connect', message)
+      @emit('connect', ConnectionError(message, 'ESOCKET'))
     else
-      @emit('errorMessage', message)
+      @emit('error', ConnectionError message)
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
@@ -437,7 +496,7 @@ class Connection extends EventEmitter
     @tokenStreamParser.addBuffer(data)
 
   sendInitialSql: ->
-    payload = new SqlBatchPayload(@getInitialSql(), @currentTransactionDescriptor())
+    payload = new SqlBatchPayload(@getInitialSql(), @currentTransactionDescriptor(), @config.options)
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
@@ -464,35 +523,41 @@ set transaction isolation level read committed'''
     if @loggedIn
       @dispatchEvent('loggedIn')
     else
-      @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->
-    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, @currentTransactionDescriptor(), @config.options))
 
   execSql: (request) ->
     request.transformIntoExecuteSqlRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   prepare: (request) ->
     request.transformIntoPrepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   unprepare: (request) ->
     request.transformIntoUnprepareRpc()
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   execute: (request, parameters) ->
     request.transformIntoExecuteRpc(parameters)
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   callProcedure: (request) ->
-    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor()))
+    @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   beginTransaction: (callback, name, isolationLevel) ->
     name ||= ''
     isolationLevel ||= @config.options.isolationLevel
 
+    if @config.options.tdsVersion < "7_2"
+      return callback RequestError "Transactions are not supported on TDS 7.1."
+      
     transaction = new Transaction(name, isolationLevel)
     @transactions.push(transaction)
 
@@ -504,7 +569,7 @@ set transaction isolation level read committed'''
 
   commitTransaction: (callback) ->
     if @transactions.length == 0
-      throw new Error('No transaction in progress')
+      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
     transaction = @transactions.pop()
 
     request = new Request(undefined, callback)
@@ -513,7 +578,7 @@ set transaction isolation level read committed'''
 
   rollbackTransaction: (callback) ->
     if @transactions.length == 0
-      throw new Error('No transaction in progress')
+      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
     transaction = @transactions.pop()
 
     request = new Request(undefined, callback)
@@ -522,10 +587,10 @@ set transaction isolation level read committed'''
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
-      message = "Invalid state; requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
+      message = "Requests can only be made in the #{@STATE.LOGGED_IN.name} state, not the #{@state.name} state"
 
       @debug.log(message)
-      request.callback(message)
+      request.callback RequestError message, 'EINVALIDSTATE'
     else
       @request = request
       @request.rowCount = 0
@@ -538,6 +603,17 @@ set transaction isolation level read committed'''
       )
 
       @transitionTo(@STATE.SENT_CLIENT_REQUEST)
+  
+  cancel: ->
+    if @state != @STATE.SENT_CLIENT_REQUEST
+      message = "Requests can only be canceled in the #{@STATE.SENT_CLIENT_REQUEST.name} state, not the #{@state.name} state"
+
+      @debug.log(message)
+      false
+    else
+      @messageIo.sendMessage(TYPE.ATTENTION)
+      @transitionTo(@STATE.SENT_ATTENTION)
+      true
 
   reset: (callback) =>
     request = new Request(@getInitialSql(), (err, rowCount, rows) ->

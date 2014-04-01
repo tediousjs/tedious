@@ -1,7 +1,7 @@
-# s2.2.7.15
+# s2.2.7.16
 
 parser = (buffer) ->
-  value = buffer.readUInt32LE()
+  value = buffer.readInt32LE()
 
   token =
     name: 'RETURNSTATUS'

@@ -10,7 +10,7 @@ STATUS =
   ATTN: 0x0020
   SRVERROR: 0x0100
 
-parser = (buffer, tdsVersion) ->
+parser = (buffer, options) ->
   status = buffer.readUInt16LE()
 
   more = !!(status & STATUS.MORE)
@@ -23,7 +23,7 @@ parser = (buffer, tdsVersion) ->
   curCmd = buffer.readUInt16LE()
 
   # If rowCount > 53 bits then rowCount will be incorrect (because Javascript uses IEEE_754 for number representation).
-  if tdsVersion < "7_2"
+  if options.tdsVersion < "7_2"
     rowCount = buffer.readUInt32LE()
   else
     rowCount = buffer.readUInt64LE()
@@ -40,22 +40,22 @@ parser = (buffer, tdsVersion) ->
     rowCount: rowCount
     curCmd: curCmd
 
-doneParser = (buffer, colMetadata, tdsVersion) ->
-  token = parser(buffer, tdsVersion)
+doneParser = (buffer, colMetadata, options) ->
+  token = parser(buffer, options)
   token.name = 'DONE'
   token.event = 'done'
 
   token
 
-doneInProcParser = (buffer, colMetadata, tdsVersion) ->
-  token = parser(buffer, tdsVersion)
+doneInProcParser = (buffer, colMetadata, options) ->
+  token = parser(buffer, options)
   token.name = 'DONEINPROC'
   token.event = 'doneInProc'
 
   token
 
-doneProcParser = (buffer, colMetadata, tdsVersion) ->
-  token = parser(buffer, tdsVersion)
+doneProcParser = (buffer, colMetadata, options) ->
+  token = parser(buffer, options)
   token.name = 'DONEPROC'
   token.event = 'doneProc'
 

@@ -4,6 +4,7 @@ exports.versions =
   '7_2': 0x72090002
   '7_3_A': 0x730A0003
   '7_3_B': 0x730B0003
+  '7_4': 0x74000004
 
 exports.versionsByValue = {}
 for name, value of exports.versions

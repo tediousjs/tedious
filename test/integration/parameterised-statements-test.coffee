@@ -67,6 +67,24 @@ exports.real = (test) ->
 exports.float = (test) ->
   execSql(test, TYPES.Float, 9654.2546456567565767644)
 
+exports.numeric = (test) ->
+  execSql(test, TYPES.Numeric, 5555)
+
+exports.numericLargeValue = (test) ->
+  execSql(test, TYPES.Numeric, 5.555555555555553333, null, {precision: 19, scale: 18})
+
+exports.decimal = (test) ->
+  execSql(test, TYPES.Decimal, 5555)
+
+exports.decimalLargeValue = (test) ->
+  execSql(test, TYPES.Decimal, 5.555555555555553333, null, {precision: 19, scale: 18})
+
+exports.smallMoney = (test) ->
+  execSql(test, TYPES.SmallMoney, 9842.4566)
+
+exports.money = (test) ->
+  execSql(test, TYPES.Money, 956455842.4566)
+
 exports.uniqueIdentifierN = (test) ->
   execSql(test, TYPES.UniqueIdentifierN, '01234567-89AB-CDEF-0123-456789ABCDEF')
 
@@ -79,6 +97,9 @@ exports.intNull = (test) ->
 exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
+exports.varCharN = (test) ->
+  execSql(test, TYPES.VarChar, 'qaz', null, {length: 8001})
+
 exports.varCharEmptyString = (test) ->
   execSql(test, TYPES.VarChar, '')
 
@@ -90,10 +111,13 @@ exports.varCharMax = (test) ->
   for i in [1..(10 * 1000)]
     longString += 'x'
 
-  execSql(test, TYPES.VarChar, longString)
+  execSql(test, TYPES.VarChar, longString, '7_2')
 
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
+
+exports.nVarCharN = (test) ->
+  execSql(test, TYPES.NVarChar, 'qaz', null, {length: 4001})
 
 exports.nVarCharEmptyString = (test) ->
   execSql(test, TYPES.NVarChar, '')
@@ -106,7 +130,7 @@ exports.nVarCharMax = (test) ->
   for i in [1..(10 * 1000)]
     longString += 'x'
 
-  execSql(test, TYPES.NVarChar, longString)
+  execSql(test, TYPES.NVarChar, longString, '7_2')
 
 exports.textNull = (test) ->
   execSql(test, TYPES.Text, null)
@@ -245,11 +269,14 @@ exports.multipleParameters = (test) ->
     #console.log(text)
   )
 
-execSql = (test, type, value) ->
-  test.expect(5)
-
+execSql = (test, type, value, tdsVersion, options) ->
   config = getConfig()
   #config.options.packetSize = 32768
+  
+  if tdsVersion and tdsVersion > config.options.tdsVersion
+  	return test.done()
+  	
+  test.expect(5)
 
   request = new Request('select @param', (err) ->
       test.ok(!err)
@@ -257,7 +284,7 @@ execSql = (test, type, value) ->
       connection.close()
   )
 
-  request.addParameter('param', type, value)
+  request.addParameter('param', type, value, options)
 
   request.on('doneInProc', (rowCount, more) ->
       test.ok(more)

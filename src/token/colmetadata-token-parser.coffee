@@ -2,19 +2,20 @@
 
 metadataParse = require('../metadata-parser')
 
-DIGITS_REGEX = /^\d+$/
-
-parser = (buffer, colMetadata, tdsVersion) ->
+parser = (buffer, colMetadata, options) ->
   columnCount = buffer.readUInt16LE()
 
   columns = []
   for c in [1..columnCount]
-    metadata = metadataParse(buffer, tdsVersion)
+    metadata = metadataParse(buffer, options)
 
     if metadata.type.hasTableName
-      numberOfTableNameParts = buffer.readUInt8()
-      tableName = for part in [1..numberOfTableNameParts]
-        buffer.readUsVarchar('ucs2')
+      if options.tdsVersion >= '7_2'
+        numberOfTableNameParts = buffer.readUInt8()
+        tableName = for part in [1..numberOfTableNameParts]
+          buffer.readUsVarchar('ucs2')
+      else
+        tableName = buffer.readUsVarchar('ucs2')
     else
       tableName = undefined
 
@@ -28,13 +29,11 @@ parser = (buffer, colMetadata, tdsVersion) ->
       collation: metadata.collation
       precision: metadata.precision
       scale: metadata.scale
+      udtInfo: metadata.udtInfo
       dataLength: metadata.dataLength
       tableName: tableName
 
     columns.push(column)
-
-    if !(DIGITS_REGEX.test(column.colName))
-      columns[column.colName] = column
 
   # Return token
   name: 'COLMETADATA'

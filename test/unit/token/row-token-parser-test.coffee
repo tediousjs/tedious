@@ -2,13 +2,14 @@ parser = require('../../../src/token/row-token-parser')
 dataTypeByName = require('../../../src/data-type').typeByName
 ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+options = useUTC: false
 
 module.exports.null = (test) ->
   colMetaData = [type: dataTypeByName.Null]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -24,7 +25,7 @@ module.exports.int = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt32LE(value)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -42,7 +43,7 @@ module.exports.bigint = (test) ->
     1,0,0,0,0,0,0,0,
     255,255,255,255,255,255,255,127]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
 
   test.strictEqual(token.columns.length, 2)
   test.strictEqual("1", token.columns[0].value)
@@ -57,7 +58,7 @@ module.exports.real = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([0x00, 0x00, 0x18, 0x41]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -73,7 +74,7 @@ module.exports.float = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -102,7 +103,7 @@ module.exports.money = (test) ->
   buffer.writeBuffer(new Buffer([0x08, 0x00, 0x00, 0x00, 0x00, 0x80, 0xd6, 0x12, 0x00]))
   buffer.writeBuffer(new Buffer([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d]))
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 6)
@@ -127,7 +128,7 @@ module.exports.varCharWithoutCodepage = (test) ->
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -148,7 +149,7 @@ module.exports.varCharWithCodepage = (test) ->
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -166,7 +167,7 @@ module.exports.nVarChar = (test) ->
   buffer.writeString(value)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -177,14 +178,14 @@ module.exports.nVarChar = (test) ->
 
 module.exports.varBinary = (test) ->
   colMetaData = [type: dataTypeByName.VarBinary]
-  value = [0x12, 0x34]
+  value = new Buffer [0x12, 0x34]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
   buffer.writeBuffer(new Buffer(value))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -195,14 +196,14 @@ module.exports.varBinary = (test) ->
 
 module.exports.binary = (test) ->
   colMetaData = [type: dataTypeByName.Binary]
-  value = [0x12, 0x34]
+  value = new Buffer [0x12, 0x34]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt16LE(value.length)
   buffer.writeBuffer(new Buffer(value))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -223,7 +224,7 @@ module.exports.varCharMaxNull = (test) ->
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -250,7 +251,7 @@ module.exports.varCharMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -277,7 +278,7 @@ module.exports.varCharMaxKnownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -304,7 +305,7 @@ module.exports.varCharMaxWithCodepage = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -330,7 +331,7 @@ module.exports.varCharMaxKnownLengthWrong = (test) ->
   #console.log(buffer.data)
 
   try
-    token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+    token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
     test.ok(false)
   catch exception
     test.done()
@@ -345,7 +346,7 @@ module.exports.varBinaryMaxNull = (test) ->
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -359,7 +360,7 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
     type: dataTypeByName.VarBinary
     dataLength: 65535
   ]
-  value = [0x12, 0x34, 0x56, 0x78]
+  value = new Buffer [0x12, 0x34, 0x56, 0x78]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeBuffer(new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
@@ -370,7 +371,7 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -411,7 +412,7 @@ module.exports.intN = (test) ->
     8, 16,39,0,0,0,0,0,0]))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 12)
@@ -443,7 +444,7 @@ module.exports.guidN = (test) ->
   ]))
   # console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   # console.log(token)
 
   test.strictEqual(token.columns.length, 2)
@@ -467,7 +468,7 @@ module.exports.floatN = (test) ->
   ]))
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 3)
@@ -489,11 +490,17 @@ module.exports.datetime = (test) ->
   buffer.writeUInt32LE(threeHundredthsOfSecond)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, {useUTC: false})
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
-  test.strictEqual(token.columns[0].value.getTime(), new Date('January 3, 1900 00:00:45').getTime())
+  test.strictEqual(token.columns[0].value.getTime(), new Date("January 3, 1900 00:00:45").getTime())
+
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, {useUTC: true})
+  #console.log(token)
+
+  test.strictEqual(token.columns.length, 1)
+  test.strictEqual(token.columns[0].value.getTime(), new Date("January 3, 1900 00:00:45 GMT").getTime())
 
   test.done()
 
@@ -505,7 +512,7 @@ module.exports.datetimeN = (test) ->
   buffer.writeUInt8(0)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -529,7 +536,7 @@ module.exports.numeric4Bytes = (test) ->
   buffer.writeUInt32LE(93)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -553,7 +560,7 @@ module.exports.numeric4BytesNegative = (test) ->
   buffer.writeUInt32LE(93)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -578,7 +585,7 @@ module.exports.numeric8Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -604,7 +611,7 @@ module.exports.numeric12Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -631,7 +638,7 @@ module.exports.numeric16Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
@@ -651,7 +658,7 @@ module.exports.numericNull = (test) ->
   buffer.writeUInt8(0)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData)
+  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), colMetaData, options)
   #console.log(token)
 
   test.strictEqual(token.columns.length, 1)
