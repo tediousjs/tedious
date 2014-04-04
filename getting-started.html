@@ -20,6 +20,9 @@ title: Getting started
     userName: 'test',
     password: 'test',
     server: '192.168.1.210',
+    
+    // If you're on Windows Azure, you will need this:
+    options: {encrypt: true}
   };
 
   var connection = new Connection(config);
