@@ -5,6 +5,14 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
+<h3>v0.2.2 <span class="date">2014-04-01</span></h3>
+<ul>
+    <li>
+        Fixed ReferenceError in instance lookup error handler (Patrik Simek)<br>
+        (Issue <a href="https://github.com/pekim/tedious/issues/142">#142</a>)
+    </li>
+</ul>
+
 <h3>v0.2.0 <span class="date">2014-04-01</span></h3>
 <ul>
 	<li>
@@ -17,7 +25,7 @@ title: ChangeLog
         Added support for UDT, TVP, Time, Date, DateTime2 and DateTimeOffset data types (Patrik Simek)
     </li>
 	<li>
-        Added option to choose whether to pass/receive times in UTC or local time (Patrik Simek)
+        Added option to choose whether to pass/receive times in UTC or local time (Patrik Simek)<br>
         (Issues <a href="https://github.com/pekim/tedious/issues/95">#95</a>, <a href="https://github.com/pekim/tedious/issues/108">#108</a> and <a href="https://github.com/pekim/tedious/issues/133">#133</a>)
     </li>
 	<li>
@@ -30,11 +38,11 @@ title: ChangeLog
         Connection errors are now correctly propagated to connect event (Patrik Simek)
     </li>
 	<li>
-        Better support for numeric column names and columns with same name (Patrik Simek)
+        Better support for numeric column names and columns with same name (Patrik Simek)<br>
         (Issues <a href="https://github.com/pekim/tedious/issues/76">#76</a> and <a href="https://github.com/pekim/tedious/issues/126">#126</a>)
     </li>
 	<li>
-        Errors are now instanceof Error / ConnectionError / RequestError (Patrik Simek)
+        Errors are now instanceof Error / ConnectionError / RequestError (Patrik Simek)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/120">#120</a>)
     </li>
 	<li>
@@ -44,15 +52,15 @@ title: ChangeLog
         Fixed issue when zero value was casted as null when using BigInt as input parameter (Patrik Simek)
     </li>
 	<li>
-        Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error (Patrik Simek)
+        Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error (Patrik Simek)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/104">#104</a>)
     </li>
 	<li>
-        Fixed negative return values (Patrik Simek)
+        Fixed negative return values (Patrik Simek)<br>
         (Issue <a href="https://github.com/patriksimek/node-mssql/issues/25">node-mssql#25</a>)
     </li>
 	<li>
-        Fixed compatibility with TDS 7.1 (Patrik Simek)
+        Fixed compatibility with TDS 7.1 (Patrik Simek)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/112">#112</a>)
     </li>
 </ul>
@@ -60,11 +68,11 @@ title: ChangeLog
 <h3>v0.1.5 <span class="date">2013-06-24</span></h3>
 <ul>
     <li>
-        Emit connect event with error (if connecting) or emit errorMessage event on socket error. (Daniel Rapp)
+        Emit connect event with error (if connecting) or emit errorMessage event on socket error. (Daniel Rapp)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/94">#94</a>)
     </li>
     <li>
-        Emit event after request callback. (Matheus Kautzmann)
+        Emit event after request callback. (Matheus Kautzmann)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/96">#96</a>)
     </li>
 </ul>
@@ -72,27 +80,27 @@ title: ChangeLog
 <h3>v0.1.4 <span class="date">2013-04-14</span></h3>
 <ul>
     <li>
-        Add placeholder event handlers to suppress crash in final. (Nicholas Penree)
+        Add placeholder event handlers to suppress crash in final. (Nicholas Penree)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/80">#80</a>)
     </li>
     <li>
-        Better default values for options in default sql statement. (Kevin Pullin)
+        Better default values for options in default sql statement. (Kevin Pullin)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/83">#83</a>)
     </li>
     <li>
-        Expose collected rows in request callback and done* events.
+        Expose collected rows in request callback and done* events.<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/73">#73</a>)
     </li>
     <li>
-        Add connection.reset function, to reset connection to initial state.
+        Add connection.reset function, to reset connection to initial state.<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/85">#85</a>)
     </li>
     <li>
-        Make encrypted connections work with node v0.10.
+        Make encrypted connections work with node v0.10.<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/86">#86</a>)
     </li>
     <li>
-        Honour optional appName property in config.options.
+        Honour optional appName property in config.options.<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/91">#91</a>)
     </li>
     <li>
@@ -107,15 +115,15 @@ title: ChangeLog
 <h3>v0.1.3 <span class="date">2013-02-17</span></h3>
 <ul>
     <li>
-        Support Text as a parameter type. (Zach Aller)
+        Support Text as a parameter type. (Zach Aller)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/75">#75</a>)
     </li>
     <li>
-        New example, showing insert statement using parameters of different types. (Will Munn)
+        New example, showing insert statement using parameters of different types. (Will Munn)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/72">#72</a>)
     </li>
     <li>
-        Support for duplicate column names in result sets. (Nadeem)
+        Support for duplicate column names in result sets. (Nadeem)<br>
         (Issue <a href="https://github.com/pekim/tedious/issues/70">#70</a>)
     </li>
 </ul>
@@ -123,11 +131,11 @@ title: ChangeLog
 <h3>v0.1.2 <span class="date">2013-01-02</span></h3>
 <ul>
   <li>
-    Column not accessible by column name when the name is numeric.
+    Column not accessible by column name when the name is numeric.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/66">#66</a>)
   </li>
   <li>
-    Support for XML data type in result sets.
+    Support for XML data type in result sets.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/67">#67</a>)
   </li>
 </ul>
@@ -179,11 +187,11 @@ title: ChangeLog
   <li>
     When the value of
     <code>tinyint</code>, <code>smallint</code> or <code>int</code>
-    parameters are 0, do not send their value as null.
+    parameters are 0, do not send their value as null.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/25">#25</a>)
   </li>
   <li>
-    Support for <code>DATABASE_MIRRORING_PARTNER</code> environment change notification.
+    Support for <code>DATABASE_MIRRORING_PARTNER</code> environment change notification.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/22">#22</a>)
   </li>
   <li>
@@ -192,7 +200,7 @@ title: ChangeLog
     types in parameterised statements.
   </li>
   <li>
-    Support for using <code>varchar(max)</code> and <code>nvarchar(max)</code> in parameterised statements.
+    Support for using <code>varchar(max)</code> and <code>nvarchar(max)</code> in parameterised statements.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/32">#32</a>)
   </li>
   <li>
@@ -216,15 +224,15 @@ title: ChangeLog
     If it is not available, then ascii is used as fallback when converting the buffers to strings.
   </li>
   <li>
-    Added support for executing parameterised statements.
+    Added support for executing parameterised statements.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/14">#14</a>)
   </li>
   <li>
-    Added support for calling procedures with parameters.
+    Added support for calling procedures with parameters.<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/16">#16</a>)
   </li>
   <li>
-    Support connecting by instance name (instead of port).
+    Support connecting by instance name (instead of port).<br>
     (Issue <a href="https://github.com/pekim/tedious/issues/20">#20</a>)
   </li>
   <li>
