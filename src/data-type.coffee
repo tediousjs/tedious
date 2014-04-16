@@ -219,7 +219,7 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = parameter.value * Math.pow 10, parameter.scale
+        value = Math.abs parameter.value * Math.pow(10, parameter.scale)
         
         if parameter.precision <= 9
           buffer.writeUInt8 5
@@ -280,8 +280,8 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = parameter.value * Math.pow 10, parameter.scale
-        
+        value = Math.abs parameter.value * Math.pow(10, parameter.scale)
+
         if parameter.precision <= 9
           buffer.writeUInt8 5
           buffer.writeUInt8 sign

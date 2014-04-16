@@ -73,11 +73,17 @@ exports.numeric = (test) ->
 exports.numericLargeValue = (test) ->
   execSql(test, TYPES.Numeric, 5.555555555555553333, null, {precision: 19, scale: 18})
 
+exports.numericNegative = (test) ->
+  execSql(test, TYPES.Numeric, -5555.55, null, {precision: 6, scale: 2})
+
 exports.decimal = (test) ->
   execSql(test, TYPES.Decimal, 5555)
 
 exports.decimalLargeValue = (test) ->
   execSql(test, TYPES.Decimal, 5.555555555555553333, null, {precision: 19, scale: 18})
+
+exports.decimalNegative = (test) ->
+  execSql(test, TYPES.Decimal, -5555.55, null, {precision: 6, scale: 2})
 
 exports.smallMoney = (test) ->
   execSql(test, TYPES.SmallMoney, 9842.4566)
