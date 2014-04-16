@@ -58,7 +58,7 @@ module.exports.varchar = (test) ->
   test.strictEqual(token.columns[0].flags, 3)
   test.strictEqual(token.columns[0].type.name, 'VarChar')
   test.strictEqual(token.columns[0].collation.lcid, 0x0409)
-  test.strictEqual(token.columns[0].collation.codepage, 'WINDOWS-1252')
+  test.strictEqual(token.columns[0].collation.codepage, 'CP1252')
   test.strictEqual(token.columns[0].collation.flags, 0x57)
   test.strictEqual(token.columns[0].collation.version, 0x8)
   test.strictEqual(token.columns[0].collation.sortId, 0x9a)
