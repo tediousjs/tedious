@@ -5,6 +5,8 @@ MessageIO = require('../../src/message-io')
 Packet = require('../../src/packet').Packet
 require('../../src/buffertools')
 
+assert = require("chai").assert
+
 class Connection extends EventEmitter
   setTimeout: ->
 
@@ -17,203 +19,161 @@ class Connection extends EventEmitter
 packetType = 2
 packetSize = 8 + 4
 
-exports.sendSmallerThanOnePacket = (test) ->
-  payload = new Buffer([1, 2, 3])
+describe "MessageIO", ->
+  beforeEach ->
+    @connection = new Connection
+    @io = new MessageIO(@connection, packetSize, new Debug())
 
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    test.ok(packet.last())
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
+  describe "#sendMessage", ->
+    it "writes payloads that fit into a single packet directly to the Connection", ->
+      packets = []
+      @connection.on('packet', (packet) -> packets.push(packet))
 
-    test.done()
-  )
+      payload = new Buffer([1, 2, 3])
+      @io.sendMessage(packetType, payload)
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+      assert.lengthOf(packets, 1)
+      assert.isTrue(packets[0].last())
+      assert.strictEqual(packets[0].type(), packetType)
+      assert.deepEqual(packets[0].data(), payload)
 
-exports.sendExactlyPacket = (test) ->
-  payload = new Buffer([1, 2, 3, 4])
+    it "writes payloads that fit exactly into a single packet directly to the Connection", ->
+      packets = []
+      @connection.on('packet', (packet) -> packets.push(packet))
 
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    test.ok(packet.last())
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
+      payload = new Buffer([1, 2, 3, 4])
+      @io.sendMessage(packetType, payload)
 
-    test.done()
-  )
+      assert.lengthOf(packets, 1)
+      assert.isTrue(packets[0].last())
+      assert.strictEqual(packets[0].type(), packetType)
+      assert.deepEqual(packets[0].data(), payload)
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+    it "splits up payloads that do not fit into a single packet", ->
+      packets = []
+      @connection.on('packet', (packet) -> packets.push(packet))
 
-exports.sendOneLongerThanPacket = (test) ->
-  payload = new Buffer([1, 2, 3, 4, 5])
-  packetNumber = 0
+      payload = new Buffer([1, 2, 3, 4, 5])
+      @io.sendMessage(packetType, payload)
 
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    packetNumber++
+      assert.lengthOf(packets, 2)
+      assert.isFalse(packets[0].last())
+      assert.strictEqual(packets[0].type(), packetType)
+      assert.deepEqual(packets[0].data(), new Buffer([1, 2, 3, 4]))
 
-    test.strictEqual(packet.type(), packetType)
+      assert.isTrue(packets[1].last())
+      assert.strictEqual(packets[1].type(), packetType)
+      assert.deepEqual(packets[1].data(), new Buffer([5]))
 
-    switch packetNumber
-      when 1
-        test.ok(!packet.last())
-        test.strictEqual(packet.packetId(), packetNumber)
-        test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])))
-      when 2
-        test.ok(packet.last())
-        test.strictEqual(packet.packetId(), packetNumber)
-        test.ok(packet.data().equals(new Buffer([5])))
+  describe "when the underlying Connection emits 'data' events", ->
+    it "emits 'data' and 'message' events", (done) ->
+      payload = new Buffer([1, 2, 3])
 
-        test.done()
-  )
+      receivedData = []
+      @io.on('data', (data) -> receivedData.push(data))
+      @io.on('message', ->
+        assert.deepEqual(Buffer.concat(receivedData), payload)
+        done()
+      )
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+      packet = new Packet(packetType)
+      packet.last(true)
+      packet.addData(payload)
+      @connection.emit('data', packet.buffer)
 
-exports.receiveOnePacket = (test) ->
-  test.expect(1)
+    it "can correctly handle a packet split over multiple chunks", (done) ->
+      payload = new Buffer([1, 2, 3])
 
-  payload = new Buffer([1, 2, 3])
-  connection = new Connection()
+      receivedData = []
+      @io.on('data', (data) -> receivedData.push(data))
+      @io.on('message', ->
+        assert.deepEqual(Buffer.concat(receivedData), payload)
+        done()
+      )
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-      test.ok(data.equals(payload))
-  )
-  io.on('message', ->
-      test.done()
-  )
+      packet = new Packet(packetType)
+      packet.last(true)
+      packet.addData(payload)
 
-  packet = new Packet(packetType)
-  packet.last(true)
-  packet.addData(payload)
-  connection.emit('data', packet.buffer)
+      @connection.emit('data', packet.buffer.slice(0, 4))
+      @connection.emit('data', packet.buffer.slice(4))
 
-exports.receiveOnePacketInTwoChunks = (test) ->
-  test.expect(1)
+    it "can correctly handle a message split over multiple packets", (done) ->
+      payload1 = new Buffer([1, 2])
+      payload2 = new Buffer([3])
 
-  payload = new Buffer([1, 2, 3])
-  connection = new Connection()
+      receivedData = []
+      @io.on('data', (data) -> receivedData.push(data))
+      @io.on('message', ->
+        assert.deepEqual(
+          Buffer.concat(receivedData),
+          Buffer.concat([payload1, payload2])
+        )
+        done()
+      )
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    test.ok(data.equals(payload))
-  )
-  io.on('message', ->
-      test.done()
-  )
+      packet = new Packet(packetType)
+      packet.addData(payload1)
+      @connection.emit('data', packet.buffer)
 
-  packet = new Packet(packetType)
-  packet.last(true)
-  packet.addData(payload)
-  connection.emit('data', packet.buffer.slice(0, 4))
-  connection.emit('data', packet.buffer.slice(4))
+      packet = new Packet(packetType)
+      packet.last(true)
+      packet.addData(payload2)
+      @connection.emit('data', packet.buffer)
 
-exports.receiveTwoPackets = (test) ->
-  test.expect(2)
+    it "can correctly handle chunks spanning two different packets", (done) ->
+      payload1 = new Buffer([1, 2])
+      payload2 = new Buffer([3, 4])
 
-  payload = new Buffer([1, 2, 3])
-  payload1 = payload.slice(0, 2)
-  payload2 = payload.slice(2, 3)
+      receivedData = []
+      @io.on('data', (data) -> receivedData.push(data))
+      @io.on('message', ->
+        assert.deepEqual(
+          Buffer.concat(receivedData),
+          Buffer.concat([payload1, payload2])
+        )
+        done()
+      )
 
-  connection = new Connection()
-  receivedPacketCount = 0
+      packet1 = new Packet(packetType)
+      packet1.addData(payload1)
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
+      packet2 = new Packet(packetType)
+      packet2.last(true)
+      packet2.addData(payload2)
 
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
-      test.done()
-  )
+      @connection.emit('data', packet1.buffer.slice(0, 6))
+      @connection.emit('data', Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)]))
+      @connection.emit('data', packet2.buffer.slice(4))
 
-  packet = new Packet(packetType)
-  packet.addData(payload1)
-  connection.emit('data', packet.buffer)
+    it "can correctly handle chunks spanning more than two different packets", (done) ->
+      payload1 = new Buffer([1, 2])
+      payload2 = new Buffer([3, 4])
+      payload3 = new Buffer([5, 6])
 
-  packet = new Packet(packetType)
-  packet.last(true)
-  packet.addData(payload2)
-  connection.emit('data', packet.buffer)
+      receivedData = []
+      @io.on('data', (data) -> receivedData.push(data))
+      @io.on('message', ->
+        assert.deepEqual(
+          Buffer.concat(receivedData),
+          Buffer.concat([payload1, payload2, payload3])
+        )
+        done()
+      )
 
-exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
-  test.expect(2)
+      packet1 = new Packet(packetType)
+      packet1.addData(payload1)
+      
+      packet2 = new Packet(packetType)
+      packet2.addData(payload2)
 
-  payload = new Buffer([1, 2, 3, 4])
-  payload1 = payload.slice(0, 2)
-  payload2 = payload.slice(2, 4)
+      packet3 = new Packet(packetType)
+      packet3.last(true)
+      packet3.addData(payload3)
 
-  connection = new Connection()
-  receivedPacketCount = 0
+      allData = Buffer.concat([packet1.buffer, packet2.buffer, packet3.buffer])
+      data1 = allData.slice(0, 5)
+      data2 = allData.slice(5)
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
-
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
-      test.done()
-  )
-
-  packet1 = new Packet(packetType)
-  packet1.addData(payload.slice(0, 2))
-
-  packet2 = new Packet(packetType)
-  packet2.last(true)
-  packet2.addData(payload.slice(2, 4))
-
-  connection.emit('data', packet1.buffer.slice(0, 6))
-  connection.emit('data', Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)]))
-  connection.emit('data', packet2.buffer.slice(4))
-
-exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
-  test.expect(1)
-
-  payload = new Buffer([1, 2, 3, 4, 5, 6])
-  payload1 = payload.slice(0, 2)
-  payload2 = payload.slice(2, 4)
-  payload3 = payload.slice(4, 6)
-
-  connection = new Connection()
-  receivedData = new Buffer(0)
-
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedData = Buffer.concat([receivedData, data])
-  )
-
-  io.on('message', ->
-      test.deepEqual(payload, receivedData)
-      test.done()
-  )
-
-  packet1 = new Packet(packetType)
-  packet1.addData(payload.slice(0, 2))
-
-  packet2 = new Packet(packetType)
-  packet2.addData(payload.slice(2, 4))
-
-  packet3 = new Packet(packetType)
-  packet3.last(true)
-  packet3.addData(payload.slice(4, 6))
-
-  allData = Buffer.concat([packet1.buffer, packet2.buffer, packet3.buffer])
-  data1 = allData.slice(0, 5)
-  data2 = allData.slice(5)
-
-  connection.emit('data', data1)
-  connection.emit('data', data2)
+      @connection.emit('data', data1)
+      @connection.emit('data', data2)
