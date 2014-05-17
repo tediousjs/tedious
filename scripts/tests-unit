@@ -1,7 +1,6 @@
 #!/bin/sh
 
-node_modules/nodeunit/bin/nodeunit \
-  test/register-coffee.js          \
+node_modules/mocha/bin/mocha -R spec --compilers coffee:coffee-script/register test/unit \
   test/unit/                       \
   test/unit/token/                 \
   test/unit/tracking-buffer
