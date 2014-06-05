@@ -180,29 +180,32 @@ describe "Selecting different data types", ->
         </xsd:element>
       </xsd:schema>'''
 
-    createSchema = """
-      IF EXISTS (SELECT * FROM sys.xml_schema_collections WHERE name = '#{schemaName}')
-        DROP XML SCHEMA COLLECTION #{schemaName};
-      CREATE XML SCHEMA COLLECTION #{schemaName} as N'#{schema}';
-    """
+    xml = '<root/>'
 
-    createTable = """
-      IF object_id('test_tedious_table', 'U') is not null
-        drop table #{tableName};
-      create table #{tableName} (xml XML (#{schemaName}));
-    """
+    setupStatements = [
+      "IF object_id('test_tedious_table', 'U') is not null
+        drop table #{tableName};"
 
-    @connection.execSqlBatch(new Request(createSchema, (err) =>
-      return done(err) if (err)
+      "IF EXISTS (SELECT * FROM sys.xml_schema_collections WHERE name = '#{schemaName}')
+        DROP XML SCHEMA COLLECTION #{schemaName};",
 
-      @connection.execSqlBatch(new Request(createTable, (err) =>
+      "CREATE XML SCHEMA COLLECTION #{schemaName} as N'#{schema}';",
+
+      "create table #{tableName} (xml XML (#{schemaName}));",
+
+      "insert into #{tableName} (xml) values('#{xml}');"
+    ]
+
+    execSetupStatements = (done) =>
+      return done(null) if !setupStatements.length
+
+      @connection.execSqlBatch(new Request(setupStatements.shift(), (err) ->
         return done(err) if (err)
 
-        xml = '<root/>'
-        @connection.execSqlBatch(new Request("insert into #{tableName} (xml) values('#{xml}');", (err) =>
-          return done(err) if (err)
-
-          assertResult("select xml from #{tableName};", xml, '7_2').call(this, done)
-        ))
+        execSetupStatements(done)
       ))
-    ))
+
+    execSetupStatements (err) =>
+      return done(err) if err
+
+      assertResult("select xml from #{tableName};", xml, '7_2').call(this, done)
