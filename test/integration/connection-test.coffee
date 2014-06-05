@@ -2,115 +2,531 @@ async = require('async')
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
+assert = require("chai").assert
+{ConnectionError} = require("../../src/errors")
 
-getConfig = ->
-  config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
-  instanceName = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
+describe "Connection", ->
+  beforeEach ->
+    @config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
-  config.options.debug =
-    packet: true
-    data: true
-    payload: true
-    token: true
-    log: true
+    @config.options.debug =
+      packet: true
+      data: true
+      payload: true
+      token: true
+      log: true
 
-  config
+  describe "when connecting to a non-existing server", ->
+    beforeEach ->
+      @config.options.connectTimeout = 200
+      @config.server = "#{@config.server}-bad"
 
-process.on 'uncaughtException', (err) ->
-  console.error err.stack
+      @connection = new Connection(@config)
 
-getInstanceName = ->
-  JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
 
-exports.badServer = (test) ->
-  config = getConfig()
-  config.server = 'bad-server'
+    it "emits a 'connect' event with a timeout error", (done) ->
+      emitted = false
+      @connection.on('connect', (err) ->
+        emitted = true
+        assert.instanceOf(err, ConnectionError)
+        assert.equal(err.code, 'ETIMEOUT')
+      )
 
-  connection = new Connection(config)
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
 
-  connection.on('connect', (err) ->
-    test.ok(err)
-  )
+  describe "when trying to connect with an invalid port", ->
+    it "throws a RangeError", ->
+      @config.options.port = -1
 
-  connection.on('end', (info) ->
-    test.done()
-  )
+      assert.throws =>
+        new Connection(@config)
+      , RangeError
 
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+  describe "when trying to connect with invalid credentials", ->
+    beforeEach ->
+      @config.password = "#{@config.password}-bad"
+      @connection = new Connection(@config)
 
-exports.badPort = (test) ->
-  config = getConfig()
-  config.options.port = -1
-  config.options.connectTimeout = 200
+    it "emits a 'connect' event with an error", (done) ->
+      emitted = false
+      @connection.on('connect', (err) ->
+        emitted = true
+        assert.instanceOf(err, ConnectionError)
+        assert.equal(err.code, 'ELOGIN')
+      )
 
-  connection = null
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
 
-  test.throws ->
-    connection = new Connection(config)
+    it "emits an 'errorMessage' event with error information", (done) ->
+      emitted = false
 
-  test.done()
+      @connection.on('errorMessage', (error) =>
+        emitted = true
+        assert.equal(error.message, "Login failed for user '#{@config.userName}'.")
+      )
 
-exports.badCredentials = (test) ->
-  test.expect(2)
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
 
-  config = getConfig()
-  config.password = 'bad-password'
+  describe "when successfully connecting", ->
+    beforeEach ->
+      @connection = new Connection(@config)
 
-  connection = new Connection(config)
+    it "emits a 'connected' event without an error", (done) ->
+      emitted = false
+      @connection.on('connect', (err) =>
+        emitted = true
+        assert.isUndefined(err)
 
-  connection.on('connect', (err) ->
-    test.ok(err)
+        @connection.close()
+      )
 
-    connection.close()
-  )
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
 
-  connection.on('end', (info) ->
-    test.done()
-  )
+    it "emits a 'databaseChange' event with the connected database name", (done) ->
+      emitted = false
+      @connection.on('databaseChange', (database) =>
+        emitted = true
+        assert.equal(database, @config.options.database)
 
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
+        @connection.close()
+      )
 
-  connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
-    test.ok(~error.message.indexOf('failed'))
-  )
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
 
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+  describe "when auto-discovering the server port using the sql server browser", ->
+    beforeEach ->
+      delete @config.options.port
 
-exports.connectByPort = (test) ->
-  test.expect(2)
+    describe "when the instance name is valid", (done) ->
+      beforeEach ->
+        return if !@config.options.instanceName
 
-  config = getConfig()
+        @connection = new Connection(@config)
 
-  connection = new Connection(config)
+      it "emits a 'connected' event without an error", (done) ->
+        if !@config.options.instanceName
+          return done()
 
-  connection.on('connect', (err) ->
-    test.ok(!err)
+        emitted = false
+        @connection.on('connect', (err) =>
+          emitted = true
+          assert.isUndefined(err)
 
-    connection.close()
-  )
+          @connection.close()
+        )
 
-  connection.on('end', (info) ->
-    test.done()
-  )
+        @connection.on('end', ->
+          assert.isTrue(emitted)
+          done()
+        )
 
-  connection.on('databaseChange', (database) ->
-    test.strictEqual(database, config.options.database)
-  )
+    describe "when the instance name is invalid", (done) ->
+      beforeEach ->
+        return if !@config.options.instanceName
 
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
+        @config.options.instanceName = "#{@config.options.instanceName}-bad"
+        @connection = new Connection(@config)
 
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+      it "emits a 'connected' event without an error", (done) ->
+        if !@config.options.instanceName
+          return done()
+
+        emitted = false
+        @connection.on('connect', (err) =>
+          emitted = true
+          assert.isUndefined(err)
+
+          @connection.close()
+        )
+
+        @connection.on('end', ->
+          assert.isTrue(emitted)
+          done()
+        )
+
+  describe "when creating an encrypted connection", ->
+    beforeEach ->
+      @config.options.encrypt = true
+      @connection = new Connection(@config)
+
+    it "emits a 'connected' event without an error", (done) ->
+      emitted = false
+      @connection.on('connect', (err) =>
+        return done(err) if err
+
+        emitted = true
+        assert.isUndefined(err)
+
+        @connection.close()
+      )
+
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
+
+    it "emits a 'secure' event with the CleartextStream", (done) ->
+      emitted = false
+      @connection.on('secure', (cleartextStream) =>
+        emitted = true
+
+        assert.ok(cleartextStream)
+        assert.ok(cleartextStream.getCipher())
+        assert.ok(cleartextStream.getPeerCertificate())
+      )
+
+      @connection.on('connect', => @connection.close())
+
+      @connection.on('end', ->
+        assert.isTrue(emitted)
+        done()
+      )
+
+  describe "#execSql", ->
+    beforeEach (done) ->
+      @connection = new Connection(@config)
+      @connection.on 'connect', done
+
+    afterEach ->
+      @connection.close if @connection
+
+    it "executes the given Request", (done) ->
+      request = new Request('select 8 as C1', (err, rowCount) =>
+        assert.equal(err, null)
+        assert.strictEqual(rowCount, 1)
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok(more)
+        assert.strictEqual(rowCount, 1)
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(columnsMetadata.length, 1)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(columns.length, 1)
+        assert.strictEqual(columns[0].value, 8)
+      )
+
+      @connection.execSql(request)
+
+    it "can be executed multiple times", (done) ->
+      timesToExec = 5
+      sqlExecCount = 0
+
+      execSql = =>
+        if sqlExecCount == timesToExec
+          return done()
+
+        request = new Request('select 8 as C1', (err, rowCount) ->
+            assert.ok(!err)
+            assert.strictEqual(rowCount, 1)
+
+            sqlExecCount++
+            execSql()
+        )
+
+        request.on('doneInProc', (rowCount, more) ->
+            assert.ok(more)
+            assert.strictEqual(rowCount, 1)
+        )
+
+        request.on('columnMetadata', (columnsMetadata) ->
+            assert.strictEqual(columnsMetadata.length, 1)
+        )
+
+        request.on('row', (columns) ->
+            assert.strictEqual(columns.length, 1)
+            assert.strictEqual(columns[0].value, 8)
+        )
+
+        @connection.execSql(request)
+
+      execSql()
+
+    it "calls back with an error on bad sql syntax", (done) ->
+      request = new Request('bad syntax here', (err) =>
+        assert.ok(err)
+
+        done()
+      )
+
+      @connection.execSql(request)
+
+    it "yields rows in the order as specified by the executed query", (done) ->
+      sql = "select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id"
+      request = new Request(sql, (err, rowCount) ->
+        return done(err) if err
+
+        assert.ok(!err)
+        assert.strictEqual(rowCount, 2)
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok(more)
+        assert.strictEqual(rowCount, 2)
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(columnsMetadata.length, 4)
+      )
+
+      request.on('order', (orderColumns) ->
+        assert.strictEqual(orderColumns.length, 2)
+        assert.strictEqual(orderColumns[0], 2)
+        assert.strictEqual(orderColumns[1], 4)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(columns.length, 4)
+      )
+
+      @connection.execSql(request)
+
+    it "can handle multiple sql statements in a single request", (done) ->
+      row = 0
+      request = new Request('select 1; select 2;', (err, rowCount) ->
+        return done(err) if err
+
+        assert.ok(!err)
+        assert.strictEqual(rowCount, 2)
+        assert.strictEqual(row, 2)
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.strictEqual(rowCount, 1)
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(columnsMetadata.length, 1)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(columns[0].value, ++row)
+      )
+
+      @connection.execSql(request)
+
+
+    it "returns the correct row count queries containing multiple mixed statemtns", (done) ->
+      setupSql = """
+        create table #tab1 (id int, name nvarchar(10));
+        insert into #tab1 values(1, N'a1');
+        insert into #tab1 values(2, N'a2');
+        insert into #tab1 values(3, N'b1');
+        update #tab1 set name = 'a3' where name like 'a%'
+      """
+
+      request = new Request(setupSql, (err, rowCount) ->
+        return done(err) if err
+
+        assert.strictEqual(rowCount, 5)
+
+        done()
+      )
+
+      @connection.execSql(request)
+
+    it "can execute procs in the sql statement", (done) ->
+      request = new Request('exec sp_help int', (err, rowCount) ->
+        return done(err) if err
+
+        assert.strictEqual(rowCount, 0)
+
+        done()
+      )
+
+      request.on('doneProc', (rowCount, more, returnStatus) ->
+        assert.ok(!more)
+        assert.strictEqual(returnStatus, 0)
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok(more)
+      )
+
+      request.on('row', (columns) ->
+        assert.ok(true)
+      )
+
+      @connection.execSql(request)
+
+  describe "#execSql, with the useColumnNames option", ->
+    beforeEach (done) ->
+      @config.options.useColumnNames = true
+      @connection = new Connection(@config)
+      @connection.on 'connect', done
+
+    afterEach ->
+      @connection.close if @connection
+
+    it "can handle numeric column names", (done) ->
+      request = new Request('select 8 as [123]', (err, rowCount) =>
+        return done(err) if err
+
+        assert.equal(err, null)
+        assert.strictEqual(rowCount, 1)
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok(more)
+        assert.strictEqual(rowCount, 1)
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(Object.keys(columnsMetadata).length, 1)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(Object.keys(columns).length, 1)
+
+        assert.strictEqual(columns[123].value, 8)
+      )
+
+      @connection.execSql(request)
+
+    it "can handle duplicate column names", (done) ->
+      request = new Request('select 1 as abc, 2 as xyz, \'3\' as abc', (err, rowCount) =>
+        assert.equal(err, null)
+        assert.strictEqual(rowCount, 1)
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok(more)
+        assert.strictEqual(rowCount, 1)
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(Object.keys(columnsMetadata).length, 2)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(Object.keys(columns).length, 2)
+
+        assert.strictEqual(columns.abc.value, 1)
+        assert.strictEqual(columns.xyz.value, 2)
+      )
+
+      @connection.execSql(request)
+
+  describe "#execSql, with the rowCollectionOnRequestCompletion option", ->
+    beforeEach (done) ->
+      @config.options.rowCollectionOnRequestCompletion = true
+      @connection = new Connection(@config)
+      @connection.on 'connect', done
+
+    afterEach ->
+      @connection.close if @connection
+
+    it "passes a collection of all returned rows to the request callback", (done) ->
+      request = new Request('select 1 as a; select 2 as b;', (err, rowCount, rows) ->
+        assert.strictEqual(rows.length, 2)
+
+        assert.strictEqual(rows[0][0].metadata.colName, 'a')
+        assert.strictEqual(rows[0][0].value, 1)
+        assert.strictEqual(rows[1][0].metadata.colName, 'b')
+        assert.strictEqual(rows[1][0].value, 2)
+
+        done()
+      )
+
+      @connection.execSql(request)
+
+  describe "#execSql, with the rowCollectionOnDone option", ->
+    beforeEach (done) ->
+      @config.options.rowCollectionOnDone = true
+      @connection = new Connection(@config)
+      @connection.on 'connect', done
+
+    afterEach ->
+      @connection.close if @connection
+
+    it "passes a collection of all returned rows to each statements 'done' callback", (done) ->
+      doneCount = 0
+
+      request = new Request('select 1 as a; select 2 as b;', done)
+
+      request.on('doneInProc', (rowCount, more, rows) ->
+        assert.strictEqual(rows.length, 1)
+
+        switch ++doneCount
+          when 1
+            assert.strictEqual(rows[0][0].metadata.colName, 'a')
+            assert.strictEqual(rows[0][0].value, 1)
+          when 2
+            assert.strictEqual(rows[0][0].metadata.colName, 'b')
+            assert.strictEqual(rows[0][0].value, 2)
+      )
+
+      @connection.execSql(request)
+
+  describe "#cancel", ->
+    beforeEach (done) ->
+      @connection = new Connection(@config)
+      @connection.on 'connect', done
+
+    afterEach ->
+      @connection.close if @connection
+
+    it "aborts the currently running request", (done) ->
+      request = new Request('select 1 as C1;waitfor delay \'00:00:05\';select 2 as C2', (err, rowCount, rows) ->
+        assert.strictEqual err.message, 'Canceled.'
+
+        done()
+      )
+
+      request.on('doneInProc', (rowCount, more) ->
+        assert.ok false
+      )
+
+      request.on('doneProc', (rowCount, more) ->
+        assert.ok !rowCount
+        assert.strictEqual more, false
+      )
+
+      request.on('done', (rowCount, more, rows) ->
+        assert.ok !rowCount
+        assert.strictEqual more, false
+      )
+
+      request.on('columnMetadata', (columnsMetadata) ->
+        assert.strictEqual(columnsMetadata.length, 1)
+      )
+
+      request.on('row', (columns) ->
+        assert.strictEqual(columns.length, 1)
+        assert.strictEqual(columns[0].value, 1)
+      )
+
+      @connection.execSql(request)
+      @connection.cancel()
 
 exports.connectByInstanceName = (test) ->
   if !getInstanceName()
@@ -182,557 +598,6 @@ exports.connectByInvalidInstanceName = (test) ->
     #console.log(text)
   )
 
-
-exports.encrypt = (test) ->
-  test.expect(5)
-
-  config = getConfig()
-  config.options.encrypt = true
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-    test.ok(!err)
-
-    connection.close()
-  )
-
-  connection.on('end', (info) ->
-    test.done()
-  )
-
-  connection.on('databaseChange', (database) ->
-    test.strictEqual(database, config.options.database)
-  )
-
-  connection.on('secure', (cleartext) ->
-    test.ok(cleartext)
-    test.ok(cleartext.getCipher())
-    test.ok(cleartext.getPeerCertificate())
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execSql = (test) ->
-  test.expect(7)
-
-  config = getConfig()
-
-  request = new Request('select 8 as C1', (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 1)
-
-      connection.close()
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-      test.strictEqual(rowCount, 1)
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
-  )
-
-  request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 8)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.numericColumnName = (test) ->
-  test.expect(5)
-
-  config = getConfig()
-  config.options.useColumnNames = true
-
-  request = new Request('select 8 as [123]', (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 1)
-
-      connection.close()
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(Object.keys(columnsMetadata).length, 1)
-  )
-
-  request.on('row', (columns) ->
-      test.strictEqual(Object.keys(columns).length, 1)
-      test.strictEqual(columns[123].value, 8)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.duplicateColumnNames = (test) ->
-  test.expect(6)
-
-  config = getConfig()
-  config.options.useColumnNames = true
-
-  request = new Request('select 1 as abc, 2 as xyz, \'3\' as abc', (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 1)
-
-      connection.close()
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(Object.keys(columnsMetadata).length, 2)
-  )
-
-  request.on('row', (columns) ->
-      test.strictEqual(Object.keys(columns).length, 2)
-
-      test.strictEqual(columns.abc.value, 1)
-      test.strictEqual(columns.xyz.value, 2)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execSqlMultipleTimes = (test) ->
-  timesToExec = 5
-  sqlExecCount = 0
-
-  test.expect(timesToExec * 7)
-
-  config = getConfig()
-
-  execSql = ->
-    if sqlExecCount == timesToExec
-      connection.close()
-      return
-
-    request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ok(!err)
-        test.strictEqual(rowCount, 1)
-
-        sqlExecCount++
-        execSql()
-    )
-
-    request.on('doneInProc', (rowCount, more) ->
-        test.ok(more)
-        test.strictEqual(rowCount, 1)
-    )
-
-    request.on('columnMetadata', (columnsMetadata) ->
-        test.strictEqual(columnsMetadata.length, 1)
-    )
-
-    request.on('row', (columns) ->
-        test.strictEqual(columns.length, 1)
-        test.strictEqual(columns[0].value, 8)
-    )
-
-    connection.execSql(request)
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-    execSql()
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execSqlWithOrder = (test) ->
-  test.expect(10)
-
-  config = getConfig()
-
-  sql = "select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id"
-  request = new Request(sql, (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 2)
-
-      connection.close()
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-      test.strictEqual(rowCount, 2)
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 4)
-  )
-
-  request.on('order', (orderColumns) ->
-      test.strictEqual(orderColumns.length, 2)
-      test.strictEqual(orderColumns[0], 2)
-      test.strictEqual(orderColumns[1], 4)
-  )
-
-  request.on('row', (columns) ->
-    test.strictEqual(columns.length, 4)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execSqlMultipleTimes = (test) ->
-  test.expect(20)
-
-  requestsToMake = 5;
-  config = getConfig()
-
-  makeRequest = ->
-    if requestsToMake == 0
-      connection.close()
-      return
-
-    request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ok(!err)
-        test.strictEqual(rowCount, 1)
-
-        requestsToMake--
-        makeRequest()
-    )
-
-    request.on('doneInProc', (rowCount, more) ->
-        test.strictEqual(rowCount, 1)
-        #makeRequest()
-    )
-
-    request.on('row', (columns) ->
-        test.strictEqual(columns.length, 1)
-    )
-
-    connection.execSql(request)
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-    makeRequest()
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execBadSql = (test) ->
-  test.expect(2)
-
-  config = getConfig()
-
-  request = new Request('bad syntax here', (err) ->
-      test.ok(err)
-
-      connection.close()
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
-    test.ok(error)
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.sqlWithMultipleResultSets = (test) ->
-  test.expect(8)
-
-  config = getConfig()
-  row = 0
-
-  request = new Request('select 1; select 2;', (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 2)
-
-      connection.close()
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.strictEqual(rowCount, 1)
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
-  )
-
-  request.on('row', (columns) ->
-      test.strictEqual(columns[0].value, ++row)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.rowCountForUpdate = (test) ->
-  test.expect(2)
-
-  config = getConfig()
-  row = 0
-
-  setupSql = """
-    create table #tab1 (id int, name nvarchar(10));
-    insert into #tab1 values(1, N'a1');
-    insert into #tab1 values(2, N'a2');
-    insert into #tab1 values(3, N'b1');
-    update #tab1 set name = 'a3' where name like 'a%'
-  """
-
-  request = new Request(setupSql, (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 5)
-      connection.close()
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.rowCollectionOnRequestCompletion = (test) ->
-  test.expect(5)
-
-  config = getConfig()
-  config.options.rowCollectionOnRequestCompletion = true
-
-  request = new Request('select 1 as a; select 2 as b;', (err, rowCount, rows) ->
-    test.strictEqual(rows.length, 2)
-
-    test.strictEqual(rows[0][0].metadata.colName, 'a')
-    test.strictEqual(rows[0][0].value, 1)
-    test.strictEqual(rows[1][0].metadata.colName, 'b')
-    test.strictEqual(rows[1][0].value, 2)
-
-    connection.close()
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-    connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-    test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.rowCollectionOnDone = (test) ->
-  test.expect(6)
-
-  config = getConfig()
-  config.options.rowCollectionOnDone = true
-
-  doneCount = 0
-
-  request = new Request('select 1 as a; select 2 as b;', (err, rowCount, rows) ->
-    connection.close()
-  )
-
-  request.on('doneInProc', (rowCount, more, rows) ->
-    test.strictEqual(rows.length, 1)
-
-    switch ++doneCount
-      when 1
-        test.strictEqual(rows[0][0].metadata.colName, 'a')
-        test.strictEqual(rows[0][0].value, 1)
-      when 2
-        test.strictEqual(rows[0][0].metadata.colName, 'b')
-        test.strictEqual(rows[0][0].value, 2)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-    connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-    test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.execProcAsSql = (test) ->
-  test.expect(7)
-
-  config = getConfig()
-
-  request = new Request('exec sp_help int', (err, rowCount) ->
-      test.ok(!err)
-      test.strictEqual(rowCount, 0)
-
-      connection.close()
-  )
-
-  request.on('doneProc', (rowCount, more, returnStatus) ->
-      test.ok(!more)
-      test.strictEqual(returnStatus, 0)
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-  )
-
-  request.on('row', (columns) ->
-      test.ok(true)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-  )
-
-  connection.on('end', (info) ->
-      test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
 exports.resetConnection = (test) ->
   test.expect(4)
 
@@ -790,59 +655,6 @@ exports.resetConnection = (test) ->
 
   connection.on('end', (info) ->
     test.done()
-  )
-
-  connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
-
-exports.cancelRequest = (test) ->
-  test.expect(8)
-
-  config = getConfig()
-
-  request = new Request('select 1 as C1;waitfor delay \'00:00:05\';select 2 as C2', (err, rowCount, rows) ->
-      test.strictEqual err.message, 'Canceled.'
-
-      connection.close()
-  )
-
-  request.on('doneInProc', (rowCount, more) ->
-      test.ok false
-  )
-
-  request.on('doneProc', (rowCount, more) ->
-      test.ok !rowCount
-      test.strictEqual more, false
-  )
-
-  request.on('done', (rowCount, more, rows) ->
-      test.ok !rowCount
-      test.strictEqual more, false
-  )
-
-  request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
-  )
-
-  request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 1)
-  )
-
-  connection = new Connection(config)
-
-  connection.on('connect', (err) ->
-      connection.execSql(request)
-      connection.cancel()
-  )
-
-  connection.on('end', (info) ->
-      test.done()
   )
 
   connection.on('infoMessage', (info) ->
