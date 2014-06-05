@@ -2,81 +2,57 @@ Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
 TYPES = require('../../src/data-type').typeByName
+assert = require('chai').assert
 
 getConfig = ->
-  config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
-  config.options.debug =
-    packet: true
-    data: true
-    payload: true
-    token: false
-    log: true
+describe "Prepared Statement", ->
+  beforeEach (done) ->
+    @config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
-  config
+    @config.options.debug =
+      packet: true
+      data: true
+      payload: true
+      token: false
+      log: true
 
-exports.prepareExecute = (test) ->
-  test.expect(4)
-  value = 8
+    @connection = new Connection(@config)
+    @connection.on('connect', done)
 
-  config = getConfig()
+  afterEach ->
+    @connection.close if @connection
 
-  request = new Request('select @param', (err) ->
-    test.ok(!err)
-    connection.close()
-  )
-  request.addParameter('param', TYPES.Int)
+  it "fires a 'prepared' event once it was prepared", (done) ->
+    request = new Request('select @param', done)
+    request.addParameter('param', TYPES.Int)
 
-  connection = new Connection(config)
+    @connection.prepare(request)
 
-  request.on('prepared', () ->
-    test.ok(request.handle)
-    connection.execute(request, {param: value})
-  )
+    request.on 'prepared', ->
+      assert.ok(request.handle)
+      done()
 
-  request.on('row', (columns) ->
-    test.strictEqual(columns.length, 1)
-    test.strictEqual(columns[0].value, value)
-  )
+  it "can be executed", (done) ->
+    request = new Request('select @param', done)
+    request.addParameter('param', TYPES.Int)
 
-  connection.on('connect', (err) ->
-    connection.prepare(request)
-  )
+    value = 8
 
-  connection.on('end', (info) ->
-    test.done()
-  )
+    request.on 'prepared', =>
+      @connection.execute(request, { param: value })
 
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+    request.on 'row', (columns) ->
+      assert.strictEqual(columns.length, 1)
+      assert.strictEqual(columns[0].value, value)
 
-exports.unprepare = (test) ->
-  test.expect(2)
+    @connection.prepare(request)
 
-  config = getConfig()
-  prepared = false
+  it "can be unprepared", (done) ->
+    request = new Request('select @param', done)
+    request.addParameter('param', TYPES.Int)
 
-  request = new Request('select 3', (err) ->
-    test.ok(!err)
-    connection.close()
-  )
+    request.on 'prepared', =>
+      @connection.unprepare(request)
 
-  connection = new Connection(config)
-
-  request.on('prepared', () ->
-    test.ok(request.handle)
-    connection.unprepare(request)
-  )
-
-  connection.on('connect', (err) ->
-    connection.prepare(request)
-  )
-
-  connection.on('end', (info) ->
-    test.done()
-  )
-
-  connection.on('debug', (text) ->
-    #console.log(text)
-  )
+    @connection.prepare(request)
