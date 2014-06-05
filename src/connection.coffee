@@ -135,21 +135,30 @@ class Connection extends EventEmitter
 
     SENT_ATTENTION:
       name: 'SentAttention'
+      enter: ->
+        @attentionReceived = false
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
         data: (data) ->
           @sendDataToTokenStreamParser(data)
+        attention: ->
+          @attentionReceived = true
         message: ->
-          @transitionTo(@STATE.LOGGED_IN)
-          sqlRequest = @request
-          @request = undefined
+          # 3.2.5.7 Sent Attention State
+          # Discard any data contained in the response, until we receive the attention response
+          if @attentionReceived
+            sqlRequest = @request
+            @request = undefined
 
-          if sqlRequest.canceled
-            sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
-          else
-            message = "Timeout: Request failed to complete in #{@config.options.requestTimeout}ms"
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'))
+            @transitionTo(@STATE.LOGGED_IN)
+
+            if sqlRequest.canceled
+              sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
+            else
+              message = "Timeout: Request failed to complete in #{@config.options.requestTimeout}ms"
+              sqlRequest.callback(RequestError(message, 'ETIMEOUT'))
+
 
     FINAL:
       name: 'Final'
@@ -333,18 +342,16 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('done', (token) =>
       if @request
-        # 3.2.5.7 Sent Attention State
-        # Discard any data contained in the response
-        if @state == @STATE.SENT_ATTENTION
-          @request.emit('attention') if token.attention
-        else
-          @request.emit('done', token.rowCount, token.more, @request.rows)
+        if token.attention
+          @dispatchEvent("attention")
 
-          if token.rowCount != undefined
-            @request.rowCount += token.rowCount
+        @request.emit('done', token.rowCount, token.more, @request.rows)
 
-          if @config.options.rowCollectionOnDone
-            @request.rows = []
+        if token.rowCount != undefined
+          @request.rowCount += token.rowCount
+
+        if @config.options.rowCollectionOnDone
+          @request.rows = []
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
