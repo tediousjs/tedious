@@ -1,76 +1,35 @@
 require('../../src/buffertools')
 
-exports.concatOneArgument = (test) ->
-  buffer1 = new Buffer([1, 2])
-  buffer2 = new Buffer([3, 4])
+assert = require("chai").assert
 
-  buffer12 = Buffer.concat([buffer1, buffer2])
+describe "Buffer", ->
+  describe "#concat", ->
+    it "concats all Buffers in the given Array", ->
+      buffer = Buffer.concat([
+        new Buffer([1, 2]),
+        new Buffer([3, 4])
+      ])
 
-  test.deepEqual(buffer12, new Buffer([1, 2, 3, 4]))
+      assert.deepEqual(buffer, new Buffer([1, 2, 3, 4]))
 
-  test.done()
+      buffer = Buffer.concat([
+        new Buffer([1, 2]),
+        new Buffer([3, 4]),
+        new Buffer([5, 6])
+      ])
 
-exports.concatTwoArguments = (test) ->
-  buffer1 = new Buffer([1, 2])
-  buffer2 = new Buffer([3, 4])
-  buffer3 = new Buffer([5, 6])
+      assert.deepEqual(buffer, new Buffer([1, 2, 3, 4, 5, 6]))
 
-  buffer123 = Buffer.concat([buffer1, buffer2, buffer3])
+  describe "#toByteArray", ->
+    it "returns an Array containing all the bytes of the given Buffer", ->
+      assert.deepEqual(new Buffer([1, 2, 3]).toByteArray(), [1, 2, 3])
 
-  test.deepEqual(buffer123, new Buffer([1, 2, 3, 4, 5, 6]))
+  describe "#equals", ->
+    it "returns true if the other Buffer contains the same bytes", ->
+      assert.isTrue(new Buffer([]).equals(new Buffer([])))
+      assert.isTrue(new Buffer([1, 2, 3]).equals(new Buffer([1, 2, 3])))
 
-  test.done()
-
-exports.toByteArray = (test) ->
-  buffer = new Buffer([1, 2, 3])
-  array = buffer.toByteArray();
-
-  test.ok(arrayEqual(array, [1, 2, 3]));
-
-  test.done()
-
-exports.equalsNonEmpty = (test) ->
-  buffer1 = new Buffer([1, 2, 3])
-  buffer2 = new Buffer([1, 2, 3])
-
-  test.ok(buffer1.equals(buffer2));
-
-  test.done()
-
-exports.equalsDifferent = (test) ->
-  buffer1 = new Buffer([1, 2, 3])
-  buffer2 = new Buffer([1, 2, 9])
-
-  test.ok(!buffer1.equals(buffer2));
-
-  test.done()
-
-exports.equalsEmpty = (test) ->
-  buffer1 = new Buffer([])
-  buffer2 = new Buffer([])
-
-  test.ok(buffer1.equals(buffer2));
-
-  test.done()
-
-exports.equalsOneEmpty = (test) ->
-  buffer1 = new Buffer([1, 2, 3])
-  buffer2 = new Buffer([])
-
-  test.ok(!buffer1.equals(buffer2));
-
-  test.done()
-
-bufferEqual = (actual, expected) ->
-  if actual.length != expected.length
-    return false
-
-  for b in expected
-    b--
-
-    if actual[b] != expected[b]
-      return false
-
-  true
-
-arrayEqual = bufferEqual
+    it "returns false if the other Buffer contains different bytes", ->
+      assert.isFalse(new Buffer([1, 2, 3]).equals(new Buffer([])))
+      assert.isFalse(new Buffer([]).equals(new Buffer([1, 2, 3])))
+      assert.isFalse(new Buffer([1, 2, 3]).equals(new Buffer([1, 2, 9])))

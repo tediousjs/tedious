@@ -42,7 +42,9 @@
   "devDependencies": {
     "async": "0.2.10",
     "coffee-script": "1.7.1",
-    "nodeunit": "0.8.4"
+    "nodeunit": "0.8.4",
+    "mocha": "^1.18.2",
+    "chai": "^1.9.1"
   },
   "scripts": {
     "test": "scripts/tests-unit",

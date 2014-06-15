@@ -1,6 +1,6 @@
 Debug = require('../../src/debug')
 
-payload = 'payload'
+assert = require("chai").assert
 
 class Packet
   headerToString: ->
@@ -9,82 +9,96 @@ class Packet
   dataToString: ->
     'data'
 
-exports.packet = (test) ->
-  emitCount = 0;
+describe "Debug", ->
+  describe "#packet", ->
+    it "emits debug information for the given packet if packet debugging is enabled", () ->
+      data = []
 
-  debug = new Debug({packet: true})
+      debug = new Debug({ packet: true })
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-  debug.on('debug', (text) ->
-    emitCount++
+      debug.packet('Sent', new Packet())
+      assert.deepEqual(data, ["", "Sent", "header"])
 
-    switch emitCount
-      when 2
-        test.ok(/dir/.test(text))
-      when 3
-        test.ok(/header/.test(text))
-        test.done()
-  )
+    it "does not emit debug information for the given packet if packet debugging is not enabled", () ->
+      data = []
 
-  debug.packet('dir', new Packet())
+      debug = new Debug()
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.payloadEnabled = (test) ->
-  debug = new Debug({payload: true})
-  debug.on('debug', (text) ->
-    test.strictEqual(text, payload)
+      debug.packet('Sent', new Packet())
+      assert.deepEqual(data, [])
 
-    test.done()
-  )
+  describe "#payload", ->
+    it "emits debug information for the given payload if payload debugging is enabled", () ->
+      data = []
 
-  debug.payload(->
-    payload
-  )
+      debug = new Debug({ payload: true })
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.payloadNotEnabled = (test) ->
-  debug = new Debug()
-  debug.on('debug', (text) ->
-    test.ok(false)
-  )
+      debug.payload(-> 'Some Payload')
+      assert.deepEqual(data, ['Some Payload'])
 
-  debug.payload(payload)
+    it "does not emit debug information for the given payload if payload debugging is not enabled", () ->
+      data = []
 
-  test.done()
+      debug = new Debug()
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.dataEnable = (test) ->
-  debug = new Debug({data: true})
-  debug.on('debug', (text) ->
-    test.strictEqual(text, 'data')
+      debug.payload(-> 'Some Payload')
+      assert.deepEqual(data, [])
 
-    test.done()
-  )
+  describe "#data", ->
+    it "emits debug information for the given data if data debugging is enabled", () ->
+      data = []
 
-  debug.data(new Packet())
+      debug = new Debug({ data: true })
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.dataNotEnabled = (test) ->
-  debug = new Debug()
-  debug.on('debug', (text) ->
-    test.ok(false)
-  )
+      debug.data(new Packet())
+      assert.deepEqual(data, ["data"])
 
-  debug.data(new Packet())
+    it "does not emit debug information for the given data if data debugging is not enabled", () ->
+      data = []
 
-  test.done()
+      debug = new Debug()
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.tokenEnabled = (test) ->
-  debug = new Debug({token: true})
-  debug.on('debug', (token) ->
-    test.ok(token.indexOf('test') != 0)
+      debug.data(new Packet())
+      assert.deepEqual(data, [])
 
-    test.done()
-  )
+  describe "#token", ->
+    it "emits debug information for the given token if token debugging is enabled", () ->
+      data = []
 
-  debug.token({name: 'test'})
+      debug = new Debug({ token: true })
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
 
-exports.payloadNotEnabled = (test) ->
-  debug = new Debug()
-  debug.on('debug', (token) ->
-    test.ok(false)
-  )
+      debug.token({name: 'test'})
+      assert.lengthOf(data, 1)
+      assert.include(data[0], 'test')
 
-  debug.token({name: 'test'})
+    it "does not emit debug information for the given token if token debugging is not enabled", () ->
+      data = []
 
-  test.done()
+      debug = new Debug()
+      debug.on('debug', (text) ->
+        data.push(text)
+      )
+
+      debug.token({name: 'test'})
+      assert.deepEqual(data, [])

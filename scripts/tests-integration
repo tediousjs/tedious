@@ -1,3 +1,3 @@
 #!/bin/sh
 
-node_modules/nodeunit/bin/nodeunit test/register-coffee.js test/integration/
+node_modules/mocha/bin/mocha -R spec --compilers coffee:coffee-script/register test/integration/
