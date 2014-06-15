@@ -224,7 +224,8 @@ TYPE =
         if parameter.precision <= 9
           buffer.writeUInt8 5
           buffer.writeUInt8 sign
-          buffer.writeUInt32LE value
+        # Round to preven IEEE 754 floating point errors
+          buffer.writeUInt32LE Math.round(value)
         else if parameter.precision <= 19
           buffer.writeUInt8 9
           buffer.writeUInt8 sign
