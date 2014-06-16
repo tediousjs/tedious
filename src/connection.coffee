@@ -527,7 +527,7 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
-    'set textsize ' + @config.options.textsize + '''
+    """set textsize #{@config.options.textsize}
 set quoted_identifier on
 set arithabort off
 set numeric_roundabort off
@@ -540,7 +540,7 @@ set implicit_transactions off
 set language us_english
 set dateformat mdy
 set datefirst 7
-set transaction isolation level #{@getIsolationLevelText @config.options.connectionIsolationLevel}'''
+set transaction isolation level #{@getIsolationLevelText @config.options.connectionIsolationLevel}"""
 
   processedInitialSql: ->
       @clearConnectTimer()
