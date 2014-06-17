@@ -662,6 +662,7 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
       when ISOLATION_LEVEL.READ_UNCOMMITTED then 'read uncommitted'
       when ISOLATION_LEVEL.REPEATABLE_READ then 'repeatable read'
       when ISOLATION_LEVEL.SERIALIZABLE then 'serializable'
+      when ISOLATION_LEVEL.SNAPSHOT then 'snapshot'
       else 'read committed'
 
 
