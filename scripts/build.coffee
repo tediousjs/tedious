@@ -7,7 +7,6 @@ rmdir = (dir) ->
   for entry in list
     remove(dir, entry)
 
-  console.log "removing #{dir}"
   fs.rmdirSync dir
 
 
@@ -19,7 +18,6 @@ remove = (dir, entry) ->
   else if stat.isDirectory()
     rmdir filename
   else
-    console.log "removing #{filename}"
     fs.unlinkSync filename
 
 
