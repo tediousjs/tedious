@@ -219,11 +219,12 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = Math.abs parameter.value * Math.pow(10, parameter.scale)
+        value = Math.round Math.abs parameter.value * Math.pow(10, parameter.scale)
         
         if parameter.precision <= 9
           buffer.writeUInt8 5
           buffer.writeUInt8 sign
+        # Round to preven IEEE 754 floating point errors
           buffer.writeUInt32LE value
         else if parameter.precision <= 19
           buffer.writeUInt8 9
@@ -280,7 +281,7 @@ TYPE =
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = Math.abs parameter.value * Math.pow(10, parameter.scale)
+        value = Math.round Math.abs parameter.value * Math.pow(10, parameter.scale)
 
         if parameter.precision <= 9
           buffer.writeUInt8 5

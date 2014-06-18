@@ -126,6 +126,7 @@ class Connection extends EventEmitter
         data: (data) ->
           @sendDataToTokenStreamParser(data)
         message: ->
+          @clearRequestTimer()
           @transitionTo(@STATE.LOGGED_IN)
 
           sqlRequest = @request
@@ -134,20 +135,30 @@ class Connection extends EventEmitter
 
     SENT_ATTENTION:
       name: 'SentAttention'
+      enter: ->
+        @attentionReceived = false
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
         data: (data) ->
           @sendDataToTokenStreamParser(data)
+        attention: ->
+          @attentionReceived = true
         message: ->
-          if @request.canceled
-            @transitionTo(@STATE.LOGGED_IN)
-
+          # 3.2.5.7 Sent Attention State
+          # Discard any data contained in the response, until we receive the attention response
+          if @attentionReceived
             sqlRequest = @request
             @request = undefined
-            sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
-          
-          # else: skip all messages, now we are only interested about cancel acknowledgement (2.2.1.6)
+
+            @transitionTo(@STATE.LOGGED_IN)
+
+            if sqlRequest.canceled
+              sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'))
+            else
+              message = "Timeout: Request failed to complete in #{@config.options.requestTimeout}ms"
+              sqlRequest.callback(RequestError(message, 'ETIMEOUT'))
+
 
     FINAL:
       name: 'Final'
@@ -183,6 +194,7 @@ class Connection extends EventEmitter
   cleanupConnection: ->
     if !@closed
       @clearConnectTimer()
+      @clearRequestTimer()
       @closeConnection()
       @emit('end')
       @closed = true
@@ -330,16 +342,16 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('done', (token) =>
       if @request
+        if token.attention
+          @dispatchEvent("attention")
+
         @request.emit('done', token.rowCount, token.more, @request.rows)
-        
+
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
           @request.rows = []
-        
-        if token.attention
-          @request.canceled = true
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
@@ -383,6 +395,10 @@ class Connection extends EventEmitter
   createConnectTimer: ->
     @connectTimer = setTimeout(@connectTimeout, @config.options.connectTimeout)
 
+  createRequestTimer: ->
+    if @config.options.requestTimeout
+      @requestTimer = setTimeout(@requestTimeout, @config.options.requestTimeout)
+
   connectTimeout: =>
     message = "Failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
 
@@ -391,9 +407,19 @@ class Connection extends EventEmitter
     @connectTimer = undefined
     @dispatchEvent('connectTimeout')
 
+  requestTimeout: =>
+    @requestTimer = undefined
+
+    @messageIo.sendMessage(TYPE.ATTENTION)
+    @transitionTo(@STATE.SENT_ATTENTION)
+
   clearConnectTimer: ->
     if @connectTimer
       clearTimeout(@connectTimer)
+
+  clearRequestTimer: ->
+    if @requestTimer
+      clearTimeout(@requestTimer)
 
   transitionTo: (newState) ->
     if @state?.exit
@@ -596,6 +622,8 @@ set transaction isolation level read committed'''
       @request.rowCount = 0
       @request.rows = []
 
+      @createRequestTimer()
+
       @messageIo.sendMessage(packetType, payload.data, @resetConnectionOnNextRequest)
       @resetConnectionOnNextRequest = false
       @debug.payload(->
@@ -611,6 +639,8 @@ set transaction isolation level read committed'''
       @debug.log(message)
       false
     else
+      @request.canceled = true
+
       @messageIo.sendMessage(TYPE.ATTENTION)
       @transitionTo(@STATE.SENT_ATTENTION)
       true

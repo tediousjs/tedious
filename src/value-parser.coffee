@@ -11,6 +11,8 @@ MONEY_DIVISOR = 10000
 PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 
+DEFAULT_ENCODING = 'utf8'
+
 parse = (buffer, metaData, options) ->
   value = undefined
   dataLength = undefined
@@ -220,7 +222,7 @@ readBinary = (buffer, dataLength) ->
   else
     buffer.readBuffer(dataLength)
 
-readChars = (buffer, dataLength, codepage) ->
+readChars = (buffer, dataLength, codepage=DEFAULT_ENCODING) ->
   if dataLength == NULL
     null
   else
@@ -237,7 +239,7 @@ readMaxBinary = (buffer) ->
     valueBuffer
   )
 
-readMaxChars = (buffer, codepage) ->
+readMaxChars = (buffer, codepage=DEFAULT_ENCODING) ->
   readMax(buffer, (valueBuffer) ->
     iconv.decode(valueBuffer, codepage)
   )
