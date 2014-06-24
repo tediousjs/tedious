@@ -21,6 +21,10 @@ parser = (buffer, colMetadata, options) ->
 
     colName = buffer.readBVarchar()
 
+    if options.camelCaseColumns
+      colName = colName.replace /^[A-Z]/, (s) -> s.toLowerCase()
+
+
     column =
       userType: metadata.userType
       flags: metadata.flags
