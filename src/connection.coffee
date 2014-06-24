@@ -214,6 +214,7 @@ class Connection extends EventEmitter
     @config.options.cryptoCredentialsDetails ||= {}
     @config.options.useUTC ?= true
     @config.options.useColumnNames ?= false
+    @config.options.connectionIsolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -526,7 +527,7 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
-    'set textsize ' + @config.options.textsize + '''
+    """set textsize #{@config.options.textsize}
 set quoted_identifier on
 set arithabort off
 set numeric_roundabort off
@@ -539,7 +540,7 @@ set implicit_transactions off
 set language us_english
 set dateformat mdy
 set datefirst 7
-set transaction isolation level read committed'''
+set transaction isolation level #{@getIsolationLevelText @config.options.connectionIsolationLevel}"""
 
   processedInitialSql: ->
       @clearConnectTimer()
@@ -655,5 +656,14 @@ set transaction isolation level read committed'''
 
   currentTransactionDescriptor: ->
     @transactionDescriptors[@transactionDescriptors.length - 1]
+
+  getIsolationLevelText: (isolationLevel) ->
+    switch isolationLevel
+      when ISOLATION_LEVEL.READ_UNCOMMITTED then 'read uncommitted'
+      when ISOLATION_LEVEL.REPEATABLE_READ then 'repeatable read'
+      when ISOLATION_LEVEL.SERIALIZABLE then 'serializable'
+      when ISOLATION_LEVEL.SNAPSHOT then 'snapshot'
+      else 'read committed'
+
 
 module.exports = Connection
