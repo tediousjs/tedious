@@ -209,6 +209,22 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.connectionIsolationLevel</code>
+      </dt>
+      <dd>
+        The default isolation level for new connections. All out-of-transaction queries are executed with this setting.
+        The isolation levels are available from <code>require('tedious').ISOLATON_LEVEL</code> .
+        <ul>
+          <li><code>READ_UNCOMMITTED</code></li>
+          <li><code>READ_COMMITTED</code></li>
+          <li><code>REPEATABLE_READ</code></li>
+          <li><code>SERIALIZABLE</code></li>
+          <li><code>SNAPSHOT</code></li>
+        </ul>
+        (default: <code>READ_COMMITED</code>).
+      </dd>
+
+      <dt>
         <code>options.encrypt</code>
       </dt>
       <dd>
