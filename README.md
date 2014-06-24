@@ -4,6 +4,14 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
+## What's new in 0.3
+
+- Added support for default connection isolation level
+- Added support for returning camel cased columns
+- Added support for building lib on Windows
+- Fixed issue with IEEE 754 rounding errors
+- Minor fixes
+
 ## What's new in 0.2
 
 - Added support for TDS 7.4
