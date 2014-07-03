@@ -255,13 +255,13 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('loginack', (token) =>
       unless token.tdsVersion
         # unsupported TDS version
-        @loginError = ConnectionError "Server responded with unknown TDS version."
+        @loginError = ConnectionError "Server responded with unknown TDS version.", 'ETDS'
         @loggedIn = false
         return
       
       unless token.interface
         # unsupported interface
-        @loginError = ConnectionError "Server responded with unsupported interface."
+        @loginError = ConnectionError "Server responded with unsupported interface.", 'EINTERFACENOTSUPP'
         @loggedIn = false
         return
         
