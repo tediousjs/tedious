@@ -1,5 +1,6 @@
-BigInteger = require("bignumber").BigInteger
+BigInteger = require("big-number").n
 crypto = require("crypto")
+hex = [ '0','1','2','3','4','5','6','7', '8', '9', 'a','b','c','d','e','f' ]
 WritableTrackingBuffer = require("./tracking-buffer/writable-tracking-buffer")
 NTLMResponsePayload = (->
   NTLMResponsePayload = (loginData) ->
@@ -91,17 +92,21 @@ NTLMResponsePayload = (->
     newHash
 
   NTLMResponsePayload::createTimestamp = (time) ->
-    bigTime = new BigInteger("" + time)
-    timestamp = bigTime.add(new BigInteger("" + 11644473600000)).multiply(new BigInteger("" + 10000)).toString(16)
-    padded = "00000000" + timestamp
-    timestamp = padded.substr(padded - 16)
-    result = new Buffer(8)
-    idx = 8
-
-    while idx > 0
-      result[idx - 1] = parseInt(timestamp.substr(timestamp.length - (2 * idx), 2), 16)
-      idx--
-    result
+    tenthsOfAMicrosecond = new BigInteger( time ).plus( 11644473600 ).multiply( 10000000 )
+    hexArray = [];
+    pair = [];
+    while tenthsOfAMicrosecond.val() != '0'
+      idx = tenthsOfAMicrosecond.mod(16)
+      pair.unshift(hex[idx]);
+      if pair.length == 2
+        hexArray.unshift(pair.pop())
+        hexArray.unshift(pair.pop())
+    
+    if pair.length > 0
+      hexArray.unshift( pair.pop() );
+      hexArray.unshift( 0 );
+      
+    return new Buffer((new Buffer(hexArray.join(''),'hex').toJSON().reverse()))
 
   NTLMResponsePayload::lmv2Response = (domain, user, password, serverNonce, clientNonce) ->
     hash = @ntv2Hash(domain, user, password)
