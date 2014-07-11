@@ -4,13 +4,13 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
-See the [changelog](https://github.com/pekim/tedious/blob/master/History.md) for version history.
+See the [changelog](http://pekim.github.io/tedious/changelog.html) for version history.
 
 ### Supported TDS versions
 
 - TDS 7.4 (SQL Server 2012/2014)
-- TDS 7.3.A (SQL Server 2008 R2)
-- TDS 7.3.B (SQL Server 2008)
+- TDS 7.3.B (SQL Server 2008 R2)
+- TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
 - TDS 7.1 (SQL Server 2000)
 
