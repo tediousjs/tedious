@@ -7,7 +7,7 @@ exports.respondToChallenge = (test) ->
         password: 'password'
         ntlmpacket:
             target: new Buffer([170, 170, 170, 170]) # aa aa aa aa
-            nonce: new Buffer([187, 187, 187, 187])
+            nonce: new Buffer([187, 187, 187, 187, 187, 187, 187, 187])
 
     response = new NTLMPayload(challenge)
 

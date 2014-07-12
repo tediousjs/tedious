@@ -5,7 +5,7 @@ WriteBuffer = require( '../../../src/tracking-buffer/writable-tracking-buffer')
 exports.parseChallenge = (test) ->
     source = new WriteBuffer(67)
     source.copyFrom(new Buffer([0x00,0x00,0x00]))
-    source.writeString('NTLMSSP\0', 'ascii')
+    source.writeString('NTLMSSP\0', 'utf8')
     source.writeInt32LE(2) # message type
     source.writeInt16LE(12) # domain len
     source.writeInt16LE(12) # domain max
@@ -24,7 +24,7 @@ exports.parseChallenge = (test) ->
     challenge = SSPIParser(readable)
 
     expected = 
-        magic: 'NTLMSSP '
+        magic: 'NTLMSSP\0'
         type: 2
         domainLen: 12
         domainMax: 12

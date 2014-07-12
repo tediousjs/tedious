@@ -239,12 +239,12 @@ class Login7Payload
 
   createNTLMRequest: (options) ->
     domain = escape(options.domain.toUpperCase())
-    protocol = "NTLMSSP\u0000"
+    protocol = 'NTLMSSP\u0000'
     BODY_LENGTH = 40
     type1flags = @getNTLMFlags()
     bufferLength = BODY_LENGTH + domain.length
     buffer = new WritableTrackingBuffer(bufferLength)
-    buffer.writeString(protocol, "utf8") # protocol
+    buffer.writeString(protocol, 'utf8') # protocol
     buffer.writeUInt32LE(1) # type 1
     buffer.writeUInt32LE(type1flags) # TYPE1 flag
     buffer.writeUInt16LE(domain.length) # domain length
@@ -257,7 +257,7 @@ class Login7Payload
     buffer.writeUInt8(0) #VersionReserved2
     buffer.writeUInt8(0) #VersionReserved3
     buffer.writeUInt8(15) #NTLMRevisionCurrent
-    buffer.writeString(domain, "ascii")
+    buffer.writeString(domain, 'ascii')
     buffer.data
 
   createPasswordBuffer: ->

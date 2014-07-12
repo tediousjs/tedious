@@ -5,7 +5,7 @@ instanceLookup = require('./instance-lookup').instanceLookup
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
-NTLMResponsePayload = require("./ntlm-payload")
+NTLMResponsePayload = require('./ntlm-payload')
 Request = require('./request')
 RpcRequestPayload = require('./rpcrequest-payload')
 SqlBatchPayload = require('./sqlbatch-payload')
@@ -554,7 +554,7 @@ class Connection extends EventEmitter
     payload = new NTLMResponsePayload(responseData)
     @messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data)
     @debug.payload ->
-      payload.toString "  "
+      payload.toString '  '
 
   initiateTlsSslHandshake: ->
     @config.options.cryptoCredentialsDetails.ciphers ||= 'RC4-MD5'
@@ -620,14 +620,20 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
     if @ntlmpacket
       @dispatchEvent('receivedChallenge')
     else
-      @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
       @dispatchEvent('loginFailed')
 
   processLogin7NTLMAck: ->
     if @loggedIn
       @dispatchEvent('loggedIn')
     else
-      @emit('connect', 'Login failed; one or more errorMessage events should have been emitted')
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
       @dispatchEvent('loginFailed')
 
   execSqlBatch: (request) ->

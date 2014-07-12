@@ -1,14 +1,14 @@
-BigInteger = require("big-number").n
-crypto = require("crypto")
+BigInteger = require('big-number').n
+crypto = require('crypto')
 hex = [ '0','1','2','3','4','5','6','7', '8', '9', 'a','b','c','d','e','f' ]
-WritableTrackingBuffer = require("./tracking-buffer/writable-tracking-buffer")
-NTLMResponsePayload = (->
-  NTLMResponsePayload = (loginData) ->
+WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer')
+class NTLMResponsePayload
+  constructor: (loginData) ->
     @data = @createResponse(loginData)
     return
   NTLMResponsePayload::toString = (indent) ->
-    indent or (indent = "")
-    indent + "NTLM Auth"
+    indent or (indent = '')
+    indent + 'NTLM Auth'
 
   NTLMResponsePayload::createResponse = (challenge) ->
     client_nonce = @createClientNonce()
@@ -23,8 +23,8 @@ NTLMResponsePayload = (->
     bufferLength = 64 + (domain.length * 2) + (username.length * 2) + lmv2len + ntlmv2len + 8 + 8 + 8 + 4 + server_data.length + 4 # empty
     data = new WritableTrackingBuffer(bufferLength)
     data.position = 0
-    data.writeString "NTLMSSP\u0000", "utf8"
-    data.writeUInt32LE 0x03
+    data.writeString('NTLMSSP\u0000', 'utf8')
+    data.writeUInt32LE(0x03)
     baseIdx = 64
     dnIdx = baseIdx
     unIdx = dnIdx + domain.length * 2
@@ -50,8 +50,8 @@ NTLMResponsePayload = (->
     data.writeUInt32LE(baseIdx)
     data.writeUInt16LE(0x8201)
     data.writeUInt16LE(0x08)
-    data.writeString(domain, "ucs2")
-    data.writeString(username, "ucs2")
+    data.writeString(domain, 'ucs2')
+    data.writeString(username, 'ucs2')
     lmv2Data = @lmv2Response(domain, username, password, server_nonce, client_nonce)
     data.copyFrom(lmv2Data)
     genTime = (new Date).getTime()
@@ -86,10 +86,9 @@ NTLMResponsePayload = (->
     timestamp.copy(data, 16, 0, 8)
     clientNonce.copy(data, 24, 0, 8)
     data.writeUInt32LE(0x0, 32)
-    targetInfo.copy(data, 36, 0, targetInfo.copy)
+    targetInfo.copy(data, 36, 0, targetInfo.length)
     data.writeUInt32LE(0x0, 36 + targetInfo.length)
-    newHash = @hmacMD5(data, hash)
-    newHash
+    @hmacMD5(data, hash)
 
   NTLMResponsePayload::createTimestamp = (time) ->
     tenthsOfAMicrosecond = new BigInteger( time ).plus( 11644473600 ).multiply( 10000000 )
@@ -99,45 +98,42 @@ NTLMResponsePayload = (->
       idx = tenthsOfAMicrosecond.mod(16)
       pair.unshift(hex[idx]);
       if pair.length == 2
-        hexArray.unshift(pair.pop())
-        hexArray.unshift(pair.pop())
+        hexArray.push(pair.join(''))
+        pair = [];
     
     if pair.length > 0
-      hexArray.unshift( pair.pop() );
-      hexArray.unshift( 0 );
-      
-    return new Buffer((new Buffer(hexArray.join(''),'hex').toJSON().reverse()))
+      hexArray.push(pair[ 0 ] + '0')
+    
+    return new Buffer( hexArray.join(''), 'hex' )
 
   NTLMResponsePayload::lmv2Response = (domain, user, password, serverNonce, clientNonce) ->
     hash = @ntv2Hash(domain, user, password)
     data = new Buffer(serverNonce.length + clientNonce.length)
-    serverNonce.copy(data, 0, 0, serverNonce.length)
+    serverNonce.copy(data)
     clientNonce.copy(data, serverNonce.length, 0, clientNonce.length)
     newhash = @hmacMD5(data, hash)
     response = new Buffer(newhash.length + clientNonce.length)
-    newhash.copy(response, 0, 0, newhash.length)
+    newhash.copy(response)
     clientNonce.copy(response, newhash.length, 0, clientNonce.length)
     response
 
   NTLMResponsePayload::ntv2Hash = (domain, user, password) ->
     hash = @ntHash(password)
-    identity = new Buffer(user.toUpperCase() + domain.toUpperCase(), "ucs2")
-    result = @hmacMD5(identity, hash)
-    result
+    identity = new Buffer(user.toUpperCase() + domain.toUpperCase(), 'ucs2')
+    @hmacMD5(identity, hash)
 
   NTLMResponsePayload::ntHash = (text) ->
-    result = new Buffer(21)
-    result.fill(0)
-    unicodeString = new Buffer(text, "ucs2")
-    md4 = crypto.createHash("md4").update(unicodeString).digest()
-    md4.copy(result, 0, 0, md4.length)
-    result
+    hash = new Buffer(21)
+    hash.fill(0)
+    unicodeString = new Buffer(text, 'ucs2')
+    md4 = crypto.createHash('md4').update(unicodeString).digest()
+    if md4.copy then md4.copy(hash) else new Buffer(md4, 'ascii').copy(hash)
+    hash
 
   NTLMResponsePayload::hmacMD5 = (data, key) ->
-    hmac = crypto.createHmac("MD5", key)
+    hmac = crypto.createHmac('MD5', key)
     hmac.update(data)
-    hmac.digest()
+    result = hmac.digest()
+    if result.copy then result else new Buffer(result, 'ascii').slice(0,16)
 
-  NTLMResponsePayload
-)()
 module.exports = NTLMResponsePayload
