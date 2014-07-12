@@ -63,9 +63,6 @@ var connection = new Connection(config);
         <p>
           User name to use for authentication.
         </p>
-        <p>
-          Only SQL Server accounts are supported. Windows domain accounts are not supported.
-        </p>
       </dd>
 
       <dt>
@@ -80,6 +77,13 @@ var connection = new Connection(config);
       </dt>
       <dd>
         Hostname to connect to.
+      </dd>
+
+      <dt>
+        <code>domain</code>
+      </dt>
+      <dd>
+        Once you set domain, driver will connect to SQL Server using domain login.
       </dd>
 
       <dt>
