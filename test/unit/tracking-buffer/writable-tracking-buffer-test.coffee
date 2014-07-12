@@ -76,6 +76,18 @@ exports.writeUsVarchar = (test) ->
 
   test.done()
 
+exports.copyFrom = (test) ->
+
+  buffer = new TrackingBuffer(10)
+  source = new Buffer( [0x01, 0x02, 0x03, 0x04] )
+
+  buffer.copyFrom(source)
+  buffer.writeUInt8(5)
+
+  assertBuffer(test, buffer, [0x01, 0x02, 0x03, 0x04, 0x05])
+
+  test.done()
+
 assertBuffer = (test, actual, expected) ->
   actual = actual.data
   expected = new Buffer(expected)

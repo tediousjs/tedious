@@ -22,6 +22,12 @@ class WritableTrackingBuffer
       @compositeBuffer
     )
 
+  copyFrom: (buffer) ->
+    length = buffer.length
+    @makeRoomFor(length)
+    buffer.copy(@buffer, @position)
+    @position += length
+
   makeRoomFor: (requiredLength) ->
     if @buffer.length - @position < requiredLength
       @newBuffer(requiredLength)

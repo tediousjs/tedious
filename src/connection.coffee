@@ -5,6 +5,7 @@ instanceLookup = require('./instance-lookup').instanceLookup
 TYPE = require('./packet').TYPE
 PreloginPayload = require('./prelogin-payload')
 Login7Payload = require('./login7-payload')
+NTLMResponsePayload = require('./ntlm-payload')
 Request = require('./request')
 RpcRequestPayload = require('./rpcrequest-payload')
 SqlBatchPayload = require('./sqlbatch-payload')
@@ -60,7 +61,10 @@ class Connection extends EventEmitter
           @processPreLoginResponse()
         noTls: ->
           @sendLogin7Packet()
-          @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
+          if @config.domain
+            @transitionTo(@STATE.SENT_LOGIN7_WITH_NTLM)
+          else
+            @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
         tls: ->
           @initiateTlsSslHandshake()
           @sendLogin7Packet()
@@ -98,6 +102,39 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.FINAL)
         message: ->
           @processLogin7Response()
+
+    SENT_LOGIN7_WITH_NTLM:
+      name: 'SentLogin7WithNTLMLogin'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
+        receivedChallenge: ->
+          @sendNTLMResponsePacket()
+          @transitionTo(@STATE.SENT_NTLM_RESPONSE)
+        loginFailed: ->
+          @transitionTo(@STATE.FINAL)
+        message: ->
+          @processLogin7NTLMResponse()
+
+    SENT_NTLM_RESPONSE:
+      name: 'SentNTLMResponse'
+      events:
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
+        data: (data) ->
+          @sendDataToTokenStreamParser(data)
+        loggedIn: ->
+          @transitionTo(@STATE.LOGGED_IN_SENDING_INITIAL_SQL)
+        loginFailed: ->
+          @transitionTo(@STATE.FINAL)
+        message: ->
+          @processLogin7NTLMAck()
 
     LOGGED_IN_SENDING_INITIAL_SQL:
       name: 'LoggedInSendingInitialSql'
@@ -234,6 +271,11 @@ class Connection extends EventEmitter
     @tokenStreamParser = new TokenStreamParser(@debug, undefined, @config.options)
     @tokenStreamParser.on('infoMessage', (token) =>
       @emit('infoMessage', token)
+    )
+    @tokenStreamParser.on('sspichallenge', (token) =>
+      if token.ntlmpacket
+        @ntlmpacket = token.ntlmpacket
+      @emit('sspichallenge', token)
     )
     @tokenStreamParser.on('errorMessage', (token) =>
       @emit('errorMessage', token)
@@ -483,6 +525,7 @@ class Connection extends EventEmitter
 
   sendLogin7Packet: ->
     loginData =
+      domain: @config.domain
       userName: @config.userName
       password: @config.password
       database: @config.options.database
@@ -495,6 +538,23 @@ class Connection extends EventEmitter
     @debug.payload(->
       payload.toString('  ')
     )
+
+  sendNTLMResponsePacket: ->
+    responseData =
+      domain: @config.domain
+      userName: @config.userName
+      password: @config.password
+      database: @config.options.database
+      appName: @config.options.appName
+      packetSize: @config.options.packetSize
+      tdsVersion: @config.options.tdsVersion
+      ntlmpacket: @ntlmpacket
+      additional: @additional
+
+    payload = new NTLMResponsePayload(responseData)
+    @messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data)
+    @debug.payload ->
+      payload.toString '  '
 
   initiateTlsSslHandshake: ->
     @config.options.cryptoCredentialsDetails.ciphers ||= 'RC4-MD5'
@@ -547,6 +607,26 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
       @emit('connect')
 
   processLogin7Response: ->
+    if @loggedIn
+      @dispatchEvent('loggedIn')
+    else
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
+      @dispatchEvent('loginFailed')
+
+  processLogin7NTLMResponse: ->
+    if @ntlmpacket
+      @dispatchEvent('receivedChallenge')
+    else
+      if @loginError
+        @emit('connect', @loginError)
+      else
+        @emit('connect', ConnectionError('Login failed.', 'ELOGIN'))
+      @dispatchEvent('loginFailed')
+
+  processLogin7NTLMAck: ->
     if @loggedIn
       @dispatchEvent('loggedIn')
     else
