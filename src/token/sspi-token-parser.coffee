@@ -16,6 +16,7 @@ parseChallenge = (buffer) ->
   challenge.domain = buffer.readString(challenge.domainLen, 'ucs2')
   challenge.target = buffer.readBuffer(challenge.targetLen)
   challenge
+
 parser = (buffer) ->
   challenge = parseChallenge(buffer)
   name: 'SSPICHALLENGE'
