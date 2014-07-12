@@ -204,12 +204,12 @@ class Login7Payload
     variableData.offsetsAndLengths.writeBuffer(@clientId)
 
     if @loginData.domain
-      ntlmPacket = @createNTLMRequest(@loginData)
-      @sspiLong = ntlmPacket.length
+      @ntlmPacket = @createNTLMRequest(@loginData)
+      @sspiLong = @ntlmPacket.length
       variableData.offsetsAndLengths.writeUInt16LE(variableData.offset)
-      variableData.offsetsAndLengths.writeUInt16LE(ntlmPacket.length)
-      variableData.data.writeBuffer(ntlmPacket)
-      variableData.offset += ntlmPacket.length
+      variableData.offsetsAndLengths.writeUInt16LE(@ntlmPacket.length)
+      variableData.data.writeBuffer(@ntlmPacket)
+      variableData.offset += @ntlmPacket.length
     else
       @addVariableDataString(variableData, @sspi)
     @addVariableDataString(variableData, @attachDbFile)
