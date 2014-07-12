@@ -31,8 +31,8 @@ exports.respondToChallenge = (test) ->
         4 +                 # target data
         4                   # placeholder
 
-    domainName = response.data.slice(64, 76).toString('utf16le')
-    userName = response.data.slice(76, 92).toString('utf16le')
+    domainName = response.data.slice(64, 76).toString('ucs2')
+    userName = response.data.slice(76, 92).toString('ucs2')
     targetData = response.data.slice(160, 164).toString('hex')
 
     test.strictEqual(domainName, 'domain')

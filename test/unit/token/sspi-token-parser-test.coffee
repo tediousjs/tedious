@@ -17,7 +17,7 @@ exports.parseChallenge = (test) ->
     source.writeInt16LE(4) # target max
     source.writeInt32LE(222) # target offset
     source.copyFrom(new Buffer([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08])) # odd data
-    source.writeString('domain', 'utf16le') # domain
+    source.writeString('domain', 'ucs2') # domain
     source.writeInt32BE(11259375) # target == 'abcdef'
 
     readable = new ReadBuffer(source.data)
