@@ -532,6 +532,7 @@ class Connection extends EventEmitter
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
+      initDbFatal: not @config.options.fallbackToDefaultDb
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
