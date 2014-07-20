@@ -4,7 +4,10 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
+**NOTE: Default login behavior has changed slightly as of version 1.2**
+
 See the [changelog](http://pekim.github.io/tedious/changelog.html) for version history.
+
 
 ### Supported TDS versions
 
@@ -17,6 +20,7 @@ See the [changelog](http://pekim.github.io/tedious/changelog.html) for version h
 ## Installation
 
     npm install tedious
+
 
 <a name="documentation" />
 ## Documentation
