@@ -133,8 +133,12 @@ class Login7Payload
       FLAGS_1.FLOAT_IEEE_754 |
       FLAGS_1.BCD_DUMPLOAD_OFF |
       FLAGS_1.USE_DB_OFF |
-      FLAGS_1.INIT_DB_WARN |
       FLAGS_1.SET_LANG_WARN_ON
+
+    if @loginData.initDbFatal
+      @flags1 |= FLAGS_1.INIT_DB_FATAL
+    else
+      @flags1 |= FLAGS_1.INIT_DB_WARN
 
     @flags2 =
       FLAGS_2.INIT_LANG_WARN |
