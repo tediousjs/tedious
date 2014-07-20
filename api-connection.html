@@ -116,6 +116,16 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.fallbackToDefaultDb</code>
+      </dt>
+      <dd>
+        By default, if the database requestion by <code>options.database</code> cannot be accessed,
+        the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
+        set to <code>true</code>, then the user's default database will be used instead
+        (Default: <code>false</code>).
+      </dd>
+
+      <dt>
         <code>options.connectTimeout</code>
       </dt>
       <dd>

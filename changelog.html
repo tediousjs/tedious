@@ -5,6 +5,18 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
+<h3>v1.2.0 <span class="date">2014-07-20</span></h3>
+<ul>
+  <li>
+    Changed default behavior for logins. Connections will no longer
+    fall back to the user's default database if the requested database is 
+    unavailable and instead will produce an error <br /><br />
+    Also added <code>fallbackToDefaultDb</code> option to re-enable 
+    previous behavior (Bryan J. Ross)
+    (Issue <a href="https://github.com/pekim/tedious/pull/166">#166</a>)
+  </li>
+</ul>
+
 <h3>v1.1.0 <span class="date">2014-07-13</span></h3>
 <ul>
     <li>
