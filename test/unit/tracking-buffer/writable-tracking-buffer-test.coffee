@@ -37,6 +37,7 @@ exports.writeSignedInt = (test) ->
   buffer.writeInt16BE(-3)
   buffer.writeInt32LE(-4)
   buffer.writeInt32BE(-5)
+  buffer.writeInt64LE(-3500000000)
 
   assertBuffer(test, buffer, [
     0xFF
@@ -44,6 +45,7 @@ exports.writeSignedInt = (test) ->
     0xFF, 0xFD
     0xFC, 0xFF, 0xFF, 0xFF
     0xFF, 0xFF, 0xFF, 0xFB
+    0x00, 0x3d, 0x62, 0x2f, 0xff, 0xff, 0xff, 0xff
   ])
 
   test.done()
