@@ -56,7 +56,7 @@ numberToInt64LE = (num) ->
   buf = new Buffer(8)
   for i in [0..7]
     buf[i] = lo & 0xff
-    lo = if i == 4 then hi else lo >>> 8
+    lo = if i == 3 then hi else lo >>> 8
   
   if negate
     carry = 1
