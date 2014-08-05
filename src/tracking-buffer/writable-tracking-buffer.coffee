@@ -1,3 +1,4 @@
+bigint = require('./bigint')
 buffertools = require('../buffertools')
 
 SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
@@ -85,6 +86,12 @@ class WritableTrackingBuffer
     high = Math.floor(value / 0x100000000)
     @writeUInt32LE(low)
     @writeUInt32LE(high)
+  
+  writeInt64LE: (value) ->
+    buf = bigint.numberToInt64LE(value);
+    console.log(value)
+    console.log(buf)
+    @copyFrom(buf)
 
   writeUInt32BE: (value) ->
     length = 4
@@ -130,13 +137,13 @@ class WritableTrackingBuffer
     @makeRoomFor(length)
     @buffer.writeInt32BE(value, @position)
     @position += length
-	
+  
   writeFloatLE: (value) ->
     length = 4
     @makeRoomFor(length)
     @buffer.writeFloatLE(value, @position)
     @position += length
-	
+  
   writeDoubleLE: (value) ->
     length = 8
     @makeRoomFor(length)

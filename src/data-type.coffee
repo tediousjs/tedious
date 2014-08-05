@@ -332,12 +332,9 @@ TYPE =
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
+        val = if typeof parameter.value != 'number' then parameter.value else parseInt(parameter.value)
         buffer.writeUInt8(8)
-        if parseInt(parameter.value) > 0x100000000 # 4294967296
-          buffer.writeUInt32LE(parseInt(parameter.value) % 0x100000000)
-        else
-          buffer.writeInt32LE(parseInt(parameter.value) % 0x100000000)
-        buffer.writeInt32LE(Math.floor(parseInt(parameter.value) / 0x100000000))
+        buffer.writeInt64LE(val)
       else
         buffer.writeUInt8(0)
 

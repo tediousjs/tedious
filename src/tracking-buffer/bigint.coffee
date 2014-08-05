@@ -46,4 +46,26 @@ convertLEBytesToString = (buffer) ->
 
     sign + result
 
+numberToInt64LE = (num) ->
+  # adapted from https://github.com/broofa/node-int64
+  negate = num < 0
+  hi = Math.abs(num)
+  lo = hi % 0x100000000
+  hi = (hi / 0x100000000) | 0
+  
+  buf = new Buffer(8)
+  for i in [0..7]
+    buf[i] = lo & 0xff
+    lo = if i == 4 then hi else lo >>> 8
+  
+  if negate
+    carry = 1
+    for i in [0..7]
+      v = (buf[i] ^ 0xff) + carry
+      buf[i] = v & 0xff
+      carry = v >> 8
+  
+  return buf
+
 module.exports.convertLEBytesToString = convertLEBytesToString
+module.exports.numberToInt64LE = numberToInt64LE
