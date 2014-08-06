@@ -89,8 +89,6 @@ class WritableTrackingBuffer
   
   writeInt64LE: (value) ->
     buf = bigint.numberToInt64LE(value);
-    console.log(value)
-    console.log(buf)
     @copyFrom(buf)
 
   writeUInt32BE: (value) ->
