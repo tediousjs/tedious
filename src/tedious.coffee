@@ -1,5 +1,6 @@
 exports.statemachineLogLevel = 0
 
+exports.BulkLoad = require('./bulk-load')
 exports.Connection = require('./connection')
 exports.Request = require('./request')
 exports.library = require('./library')

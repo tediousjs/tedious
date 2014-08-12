@@ -1,4 +1,5 @@
 require('./buffertools')
+BulkLoad = require('./bulk-load')
 Debug = require('./debug')
 EventEmitter = require('events').EventEmitter
 instanceLookup = require('./instance-lookup').instanceLookup
@@ -643,6 +644,16 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
   execSql: (request) ->
     request.transformIntoExecuteSqlRpc()
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
+  
+  execBulkLoad: (bulkLoad) ->
+    request = new Request(bulkLoad.getSql(), (error) =>
+      if error
+        bulkLoad.error = error
+        bulkLoad.callback(error)
+      else
+        @makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload(@config.options.tdsVersion))
+    )
+    @execSqlBatch(request)
 
   prepare: (request) ->
     request.transformIntoPrepareRpc()
