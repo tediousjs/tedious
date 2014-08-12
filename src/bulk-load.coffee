@@ -52,9 +52,10 @@ class BulkLoad extends EventEmitter
   addRow: (row) ->
     if arguments.length > 1 || !row || typeof row != 'object'
       # convert arguments to array in a way the optimizer can handle
-      arr = new Array(arguments.length);
+      arrTemp = new Array(arguments.length);
       for c, i in arguments
-        arr[i] = c
+        arrTemp[i] = c
+      row = arrTemp;
     
     # write row token
     @rowsData.writeUInt8(TOKEN_TYPE.ROW)
