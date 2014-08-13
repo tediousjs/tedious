@@ -645,13 +645,16 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
     request.transformIntoExecuteSqlRpc()
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
   
+  newBulkLoad: (table, callback) ->
+    return new BulkLoad(table, @config.options, callback)
+  
   execBulkLoad: (bulkLoad) ->
     request = new Request(bulkLoad.getSql(), (error) =>
       if error
         bulkLoad.error = error
         bulkLoad.callback(error)
       else
-        @makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload(@config.options.tdsVersion))
+        @makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload())
     )
     @execSqlBatch(request)
 

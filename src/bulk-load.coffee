@@ -29,7 +29,7 @@ class BulkLoad extends EventEmitter
   error: null
   canceled: false
   
-  constructor: (@table, @callback) ->
+  constructor: (@table, @options, @callback) ->
     @columns = []
     @columnsByName = {}
     @rowsData = new WritableTrackingBuffer(100) # todo: we should size the buffer better for performance
@@ -64,7 +64,7 @@ class BulkLoad extends EventEmitter
     arr = row instanceof Array
     for c, i in @columns
       c.value = row[if arr then i else c.objName]
-      c.type.writeParameterData(@rowsData, c)
+      c.type.writeParameterData(@rowsData, c, @options)
   
   getSql: () ->
     sql = 'insert bulk ' + @table + '('
@@ -76,9 +76,9 @@ class BulkLoad extends EventEmitter
     sql += ')'
     return sql
   
-  getPayload: (tdsVersion) ->
+  getPayload: () ->
     # Create COLMETADATA token
-    metaData = @getColMetaData(tdsVersion)
+    metaData = @getColMetaData()
     length = metaData.length
     
     # row data
@@ -87,13 +87,13 @@ class BulkLoad extends EventEmitter
     
     # Create DONE token
     # It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    tBuf = new WritableTrackingBuffer(if tdsVersion < "7_2" then 9 else 13)
+    tBuf = new WritableTrackingBuffer(if @options.tdsVersion < "7_2" then 9 else 13)
     tBuf.writeUInt8(TOKEN_TYPE.DONE)
     status = DONE_STATUS.FINAL
     tBuf.writeUInt16LE(status)
     tBuf.writeUInt16LE(0) # CurCmd (TDS ignores this)
     tBuf.writeUInt32LE(0) # row count - doesn't really matter
-    if tdsVersion >= "7_2"
+    if @options.tdsVersion >= "7_2"
       tBuf.writeUInt32LE(0) # row count is 64 bits in >= TDS 7.2
 
     done = tBuf.data
@@ -107,7 +107,7 @@ class BulkLoad extends EventEmitter
     
     return payload
   
-  getColMetaData: (tdsVersion) ->
+  getColMetaData: () ->
     tBuf = new WritableTrackingBuffer(100) # todo: take a good guess at a correct buffer size
     # TokenType
     tBuf.writeUInt8(TOKEN_TYPE.COLMETADATA)
@@ -116,7 +116,7 @@ class BulkLoad extends EventEmitter
     
     for c in @columns
       # UserType
-      if tdsVersion < "7_2"
+      if @options.tdsVersion < "7_2"
         tBuf.writeUInt16LE(0)
       else
         tBuf.writeUInt32LE(0)
@@ -125,12 +125,12 @@ class BulkLoad extends EventEmitter
       flags = FLAGS.updateableReadWrite
       if c.nullable
         flags |= FLAGS.nullable
-      else if c.nullable == undefined && tdsVersion >= "7_2"
+      else if c.nullable == undefined && @options.tdsVersion >= "7_2"
         flags |= FLAGS.nullableUnknown # this seems prudent to set, not sure if there are performance consequences
       tBuf.writeUInt16LE(flags)
       
       # TYPE_INFO
-      c.type.writeTypeInfo(tBuf, c)
+      c.type.writeTypeInfo(tBuf, c, @options)
       
       # ColName
       tBuf.writeBVarchar(c.name, 'ucs2')
