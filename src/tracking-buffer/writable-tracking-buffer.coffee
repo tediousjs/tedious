@@ -33,10 +33,11 @@ class WritableTrackingBuffer
   makeRoomFor: (requiredLength) ->
     if @buffer.length - @position < requiredLength
       if @doubleSizeGrowth 
-        @newBuffer(@buffer.length * 2) 
+        size = @buffer.length * 2
+        size += @buffer.length * 2 while (size < requiredLength) 
+        @newBuffer(size)
       else 
         @newBuffer(requiredLength)
-
 
   newBuffer: (size) ->
     size ||= @initialSize
