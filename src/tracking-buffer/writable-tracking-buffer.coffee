@@ -34,7 +34,8 @@ class WritableTrackingBuffer
     if @buffer.length - @position < requiredLength
       if @doubleSizeGrowth 
         size = @buffer.length * 2
-        size += @buffer.length * 2 while (size < requiredLength) 
+        while (size < requiredLength)
+          size *= 2
         @newBuffer(size)
       else 
         @newBuffer(requiredLength)
