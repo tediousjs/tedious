@@ -72,7 +72,6 @@ class BulkLoad extends EventEmitter
       if i != 0
         sql += ', '
       sql += "[#{c.name}] #{c.type.declaration(c)}"
-      # todo: include precision, length, and collation as necessary
     sql += ')'
     return sql
   
