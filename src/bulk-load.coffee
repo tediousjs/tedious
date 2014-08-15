@@ -32,7 +32,7 @@ class BulkLoad extends EventEmitter
   constructor: (@table, @options, @callback) ->
     @columns = []
     @columnsByName = {}
-    @rowsData = new WritableTrackingBuffer(100) # todo: we should size the buffer better for performance
+    @rowsData = new WritableTrackingBuffer(100, 'ucs2', true)
   
   addColumn: (name, type, options = {}) ->
     column =

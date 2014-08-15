@@ -11,10 +11,11 @@ SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
   When writing, automatically allocates new buffers if there's not enough space.
 ###
 class WritableTrackingBuffer
-  constructor: (@sizeIncrement, @encoding) ->
+  constructor: (@initialSize, @encoding, @doubleSizeGrowth) ->
+    @doubleSizeGrowth ||= false
     @encoding ||= 'ucs2'
 
-    @buffer = new Buffer(@sizeIncrement)
+    @buffer = new Buffer(@initialSize)
     @position = 0
 
     @.__defineGetter__("data", ->
@@ -31,10 +32,15 @@ class WritableTrackingBuffer
 
   makeRoomFor: (requiredLength) ->
     if @buffer.length - @position < requiredLength
-      @newBuffer(requiredLength)
+      if @doubleSizeGrowth 
+        size = @buffer.length * 2
+        size += @buffer.length * 2 while (size < requiredLength) 
+        @newBuffer(size)
+      else 
+        @newBuffer(requiredLength)
 
   newBuffer: (size) ->
-    size ||= @sizeIncrement
+    size ||= @initialSize
 
     buffer = @buffer.slice(0, @position)
 
