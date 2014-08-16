@@ -75,6 +75,17 @@ class BulkLoad extends EventEmitter
     sql += ')'
     return sql
   
+  getTableCreationSql: () ->
+    sql = 'CREATE TABLE ' + @table + '(' + "\n"
+    for c, i in @columns
+      if i != 0
+        sql += ', \n'
+      sql += "[#{c.name}] [#{c.type.declaration(c)}]"
+      if (c.nullable != undefined)
+        sql += " " + (if c.nullable then "NULL" else "NOT NULL")
+    sql += '\n)'
+    return sql
+
   getPayload: () ->
     # Create COLMETADATA token
     metaData = @getColMetaData()
