@@ -649,7 +649,7 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
     return new BulkLoad(table, @config.options, callback)
   
   execBulkLoad: (bulkLoad) ->
-    request = new Request(bulkLoad.getSql(), (error) =>
+    request = new Request(bulkLoad.getBulkInsertSql(), (error) =>
       if error
         bulkLoad.error = error
         bulkLoad.callback(error)

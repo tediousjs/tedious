@@ -65,8 +65,8 @@ class BulkLoad extends EventEmitter
     for c, i in @columns
       c.value = row[if arr then i else c.objName]
       c.type.writeParameterData(@rowsData, c, @options)
-  
-  getSql: () ->
+
+  getBulkInsertSql: () ->
     sql = 'insert bulk ' + @table + '('
     for c, i in @columns
       if i != 0
@@ -76,11 +76,11 @@ class BulkLoad extends EventEmitter
     return sql
   
   getTableCreationSql: () ->
-    sql = 'CREATE TABLE ' + @table + '(' + "\n"
+    sql = 'CREATE TABLE ' + @table + '(\n'
     for c, i in @columns
       if i != 0
-        sql += ', \n'
-      sql += "[#{c.name}] [#{c.type.declaration(c)}]"
+        sql += ',\n'
+      sql += "[#{c.name}] #{c.type.declaration(c)}"
       if (c.nullable != undefined)
         sql += " " + (if c.nullable then "NULL" else "NOT NULL")
     sql += '\n)'
