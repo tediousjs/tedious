@@ -33,8 +33,12 @@ class BulkLoad extends EventEmitter
     @columns = []
     @columnsByName = {}
     @rowsData = new WritableTrackingBuffer(1024, 'ucs2', true)
+    @firstRowWritten = false
   
   addColumn: (name, type, options = {}) ->
+    if @firstRowWritten
+      throw new Error('Columns cannot be added to bulk insert after the first row has been written.')
+      
     column =
       type: type
       name: name
@@ -50,6 +54,7 @@ class BulkLoad extends EventEmitter
     @columnsByName[name] = column
   
   addRow: (row) ->
+    @firstRowWritten = true
     if arguments.length > 1 || !row || typeof row != 'object'
       # convert arguments to array in a way the optimizer can handle
       arrTemp = new Array(arguments.length);
