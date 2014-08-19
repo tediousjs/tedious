@@ -123,7 +123,7 @@ class BulkLoad extends EventEmitter
     return payload
   
   getColMetaData: () ->
-    tBuf = new WritableTrackingBuffer(100) # todo: take a good guess at a correct buffer size
+    tBuf = new WritableTrackingBuffer(100, null, true)
     # TokenType
     tBuf.writeUInt8(TOKEN_TYPE.COLMETADATA)
     # Count
