@@ -55,7 +55,8 @@ class Request extends EventEmitter
     @parameters = []
 
     @addParameter('statement', TYPES.NVarChar, @sqlTextOrProcedure)
-    @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
+    if (@originalParameters.length)
+      @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
 
     for parameter in @originalParameters
       @parameters.push(parameter)
@@ -67,7 +68,8 @@ class Request extends EventEmitter
     @parameters = []
 
     @addOutputParameter('handle', TYPES.Int)
-    @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
+    if (@originalParameters.length)
+      @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
     @addParameter('stmt', TYPES.NVarChar, @sqlTextOrProcedure)
 
     @sqlTextOrProcedure = 'sp_prepare'
