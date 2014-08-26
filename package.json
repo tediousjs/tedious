@@ -17,8 +17,10 @@
     "database",
     "mssql",
     "sqlserver",
+    "sql-server",
     "tds",
-    "msnodesql"
+    "msnodesql",
+    "azure"
   ],
   "homepage": "https://github.com/pekim/tedious",
   "bugs": "https://github.com/pekim/tedious/issues",
