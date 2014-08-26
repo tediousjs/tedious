@@ -38,11 +38,13 @@ title: API - Connection
   <li><a href="#function_commitTransaction">connection.commitTransaction(callback)</a></li>
   <li><a href="#function_execSql">connection.execSql(request)</a></li>
   <li><a href="#function_execSqlBatch">connection.execSqlBatch(request)</a></li>
+  <li><a href="#function_execBulkLoad">connection.execBulkLoad(bulkLoad)</a></li>
   <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
   <li><a href="#function_prepare">connection.prepare(request)</a></li>
   <li><a href="#function_reset">connection.reset(callback)</a></li>
   <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback)</a></li>
   <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
+  <li><a href="#function_newBulkLoad">connection.newBulkLoad(tableName, callback)</a></li>
 </ul>
 
 <h2 id="function_newConnection">new Connection(config)</h2>
@@ -642,6 +644,11 @@ var connection = new Connection(config);
   </div>
 </div>
 
+<h2 id="function_execBulkLoad">connection.execBulkLoad(bulkLoad)</h2>
+<p>
+  Executes a <a href="bulk-load.html">BulkLoad</a>.
+</p>
+
 <h2 id="function_execute">connection.execute(request, parameters)</h2>
 <p>
   Execute previously prepared SQL, using the supplied parameters.
@@ -755,6 +762,29 @@ var connection = new Connection(config);
   <div class="description">
     <p>
       The request to be unprepared.
+    </p>
+  </div>
+</div>
+        
+<h2 id="function_newBulkLoad">connection.newBulkLoad(tableName, callback)</h2>
+<p>
+  Creates a new <a href="bulk-load.html">BulkLoad</a> instance.
+</p>
+<div class="argument">
+  <div class="name">tableName</div>
+  <div class="description">
+    <p>
+      The name of the table to bulk-insert into.
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err, rowCount) { }</span>
+    <p>
+      A function which will be called after the BulkLoad finishes executing. <code>rowCount</code> will equal the 
+      number of rows inserted.
     </p>
   </div>
 </div>
