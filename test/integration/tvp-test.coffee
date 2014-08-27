@@ -4,13 +4,16 @@ Request = require('../../src/request')
 TYPES = require('../../src/tedious').TYPES
 fs = require('fs')
 
+config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
+if config.options.tdsVersion < '7_3_A'
+  console.log "TVP is not supported on TDS #{config.options.tdsVersion}."
+  return
+
 TEST_SETUP_1 = 'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH'
 TEST_SETUP_2 = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);'
 TEST_SETUP_3 = 'CREATE PROCEDURE __tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END'
 
 getConfig = ->
-  config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
-
   config.options.debug =
     packet: true
     data: true
