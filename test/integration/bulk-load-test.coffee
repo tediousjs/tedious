@@ -57,3 +57,44 @@ exports.bulkLoad = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+exports.bulkLoadError = (test) ->
+  config = getConfig()
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ifError(err)
+
+    bulk = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) ->
+      test.ok(err, 'An error should have been thrown to indicate the incorrect table format.')
+      connection.close()
+    )
+
+    bulk.addColumn('x', TYPES.Int, { nullable: false })
+    bulk.addColumn('y', TYPES.Int, { nullable: false })
+
+    # create temporary table with an incorrect schema
+    request = new Request("CREATE TABLE #tmpTestTable2 ([id] int not null)", (err) ->
+      test.ifError(err)
+
+      bulk.addRow({ x: 1, y: 1 })
+
+      connection.execBulkLoad(bulk)
+    )
+
+    connection.execSqlBatch(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+#  connection.on('error', (err) ->
+#    console.error("ERROR: #{err.stack}")
+#  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+ 

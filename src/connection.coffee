@@ -388,6 +388,10 @@ class Connection extends EventEmitter
       if @request
         if token.attention
           @dispatchEvent("attention")
+        
+        # check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+        if token.sqlError && !@request.error
+          @request.error = RequestError('An unknown error has occurred.', 'UNKNOWN')
 
         @request.emit('done', token.rowCount, token.more, @request.rows)
 
@@ -651,6 +655,8 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
   execBulkLoad: (bulkLoad) ->
     request = new Request(bulkLoad.getBulkInsertSql(), (error) =>
       if error
+        if error.code == 'UNKNOWN'
+          error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.'
         bulkLoad.error = error
         bulkLoad.callback(error)
       else
