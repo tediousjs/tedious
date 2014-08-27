@@ -90,10 +90,6 @@ exports.bulkLoadError = (test) ->
     test.done()
   )
 
-#  connection.on('error', (err) ->
-#    console.error("ERROR: #{err.stack}")
-#  )
-
   connection.on('debug', (text) ->
     #console.log(text)
   )
