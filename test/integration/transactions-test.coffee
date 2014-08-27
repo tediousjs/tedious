@@ -6,9 +6,6 @@ async = require('async')
 debug = false
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
-if config.options.tdsVersion < '7_2'
-  console.log "Transactions are not supported on TDS 7.1."
-  return
 
 if (debug)
   config.options.debug =
@@ -100,7 +97,7 @@ class Tester
   beginTransaction: (callback, transactionName) =>
     @connection.beginTransaction((err, transactionDescriptor) =>
       @test.ok(!err)
-      @test.ok(transactionDescriptor)
+      @test.ok(if config.options.tdsVersion < '7_2' then true else transactionDescriptor)
 
       callback(err)
     , transactionName)

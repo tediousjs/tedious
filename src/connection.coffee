@@ -682,12 +682,12 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
   beginTransaction: (callback, name, isolationLevel) ->
     name ||= ''
     isolationLevel ||= @config.options.isolationLevel
-
-    if @config.options.tdsVersion < "7_2"
-      return callback RequestError "Transactions are not supported on TDS 7.1."
       
     transaction = new Transaction(name, isolationLevel)
     @transactions.push(transaction)
+
+    if @config.options.tdsVersion < "7_2"
+      return @execSqlBatch new Request "SET TRANSACTION ISOLATION LEVEL #{transaction.isolationLevelToTSQL()};BEGIN TRAN #{transaction.name}", callback
 
     request = new Request(undefined, (err) =>
       callback(err, @currentTransactionDescriptor())
@@ -698,19 +698,25 @@ set transaction isolation level #{@getIsolationLevelText @config.options.connect
   commitTransaction: (callback) ->
     if @transactions.length == 0
       return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
+      
     transaction = @transactions.pop()
+    
+    if @config.options.tdsVersion < "7_2"
+      return  @execSqlBatch new Request "COMMIT TRAN #{transaction.name}", callback
 
     request = new Request(undefined, callback)
-
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(@currentTransactionDescriptor()))
 
   rollbackTransaction: (callback) ->
     if @transactions.length == 0
       return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
+      
     transaction = @transactions.pop()
+    
+    if @config.options.tdsVersion < "7_2"
+      return @execSqlBatch new Request "ROLLBACK TRAN #{transaction.name}", callback
 
     request = new Request(undefined, callback)
-
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(@currentTransactionDescriptor()))
 
   makeRequest: (request, packetType, payload) ->

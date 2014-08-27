@@ -68,6 +68,16 @@ class Transaction
       data: buffer.data
       toString: =>
         "Rollback Transaction: name=#{@name}"
+  
+  isolationLevelToTSQL: ->
+    switch @isolationLevel
+      when ISOLATION_LEVEL.READ_UNCOMMITTED then return 'READ UNCOMMITTED'
+      when ISOLATION_LEVEL.READ_COMMITTED then return 'READ COMMITTED'
+      when ISOLATION_LEVEL.REPEATABLE_READ then return 'REPEATABLE READ'
+      when ISOLATION_LEVEL.SERIALIZABLE then return 'SERIALIZABLE'
+      when ISOLATION_LEVEL.SNAPSHOT then return 'SNAPSHOT'
+    
+    return ''
 
 exports.Transaction = Transaction
 exports.ISOLATION_LEVEL = ISOLATION_LEVEL
