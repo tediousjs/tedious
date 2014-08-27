@@ -68,8 +68,7 @@ class Request extends EventEmitter
     @parameters = []
 
     @addOutputParameter('handle', TYPES.Int)
-    if (@originalParameters.length)
-      @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
+    @addParameter('params', TYPES.NVarChar, @makeParamsParameter(@originalParameters))
     @addParameter('stmt', TYPES.NVarChar, @sqlTextOrProcedure)
 
     @sqlTextOrProcedure = 'sp_prepare'
