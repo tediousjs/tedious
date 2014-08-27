@@ -30,7 +30,7 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "1.4.1",
+  "version": "1.4.2",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
