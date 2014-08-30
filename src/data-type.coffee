@@ -916,7 +916,8 @@ for id, type of TYPE
   type.id = parseInt(id, 10)
   typeByName[type.name] = type
   for alias in type.aliases
-    typeByName[alias] = type
+    if not typeByName[alias]
+      typeByName[alias] = type
 
 
 exports.TYPE = TYPE
