@@ -395,6 +395,7 @@ TYPE =
   0x24:
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
+    aliases: ['UniqueIdentifier']
     dataLengthLength: 1
     declaration: (parameter) ->
       'uniqueidentifier'
@@ -647,6 +648,7 @@ TYPE =
   0x29:
     type: 'TIMEN'
     name: 'TimeN'
+    aliases: ['Time']
     hasScale: true
     dataLengthLength: 0
     dataLengthFromScale: (scale) ->
@@ -693,6 +695,7 @@ TYPE =
   0x28:
     type: 'DATEN'
     name: 'DateN'
+    aliases: ['Date']
     dataLengthLength: 0
     declaration: (parameter) ->
       "date"
@@ -710,6 +713,7 @@ TYPE =
   0x2A:
     type: 'DATETIME2N'
     name: 'DateTime2N'
+    aliases: ['DateTime2']
     hasScale: true
     dataLengthLength: 0
     dataLengthFromScale: (scale) ->
@@ -758,6 +762,7 @@ TYPE =
   0x2B:
     type: 'DATETIMEOFFSETN'
     name: 'DateTimeOffsetN'
+    aliases: ['DateTimeOffset']
     hasScale: true
     dataLengthLength: 0
     dataLengthFromScale: (scale) ->
@@ -877,6 +882,10 @@ typeByName = {}
 for id, type of TYPE
   type.id = parseInt(id, 10)
   typeByName[type.name] = type
+  if type.aliases? and type.aliases instanceof Array
+    for alias in type.aliases
+      if not typeByName[alias]
+        typeByName[alias] = type
 
 
 exports.TYPE = TYPE
