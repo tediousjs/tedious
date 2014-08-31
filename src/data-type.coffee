@@ -10,13 +10,11 @@ TYPE =
   0x1F:
     type: 'NULL'
     name: 'Null'
-    aliases: []
 
   # Fixed-length types
   0x30:
     type: 'INT1'
     name: 'TinyInt'
-    aliases: []
     declaration: (parameter) ->
       'tinyint'
     writeTypeInfo: (buffer) ->
@@ -33,7 +31,6 @@ TYPE =
   0x32:
     type: 'BIT'
     name: 'Bit'
-    aliases: []
     declaration: (parameter) ->
       'bit'
     writeTypeInfo: (buffer) ->
@@ -50,7 +47,6 @@ TYPE =
   0x34:
     type: 'INT2'
     name: 'SmallInt'
-    aliases: []
     declaration: (parameter) ->
       'smallint'
     writeTypeInfo: (buffer) ->
@@ -67,7 +63,6 @@ TYPE =
   0x38:
     type: 'INT4'
     name: 'Int'
-    aliases: []
     declaration: (parameter) ->
       'int'
     writeTypeInfo: (buffer) ->
@@ -84,7 +79,6 @@ TYPE =
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
-    aliases: []
     declaration: (parameter) ->
       'smalldatetime'
     writeTypeInfo: (buffer) ->
@@ -109,7 +103,6 @@ TYPE =
   0x3B:
     type: 'FLT4'
     name: 'Real'
-    aliases: []
     declaration: (parameter) ->
       'real'
     writeTypeInfo: (buffer) ->
@@ -126,7 +119,6 @@ TYPE =
   0x3C:
     type: 'MONEY'
     name: 'Money'
-    aliases: []
     declaration: (parameter) ->
       "money"
     writeTypeInfo: (buffer, parameter) ->
@@ -143,7 +135,6 @@ TYPE =
   0x3D:
     type: 'DATETIME'
     name: 'DateTime'
-    aliases: []
     declaration: (parameter) ->
       'datetime'
     writeTypeInfo: (buffer) ->
@@ -177,7 +168,6 @@ TYPE =
   0x3E:
     type: 'FLT8'
     name: 'Float'
-    aliases: []
     declaration: (parameter) ->
       'float'
     writeTypeInfo: (buffer) ->
@@ -194,7 +184,6 @@ TYPE =
   0x37:
     type: 'DECIMAL'
     name: 'Decimal'
-    aliases: []
     hasPrecision: true
     hasScale: true
     declaration: (parameter) ->
@@ -257,7 +246,6 @@ TYPE =
   0x3F:
     type: 'NUMERIC'
     name: 'Numeric'
-    aliases: []
     hasPrecision: true
     hasScale: true
     declaration: (parameter) ->
@@ -319,7 +307,6 @@ TYPE =
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
-    aliases: []
     declaration: (parameter) ->
       "smallmoney"
     writeTypeInfo: (buffer, parameter) ->
@@ -336,7 +323,6 @@ TYPE =
   0x7F:
     type: 'INT8'
     name: 'BigInt'
-    aliases: []
     declaration: (parameter) ->
       'bigint'
     writeTypeInfo: (buffer) ->
@@ -356,7 +342,6 @@ TYPE =
   0x22:
     type: 'IMAGE'
     name: 'Image'
-    aliases: []
     hasTableName: true
     hasTextPointerAndTimestamp: true
     dataLengthLength: 4
@@ -382,7 +367,6 @@ TYPE =
   0x23:
     type: 'TEXT'
     name: 'Text'
-    aliases: []
     hasCollation: true
     hasTableName: true
     hasTextPointerAndTimestamp: true
@@ -431,12 +415,10 @@ TYPE =
   0x26:
     type: 'INTN'
     name: 'IntN'
-    aliases: []
     dataLengthLength: 1
   0x63:
     type: 'NTEXT'
     name: 'NText'
-    aliases: []
     hasCollation: true
     hasTableName: true
     hasTextPointerAndTimestamp: true
@@ -444,41 +426,34 @@ TYPE =
   0x68:
     type: 'BITN'
     name: 'BitN'
-    aliases: []
     dataLengthLength: 1
   0x6A:
     type: 'DECIMALN'
     name: 'DecimalN'
-    aliases: []
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
   0x6C:
     type: 'NUMERICN'
     name: 'NumericN'
-    aliases: []
     dataLengthLength: 1
     hasPrecision: true
     hasScale: true
   0x6D:
     type: 'FLTN'
     name: 'FloatN'
-    aliases: []
     dataLengthLength: 1
   0x6E:
     type: 'MONEYN'
     name: 'MoneyN'
-    aliases: []
     dataLengthLength: 1
   0x6F:
     type: 'DATETIMN'
     name: 'DateTimeN'
-    aliases: []
     dataLengthLength: 1
   0xA5:
     type: 'BIGVARBIN'
     name: 'VarBinary'
-    aliases: []
     dataLengthLength: 2
     maximumLength: 8000
     declaration: (parameter) ->
@@ -529,7 +504,6 @@ TYPE =
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
-    aliases: []
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 8000
@@ -583,7 +557,6 @@ TYPE =
   0xAD:
     type: 'BIGBinary'
     name: 'Binary'
-    aliases: []
     dataLengthLength: 2
     maximumLength: 8000
     declaration: (parameter) ->
@@ -608,13 +581,11 @@ TYPE =
   0xAF:
     type: 'BIGCHAR'
     name: 'Char'
-    aliases: []
     hasCollation: true
     dataLengthLength: 2
   0xE7:
     type: 'NVARCHAR'
     name: 'NVarChar'
-    aliases: []
     hasCollation: true
     dataLengthLength: 2
     maximumLength: 4000
@@ -668,13 +639,11 @@ TYPE =
   0xEF:
     type: 'NCHAR'
     name: 'NChar'
-    aliases: []
     hasCollation: true
     dataLengthLength: 2
   0xF1:
     type: 'XML'
     name: 'Xml'
-    aliases: []
     hasSchemaPresent: true
   0x29:
     type: 'TIMEN'
@@ -847,12 +816,10 @@ TYPE =
   0xF0:
     type: 'UDTTYPE'
     name: 'UDT'
-    aliases: []
     hasUDTInfo: true
   0xF3:
     type: 'TVPTYPE'
     name: 'TVP'
-    aliases: []
     declaration: (parameter) ->
       "#{parameter.value.name} readonly"
     writeTypeInfo: (buffer, parameter) ->
@@ -915,9 +882,10 @@ typeByName = {}
 for id, type of TYPE
   type.id = parseInt(id, 10)
   typeByName[type.name] = type
-  for alias in type.aliases
-    if not typeByName[alias]
-      typeByName[alias] = type
+  if type.aliases? and type.aliases instanceof Array
+    for alias in type.aliases
+      if not typeByName[alias]
+        typeByName[alias] = type
 
 
 exports.TYPE = TYPE

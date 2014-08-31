@@ -6,7 +6,7 @@ exports.noTypeOverridesByAliases = (test) ->
     typesByName[type.name] = type
 
   for id, type of TYPES.TYPE
-    for alias in type.aliases
+    for alias in (type.aliases || [])
       test.ok(not typesByName[alias], "Type #{alias} already exist. #{type.name} should not declare it as its alias.")
 
   test.done()
