@@ -158,6 +158,11 @@ class Login7Payload
       TYPE_FLAGS.SQL_DFLT |
       TYPE_FLAGS.OLEDB_OFF
 
+    if @loginData.readOnlyIntent
+      @typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT
+    else
+      @typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT
+
     buffer = new WritableTrackingBuffer(100)
     buffer.writeUInt32LE(@tdsVersion)
     buffer.writeUInt32LE(@packetSize)

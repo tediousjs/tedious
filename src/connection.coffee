@@ -272,6 +272,7 @@ class Connection extends EventEmitter
     @config.options.useUTC ?= true
     @config.options.useColumnNames ?= false
     @config.options.connectionIsolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
+    @config.options.readOnlyIntent ?= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -574,6 +575,7 @@ class Connection extends EventEmitter
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
       initDbFatal: not @config.options.fallbackToDefaultDb
+      readOnlyIntent: @config.options.readOnlyIntent
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
