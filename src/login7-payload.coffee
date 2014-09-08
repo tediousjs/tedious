@@ -49,12 +49,13 @@ FLAGS_2 =
 
 TYPE_FLAGS =
   SQL_DFLT: 0x00,
-  SQL_TSQL: 0x01,
+  SQL_TSQL: 0x08,
 
   OLEDB_OFF: 0x00,
-  OLEDB_ON: 0x02,                 # Introduced in TDS 7.2
+  OLEDB_ON: 0x10,                 # Introduced in TDS 7.2
 
-  READ_ONLY_INTENT: 0x04          # Introduced in TDS 7.4
+  READ_WRITE_INTENT: 0x00,
+  READ_ONLY_INTENT: 0x20          # Introduced in TDS 7.4
 
 FLAGS_3 =
   CHANGE_PASSWORD_NO: 0x00,
@@ -156,6 +157,11 @@ class Login7Payload
     @typeFlags =
       TYPE_FLAGS.SQL_DFLT |
       TYPE_FLAGS.OLEDB_OFF
+
+    if @loginData.readOnlyIntent
+      @typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT
+    else
+      @typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT
 
     buffer = new WritableTrackingBuffer(100)
     buffer.writeUInt32LE(@tdsVersion)

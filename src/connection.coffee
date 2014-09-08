@@ -71,6 +71,21 @@ class Connection extends EventEmitter
           @sendLogin7Packet()
           @transitionTo(@STATE.SENT_TLSSSLNEGOTIATION)
 
+    REROUTING:
+      name: 'ReRouting'
+      enter: ->
+        @cleanupConnection()
+      events:
+        message: ->
+        socketError: (error) ->
+          @transitionTo(@STATE.FINAL)
+        connectTimeout: ->
+          @transitionTo(@STATE.FINAL)
+        reconnect: ->
+          @config.server = @routingData.server
+          @config.options.port = @routingData.port
+          @transitionTo(@STATE.CONNECTING)
+
     SENT_TLSSSLNEGOTIATION:
       name: 'SentTLSSSLNegotiation'
       enter: ->
@@ -99,6 +114,8 @@ class Connection extends EventEmitter
           @sendDataToTokenStreamParser(data)
         loggedIn: ->
           @transitionTo(@STATE.LOGGED_IN_SENDING_INITIAL_SQL)
+        routingChange: ->
+          @transitionTo(@STATE.REROUTING)
         loginFailed: ->
           @transitionTo(@STATE.FINAL)
         message: ->
@@ -134,6 +151,8 @@ class Connection extends EventEmitter
           @transitionTo(@STATE.LOGGED_IN_SENDING_INITIAL_SQL)
         loginFailed: ->
           @transitionTo(@STATE.FINAL)
+        routingChange: ->
+          @transitionTo(@STATE.REROUTING)
         message: ->
           @processLogin7NTLMAck()
 
@@ -253,6 +272,7 @@ class Connection extends EventEmitter
     @config.options.useUTC ?= true
     @config.options.useColumnNames ?= false
     @config.options.connectionIsolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
+    @config.options.readOnlyIntent ?= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -311,6 +331,10 @@ class Connection extends EventEmitter
       # use negotiated version
       @config.options.tdsVersion = token.tdsVersion
       @loggedIn = true
+    )
+    @tokenStreamParser.on('routingChange', (token) =>
+      @routingData = token.newValue
+      @dispatchEvent('routingChange')
     )
     @tokenStreamParser.on('packetSizeChange', (token) =>
       @messageIo.packetSize(token.newValue)
@@ -427,7 +451,7 @@ class Connection extends EventEmitter
     @socket.on('error', @socketError)
     @socket.on('connect', @socketConnect)
     @socket.on('close', @socketClose)
-    @socket.on('end', @socketClose)
+    @socket.on('end', @socketEnd)
 
     @messageIo = new MessageIO(@socket, @config.options.packetSize, @debug)
     @messageIo.on('data', (data) =>
@@ -470,6 +494,10 @@ class Connection extends EventEmitter
       clearTimeout(@requestTimer)
 
   transitionTo: (newState) ->
+    if @state == newState
+      @debug.log("State is already #{newState.name}")
+      return
+      
     if @state?.exit
       @state.exit.apply(@)
 
@@ -497,12 +525,21 @@ class Connection extends EventEmitter
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
+    @closed = false
     @debug.log("connected to #{@config.server}:#{@config.options.port}")
     @dispatchEvent('socketConnect')
 
+  socketEnd: =>
+    @debug.log("socket ended")
+    @transitionTo(@STATE.FINAL)
+
   socketClose: =>
     @debug.log("connection to #{@config.server}:#{@config.options.port} closed")
-    @transitionTo(@STATE.FINAL)
+    if @state is @STATE.REROUTING
+      @debug.log("Rerouting to #{@routingData.server}:#{@routingData.port}")
+      @dispatchEvent('reconnect')
+    else
+      @transitionTo(@STATE.FINAL)
 
   sendPreLogin: ->
     payload = new PreloginPayload({encrypt: @config.options.encrypt})
@@ -538,6 +575,7 @@ class Connection extends EventEmitter
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
       initDbFatal: not @config.options.fallbackToDefaultDb
+      readOnlyIntent: @config.options.readOnlyIntent
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
