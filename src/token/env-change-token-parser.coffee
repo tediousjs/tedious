@@ -35,6 +35,9 @@ types =
   18:
     name: 'RESET_CONNECTION'
     event: 'resetConnection'
+  20:
+    name: 'ROUTING_CHANGE'
+    event: 'routingChange'
 
 module.exports = (buffer) ->
   length = buffer.readUInt16LE()
@@ -51,6 +54,33 @@ module.exports = (buffer) ->
         newValue = buffer.readBuffer(valueLength)
 
         valueLength = buffer.readUInt8()
+        oldValue = buffer.readBuffer(valueLength)
+      when 'ROUTING_CHANGE'
+        valueLength = buffer.readUInt16LE()
+
+        # Routing Change:
+        # Byte 1: Protocol (must be 0)
+        # Bytes 2-3 (USHORT): Port number
+        # Bytes 4-5 (USHORT): Length of server data in unicode (2byte chars)
+        # Bytes 6-*: Server name in unicode characters
+        
+        routePacket = buffer.readBuffer(valueLength)
+        protocol = routePacket.readUInt8(0)
+        if (protocol != 0)
+          throw new Error('Unknown protocol byte in routing change event')
+
+        port = routePacket.readUInt16LE(1)
+
+        serverLen = routePacket.readUInt16LE(3)
+        # 2 bytes per char, starting at offset 5
+        server = routePacket.toString('ucs2', 5, 5 + (serverLen * 2))
+      
+        newValue =
+          protocol: protocol
+          port: port
+          server: server
+
+        valueLength = buffer.readUInt16LE()
         oldValue = buffer.readBuffer(valueLength)
       else
         console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}"
