@@ -169,6 +169,21 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.abortTransactionOnError</code>
+      </dt>
+      <dd>
+        A boolean determining whether to rollback a transaction automatically if any error is encountered
+        during the given transaction's execution.
+      </dd>
+
+      <dt>
+        <code>options.localAddress</code>
+      </dt>
+      <dd>
+        A string indicating which network interface (ip addres) to use when connecting to SQL Server.
+      </dd>
+
+      <dt>
         <code>options.useColumnNames</code>
       </dt>
       <dd>
