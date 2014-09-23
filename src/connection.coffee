@@ -631,6 +631,7 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
+    xact_abort = if @config.options.abortTransactionOnError then 'on' else 'off'
     """set textsize #{@config.options.textsize}
 set quoted_identifier on
 set arithabort off
@@ -644,7 +645,8 @@ set implicit_transactions off
 set language us_english
 set dateformat mdy
 set datefirst 7
-set transaction isolation level #{@getIsolationLevelText @config.options.connectionIsolationLevel}"""
+set transaction isolation level #{@getIsolationLevelText @config.options.connectionIsolationLevel}
+set xact_abort #{xact_abort}"""
 
   processedInitialSql: ->
       @clearConnectTimer()
