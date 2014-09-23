@@ -173,7 +173,8 @@ var connection = new Connection(config);
       </dt>
       <dd>
         A boolean determining whether to rollback a transaction automatically if any error is encountered
-        during the given transaction's execution.
+        during the given transaction's execution. This sets the value for <code>SET XACT_ABORT</code> during the
+        initial SQL phase of a connection (<a href="http://msdn.microsoft.com/en-us/library/ms188792.aspx" target="_blank">documentation</a>).
       </dd>
 
       <dt>
