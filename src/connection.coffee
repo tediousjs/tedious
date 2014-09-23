@@ -447,7 +447,15 @@ class Connection extends EventEmitter
   connectOnPort: (port) ->
     @socket = new Socket({})
     @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
-    @socket.connect(port, @config.server)
+
+    connectOpts =
+      host: @config.server
+      port: port
+
+    if @config.options.localAddress
+      connectOpts.localAddress = @config.options.localAddress
+
+    @socket.connect(connectOpts)
     @socket.on('error', @socketError)
     @socket.on('connect', @socketConnect)
     @socket.on('close', @socketClose)
