@@ -279,7 +279,7 @@ class Connection extends EventEmitter
     else if @config.options.port && @config.options.instanceName
       throw new Error("Port and instanceName are mutually exclusive, but #{@config.options.port} and #{@config.options.instanceName} provided")
     else if @config.options.port
-      if @config.options.port < 0 or @config.options.port > 65536
+      if @config.options.port < 0 or @config.options.port > 65536
         throw new RangeError "Port should be > 0 and < 65536"
 
   createDebug: ->
@@ -437,12 +437,15 @@ class Connection extends EventEmitter
     if (@config.options.port)
       @connectOnPort(@config.options.port)
     else
-      instanceLookup(@config.server, @config.options.instanceName, (message, port) =>
-        if message
-          @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
-        else
-          @connectOnPort(port)
-      )
+      instanceLookup(
+        @config.server
+        @config.options.instanceName
+        (message, port) =>
+          if message
+            @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
+          else
+            @connectOnPort(port)
+        @config.options.connectTimeout)
 
   connectOnPort: (port) ->
     @socket = new Socket({})
