@@ -449,7 +449,6 @@ class Connection extends EventEmitter
 
   connectOnPort: (port) ->
     @socket = new Socket({})
-    @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
 
     connectOpts =
       host: @config.server
@@ -536,6 +535,7 @@ class Connection extends EventEmitter
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
+    @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
     @closed = false
     @debug.log("connected to #{@config.server}:#{@config.options.port}")
     @dispatchEvent('socketConnect')
