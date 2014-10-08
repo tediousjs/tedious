@@ -86,7 +86,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_columnMetadata">Event: columnMetadata</h2>
-<pre>request.on('columnMetadata', function (columns) { });</pre>
+{% highlight javascript %}
+request.on('columnMetadata', function (columns) { });
+{% endhighlight %}
+
 <p>
   This event, describing result set columns, will be emitted before <code>row</code> events are emitted.
   This event may be emited multiple times when more than one recordset is produced by the statement.
@@ -142,7 +145,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_row">Event: row</h2>
-<pre>request.on('row', function (columns) { });</pre>
+{% highlight javascript %}
+request.on('row', function (columns) { });
+{% endhighlight %}
+
 <p>
   A row resulting from execution of the SQL statement.
 </p>
@@ -178,7 +184,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_done">Event: done</h2>
-<pre>request.on('done', function (rowCount, more, rows) { });</pre>
+{% highlight javascript %}
+request.on('done', function (rowCount, more, rows) { });
+{% endhighlight %}
+
 <p>
   All rows from a result set have been provided (through <code>row</code> events).
   This token is used to indicate the completion of a SQL statement. As multiple SQL statements can
@@ -220,7 +229,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneInProc">Event: doneInProc</h2>
-<pre>request.on('doneInProc', function (rowCount, more, rows) { });</pre>
+{% highlight javascript %}
+request.on('doneInProc', function (rowCount, more, rows) { });
+{% endhighlight %}
+
 <p>
   Indicates the completion status of a SQL statement within a stored procedure. All rows from a statement
   in a stored procedure have been provided (through <code>row</code> events).
@@ -258,7 +270,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneProc">Event: doneProc</h2>
-<pre>request.on('doneProc', function (rowCount, more, returnStatus) { });</pre>
+{% highlight javascript %}
+request.on('doneProc', function (rowCount, more, returnStatus) { });
+{% endhighlight %}
+
 <p>
   Indicates the completion status of a stored procedure. This is also generated for stored procedures
   executed through SQL statements.
@@ -291,7 +306,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_returnValue">Event: returnValue</h2>
-<pre>request.on('returnValue', function (parameterName, value, metadata) { });</pre>
+{% highlight javascript %}
+request.on('returnValue', function (parameterName, value, metadata) { });
+{% endhighlight %}
+
 <p>
   A value for an output parameter
   (that was added to the request with
