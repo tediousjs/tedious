@@ -4,6 +4,8 @@ buffertools = require('../buffertools')
 SHIFT_LEFT_32 = (1 << 16) * (1 << 16)
 SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32
 
+UNKNOWN_PLP_LEN = new Buffer([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
+
 ###
   A Buffer-like class that tracks position.
 
@@ -197,7 +199,8 @@ class WritableTrackingBuffer
       length = Buffer.byteLength value, encoding
     
     # Length of all chunks.
-    @writeUInt64LE length
+#    @writeUInt64LE length
+    @writeBuffer(UNKNOWN_PLP_LEN) # unknown seems to work better here - might revisit later.
     
     # One chunk.
     @writeUInt32LE length
