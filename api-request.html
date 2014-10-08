@@ -35,7 +35,7 @@ connection.execSql(request);
   <div class="name">sql</div>
   <div class="description">
     <p>
-      The SQL to be executed
+      The SQL statement to be executed
       (or a procedure name, if the request is to be used with
       <a href="api-connection.html#function_callProcedure"><code>connection.callProcedure</code></a>).
     </p>
@@ -65,7 +65,7 @@ connection.execSql(request);
           <div class="name">rowCount</div>
           <div class="description">
               <p>
-                  The number of rows emitted as result of executing the SQL.
+                  The number of rows emitted as result of executing the SQL statement.
               </p>
           </div>
       </div>
@@ -73,7 +73,7 @@ connection.execSql(request);
           <div class="name">rows</div>
           <div class="description">
               <p>
-                  Rows as a result of executing the SQL.
+                  Rows as a result of executing the SQL statement. If multiple recordset are produced by the statement, only the last one is returned.
               </p>
               <p>
                   Will only be avaiable if Connection's
@@ -89,6 +89,7 @@ connection.execSql(request);
 <code>function (columns) { }</code>
 <p>
   This event, describing result set columns, will be emitted before <code>row</code> events are emitted.
+  This event may be emited multiple times when more than one recordset is produced by the statement.
 </p>
 <div class="argument">
   <div class="name">columns</div>
@@ -143,13 +144,13 @@ connection.execSql(request);
 <h2 id="event_row">Event: row</h2>
 <code>function (columns) { }</code>
 <p>
-  A row resulting from execution of the SQL.
+  A row resulting from execution of the SQL statement.
 </p>
 <div class="argument">
   <div class="name">columns</div>
   <div class="description">
     <p>
-      An array like object, where the columns can be accessed either by index or name.
+      An array or object (depends on <code>config.options.useColumnNames</code>), where the columns can be accessed by index/name.
       Each column has two properties, <code>metadata</code> and <code>value</code>.
     </p>
     <dl>
@@ -177,14 +178,14 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_done">Event: done</h2>
-<p>
-  <em>This is a relatively low-level event, driven by the receipt of a TDS Done token.
-  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
-  know when the request has completed.</em>
-</p>
 <code>function (rowCount, more, rows) { }</code>
 <p>
   All rows from a result set have been provided (through <code>row</code> events).
+  This token is used to indicate the completion of a SQL statement. As multiple SQL statements can
+  be sent to the server in a single SQL batch, multiple <code>done</code> events can be generated.
+  An <code>done</code> event is emited for each SQL statement in the SQL batch except variable declarations.
+  For execution of SQL statements within stored procedures, <code>doneProc</code> and <code>doneInProc</code>
+  events are used in place of <code>done</code> events.
 </p>
 <div class="argument">
   <div class="name">rowCount</div>
@@ -208,7 +209,7 @@ connection.execSql(request);
     <div class="name">rows</div>
     <div class="description">
         <p>
-            Rows as a result of executing the SQL.
+            Rows as a result of executing the SQL statement.
         </p>
         <p>
             Will only be avaiable if Connection's
@@ -219,14 +220,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneInProc">Event: doneInProc</h2>
-<p>
-  <em>This is a relatively low-level event, driven by the receipt of a TDS DoneInProc token.
-  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
-  know when the request has completed.</em>
-</p>
 <code>function (rowCount, more, rows) { }</code>
 <p>
-  All rows from a statement in a stored procedure have been provided (through <code>row</code> events).
+  Indicates the completion status of a SQL statement within a stored procedure. All rows from a statement
+  in a stored procedure have been provided (through <code>row</code> events).
 </p>
 <div class="argument">
   <div class="name">rowCount</div>
@@ -261,14 +258,10 @@ connection.execSql(request);
 </div>
 
 <h2 id="event_doneProc">Event: doneProc</h2>
+<code>function (rowCount, more, returnStatus) { }</code>
 <p>
-  <em>This is a relatively low-level event, driven by the receipt of a TDS DoneProc token.
-  Most uses of Tedious can ignore this event, and should rely on the Request's callback function to
-  know when the request has completed.</em>
-</p>
-<code>function (rowCount, more, returnStatus, rows) { }</code>
-<p>
-  A stored procedure has been completed.
+  Indicates the completion status of a stored procedure. This is also generated for stored procedures
+  executed through SQL statements.
 </p>
 <div class="argument">
   <div class="name">rowCount</div>
@@ -295,19 +288,6 @@ connection.execSql(request);
       The value returned from a stored procedure.
     </p>
   </div>
-</div>
-<div class="argument">
-    <div class="name">rows</div>
-    <div class="description">
-        <p>
-            Rows as a result of executing the SQL.
-        </p>
-        <p>
-            Will only be avaiable if Connection's
-            <code>config.options.rowCollectionOnDone</code>
-            is <code>true</code>.
-        </p>
-    </div>
 </div>
 
 <h2 id="event_returnValue">Event: returnValue</h2>
