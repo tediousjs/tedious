@@ -373,8 +373,11 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('row', (token) =>
       if @request
-        if @config.options.rowCollectionOnRequestCompletion || @config.options.rowCollectionOnDone
+        if @config.options.rowCollectionOnRequestCompletion
           @request.rows.push token.columns
+        
+        if @config.options.rowCollectionOnDone
+          @request.rst.push token.columns
 
         @request.emit('row', token.columns)
       else
@@ -392,24 +395,24 @@ class Connection extends EventEmitter
     )
     @tokenStreamParser.on('doneProc', (token) =>
       if @request
-        @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue, @request.rows)
+        @request.emit('doneProc', token.rowCount, token.more, @procReturnStatusValue, @request.rst)
         @procReturnStatusValue = undefined
 
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
-          @request.rows = []
+          @request.rst = []
     )
     @tokenStreamParser.on('doneInProc', (token) =>
       if @request
-        @request.emit('doneInProc', token.rowCount, token.more, @request.rows)
+        @request.emit('doneInProc', token.rowCount, token.more, @request.rst)
 
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
-          @request.rows = []
+          @request.rst = []
     )
     @tokenStreamParser.on('done', (token) =>
       if @request
@@ -420,13 +423,13 @@ class Connection extends EventEmitter
         if token.sqlError && !@request.error
           @request.error = RequestError('An unknown error has occurred.', 'UNKNOWN')
 
-        @request.emit('done', token.rowCount, token.more, @request.rows)
+        @request.emit('done', token.rowCount, token.more, @request.rst)
 
         if token.rowCount != undefined
           @request.rowCount += token.rowCount
 
         if @config.options.rowCollectionOnDone
-          @request.rows = []
+          @request.rst = []
     )
     @tokenStreamParser.on('resetConnection', (token) =>
       @emit('resetConnection')
@@ -783,6 +786,7 @@ set xact_abort #{xact_abort}"""
       @request = request
       @request.rowCount = 0
       @request.rows = []
+      @request.rst = []
 
       @createRequestTimer()
 
