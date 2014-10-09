@@ -193,6 +193,25 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.camelCaseColumns</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether the column names returned will have the first letter converted to lower case
+        (<code>true</code>) or not. This value is ignored if you provide a <code>columnNameReplacer</code>code>.
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.columnNameReplacer</code>
+      </dt>
+      <dd>
+        A function with parameters <code>(columnName, index, columnMetaData)</code> and returns a string. If provided, 
+        this will be called once per row per result-set. The returned value will be used instead of the SQL-provided 
+        column name on row and meta data objects. This allows you to dynamically convert between naming conventions.
+        (default: <code>null</code>).
+      </dd>
+
+      <dt>
         <code>options.debug.packet</code>
       </dt>
       <dd>
@@ -254,14 +273,6 @@ var connection = new Connection(config);
           <li><code>SNAPSHOT</code></li>
         </ul>
         (default: <code>READ_COMMITED</code>).
-      </dd>
-
-      <dt>
-        <code>options.camelCaseColumns</code>
-      </dt>
-      <dd>
-        A boolean, controlling whether the column names returned will have the first letter converted to lower case (<code>true</code>) or not.
-        (default: <code>false</code>).
       </dd>
 
       <dt>
