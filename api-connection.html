@@ -205,8 +205,8 @@ var connection = new Connection(config);
         <code>options.columnNameReplacer</code>
       </dt>
       <dd>
-        A function with parameters <code>(columnName, index, columnMetaData)</code> and returns a string. If provided, 
-        this will be called once per row per result-set. The returned value will be used instead of the SQL-provided 
+        A function with parameters <code>(columnName, index, columnMetaData)</code> and returning a string. If provided, 
+        this will be called once per column per result-set. The returned value will be used instead of the SQL-provided 
         column name on row and meta data objects. This allows you to dynamically convert between naming conventions.
         (default: <code>null</code>).
       </dd>
