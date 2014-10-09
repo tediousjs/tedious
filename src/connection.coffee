@@ -281,6 +281,9 @@ class Connection extends EventEmitter
     else if @config.options.port
       if @config.options.port < 0 or @config.options.port > 65536
         throw new RangeError "Port should be > 0 and < 65536"
+    
+    if @config.options.columnNameReplacer && typeof @config.options.columnNameReplacer != 'function'
+      throw new TypeError('options.columnNameReplacer must be a function or null.')
 
   createDebug: ->
     @debug = new Debug(@config.options.debug)

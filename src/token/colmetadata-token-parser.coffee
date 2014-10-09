@@ -6,7 +6,7 @@ parser = (buffer, colMetadata, options) ->
   columnCount = buffer.readUInt16LE()
 
   columns = []
-  for c in [1..columnCount]
+  for c in [0...columnCount]
     metadata = metadataParse(buffer, options)
 
     if metadata.type.hasTableName
@@ -20,10 +20,11 @@ parser = (buffer, colMetadata, options) ->
       tableName = undefined
 
     colName = buffer.readBVarchar()
-
-    if options.camelCaseColumns
+    
+    if options.columnNameReplacer
+      colName = options.columnNameReplacer(colName, c, metadata)
+    else if options.camelCaseColumns
       colName = colName.replace /^[A-Z]/, (s) -> s.toLowerCase()
-
 
     column =
       userType: metadata.userType
