@@ -271,7 +271,7 @@ request.on('doneInProc', function (rowCount, more, rows) { });
 
 <h2 id="event_doneProc">Event: doneProc</h2>
 {% highlight javascript %}
-request.on('doneProc', function (rowCount, more, returnStatus) { });
+request.on('doneProc', function (rowCount, more, returnStatus, rows) { });
 {% endhighlight %}
 
 <p>
@@ -303,6 +303,19 @@ request.on('doneProc', function (rowCount, more, returnStatus) { });
       The value returned from a stored procedure.
     </p>
   </div>
+</div>
+<div class="argument">
+    <div class="name">rows</div>
+    <div class="description">
+        <p>
+            Rows as a result of executing the SQL.
+        </p>
+        <p>
+            Will only be avaiable if Connection's
+            <code>config.options.rowCollectionOnDone</code>
+            is <code>true</code>.
+        </p>
+    </div>
 </div>
 
 <h2 id="event_returnValue">Event: returnValue</h2>
