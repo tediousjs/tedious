@@ -66,8 +66,6 @@ connection.execSql(request);
           <div class="description">
               <p>
                   The number of rows emitted as result of executing the SQL statement.
-                  Note that this number may not correspond with number of rows returned
-                  as a result in third argument because only the last recordset is returned as a result.
               </p>
           </div>
       </div>
@@ -75,8 +73,7 @@ connection.execSql(request);
           <div class="name">rows</div>
           <div class="description">
               <p>
-                  Rows as a result of executing the SQL statement. If multiple recordsets are produced
-                  by the statement, only the last one is returned.
+                  Rows as a result of executing the SQL statement.
               </p>
               <p>
                   Will only be avaiable if Connection's
