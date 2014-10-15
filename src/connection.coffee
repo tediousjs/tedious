@@ -262,8 +262,8 @@ class Connection extends EventEmitter
     @config.options ||= {}
     @config.options.textsize ||= DEFAULT_TEXTSIZE
     @config.options.connectTimeout ||= DEFAULT_CONNECT_TIMEOUT
-    @config.options.requestTimeout ||= DEFAULT_CLIENT_REQUEST_TIMEOUT
-    @config.options.cancelTimeout ||= DEFAULT_CANCEL_TIMEOUT
+    @config.options.requestTimeout ?= DEFAULT_CLIENT_REQUEST_TIMEOUT
+    @config.options.cancelTimeout ?= DEFAULT_CANCEL_TIMEOUT
     @config.options.packetSize ||= DEFAULT_PACKET_SIZE
     @config.options.tdsVersion ||= DEFAULT_TDS_VERSION
     @config.options.isolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
