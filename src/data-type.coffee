@@ -214,12 +214,12 @@ TYPE =
         buffer.writeUInt8 17
       
       buffer.writeUInt8 parameter.precision
-      buffer.writeUInt8 parameter.scale
+      buffer.writeUInt8 @resolveScale(parameter)
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = Math.round Math.abs parameter.value * Math.pow(10, parameter.scale)
+        value = Math.round Math.abs parameter.value * Math.pow(10, @resolveScale(parameter))
         
         if parameter.precision <= 9
           buffer.writeUInt8 5
@@ -276,12 +276,12 @@ TYPE =
         buffer.writeUInt8 17
       
       buffer.writeUInt8 parameter.precision
-      buffer.writeUInt8 parameter.scale
+      buffer.writeUInt8 @resolveScale(parameter)
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
-        value = Math.round Math.abs parameter.value * Math.pow(10, parameter.scale)
+        value = Math.round Math.abs parameter.value * Math.pow(10, @resolveScale(parameter))
 
         if parameter.precision <= 9
           buffer.writeUInt8 5
@@ -355,14 +355,16 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeInt32LE parameter.length
+      buffer.writeInt32LE @resolveLength(parameter)
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        buffer.writeInt32LE parameter.length
+        buffer.writeInt32LE @resolveLength(parameter)
         buffer.writeBuffer parameter.value
+        # console.log "here we are"
+        # buffer.writePLPBody parameter.value
       else
-        buffer.writeInt32LE parameter.length
+        buffer.writeInt32LE @resolveLength(parameter)
       
   0x23:
     type: 'TEXT'
@@ -668,7 +670,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 parameter.scale
+      buffer.writeUInt8 @resolveScale(parameter)
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
@@ -676,10 +678,10 @@ TYPE =
         parameter.value.setUTCMonth 0
         parameter.value.setUTCDate 1
 
-        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
+        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, @resolveScale(parameter)
 
         # seconds since midnight
-        switch parameter.scale
+        switch @resolveScale(parameter)
           when 0, 1, 2
             buffer.writeUInt8 3
             buffer.writeUInt24LE time
@@ -733,7 +735,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 parameter.scale
+      buffer.writeUInt8 @resolveScale(parameter)
       
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
@@ -742,10 +744,10 @@ TYPE =
         time.setUTCFullYear 1970
         time.setUTCMonth 0
         time.setUTCDate 1
-        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, @resolveScale(parameter)
 
         # seconds since midnight
-        switch parameter.scale
+        switch @resolveScale(parameter)
           when 0, 1, 2
             buffer.writeUInt8 6
             buffer.writeUInt24LE time
@@ -782,7 +784,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-      buffer.writeUInt8 parameter.scale
+      buffer.writeUInt8 @resolveScale(parameter)
       
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
@@ -791,12 +793,12 @@ TYPE =
         time.setUTCFullYear 1970
         time.setUTCMonth 0
         time.setUTCDate 1
-        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
+        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, @resolveScale(parameter)
         
         offset = -parameter.value.getTimezoneOffset()
         
         # seconds since midnight
-        switch parameter.scale
+        switch @resolveScale(parameter)
           when 0, 1, 2
             buffer.writeUInt8 8
             buffer.writeUInt24LE time
