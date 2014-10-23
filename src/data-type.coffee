@@ -583,6 +583,47 @@ TYPE =
     name: 'Char'
     hasCollation: true
     dataLengthLength: 2
+    maximumLength: 8000
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.toString().length || 1
+      else if parameter.value is null and not parameter.output
+        length = 1
+      else
+        length = @maximumLength
+
+      if length <= @maximumLength
+        "char(#{length})"
+      else
+        "char(#{@maximumLength})"
+    resolveLength: (parameter) ->
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
+        if Buffer.isBuffer parameter.value
+          (parameter.value.length / 2) || 1
+        else
+          parameter.value.toString().length || 1
+      else
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
+      buffer.writeUInt8(@.id)
+      buffer.writeUInt16LE @maximumLength
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+    writeParameterData: (buffer, parameter) ->
+      if parameter.value?
+        if parameter.length <= @maximumLength
+          buffer.writeUsChar parameter.value, 'ascii'
+        else
+          buffer.writePLPBody parameter.value, 'ascii'
+      else
+        if parameter.length <= @maximumLength
+          buffer.writeUInt32LE(NULL)
+        else
+          buffer.writeUInt32LE(0xFFFFFFFF)
+          buffer.writeUInt32LE(0xFFFFFFFF)
   0xE7:
     type: 'NVARCHAR'
     name: 'NVarChar'

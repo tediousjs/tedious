@@ -174,6 +174,10 @@ class WritableTrackingBuffer
   writeUsVarchar: (value, encoding) ->
     @writeUInt16LE(value.length)
     @writeString(value, encoding)
+
+  writeUsChar: (value, encoding) ->
+    @writeUInt16LE(value.length)
+    @writeString(value, encoding)
   
   writeUsVarbyte: (value, encoding = @encoding) ->
     if Buffer.isBuffer value
