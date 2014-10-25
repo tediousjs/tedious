@@ -447,6 +447,8 @@ class Connection extends EventEmitter
         @config.server
         @config.options.instanceName
         (message, port) =>
+          if @state == @STATE.FINAL
+            return
           if message
             @emit('connect', ConnectionError(message, 'EINSTLOOKUP'))
           else
