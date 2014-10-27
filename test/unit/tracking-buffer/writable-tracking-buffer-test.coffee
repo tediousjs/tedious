@@ -78,15 +78,6 @@ exports.writeUsVarchar = (test) ->
 
   test.done()
 
-exports.writeUsChar = (test) ->
-  buffer = new TrackingBuffer(2, 'ascii')
-
-  buffer.writeUsChar('abc')
-
-  assertBuffer(test, buffer, [0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00])
-
-  test.done()
-
 exports.copyFrom = (test) ->
 
   buffer = new TrackingBuffer(10)
