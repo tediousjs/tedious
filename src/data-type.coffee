@@ -585,6 +585,40 @@ TYPE =
     name: 'Char'
     hasCollation: true
     dataLengthLength: 2
+    maximumLength: 8000
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.toString().length || 1
+      else if parameter.value is null and not parameter.output
+        length = 1
+      else
+        length = @maximumLength
+
+      if length < @maximumLength
+        "char(#{length})"
+      else
+        "char(#{@maximumLength})"
+    resolveLength: (parameter) ->
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
+        if Buffer.isBuffer parameter.value
+          parameter.value.length || 1
+        else
+          parameter.value.toString().length || 1
+      else
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
+      buffer.writeUInt8(@.id)
+      buffer.writeUInt16LE parameter.length
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+    writeParameterData: (buffer, parameter) ->
+      if parameter.value?
+        buffer.writeUsVarbyte parameter.value, 'ascii'
+      else
+        buffer.writeUInt16LE NULL
   0xE7:
     type: 'NVARCHAR'
     name: 'NVarChar'
@@ -643,6 +677,40 @@ TYPE =
     name: 'NChar'
     hasCollation: true
     dataLengthLength: 2
+    maximumLength: 4000
+    declaration: (parameter) ->
+      if parameter.length
+        length = parameter.length
+      else if parameter.value?
+        length = parameter.value.toString().length || 1
+      else if parameter.value is null and not parameter.output
+        length = 1
+      else
+        length = @maximumLength
+
+      if length < @maximumLength
+        "nchar(#{length})"
+      else
+        "nchar(#{@maximumLength})"
+    resolveLength: (parameter) ->
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
+        if Buffer.isBuffer parameter.value
+          (parameter.value.length / 2) || 1
+        else
+          parameter.value.toString().length || 1
+      else
+        @maximumLength
+    writeTypeInfo: (buffer, parameter) ->
+      buffer.writeUInt8(@.id)
+      buffer.writeUInt16LE parameter.length * 2
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))
+    writeParameterData: (buffer, parameter) ->
+      if parameter.value?
+        buffer.writeUsVarbyte parameter.value, 'ucs2'
+      else
+        buffer.writeUInt16LE NULL
   0xF1:
     type: 'XML'
     name: 'Xml'

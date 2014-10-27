@@ -8,11 +8,11 @@ getConfig = ->
   config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
 
   config.options.debug =
-    packet: false
-    data: false
+    packet: true
+    data: true
     payload: true
-    token: false
-    log: false
+    token: true
+    log: true
 
   config
 
@@ -137,6 +137,24 @@ exports.nVarCharMax = (test) ->
     longString += 'x'
 
   execSql(test, TYPES.NVarChar, longString, '7_2')
+
+exports.Char = (test) ->
+  execSql(test, TYPES.Char, 'qaz')
+
+exports.CharN = (test) ->
+  execSql(test, TYPES.Char, 'qaz', null, {length: 3})
+
+exports.CharNull = (test) ->
+  execSql(test, TYPES.Char, null)
+
+exports.NChar = (test) ->
+  execSql(test, TYPES.NChar, 'qaz')
+
+exports.NCharN = (test) ->
+  execSql(test, TYPES.NChar, 'qaz', null, {length: 3})
+
+exports.NCharNull = (test) ->
+  execSql(test, TYPES.NChar, null)
 
 exports.textNull = (test) ->
   execSql(test, TYPES.Text, null)
