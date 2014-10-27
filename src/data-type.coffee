@@ -609,7 +609,6 @@ TYPE =
       else
         @maximumLength
     writeTypeInfo: (buffer, parameter) ->
-      console.log parameter
       buffer.writeUInt8(@.id)
       buffer.writeUInt16LE parameter.length
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]))

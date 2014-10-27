@@ -147,9 +147,6 @@ exports.CharN = (test) ->
 exports.CharNull = (test) ->
   execSql(test, TYPES.Char, null)
 
-exports.CharEmptyChar = (test) ->
-  execSql(test, TYPES.Char, '')
-
 exports.NChar = (test) ->
   execSql(test, TYPES.NChar, 'qaz')
 
@@ -158,9 +155,6 @@ exports.NCharN = (test) ->
 
 exports.NCharNull = (test) ->
   execSql(test, TYPES.NChar, null)
-
-exports.NCharEmptyChar = (test) ->
-  execSql(test, TYPES.NChar, '')
 
 exports.textNull = (test) ->
   execSql(test, TYPES.Text, null)
