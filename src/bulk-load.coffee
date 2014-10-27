@@ -49,6 +49,15 @@ class BulkLoad extends EventEmitter
       scale: options.scale
       objName: options.objName || name
       nullable: options.nullable
+    
+    if (type.id & 0x30) == 0x20 # Variable length
+      column.length = column.length ? type.resolveLength? column
+      
+    if type.hasPrecision
+      column.precision = column.precision ? type.resolvePrecision? column
+      
+    if type.hasScale
+      column.scale = column.scale ? type.resolveScale? column
 
     @columns.push(column)
     @columnsByName[name] = column
@@ -68,8 +77,12 @@ class BulkLoad extends EventEmitter
     # write each column
     arr = row instanceof Array
     for c, i in @columns
-      c.value = row[if arr then i else c.objName]
-      c.type.writeParameterData(@rowsData, c, @options)
+      c.type.writeParameterData(@rowsData, {
+        length: c.length
+        scale: c.scale
+        precision: c.precision
+        value: row[if arr then i else c.objName]
+      }, @options)
 
   getBulkInsertSql: () ->
     sql = 'insert bulk ' + @table + '('
