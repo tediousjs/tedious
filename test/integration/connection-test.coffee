@@ -84,9 +84,15 @@ exports.badCredentials = (test) ->
   )
 
 exports.connectByPort = (test) ->
-  test.expect(2)
-
   config = getConfig()
+
+  unless config.options?.port?
+    # Config says don't do this test (probably because ports are dynamic).
+    console.log('Skipping connectByPort test')
+    test.done()
+    return
+
+  test.expect(2)
 
   connection = new Connection(config)
 
