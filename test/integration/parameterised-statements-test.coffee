@@ -260,7 +260,7 @@ exports.multipleParameters = (test) ->
   config = getConfig()
 
   request = new Request('select @param1, @param2', (err) ->
-      test.ok(!err)
+      test.ifError(err)
 
       connection.close()
   )
@@ -296,14 +296,14 @@ exports.multipleParameters = (test) ->
 execSql = (test, type, value, tdsVersion, options) ->
   config = getConfig()
   #config.options.packetSize = 32768
-  
+
   if tdsVersion and tdsVersion > config.options.tdsVersion
   	return test.done()
-  	
+
   test.expect(5)
 
   request = new Request('select @param', (err) ->
-      test.ok(!err)
+      test.ifError(err)
 
       connection.close()
   )
@@ -352,7 +352,7 @@ execSqlOutput = (test, type, value) ->
   config = getConfig()
 
   request = new Request('set @paramOut = @paramIn', (err) ->
-      test.ok(!err)
+      test.ifError(err)
 
       connection.close()
   )

@@ -91,7 +91,7 @@ exports.connectByPort = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )
@@ -128,7 +128,7 @@ exports.connectByInstanceName = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )
@@ -192,7 +192,7 @@ exports.encrypt = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )
@@ -225,7 +225,7 @@ exports.execSql = (test) ->
   config = getConfig()
 
   request = new Request('select 8 as C1', (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 1)
 
       connection.close()
@@ -270,7 +270,7 @@ exports.numericColumnName = (test) ->
   config.options.useColumnNames = true
 
   request = new Request('select 8 as [123]', (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 1)
 
       connection.close()
@@ -310,7 +310,7 @@ exports.duplicateColumnNames = (test) ->
   config.options.useColumnNames = true
 
   request = new Request('select 1 as abc, 2 as xyz, \'3\' as abc', (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 1)
 
       connection.close()
@@ -359,7 +359,7 @@ exports.execSqlMultipleTimes = (test) ->
       return
 
     request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ok(!err)
+        test.ifError(err)
         test.strictEqual(rowCount, 1)
 
         sqlExecCount++
@@ -407,7 +407,7 @@ exports.execSqlWithOrder = (test) ->
 
   sql = "select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id"
   request = new Request(sql, (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 2)
 
       connection.close()
@@ -466,7 +466,7 @@ exports.execSqlMultipleTimes = (test) ->
       return
 
     request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ok(!err)
+        test.ifError(err)
         test.strictEqual(rowCount, 1)
 
         requestsToMake--
@@ -539,7 +539,7 @@ exports.sqlWithMultipleResultSets = (test) ->
   row = 0
 
   request = new Request('select 1; select 2;', (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 2)
 
       connection.close()
@@ -590,7 +590,7 @@ exports.rowCountForUpdate = (test) ->
   """
 
   request = new Request(setupSql, (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 5)
       connection.close()
   )
@@ -696,7 +696,7 @@ exports.execProcAsSql = (test) ->
   config = getConfig()
 
   request = new Request('exec sp_help int', (err, rowCount) ->
-      test.ok(!err)
+      test.ifError(err)
       test.strictEqual(rowCount, 0)
 
       connection.close()
@@ -779,7 +779,7 @@ exports.resetConnection = (test) ->
           if connection.config.options.tdsVersion < '7_2'
             # TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
             test.ok(true)
-           
+
           callback err
       testAnsiNullsOptionOn,
       (callback) ->

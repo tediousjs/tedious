@@ -299,11 +299,11 @@ exports.udtNull = (test) ->
 execSql = (test, sql, expectedValue, tdsVersion) ->
   if tdsVersion and tdsVersion > config.options.tdsVersion
   	return test.done()
-  	
+
   test.expect(2)
 
   request = new Request(sql, (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )

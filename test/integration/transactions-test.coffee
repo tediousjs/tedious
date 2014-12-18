@@ -36,7 +36,7 @@ class Tester
 
   createTable: (callback) =>
     request = new Request('create table #temp (id int)', (err) =>
-      @test.ok(!err)
+      @test.ifError(err)
       callback(err)
     )
 
@@ -53,7 +53,7 @@ class Tester
         commit transaction
       GO'''
     , (err) =>
-      @test.ok(!err)
+      @test.ifError(err)
       callback(err)
     )
 
@@ -61,7 +61,7 @@ class Tester
 
   execProc: (callback) =>
     request = new Request('exec #proc', (err) =>
-      @test.ok(!err)
+      @test.ifError(err)
       callback(err)
     )
 
@@ -69,7 +69,7 @@ class Tester
 
   insert: (callback) =>
     request = new Request('insert into #temp (id) values(1)', (err) =>
-      @test.ok(!err)
+      @test.ifError(err)
       callback(err)
     )
 
@@ -77,7 +77,7 @@ class Tester
 
   select: (callback, expectedRows) =>
     request = new Request('select id from #temp', (err, rowCount) =>
-      @test.ok(!err)
+      @test.ifError(err)
       @test.strictEqual(rowCount, expectedRows)
       callback(err)
     )
@@ -96,7 +96,7 @@ class Tester
 
   beginTransaction: (callback, transactionName) =>
     @connection.beginTransaction((err, transactionDescriptor) =>
-      @test.ok(!err)
+      @test.ifError(err)
       @test.ok(if config.options.tdsVersion < '7_2' then true else transactionDescriptor)
 
       callback(err)
@@ -110,14 +110,14 @@ class Tester
 
   commitTransaction: (callback) =>
     @connection.commitTransaction((err) =>
-      @test.ok(!err)
+      @test.ifError(err)
 
       callback(err)
     )
 
   rollbackTransaction: (callback) =>
     @connection.rollbackTransaction((err) =>
-      @test.ok(!err)
+      @test.ifError(err)
 
       callback(err)
     )

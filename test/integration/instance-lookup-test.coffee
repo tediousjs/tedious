@@ -17,7 +17,7 @@ exports.goodInstance = (test) ->
     return
 
   callback = (err, port) ->
-    test.ok(!err)
+    test.ifError(err)
     test.ok(port)
 
     test.done()
