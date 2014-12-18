@@ -50,9 +50,9 @@
     "nodeunit": "0.8.4"
   },
   "scripts": {
-    "test": "node_modules/.bin/nodeunit test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
-    "test-all": "node_modules/.bin/nodeunit test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "test-integration": "node_modules/.bin/nodeunit test/register-coffee.js test/integration/",
+    "test": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test-all": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test-integration": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/integration/",
     "prepublish": "node_modules/.bin/coffee scripts/build.coffee"
   }
 }
