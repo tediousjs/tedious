@@ -166,7 +166,7 @@ exports.textSmall = (test) ->
   execSql(test, TYPES.Text, 'small')
 
 exports.textLarge = (test) ->
-  dBuf = new Buffer(5000000)
+  dBuf = new Buffer(500000)
   dBuf.fill('x')
   execSql(test, TYPES.Text, dBuf.toString())
 
