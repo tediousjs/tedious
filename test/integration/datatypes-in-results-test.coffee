@@ -268,27 +268,31 @@ exports.xmlWithSchema = (test) ->
   xml = '<root/>'
 
   schemaName = 'test_tedious_schema'
+  tableName = 'test_tedious_table'
+
   schema = '''
     <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
       <xsd:element name="root">
       </xsd:element>
     </xsd:schema>'''
 
-  dropSchema = """
-    begin try
-      drop xml schema collection #{schemaName}
-    end try begin catch end catch;
+  sql = """
+    IF OBJECT_ID('#{tableName}', 'U') IS NOT NULL
+      DROP TABLE [#{tableName}];
+
+    IF EXISTS (SELECT * FROM [sys].[xml_schema_collections] WHERE [name] = '#{schemaName}' AND [schema_id] = SCHEMA_ID())
+      DROP XML SCHEMA COLLECTION [#{schemaName}];
+
+    CREATE XML SCHEMA COLLECTION [#{schemaName}] AS N'#{schema}';
+
+    EXEC('CREATE TABLE [#{tableName}] ([xml] [xml]([#{schemaName}]))');
+
+    INSERT INTO [#{tableName}] ([xml]) VALUES ('#{xml}');
+
+    SELECT [xml] FROM [#{tableName}];
   """
 
-  createSchema = "create xml schema collection #{schemaName} as N'#{schema}';"
-
-  tableName = 'test_tedious_table'
-  dropTable = "drop table #{tableName};"
-  createTable = "create table #{tableName} (xml XML (#{schemaName}));"
-  insert = "insert into #{tableName} (xml) values('#{xml}');"
-  select = "select xml from #{tableName};"
-
-  execSql(test, "#{dropTable} #{dropSchema} #{createSchema} #{createTable} #{insert} #{select}", xml, '7_2')
+  execSql(test, sql, xml, '7_2')
 
 exports.udt = (test) ->
   execSql(test, "select geography::STGeomFromText('LINESTRING(-122.360 47.656, -122.343 47.656 )', 4326) as geo", new Buffer([230,16,0,0,1,20,135,22,217,206,247,211,71,64,215,163,112,61,10,151,94,192,135,22,217,206,247,211,71,64,203,161,69,182,243,149,94,192]), '7_2')
