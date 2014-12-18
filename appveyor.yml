@@ -1,0 +1,38 @@
+version: "{build}"
+
+environment:
+  matrix:
+    - nodejs_version: "0.10"
+    - nodejs_version: "0.11"
+
+install:
+  - ps: Install-Product node $env:nodejs_version
+  - npm install
+
+build: off
+
+before_test:
+  - sc config sqlbrowser start= auto
+  - net start sqlbrowser
+
+  - mkdir C:\Users\appveyor\.tedious
+
+test_script:
+  - node --version
+  - npm --version
+
+  - cmd: |
+      SET EXITVAL=0
+
+      npm run-script test || SET EXITVAL=1
+
+      powershell %cd%\scripts\appveyor\config.ps1 SQL2008R2SP2
+      npm run-script test-integration || SET EXITVAL=1
+
+      powershell %cd%\scripts\appveyor\config.ps1 SQL2012SP1
+      npm run-script test-integration || SET EXITVAL=1
+
+      powershell %cd%\scripts\appveyor\config.ps1 SQL2014
+      npm run-script test-integration || SET EXITVAL=1
+
+      EXIT /B %EXITVAL%
