@@ -843,8 +843,8 @@ exports.cancelRequest = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
-      connection.cancel()
+    connection.execSql(request)
+    setTimeout(connection.cancel.bind(connection), 2000)
   )
 
   connection.on('end', (info) ->
