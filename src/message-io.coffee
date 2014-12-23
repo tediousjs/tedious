@@ -6,38 +6,36 @@ packetHeaderLength = require('./packet').HEADER_LENGTH
 Packet = require('./packet').Packet
 TYPE = require('./packet').TYPE
 
+Dissolve = require('dissolve')
+
+class ReadablePacketStream extends Dissolve
+  constructor: ->
+    super()
+
+    @loop (end) ->
+      @uint8("type")
+      @uint8("status")
+      @uint16be("length")
+      @uint16be("spid")
+      @uint8("packetId")
+      @uint8("window")
+      @tap ->
+        @buffer("data", @vars.length - packetHeaderLength)
+      @tap ->
+        @push
+          data: @vars.data
+          isLast: if @vars.status & 0x01 then -> true else -> false
+
 class MessageIO extends EventEmitter
   constructor: (@socket, @_packetSize, @debug) ->
-    @socket.addListener('data', @eventData)
+    @packetStream = new ReadablePacketStream()
+    @packetStream.on 'data', (packet) =>
+      @emit 'data', packet.data
+      @emit 'message' if packet.isLast()
+
+    @socket.pipe(@packetStream)
 
     @packetDataSize = @_packetSize - packetHeaderLength
-    @packetBuffer = new Buffer(0)
-    @payloadBuffer = new Buffer(0)
-
-  eventData: (data) =>
-    if (@packetBuffer.length > 0)
-      @packetBuffer = Buffer.concat([@packetBuffer, data])
-    else
-      @packetBuffer = data
-
-    packetsData = []
-    endOfMessage = false
-
-    while isPacketComplete(@packetBuffer)
-      length = packetLength(@packetBuffer)
-      packet = new Packet(@packetBuffer.slice(0, length))
-      @logPacket('Received', packet);
-
-      packetsData.push(packet.data())
-      if (packet.isLast())
-        endOfMessage = true
-
-      @packetBuffer = @packetBuffer.slice(length)
-
-    if packetsData.length > 0
-      @emit('data', Buffer.concat(packetsData))
-      if endOfMessage
-        @emit('message')
 
   packetSize: (packetSize) ->
     if arguments.length > 0
@@ -52,13 +50,13 @@ class MessageIO extends EventEmitter
     @tlsNegotiationInProgress = true;
 
   encryptAllFutureTraffic: () ->
-    @socket.removeAllListeners('data')
+    @socket.unpipe(@packetStream)
     @securePair.encrypted.removeAllListeners('data')
 
     @socket.pipe(@securePair.encrypted)
     @securePair.encrypted.pipe(@socket)
 
-    @securePair.cleartext.addListener('data', @eventData)
+    @securePair.cleartext.pipe(@packetStream)
 
     @tlsNegotiationInProgress = false;
 
