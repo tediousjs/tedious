@@ -1,6 +1,4 @@
-parser = require('../../../src/token/order-token-parser')
-dataTypeByName = require('../../../src/data-type').typeByName
-ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+Parser = require('../../../src/token/stream-parser')
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.oneColumn = (test) ->
@@ -10,11 +8,14 @@ module.exports.oneColumn = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xA9)
   buffer.writeUInt16LE(length)
   buffer.writeUInt16LE(column)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
+  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser.write(buffer.data)
+  token = parser.read()
   #console.log(token)
 
   test.strictEqual(token.orderColumns.length, 1)
@@ -30,12 +31,15 @@ module.exports.twoColumns = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xA9)
   buffer.writeUInt16LE(length)
   buffer.writeUInt16LE(column1)
   buffer.writeUInt16LE(column2)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'))
+  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser.write(buffer.data)
+  token = parser.read()
   #console.log(token)
 
   test.strictEqual(token.orderColumns.length, 2)

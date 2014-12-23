@@ -3,9 +3,9 @@
 valueParse = require('../value-parser')
 sprintf = require('sprintf').sprintf
 
-parser = (buffer, columnsMetaData, options) ->
+module.exports = (parser, columnsMetaData, options) ->
   length = Math.ceil columnsMetaData.length / 8
-  bytes = buffer.readBuffer length
+  bytes = yield parser.readBuffer(length)
   bitmap = []
 
   for byte in bytes
@@ -19,7 +19,7 @@ parser = (buffer, columnsMetaData, options) ->
     if bitmap[index]
       value = null
     else
-      value = valueParse(buffer, columnMetaData, options)
+      value = yield from valueParse(parser, columnMetaData)
 
     column =
       value: value
@@ -35,5 +35,3 @@ parser = (buffer, columnsMetaData, options) ->
   name: 'NBCROW'
   event: 'row'
   columns: columns
-
-module.exports = parser

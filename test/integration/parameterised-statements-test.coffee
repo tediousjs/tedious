@@ -300,12 +300,98 @@ exports.multipleParameters = (test) ->
     #console.log(text)
   )
 
+exports.callProcedureWithParameters = (test) ->
+  test.expect(13)
+
+  config = getConfig()
+
+  setupSql = """
+    if exists (select * from sys.procedures where name = '__test5')
+      exec('drop procedure [dbo].[__test5]')
+
+    exec('create procedure [dbo].[__test5]
+      @in BINARY(4),
+      @in2 BINARY(4) = NULL,
+      @in3 VARBINARY(MAX),
+      @in4 VARBINARY(MAX) = NULL,
+      @in5 IMAGE,
+      @in6 IMAGE = NULL,
+      @out BINARY(4) = NULL OUTPUT,
+      @out2 VARBINARY(MAX) = NULL OUTPUT
+    as
+    begin
+
+      set nocount on
+
+      select CAST( 123456 AS BINARY(4) ) as ''bin'', @in as ''in'', @in2 as ''in2'', @in3 as ''in3'', @in4 as ''in4'', @in5 as ''in5'', @in6 as ''in6''
+
+      set @out = @in
+      set @out2 = @in3
+
+      return 0
+
+    end')
+  """
+
+  request = new Request setupSql, (err) ->
+    test.ifError (err)
+
+    request = new Request('__test5', (err) ->
+        test.ifError(err)
+
+        connection.close()
+    )
+
+    sample = new Buffer([0x00, 0x01, 0xe2, 0x40])
+
+    request.addParameter 'in', TYPES.Binary, sample
+    request.addParameter 'in2', TYPES.Binary, null
+    request.addParameter 'in3', TYPES.VarBinary, sample
+    request.addParameter 'in4', TYPES.VarBinary, null
+    request.addParameter 'in5', TYPES.Image, sample
+    request.addParameter 'in6', TYPES.Image, null
+    request.addOutputParameter 'out', TYPES.Binary, null, { length: 4 }
+    request.addOutputParameter 'out2', TYPES.VarBinary
+
+    request.on('doneInProc', (rowCount, more) ->
+      test.strictEqual(rowCount, undefined)
+      test.ok(more)
+    )
+
+    request.on('row', (columns) ->
+      test.strictEqual(columns.length, 7)
+      test.deepEqual(columns[0].value, sample)
+      test.deepEqual(columns[1].value, sample)
+      test.strictEqual(columns[2].value, null)
+      test.deepEqual(columns[3].value, sample)
+      test.strictEqual(columns[4].value, null)
+      test.deepEqual(columns[5].value, sample)
+      test.strictEqual(columns[6].value, null)
+    )
+
+    connection.callProcedure(request)
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+      test.ifError(err)
+      connection.execSqlBatch(request)
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 execSql = (test, type, value, tdsVersion, options) ->
   config = getConfig()
   #config.options.packetSize = 32768
 
   if tdsVersion and tdsVersion > config.options.tdsVersion
-  	return test.done()
+    return test.done()
 
   test.expect(6)
 

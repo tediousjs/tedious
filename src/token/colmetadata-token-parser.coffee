@@ -2,31 +2,31 @@
 
 metadataParse = require('../metadata-parser')
 
-parser = (buffer, colMetadata, options) ->
-  columnCount = buffer.readUInt16LE()
+module.exports = (parser, colMetadata, options) ->
+  columnCount = yield parser.readUInt16LE()
 
   columns = []
   for c in [0...columnCount]
-    metadata = metadataParse(buffer, options)
+    metadata = yield from metadataParse(parser, options)
 
     if metadata.type.hasTableName
       if options.tdsVersion >= '7_2'
-        numberOfTableNameParts = buffer.readUInt8()
+        numberOfTableNameParts = yield parser.readUInt8()
         tableName = for part in [1..numberOfTableNameParts]
-          buffer.readUsVarchar('ucs2')
+          yield from parser.readUsVarChar()
       else
-        tableName = buffer.readUsVarchar('ucs2')
+        tableName = yield from parser.readUsVarChar()
     else
       tableName = undefined
 
-    colName = buffer.readBVarchar()
-    
+    colName = yield from parser.readBVarChar()
+
     if options.columnNameReplacer
       colName = options.columnNameReplacer(colName, c, metadata)
     else if options.camelCaseColumns
       colName = colName.replace /^[A-Z]/, (s) -> s.toLowerCase()
 
-    column =
+    columns.push
       userType: metadata.userType
       flags: metadata.flags
       type: metadata.type
@@ -38,11 +38,7 @@ parser = (buffer, colMetadata, options) ->
       dataLength: metadata.dataLength
       tableName: tableName
 
-    columns.push(column)
-
   # Return token
   name: 'COLMETADATA'
   event: 'columnMetadata'
   columns: columns
-
-module.exports = parser

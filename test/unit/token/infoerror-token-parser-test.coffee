@@ -1,5 +1,4 @@
-infoParser = require('../../../src/token/infoerror-token-parser').infoParser
-ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+Parser = require('../../../src/token/stream-parser')
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.info = (test) ->
@@ -13,6 +12,7 @@ module.exports.info = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xAB)
   buffer.writeUInt16LE(0)         # Length written later
   buffer.writeUInt32LE(number)
   buffer.writeUInt8(state)
@@ -23,11 +23,11 @@ module.exports.info = (test) ->
   buffer.writeUInt32LE(lineNumber)
 
   data = buffer.data
-  data.writeUInt16LE(data.length - 2, 0)
-  #console.log(buffer)
+  data.writeUInt16LE(data.length - 3, 1)
 
-  token = infoParser(new ReadableTrackingBuffer(data, 'ucs2'), null, {})
-  #console.log(token)
+  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser.write(data)
+  token = parser.read()
 
   test.strictEqual(token.number, number)
   test.strictEqual(token.state, state)

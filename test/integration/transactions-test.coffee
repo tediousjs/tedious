@@ -216,6 +216,39 @@ exports.nestedTransactionInProcRollbackOuter = (test) ->
     tester.close
   ])
 
+exports.firesRollbackTransactionEventWithXactAbort = (test) ->
+  test.expect(5)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message))
+
+  connection.on 'connect', (err) ->
+    req = new Request("create table #temp (value varchar(50))", (err) ->
+      test.ifError(err)
+
+      req = new Request("SET XACT_ABORT ON", (err) ->
+        test.ifError(err)
+
+        connection.beginTransaction (err) ->
+          test.ifError(err)
+
+          connection.on "rollbackTransaction", ->
+            # Ensure rollbackTransaction event is fired
+            test.ok(true)
+
+          req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", (err) ->
+            test.strictEqual(err.message, "String or binary data would be truncated.")
+
+            connection.close()
+          )
+          connection.execSqlBatch(req)
+      )
+      connection.execSqlBatch(req)
+    )
+    connection.execSqlBatch(req)
+
 exports.transactionHelper = (test) ->
   test.expect(3)
 

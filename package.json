@@ -37,19 +37,31 @@
     "node": ">= 0.10"
   },
   "dependencies": {
+    "babel-runtime": "^5.8.12",
     "big-number": "0.3.1",
+    "bl": "^1.0.0",
     "iconv-lite": "0.4.7",
+    "readable-stream": "^2.0.2",
     "sprintf": "0.1.5"
   },
   "devDependencies": {
     "async": "0.9.0",
+    "babel": "^5.8.12",
+    "benchmark": "^1.0.0",
     "coffee-script": "1.9.0",
     "nodeunit": "0.9.0"
   },
   "scripts": {
-    "test": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
-    "test-all": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "test-integration": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/integration/",
-    "prepublish": "node_modules/.bin/coffee scripts/build.coffee"
+    "test": "nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test-all": "nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test-integration": "nodeunit --reporter minimal test/register-coffee.js test/integration/",
+    "prepublish": "coffee scripts/build.coffee"
+  },
+  "babel": {
+    "whitelist": [
+      "regenerator",
+      "es6.modules",
+      "runtime"
+    ]
   }
 }
