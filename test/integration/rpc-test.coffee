@@ -211,7 +211,7 @@ testProc = (test, type, typeAsString, value) ->
   config = getConfig()
 
   request = new Request('#test_proc', (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )
@@ -271,7 +271,7 @@ testProcOutput = (test, type, typeAsString, value) ->
   config = getConfig()
 
   request = new Request('#test_proc', (err) ->
-    test.ok(!err)
+    test.ifError(err)
 
     connection.close()
   )

@@ -22,7 +22,7 @@ exports.prepareExecute = (test) ->
   config = getConfig()
 
   request = new Request('select @param', (err) ->
-    test.ok(!err)
+    test.ifError(err)
     connection.close()
   )
   request.addParameter('param', TYPES.Int)
@@ -58,7 +58,7 @@ exports.unprepare = (test) ->
   prepared = false
 
   request = new Request('select 3', (err) ->
-    test.ok(!err)
+    test.ifError(err)
     connection.close()
   )
 
