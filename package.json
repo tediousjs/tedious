@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "big-number": "0.3.1",
+    "dissolve": "^0.3.3",
     "iconv-lite": "0.4.7",
     "sprintf": "0.1.5"
   },
