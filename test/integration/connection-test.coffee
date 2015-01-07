@@ -207,6 +207,10 @@ exports.encrypt = (test) ->
     test.done()
   )
 
+  connection.on('rerouting', (info) ->
+    test.expect(8)
+  )
+
   connection.on('databaseChange', (database) ->
     test.strictEqual(database, config.options.database)
   )

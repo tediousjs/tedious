@@ -74,7 +74,7 @@ class Connection extends EventEmitter
     REROUTING:
       name: 'ReRouting'
       enter: ->
-        @cleanupConnection()
+        @cleanupConnection(true)
       events:
         message: ->
         socketError: (error) ->
@@ -89,6 +89,7 @@ class Connection extends EventEmitter
     SENT_TLSSSLNEGOTIATION:
       name: 'SentTLSSSLNegotiation'
       enter: ->
+        @tlsNegotiationComplete = false
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
@@ -248,12 +249,15 @@ class Connection extends EventEmitter
     @connect()
     @createConnectTimer()
 
-  cleanupConnection: ->
+  cleanupConnection: (@redirect)->
     if !@closed
       @clearConnectTimer()
       @clearRequestTimer()
       @closeConnection()
-      @emit('end')
+      if !@redirect
+        @emit('end')
+      else
+        @emit('rerouting')
       @closed = true
       @loggedIn = false
       @loginError = null
@@ -590,6 +594,7 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
+      serverName: @config.server
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
