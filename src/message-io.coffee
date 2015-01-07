@@ -13,14 +13,14 @@ class ReadablePacketStream extends Dissolve
     super()
 
     @loop (end) ->
-      @uint8("type")
-      @uint8("status")
-      @uint16be("length")
-      @uint16be("spid")
-      @uint8("packetId")
-      @uint8("window")
+      @uint8 "type"
+      @uint8 "status"
+      @uint16be "length"
+      @uint16be "spid"
+      @uint8 "packetId"
+      @uint8 "window"
       @tap ->
-        @buffer("data", @vars.length - packetHeaderLength)
+        @buffer "data", @vars.length - packetHeaderLength
       @tap ->
         @push
           data: @vars.data
