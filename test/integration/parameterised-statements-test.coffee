@@ -100,6 +100,12 @@ exports.intZero = (test) ->
 exports.intNull = (test) ->
   execSql(test, TYPES.Int, null)
 
+exports.varBinaryWithString = (test) ->
+  execSql(test, TYPES.VarBinary, "test")
+
+exports.varBinaryWithBuffer = (test) ->
+  execSql(test, TYPES.VarBinary, new Buffer([0x01, 0x02, 0x03, 0x04]))
+
 exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
@@ -318,7 +324,12 @@ execSql = (test, type, value, tdsVersion, options) ->
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
 
-      if (value instanceof Date)
+      if (type == TYPES.VarBinary)
+        if typeof value == "string"
+          test.strictEqual(columns[0].value.toString(), value)
+        else
+          test.deepEqual(columns[0].value, value)
+      else if (value instanceof Date)
         test.strictEqual(columns[0].value.getTime(), value.getTime())
       else if (type == TYPES.BigInt)
         test.strictEqual(columns[0].value, value.toString())
