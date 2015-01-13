@@ -249,7 +249,7 @@ class Login7Payload
 
   createNTLMRequest: (options) ->
     domain = escape(options.domain.toUpperCase())
-    workstation = escape( if options.workstation then options.workstation.toUpperCase() else '')
+    workstation = if options.workstation then escape( options.workstation.toUpperCase() ) else ''
     protocol = 'NTLMSSP\u0000'
     BODY_LENGTH = 40
     type1flags = @getNTLMFlags()
