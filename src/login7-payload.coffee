@@ -249,6 +249,7 @@ class Login7Payload
 
   createNTLMRequest: (options) ->
     domain = escape(options.domain.toUpperCase())
+    workstation = escape( if options.workstation then options.workstation.toUpperCase() else '')
     protocol = 'NTLMSSP\u0000'
     BODY_LENGTH = 40
     type1flags = @getNTLMFlags()
@@ -259,6 +260,9 @@ class Login7Payload
     buffer.writeUInt32LE(type1flags) # TYPE1 flag
     buffer.writeUInt16LE(domain.length) # domain length
     buffer.writeUInt16LE(domain.length) # domain max length
+    buffer.writeUInt32LE(BODY_LENGTH + workstation.length) # domain buffer offset
+    buffer.writeUInt16LE(workstation.length) # workstation length
+    buffer.writeUInt16LE(workstation.length) # workstation max length
     buffer.writeUInt32LE(BODY_LENGTH) # domain buffer offset
     buffer.writeUInt8(5) #ProductMajorVersion
     buffer.writeUInt8(0) #ProductMinorVersion
@@ -267,6 +271,7 @@ class Login7Payload
     buffer.writeUInt8(0) #VersionReserved2
     buffer.writeUInt8(0) #VersionReserved3
     buffer.writeUInt8(15) #NTLMRevisionCurrent
+    buffer.writeString(workstation, 'ascii')
     buffer.writeString(domain, 'ascii')
     buffer.data
 
@@ -288,14 +293,14 @@ class Login7Payload
     password
 
   getNTLMFlags: ->
-    (NTLMFlags.NTLM_NegotiateUnicode + 
-    NTLMFlags.NTLM_NegotiateOEM + 
-    NTLMFlags.NTLM_RequestTarget + 
-    NTLMFlags.NTLM_NegotiateNTLM + 
-    NTLMFlags.NTLM_NegotiateOemDomainSupplied + 
-    NTLMFlags.NTLM_NegotiateAlwaysSign + 
-    NTLMFlags.NTLM_NegotiateVersion + 
-    NTLMFlags.NTLM_Negotiate128 + 
+    (NTLMFlags.NTLM_NegotiateUnicode +
+    NTLMFlags.NTLM_NegotiateOEM +
+    NTLMFlags.NTLM_RequestTarget +
+    NTLMFlags.NTLM_NegotiateNTLM +
+    NTLMFlags.NTLM_NegotiateOemDomainSupplied +
+    NTLMFlags.NTLM_NegotiateAlwaysSign +
+    NTLMFlags.NTLM_NegotiateVersion +
+    NTLMFlags.NTLM_Negotiate128 +
     NTLMFlags.NTLM_Negotiate56)
 
   toString: (indent) ->
