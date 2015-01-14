@@ -253,6 +253,7 @@ class Login7Payload
     protocol = 'NTLMSSP\u0000'
     BODY_LENGTH = 40
     type1flags = @getNTLMFlags()
+    type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied if workstation is ''
     bufferLength = BODY_LENGTH + domain.length
     buffer = new WritableTrackingBuffer(bufferLength)
     buffer.writeString(protocol, 'utf8') # protocol
@@ -298,8 +299,10 @@ class Login7Payload
     NTLMFlags.NTLM_RequestTarget +
     NTLMFlags.NTLM_NegotiateNTLM +
     NTLMFlags.NTLM_NegotiateOemDomainSupplied +
+    NTLMFlags.NTLM_NegotiateOemWorkstationSupplied +
     NTLMFlags.NTLM_NegotiateAlwaysSign +
     NTLMFlags.NTLM_NegotiateVersion +
+    NTLMFlags.NTLM_NegotiateExtendedSecurity +
     NTLMFlags.NTLM_Negotiate128 +
     NTLMFlags.NTLM_Negotiate56)
 
