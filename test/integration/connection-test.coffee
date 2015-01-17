@@ -915,3 +915,50 @@ exports.requestTimeout = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+runSqlBatch = (test, config, sql, requestCallback) ->
+  connection = new Connection(config)
+
+  request = new Request sql, ->
+    requestCallback.apply this, arguments
+    connection.close()
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSqlBatch(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
+# Test that the default behavior allows adding null values to a
+# temporary table where the nullability is not explicitly declared.
+exports.testAnsiNullDefault = (test) ->
+    test.expect(2)
+
+    sql = """
+      create table #testAnsiNullDefault (id int);
+      insert #testAnsiNullDefault values (null);
+      drop table #testAnsiNullDefault;
+    """
+    
+    runSqlBatch test, getConfig(), sql, (err) ->
+        test.ifError(err)
+
+# Test that the default behavior can be overridden (so that temporary
+# table columns are non-nullable by default).
+exports.disableAnsiNullDefault = (test) ->
+    test.expect(3)
+
+    sql = """
+      create table #testAnsiNullDefaults (id int);
+      insert #testAnsiNullDefaults values (null);
+      drop table #testAnsiNullDefaults;
+    """
+
+    config = getConfig()
+    config.options.enableAnsiNullDefault = false
+    
+    runSqlBatch test, config, sql, (err) ->
+        test.ok(err instanceof Error)
+        test.strictEqual err?.number, 515 # Cannot insert the value NULL
+
