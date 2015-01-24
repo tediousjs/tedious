@@ -5,6 +5,18 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
+<h3>v1.9.0 <span class="date">2015-XX-XX</span></h3>
+<ul>
+  <li>
+    <a href="https://github.com/pekim/tedious/pull/231">#231</a>
+    Add <code>Connection#saveTransaction</code> to create transaction savepoints.
+    Change <code>Connection#rollbackTransaction</code> to allow manually specifying
+    a transaction or savepoint name. Introduce new <code>Connection#transaction</code>
+    helper to simplify transaction handling, especially when nesting transactions.
+    (Rohit Arjunagi, Arthur Schreiber)
+  </li>
+</ul>
+
 <h3>v1.8.1 <span class="date">2015-01-07</span></h3>
 <ul>
   <li>

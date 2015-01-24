@@ -42,7 +42,9 @@ title: API - Connection
   <li><a href="#function_execute">connection.execute(request, parameters)</a></li>
   <li><a href="#function_prepare">connection.prepare(request)</a></li>
   <li><a href="#function_reset">connection.reset(callback)</a></li>
-  <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback)</a></li>
+  <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback, [name])</a></li>
+  <li><a href="#function_saveTransaction">connection.saveTransaction(callback, name)</a></li>
+  <li><a href="#function_transaction">connection.transaction(callback)</a></li>
   <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
   <li><a href="#function_newBulkLoad">connection.newBulkLoad(tableName, callback)</a></li>
 </ul>
@@ -782,6 +784,86 @@ var connection = new Connection(config);
       <div class="description">
         <p>
           If an error occured, a string with details of the error.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 id="function_saveTransaction">connection.saveTransaction(callback, name)</h2>
+<p>
+  Set a savepoint within a transaction.
+</p>
+<p>
+  There should be an active transaction.
+  That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+</p>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the request to set a savepoint within the transaction has completed,
+      either successfully or with an error.
+      If an error occured then <code>err</code> will describe the error.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occured, a string with details of the error.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 id="function_transaction">connection.transaction(callback)</h2>
+<p>
+  Run the given callback after starting a transaction, and commit or rollback the transaction afterwards.
+</p>
+<p>
+  This is a helper that employs <a href="#function_beginTransaction"><code>beginTransaction</code></a>,
+  <a href="#function_commitTransaction"><code>commitTrnsaction</code></a>,
+  <a href="#function_rollbackTransaction"><code>rollbackTransaction</code></a> and
+  <a href="#function_saveTransaction"><code>saveTransaction</code></a> to greatly simplify the
+  use of database transactions and automatically handle transaction nesting.
+</p>
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err, done) { }</span>
+    <p>
+      The callback is called when the request to start a transaction (or create a savepoint, in
+      the case of a nested transaction) has completed, either successfully or with an error.
+      If an error occured, then <code>err</code> will describe the error.
+      If no error occured, the callback should perform its work and eventually call
+      <code>done</code> with an error or null (to trigger a transaction rollback or a
+      transaction commit) and an additional completion callback that will be called when the request
+      to rollback or commit the current transaction has completed, either successfully or with an error.
+      Additional arguments given to <code>done</code> will be passed through to this callback.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until the completion callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occured, a string with details of the error.
+        </p>
+      </div>
+
+      <div class="name">done</div>
+      <div class="description">
+        <p>
+          If no error occured, a function to be called to commit or rollback
+          the transaction.
         </p>
       </div>
     </div>
