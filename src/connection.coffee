@@ -237,7 +237,7 @@ class Connection extends EventEmitter
     @createDebug()
     @createTokenStreamParser()
 
-    @transactions = []
+    @inTransaction = false
     @transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])]
 
     @transitionTo(@STATE.CONNECTING)
@@ -346,15 +346,30 @@ class Connection extends EventEmitter
     @tokenStreamParser.on('packetSizeChange', (token) =>
       @messageIo.packetSize(token.newValue)
     )
+
+    # A new top-level transaction was started. This is not fired
+    # for nested transactions.
     @tokenStreamParser.on('beginTransaction', (token) =>
       @transactionDescriptors.push(token.newValue)
+      @inTransaction = true
     )
+
+    # A top-level transaction was committed. This is not fired
+    # for nested transactions.
     @tokenStreamParser.on('commitTransaction', (token) =>
-      @transactionDescriptors.pop()
+      @transactionDescriptors.length = 1
+      @inTransaction = false
     )
+
+    # A top-level transaction was rolled back. This is not fired
+    # for nested transactions. This is also fired if a batch
+    # aborting error happened that caused a rollback.
     @tokenStreamParser.on('rollbackTransaction', (token) =>
-      @transactionDescriptors.pop()
+      @transactionDescriptors.length = 1
+      # An outermost transaction was rolled back. Reset the transaction counter
+      @inTransaction = false
     )
+
     @tokenStreamParser.on('columnMetadata', (token) =>
         if @request
           if @config.options.useColumnNames
@@ -742,12 +757,9 @@ set xact_abort #{xact_abort}"""
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   beginTransaction: (callback, name, isolationLevel) ->
-    name ||= ''
     isolationLevel ||= @config.options.isolationLevel
       
-    transaction = new Transaction(name, isolationLevel)
-    @transactions.push(transaction)
-
+    transaction = new Transaction(name || '', isolationLevel)
     if @config.options.tdsVersion < "7_2"
       return @execSqlBatch new Request "SET TRANSACTION ISOLATION LEVEL #{transaction.isolationLevelToTSQL()};BEGIN TRAN #{transaction.name}", callback
 
@@ -757,29 +769,88 @@ set xact_abort #{xact_abort}"""
 
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(@currentTransactionDescriptor()))
 
-  commitTransaction: (callback) ->
-    if @transactions.length == 0
-      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
-      
-    transaction = @transactions.pop()
-    
+  commitTransaction: (callback, name) ->
+    transaction = new Transaction(name || '')
     if @config.options.tdsVersion < "7_2"
       return  @execSqlBatch new Request "COMMIT TRAN #{transaction.name}", callback
 
     request = new Request(undefined, callback)
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(@currentTransactionDescriptor()))
 
-  rollbackTransaction: (callback) ->
-    if @transactions.length == 0
-      return callback RequestError('No transaction in progress', 'ENOTRNINPROG')
-      
-    transaction = @transactions.pop()
+  rollbackTransaction: (callback, name) ->
+    transaction = new Transaction(name || '')
     
     if @config.options.tdsVersion < "7_2"
       return @execSqlBatch new Request "ROLLBACK TRAN #{transaction.name}", callback
 
     request = new Request(undefined, callback)
     @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(@currentTransactionDescriptor()))
+
+  saveTransaction: (callback, name) ->
+    transaction = new Transaction(name)
+
+    if @config.options.tdsVersion < "7_2"
+      return @execSqlBatch new Request "SAVE TRAN #{transaction.name}", callback
+
+    request = new Request(undefined, callback)
+    @makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(@currentTransactionDescriptor()))
+
+  transaction: (cb, isolationLevel) ->
+    if typeof cb != 'function'
+      throw new TypeError('`cb` must be a function')
+
+    useSavepoint = @inTransaction
+    name = "_tedious_#{crypto.randomBytes(10).toString('hex')}"
+
+    txDone = (err, done) =>
+      args = []
+      args.push(arguments[i]) for i in [2..arguments.length]
+
+      if err
+        if @inTransaction
+          @rollbackTransaction((txErr) ->
+            args.unshift(txErr || err)
+            done.apply(null, args)
+          , name)
+        else
+          # We're no longer inside a transaction. This happens if the outermost transaction
+          # was rolled back, for one of the following reasons:
+          # * Connection#rollbackTransaction was called.
+          # * `ROLLBACK TRANSACTION` was executed.
+          # * the server rolled back the transaction, due to a batch aborting error.
+          #
+          # As the transaction was already rolled back, we only need to propagate
+          # the error through all callbacks.
+          process.nextTick ->
+            args.unshift(err)
+            done.apply(null, args)
+      else
+        if useSavepoint
+          process.nextTick ->
+            args.unshift(null)
+            done.apply(null, args)
+        else
+          @commitTransaction((txErr) ->
+            args.unshift(txErr)
+            done.apply(null, args)
+          , name)
+
+    if useSavepoint
+      @saveTransaction((err) =>
+        return cb(err) if err
+
+        if isolationLevel
+          @execSqlBatch new Request "SET transaction isolation level #{@getIsolationLevelText(isolationLevel)}", (err) ->
+            cb(err, txDone)
+        else
+          cb(null, txDone)
+      , name)
+    else
+      @beginTransaction((err) ->
+        return cb(err) if err
+
+        cb(null, txDone)
+      , name, isolationLevel)
 
   makeRequest: (request, packetType, payload) ->
     if @state != @STATE.LOGGED_IN
