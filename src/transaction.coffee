@@ -68,7 +68,19 @@ class Transaction
       data: buffer.data
       toString: =>
         "Rollback Transaction: name=#{@name}"
-  
+
+  savePayload: (txnDescriptor) ->
+    buffer = new WritableTrackingBuffer(100, 'ascii')
+    writeAllHeaders(buffer, txnDescriptor, @outstandingRequestCount)
+    buffer.writeUShort(OPERATION_TYPE.TM_SAVE_XACT)
+    buffer.writeUInt8(@name.length * 2)
+    buffer.writeString(@name, 'ucs2')
+
+    payload =
+      data: buffer.data
+      toString: =>
+        "Save Transaction: name=#{@name}"
+
   isolationLevelToTSQL: ->
     switch @isolationLevel
       when ISOLATION_LEVEL.READ_UNCOMMITTED then return 'READ UNCOMMITTED'

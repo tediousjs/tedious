@@ -1,5 +1,7 @@
 Connection = require('../../src/connection')
 Request = require('../../src/request')
+Transaction = require('../../src/transaction')
+
 fs = require('fs')
 async = require('async')
 
@@ -213,3 +215,237 @@ exports.nestedTransactionInProcRollbackOuter = (test) ->
     tester.selectExpectZeroRows
     tester.close
   ])
+
+exports.transactionHelper = (test) ->
+  test.expect(3)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    connection.transaction (err, outerDone) ->
+      test.ifError(err)
+
+      connection.transaction (err, innerDone) ->
+        test.ifError(err)
+
+        innerDone null, outerDone, (err) ->
+          test.ifError(err)
+          connection.close()
+
+exports.transactionHelperSelectiveRollback = (test) ->
+  test.expect(9)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    request = new Request 'create table #temp (id int)', (err) ->
+      test.ifError(err)
+
+      connection.transaction (err, outerDone) ->
+        test.ifError(err)
+
+        request = new Request 'insert into #temp (id) VALUES (1)', (err) ->
+          test.ifError(err)
+
+          connection.transaction (err, innerDone) ->
+            test.ifError(err)
+
+            request = new Request 'insert into #temp (id) VALUES (2)', (err) ->
+              test.ifError(err)
+
+              expectedError = new Error("Something failed")
+              innerDone expectedError, (err) ->
+                test.strictEqual(err, expectedError)
+
+                # Do not pass the error to the outer transaction continuation
+                outerDone null, (err) ->
+                  test.ifError(err)
+
+                  request = new Request 'select * from #temp', (err) ->
+                    test.ifError(err)
+                    connection.close()
+
+                  request.on 'row', (row) ->
+                    test.strictEqual(row[0].value, 1)
+
+                  connection.execSql(request)
+
+            connection.execSql(request)
+        connection.execSql(request)
+    connection.execSqlBatch(request)
+
+exports.transactionHelperFullRollback = (test) ->
+  test.expect(7)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    request = new Request 'create table #temp (id int)', (err) ->
+      test.ifError(err)
+
+      connection.transaction (err, outerDone) ->
+        test.ifError(err)
+
+        request = new Request 'insert into #temp (id) VALUES (1)', (err) ->
+          test.ifError(err)
+
+          connection.transaction (err, innerDone) ->
+            test.ifError(err)
+
+            request = new Request 'insert into #temp (id) VALUES (2)', (err) ->
+              test.ifError(err)
+
+              expectedError = new Error("Something failed")
+              innerDone expectedError, outerDone, (err) ->
+                test.strictEqual(err, expectedError)
+
+                request = new Request 'select * from #temp', (err) ->
+                  test.ifError(err)
+                  connection.close()
+
+                request.on 'row', (row) ->
+                  throw new Error("Did not expect any rows")
+
+                connection.execSql(request)
+
+            connection.execSql(request)
+        connection.execSql(request)
+    connection.execSqlBatch(request)
+
+exports.transactionHelperBatchAbortingError = (test) ->
+  test.expect(4)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    connection.transaction (err, outerDone) ->
+      test.ifError(err)
+
+      connection.transaction (err, innerDone) ->
+        test.ifError(err)
+
+        request = new Request 'create table #temp (id int)', (err) ->
+          test.ifError(err)
+
+          request = new Request 'create table #temp (id int)', (err) ->
+            innerDone err, outerDone, (err) ->
+              test.equal(err.message, "There is already an object named '#temp' in the database.")
+
+              connection.close()
+
+          connection.execSqlBatch(request)
+        connection.execSqlBatch(request)
+
+exports.transactionHelperIsolationLevel = (test) ->
+  test.expect(8)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+
+  connection.on 'connect', (err) ->
+    connection.transaction((err, outerDone) ->
+      test.ifError(err)
+
+      request = new Request "SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID", (err) ->
+        test.ifError(err)
+
+        connection.transaction((err, innerDone) ->
+          test.ifError(err)
+
+          request = new Request "SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID", (err) ->
+            test.ifError(err)
+
+            innerDone null, outerDone, (err) ->
+              request = new Request "SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID", (err) ->
+                test.ifError(err)
+
+                connection.close()
+
+              request.on 'row', (row) ->
+                test.equal row[0].value, Transaction.ISOLATION_LEVEL.SERIALIZABLE
+
+              connection.execSqlBatch(request)
+
+          request.on 'row', (row) ->
+            test.equal row[0].value, Transaction.ISOLATION_LEVEL.SERIALIZABLE
+
+          connection.execSqlBatch(request)
+        , Transaction.ISOLATION_LEVEL.SERIALIZABLE)
+
+      request.on 'row', (row) ->
+        test.equal row[0].value, Transaction.ISOLATION_LEVEL.REPEATABLE_READ
+
+      connection.execSqlBatch(request)
+    , Transaction.ISOLATION_LEVEL.REPEATABLE_READ)
+
+exports.transactionHelperResetOpenTransactionCount = (test) ->
+  test.expect(3)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    connection.transaction (err) ->
+      test.ifError(err)
+
+      connection.reset (err) ->
+        test.ifError(err)
+
+        test.strictEqual(connection.inTransaction, false)
+        connection.close()
+
+exports.transactionHelperMixedWithLowLevelTransactionMethods = (test) ->
+  test.expect(11)
+
+  connection = new Connection(config)
+  connection.on('end', (info) => test.done())
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    connection.beginTransaction (err) ->
+      test.ifError(err)
+
+      test.strictEqual(connection.inTransaction, true)
+
+      connection.transaction (err, txDone) ->
+        test.ifError(err)
+
+        test.strictEqual(connection.inTransaction, true)
+
+        connection.beginTransaction (err) ->
+          test.ifError(err)
+
+          test.strictEqual(connection.inTransaction, true)
+
+          connection.commitTransaction (err) ->
+            test.ifError(err)
+
+            test.strictEqual(connection.inTransaction, true)
+
+            txDone null, (err) ->
+              test.strictEqual(connection.inTransaction, true)
+
+              connection.commitTransaction (err) ->
+                test.ifError err
+
+                test.strictEqual(connection.inTransaction, false)
+
+                connection.close()
