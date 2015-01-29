@@ -62,7 +62,7 @@ exports.extendedErrorInfo = (test) ->
 
   test.expect(9)
 
-  execProc = new Request "#divideByZero", (err) ->
+  execProc = new Request "#testExtendedErrorInfo", (err) ->
     test.ok(err instanceof Error)
 
     test.strictEqual(err.number, 50000)
@@ -73,13 +73,13 @@ exports.extendedErrorInfo = (test) ->
 
     # The procedure name will actually be padded to 128 chars with underscores and
     # some random hexadecimal digits.
-    test.ok(err.procName?.indexOf("#divideByZero") == 0,
-      "err.procName should begin with #divideByZero, was actually #{err.procName}")
+    test.ok(err.procName?.indexOf("#testExtendedErrorInfo") == 0,
+      "err.procName should begin with #testExtendedErrorInfo, was actually #{err.procName}")
     test.strictEqual(err.lineNumber, 1, "err.lineNumber should be 1")
       
     connection.close()
 
-  createProc = new Request "create procedure #divideByZero as raiserror('test error message', 14, 42)", (err) ->
+  createProc = new Request "create procedure #testExtendedErrorInfo as raiserror('test error message', 14, 42)", (err) ->
     test.ifError(err)
     connection.callProcedure execProc
 
