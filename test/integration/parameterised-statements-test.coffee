@@ -255,7 +255,7 @@ exports.outputDateTimeNull = (test) ->
   execSqlOutput(test, TYPES.DateTime, null)
 
 exports.multipleParameters = (test) ->
-  test.expect(6)
+  test.expect(7)
 
   config = getConfig()
 
@@ -282,6 +282,7 @@ exports.multipleParameters = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
+      test.ifError(err)
       connection.execSql(request)
   )
 
@@ -300,7 +301,7 @@ execSql = (test, type, value, tdsVersion, options) ->
   if tdsVersion and tdsVersion > config.options.tdsVersion
   	return test.done()
 
-  test.expect(5)
+  test.expect(6)
 
   request = new Request('select @param', (err) ->
       test.ifError(err)
@@ -331,6 +332,7 @@ execSql = (test, type, value, tdsVersion, options) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
+      test.ifError(err)
       connection.execSql(request)
   )
 
@@ -347,7 +349,7 @@ execSql = (test, type, value, tdsVersion, options) ->
   )
 
 execSqlOutput = (test, type, value) ->
-  test.expect(6)
+  test.expect(7)
 
   config = getConfig()
 
@@ -383,6 +385,7 @@ execSqlOutput = (test, type, value) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
+      test.ifError(err)
       connection.execSql(request)
   )
 

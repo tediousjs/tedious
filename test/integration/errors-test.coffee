@@ -26,7 +26,7 @@ exports.uniqueConstraint = (test) ->
   drop table #testUnique;
   """
 
-  test.expect(2)
+  test.expect(3)
   execSql test, sql, (err) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 2627)
@@ -38,7 +38,7 @@ exports.ansiNullDefaults = (test) ->
   drop table #testAnsiNullDefault;
   """
 
-  test.expect(2)
+  test.expect(3)
   execSql test, sql, (err) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 515)
@@ -48,14 +48,15 @@ exports.cannotDropProcedure = (test) ->
   drop procedure #nonexistentProcedure;
   """
 
-  test.expect(2)
+  test.expect(3)
   execSql test, sql, (err) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 3701)
 
-# Create a temporary stored procedure to test that err.procName and
-# err.lineNumber are correct.
-# We can't really test much else reliably, other than that they exist.
+# Create a temporary stored procedure to test that err.procName,
+# err.lineNumber, err.class, and err.state are correct.
+# 
+# We can't really test serverName reliably, other than that it exists.
 exports.extendedErrorInfo = (test) ->
   connection = new Connection(config)
 
@@ -63,14 +64,13 @@ exports.extendedErrorInfo = (test) ->
 
   execProc = new Request "#divideByZero", (err) ->
     test.ok(err instanceof Error)
-    test.strictEqual(err.number, 8134)
-      
-    # It doesn't look like there's any guarantee that error state values
-    # will be kept the same across different versions of SQL Server, so
-    # it's probably best to just test that it's not null.
-    test.ok(err.state?, "err.state not set")
-    test.ok(err.class?, "err.class not set")
+
+    test.strictEqual(err.number, 50000)
+    test.strictEqual(err.state, 42, "err.state wrong")
+    test.strictEqual(err.class, 14, "err.class wrong")
+
     test.ok(err.serverName?, "err.serverName not set")
+
     # The procedure name will actually be padded to 128 chars with underscores and
     # some random hexadecimal digits.
     test.ok(err.procName?.indexOf("#divideByZero") == 0,
@@ -79,7 +79,7 @@ exports.extendedErrorInfo = (test) ->
       
     connection.close()
 
-  createProc = new Request "create procedure #divideByZero as select 1/0 as x", (err) ->
+  createProc = new Request "create procedure #divideByZero as raiserror('test error message', 14, 42)", (err) ->
     test.ifError(err)
     connection.callProcedure execProc
 
@@ -101,10 +101,8 @@ execSql = (test, sql, requestCallback) ->
     connection.close()
 
   connection.on 'connect', (err) ->
-    if (err)
-      console.log err
-    else
-      connection.execSqlBatch(request)
+    test.ifError(err)
+    connection.execSqlBatch(request)
 
   connection.on 'end', (info) ->
     test.done()
