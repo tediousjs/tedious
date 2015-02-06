@@ -16,7 +16,7 @@ getConfig = ->
   config
 
 exports.prepareExecute = (test) ->
-  test.expect(4)
+  test.expect(5)
   value = 8
 
   config = getConfig()
@@ -40,6 +40,7 @@ exports.prepareExecute = (test) ->
   )
 
   connection.on('connect', (err) ->
+    test.ifError(err)
     connection.prepare(request)
   )
 
@@ -52,7 +53,7 @@ exports.prepareExecute = (test) ->
   )
 
 exports.unprepare = (test) ->
-  test.expect(2)
+  test.expect(3)
 
   config = getConfig()
   prepared = false
@@ -70,6 +71,7 @@ exports.unprepare = (test) ->
   )
 
   connection.on('connect', (err) ->
+    test.ifError(err)
     connection.prepare(request)
   )
 

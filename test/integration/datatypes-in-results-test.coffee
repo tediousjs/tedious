@@ -304,7 +304,7 @@ execSql = (test, sql, expectedValue, tdsVersion) ->
   if tdsVersion and tdsVersion > config.options.tdsVersion
   	return test.done()
 
-  test.expect(2)
+  test.expect(3)
 
   request = new Request(sql, (err) ->
     test.ifError(err)
@@ -324,10 +324,8 @@ execSql = (test, sql, expectedValue, tdsVersion) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-    if (err)
-      console.log err
-    else
-      connection.execSqlBatch(request)
+    test.ifError(err)
+    connection.execSqlBatch(request)
   )
 
   connection.on('end', (info) ->

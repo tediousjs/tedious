@@ -24,7 +24,7 @@ getConfig = ->
   config
 
 exports.callProcedureWithTVP = (test) ->
-  test.expect(12)
+  test.expect(13)
 
   config = getConfig()
 
@@ -106,6 +106,7 @@ exports.callProcedureWithTVP = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
+    test.ifError(err)
     connection.execSqlBatch(request)
   )
 

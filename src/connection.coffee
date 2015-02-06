@@ -310,6 +310,12 @@ class Connection extends EventEmitter
       if @loggedIn
         if @request
           @request.error = RequestError token.message, 'EREQUEST'
+          @request.error.number = token.number
+          @request.error.state = token.state
+          @request.error.class = token.class
+          @request.error.serverName = token.serverName
+          @request.error.procName = token.procName
+          @request.error.lineNumber = token.lineNumber
       else
         @loginError = ConnectionError token.message, 'ELOGIN'
     )
