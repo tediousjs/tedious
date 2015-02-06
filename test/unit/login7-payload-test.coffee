@@ -55,6 +55,7 @@ exports.createNTLM = (test) ->
     appName: 'app'
     serverName: 'server'
     domain: 'domain'
+    workstation: 'workstation'
     language: 'lang'
     database: 'db'
     packetSize: 1024
@@ -84,6 +85,9 @@ exports.createNTLM = (test) ->
 
   protocolHeader = payload.ntlmPacket.slice(0, 8).toString('utf8')
   test.strictEqual(protocolHeader, 'NTLMSSP\u0000')
+
+  workstationName = payload.ntlmPacket.slice(payload.ntlmPacket.length - 17).toString('ascii').substr( 0, 11 )
+  test.strictEqual(workstationName, 'WORKSTATION')
 
   domainName = payload.ntlmPacket.slice(payload.ntlmPacket.length - 6).toString('ascii')
   test.strictEqual(domainName, 'DOMAIN')
