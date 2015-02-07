@@ -43,7 +43,7 @@ title: API - Connection
   <li><a href="#function_prepare">connection.prepare(request)</a></li>
   <li><a href="#function_reset">connection.reset(callback)</a></li>
   <li><a href="#function_rollbackTransaction">connection.rollbackTransaction(callback, [name])</a></li>
-  <li><a href="#function_saveTransaction">connection.saveTransaction(callback, name)</a></li>
+  <li><a href="#function_saveTransaction">connection.saveTransaction(callback)</a></li>
   <li><a href="#function_transaction">connection.transaction(callback)</a></li>
   <li><a href="#function_unprepare">connection.unprepare(request)</a></li>
   <li><a href="#function_newBulkLoad">connection.newBulkLoad(tableName, callback)</a></li>
@@ -790,7 +790,7 @@ var connection = new Connection(config);
   </div>
 </div>
 
-<h2 id="function_saveTransaction">connection.saveTransaction(callback, name)</h2>
+<h2 id="function_saveTransaction">connection.saveTransaction(callback)</h2>
 <p>
   Set a savepoint within a transaction.
 </p>
@@ -822,7 +822,7 @@ var connection = new Connection(config);
   </div>
 </div>
 
-<h2 id="function_transaction">connection.transaction(callback)</h2>
+<h2 id="function_transaction">connection.transaction(callback, name, isolationLevel)</h2>
 <p>
   Run the given callback after starting a transaction, and commit or rollback the transaction afterwards.
 </p>
@@ -867,6 +867,36 @@ var connection = new Connection(config);
         </p>
       </div>
     </div>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">name</div>
+  <div class="description">
+    <p>
+      A string representing a name to associate with the transaction.
+    </p>
+    <p>
+      Optional, and defaults to an empty string. In case of a nested transaction, naming the transaction name has no effect.
+    </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">isolationLevel</div>
+  <div class="description">
+    <p>
+      The isolation level that the transaction is to be run with.
+      The isolation levels are available from <code>require('tedious').ISOLATON_LEVEL</code> .
+      <ul>
+        <li><code>READ_UNCOMMITTED</code></li>
+        <li><code>READ_COMMITTED</code></li>
+        <li><code>REPEATABLE_READ</code></li>
+        <li><code>SERIALIZABLE</code></li>
+        <li><code>SNAPSHOT</code></li>
+      </ul>
+    </p>
+    <p>
+      Optional, and defaults to the Connection's isolation level.
+    </p>
   </div>
 </div>
 
