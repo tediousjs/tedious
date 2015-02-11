@@ -8,7 +8,7 @@ convertLEBytesToString= require('./bigint').convertLEBytesToString
 ###
 class ReadableTrackingBuffer
   constructor: (@buffer, @encoding) ->
-    if !buffer
+    if !@buffer
       @buffer = new Buffer(0)
       @encoding = undefined
 
