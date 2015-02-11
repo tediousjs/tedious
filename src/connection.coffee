@@ -605,7 +605,7 @@ class Connection extends EventEmitter
       preloginPayload.toString('  ')
     )
 
-    if preloginPayload.encryptionString == 'ON'
+    if preloginPayload.encryptionString in ['ON','REQ']
       @dispatchEvent('tls')
     else
       @dispatchEvent('noTls')
