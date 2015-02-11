@@ -558,13 +558,14 @@ class Connection extends EventEmitter
       @close()
 
   socketError: (error) =>
-    message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"
-
-    @debug.log(message)
     if @state == @STATE.CONNECTING
+      message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"
+      @debug.log(message)
       @emit('connect', ConnectionError(message, 'ESOCKET'))
     else
-      @emit('error', ConnectionError message)
+      message = "Connection lost - #{error.message}"
+      @debug.log(message)
+      @emit('error', ConnectionError(message, 'ESOCKET'))
     @dispatchEvent('socketError', error)
 
   socketConnect: =>
