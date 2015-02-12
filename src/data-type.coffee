@@ -903,7 +903,7 @@ TYPE =
       if not value? then return null
       if value instanceof Date then return value
       value = Date.parse value
-      if isNaN value then return new TypeError "Invalid time."
+      if isNaN value then return new TypeError "Invalid date."
       value
   0x2A:
     type: 'DATETIME2N'
@@ -958,7 +958,7 @@ TYPE =
       if not value? then return null
       if value instanceof Date then return value
       value = Date.parse value
-      if isNaN value then return new TypeError "Invalid time."
+      if isNaN value then return new TypeError "Invalid date."
       value
   0x2B:
     type: 'DATETIMEOFFSETN'
@@ -1017,7 +1017,7 @@ TYPE =
       if not value? then return null
       if value instanceof Date then return value
       value = Date.parse value
-      if isNaN value then return new TypeError "Invalid time."
+      if isNaN value then return new TypeError "Invalid date."
       value
   0xF0:
     type: 'UDTTYPE'
