@@ -374,6 +374,7 @@ class Connection extends EventEmitter
       @transactionDescriptors.length = 1
       # An outermost transaction was rolled back. Reset the transaction counter
       @inTransaction = false
+      @emit('rollbackTransaction')
     )
 
     @tokenStreamParser.on('columnMetadata', (token) =>
