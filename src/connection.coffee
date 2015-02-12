@@ -648,7 +648,7 @@ class Connection extends EventEmitter
       payload.toString '  '
 
   initiateTlsSslHandshake: ->
-    credentials = crypto.createCredentials(@config.options.cryptoCredentialsDetails)
+    credentials = tls.createSecureContext(@config.options.cryptoCredentialsDetails)
     @securePair = tls.createSecurePair(credentials)
 
     @securePair.on('secure', =>
