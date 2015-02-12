@@ -28,6 +28,12 @@ TYPE =
         buffer.writeUInt8(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value = parseInt value
+      if isNaN value then return new TypeError "Invalid number."
+      if value < 0 or value > 255 then return new TypeError "Value must be between 0 and 255."
+      value
   0x32:
     type: 'BIT'
     name: 'Bit'
@@ -44,6 +50,9 @@ TYPE =
       else
         buffer.writeUInt8(1)
         buffer.writeUInt8(if parameter.value then 1 else 0)
+    validate: (value) ->
+      if not value? then return null
+      if value then true else false
   0x34:
     type: 'INT2'
     name: 'SmallInt'
@@ -60,6 +69,12 @@ TYPE =
         buffer.writeInt16LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value = parseInt value
+      if isNaN value then return new TypeError "Invalid number."
+      if value < -32768 or value > 32767 then return new TypeError "Value must be between -32768 and 32767."
+      value
   0x38:
     type: 'INT4'
     name: 'Int'
@@ -76,6 +91,12 @@ TYPE =
         buffer.writeInt32LE(parseInt(parameter.value))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value = parseInt value
+      if isNaN value then return new TypeError "Invalid number."
+      if value < -2147483648 or value > 2147483647 then return new TypeError "Value must be between -2147483648 and 2147483647."
+      value
   0x3A:
     type: 'DATETIM4'
     name: 'SmallDateTime'
@@ -100,6 +121,12 @@ TYPE =
         buffer.writeUInt16LE(minutes)
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid date."
+      value
   0x3B:
     type: 'FLT4'
     name: 'Real'
@@ -116,6 +143,11 @@ TYPE =
         buffer.writeFloatLE(parseFloat(parameter.value))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      value
   0x3C:
     type: 'MONEY'
     name: 'Money'
@@ -132,6 +164,11 @@ TYPE =
         buffer.writeMoney parameter.value * 10000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      value
   0x3D:
     type: 'DATETIME'
     name: 'DateTime'
@@ -165,6 +202,12 @@ TYPE =
         buffer.writeUInt32LE(threeHundredthsOfSecond)
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid date."
+      value
   0x3E:
     type: 'FLT8'
     name: 'Float'
@@ -181,6 +224,11 @@ TYPE =
         buffer.writeDoubleLE(parseFloat(parameter.value))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      value
   0x37:
     type: 'DECIMAL'
     name: 'Decimal'
@@ -243,6 +291,11 @@ TYPE =
           buffer.writeUInt32LE 0x00000000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      value
   0x3F:
     type: 'NUMERIC'
     name: 'Numeric'
@@ -304,6 +357,11 @@ TYPE =
           buffer.writeUInt32LE 0x00000000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      value
   0x7A:
     type: 'MONEY4'
     name: 'SmallMoney'
@@ -320,6 +378,12 @@ TYPE =
         buffer.writeInt32LE parameter.value * 10000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      value = parseFloat value
+      if isNaN value then return new TypeError "Invalid number."
+      if value < -214748.3648 or value > 214748.3647 then return new TypeError "Value must be between -214748.3648 and 214748.3647."
+      value
   0x7F:
     type: 'INT8'
     name: 'BigInt'
@@ -337,6 +401,9 @@ TYPE =
         buffer.writeInt64LE(val)
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      value
 
   # Variable-length types
   0x22:
@@ -365,6 +432,10 @@ TYPE =
         # buffer.writePLPBody parameter.value
       else
         buffer.writeInt32LE parameter.length
+    validate: (value) ->
+      if not value? then return null
+      if not Buffer.isBuffer value then return new TypeError "Invalid buffer."
+      value
       
   0x23:
     type: 'TEXT'
@@ -394,6 +465,12 @@ TYPE =
         buffer.writeString(parameter.value.toString(), 'ascii')
       else
         buffer.writeInt32LE(parameter.length)
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0x24:
     type: 'GUIDN'
     name: 'UniqueIdentifierN'
@@ -414,6 +491,12 @@ TYPE =
         buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)))
       else
         buffer.writeUInt8(0)
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0x26:
     type: 'INTN'
     name: 'IntN'
@@ -502,6 +585,10 @@ TYPE =
           # PLP_NULL
           buffer.writeUInt32LE(0xFFFFFFFF)
           buffer.writeUInt32LE(0xFFFFFFFF)
+    validate: (value) ->
+      if not value? then return null
+      if not Buffer.isBuffer value then return new TypeError "Invalid buffer."
+      value
         
   0xA7:
     type: 'BIGVARCHR'
@@ -556,6 +643,12 @@ TYPE =
           # PLP_NULL
           buffer.writeUInt32LE(0xFFFFFFFF)
           buffer.writeUInt32LE(0xFFFFFFFF)
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0xAD:
     type: 'BIGBinary'
     name: 'Binary'
@@ -579,7 +672,10 @@ TYPE =
         buffer.writeBuffer parameter.value.slice 0, Math.min(parameter.length, @maximumLength)
       else
         buffer.writeUInt16LE NULL
-      
+    validate: (value) ->
+      if not value? then return null
+      if not Buffer.isBuffer value then return new TypeError "Invalid buffer."
+      value
   0xAF:
     type: 'BIGCHAR'
     name: 'Char'
@@ -619,6 +715,12 @@ TYPE =
         buffer.writeUsVarbyte parameter.value, 'ascii'
       else
         buffer.writeUInt16LE NULL
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0xE7:
     type: 'NVARCHAR'
     name: 'NVarChar'
@@ -672,6 +774,12 @@ TYPE =
           # PLP_NULL
           buffer.writeUInt32LE(0xFFFFFFFF)
           buffer.writeUInt32LE(0xFFFFFFFF)
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0xEF:
     type: 'NCHAR'
     name: 'NChar'
@@ -711,6 +819,12 @@ TYPE =
         buffer.writeUsVarbyte parameter.value, 'ucs2'
       else
         buffer.writeUInt16LE NULL
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'string'
+        if typeof value.toString isnt 'function' then return TypeError "Invalid string."
+        value = value.toString()
+      value
   0xF1:
     type: 'XML'
     name: 'Xml'
@@ -761,7 +875,12 @@ TYPE =
             buffer.writeUInt40LE time
       else
         buffer.writeUInt8 0
-        
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid time."
+      value
   0x28:
     type: 'DATEN'
     name: 'DateN'
@@ -780,6 +899,12 @@ TYPE =
         buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid time."
+      value
   0x2A:
     type: 'DATETIME2N'
     name: 'DateTime2N'
@@ -829,6 +954,12 @@ TYPE =
         buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
       else
         buffer.writeUInt8 0
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid time."
+      value
   0x2B:
     type: 'DATETIMEOFFSETN'
     name: 'DateTimeOffsetN'
@@ -882,7 +1013,12 @@ TYPE =
         buffer.writeInt16LE offset
       else
         buffer.writeUInt8 0
-  # ---
+    validate: (value) ->
+      if not value? then return null
+      if value instanceof Date then return value
+      value = Date.parse value
+      if isNaN value then return new TypeError "Invalid time."
+      value
   0xF0:
     type: 'UDTTYPE'
     name: 'UDT'
@@ -937,6 +1073,12 @@ TYPE =
 
       # TVP_NULL_TOKEN
       buffer.writeUInt8 0x00
+    validate: (value) ->
+      if not value? then return null
+      if typeof value isnt 'object' then return new TypeError "Invalid table."
+      if not Array.isArray value.columns then return new TypeError "Invalid table."
+      if not Array.isArray value.rows then return new TypeError "Invalid table."
+      value
 
 # Types not (yet) supported
 ###

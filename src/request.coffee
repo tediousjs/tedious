@@ -51,6 +51,8 @@ class Request extends EventEmitter
     paramsParameter
 
   transformIntoExecuteSqlRpc: () ->
+    if @validateParameters() then return
+  	
     @originalParameters = @parameters
     @parameters = []
 
@@ -96,7 +98,19 @@ class Request extends EventEmitter
     for parameter in @originalParameters
       parameter.value = parameters[parameter.name]
       @parameters.push(parameter)
+    
+    if @validateParameters() then return
 
     @sqlTextOrProcedure = 'sp_execute'
+  
+  validateParameters: ->
+    for parameter in @parameters
+      value = parameter.type.validate parameter.value
+      if value instanceof TypeError
+        return @error = new RequestError "Validation failed for parameter '#{parameter.name}'. #{value.message}", "EPARAM"
+      	
+      parameter.value = value
+    
+    null
 
 module.exports = Request
