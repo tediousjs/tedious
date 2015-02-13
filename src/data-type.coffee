@@ -2,7 +2,8 @@ guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
 UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1))
-YEAR_ONE = Date.UTC(2000, 0, -730118)
+YEAR_ONE = new Date(2000, 0, -730118).getTime()
+UTC_YEAR_ONE = Date.UTC(2000, 0, -730118)
 MAX = (1 << 16) - 1
 
 TYPE =
@@ -853,14 +854,17 @@ TYPE =
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
       buffer.writeUInt8 parameter.scale
-    writeParameterData: (buffer, parameter) ->
+    writeParameterData: (buffer, parameter, options) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
-        parameter.value.setUTCFullYear 1970
-        parameter.value.setUTCMonth 0
-        parameter.value.setUTCDate 1
+        time = new Date(+parameter.value)
 
-        time = (+parameter.value / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
+        if options.useUTC
+          time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds()
+        else
+          time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds()
+
+        time = (time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
 
         # seconds since midnight
         switch parameter.scale
@@ -891,12 +895,15 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8(@id)
-    writeParameterData: (buffer, parameter) ->
+    writeParameterData: (buffer, parameter, options) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         buffer.writeUInt8 3
         # days since 1-1-1
-        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+        if options.useUTC
+          buffer.writeUInt24LE Math.floor (+parameter.value - UTC_YEAR_ONE) / 86400000
+        else
+          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
       else
         buffer.writeUInt8 0
     validate: (value) ->
@@ -930,14 +937,17 @@ TYPE =
       buffer.writeUInt8 @id
       buffer.writeUInt8 parameter.scale
       
-    writeParameterData: (buffer, parameter) ->
+    writeParameterData: (buffer, parameter, options) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         time = new Date(+parameter.value)
-        time.setUTCFullYear 1970
-        time.setUTCMonth 0
-        time.setUTCDate 1
-        time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
+        
+        if options.useUTC
+          time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds()
+        else
+          time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds()
+        
+        time = (time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
 
         # seconds since midnight
         switch parameter.scale
@@ -951,7 +961,10 @@ TYPE =
             buffer.writeUInt8 8
             buffer.writeUInt40LE time
         # days since 1-1-1
-        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+        if options.useUTC
+          buffer.writeUInt24LE Math.floor (+parameter.value - UTC_YEAR_ONE) / 86400000
+        else
+          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
       else
         buffer.writeUInt8 0
     validate: (value) ->
@@ -1008,7 +1021,7 @@ TYPE =
             buffer.writeUInt8 10
             buffer.writeUInt40LE time
         # days since 1-1-1
-        buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+        buffer.writeUInt24LE Math.floor (+parameter.value - UTC_YEAR_ONE) / 86400000
         # offset
         buffer.writeInt16LE offset
       else

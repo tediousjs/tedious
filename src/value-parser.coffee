@@ -163,17 +163,17 @@ parse = (buffer, metaData, options) ->
       if (dataLength = buffer.readUInt8()) == 0
         value = null
       else
-        value = readTime buffer, dataLength, metaData.scale
+        value = readTime buffer, dataLength, metaData.scale, options.useUTC
     when 'DateN'
       if (dataLength = buffer.readUInt8()) == 0
         value = null
       else
-        value = readDate buffer
+        value = readDate buffer, options.useUTC
     when 'DateTime2N'
       if (dataLength = buffer.readUInt8()) == 0
         value = null
       else
-        value = readDateTime2 buffer, dataLength, metaData.scale
+        value = readDateTime2 buffer, dataLength, metaData.scale, options.useUTC
     when 'DateTimeOffsetN'
       if (dataLength = buffer.readUInt8()) == 0
         value = null
@@ -315,7 +315,7 @@ readDateTime = (buffer, useUTC) ->
     
   value
 
-readTime = (buffer, dataLength, scale) ->
+readTime = (buffer, dataLength, scale, useUTC) ->
   switch dataLength
     when 3 then value = buffer.readUInt24LE()
     when 4 then value = buffer.readUInt32LE()
@@ -324,23 +324,34 @@ readTime = (buffer, dataLength, scale) ->
   if scale < 7
 	  value *= 10 for i in [scale+1..7]
   
-  date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000))
+  if useUTC
+    date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000))
+  else
+    date = new Date(1970, 0, 1, 0, 0, 0, value / 10000)
+    
   Object.defineProperty date, "nanosecondsDelta",
     enumerable: false
     value: (value % 10000) / Math.pow(10, 7)
 
   date
 
-readDate = (buffer) ->
-  days = buffer.readUInt24LE()
-  
-  new Date(Date.UTC(2000, 0, days - 730118))
-
-readDateTime2 = (buffer, dataLength, scale) ->
-  time = readTime buffer, dataLength - 3, scale
+readDate = (buffer, useUTC) ->
   days = buffer.readUInt24LE()
 
-  date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time))
+  if useUTC
+    new Date(Date.UTC(2000, 0, days - 730118))
+  else
+    new Date(2000, 0, days - 730118)
+
+readDateTime2 = (buffer, dataLength, scale, useUTC) ->
+  time = readTime buffer, dataLength - 3, scale, useUTC
+  days = buffer.readUInt24LE()
+
+  if useUTC
+    date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time))
+  else
+    date = new Date(2000, 0, days - 730118, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+    
   Object.defineProperty date, "nanosecondsDelta",
     enumerable: false
     value: time.nanosecondsDelta
@@ -348,10 +359,10 @@ readDateTime2 = (buffer, dataLength, scale) ->
   date
 
 readDateTimeOffset = (buffer, dataLength, scale) ->
-  time = readTime buffer, dataLength - 5, scale
+  time = readTime buffer, dataLength - 5, scale, true
   days = buffer.readUInt24LE()
   offset = buffer.readInt16LE()
-
+  
   date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time))
   Object.defineProperty date, "nanosecondsDelta",
     enumerable: false
