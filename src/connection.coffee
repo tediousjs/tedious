@@ -735,6 +735,11 @@ set xact_abort #{xact_abort}"""
 
   execSql: (request) ->
     request.transformIntoExecuteSqlRpc()
+    if request.error?
+      return process.nextTick =>
+        @debug.log request.error.message
+        request.callback request.error
+
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
   
   newBulkLoad: (table, callback) ->
@@ -762,9 +767,20 @@ set xact_abort #{xact_abort}"""
 
   execute: (request, parameters) ->
     request.transformIntoExecuteRpc(parameters)
+    if request.error?
+      return process.nextTick =>
+        @debug.log request.error.message
+        request.callback request.error
+
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   callProcedure: (request) ->
+    request.validateParameters()
+    if request.error?
+      return process.nextTick =>
+        @debug.log request.error.message
+        request.callback request.error
+
     @makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, @currentTransactionDescriptor(), @config.options))
 
   beginTransaction: (callback, name, isolationLevel) ->
