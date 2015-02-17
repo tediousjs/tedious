@@ -1,14 +1,16 @@
 {
   "author": "Mike D Pilsbury <mike.pilsbury@gmail.com>",
   "contributors": [
+    "Alex Robson",
+    "Arthur Schreiber",
+    "Bret Copeland <bret@atlantisflight.org> (https://github.com/bretcope)",
+    "Bryan Ross <bryan@rossipedia.com> (https://github.com/rossipedia)",
     "Ciaran Jessup <ciaranj@gmail.com>",
     "Cort Fritz <cfritz@caa.com>",
     "lastonesky",
     "Patrik Simek <patrik@patriksimek.cz>",
     "Phil Dodderidge <pdodde@poyntz.com>",
-    "Zach Aller",
-    "Bryan Ross <bryan@rossipedia.com> (https://github.com/rossipedia)",
-    "Bret Copeland <bret@atlantisflight.org> (https://github.com/bretcope)"
+    "Zach Aller"
   ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
@@ -30,24 +32,24 @@
       "url": "https://raw.github.com/pekim/tedious/master/LICENSE"
     }
   ],
-  "version": "1.9.0",
+  "version": "1.10.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/pekim/tedious.git"
   },
   "engines": {
-    "node": "0.6 || 0.7 || 0.8 || 0.9 || 0.10 || 0.11"
+    "node": ">=0.6"
   },
   "dependencies": {
-    "big-number": "0.3.0",
-    "iconv-lite": "0.4.2",
-    "sprintf": "0.1.1"
+    "big-number": "0.3.1",
+    "iconv-lite": "0.4.7",
+    "sprintf": "0.1.5"
   },
   "devDependencies": {
-    "async": "0.2.10",
-    "coffee-script": "1.7.1",
-    "nodeunit": "0.8.4"
+    "async": "0.9.0",
+    "coffee-script": "1.9.0",
+    "nodeunit": "0.9.0"
   },
   "scripts": {
     "test": "node_modules/.bin/nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
