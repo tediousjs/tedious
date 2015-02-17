@@ -119,6 +119,9 @@ exports.varCharMax = (test) ->
 
   execSql(test, TYPES.VarChar, longString, '7_2')
 
+exports.varCharMaxEmptyString = (test) ->
+  execSql(test, TYPES.VarChar, '', null, {length: 8001})
+
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
 
@@ -137,6 +140,9 @@ exports.nVarCharMax = (test) ->
     longString += 'x'
 
   execSql(test, TYPES.NVarChar, longString, '7_2')
+
+exports.nVarCharMaxEmptyString = (test) ->
+  execSql(test, TYPES.NVarChar, '', null, {length: 4001})
 
 exports.Char = (test) ->
   execSql(test, TYPES.Char, 'qaz')

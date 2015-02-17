@@ -202,15 +202,17 @@ class WritableTrackingBuffer
 #    @writeUInt64LE length
     @writeBuffer(UNKNOWN_PLP_LEN) # unknown seems to work better here - might revisit later.
     
-    # One chunk.
-    @writeUInt32LE length
-    
-    if Buffer.isBuffer value
-      @writeBuffer value
-    else
-      @makeRoomFor length
-      @buffer.write value, @position, encoding
-      @position += length
+    # In the UNKNOWN_PLP_LEN case, the data is represented as a series of zero or more chunks.
+    if length > 0
+      # One chunk.
+      @writeUInt32LE length
+
+      if Buffer.isBuffer value
+        @writeBuffer value
+      else
+        @makeRoomFor length
+        @buffer.write value, @position, encoding
+        @position += length
 
     # PLP_TERMINATOR (no more chunks).
     @writeUInt32LE(0)
