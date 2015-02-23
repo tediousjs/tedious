@@ -39,7 +39,7 @@
     "url": "https://github.com/pekim/tedious.git"
   },
   "engines": {
-    "node": ">=0.6"
+    "node": ">= 0.10"
   },
   "dependencies": {
     "big-number": "0.3.1",
