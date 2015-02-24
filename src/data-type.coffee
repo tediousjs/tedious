@@ -2,7 +2,7 @@ guidParser = require('./guid-parser')
 NULL = (1 << 16) - 1
 EPOCH_DATE = new Date(1900, 0, 1)
 UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1))
-YEAR_ONE = new Date(2000, 0, -730118).getTime()
+YEAR_ONE = new Date(2000, 0, -730118)
 UTC_YEAR_ONE = Date.UTC(2000, 0, -730118)
 MAX = (1 << 16) - 1
 
@@ -114,7 +114,8 @@ TYPE =
           days = Math.floor (parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
           minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes()
         else
-          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000
+          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24)
           minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes()
 
         buffer.writeUInt8(4)
@@ -189,7 +190,8 @@ TYPE =
           seconds += parameter.value.getUTCSeconds()
           milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds()
         else
-          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24)
+          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000
+          days = Math.floor (parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24)
           seconds = parameter.value.getHours() * 60 * 60
           seconds += parameter.value.getMinutes() * 60
           seconds += parameter.value.getSeconds()
@@ -903,7 +905,8 @@ TYPE =
         if options.useUTC
           buffer.writeUInt24LE Math.floor (+parameter.value - UTC_YEAR_ONE) / 86400000
         else
-          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+          dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000
+          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE + dstDiff) / 86400000
       else
         buffer.writeUInt8 0
     validate: (value) ->
@@ -964,7 +967,8 @@ TYPE =
         if options.useUTC
           buffer.writeUInt24LE Math.floor (+parameter.value - UTC_YEAR_ONE) / 86400000
         else
-          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE) / 86400000
+          dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000
+          buffer.writeUInt24LE Math.floor (+parameter.value - YEAR_ONE + dstDiff) / 86400000
       else
         buffer.writeUInt8 0
     validate: (value) ->
