@@ -1,5 +1,6 @@
 TYPES = require('../../src/data-type')
 WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer')
+ReadableTrackingBuffer = require('../../src/tracking-buffer/readable-tracking-buffer')
 
 exports.noTypeOverridesByAliases = (test) ->
   typesByName = {}
@@ -22,10 +23,10 @@ exports.knownAliases = (test) ->
 # Test date calculation for non utc date during daylight savings period
 exports.smallDateTimeDaylightSaving = (test) ->
   type = TYPES.typeByName['SmallDateTime']
-  for testSet in [[new Date('2015-06-18T23:59:59+0200'),42171],
-                  [new Date('2015-06-19T00:00:00+0200'),42172],
-                  [new Date('2015-06-19T23:59:59+0200'),42172],
-                  [new Date('2015-06-20T00:00:00+0200'),42173]]
+  for testSet in [[new Date('2015-06-18T21:59:59'),42171],
+                  [new Date('2015-06-18T22:00:00'),42172],
+                  [new Date('2015-06-19T21:59:59'),42172],
+                  [new Date('2015-06-19T22:00:00'),42173]]
     buffer = new WritableTrackingBuffer 8
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
@@ -35,10 +36,10 @@ exports.smallDateTimeDaylightSaving = (test) ->
 
 exports.dateTimeDaylightSaving = (test) ->
   type = TYPES.typeByName['DateTime']
-  for testSet in [[new Date('2015-06-18T23:59:59+0200'),42171],
-                  [new Date('2015-06-19T00:00:00+0200'),42172],
-                  [new Date('2015-06-19T23:59:59+0200'),42172],
-                  [new Date('2015-06-20T00:00:00+0200'),42173]]
+  for testSet in [[new Date('2015-06-18T21:59:59'),42171],
+                  [new Date('2015-06-18T22:00:00'),42172],
+                  [new Date('2015-06-19T21:59:59'),42172],
+                  [new Date('2015-06-19T22:00:00'),42173]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
@@ -46,28 +47,33 @@ exports.dateTimeDaylightSaving = (test) ->
     test.strictEqual(buffer.buffer.readInt32LE(1), expectedNoOfDays)
   test.done()
 
-exports.dateTimeDaylightSaving = (test) ->
+exports.dateTime2DaylightSaving = (test) ->
   type = TYPES.typeByName['DateTime2']
-  for testSet in [[new Date('2015-06-18T23:59:59+0200'),735766],
-                  [new Date('2015-06-19T00:00:00+0200'),735767],
-                  [new Date('2015-06-19T23:59:59+0200'),735767],
-                  [new Date('2015-06-20T00:00:00+0200'),735768]]
+  for testSet in [[new Date('2015-06-18T21:59:59'),735766],
+                  [new Date('2015-06-18T22:00:00'),735767],
+                  [new Date('2015-06-19T21:59:59'),735767],
+                  [new Date('2015-06-19T22:00:00'),735768]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0], scale: 0 }
     expectedNoOfDays = testSet[1]
     type.writeParameterData(buffer, parameter, { useUTC: false })
-    test.strictEqual(buffer.buffer.readUIntLE(4,3), expectedNoOfDays)
+    rBuffer = new ReadableTrackingBuffer(buffer.buffer)
+    rBuffer.readUInt8()
+    rBuffer.readUInt24LE()
+    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays)
   test.done()
 
 exports.dateDaylightSaving = (test) ->
   type = TYPES.typeByName['Date']
-  for testSet in [[new Date('2015-06-18T23:59:59+0200'),735766],
-                  [new Date('2015-06-19T00:00:00+0200'),735767],
-                  [new Date('2015-06-19T23:59:59+0200'),735767],
-                  [new Date('2015-06-20T00:00:00+0200'),735768]]
+  for testSet in [[new Date('2015-06-18T21:59:59'),735766],
+                  [new Date('2015-06-18T22:00:00'),735767],
+                  [new Date('2015-06-19T21:59:59'),735767],
+                  [new Date('2015-06-19T22:00:00'),735768]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
     type.writeParameterData(buffer, parameter, { useUTC: false })
-    test.strictEqual(buffer.buffer.readUIntLE(1,3), expectedNoOfDays)
+    rBuffer = new ReadableTrackingBuffer(buffer.buffer)
+    rBuffer.readUInt8()
+    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays)
   test.done()
