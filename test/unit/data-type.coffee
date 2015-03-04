@@ -23,10 +23,10 @@ exports.knownAliases = (test) ->
 # Test date calculation for non utc date during daylight savings period
 exports.smallDateTimeDaylightSaving = (test) ->
   type = TYPES.typeByName['SmallDateTime']
-  for testSet in [[new Date('2015-06-18T21:59:59'),42171],
-                  [new Date('2015-06-18T22:00:00'),42172],
-                  [new Date('2015-06-19T21:59:59'),42172],
-                  [new Date('2015-06-19T22:00:00'),42173]]
+  for testSet in [[new Date(2015,5,18,23,59,59),42171],
+                  [new Date(2015,5,19,0,0,0),42172],
+                  [new Date(2015,5,19,23,59,59),42172],
+                  [new Date(2015,5,20,0,0,0),42173]]
     buffer = new WritableTrackingBuffer 8
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
@@ -36,10 +36,10 @@ exports.smallDateTimeDaylightSaving = (test) ->
 
 exports.dateTimeDaylightSaving = (test) ->
   type = TYPES.typeByName['DateTime']
-  for testSet in [[new Date('2015-06-18T21:59:59'),42171],
-                  [new Date('2015-06-18T22:00:00'),42172],
-                  [new Date('2015-06-19T21:59:59'),42172],
-                  [new Date('2015-06-19T22:00:00'),42173]]
+  for testSet in [[new Date(2015,5,18,23,59,59),42171],
+                  [new Date(2015,5,19,0,0,0),42172],
+                  [new Date(2015,5,19,23,59,59),42172],
+                  [new Date(2015,5,20,0,0,0),42173]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
@@ -49,10 +49,10 @@ exports.dateTimeDaylightSaving = (test) ->
 
 exports.dateTime2DaylightSaving = (test) ->
   type = TYPES.typeByName['DateTime2']
-  for testSet in [[new Date('2015-06-18T21:59:59'),735766],
-                  [new Date('2015-06-18T22:00:00'),735767],
-                  [new Date('2015-06-19T21:59:59'),735767],
-                  [new Date('2015-06-19T22:00:00'),735768]]
+  for testSet in [[new Date(2015,5,18,23,59,59),735766],
+                  [new Date(2015,5,19,0,0,0),735767],
+                  [new Date(2015,5,19,23,59,59),735767],
+                  [new Date(2015,5,20,0,0,0),735768]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0], scale: 0 }
     expectedNoOfDays = testSet[1]
@@ -65,10 +65,10 @@ exports.dateTime2DaylightSaving = (test) ->
 
 exports.dateDaylightSaving = (test) ->
   type = TYPES.typeByName['Date']
-  for testSet in [[new Date('2015-06-18T21:59:59'),735766],
-                  [new Date('2015-06-18T22:00:00'),735767],
-                  [new Date('2015-06-19T21:59:59'),735767],
-                  [new Date('2015-06-19T22:00:00'),735768]]
+  for testSet in [[new Date(2015,5,18,23,59,59),735766],
+                  [new Date(2015,5,19,0,0,0),735767],
+                  [new Date(2015,5,19,23,59,59),735767],
+                  [new Date(2015,5,20,0,0,0),735768]]
     buffer = new WritableTrackingBuffer 16
     parameter = { value: testSet[0] }
     expectedNoOfDays = testSet[1]
