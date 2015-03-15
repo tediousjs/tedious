@@ -31,11 +31,11 @@ exports.uniqueConstraint = (test) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 2627)
     
-exports.ansiNullDefaults = (test) ->
+exports.nullable = (test) ->
   sql = """
-  create table #testAnsiNullDefault (id int);
-  insert #testAnsiNullDefault values (null);
-  drop table #testAnsiNullDefault;
+  create table #testNullable (id int not null);
+  insert #testNullable values (null);
+  drop table #testNullable;
   """
 
   test.expect(3)

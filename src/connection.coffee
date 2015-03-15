@@ -277,6 +277,7 @@ class Connection extends EventEmitter
     @config.options.useColumnNames ?= false
     @config.options.connectionIsolationLevel ||= ISOLATION_LEVEL.READ_COMMITTED
     @config.options.readOnlyIntent ?= false
+    @config.options.enableAnsiNullDefault ?= true
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -680,6 +681,7 @@ class Connection extends EventEmitter
 
   getInitialSql: ->
     xact_abort = if @config.options.abortTransactionOnError then 'on' else 'off'
+    enableAnsiNullDefault = if @config.options.enableAnsiNullDefault then 'on' else 'off'
     """set textsize #{@config.options.textsize}
 set quoted_identifier on
 set arithabort off
@@ -687,6 +689,7 @@ set numeric_roundabort off
 set ansi_warnings on
 set ansi_padding on
 set ansi_nulls on
+set ansi_null_dflt_on #{enableAnsiNullDefault}
 set concat_null_yields_null on
 set cursor_close_on_commit off
 set implicit_transactions off
