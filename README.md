@@ -4,6 +4,10 @@
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
+**NOTE: New columns are nullable by default as of version 1.11.0**
+
+Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/pekim/tedious/pull/230).
+
 **NOTE: Default login behavior has changed slightly as of version 1.2**
 
 See the [changelog](http://pekim.github.io/tedious/changelog.html) for version history.
