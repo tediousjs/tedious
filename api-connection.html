@@ -130,6 +130,14 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.enableAnsiNullDefault</code>
+      </dt>
+      <dd>
+        If true, <code>SET ANSI_NULL_DFLT_ON ON</code> will be set in the initial sql. This means new columns will be nullable by default. See the <a href="https://msdn.microsoft.com/en-us/library/ms187375.aspx">T-SQL documentation</a> for more details.
+        (Default: <code>true</code>).
+      </dd>
+
+      <dt>
         <code>options.connectTimeout</code>
       </dt>
       <dd>
