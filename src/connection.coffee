@@ -834,7 +834,7 @@ set xact_abort #{xact_abort}"""
 
     txDone = (err, done) =>
       args = []
-      args.push(arguments[i]) for i in [2..arguments.length]
+      args.push(arguments[i]) for i in [2...arguments.length]
 
       if err
         if @inTransaction
