@@ -125,10 +125,9 @@ TYPE =
         buffer.writeUInt8(0)
     validate: (value) ->
       if not value? then return null
-      if value instanceof Date then return value
-      value = Date.parse value
+      if not (value instanceof Date) then value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
-      value
+      return value
   0x3B:
     type: 'FLT4'
     name: 'Real'
@@ -207,10 +206,9 @@ TYPE =
         buffer.writeUInt8(0)
     validate: (value) ->
       if not value? then return null
-      if value instanceof Date then return value
-      value = Date.parse value
+      if not (value instanceof Date) then value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
-      value
+      return value
   0x3E:
     type: 'FLT8'
     name: 'Float'
@@ -911,10 +909,9 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
-      if value instanceof Date then return value
-      value = Date.parse value
+      if not (value instanceof Date) then value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
-      value
+      return value
   0x2A:
     type: 'DATETIME2N'
     name: 'DateTime2N'
@@ -973,10 +970,9 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
-      if value instanceof Date then return value
-      value = Date.parse value
+      if not (value instanceof Date) then value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
-      value
+      return value
   0x2B:
     type: 'DATETIMEOFFSETN'
     name: 'DateTimeOffsetN'
@@ -1032,10 +1028,9 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
-      if value instanceof Date then return value
-      value = Date.parse value
+      if not (value instanceof Date) then value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
-      value
+      return value
   0xF0:
     type: 'UDTTYPE'
     name: 'UDT'
