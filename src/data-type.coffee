@@ -125,6 +125,7 @@ TYPE =
         buffer.writeUInt8(0)
     validate: (value) ->
       if not value? then return null
+      if `value == "Invalid Date"` then return new TypeError "Invalid date."
       if value instanceof Date then return value
       value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
@@ -207,6 +208,7 @@ TYPE =
         buffer.writeUInt8(0)
     validate: (value) ->
       if not value? then return null
+      if `value == "Invalid Date"` then return new TypeError "Invalid date."
       if value instanceof Date then return value
       value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
@@ -911,6 +913,7 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
+      if `value == "Invalid Date"` then return new TypeError "Invalid date."
       if value instanceof Date then return value
       value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
@@ -973,6 +976,7 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
+      if `value == "Invalid Date"` then return new TypeError "Invalid date."
       if value instanceof Date then return value
       value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
@@ -1032,6 +1036,7 @@ TYPE =
         buffer.writeUInt8 0
     validate: (value) ->
       if not value? then return null
+      if `value == "Invalid Date"` then return new TypeError "Invalid date."
       if value instanceof Date then return value
       value = Date.parse value
       if isNaN value then return new TypeError "Invalid date."
