@@ -23,6 +23,7 @@ $config = @{
     options = @{
       port = $port;
       database = "master";
+      requestTimeout = 25000;
       cryptoCredentialsDetails = @{
         ciphers = "RC4-MD5"
       }

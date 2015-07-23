@@ -29,11 +29,14 @@ test_script:
 
       powershell %cd%\scripts\appveyor\config.ps1 SQL2008R2SP2
       npm run-script test-integration || SET EXITVAL=1
-
+      net stop MSSQL$SQL2008R2SP2
+      
       powershell %cd%\scripts\appveyor\config.ps1 SQL2012SP1
       npm run-script test-integration || SET EXITVAL=1
+      net stop MSSQL$SQL2012SP1
 
       powershell %cd%\scripts\appveyor\config.ps1 SQL2014
       npm run-script test-integration || SET EXITVAL=1
+      net stop MSSQL$SQL2014
 
       EXIT /B %EXITVAL%
