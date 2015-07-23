@@ -1,18 +1,17 @@
 Debug = require('../../src/debug')
-EventEmitter = require('events').EventEmitter
+Duplex = require('stream').Duplex
 require('../../src/buffertools')
 MessageIO = require('../../src/message-io')
 Packet = require('../../src/packet').Packet
 require('../../src/buffertools')
 
-class Connection extends EventEmitter
-  setTimeout: ->
+class Connection extends Duplex
+  _read: (size) ->
 
-  connect: ->
-
-  write: (data) ->
-    packet = new Packet(data)
+  _write: (chunk, encoding, callback) ->
+    packet = new Packet(chunk)
     @emit('packet', packet)
+    callback()
 
 packetType = 2
 packetSize = 8 + 4
@@ -90,7 +89,7 @@ exports.receiveOnePacket = (test) ->
   packet = new Packet(packetType)
   packet.last(true)
   packet.addData(payload)
-  connection.emit('data', packet.buffer)
+  connection.push(packet.buffer)
 
 exports.receiveOnePacketInTwoChunks = (test) ->
   test.expect(1)
@@ -109,8 +108,8 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   packet = new Packet(packetType)
   packet.last(true)
   packet.addData(payload)
-  connection.emit('data', packet.buffer.slice(0, 4))
-  connection.emit('data', packet.buffer.slice(4))
+  connection.push(packet.buffer.slice(0, 4))
+  connection.push(packet.buffer.slice(4))
 
 exports.receiveTwoPackets = (test) ->
   test.expect(2)
@@ -138,12 +137,12 @@ exports.receiveTwoPackets = (test) ->
 
   packet = new Packet(packetType)
   packet.addData(payload1)
-  connection.emit('data', packet.buffer)
+  connection.push(packet.buffer)
 
   packet = new Packet(packetType)
   packet.last(true)
   packet.addData(payload2)
-  connection.emit('data', packet.buffer)
+  connection.push(packet.buffer)
 
 exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   test.expect(2)
@@ -176,9 +175,9 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   packet2.last(true)
   packet2.addData(payload.slice(2, 4))
 
-  connection.emit('data', packet1.buffer.slice(0, 6))
-  connection.emit('data', Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)]))
-  connection.emit('data', packet2.buffer.slice(4))
+  connection.push(packet1.buffer.slice(0, 6))
+  connection.push(Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)]))
+  connection.push(packet2.buffer.slice(4))
 
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   test.expect(1)
@@ -215,5 +214,5 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   data1 = allData.slice(0, 5)
   data2 = allData.slice(5)
 
-  connection.emit('data', data1)
-  connection.emit('data', data2)
+  connection.push(data1)
+  connection.push(data2)
