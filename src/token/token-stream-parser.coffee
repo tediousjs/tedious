@@ -43,4 +43,7 @@ class Parser extends EventEmitter
     catch error
       console.log(error)
 
+  isEnd: () ->
+    @parser._buffer.length == 0
+
 exports.Parser = Parser
