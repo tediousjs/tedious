@@ -46,7 +46,7 @@ module.exports =
         return cb(err) if err
 
         request = new Request "INSERT INTO #benchmark ([value]) VALUES (@value)", cb
-        request.addParameter("value", TYPES.VarBinary, "asdf")
+        request.addParameter("value", TYPES.VarBinary, new Buffer("asdf"))
         connection.execSql(request)
 
       connection.execSqlBatch(request)
@@ -65,7 +65,7 @@ module.exports =
         return cb(err) if err
 
         request = new Request "INSERT INTO #benchmark ([value]) VALUES (@value)", cb
-        request.addParameter("value", TYPES.VarBinary, "asdf")
+        request.addParameter("value", TYPES.VarBinary, new Buffer("asdf"))
         connection.execSql(request)
 
       connection.execSqlBatch(request)
@@ -89,7 +89,9 @@ module.exports =
         return cb(err) if err
 
         request = new Request "INSERT INTO #benchmark ([value]) VALUES (@value)", cb
-        request.addParameter("value", TYPES.VarBinary, new Array(5 * 1024 * 1024).join("x"))
+        buf = new Buffer(5 * 1024 * 1024)
+        buf.fill("x")
+        request.addParameter("value", TYPES.VarBinary, buf)
         connection.execSql(request)
 
       connection.execSqlBatch(request)
@@ -108,7 +110,9 @@ module.exports =
         return cb(err) if err
 
         request = new Request "INSERT INTO #benchmark ([value]) VALUES (@value)", cb
-        request.addParameter("value", TYPES.VarBinary, new Array(50 * 1024 * 1024).join("x"))
+        buf = new Buffer(50 * 1024 * 1024)
+        buf.fill("x")
+        request.addParameter("value", TYPES.VarBinary, buf)
         connection.execSql(request)
 
       connection.execSqlBatch(request)
