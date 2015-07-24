@@ -71,11 +71,7 @@ module.exports =
       connection.execSqlBatch(request)
 
     exec: (connection, cb) ->
-      request = new Request "SELECT * FROM #benchmark", (err) ->
-        console.log(arguments)
-        cb()
-      request.on "row", (data) ->
-        console.log(data[0].value.toString())
+      request = new Request "SELECT * FROM #benchmark", cb
       connection.execSql(request)
 
     teardown: (connection, cb) ->
