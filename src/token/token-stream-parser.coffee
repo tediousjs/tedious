@@ -35,6 +35,7 @@ class Parser extends EventEmitter
     @parser = new StreamParser(@debug, @colMetadata, @options)
 
     @parser.on "data", (token) =>
+      @debug.token(token)
       @emit(token.event, token) if token.event
 
   addBuffer: (buffer) ->
