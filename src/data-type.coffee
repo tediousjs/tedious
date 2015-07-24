@@ -195,7 +195,7 @@ TYPE =
           seconds += parameter.value.getMinutes() * 60
           seconds += parameter.value.getSeconds()
           milliseconds = (seconds * 1000) + parameter.value.getMilliseconds()
-        
+
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3))
         threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond)
 
@@ -252,7 +252,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 typeByName.DecimalN.id
-      
+
       if parameter.precision <= 9
         buffer.writeUInt8 5
       else if parameter.precision <= 19
@@ -261,7 +261,7 @@ TYPE =
         buffer.writeUInt8 13
       else
         buffer.writeUInt8 17
-      
+
       buffer.writeUInt8 parameter.precision
       buffer.writeUInt8 parameter.scale
     writeParameterData: (buffer, parameter) ->
@@ -269,7 +269,7 @@ TYPE =
       if parameter.value?
         sign = if parameter.value < 0 then 0 else 1
         value = Math.round Math.abs parameter.value * Math.pow(10, parameter.scale)
-        
+
         if parameter.precision <= 9
           buffer.writeUInt8 5
           buffer.writeUInt8 sign
@@ -319,7 +319,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 typeByName.NumericN.id
-      
+
       if parameter.precision <= 9
         buffer.writeUInt8 5
       else if parameter.precision <= 19
@@ -328,7 +328,7 @@ TYPE =
         buffer.writeUInt8 13
       else
         buffer.writeUInt8 17
-      
+
       buffer.writeUInt8 parameter.precision
       buffer.writeUInt8 parameter.scale
     writeParameterData: (buffer, parameter) ->
@@ -437,7 +437,7 @@ TYPE =
       if not value? then return null
       if not Buffer.isBuffer value then return new TypeError "Invalid buffer."
       value
-      
+
   0x23:
     type: 'TEXT'
     name: 'Text'
@@ -566,7 +566,7 @@ TYPE =
     writeTypeInfo: (buffer, parameter) ->
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
-    
+
       if parameter.length <= @maximumLength
         buffer.writeUInt16LE @maximumLength
       else
@@ -590,7 +590,7 @@ TYPE =
       if not value? then return null
       if not Buffer.isBuffer value then return new TypeError "Invalid buffer."
       value
-        
+
   0xA7:
     type: 'BIGVARCHR'
     name: 'VarChar'
@@ -656,9 +656,18 @@ TYPE =
     dataLengthLength: 2
     maximumLength: 8000
     declaration: (parameter) ->
-      'binary'
+      length = @resolveLength parameter
+
+      console.log(parameter, length)
+
+      if length < @maximumLength
+        "binary(#{length})"
+      else
+        "binary(#{@maximumLength})"
     resolveLength: (parameter) ->
-      if parameter.value?
+      if parameter.length?
+        parameter.length
+      else if parameter.value?
         parameter.value.length
       else
         @maximumLength
@@ -936,17 +945,17 @@ TYPE =
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
       buffer.writeUInt8 parameter.scale
-      
+
     writeParameterData: (buffer, parameter, options) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
         time = new Date(+parameter.value)
-        
+
         if options.useUTC
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds()
         else
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds()
-        
+
         time = (time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
 
         # seconds since midnight
@@ -997,7 +1006,7 @@ TYPE =
       # ParamMetaData (TYPE_INFO)
       buffer.writeUInt8 @id
       buffer.writeUInt8 parameter.scale
-      
+
     writeParameterData: (buffer, parameter) ->
       # ParamLenData (TYPE_VARBYTE)
       if parameter.value?
@@ -1006,9 +1015,9 @@ TYPE =
         time.setUTCMonth 0
         time.setUTCDate 1
         time = (+time / 1000 + (parameter.value.nanosecondDelta ? 0)) * Math.pow 10, parameter.scale
-        
+
         offset = -parameter.value.getTimezoneOffset()
-        
+
         # seconds since midnight
         switch parameter.scale
           when 0, 1, 2
@@ -1047,40 +1056,40 @@ TYPE =
       buffer.writeBVarchar "" # DbName (always emtpty string)
       buffer.writeBVarchar parameter.value?.schema ? "" # OwningSchema
       buffer.writeBVarchar parameter.value?.name ? "" # TypeName
-      
+
     writeParameterData: (buffer, parameter, options) ->
       unless parameter.value?
         buffer.writeUInt16LE 0xFFFF
         buffer.writeUInt8 0x00
         buffer.writeUInt8 0x00
         return
-      
+
       # Columns count
       buffer.writeUInt16LE parameter.value.columns.length
-      
+
       # *TVP_COLMETADATA
       for column in parameter.value.columns
         buffer.writeUInt32LE 0x00000000 # UserType
         buffer.writeUInt16LE 0x0000
-        
+
         column.type.writeTypeInfo buffer, column
-        
+
         buffer.writeBVarchar "" # ColName
-      
+
       # TVP_NULL_TOKEN
       buffer.writeUInt8 0x00
-      
+
       # *TVP_ROW
       for row in parameter.value.rows
         buffer.writeUInt8 0x01 # TVP_ROW_TOKEN
-        
+
         for value, index in row
           param =
             value: value
             length: parameter.value.columns[index].length
             scale: parameter.value.columns[index].scale
             precision: parameter.value.columns[index].precision
-            
+
           parameter.value.columns[index].type.writeParameterData buffer, param, options
 
       # TVP_NULL_TOKEN
