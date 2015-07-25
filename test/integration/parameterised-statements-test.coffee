@@ -153,6 +153,15 @@ exports.CharN = (test) ->
 exports.CharNull = (test) ->
   execSql(test, TYPES.Char, null)
 
+exports.Binary = (test) ->
+  execSql(test, TYPES.Binary, new Buffer('qaz'))
+
+exports.BinaryN = (test) ->
+  execSql(test, TYPES.Binary, new Buffer('qaz'), null, { length: 3 })
+
+exports.BinaryNull = (test) ->
+  execSql(test, TYPES.Binary, null)
+
 exports.NChar = (test) ->
   execSql(test, TYPES.NChar, 'qaz')
 
@@ -236,8 +245,17 @@ exports.outputUniqueIdentifierN = (test) ->
 exports.outputIntNull = (test) ->
   execSqlOutput(test, TYPES.Int, null)
 
-exports.outputVarChar = (test) ->
-  execSqlOutput(test, TYPES.VarChar, 'qwerty')
+exports.outputBinaryNull = (test) ->
+  execSqlOutput(test, TYPES.Binary, null)
+
+#exports.outputBinary = (test) ->
+#  execSqlOutput(test, TYPES.Binary, new Buffer('qwerty'))
+
+exports.outputVarBinaryNull = (test) ->
+  execSqlOutput(test, TYPES.VarBinary, null)
+
+exports.outputVarBinary = (test) ->
+  execSqlOutput(test, TYPES.VarBinary, new Buffer('qwerty'))
 
 exports.outputVarCharNull = (test) ->
   execSqlOutput(test, TYPES.VarChar, null)
@@ -305,7 +323,7 @@ execSql = (test, type, value, tdsVersion, options) ->
   #config.options.packetSize = 32768
 
   if tdsVersion and tdsVersion > config.options.tdsVersion
-  	return test.done()
+    return test.done()
 
   test.expect(6)
 
@@ -329,7 +347,7 @@ execSql = (test, type, value, tdsVersion, options) ->
         test.strictEqual(columns[0].value.getTime(), value.getTime())
       else if (type == TYPES.BigInt)
         test.strictEqual(columns[0].value, value.toString())
-      else if (type == TYPES.UniqueIdentifierN)
+      else if (type == TYPES.UniqueIdentifierN || type == TYPES.Binary)
         test.deepEqual(columns[0].value, value)
       else
         test.strictEqual(columns[0].value, value)
@@ -351,7 +369,7 @@ execSql = (test, type, value, tdsVersion, options) ->
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#    console.log(text)
   )
 
 execSqlOutput = (test, type, value) ->
@@ -380,7 +398,7 @@ execSqlOutput = (test, type, value) ->
       test.strictEqual(returnValue.getTime(), value.getTime())
     else if (type == TYPES.BigInt)
       test.strictEqual(returnValue, value.toString())
-    else if (type == TYPES.UniqueIdentifierN)
+    else if (type == TYPES.UniqueIdentifierN || type == TYPES.VarBinary || type == TYPES.Binary)
       test.deepEqual(returnValue, value)
     else
       test.strictEqual(returnValue, value)
@@ -400,5 +418,5 @@ execSqlOutput = (test, type, value) ->
   )
 
   connection.on('debug', (text) ->
-    # console.log(text)
+#    console.log(text)
   )
