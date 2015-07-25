@@ -21,11 +21,15 @@ parser = ->
         #console.log sprintf('Token @ 0x%02X', buffer.position)
 
         if bitmap[index]
-          @vars.value = null
+          @tap ->
+            @vars.value = null
         else
           valueParse.call(@, columnMetaData)
 
         @tap ->
+
+          console.log("value", @vars.value)
+
           column =
             value: @vars.value
             metadata: columnMetaData
