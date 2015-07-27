@@ -27,9 +27,6 @@ parser = ->
           valueParse.call(@, columnMetaData)
 
         @tap ->
-
-          console.log("value", @vars.value)
-
           column =
             value: @vars.value
             metadata: columnMetaData
