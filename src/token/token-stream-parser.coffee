@@ -18,6 +18,8 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser')
 tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser')
 tokenParsers[TYPE.SSPI] = require('./sspi-token-parser')
 
+StreamParser = require("./streaming/parser")
+
 ###
   Buffers are thrown at the parser (by calling addBuffer).
   Tokens are parsed from the buffer until there are no more tokens in
@@ -30,62 +32,19 @@ tokenParsers[TYPE.SSPI] = require('./sspi-token-parser')
 ###
 class Parser extends EventEmitter
   constructor: (@debug, @colMetadata, @options) ->
-    @buffer = new ReadableTrackingBuffer(new Buffer(0), 'ucs2')
-    @position = 0
+    @parser = new StreamParser(@debug, @colMetadata, @options)
+
+    @parser.on "data", (token) =>
+      @debug.token(token)
+      @emit(token.event, token) if token.event
 
   addBuffer: (buffer) ->
-    @buffer.add(buffer)
-    @position = @buffer.position
-
-    while @nextToken()
-      'NOOP'
-
-    # Position to the end of the last successfully parsed token.
-    @buffer.position = @position
-
-  isEnd: ->
-    @buffer.empty()
-
-  nextToken: ->
     try
-      # check if we have available bytes
-      unless @buffer.buffer.length > @buffer.position
-        return false
-
-      type = @buffer.readUInt8()
-
-      if tokenParsers[type]
-        token = tokenParsers[type](@buffer, @colMetadata, @options)
-
-        if token
-          @debug.token(token)
-
-          # Note current position, so that it can be rolled back to if the next token runs out of buffer.
-          @position = @buffer.position
-
-          if token.event
-            @emit(token.event, token)
-
-          switch token.name
-            when 'COLMETADATA'
-              @colMetadata = token.columns
-
-          return true
-        else
-          return false
-
-      else
-        @emit 'tokenStreamError', "Unrecognized token #{type} at offset #{@buffer.position}"
-        return false
-
+      @parser.write(buffer)
     catch error
-      if error?.code == 'oob'
-        #console.error "OOB ERROR", type, error.stack
-        # There was an attempt to read past the end of the buffer.
-        # In other words, we've run out of buffer.
-        return false
-      else
-        @emit 'tokenStreamError', error
-        return false
+      console.log(error)
+
+  isEnd: () ->
+    @parser._buffer.length == 0
 
 exports.Parser = Parser

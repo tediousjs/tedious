@@ -38,11 +38,13 @@
   },
   "dependencies": {
     "big-number": "0.3.1",
+    "dissolve": "^0.3.3",
     "iconv-lite": "0.4.7",
     "sprintf": "0.1.5"
   },
   "devDependencies": {
     "async": "0.9.0",
+    "benchmark": "^1.0.0",
     "coffee-script": "1.9.0",
     "nodeunit": "0.9.0"
   },
