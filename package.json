@@ -40,7 +40,7 @@
     "babel-runtime": "^5.8.19",
     "big-number": "0.3.1",
     "bl": "^1.0.0",
-    "iconv-lite": "0.4.7",
+    "iconv-lite": "^0.4.11",
     "readable-stream": "^2.0.2",
     "sprintf": "0.1.5"
   },
