@@ -12,8 +12,8 @@ deploy:
   provider: npm
   email: "schreiber.arthur@googlemail.com"
   api_key:
-    secure: qqKBWeZEc5jvGuM8j44sgPNxqkrLaveRt1SIRqFZG9JRcA0i/t/vxRxhGSelnDymjzfQ4M71jAHQe9DJ14rjzMeFdA7qPUXfHjgmhQ4EQW3zBhVzAA2JxBZeoA2R6dcGkY6jsStjPQPBpTsUkFprDG96pHndB3mK4DJ+a6cs8ew=
+    secure: pSwLyKvYC3sxv0qxvbZy2W4ENXeE7/7emnnFJ8BMEYBTel/g+An0fN9lbtZSPoOaCEUVWEa2DzCHvU0jZ+qiOB1iZ+Swav9Ka0aOW54mtiig7oQY3GZpNvMkBhMPmkyIloECjFKNpxnZyi/ZHUjJLhu04o36xcAWASowfs3Mdwg=
   on:
-    tags: true
+    branch: master
     repo: pekim/tedious
     node: "0.10"
