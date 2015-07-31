@@ -49,7 +49,7 @@
     "babel": "^5.8.19",
     "benchmark": "^1.0.0",
     "coffee-script": "^1.9.3",
-    "nodeunit": "0.9.0"
+    "nodeunit": "^0.9.1"
   },
   "scripts": {
     "test": "nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
