@@ -7,3 +7,12 @@ node_js:
   - "1.8"
   - "2.0"
   - "2.3"
+
+deploy:
+  provider: npm
+  email: "schreiber.arthur@googlemail.com"
+  api_key:
+    secure: bsf8+yRHbphPCaP6w0Fqg66zOEyBss/XGpKqSiESrBI4cbIPAKKvUL/SFzibKqRV6mtYYJGmwRSaS4okhwSeCvi0hnHqAMBQQs863eatoUNbTTrGfH5EB97jaqkcdpCCvtup2Uqu+GcHXRgW1HsQ51jAntfY5DAazVsuRCTNNHI=
+  on:
+    tags: true
+    node: "0.10"
