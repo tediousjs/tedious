@@ -10,6 +10,7 @@ node_js:
 
 deploy:
   provider: npm
+  skip_cleanup: true
   email: "schreiber.arthur@googlemail.com"
   api_key:
     secure: pSwLyKvYC3sxv0qxvbZy2W4ENXeE7/7emnnFJ8BMEYBTel/g+An0fN9lbtZSPoOaCEUVWEa2DzCHvU0jZ+qiOB1iZ+Swav9Ka0aOW54mtiig7oQY3GZpNvMkBhMPmkyIloECjFKNpxnZyi/ZHUjJLhu04o36xcAWASowfs3Mdwg=
