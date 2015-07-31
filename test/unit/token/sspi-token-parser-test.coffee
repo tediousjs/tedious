@@ -1,9 +1,11 @@
+Parser = require('../../../src/token/stream-parser')
 SSPIParser = require('../../../src/token/sspi-token-parser')
 ReadBuffer = require( '../../../src/tracking-buffer/readable-tracking-buffer')
 WriteBuffer = require( '../../../src/tracking-buffer/writable-tracking-buffer')
 
 exports.parseChallenge = (test) ->
-    source = new WriteBuffer(67)
+    source = new WriteBuffer(68)
+    source.writeUInt8(0xED)
     source.copyFrom(new Buffer([0x00,0x00,0x00]))
     source.writeString('NTLMSSP\0', 'utf8')
     source.writeInt32LE(2) # message type
@@ -20,25 +22,26 @@ exports.parseChallenge = (test) ->
     source.writeString('domain', 'ucs2') # domain
     source.writeInt32BE(11259375) # target == 'abcdef'
 
-    readable = new ReadBuffer(source.data)
-    challenge = SSPIParser(readable)
+    parser = new Parser({}, {}, {})
+    parser.write(source.data)
+    challenge = parser.read()
 
-    expected = 
-        magic: 'NTLMSSP\0'
-        type: 2
-        domainLen: 12
-        domainMax: 12
-        domainOffset: 111
-        flags: 11256099
-        nonce: new Buffer([0xa1,0xb2,0xc3,0xd4,0xe5,0xf6,0xa7,0xb8])
-        zeroes: new Buffer([0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
-        targetLen: 4
-        targetMax: 4
-        targetOffset: 222
-        oddData: new Buffer([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08])
-        domain: 'domain'
-        target: new Buffer([0x00, 0xab, 0xcd, 0xef])
+    expected =
+      magic: 'NTLMSSP\0'
+      type: 2
+      domainLen: 12
+      domainMax: 12
+      domainOffset: 111
+      flags: 11256099
+      nonce: new Buffer([0xa1,0xb2,0xc3,0xd4,0xe5,0xf6,0xa7,0xb8])
+      zeroes: new Buffer([0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
+      targetLen: 4
+      targetMax: 4
+      targetOffset: 222
+      oddData: new Buffer([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08])
+      domain: 'domain'
+      target: new Buffer([0x00, 0xab, 0xcd, 0xef])
 
     test.deepEqual(challenge.ntlmpacket, expected)
-    
+
     test.done()

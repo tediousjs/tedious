@@ -3,12 +3,12 @@
 metadataParse = require('../metadata-parser')
 valueParse = require('../value-parser')
 
-parser = (buffer, colMetadata, options) ->
-  paramOrdinal = buffer.readUInt16LE()
-  paramName = buffer.readBVarchar()
-  status = buffer.readUInt8()
-  metadata = metadataParse(buffer, options)
-  value = valueParse(buffer, metadata, options)
+module.exports = (parser, colMetadata, options) ->
+  paramOrdinal = yield parser.readUInt16LE()
+  paramName = yield from parser.readBVarChar()
+  status = yield parser.readUInt8()
+  metadata = yield from metadataParse(parser, options)
+  value = yield from valueParse(parser, metadata, options)
 
   if paramName.charAt(0) == '@'
     paramName = paramName.slice(1)
@@ -20,5 +20,3 @@ parser = (buffer, colMetadata, options) ->
     paramName: paramName
     metadata: metadata
     value: value
-
-module.exports = parser

@@ -29,7 +29,14 @@ isdir = (dir) ->
 
 if isdir 'src'
   rmdir 'lib' if isdir 'lib'
+
   coffee_bin = path.join 'node_modules', '.bin', 'coffee'
+  babel_bin = path.join 'node_modules', '.bin', 'babel'
+
   child.exec "#{coffee_bin} -b -c -o lib/ src/", (err) ->
     if err
       console.error err
+    else
+      child.exec "#{babel_bin} lib --out-dir lib", (err) ->
+        if err
+          console.error err

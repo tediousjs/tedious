@@ -1,7 +1,8 @@
 parser = require('../../../src/token/colmetadata-token-parser')
 dataTypeByName = require('../../../src/data-type').typeByName
-ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
+
+TokenStreamParser = require('../../../src/token/stream-parser')
 
 module.exports.int = (test) ->
   numberOfColumns = 1
@@ -11,6 +12,7 @@ module.exports.int = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0x81)
   buffer.writeUInt16LE(numberOfColumns)
   buffer.writeUInt32LE(userType)
   buffer.writeUInt16LE(flags)
@@ -18,7 +20,9 @@ module.exports.int = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer.data)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
+  parser = new TokenStreamParser({}, {}, {})
+  parser.write(buffer.data)
+  token = parser.read()
   #console.log(token)
 
   test.ok(!token.error)
@@ -40,6 +44,7 @@ module.exports.varchar = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0x81)
   buffer.writeUInt16LE(numberOfColumns)
   buffer.writeUInt32LE(userType)
   buffer.writeUInt16LE(flags)
@@ -49,7 +54,9 @@ module.exports.varchar = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
+  parser = new TokenStreamParser({}, {}, {})
+  parser.write(buffer.data)
+  token = parser.read()
   #console.log(token)
 
   test.ok(!token.error)

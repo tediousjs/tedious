@@ -6,20 +6,20 @@ interfaceTypes =
   0: 'SQL_DFLT'
   1: 'SQL_TSQL'
 
-parser = (buffer) ->
-  length = buffer.readUInt16LE()
+module.exports = (parser) ->
+  length = yield parser.readUInt16LE()
 
-  interfaceNumber = buffer.readUInt8()
+  interfaceNumber = yield parser.readUInt8()
   interfaceType = interfaceTypes[interfaceNumber]
-  tdsVersionNumber = buffer.readUInt32BE()
+  tdsVersionNumber = yield parser.readUInt32BE()
   tdsVersion = versions[tdsVersionNumber]
-  progName = buffer.readBVarchar()
+  progName = yield from parser.readBVarChar()
 
   progVersion =
-    major: buffer.readUInt8()
-    minor: buffer.readUInt8()
-    buildNumHi: buffer.readUInt8()
-    buildNumLow: buffer.readUInt8()
+    major: yield parser.readUInt8()
+    minor: yield parser.readUInt8()
+    buildNumHi: yield parser.readUInt8()
+    buildNumLow: yield parser.readUInt8()
 
   # Return token
   name: 'LOGINACK'
@@ -28,5 +28,3 @@ parser = (buffer) ->
   tdsVersion: tdsVersion
   progName: progName
   progVersion: progVersion
-
-module.exports = parser

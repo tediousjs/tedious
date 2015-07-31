@@ -1,7 +1,5 @@
 # s2.2.7.8
 
-EventEmitter = require('events').EventEmitter
-
 types =
   1:
     name: 'DATABASE'
@@ -39,32 +37,29 @@ types =
     name: 'ROUTING_CHANGE'
     event: 'routingChange'
 
-module.exports = (buffer) ->
-  length = buffer.readUInt16LE()
-  typeNumber = buffer.readUInt8()
+module.exports = (parser) ->
+  length = yield parser.readUInt16LE()
+  typeNumber = yield parser.readUInt8()
   type = types[typeNumber]
 
   if type
     switch type.name
       when 'DATABASE', 'LANGUAGE', 'CHARSET', 'PACKET_SIZE', 'DATABASE_MIRRORING_PARTNER'
-        newValue = buffer.readBVarchar()
-        oldValue = buffer.readBVarchar()
+        newValue = yield from parser.readBVarChar()
+        oldValue = yield from parser.readBVarChar()
       when 'SQL_COLLATION', 'BEGIN_TXN', 'COMMIT_TXN', 'ROLLBACK_TXN', 'RESET_CONNECTION'
-        valueLength = buffer.readUInt8()
-        newValue = buffer.readBuffer(valueLength)
-
-        valueLength = buffer.readUInt8()
-        oldValue = buffer.readBuffer(valueLength)
+        newValue = yield from parser.readBVarByte()
+        oldValue = yield from parser.readBVarByte()
       when 'ROUTING_CHANGE'
-        valueLength = buffer.readUInt16LE()
+        valueLength = yield parser.readUInt16LE()
 
         # Routing Change:
         # Byte 1: Protocol (must be 0)
         # Bytes 2-3 (USHORT): Port number
         # Bytes 4-5 (USHORT): Length of server data in unicode (2byte chars)
         # Bytes 6-*: Server name in unicode characters
-        
-        routePacket = buffer.readBuffer(valueLength)
+
+        routePacket = yield parser.readBuffer(valueLength)
         protocol = routePacket.readUInt8(0)
         if (protocol != 0)
           throw new Error('Unknown protocol byte in routing change event')
@@ -74,25 +69,25 @@ module.exports = (buffer) ->
         serverLen = routePacket.readUInt16LE(3)
         # 2 bytes per char, starting at offset 5
         server = routePacket.toString('ucs2', 5, 5 + (serverLen * 2))
-      
+
         newValue =
           protocol: protocol
           port: port
           server: server
 
-        valueLength = buffer.readUInt16LE()
-        oldValue = buffer.readBuffer(valueLength)
+        valueLength = yield parser.readUInt16LE()
+        oldValue = yield parser.readBuffer(valueLength)
       else
-        console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber} #{type.name} at offset #{buffer.position - 1}"
-        buffer.readBuffer length - 1 # skip unknown bytes
+        console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber}"
+        yield parser.readBuffer(length - 1) # skip unknown bytes
         return
 
     if type.name == 'PACKET_SIZE'
       newValue = parseInt(newValue)
       oldValue = parseInt(oldValue)
   else
-    console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber} at offset #{buffer.position - 1}"
-    buffer.readBuffer length - 1 # skip unknown bytes
+    console.error "Tedious > Unsupported ENVCHANGE type #{typeNumber}"
+    yield parser.readBuffer(length - 1) # skip unknown bytes
     return
 
   # Return token

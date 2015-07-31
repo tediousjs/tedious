@@ -3,17 +3,18 @@ codepageByLcid = require('./collation').codepageByLcid
 TYPE = require('./data-type').TYPE
 sprintf = require('sprintf').sprintf
 
-parse = (buffer, options) ->
+module.exports = (parser, options) ->
   if options.tdsVersion < "7_2"
-    userType = buffer.readUInt16LE()
+    userType = yield parser.readUInt16LE()
   else
-    userType = buffer.readUInt32LE()
-  flags = buffer.readUInt16LE()
-  typeNumber = buffer.readUInt8()
+    userType = yield parser.readUInt32LE()
+
+  flags = yield parser.readUInt16LE()
+  typeNumber = yield parser.readUInt8()
   type = TYPE[typeNumber]
 
   if !type
-    throw new Error(sprintf('Unrecognised data type 0x%02X at offset 0x%04X', typeNumber, (buffer.position - 1)))
+    throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber))
 
   if (type.id & 0x30) == 0x20
     # xx10xxxx - s2.2.4.2.1.3
@@ -22,24 +23,24 @@ parse = (buffer, options) ->
       when 0
         dataLength = undefined
       when 1
-        dataLength = buffer.readUInt8()
+        dataLength = yield parser.readUInt8()
       when 2
-        dataLength = buffer.readUInt16LE()
+        dataLength = yield parser.readUInt16LE()
       when 4
-        dataLength = buffer.readUInt32LE()
+        dataLength = yield parser.readUInt32LE()
       else
         throw new Error("Unsupported dataLengthLength #{type.dataLengthLength} for data type #{type.name}")
   else
     dataLength = undefined
 
   if type.hasPrecision
-    precision = buffer.readUInt8()
+    precision = yield parser.readUInt8()
   else
     precision = undefined
 
   if type.hasScale
-    scale = buffer.readUInt8()
-  
+    scale = yield parser.readUInt8()
+
     if type.dataLengthFromScale
       dataLength = type.dataLengthFromScale scale
   else
@@ -47,7 +48,7 @@ parse = (buffer, options) ->
 
   if type.hasCollation
     # s2.2.5.1.2
-    collationData = buffer.readBuffer(5)
+    collationData = yield parser.readBuffer(5)
     collation = {}
 
     collation.lcid = (collationData[2] & 0x0F) << 16
@@ -70,23 +71,23 @@ parse = (buffer, options) ->
   schema = undefined
   if type.hasSchemaPresent
     # s2.2.5.5.3
-    schemaPresent = buffer.readUInt8()
+    schemaPresent = yield parser.readUInt8()
 
     if schemaPresent == 0x01
       schema =
-        dbname: buffer.readBVarchar()
-        owningSchema: buffer.readBVarchar()
-        xmlSchemaCollection: buffer.readUsVarchar()
-  
+        dbname: yield from parser.readBVarChar()
+        owningSchema: yield from parser.readBVarChar()
+        xmlSchemaCollection: yield from parser.readUsVarChar()
+
   udtInfo = undefined
   if type.hasUDTInfo
     # s2.2.5.5.2
     udtInfo =
-      maxByteSize: buffer.readUInt16LE()
-      dbname: buffer.readBVarchar()
-      owningSchema: buffer.readBVarchar()
-      typeName: buffer.readBVarchar()
-      assemblyName: buffer.readUsVarchar()
+      maxByteSize: yield parser.readUInt16LE()
+      dbname: yield from parser.readBVarChar()
+      owningSchema: yield from parser.readBVarChar()
+      typeName: yield from parser.readBVarChar()
+      assemblyName: yield from parser.readUsVarChar()
 
   metadata =
     userType: userType
@@ -98,5 +99,3 @@ parse = (buffer, options) ->
     dataLength: dataLength
     schema: schema
     udtInfo: udtInfo
-
-module.exports = parse

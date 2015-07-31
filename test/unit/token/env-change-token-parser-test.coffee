@@ -1,5 +1,4 @@
-parser = require('../../../src/token/env-change-token-parser')
-ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+Parser = require('../../../src/token/stream-parser')
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 module.exports.database = (test) ->
@@ -8,15 +7,18 @@ module.exports.database = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xE3)
   buffer.writeUInt16LE(0)                 # Length written later
   buffer.writeUInt8(0x01)                 # Database
   buffer.writeBVarchar(newDb)
   buffer.writeBVarchar(oldDb)
 
   data = buffer.data
-  data.writeUInt16LE(data.length - 2, 0)
+  data.writeUInt16LE(data.length - 3, 1)
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
+  parser = new Parser({}, {}, {})
+  parser.write(data)
+  token = parser.read()
 
   test.strictEqual(token.type, 'DATABASE')
   test.strictEqual(token.oldValue, 'old')
@@ -30,15 +32,18 @@ module.exports.packetSize = (test) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xE3)
   buffer.writeUInt16LE(0)                 # Length written later
   buffer.writeUInt8(0x04)                 # Packet size
   buffer.writeBVarchar(newSize)
   buffer.writeBVarchar(oldSize)
 
   data = buffer.data
-  data.writeUInt16LE(data.length - 2, 0)
+  data.writeUInt16LE(data.length - 3, 1)
 
-  token = parser(new ReadableTrackingBuffer(data, 'ucs2'))
+  parser = new Parser({}, {}, {})
+  parser.write(data)
+  token = parser.read()
 
   test.strictEqual(token.type, 'PACKET_SIZE')
   test.strictEqual(token.oldValue, 1024)
@@ -49,19 +54,16 @@ module.exports.packetSize = (test) ->
 module.exports.badType = (test) ->
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xE3)
   buffer.writeUInt16LE(0)                 # Length written later
   buffer.writeUInt8(0xFF)                 # Bad type
 
   data = buffer.data
-  data.writeUInt16LE(data.length - 2, 0);
-  
-  reader = new ReadableTrackingBuffer(data, 'ucs2')
+  data.writeUInt16LE(data.length - 3, 1);
 
-  try
-    token = parser(reader)
-    test.ok reader.position is 3
-  catch error
-    console.log error
-    test.ok(false)
-   
+  parser = new Parser({}, {}, {})
+  parser.write(data)
+  token = parser.read()
+
+  test.strictEqual(token, null)
   test.done()

@@ -1,5 +1,4 @@
-parser = require('../../../src/token/done-token-parser').doneParser
-ReadableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').ReadableTrackingBuffer
+Parser = require('../../../src/token/stream-parser')
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 
 parse = (status, curCmd, doneRowCount) ->
@@ -8,15 +7,15 @@ parse = (status, curCmd, doneRowCount) ->
 
   buffer = new WritableTrackingBuffer(50, 'ucs2')
 
+  buffer.writeUInt8(0xFD)
   buffer.writeUInt16LE(status)
   buffer.writeUInt16LE(curCmd)
   buffer.writeUInt32LE(doneRowCountLow)
   buffer.writeUInt32LE(doneRowCountHi)
 
-  token = parser(new ReadableTrackingBuffer(buffer.data, 'ucs2'), null, {})
-  #console.log(token)
-  
-  token
+  parser = new Parser({}, {}, { tdsVersion: "7_2" })
+  parser.write(buffer.data)
+  parser.read()
 
 module.exports.done = (test) ->
   status = 0x0000

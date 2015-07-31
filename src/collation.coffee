@@ -2,7 +2,6 @@
 
 exports.codepageByLcid =
   0x436: 'CP1252'
-  0x41C: 'CP1250'
   0x401: 'CP1256'
   0x801: 'CP1256'
   0xC01: 'CP1256'
@@ -69,7 +68,6 @@ exports.codepageByLcid =
   0x810: 'CP1252'
   0x411: 'CP932'
   0x10411: 'CP932'
-  0x412: 'CP949'
   0x412: 'CP949'
   0x426: 'CP1257'
   0x427: 'CP1257'
