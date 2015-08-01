@@ -19,7 +19,7 @@ module.exports = (parser, columnsMetaData, options) ->
     if bitmap[index]
       value = null
     else
-      value = yield from valueParse(parser, columnMetaData)
+      value = yield from valueParse(parser, columnMetaData, options)
 
     column =
       value: value
