@@ -70,6 +70,12 @@ class MessageIO extends EventEmitter
     @securePair.encrypted.on 'data', (data) =>
       @sendMessage(TYPE.PRELOGIN, data)
 
+    # On Node >= 0.12, the encrypted stream automatically starts spewing out
+    # data once we attach a `data` listener. But on Node <= 0.10.x, this is not
+    # the case. We need to kick the cleartext stream once to get the
+    # encrypted end of the secure pair to emit the TLS handshake data.
+    @securePair.cleartext.write('')
+
   encryptAllFutureTraffic: () ->
     @socket.unpipe(@packetStream)
     @securePair.encrypted.removeAllListeners('data')
