@@ -16,7 +16,6 @@ TokenStreamParser = require('./token/token-stream-parser').Parser
 Transaction = require('./transaction').Transaction
 ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL
 crypto = require('crypto')
-tls = require('tls')
 
 {ConnectionError, RequestError} = require('./errors')
 
@@ -67,8 +66,7 @@ class Connection extends EventEmitter
           else
             @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
         tls: ->
-          @initiateTlsSslHandshake()
-          @sendLogin7Packet()
+          @messageIo.startTls @config.options.cryptoCredentialsDetails
           @transitionTo(@STATE.SENT_TLSSSLNEGOTIATION)
 
     REROUTING:
@@ -88,21 +86,17 @@ class Connection extends EventEmitter
 
     SENT_TLSSSLNEGOTIATION:
       name: 'SentTLSSSLNegotiation'
-      enter: ->
-        @tlsNegotiationComplete = false
       events:
         socketError: (error) ->
           @transitionTo(@STATE.FINAL)
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         data: (data) ->
-          @securePair.encrypted.write(data)
-        tlsNegotiated: ->
-          @tlsNegotiationComplete = true
+          @messageIo.tlsHandshakeData(data)
         message: ->
-          if  @tlsNegotiationComplete
+          if @messageIo.tlsNegotiationComplete
+            @sendLogin7Packet()
             @transitionTo(@STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN)
-          else
 
     SENT_LOGIN7_WITH_STANDARD_LOGIN:
       name: 'SentLogin7WithStandardLogin'
@@ -506,6 +500,8 @@ class Connection extends EventEmitter
       @dispatchEvent('message')
     )
 
+    @messageIo.on('secure', @emit.bind(@, 'secure'))
+
   closeConnection: ->
     @socket?.destroy()
 
@@ -647,30 +643,6 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data)
     @debug.payload ->
       payload.toString '  '
-
-  initiateTlsSslHandshake: ->
-    credentials = if tls.createSecureContext
-      tls.createSecureContext(@config.options.cryptoCredentialsDetails)
-    else
-      crypto.createCredentials(@config.options.cryptoCredentialsDetails)
-    @securePair = tls.createSecurePair(credentials)
-
-    @securePair.on('secure', =>
-      cipher = @securePair.cleartext.getCipher()
-      @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
-      # console.log cipher
-      # console.log @securePair.cleartext.getPeerCertificate()
-
-      @emit('secure', @securePair.cleartext)
-      @messageIo.encryptAllFutureTraffic()
-      @dispatchEvent('tlsNegotiated')
-    )
-
-    @securePair.encrypted.on('data', (data) =>
-      @messageIo.sendMessage(TYPE.PRELOGIN, data)
-    )
-
-    @messageIo.tlsNegotiationStarting(@securePair)
 
   sendDataToTokenStreamParser: (data) ->
     @tokenStreamParser.addBuffer(data)

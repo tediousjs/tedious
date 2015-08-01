@@ -1,3 +1,6 @@
+tls = require('tls')
+crypto = require('crypto')
+
 require('./buffertools')
 EventEmitter = require('events').EventEmitter
 isPacketComplete = require('./packet').isPacketComplete
@@ -48,9 +51,30 @@ class MessageIO extends EventEmitter
 
     @_packetSize
 
-  tlsNegotiationStarting: (securePair) ->
-    @securePair = securePair
-    @tlsNegotiationInProgress = true;
+  startTls: (credentialsDetails) ->
+    credentials = if tls.createSecureContext
+      tls.createSecureContext(credentialsDetails)
+    else
+      crypto.createCredentials(credentialsDetails)
+
+    @securePair = tls.createSecurePair(credentials)
+    @tlsNegotiationComplete = false
+
+    @securePair.on 'secure', =>
+      cipher = @securePair.cleartext.getCipher()
+      @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
+
+      @emit('secure', @securePair.cleartext)
+      @encryptAllFutureTraffic()
+
+    @securePair.encrypted.on 'data', (data) =>
+      @sendMessage(TYPE.PRELOGIN, data)
+
+    # On Node >= 0.12, the encrypted stream automatically starts spewing out
+    # data once we attach a `data` listener. But on Node <= 0.10.x, this is not
+    # the case. We need to kick the cleartext stream once to get the
+    # encrypted end of the secure pair to emit the TLS handshake data.
+    @securePair.cleartext.write('')
 
   encryptAllFutureTraffic: () ->
     @socket.unpipe(@packetStream)
@@ -61,7 +85,10 @@ class MessageIO extends EventEmitter
 
     @securePair.cleartext.pipe(@packetStream)
 
-    @tlsNegotiationInProgress = false;
+    @tlsNegotiationComplete = true
+
+  tlsHandshakeData: (data) ->
+    @securePair.encrypted.write(data)
 
   # TODO listen for 'drain' event when socket.write returns false.
   # TODO implement incomplete request cancelation (2.2.1.6)
@@ -91,16 +118,10 @@ class MessageIO extends EventEmitter
   sendPacket: (packet, packetType) =>
     @logPacket('Sent', packet);
 
-    if @tlsNegotiationInProgress && packetType != TYPE.PRELOGIN
-      # LOGIN7 packet.
-      #   Something written to cleartext stream will initiate TLS handshake.
-      #   Will not emerge from the encrypted stream until after negotiation has completed.
+    if @securePair && @tlsNegotiationComplete
       @securePair.cleartext.write(packet.buffer)
     else
-      if (@securePair && !@tlsNegotiationInProgress)
-        @securePair.cleartext.write(packet.buffer)
-      else
-        @socket.write(packet.buffer)
+      @socket.write(packet.buffer)
 
   logPacket: (direction, packet) ->
     @debug.packet(direction, packet)
