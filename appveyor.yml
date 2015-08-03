@@ -3,12 +3,18 @@ version: "{build}"
 environment:
   matrix:
     - nodejs_version: "0.10"
-    - nodejs_version: "0.11"
-    - nodejs_version: "1.1.0"
+    - nodejs_version: "0.12"
+    - nodejs_version: "1.0"
+    - nodejs_version: "1.8"
+    - nodejs_version: "2.0"
+    - nodejs_version: "2.3"
 
 install:
   - ps: Install-Product node $env:nodejs_version
   - npm install
+
+cache:
+  - node_modules
 
 build: off
 
