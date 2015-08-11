@@ -1,6 +1,6 @@
 parseChallenge = (parser) ->
   challenge = {}
-  yield parser.readBuffer(3) # the token buffer starts w/ junk, this skips it
+  yield parser.readBuffer(2) # the token buffer starts w/ junk, this skips it
   challenge.magic = yield parser.readString(8)
   challenge.type = yield parser.readInt32LE()
   challenge.domainLen = yield parser.readInt16LE()
