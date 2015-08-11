@@ -1,24 +1,25 @@
-parseChallenge = (parser) ->
+parseChallenge = (buffer) ->
   challenge = {}
-  yield parser.readBuffer(2) # the token buffer starts w/ junk, this skips it
-  challenge.magic = yield parser.readString(8)
-  challenge.type = yield parser.readInt32LE()
-  challenge.domainLen = yield parser.readInt16LE()
-  challenge.domainMax = yield parser.readInt16LE()
-  challenge.domainOffset = yield parser.readInt32LE()
-  challenge.flags = yield parser.readInt32LE()
-  challenge.nonce = yield parser.readBuffer(8)
-  challenge.zeroes = yield parser.readBuffer(8)
-  challenge.targetLen = yield parser.readInt16LE()
-  challenge.targetMax = yield parser.readInt16LE()
-  challenge.targetOffset = yield parser.readInt32LE()
-  challenge.oddData = yield parser.readBuffer(8)
-  challenge.domain = (yield parser.readBuffer(challenge.domainLen)).toString('ucs2')
-  challenge.target = yield parser.readBuffer(challenge.targetLen)
+  challenge.magic = buffer.slice(0, 8).toString("utf8")
+  challenge.type = buffer.readInt32LE(8)
+  challenge.domainLen = buffer.readInt16LE(12)
+  challenge.domainMax = buffer.readInt16LE(14)
+  challenge.domainOffset = buffer.readInt32LE(16)
+  challenge.flags = buffer.readInt32LE(20)
+  challenge.nonce = buffer.slice(24, 32)
+  challenge.zeroes = buffer.slice(32, 40)
+  challenge.targetLen = buffer.readInt16LE(40)
+  challenge.targetMax = buffer.readInt16LE(42)
+  challenge.targetOffset = buffer.readInt32LE(44)
+  challenge.oddData = buffer.slice(48, 56)
+  challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2')
+  challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen)
   challenge
 
 module.exports = (parser) ->
-  challenge =  yield from parseChallenge(parser)
+  sspiBuffer = yield from parser.readUsVarByte()
+  challenge = parseChallenge(sspiBuffer)
+
   name: 'SSPICHALLENGE'
   event: 'sspichallenge'
   ntlmpacket: challenge
