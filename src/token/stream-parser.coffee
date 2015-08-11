@@ -57,6 +57,11 @@ module.exports = class Parser extends StreamParser
     length = yield @readUInt8()
     yield @readBuffer(length)
 
+  # Read binary data (USVARCHAR)
+  readUsVarByte: (name) ->
+    length = yield @readUInt16LE()
+    yield @readBuffer(length)
+
   readUInt24LE: (name) ->
     low = yield @readUInt16LE()
     high = yield @readUInt8()

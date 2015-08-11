@@ -6,7 +6,7 @@ WriteBuffer = require( '../../../src/tracking-buffer/writable-tracking-buffer')
 exports.parseChallenge = (test) ->
     source = new WriteBuffer(68)
     source.writeUInt8(0xED)
-    source.copyFrom(new Buffer([0x00,0x00,0x00]))
+    source.writeUInt16LE(0)
     source.writeString('NTLMSSP\0', 'utf8')
     source.writeInt32LE(2) # message type
     source.writeInt16LE(12) # domain len
@@ -23,7 +23,9 @@ exports.parseChallenge = (test) ->
     source.writeInt32BE(11259375) # target == 'abcdef'
 
     parser = new Parser({}, {}, {})
-    parser.write(source.data)
+    data = source.data
+    data.writeUInt16LE(data.length - 3, 1)
+    parser.write(data)
     challenge = parser.read()
 
     expected =
