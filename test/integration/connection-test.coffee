@@ -22,6 +22,9 @@ process.on 'uncaughtException', (err) ->
 getInstanceName = ->
   JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).instanceName
 
+getNtlmConfig = ->
+  JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).ntlm
+
 exports.badServer = (test) ->
   config = getConfig()
   config.server = 'bad-server'
@@ -188,6 +191,40 @@ exports.connectByInvalidInstanceName = (test) ->
     #console.log(text)
   )
 
+exports.ntlm = (test) ->
+  if !getNtlmConfig()
+    console.log('Skipping ntlm test')
+    test.done()
+    return
+
+  test.expect(1)
+
+  config = getConfig()
+  ntlmConfig = getNtlmConfig()
+
+  config.userName = ntlmConfig.userName
+  config.password = ntlmConfig.password
+  config.domain = ntlmConfig.domain
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ifError(err)
+
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
 
 exports.encrypt = (test) ->
   test.expect(5)
