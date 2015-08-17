@@ -10,6 +10,10 @@ node_js:
   - "2.0"
   - "2.3"
 
+branches:
+  only:
+    - master
+
 cache:
   directories:
     - node_modules
