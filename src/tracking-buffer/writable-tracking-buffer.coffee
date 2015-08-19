@@ -175,7 +175,7 @@ class WritableTrackingBuffer
     @writeUInt16LE(value.length)
     @writeString(value, encoding)
   
-  writeUsVarbyte: (value, encoding = @encoding) ->
+  writeUsVarbyte: (value, encoding = "utf8") ->
     if Buffer.isBuffer value
       length = value.length
     else
