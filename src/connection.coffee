@@ -80,8 +80,8 @@ class Connection extends EventEmitter
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         reconnect: ->
-          @config.server = @routingData.server
-          @config.options.port = @routingData.port
+          @config.options.redirectionServer = @routingData.server
+          @config.options.redirectionPort = @routingData.port
           @transitionTo(@STATE.CONNECTING)
 
     SENT_TLSSSLNEGOTIATION:
@@ -461,11 +461,11 @@ class Connection extends EventEmitter
     )
 
   connect: ->
-    if (@config.options.port)
-      @connectOnPort(@config.options.port)
+    if (@config.options.redirectionPort or @config.options.port)
+      @connectOnPort(@config.options.redirectionPort or @config.options.port)
     else
       instanceLookup(
-        @config.server
+        @config.options.redirectionServer or @config.server
         @config.options.instanceName
         (message, port) =>
           if @state == @STATE.FINAL
@@ -480,11 +480,13 @@ class Connection extends EventEmitter
     @socket = new Socket({})
 
     connectOpts =
-      host: @config.server
+      host: @config.options.redirectionServer or @config.server
       port: port
 
     if @config.options.localAddress
       connectOpts.localAddress = @config.options.localAddress
+
+    @latestConnectOptions = connectOpts;
 
     @socket.connect(connectOpts)
     @socket.on('error', @socketError)
@@ -499,6 +501,13 @@ class Connection extends EventEmitter
     @messageIo.on('message', =>
       @dispatchEvent('message')
     )
+    @clearRedirectionConfiguration()
+    
+  clearRedirectionConfiguration: ->
+    if @config.options.redirectionServer
+      @config.options.redirectionServer = undefined
+    if @config.options.redirectionPort
+      @config.options.redirectionPort = undefined
 
     @messageIo.on('secure', @emit.bind(@, 'secure'))
 
@@ -513,7 +522,7 @@ class Connection extends EventEmitter
       @requestTimer = setTimeout(@requestTimeout, @config.options.requestTimeout)
 
   connectTimeout: =>
-    message = "Failed to connect to #{@config.server}:#{@config.options.port} in #{@config.options.connectTimeout}ms"
+    message = "Failed to connect to #{@latestConnectOptions.host}:#{@latestConnectOptions.port} in #{@config.options.connectTimeout}ms"
 
     @debug.log(message)
     @emit('connect', ConnectionError(message, 'ETIMEOUT'))
@@ -557,7 +566,7 @@ class Connection extends EventEmitter
 
   socketError: (error) =>
     if @state == @STATE.CONNECTING
-      message = "Failed to connect to #{@config.server}:#{@config.options.port} - #{error.message}"
+      message = "Failed to connect to #{@latestConnectOptions.host}:#{@latestConnectOptions.port} - #{error.message}"
       @debug.log(message)
       @emit('connect', ConnectionError(message, 'ESOCKET'))
     else
@@ -569,7 +578,7 @@ class Connection extends EventEmitter
   socketConnect: =>
     @socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY)
     @closed = false
-    @debug.log("connected to #{@config.server}:#{@config.options.port}")
+    @debug.log("connected to #{@latestConnectOptions.host}:#{@latestConnectOptions.port}")
     @dispatchEvent('socketConnect')
 
   socketEnd: =>
@@ -577,7 +586,7 @@ class Connection extends EventEmitter
     @transitionTo(@STATE.FINAL)
 
   socketClose: =>
-    @debug.log("connection to #{@config.server}:#{@config.options.port} closed")
+    @debug.log("connection to #{@latestConnectOptions.host}:#{@latestConnectOptions.port} closed")
     if @state is @STATE.REROUTING
       @debug.log("Rerouting to #{@routingData.server}:#{@routingData.port}")
       @dispatchEvent('reconnect')
@@ -614,7 +623,7 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
-      serverName: @config.server
+      serverName: @latestConnectOptions.host
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
