@@ -13,7 +13,7 @@ parse = (status, curCmd, doneRowCount) ->
   buffer.writeUInt32LE(doneRowCountLow)
   buffer.writeUInt32LE(doneRowCountHi)
 
-  parser = new Parser({}, {}, { tdsVersion: "7_2" })
+  parser = new Parser({ token: -> }, {}, { tdsVersion: "7_2" })
   parser.write(buffer.data)
   parser.read()
 

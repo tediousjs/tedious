@@ -16,7 +16,7 @@ module.exports.database = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 3, 1)
 
-  parser = new Parser({}, {}, {})
+  parser = new Parser({ token: -> }, {}, {})
   parser.write(data)
   token = parser.read()
 
@@ -41,7 +41,7 @@ module.exports.packetSize = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 3, 1)
 
-  parser = new Parser({}, {}, {})
+  parser = new Parser({ token: -> }, {}, {})
   parser.write(data)
   token = parser.read()
 
@@ -61,7 +61,7 @@ module.exports.badType = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 3, 1);
 
-  parser = new Parser({}, {}, {})
+  parser = new Parser({ token: -> }, {}, {})
   parser.write(data)
   token = parser.read()
 

@@ -13,7 +13,7 @@ module.exports.oneColumn = (test) ->
   buffer.writeUInt16LE(column)
   #console.log(buffer.data)
 
-  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser = new Parser({ token: -> }, {}, { tdsVersion: '7_2' })
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -37,7 +37,7 @@ module.exports.twoColumns = (test) ->
   buffer.writeUInt16LE(column2)
   #console.log(buffer.data)
 
-  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser = new Parser({ token: -> }, {}, { tdsVersion: '7_2' })
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)

@@ -22,7 +22,7 @@ exports.parseChallenge = (test) ->
     source.writeString('domain', 'ucs2') # domain
     source.writeInt32BE(11259375) # target == 'abcdef'
 
-    parser = new Parser({}, {}, {})
+    parser = new Parser({ token: -> }, {}, {})
     data = source.data
     data.writeUInt16LE(data.length - 3, 1)
     parser.write(data)

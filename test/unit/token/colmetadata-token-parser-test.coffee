@@ -20,7 +20,7 @@ module.exports.int = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer.data)
 
-  parser = new TokenStreamParser({}, {}, {})
+  parser = new TokenStreamParser({ token: -> }, {}, {})
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -54,7 +54,7 @@ module.exports.varchar = (test) ->
   buffer.writeBVarchar(columnName)
   #console.log(buffer)
 
-  parser = new TokenStreamParser({}, {}, {})
+  parser = new TokenStreamParser({ token: -> }, {}, {})
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
