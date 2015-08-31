@@ -11,7 +11,7 @@ module.exports.null = (test) ->
   buffer = new WritableTrackingBuffer(0, 'ucs2')
   buffer.writeUInt8(0xD1)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
 
@@ -29,7 +29,7 @@ module.exports.int = (test) ->
   buffer.writeUInt8(0xD1)
   buffer.writeUInt32LE(value)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
 
@@ -51,7 +51,7 @@ module.exports.bigint = (test) ->
     1,0,0,0,0,0,0,0,
     255,255,255,255,255,255,255,127]))
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -70,7 +70,7 @@ module.exports.real = (test) ->
   buffer.writeUInt8(0xD1)
   buffer.writeBuffer(new Buffer([0x00, 0x00, 0x18, 0x41]))
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -89,7 +89,7 @@ module.exports.float = (test) ->
   buffer.writeUInt8(0xD1)
   buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40]))
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -121,7 +121,7 @@ module.exports.money = (test) ->
   buffer.writeBuffer(new Buffer([0x08, 0x00, 0x00, 0x00, 0x00, 0x80, 0xd6, 0x12, 0x00]))
   buffer.writeBuffer(new Buffer([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d]))
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -149,7 +149,7 @@ module.exports.varCharWithoutCodepage = (test) ->
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -173,7 +173,7 @@ module.exports.varCharWithCodepage = (test) ->
   buffer.writeUsVarchar(value)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -194,7 +194,7 @@ module.exports.nVarChar = (test) ->
   buffer.writeString(value)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -215,7 +215,7 @@ module.exports.varBinary = (test) ->
   buffer.writeBuffer(new Buffer(value))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -236,7 +236,7 @@ module.exports.binary = (test) ->
   buffer.writeBuffer(new Buffer(value))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -260,7 +260,7 @@ module.exports.varCharMaxNull = (test) ->
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -290,7 +290,7 @@ module.exports.varCharMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -320,7 +320,7 @@ module.exports.varCharMaxKnownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -350,7 +350,7 @@ module.exports.varCharMaxWithCodepage = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -379,7 +379,7 @@ module.exports.varCharMaxKnownLengthWrong = (test) ->
   #console.log(buffer.data)
 
   try
-    parser = new Parser({}, colMetaData, options)
+    parser = new Parser({ token: -> }, colMetaData, options)
     parser.write(buffer.data)
     token = parser.read()
     test.ok(false)
@@ -397,7 +397,7 @@ module.exports.varBinaryMaxNull = (test) ->
   buffer.writeBuffer(new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -425,7 +425,7 @@ module.exports.varBinaryMaxUnknownLength = (test) ->
   buffer.writeUInt32LE(0)
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -469,7 +469,7 @@ module.exports.intN = (test) ->
     8, 16,39,0,0,0,0,0,0]))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -504,7 +504,7 @@ module.exports.guidN = (test) ->
   ]))
   # console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -531,7 +531,7 @@ module.exports.floatN = (test) ->
   ]))
   #console.log(buffer.data)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -556,7 +556,7 @@ module.exports.datetime = (test) ->
   buffer.writeUInt32LE(threeHundredthsOfSecond)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, { useUTC: false })
+  parser = new Parser({ token: -> }, colMetaData, { useUTC: false })
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -564,7 +564,7 @@ module.exports.datetime = (test) ->
   test.strictEqual(token.columns.length, 1)
   test.strictEqual(token.columns[0].value.getTime(), new Date("January 3, 1900 00:00:45").getTime())
 
-  parser = new Parser({}, colMetaData, { useUTC: true })
+  parser = new Parser({ token: -> }, colMetaData, { useUTC: true })
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -583,7 +583,7 @@ module.exports.datetimeN = (test) ->
   buffer.writeUInt8(0)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -610,7 +610,7 @@ module.exports.numeric4Bytes = (test) ->
   buffer.writeUInt32LE(93)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -637,7 +637,7 @@ module.exports.numeric4BytesNegative = (test) ->
   buffer.writeUInt32LE(93)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -665,7 +665,7 @@ module.exports.numeric8Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -694,7 +694,7 @@ module.exports.numeric12Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -724,7 +724,7 @@ module.exports.numeric16Bytes = (test) ->
   buffer.writeUInt32LE(1)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)
@@ -747,7 +747,7 @@ module.exports.numericNull = (test) ->
   buffer.writeUInt8(0)
   #console.log(buffer)
 
-  parser = new Parser({}, colMetaData, options)
+  parser = new Parser({ token: -> }, colMetaData, options)
   parser.write(buffer.data)
   token = parser.read()
   #console.log(token)

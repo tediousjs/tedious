@@ -30,6 +30,8 @@ module.exports = class Parser extends StreamParser
         token = yield from tokenParsers[type](@, @colMetadata, @options)
 
         if token
+          @debug.token(token)
+
           switch token.name
             when 'COLMETADATA'
               @colMetadata = token.columns

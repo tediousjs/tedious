@@ -25,7 +25,7 @@ module.exports.info = (test) ->
   data = buffer.data
   data.writeUInt16LE(data.length - 3, 1)
 
-  parser = new Parser({}, {}, { tdsVersion: '7_2' })
+  parser = new Parser({ token: -> }, {}, { tdsVersion: '7_2' })
   parser.write(data)
   token = parser.read()
 

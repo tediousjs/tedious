@@ -17,18 +17,11 @@ class ReadablePacketStream extends StreamParser
 
   parser: ->
     while true
-      type = yield @readUInt8()
-      status = yield @readUInt8()
-      length = yield @readUInt16BE()
-      spid = yield @readUInt16BE()
-      packetId = yield @readUInt8()
-      window = yield @readUInt8()
-
+      header = yield @readBuffer(packetHeaderLength)
+      length = header.readUInt16BE(2)
       data = yield @readBuffer(length - packetHeaderLength)
 
-      @push
-        data: data
-        isLast: if status & 0x01 then -> true else -> false
+      @push(new Packet(Buffer.concat([header, data])))
 
     undefined
 
@@ -36,7 +29,8 @@ class MessageIO extends EventEmitter
   constructor: (@socket, @_packetSize, @debug) ->
     @packetStream = new ReadablePacketStream()
     @packetStream.on 'data', (packet) =>
-      @emit 'data', packet.data
+      @logPacket('Received', packet)
+      @emit 'data', packet.data()
       @emit 'message' if packet.isLast()
 
     @socket.pipe(@packetStream)
