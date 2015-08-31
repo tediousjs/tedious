@@ -37,6 +37,6 @@ if isdir 'src'
     if err
       console.error err
     else
-      child.exec "#{babel_bin} lib --out-dir lib", (err) ->
+      child.exec "#{babel_bin} src --out-dir lib", (err) ->
         if err
           console.error err
