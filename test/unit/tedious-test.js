@@ -1,6 +1,4 @@
-TYPES = require('../../src/tedious').TYPES
-ISOLATION_LEVEL = require('../../src/tedious').ISOLATION_LEVEL
-Connection = require('../../src/tedious').Connection
+import { Connection, ISOLATION_LEVEL, TYPES } from '../../src/tedious';
 
 exports.types = function(test) {
   test.ok(TYPES)

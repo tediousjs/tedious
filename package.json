@@ -52,16 +52,12 @@
     "nodeunit": "^0.9.1"
   },
   "scripts": {
-    "test": "nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
-    "test-all": "nodeunit --reporter minimal test/register-coffee.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "test-integration": "nodeunit --reporter minimal test/register-coffee.js test/integration/",
+    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
     "prepublish": "coffee scripts/build.coffee"
   },
   "babel": {
-    "whitelist": [
-      "regenerator",
-      "es6.modules",
-      "runtime"
-    ]
+    "optional": [ "runtime" ]
   }
 }
