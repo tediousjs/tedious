@@ -5,26 +5,37 @@ const interfaceTypes = {
   1: 'SQL_TSQL'
 };
 
-module.exports = function*(parser) {
-  yield parser.readUInt16LE(); // length
-  const interfaceNumber = yield parser.readUInt8();
-  const interfaceType = interfaceTypes[interfaceNumber];
-  const tdsVersionNumber = yield parser.readUInt32BE();
-  const tdsVersion = versions[tdsVersionNumber];
-  const progName = yield* parser.readBVarChar();
-  const progVersion = {
-    major: yield parser.readUInt8(),
-    minor: yield parser.readUInt8(),
-    buildNumHi: yield parser.readUInt8(),
-    buildNumLow: yield parser.readUInt8()
-  };
-
-  return {
-    name: 'LOGINACK',
-    event: 'loginack',
-    "interface": interfaceType,
-    tdsVersion: tdsVersion,
-    progName: progName,
-    progVersion: progVersion
-  };
+module.exports = function(parser, colMetadata, options, callback) {
+  // length
+  parser.readUInt16LE(() => {
+    parser.readUInt8((interfaceNumber) => {
+      const interfaceType = interfaceTypes[interfaceNumber];
+      parser.readUInt32BE((tdsVersionNumber) => {
+        const tdsVersion = versions[tdsVersionNumber];
+        parser.readBVarChar((progName) => {
+          parser.readUInt8((major) => {
+            parser.readUInt8((minor) => {
+              parser.readUInt8((buildNumHi) => {
+                parser.readUInt8((buildNumLow) => {
+                  callback({
+                    name: 'LOGINACK',
+                    event: 'loginack',
+                    "interface": interfaceType,
+                    tdsVersion: tdsVersion,
+                    progName: progName,
+                    progVersion: {
+                      major: major,
+                      minor: minor,
+                      buildNumHi: buildNumHi,
+                      buildNumLow: buildNumLow
+                    }
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
 };

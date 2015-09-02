@@ -1,16 +1,31 @@
 // s2.2.7.14
 
-export default function*(parser) {
-  const columnCount = (yield parser.readUInt16LE("length")) / 2;
-  const orderColumns = [];
+export default function(parser, colMetadata, options, callback) {
+  parser.readUInt16LE((length) => {
+    const columnCount = length / 2;
+    const orderColumns = [];
 
-  for (let i = 0; i < columnCount; i++) {
-    orderColumns.push(yield parser.readUInt16LE());
-  }
+    let i = 0;
+    function next(done) {
+      if (i === columnCount) {
+        return done();
+      }
 
-  return {
-    name: 'ORDER',
-    event: 'order',
-    orderColumns: orderColumns
-  };
+      parser.readUInt16LE((column) => {
+        orderColumns.push(column);
+
+        i++;
+
+        next(done);
+      });
+    }
+
+    next(() => {
+      callback({
+        name: 'ORDER',
+        event: 'order',
+        orderColumns: orderColumns
+      });
+    });
+  });
 }

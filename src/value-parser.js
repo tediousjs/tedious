@@ -11,515 +11,561 @@ const PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
-export default function*(parser, metaData, options) {
-  const type = metaData.type;
-  let value, dataLength, textPointerNull;
-
+function readTextPointerNull(parser, type, callback) {
   if (type.hasTextPointerAndTimestamp) {
-    const textPointerLength = yield parser.readUInt8();
+    parser.readUInt8((textPointerLength) => {
+      if (textPointerLength !== 0) {
+        // Appear to be dummy values, so consume and discard them.
+        parser.readBuffer(textPointerLength, () => {
+          parser.readBuffer(8, () => {
+            callback(undefined);
+          });
+        });
+      } else {
+        callback(true);
+      }
+    });
+  } else {
+    callback(undefined);
+  }
+}
 
-    if (textPointerLength !== 0) {
-      // Appear to be dummy values, so consume and discard them.
-      yield parser.readBuffer(textPointerLength);
-      yield parser.readBuffer(8);
-    } else {
-      dataLength = 0;
-      textPointerNull = true;
-    }
+function readDataLength(parser, type, metaData, textPointerNull, callback) {
+  if (textPointerNull) {
+    return callback(0);
   }
 
-  if (dataLength !== 0) {
-    // s2.2.4.2.1
-    switch (type.id & 0x30) {
-      case 0x10: // xx01xxxx - s2.2.4.2.1.1
-        dataLength = 0;
-        break;
-      case 0x20: // xx10xxxx - s2.2.4.2.1.3
-        // Variable length
-        if (metaData.dataLength !== MAX) {
-          switch (type.dataLengthLength) {
-            case 0:
-              dataLength = void 0;
-              break;
-            case 1:
-              dataLength = yield parser.readUInt8();
-              break;
-            case 2:
-              dataLength = yield parser.readUInt16LE();
-              break;
-            case 4:
-              dataLength = yield parser.readUInt32LE();
-              break;
-            default:
-              throw Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name);
-          }
-        }
-        break;
-      case 0x30:
-        dataLength = 1 << ((type.id & 0x0C) >> 2);
-    }
-  }
+  // s2.2.4.2.1
+  switch (type.id & 0x30) {
+    case 0x10: // xx01xxxx - s2.2.4.2.1.1
+      return callback(0);
 
-  switch (type.name) {
-    case 'Null':
-      value = null;
-      break;
+    case 0x20: // xx10xxxx - s2.2.4.2.1.3
+      // Variable length
+      if (metaData.dataLength !== MAX) {
+        switch (type.dataLengthLength) {
+          case 0:
+            return callback(undefined);
 
-    case 'TinyInt':
-      value = yield parser.readUInt8();
-      break;
+          case 1:
+            return parser.readUInt8(callback);
 
-    case 'Int':
-      value = yield parser.readInt32LE();
-      break;
+          case 2:
+            return parser.readUInt16LE(callback);
 
-    case 'SmallInt':
-      value = yield parser.readInt16LE();
-      break;
-
-    case 'BigInt':
-      value = convertLEBytesToString(yield parser.readBuffer(8));
-      break;
-
-    case 'IntN':
-      switch (dataLength) {
-        case 0:
-          value = null;
-          break;
-        case 1:
-          value = yield parser.readUInt8();
-          break;
-        case 2:
-          value = yield parser.readInt16LE();
-          break;
-        case 4:
-          value = yield parser.readInt32LE();
-          break;
-        case 8:
-          value = convertLEBytesToString(yield parser.readBuffer(8));
-          break;
-        default:
-          throw new Error("Unsupported dataLength " + dataLength + " for IntN");
-      }
-      break;
-
-    case 'Real':
-      value = yield parser.readFloatLE();
-      break;
-
-    case 'Float':
-      value = yield parser.readDoubleLE();
-      break;
-
-    case 'FloatN':
-      switch (dataLength) {
-        case 0:
-          value = null;
-          break;
-        case 4:
-          value = yield parser.readFloatLE();
-          break;
-        case 8:
-          value = yield parser.readDoubleLE();
-          break;
-        default:
-          throw new Error("Unsupported dataLength " + dataLength + " for FloatN");
-      }
-      break;
-
-    case 'Money':
-    case 'SmallMoney':
-    case 'MoneyN':
-      switch (dataLength) {
-        case 0:
-          value = null;
-          break;
-        case 4:
-          value = (yield parser.readInt32LE()) / MONEY_DIVISOR;
-          break;
-        case 8:
-          const high = yield parser.readInt32LE();
-          const low = yield parser.readUInt32LE();
-          value = low + (0x100000000 * high);
-          value /= MONEY_DIVISOR;
-          break;
-        default:
-          throw new Error("Unsupported dataLength " + dataLength + " for MoneyN");
-      }
-      break;
-
-    case 'Bit':
-      value = !!(yield parser.readUInt8());
-      break;
-
-    case 'BitN':
-      switch (dataLength) {
-        case 0:
-          value = null;
-          break;
-        case 1:
-          value = !!(yield parser.readUInt8());
-      }
-      break;
-
-    case 'VarChar':
-    case 'Char':
-      const codepage = metaData.collation.codepage;
-      if (metaData.dataLength === MAX) {
-        value = yield* readMaxChars(parser, codepage);
-      } else {
-        value = yield* readChars(parser, dataLength, codepage);
-      }
-      break;
-
-    case 'NVarChar':
-    case 'NChar':
-      if (metaData.dataLength === MAX) {
-        value = yield* readMaxNChars(parser);
-      } else {
-        value = yield* readNChars(parser, dataLength);
-      }
-      break;
-
-    case 'VarBinary':
-    case 'Binary':
-      if (metaData.dataLength === MAX) {
-        value = yield* readMaxBinary(parser);
-      } else {
-        value = yield* readBinary(parser, dataLength);
-      }
-      break;
-
-    case 'Text':
-      if (textPointerNull) {
-        value = null;
-      } else {
-        value = yield* readChars(parser, dataLength, metaData.collation.codepage);
-      }
-      break;
-
-    case 'NText':
-      if (textPointerNull) {
-        value = null;
-      } else {
-        value = yield* readNChars(parser, dataLength);
-      }
-      break;
-
-    case 'Image':
-      if (textPointerNull) {
-        value = null;
-      } else {
-        value = yield* readBinary(parser, dataLength);
-      }
-      break;
-
-    case 'Xml':
-      value = yield* readMaxNChars(parser);
-      break;
-
-    case 'SmallDateTime':
-      value = yield* readSmallDateTime(parser, options.useUTC);
-      break;
-
-    case 'DateTime':
-      value = yield* readDateTime(parser, options.useUTC);
-      break;
-
-    case 'DateTimeN':
-      switch (dataLength) {
-        case 0:
-          value = null;
-          break;
-        case 4:
-          value = yield* readSmallDateTime(parser, options.useUTC);
-          break;
-        case 8:
-          value = yield* readDateTime(parser, options.useUTC);
-      }
-      break;
-
-    case 'TimeN':
-      if ((dataLength = yield parser.readUInt8()) === 0) {
-        value = null;
-      } else {
-        value = yield* readTime(parser, dataLength, metaData.scale, options.useUTC);
-      }
-      break;
-
-    case 'DateN':
-      if ((dataLength = yield parser.readUInt8()) === 0) {
-        value = null;
-      } else {
-        value = yield* readDate(parser, options.useUTC);
-      }
-      break;
-
-    case 'DateTime2N':
-      if ((dataLength = yield parser.readUInt8()) === 0) {
-        value = null;
-      } else {
-        value = yield* readDateTime2(parser, dataLength, metaData.scale, options.useUTC);
-      }
-      break;
-
-    case 'DateTimeOffsetN':
-      if ((dataLength = yield parser.readUInt8()) === 0) {
-        value = null;
-      } else {
-        value = yield* readDateTimeOffset(parser, dataLength, metaData.scale);
-      }
-      break;
-
-    case 'NumericN':
-    case 'DecimalN':
-      if (dataLength === 0) {
-        value = null;
-      } else {
-        const sign = (yield parser.readUInt8()) === 1 ? 1 : -1;
-        switch (dataLength - 1) {
           case 4:
-            value = yield parser.readUInt32LE();
-            break;
-          case 8:
-            value = yield* parser.readUNumeric64LE();
-            break;
-          case 12:
-            value = yield* parser.readUNumeric96LE();
-            break;
-          case 16:
-            value = yield* parser.readUNumeric128LE();
-            break;
+            return parser.readUInt32LE(callback);
+
           default:
-            throw new Error(sprintf('Unsupported numeric size %d', dataLength - 1));
+            return parser.emit('error', new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name));
         }
-        value *= sign;
-        value /= Math.pow(10, metaData.scale);
+      } else {
+        return callback(undefined);
       }
-      break;
 
-    case 'UniqueIdentifierN':
-      switch (dataLength) {
-        case 0:
-          value = null;
+    case 0x30:
+      return callback(1 << ((type.id & 0x0C) >> 2));
+  }
+}
+
+export default function(parser, metaData, options, callback) {
+  const type = metaData.type;
+
+  readTextPointerNull(parser, type, (textPointerNull) => {
+    readDataLength(parser, type, metaData, textPointerNull, (dataLength) => {
+      switch (type.name) {
+        case 'Null':
+          return callback(null);
+
+        case 'TinyInt':
+          return parser.readUInt8(callback);
+
+        case 'Int':
+          return parser.readInt32LE(callback);
+
+        case 'SmallInt':
+          return parser.readInt16LE(callback);
+
+        case 'BigInt':
+          return parser.readBuffer(8, (buffer) => {
+            callback(convertLEBytesToString(buffer));
+          });
+
+        case 'IntN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 1:
+              return parser.readUInt8(callback);
+            case 2:
+              return parser.readInt16LE(callback);
+            case 4:
+              return parser.readInt32LE(callback);
+            case 8:
+              return parser.readBuffer(8, (buffer) => {
+                callback(convertLEBytesToString(buffer));
+              });
+
+            default:
+              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for IntN"));
+          }
+
+        case 'Real':
+          return parser.readFloatLE(callback);
+
+        case 'Float':
+          return parser.readDoubleLE(callback);
+
+        case 'FloatN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 4:
+              return parser.readFloatLE(callback);
+            case 8:
+              return parser.readDoubleLE(callback);
+
+            default:
+              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for FloatN"));
+          }
+
+        case 'Money':
+        case 'SmallMoney':
+        case 'MoneyN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 4:
+              return parser.readInt32LE((value) => {
+                callback(value / MONEY_DIVISOR);
+              });
+            case 8:
+              return parser.readInt32LE((high) => {
+                parser.readUInt32LE((low) => {
+                  callback((low + (0x100000000 * high)) / MONEY_DIVISOR);
+                });
+              });
+
+            default:
+              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for MoneyN"));
+          }
+
+        case 'Bit':
+          return parser.readUInt8((value) => {
+            callback(!!value);
+          });
+
+        case 'BitN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 1:
+              return parser.readUInt8((value) => {
+                callback(!!value);
+              });
+          }
+
+        case 'VarChar':
+        case 'Char':
+          const codepage = metaData.collation.codepage;
+          if (metaData.dataLength === MAX) {
+            return readMaxChars(parser, codepage, callback);
+          } else {
+            return readChars(parser, dataLength, codepage, callback);
+          }
+
+        case 'NVarChar':
+        case 'NChar':
+          if (metaData.dataLength === MAX) {
+            return readMaxNChars(parser, callback);
+          } else {
+            return readNChars(parser, dataLength, callback);
+          }
+
+        case 'VarBinary':
+        case 'Binary':
+          if (metaData.dataLength === MAX) {
+            return readMaxBinary(parser, callback);
+          } else {
+            return readBinary(parser, dataLength, callback);
+          }
           break;
-        case 0x10:
-          const data = new Buffer(yield parser.readBuffer(0x10));
-          value = guidParser.arrayToGuid(data);
+
+        case 'Text':
+          if (textPointerNull) {
+            return callback(null);
+          } else {
+            return readChars(parser, dataLength, metaData.collation.codepage, callback);
+          }
           break;
+
+        case 'NText':
+          if (textPointerNull) {
+            return callback(null);
+          } else {
+            return readNChars(parser, dataLength, callback);
+          }
+          break;
+
+        case 'Image':
+          if (textPointerNull) {
+            return callback(null);
+          } else {
+            return readBinary(parser, dataLength, callback);
+          }
+
+        case 'Xml':
+          return readMaxNChars(parser, callback);
+
+        case 'SmallDateTime':
+          return readSmallDateTime(parser, options.useUTC, callback);
+
+        case 'DateTime':
+          return readDateTime(parser, options.useUTC, callback);
+
+        case 'DateTimeN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 4:
+              return readSmallDateTime(parser, options.useUTC, callback);
+            case 8:
+              return readDateTime(parser, options.useUTC, callback);
+          }
+
+        case 'TimeN':
+          return parser.readUInt8((dataLength) => {
+            if (dataLength === 0) {
+              return callback(null);
+            } else {
+              return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
+            }
+          });
+
+        case 'DateN':
+          return parser.readUInt8((dataLength) => {
+            if (dataLength === 0) {
+              return callback(null);
+            } else {
+              return readDate(parser, options.useUTC, callback);
+            }
+          });
+
+        case 'DateTime2N':
+          return parser.readUInt8((dataLength) => {
+            if (dataLength === 0) {
+              return callback(null);
+            } else {
+              return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
+            }
+          });
+
+        case 'DateTimeOffsetN':
+          return parser.readUInt8((dataLength) => {
+            if (dataLength === 0) {
+              return callback(null);
+            } else {
+              return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
+            }
+          });
+
+        case 'NumericN':
+        case 'DecimalN':
+          if (dataLength === 0) {
+            return callback(null);
+          } else {
+            return parser.readUInt8((sign) => {
+              sign = sign === 1 ? 1 : -1;
+
+              let readValue;
+              switch (dataLength - 1) {
+                case 4:
+                  readValue = parser.readUInt32LE;
+                  break;
+                case 8:
+                  readValue = parser.readUNumeric64LE;
+                  break;
+                case 12:
+                  readValue = parser.readUNumeric96LE;
+                  break;
+                case 16:
+                  readValue = parser.readUNumeric128LE;
+                  break;
+                default:
+                  return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength - 1)));
+              }
+
+              readValue.call(parser, (value) => {
+                callback((value * sign) / Math.pow(10, metaData.scale));
+              });
+            });
+          }
+          break;
+
+        case 'UniqueIdentifierN':
+          switch (dataLength) {
+            case 0:
+              return callback(null);
+            case 0x10:
+              return parser.readBuffer(0x10, (data) => {
+                callback(guidParser.arrayToGuid(data));
+              });
+
+            default:
+              return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
+          }
+
+        case 'UDT':
+          return readMaxBinary(parser, callback);
+
         default:
-          throw new Error(sprintf('Unsupported guid size %d', dataLength - 1));
+          return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
       }
-      break;
-
-    case 'UDT':
-      value = yield* readMaxBinary(parser);
-      break;
-
-    default:
-      throw new Error(sprintf('Unrecognised type %s', type.name));
-  }
-
-  return value;
+    });
+  });
 }
 
-function* readBinary(parser, dataLength) {
+function readBinary(parser, dataLength, callback) {
   if (dataLength === NULL) {
-    return null;
+    return callback(null);
   } else {
-    return yield parser.readBuffer(dataLength);
+    return parser.readBuffer(dataLength, callback);
   }
 }
 
-function* readChars(parser, dataLength, codepage) {
+function readChars(parser, dataLength, codepage, callback) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
 
   if (dataLength === NULL) {
-    return null;
+    return callback(null);
   } else {
-    return iconv.decode(yield parser.readBuffer(dataLength), codepage);
+    return parser.readBuffer(dataLength, (data) => {
+      callback(iconv.decode(data, codepage));
+    });
   }
 }
 
-function* readNChars(parser, dataLength) {
+function readNChars(parser, dataLength, callback) {
   if (dataLength === NULL) {
-    return null;
+    return callback(null);
   } else {
-    return (yield parser.readBuffer(dataLength)).toString("ucs2");
+    return parser.readBuffer(dataLength, (data) => {
+      callback(data.toString("ucs2"));
+    });
   }
 }
 
-function* readMaxBinary(parser) {
-  return yield* readMax(parser);
+function readMaxBinary(parser, callback) {
+  return readMax(parser, callback);
 }
 
-function* readMaxChars(parser, codepage) {
+function readMaxChars(parser, codepage, callback) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
 
-  let data;
-  if ((data = yield* readMax(parser))) {
-    return iconv.decode(data, codepage);
-  } else {
-    return null;
-  }
-}
-
-function* readMaxNChars(parser) {
-  return (yield* readMax(parser)).toString('ucs2');
-}
-
-function* readMax(parser) {
-  const type = yield parser.readBuffer(8);
-
-  if (type.equals(PLP_NULL)) {
-    return null;
-  } else if (type.equals(UNKNOWN_PLP_LEN)) {
-    return yield* readMaxUnknownLength(parser);
-  } else {
-    const low = type.readUInt32LE(0);
-    const high = type.readUInt32LE(4);
-    if (high >= (2 << (53 - 32))) {
-      console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
+  readMax(parser, (data) => {
+    if (data) {
+      callback(iconv.decode(data, codepage));
+    } else {
+      callback(null);
     }
-
-    const expectedLength = low + (0x100000000 * high);
-    return yield* readMaxKnownLength(parser, expectedLength);
-  }
+  })
 }
 
-function* readMaxKnownLength(parser, totalLength) {
+function readMaxNChars(parser, callback) {
+  readMax(parser, (data) => {
+    callback(data.toString('ucs2'))
+  });
+}
+
+function readMax(parser, callback) {
+  parser.readBuffer(8, (type) => {
+    if (type.equals(PLP_NULL)) {
+      return callback(null);
+    } else if (type.equals(UNKNOWN_PLP_LEN)) {
+      return readMaxUnknownLength(parser, callback);
+    } else {
+      const low = type.readUInt32LE(0);
+      const high = type.readUInt32LE(4);
+
+      if (high >= (2 << (53 - 32))) {
+        console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
+      }
+
+      const expectedLength = low + (0x100000000 * high);
+      return readMaxKnownLength(parser, expectedLength, callback);
+    }
+  });
+}
+
+function readMaxKnownLength(parser, totalLength, callback) {
   const data = new Buffer(totalLength);
 
   let offset = 0, chunkLength;
-  while ((chunkLength = yield parser.readUInt32LE())) {
-    (yield parser.readBuffer(chunkLength)).copy(data, offset);
-    offset += chunkLength;
+  function next(done) {
+    parser.readUInt32LE((chunkLength) => {
+      if (!chunkLength) {
+        return done();
+      }
+
+      parser.readBuffer(chunkLength, (chunk) => {
+        chunk.copy(data, offset);
+        offset += chunkLength;
+
+        next(done);
+      });
+    });
   }
 
-  if (offset !== totalLength) {
-    throw new Error("Partially Length-prefixed Bytes unmatched lengths : expected " + totalLength + ", but got " + offset + " bytes");
-  }
+  next(() => {
+    if (offset !== totalLength) {
+      parser.emit('error', new Error("Partially Length-prefixed Bytes unmatched lengths : expected " + totalLength + ", but got " + offset + " bytes"));
+    }
 
-  return data;
+    callback(data);
+  });
 }
 
-function* readMaxUnknownLength(parser) {
+function readMaxUnknownLength(parser, callback) {
   const chunks = [];
-  let chunkLength, length = 0;
 
-  while ((chunkLength = yield parser.readUInt32LE())) {
-    length += chunkLength;
-    chunks.push(yield parser.readBuffer(chunkLength));
+  let length = 0;
+  function next(done) {
+    parser.readUInt32LE((chunkLength) => {
+      if (!chunkLength) {
+        return done();
+      }
+
+      parser.readBuffer(chunkLength, (chunk) => {
+        chunks.push(chunk);
+        length += chunkLength;
+
+        next(done);
+      });
+    });
   }
 
-  return Buffer.concat(chunks, length);
+  next(() => {
+    callback(Buffer.concat(chunks, length));
+  });
 }
 
-function* readSmallDateTime(parser, useUTC) {
-  const days = yield parser.readUInt16LE();
-  const minutes = yield parser.readUInt16LE();
-
-  let value;
-  if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1));
-    value.setUTCDate(value.getUTCDate() + days);
-    value.setUTCMinutes(value.getUTCMinutes() + minutes);
-  } else {
-    value = new Date(1900, 0, 1);
-    value.setDate(value.getDate() + days);
-    value.setMinutes(value.getMinutes() + minutes);
-  }
-  return value;
+function readSmallDateTime(parser, useUTC, callback) {
+  parser.readUInt16LE((days) => {
+    parser.readUInt16LE((minutes) => {
+      let value;
+      if (useUTC) {
+        value = new Date(Date.UTC(1900, 0, 1));
+        value.setUTCDate(value.getUTCDate() + days);
+        value.setUTCMinutes(value.getUTCMinutes() + minutes);
+      } else {
+        value = new Date(1900, 0, 1);
+        value.setDate(value.getDate() + days);
+        value.setMinutes(value.getMinutes() + minutes);
+      }
+      callback(value);
+    });
+  });
 }
 
-function* readDateTime(parser, useUTC) {
-  const days = yield parser.readInt32LE();
-  const threeHundredthsOfSecond = yield parser.readUInt32LE();
-  const milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD;
+function readDateTime(parser, useUTC, callback) {
+  parser.readInt32LE((days) => {
+    parser.readUInt32LE((threeHundredthsOfSecond) => {
+      const milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD;
 
-  let value;
-  if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1));
-    value.setUTCDate(value.getUTCDate() + days);
-    value.setUTCMilliseconds(value.getUTCMilliseconds() + milliseconds);
-  } else {
-    value = new Date(1900, 0, 1);
-    value.setDate(value.getDate() + days);
-    value.setMilliseconds(value.getMilliseconds() + milliseconds);
-  }
-  return value;
+      let value;
+      if (useUTC) {
+        value = new Date(Date.UTC(1900, 0, 1));
+        value.setUTCDate(value.getUTCDate() + days);
+        value.setUTCMilliseconds(value.getUTCMilliseconds() + milliseconds);
+      } else {
+        value = new Date(1900, 0, 1);
+        value.setDate(value.getDate() + days);
+        value.setMilliseconds(value.getMilliseconds() + milliseconds);
+      }
+
+      callback(value);
+    });
+  });
 }
 
-function* readTime(parser, dataLength, scale, useUTC) {
-  let value;
+function readTime(parser, dataLength, scale, useUTC, callback) {
+  let readValue;
   switch (dataLength) {
     case 3:
-      value = yield* parser.readUInt24LE();
+      readValue = parser.readUInt24LE;
       break;
     case 4:
-      value = yield parser.readUInt32LE();
+      readValue = parser.readUInt32LE;
       break;
     case 5:
-      value = yield* parser.readUInt40LE();
+      readValue = parser.readUInt40LE;
   }
 
-  if (scale < 7) {
-    for (let i = scale; i < 7; i++) {
-      value *= 10;
+  readValue.call(parser, (value) => {
+    if (scale < 7) {
+      for (let i = scale; i < 7; i++) {
+        value *= 10;
+      }
     }
-  }
 
-  let date;
-  if (useUTC) {
-    date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000));
-  } else {
-    date = new Date(1970, 0, 1, 0, 0, 0, value / 10000);
-  }
-  Object.defineProperty(date, "nanosecondsDelta", {
-    enumerable: false,
-    value: (value % 10000) / Math.pow(10, 7)
+    let date;
+    if (useUTC) {
+      date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000));
+    } else {
+      date = new Date(1970, 0, 1, 0, 0, 0, value / 10000);
+    }
+    Object.defineProperty(date, "nanosecondsDelta", {
+      enumerable: false,
+      value: (value % 10000) / Math.pow(10, 7)
+    });
+    callback(date);
   });
-  return date;
 }
 
-function* readDate(parser, useUTC) {
-  const days = yield* parser.readUInt24LE();
-  if (useUTC) {
-    return new Date(Date.UTC(2000, 0, days - 730118));
-  } else {
-    return new Date(2000, 0, days - 730118);
-  }
+function readDate(parser, useUTC, callback) {
+  parser.readUInt24LE((days) => {
+    if (useUTC) {
+      callback(new Date(Date.UTC(2000, 0, days - 730118)));
+    } else {
+      callback(new Date(2000, 0, days - 730118));
+    }
+  });
 }
 
-function* readDateTime2(parser, dataLength, scale, useUTC) {
-  const time = yield* readTime(parser, dataLength - 3, scale, useUTC);
-  const days = yield* parser.readUInt24LE();
-
-  let date;
-  if (useUTC) {
-    date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time));
-  } else {
-    date = new Date(2000, 0, days - 730118, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds());
-  }
-  Object.defineProperty(date, "nanosecondsDelta", {
-    enumerable: false,
-    value: time.nanosecondsDelta
+function readDateTime2(parser, dataLength, scale, useUTC, callback) {
+  readTime(parser, dataLength - 3, scale, useUTC, (time) => {
+    parser.readUInt24LE((days) => {
+      let date;
+      if (useUTC) {
+        date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time));
+      } else {
+        date = new Date(2000, 0, days - 730118, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds());
+      }
+      Object.defineProperty(date, "nanosecondsDelta", {
+        enumerable: false,
+        value: time.nanosecondsDelta
+      });
+      callback(date);
+    });
   });
-  return date;
 }
 
-function* readDateTimeOffset(parser, dataLength, scale) {
-  const time = yield* readTime(parser, dataLength - 5, scale, true);
-  const days = yield* parser.readUInt24LE();
-  yield parser.readInt16LE(); // offset
-  const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time));
-  Object.defineProperty(date, "nanosecondsDelta", {
-    enumerable: false,
-    value: time.nanosecondsDelta
+function readDateTimeOffset(parser, dataLength, scale, callback) {
+  readTime(parser, dataLength - 5, scale, true, (time) => {
+    parser.readUInt24LE((days) => {
+      // offset
+      parser.readInt16LE(() => {
+        const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time));
+        Object.defineProperty(date, "nanosecondsDelta", {
+          enumerable: false,
+          value: time.nanosecondsDelta
+        });
+        callback(date);
+      });
+    });
   });
-  return date;
 }

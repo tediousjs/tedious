@@ -2,46 +2,58 @@
 
 import valueParse from '../value-parser';
 
-export default function*(parser, columnsMetaData, options) {
+function nullHandler(parser, columnMetaData, options, callback) {
+  callback(null);
+}
+
+export default function(parser, columnsMetaData, options, callback) {
   const length = Math.ceil(columnsMetaData.length / 8);
-  const bytes = yield parser.readBuffer(length);
-  const bitmap = [];
+  parser.readBuffer(length, (bytes) => {
+    const bitmap = [];
 
-  for (let i = 0, len = bytes.length; i < len; i++) {
-    const byte = bytes[i];
-    for (let j = 0; j <= 7; j++) {
-      bitmap.push(byte & (1 << j) ? true : false);
-    }
-  }
-
-  const columns = options.useColumnNames ? {} : [];
-  for (let i = 0, len = columnsMetaData.length; i < len; i++) {
-    const columnMetaData = columnsMetaData[i];
-
-    let value;
-
-    if (bitmap[i]) {
-      value = null;
-    } else {
-      value = yield* valueParse(parser, columnMetaData, options);
-    }
-
-    const column = {
-      value: value,
-      metadata: columnMetaData
-    };
-
-    if (options.useColumnNames) {
-      if (columns[columnMetaData.colName] == null) {
-        columns[columnMetaData.colName] = column;
+    for (let i = 0, len = bytes.length; i < len; i++) {
+      const byte = bytes[i];
+      for (let j = 0; j <= 7; j++) {
+        bitmap.push(byte & (1 << j) ? true : false);
       }
-    } else {
-      columns.push(column);
     }
-  }
-  return {
-    name: 'NBCROW',
-    event: 'row',
-    columns: columns
-  };
+
+    const columns = options.useColumnNames ? {} : [];
+
+    const len = columnsMetaData.length;
+    let i = 0;
+    function next(done) {
+      if (i === len) {
+        return done();
+      }
+
+      const columnMetaData = columnsMetaData[i];
+
+      (bitmap[i] ? nullHandler : valueParse)(parser, columnMetaData, options, (value) => {
+        const column = {
+          value: value,
+          metadata: columnMetaData
+        };
+
+        if (options.useColumnNames) {
+          if (columns[columnMetaData.colName] == null) {
+            columns[columnMetaData.colName] = column;
+          }
+        } else {
+          columns.push(column);
+        }
+
+        i++;
+        next(done);
+      });
+    }
+
+    next(() => {
+      callback({
+        name: 'NBCROW',
+        event: 'row',
+        columns: columns
+      });
+    });
+  });
 }
