@@ -2,114 +2,162 @@ import { codepageByLcid } from './collation';
 import { TYPE } from './data-type';
 import { sprintf } from 'sprintf';
 
-export default function*(parser, options) {
-  let userType;
-  if (options.tdsVersion < "7_2") {
-    userType = yield parser.readUInt16LE();
-  } else {
-    userType = yield parser.readUInt32LE();
-  }
-
-  const flags = yield parser.readUInt16LE();
-  const typeNumber = yield parser.readUInt8();
-  const type = TYPE[typeNumber];
-
-  if (!type) {
-    throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber));
-  }
-
-  let dataLength;
+function readDataLength(parser, type, callback) {
   if ((type.id & 0x30) === 0x20) {
     // xx10xxxx - s2.2.4.2.1.3
     // Variable length
     switch (type.dataLengthLength) {
       case 0:
-        dataLength = void 0;
-        break;
+        return callback(undefined);
+
       case 1:
-        dataLength = yield parser.readUInt8();
-        break;
+        return parser.readUInt8(callback);
+
       case 2:
-        dataLength = yield parser.readUInt16LE();
-        break;
+        return parser.readUInt16LE(callback);
+
       case 4:
-        dataLength = yield parser.readUInt32LE();
-        break;
+        return parser.readUInt32LE(callback);
+
       default:
-        throw new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name);
+        return parser.emit(new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name));
     }
+  } else {
+    callback(undefined);
   }
+}
 
-  let precision;
+function readPrecision(parser, type, callback) {
   if (type.hasPrecision) {
-    precision = yield parser.readUInt8();
+    parser.readUInt8(callback);
+  } else {
+    callback(undefined);
   }
+}
 
-  let scale;
+function readScale(parser, type, callback) {
   if (type.hasScale) {
-    scale = yield parser.readUInt8();
-    if (type.dataLengthFromScale) {
-      dataLength = type.dataLengthFromScale(scale);
-    }
+    parser.readUInt8(callback);
+  } else {
+    callback(undefined);
   }
+}
 
-  let collation;
+function readCollation(parser, type, callback) {
   if (type.hasCollation) {
     // s2.2.5.1.2
-    const collationData = yield parser.readBuffer(5);
+    parser.readBuffer(5, (collationData) => {
+      const collation = {};
 
-    collation = {};
+      collation.lcid = (collationData[2] & 0x0F) << 16;
+      collation.lcid |= collationData[1] << 8;
+      collation.lcid |= collationData[0];
 
-    collation.lcid = (collationData[2] & 0x0F) << 16;
-    collation.lcid |= collationData[1] << 8;
-    collation.lcid |= collationData[0];
+      collation.codepage = codepageByLcid[collation.lcid];
 
-    collation.codepage = codepageByLcid[collation.lcid];
+      // This may not be extracting the correct nibbles in the correct order.
+      collation.flags = collationData[3] >> 4;
+      collation.flags |= collationData[2] & 0xF0;
 
-    // This may not be extracting the correct nibbles in the correct order.
-    collation.flags = collationData[3] >> 4;
-    collation.flags |= collationData[2] & 0xF0;
+      // This may not be extracting the correct nibble.
+      collation.version = collationData[3] & 0x0F;
 
-    // This may not be extracting the correct nibble.
-    collation.version = collationData[3] & 0x0F;
+      collation.sortId = collationData[4];
 
-    collation.sortId = collationData[4];
+      callback(collation);
+    });
+  } else {
+    callback(undefined);
   }
+}
 
-  let schema;
+function readSchema(parser, type, callback) {
   if (type.hasSchemaPresent) {
     // s2.2.5.5.3
-    const schemaPresent = yield parser.readUInt8();
-    if (schemaPresent === 0x01) {
-      schema = {
-        dbname: yield* parser.readBVarChar(),
-        owningSchema: yield* parser.readBVarChar(),
-        xmlSchemaCollection: yield* parser.readUsVarChar()
-      };
-    }
+    parser.readUInt8((schemaPresent) => {
+      if (schemaPresent === 0x01) {
+        parser.readBVarChar((dbname) => {
+          parser.readBVarChar((owningSchema) => {
+            parser.readUsVarChar((xmlSchemaCollection) => {
+              callback({
+                dbname: dbname,
+                owningSchema: owningSchema,
+                xmlSchemaCollection: xmlSchemaCollection
+              });
+            });
+          });
+        });
+      } else {
+        callback(undefined);
+      }
+    });
+  } else {
+    callback(undefined);
   }
+}
 
-  let udtInfo;
+function readUDTInfo(parser, type, callback) {
   if (type.hasUDTInfo) {
-    // s2.2.5.5.2
-    udtInfo = {
-      maxByteSize: yield parser.readUInt16LE(),
-      dbname: yield* parser.readBVarChar(),
-      owningSchema: yield* parser.readBVarChar(),
-      typeName: yield* parser.readBVarChar(),
-      assemblyName: yield* parser.readUsVarChar()
-    };
+    parser.readUInt16LE((maxByteSize) => {
+      parser.readBVarChar((dbname) => {
+        parser.readBVarChar((owningSchema) => {
+          parser.readBVarChar((typeName) => {
+            parser.readUsVarChar((assemblyName) => {
+              callback({
+                maxByteSize: maxByteSize,
+                dbname: dbname,
+                owningSchema: owningSchema,
+                typeName: typeName,
+                assemblyName: assemblyName
+              });
+            });
+          });
+        });
+      });
+    });
+  } else {
+    return callback();
   }
+}
 
-  return {
-    userType: userType,
-    flags: flags,
-    type: type,
-    collation: collation,
-    precision: precision,
-    scale: scale,
-    dataLength: dataLength,
-    schema: schema,
-    udtInfo: udtInfo
-  };
+export default function(parser, options, callback) {
+  (options.tdsVersion < "7_2" ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+    parser.readUInt16LE((flags) => {
+      parser.readUInt8((typeNumber) => {
+        const type = TYPE[typeNumber];
+
+        if (!type) {
+          return parser.emit(new Error(sprintf('Unrecognised data type 0x%02X', typeNumber)));
+        }
+
+        readDataLength(parser, type, (dataLength) => {
+          readPrecision(parser, type, (precision) => {
+            readScale(parser, type, (scale) => {
+              if (scale && type.dataLengthFromScale) {
+                dataLength = type.dataLengthFromScale(scale);
+              }
+
+              readCollation(parser, type, (collation) => {
+                readSchema(parser, type, (schema) => {
+                  readUDTInfo(parser, type, (udtInfo) => {
+                    callback({
+                      userType: userType,
+                      flags: flags,
+                      type: type,
+                      collation: collation,
+                      precision: precision,
+                      scale: scale,
+                      dataLength: dataLength,
+                      schema: schema,
+                      udtInfo: udtInfo
+                    });
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
 }
