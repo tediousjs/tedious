@@ -1,20 +1,42 @@
 import tls from 'tls';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+import { Transform } from 'readable-stream';
 
 import {} from './buffertools';
 import { Packet, TYPE, HEADER_LENGTH as packetHeaderLength } from './packet';
-import StreamParser from './stream-parser';
 
-class ReadablePacketStream extends StreamParser {
-  *parser() {
-    for (;;) {
-      const header = yield this.readBuffer(packetHeaderLength);
-      const length = header.readUInt16BE(2);
-      const data = yield this.readBuffer(length - packetHeaderLength);
+class ReadablePacketStream extends Transform {
+  constructor() {
+    super({ "objectMode": true });
 
-      this.push(new Packet(Buffer.concat([header, data])));
+    this.buffer = new Buffer(0);
+  }
+
+  _transform(chunk, encoding, callback) {
+    if (this.buffer.length) {
+      this.buffer = Buffer.concat([this.buffer, chunk], this.buffer.length + chunk.length);
+    } else {
+      this.buffer = chunk;
     }
+
+    // We need to have at least 4 bytes available to be able to determine
+    // the full packet size.
+    while (this.buffer.length >= 4) {
+      const length = this.buffer.readUInt16BE(2);
+
+      if (this.buffer.length >= length) {
+        const data = this.buffer.slice(0, length);
+        this.buffer = this.buffer.slice(length);
+        this.push(new Packet(data));
+      } else {
+        // Not enough data to provide the next packet. Stop here and wait for
+        // the next call to `_transform`.
+        break;
+      }
+    }
+
+    callback();
   }
 }
 
