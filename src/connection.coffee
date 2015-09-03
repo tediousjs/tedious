@@ -82,8 +82,6 @@ class Connection extends EventEmitter
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         reconnect: ->
-          @config.server = @routingData.server
-          @config.options.port = @routingData.port
           @transitionTo(@STATE.CONNECTING)
 
     SENT_TLSSSLNEGOTIATION:
@@ -486,8 +484,12 @@ class Connection extends EventEmitter
     @socket = new Socket({})
 
     connectOpts =
-      host: @config.server
-      port: port
+      host: @routingData?.server || @config.server
+      port: @routingData?.port || port
+
+    # Unset routing information so we reuse the initial config on the next
+    # connection attempt again.
+    @routingData = undefined
 
     if @config.options.localAddress
       connectOpts.localAddress = @config.options.localAddress
