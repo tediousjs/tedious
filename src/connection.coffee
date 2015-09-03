@@ -487,10 +487,6 @@ class Connection extends EventEmitter
       host: @routingData?.server || @config.server
       port: @routingData?.port || port
 
-    # Unset routing information so we reuse the initial config on the next
-    # connection attempt again.
-    @routingData = undefined
-
     if @config.options.localAddress
       connectOpts.localAddress = @config.options.localAddress
 
@@ -620,12 +616,16 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
-      serverName: @config.server
+      serverName: @routingData?.server || @config.server
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
       initDbFatal: not @config.options.fallbackToDefaultDb
       readOnlyIntent: @config.options.readOnlyIntent
+
+    # Unset routing information so we reuse the initial config on the next
+    # connection attempt again.
+    @routingData = undefined
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
