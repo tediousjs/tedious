@@ -616,7 +616,7 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
-      serverName: @config.server
+      serverName: @routingData?.server || @config.server
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
