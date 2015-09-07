@@ -80,8 +80,6 @@ class Connection extends EventEmitter
         connectTimeout: ->
           @transitionTo(@STATE.FINAL)
         reconnect: ->
-          @config.server = @routingData.server
-          @config.options.port = @routingData.port
           @transitionTo(@STATE.CONNECTING)
 
     SENT_TLSSSLNEGOTIATION:
@@ -480,8 +478,8 @@ class Connection extends EventEmitter
     @socket = new Socket({})
 
     connectOpts =
-      host: @config.server
-      port: port
+      host: @routingData?.server || @config.server
+      port: @routingData?.port || port
 
     if @config.options.localAddress
       connectOpts.localAddress = @config.options.localAddress
@@ -614,12 +612,16 @@ class Connection extends EventEmitter
       userName: @config.userName
       password: @config.password
       database: @config.options.database
-      serverName: @config.server
+      serverName: @routingData?.server || @config.server
       appName: @config.options.appName
       packetSize: @config.options.packetSize
       tdsVersion: @config.options.tdsVersion
       initDbFatal: not @config.options.fallbackToDefaultDb
       readOnlyIntent: @config.options.readOnlyIntent
+
+    # Unset routing information so we reuse the initial config on the next
+    # connection attempt again.
+    @routingData = undefined
 
     payload = new Login7Payload(loginData)
     @messageIo.sendMessage(TYPE.LOGIN7, payload.data)
