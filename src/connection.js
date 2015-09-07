@@ -386,8 +386,8 @@ export default class Connection extends EventEmitter {
   connectOnPort(port) {
     this.socket = new Socket({});
     const connectOpts = {
-      host: this.config.server,
-      port: port
+      host: this.routingData ? this.routingData.server : this.config.server,
+      port: this.routingData ? this.routingData.port : port
     };
     if (this.config.options.localAddress) {
       connectOpts.localAddress = this.config.options.localAddress;
@@ -546,14 +546,17 @@ export default class Connection extends EventEmitter {
       userName: this.config.userName,
       password: this.config.password,
       database: this.config.options.database,
-      serverName: this.config.server,
+      serverName: this.routingData ? this.routingData.server : this.config.server,
       appName: this.config.options.appName,
       packetSize: this.config.options.packetSize,
       tdsVersion: this.config.options.tdsVersion,
       initDbFatal: !this.config.options.fallbackToDefaultDb,
       readOnlyIntent: this.config.options.readOnlyIntent
     });
+
+    this.routingData = undefined;
     this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+
     return this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -923,8 +926,6 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       reconnect: function() {
-        this.config.server = this.routingData.server;
-        this.config.options.port = this.routingData.port;
         return this.transitionTo(this.STATE.CONNECTING);
       }
     }
