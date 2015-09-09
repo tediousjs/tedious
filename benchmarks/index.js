@@ -6,7 +6,7 @@ var Benchmark = require("benchmark");
 var Connection = require("../lib/tedious").Connection;
 var Request = require("../lib/tedious").Request;
 
-var types = ["query"];
+var types = ["query", "token-parser"];
 var tests = [];
 
 types.forEach(function(type) {
