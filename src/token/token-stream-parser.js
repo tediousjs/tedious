@@ -32,6 +32,6 @@ export class Parser extends EventEmitter {
   }
 
   isEnd()  {
-    return this.parser.buffer.length === 0;
+    return this.parser.buffer.length === this.parser.position;
   }
 }
