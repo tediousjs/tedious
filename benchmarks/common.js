@@ -68,8 +68,10 @@ function runProfile(test) {
       if (err) throw err;
 
       async.timesSeries(test.profileIterations, function(n, done) {
-        console.log("[Iteration " +  n + "]");
-        test.exec(connection, done);
+        async.setImmediate(function() {
+          console.log("[Iteration " +  n + "]");
+          test.exec(connection, done);
+        });
       }, function(err) {
         if (err) throw err;
 
