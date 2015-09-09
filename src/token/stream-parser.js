@@ -31,6 +31,8 @@ export default class Parser extends Transform {
     this.nextStep = undefined;
     this.buffer = new Buffer(0);
     this.position = 0;
+    this.await = undefined;
+    this.next = undefined;
   }
 
   _transform(input, encoding, done) {
