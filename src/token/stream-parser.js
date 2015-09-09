@@ -77,6 +77,11 @@ export default class Parser extends Transform {
     });
   }
 
+  suspend(next) {
+    this.next = next;
+    this.await();
+  }
+
   awaitData(length, callback) {
     if (this.position + length <= this.buffer.length) {
       callback();
