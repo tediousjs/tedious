@@ -57,7 +57,11 @@ export default class Parser extends Transform {
   }
 
   parseNextToken() {
-    this.readUInt8((type) => {
+    if (this.position + 1 <= this.buffer.length) {
+      const type = this.buffer.readUInt8(this.position, true);
+
+      this.position += 1;
+
       if (tokenParsers[type]) {
         tokenParsers[type](this, this.colMetadata, this.options, (token) => {
           if (token) {
@@ -74,7 +78,11 @@ export default class Parser extends Transform {
       } else {
         this.emit('error', new Error("Unknown type: " + type));
       }
-    });
+    } else {
+      this.suspend(() => {
+        this.parseNextToken();
+      });
+    }
   }
 
   suspend(next) {
