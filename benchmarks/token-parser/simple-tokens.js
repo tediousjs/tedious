@@ -346,11 +346,11 @@ common.createBenchmark({
 
   profileIterations: 1000,
 
-  setup: function(connection, cb) {
+  setup: function(cb) {
     cb();
   },
 
-  exec: function(connection, cb) {
+  exec: function(cb) {
     parser.on("doneProc", function() {
       parser.removeAllListeners("doneProc");
 
@@ -360,7 +360,7 @@ common.createBenchmark({
     parser.addBuffer(data);
   },
 
-  teardown: function(connection, cb) {
+  teardown: function(cb) {
     cb();
   }
 });
