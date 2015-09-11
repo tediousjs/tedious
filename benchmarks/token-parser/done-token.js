@@ -16,11 +16,11 @@ common.createBenchmark({
 
   profileIterations: 3000,
 
-  setup: function(connection, cb) {
+  setup: function(cb) {
     cb();
   },
 
-  exec: function(connection, cb) {
+  exec: function(cb) {
     var count = 0;
 
     parser.on("doneProc", function() {
@@ -36,7 +36,7 @@ common.createBenchmark({
     parser.addBuffer(data);
   },
 
-  teardown: function(connection, cb) {
+  teardown: function(cb) {
     cb();
   }
 });
