@@ -383,14 +383,14 @@ function readMaxNChars(parser, callback) {
 
 function readMax(parser, callback) {
   parser.readBuffer(8, (type) => {
-    if (type.equals(PLP_NULL)) {
+    const low = type.readUInt32LE(0);
+    const high = type.readUInt32LE(4);
+
+    if (low === 0xFFFFFFFE && high === 0xFFFFFFFF) {
       return callback(null);
-    } else if (type.equals(UNKNOWN_PLP_LEN)) {
+    } else if (low === 0xFFFFFFFF && high === 0xFFFFFFFF) {
       return readMaxUnknownLength(parser, callback);
     } else {
-      const low = type.readUInt32LE(0);
-      const high = type.readUInt32LE(4);
-
       if (high >= (2 << (53 - 32))) {
         console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
       }
@@ -401,32 +401,32 @@ function readMax(parser, callback) {
   });
 }
 
-function readMaxKnownLength(parser, totalLength, callback) {
-  const data = new Buffer(totalLength);
+function _readMaxKnownLength(parser, data, offset, callback) {
+  while (parser.position + 4 <= parser.buffer.length) {
+    const chunkLength = parser.buffer.readUInt32LE(parser.position, true);
 
-  let offset = 0, chunkLength;
-  function next(done) {
-    parser.readUInt32LE((chunkLength) => {
-      if (!chunkLength) {
-        return done();
+    if (!chunkLength) {
+      parser.position += 4;
+
+      if (offset !== data.length) {
+        parser.emit('error', new Error("Partially Length-prefixed Bytes unmatched lengths : expected " + data.length + ", but got " + offset + " bytes"));
       }
 
-      parser.readBuffer(chunkLength, (chunk) => {
-        chunk.copy(data, offset);
-        offset += chunkLength;
-
-        next(done);
-      });
-    });
-  }
-
-  next(() => {
-    if (offset !== totalLength) {
-      parser.emit('error', new Error("Partially Length-prefixed Bytes unmatched lengths : expected " + totalLength + ", but got " + offset + " bytes"));
+      return callback(data);
     }
 
-    callback(data);
+    parser.buffer.copy(data, offset, parser.position + 4, parser.position += 4 + chunkLength);
+    offset += chunkLength;
+  }
+
+  parser.suspend(() => {
+    _readMaxKnownLength(parser, data, offset, callback);
   });
+}
+
+function readMaxKnownLength(parser, totalLength, callback) {
+  const data = new Buffer(totalLength);
+  _readMaxKnownLength(parser, data, 0, callback);
 }
 
 function readMaxUnknownLength(parser, callback) {
