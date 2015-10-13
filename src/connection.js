@@ -1055,7 +1055,10 @@ Connection.prototype.STATE = {
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = void 0;
+        sqlRequest.callback(err);
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
