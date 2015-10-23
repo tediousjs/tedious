@@ -954,8 +954,18 @@ export const TYPE = {
     dataLengthLength: 2,
     maximumLength: 8000,
 
-    declaration: function() {
-      return 'binary';
+    declaration: function(parameter) {
+      var length;
+      if (parameter.length) {
+        length = parameter.length;
+      } else if (parameter.value != null) {
+        length = parameter.value.length || 1;
+      } else if (parameter.value === null && !parameter.output) {
+        length = 1;
+      } else {
+        length = this.maximumLength;
+      }
+      return "binary(" + length + ")";
     },
 
     resolveLength: function(parameter) {
