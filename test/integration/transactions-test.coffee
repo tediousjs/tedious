@@ -381,6 +381,33 @@ exports.transactionHelperBatchAbortingError = (test) ->
           connection.execSqlBatch(request)
         connection.execSqlBatch(request)
 
+exports.transactionHelperSocketError = (test) ->
+  test.expect(3)
+
+  connection = new Connection(config)
+  connection.on('end', (info) ->
+    test.done()
+  )
+  connection.on('error', (err) ->
+    test.ok(~err.message.indexOf('socket error'))
+  )
+#  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
+#  connection.on('debug', (message) => console.log(message) if (debug))
+
+  connection.on 'connect', (err) ->
+    connection.transaction (err, outerDone) ->
+      test.ifError(err)
+
+      connection.transaction (err, innerDone) ->
+        test.ifError(err)
+
+        request = new Request "WAITFOR 00:00:30", (err) ->
+          innerDone err, outerDone, (err) ->
+            test.ok(~err.message.indexOf('socket error'));
+
+        connection.execSql(request)
+        connection.socket.emit('error', new Error('socket error'))
+
 exports.transactionHelperIsolationLevel = (test) ->
   test.expect(8)
 
