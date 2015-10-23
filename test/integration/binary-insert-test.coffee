@@ -22,10 +22,10 @@ else
 exports.insertBinary = (test) ->
   sample = new Buffer [0x12, 0x34, 0x00, 0xce]
   stmts = [
-    ["create table binaryInsertTest (data binary(4))"],
-    ["insert into binaryInsertTest (data) values (@p1)", [['p1', TYPES.Binary, sample]]],
-    ["select data from binaryInsertTest", [], [[sample]]],
-    ["drop table binaryInsertTest"]]
+    ["create table #binaryInsertTest (data binary(4))"],
+    ["insert into #binaryInsertTest (data) values (@p1)", [['p1', TYPES.Binary, sample]]],
+    ["select data from #binaryInsertTest", [], [[sample]]],
+  ]
   test.expect 7
   testSqls test, stmts
 
@@ -51,7 +51,6 @@ testSqls = (test, stmts) ->
         test.strictEqual stmts.length, 0
         connection.close()
     testOne()
-  
+
   connection.on 'end', (info) ->
     test.done()
-
