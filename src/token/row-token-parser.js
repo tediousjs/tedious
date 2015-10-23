@@ -2,29 +2,44 @@
 
 import valueParse from '../value-parser';
 
-export default function*(parser, columnsMetaData, options) {
+export default function(parser, colMetadata, options, callback) {
   const columns = options.useColumnNames ? {} : [];
 
-  for (let i = 0, len = columnsMetaData.length; i < len; i++) {
-    const columnMetaData = columnsMetaData[i];
-    const value = yield* valueParse(parser, columnMetaData, options);
-    const column = {
-      value: value,
-      metadata: columnMetaData
-    };
+  const len = colMetadata.length;
+  let i = 0;
 
-    if (options.useColumnNames) {
-      if (columns[columnMetaData.colName] == null) {
-        columns[columnMetaData.colName] = column;
-      }
-    } else {
-      columns.push(column);
+  function next(done) {
+    if (i === len) {
+      return done();
     }
+
+
+    const columnMetaData = colMetadata[i];
+    valueParse(parser, columnMetaData, options, (value) => {
+      const column = {
+        value: value,
+        metadata: columnMetaData
+      };
+
+      if (options.useColumnNames) {
+        if (columns[columnMetaData.colName] == null) {
+          columns[columnMetaData.colName] = column;
+        }
+      } else {
+        columns.push(column);
+      }
+
+      i++;
+
+      next(done);
+    });
   }
 
-  return {
-    name: 'ROW',
-    event: 'row',
-    columns: columns
-  };
+  next(() => {
+    callback({
+      name: 'ROW',
+      event: 'row',
+      columns: columns
+    });
+  });
 }

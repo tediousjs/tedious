@@ -1,20 +1,51 @@
 import tls from 'tls';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+import { Transform } from 'readable-stream';
 
 import {} from './buffertools';
 import { Packet, TYPE, HEADER_LENGTH as packetHeaderLength } from './packet';
-import StreamParser from './stream-parser';
 
-class ReadablePacketStream extends StreamParser {
-  *parser() {
-    for (;;) {
-      const header = yield this.readBuffer(packetHeaderLength);
-      const length = header.readUInt16BE(2);
-      const data = yield this.readBuffer(length - packetHeaderLength);
+class ReadablePacketStream extends Transform {
+  constructor() {
+    super({ "objectMode": true });
 
-      this.push(new Packet(Buffer.concat([header, data])));
+    this.buffer = new Buffer(0);
+    this.position = 0;
+  }
+
+  _transform(chunk, encoding, callback) {
+    if (this.position === this.buffer.length) {
+      // If we have fully consumed the previous buffer,
+      // we can just replace it with the new chunk
+      this.buffer = chunk;
+    } else {
+      // If we haven't fully consumed the previous buffer,
+      // we simply concatenate the leftovers and the new chunk.
+      this.buffer = Buffer.concat([
+        this.buffer.slice(this.position), chunk
+      ], (this.buffer.length - this.position) + chunk.length);
     }
+
+    this.position = 0;
+
+    // The packet header is always 8 bytes of length.
+    while (this.buffer.length >= this.position + packetHeaderLength) {
+      // Get the full packet length
+      const length = this.buffer.readUInt16BE(this.position + 2);
+
+      if (this.buffer.length >= this.position + length) {
+        const data = this.buffer.slice(this.position, this.position + length);
+        this.position += length;
+        this.push(new Packet(data));
+      } else {
+        // Not enough data to provide the next packet. Stop here and wait for
+        // the next call to `_transform`.
+        break;
+      }
+    }
+
+    callback();
   }
 }
 

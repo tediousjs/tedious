@@ -17,10 +17,12 @@ function parseChallenge(buffer) {
   return challenge;
 }
 
-export default function*(parser) {
-  return {
-    name: 'SSPICHALLENGE',
-    event: 'sspichallenge',
-    ntlmpacket: parseChallenge(yield* parser.readUsVarByte())
-  };
+export default function(parser, colMetadata, options, callback) {
+  parser.readUsVarByte((buffer) => {
+    callback({
+      name: 'SSPICHALLENGE',
+      event: 'sspichallenge',
+      ntlmpacket: parseChallenge(buffer)
+    });
+  });
 }

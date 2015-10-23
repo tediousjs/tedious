@@ -48,86 +48,100 @@ const types = {
   }
 };
 
-export default function* (parser) {
-  let newValue, oldValue;
+function readNewAndOldValue(parser, length, type, callback) {
+  switch (type.name) {
+    case 'DATABASE':
+    case 'LANGUAGE':
+    case 'CHARSET':
+    case 'PACKET_SIZE':
+    case 'DATABASE_MIRRORING_PARTNER':
+      return parser.readBVarChar((newValue) => {
+        parser.readBVarChar((oldValue) => {
+          if (type.name === 'PACKET_SIZE') {
+            callback(parseInt(newValue), parseInt(oldValue));
+          } else {
+            callback(newValue, oldValue);
+          }
+        });
+      });
 
-  const length = yield parser.readUInt16LE();
-  const typeNumber = yield parser.readUInt8();
-  const type = types[typeNumber];
+    case 'SQL_COLLATION':
+    case 'BEGIN_TXN':
+    case 'COMMIT_TXN':
+    case 'ROLLBACK_TXN':
+    case 'RESET_CONNECTION':
+      return parser.readBVarByte((newValue) => {
+        parser.readBVarByte((oldValue) => {
+          callback(newValue, oldValue);
+        });
+      });
 
-  if (type) {
-    switch (type.name) {
-      case 'DATABASE':
-      case 'LANGUAGE':
-      case 'CHARSET':
-      case 'PACKET_SIZE':
-      case 'DATABASE_MIRRORING_PARTNER':
-        newValue = yield* parser.readBVarChar();
-        oldValue = yield* parser.readBVarChar();
-        break;
-
-      case 'SQL_COLLATION':
-      case 'BEGIN_TXN':
-      case 'COMMIT_TXN':
-      case 'ROLLBACK_TXN':
-      case 'RESET_CONNECTION':
-        newValue = yield* parser.readBVarByte();
-        oldValue = yield* parser.readBVarByte();
-        break;
-
-      case 'ROUTING_CHANGE':
-        let valueLength = yield parser.readUInt16LE();
-
+    case 'ROUTING_CHANGE':
+      parser.readUInt16LE((valueLength) => {
         // Routing Change:
         // Byte 1: Protocol (must be 0)
         // Bytes 2-3 (USHORT): Port number
         // Bytes 4-5 (USHORT): Length of server data in unicode (2byte chars)
         // Bytes 6-*: Server name in unicode characters
+        parser.readBuffer(valueLength, (routePacket) => {
+          const protocol = routePacket.readUInt8(0);
 
-        const routePacket = yield parser.readBuffer(valueLength);
-        const protocol = routePacket.readUInt8(0);
+          if (protocol !== 0) {
+            return parser.emit('error', new Error('Unknown protocol byte in routing change event'));
+          }
 
-        if (protocol !== 0) {
-          throw new Error('Unknown protocol byte in routing change event');
-        }
+          const port = routePacket.readUInt16LE(1);
+          const serverLen = routePacket.readUInt16LE(3);
+          // 2 bytes per char, starting at offset 5
+          const server = routePacket.toString('ucs2', 5, 5 + (serverLen * 2));
 
-        const port = routePacket.readUInt16LE(1);
-        const serverLen = routePacket.readUInt16LE(3);
-        // 2 bytes per char, starting at offset 5
-        const server = routePacket.toString('ucs2', 5, 5 + (serverLen * 2));
+          const newValue = {
+            protocol: protocol,
+            port: port,
+            server: server
+          };
 
-        newValue = {
-          protocol: protocol,
-          port: port,
-          server: server
-        };
+          parser.readUInt16LE((oldValueLength) => {
+            parser.readBuffer(oldValueLength, (oldValue) => {
+              callback(newValue, oldValue);
+            });
+          });
+        });
+      });
 
-        valueLength = yield parser.readUInt16LE();
-        oldValue = yield parser.readBuffer(valueLength);
+      break;
 
-        break;
-
-      default:
-        console.error("Tedious > Unsupported ENVCHANGE type " + typeNumber);
-        yield parser.readBuffer(length - 1); // skip unknown bytes
-        return;
-    }
-
-    if (type.name === 'PACKET_SIZE') {
-      newValue = parseInt(newValue);
-      oldValue = parseInt(oldValue);
-    }
-  } else {
-    console.error("Tedious > Unsupported ENVCHANGE type " + typeNumber);
-    yield parser.readBuffer(length - 1); // skip unknown bytes
-    return;
+    default:
+      console.error("Tedious > Unsupported ENVCHANGE type " + type.name);
+      // skip unknown bytes
+      parser.readBuffer(length - 1, () => {
+        callback(undefined, undefined);
+      });
   }
+}
 
-  return {
-    name: 'ENVCHANGE',
-    type: type.name,
-    event: type.event,
-    oldValue: oldValue,
-    newValue: newValue
-  };
+export default function(parser, colMetadata, options, callback) {
+  parser.readUInt16LE((length) => {
+    parser.readUInt8((typeNumber) => {
+      const type = types[typeNumber];
+
+      if (!type) {
+        console.error("Tedious > Unsupported ENVCHANGE type " + typeNumber);
+        // skip unknown bytes
+        return parser.readBuffer(length - 1, () => {
+          callback();
+        });
+      }
+
+      readNewAndOldValue(parser, length, type, (newValue, oldValue) => {
+        callback({
+          name: 'ENVCHANGE',
+          type: type.name,
+          event: type.event,
+          oldValue: oldValue,
+          newValue: newValue
+        });
+      });
+    });
+  });
 }

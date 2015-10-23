@@ -3,24 +3,28 @@
 import metadataParse from '../metadata-parser';
 import valueParse from '../value-parser';
 
-export default function*(parser, colMetadata, options) {
-  const paramOrdinal = yield parser.readUInt16LE();
+export default function(parser, colMetadata, options, callback) {
+  parser.readUInt16LE((paramOrdinal) => {
+    parser.readBVarChar((paramName) => {
+      if (paramName.charAt(0) === '@') {
+        paramName = paramName.slice(1);
+      }
 
-  let paramName = yield* parser.readBVarChar();
-  if (paramName.charAt(0) === '@') {
-    paramName = paramName.slice(1);
-  }
-
-  yield parser.readUInt8(); // status
-  const metadata = yield* metadataParse(parser, options);
-  const value = yield* valueParse(parser, metadata, options);
-
-  return {
-    name: 'RETURNVALUE',
-    event: 'returnValue',
-    paramOrdinal: paramOrdinal,
-    paramName: paramName,
-    metadata: metadata,
-    value: value
-  };
+      // status
+      parser.readUInt8(() => {
+        metadataParse(parser, options, (metadata) => {
+          valueParse(parser, metadata, options, (value) => {
+            callback({
+              name: 'RETURNVALUE',
+              event: 'returnValue',
+              paramOrdinal: paramOrdinal,
+              paramName: paramName,
+              metadata: metadata,
+              value: value
+            });
+          });
+        });
+      });
+    });
+  });
 }
