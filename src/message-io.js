@@ -11,23 +11,32 @@ class ReadablePacketStream extends Transform {
     super({ "objectMode": true });
 
     this.buffer = new Buffer(0);
+    this.position = 0;
   }
 
   _transform(chunk, encoding, callback) {
-    if (this.buffer.length) {
-      this.buffer = Buffer.concat([this.buffer, chunk], this.buffer.length + chunk.length);
-    } else {
+    if (this.position === this.buffer.length) {
+      // If we have fully consumed the previous buffer,
+      // we can just replace it with the new chunk
       this.buffer = chunk;
+    } else {
+      // If we haven't fully consumed the previous buffer,
+      // we simply concatenate the leftovers and the new chunk.
+      this.buffer = Buffer.concat([
+        this.buffer.slice(this.position), chunk
+      ], (this.buffer.length - this.position) + chunk.length);
     }
 
-    // We need to have at least 4 bytes available to be able to determine
-    // the full packet size.
-    while (this.buffer.length >= 4) {
-      const length = this.buffer.readUInt16BE(2);
+    this.position = 0;
 
-      if (this.buffer.length >= length) {
-        const data = this.buffer.slice(0, length);
-        this.buffer = this.buffer.slice(length);
+    // The packet header is always 8 bytes of length.
+    while (this.buffer.length >= this.position + packetHeaderLength) {
+      // Get the full packet length
+      const length = this.buffer.readUInt16BE(this.position + 2);
+
+      if (this.buffer.length >= this.position + length) {
+        const data = this.buffer.slice(this.position, this.position + length);
+        this.position += length;
         this.push(new Packet(data));
       } else {
         // Not enough data to provide the next packet. Stop here and wait for
