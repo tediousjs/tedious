@@ -752,7 +752,7 @@ export default class Connection extends EventEmitter {
     const name = "_tedious_" + (crypto.randomBytes(10).toString('hex'));
     const txDone = (err, done, ...args) => {
       if (err) {
-        if (this.inTransaction) {
+        if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
           return this.rollbackTransaction(function(txErr) {
             args.unshift(txErr || err);
             return done.apply(null, args);
@@ -1055,7 +1055,10 @@ Connection.prototype.STATE = {
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = void 0;
+        sqlRequest.callback(err);
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
