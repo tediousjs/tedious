@@ -1,31 +1,27 @@
 // s2.2.7.14
 
-export default function(parser, colMetadata, options, callback) {
-  parser.readUInt16LE((length) => {
-    const columnCount = length / 2;
-    const orderColumns = [];
+export default function parseToken(parser, colMetadata, options, callback) {
+  if (parser.position + 2 <= parser.buffer.length) {
+    const length = parser.buffer.readUInt16LE(parser.position, true);
 
-    let i = 0;
-    function next(done) {
-      if (i === columnCount) {
-        return done();
+    if (parser.position + 2 + length <= parser.buffer.length) {
+      parser.position += 2;
+
+      const orderColumns = [];
+      for (let i = 0, len = length / 2; i < len; i++) {
+        orderColumns.push(parser.buffer.readUInt16LE(parser.position, true));
+        parser.position += 2;
       }
 
-      parser.readUInt16LE((column) => {
-        orderColumns.push(column);
-
-        i++;
-
-        next(done);
-      });
-    }
-
-    next(() => {
-      callback({
+      return callback({
         name: 'ORDER',
         event: 'order',
         orderColumns: orderColumns
       });
-    });
+    }
+  }
+
+  parser.suspend(() => {
+    parseToken(parser, colMetadata, options, callback);
   });
 }
