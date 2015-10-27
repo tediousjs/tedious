@@ -27,7 +27,7 @@
   "homepage": "https://github.com/pekim/tedious",
   "bugs": "https://github.com/pekim/tedious/issues",
   "license": "MIT",
-  "version": "1.12.3",
+  "version": "1.13.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
