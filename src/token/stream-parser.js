@@ -28,9 +28,9 @@ export default class Parser extends Transform {
     this.colMetadata = colMetadata;
     this.options = options;
 
-    this.nextStep = undefined;
     this.buffer = new Buffer(0);
     this.position = 0;
+    this.suspended = false;
     this.await = undefined;
     this.next = undefined;
   }
@@ -47,44 +47,62 @@ export default class Parser extends Transform {
     // become available
     this.await = done;
 
-    if (!this.next) {
+    if (this.suspended) {
+      // Unsuspend and continue from where ever we left off.
+      this.suspended = false;
+      this.next.call(null);
+    }
+
+    // If we're no longer suspended, parse new tokens
+    if (!this.suspended) {
       // Start the parser
-      this.parseNextToken();
-    } else {
-      // Continue from the last location
-      this.next();
+      this.parseTokens();
     }
   }
 
-  parseNextToken() {
-    this.readUInt8((type) => {
+  parseTokens() {
+    const doneParsing = (token) => {
+      if (token) {
+        switch (token.name) {
+          case 'COLMETADATA':
+            this.colMetadata = token.columns;
+        }
+
+        this.push(token);
+      }
+    };
+
+    while (!this.suspended && this.position + 1 <= this.buffer.length) {
+      const type = this.buffer.readUInt8(this.position, true);
+
+      this.position += 1;
+
       if (tokenParsers[type]) {
-        tokenParsers[type](this, this.colMetadata, this.options, (token) => {
-          if (token) {
-            switch (token.name) {
-              case 'COLMETADATA':
-                this.colMetadata = token.columns;
-            }
-
-            this.push(token);
-          }
-
-          this.parseNextToken();
-        });
+        tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
       } else {
         this.emit('error', new Error("Unknown type: " + type));
       }
-    });
+    }
+
+    if (!this.suspended && this.position === this.buffer.length) {
+      // If we reached the end of the buffer, we can stop parsing now.
+      return this.await.call(null);
+    }
+  }
+
+  suspend(next) {
+    this.suspended = true;
+    this.next = next;
+    this.await.call(null);
   }
 
   awaitData(length, callback) {
     if (this.position + length <= this.buffer.length) {
       callback();
     } else {
-      this.next = () => {
+      this.suspend(() => {
         this.awaitData(length, callback);
-      };
-      this.await();
+      });
     }
   }
 
