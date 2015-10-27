@@ -10,51 +10,59 @@ const STATUS = {
   SRVERROR: 0x0100
 };
 
-function parseToken(parser, options, callback) {
-  parser.readUInt16LE((status) => {
+function readUInt64LE(offset, noAssert) {
+  const low = this.readUInt32LE(offset, noAssert);
+  const high = this.readUInt32LE(offset + 4, noAssert);
+
+  if (high) {
+    return Math.pow(2, 32) * high + low;
+  } else {
+    return low;
+  }
+}
+
+function parseToken(parser, options, name, event, callback) {
+  const is32Bit = options.tdsVersion < "7_2";
+  const length = 2 + 2 + (is32Bit ? 4 : 8);
+  const position = parser.position;
+
+  if (position + length <= parser.buffer.length) {
+    const status = parser.buffer.readUInt16LE(position, true);
     const more = !!(status & STATUS.MORE);
     const sqlError = !!(status & STATUS.ERROR);
     const rowCountValid = !!(status & STATUS.COUNT);
     const attention = !!(status & STATUS.ATTN);
     const serverError = !!(status & STATUS.SRVERROR);
+    const curCmd = parser.buffer.readUInt16LE(position + 2, true);
+    const rowCount = (is32Bit ? parser.buffer.readUInt32LE : readUInt64LE).call(parser.buffer, position + 4, true);
 
-    parser.readUInt16LE((curCmd) => {
-      (options.tdsVersion < "7_2" ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
-        callback({
-          name: 'DONE',
-          event: 'done',
-          more: more,
-          sqlError: sqlError,
-          attention: attention,
-          serverError: serverError,
-          rowCount: rowCountValid ? rowCount : undefined,
-          curCmd: curCmd
-        });
-      });
+    parser.position = position + length;
+
+    return callback({
+      name: name,
+      event: event,
+      more: more,
+      sqlError: sqlError,
+      attention: attention,
+      serverError: serverError,
+      rowCount: rowCountValid ? rowCount : undefined,
+      curCmd: curCmd
     });
+  }
+
+  parser.suspend(() => {
+    parseToken(parser, options, callback);
   });
 }
 
 export function doneParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONE';
-    token.event = 'done';
-    callback(token);
-  });
+  parseToken(parser, options, 'DONE', 'done', callback);
 }
 
 export function doneInProcParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONEINPROC';
-    token.event = 'doneInProc';
-    callback(token);
-  });
+  parseToken(parser, options, 'DONEINPROC', 'doneInProc', callback);
 }
 
 export function doneProcParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONEPROC';
-    token.event = 'doneProc';
-    callback(token);
-  });
+  parseToken(parser, options, 'DONEPROC', 'doneProc', callback);
 }
