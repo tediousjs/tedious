@@ -188,6 +188,12 @@ exports.dateTime = (test) ->
 exports.dateTimeNull = (test) ->
   execSql(test, TYPES.DateTime, null)
 
+exports.dateTime2 = (test) ->
+  execSql(test, TYPES.DateTime2, new Date('December 4, 2011 10:04:23'))
+
+exports.dateTime2Null = (test) ->
+  execSql(test, TYPES.DateTime2, null)
+
 exports.outputBitTrue = (test) ->
   execSqlOutput(test, TYPES.Bit, true)
 
