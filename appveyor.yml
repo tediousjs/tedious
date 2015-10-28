@@ -10,6 +10,7 @@ branches:
   only:
     - master
     - /^maint\/.+/
+    - /v\d+\.\d+\.\d+/
 
 install:
   - ps: Install-Product node $env:nodejs_version

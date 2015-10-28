@@ -11,6 +11,7 @@ branches:
   only:
     - master
     - /^maint\/.+/
+    - /v\d+\.\d+\.\d+/
 
 cache:
   directories:
