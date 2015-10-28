@@ -72,7 +72,7 @@ export default class RpcRequestPayload {
       if (type.hasScale) {
         if (parameter.scale) {
           param.scale = parameter.scale;
-        } else if (type.resolvePrecision) {
+        } else if (type.resolveScale) {
           param.scale = type.resolveScale(parameter);
         }
       }
