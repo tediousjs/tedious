@@ -12,6 +12,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Socket } from 'net';
+import Dns from 'dns';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL } from './transaction';
 import crypto from 'crypto';
@@ -368,7 +369,7 @@ export default class Connection extends EventEmitter {
 
   connect() {
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     } else {
       return instanceLookup(this.config.server, this.config.options.instanceName, (message, port) => {
         if (this.state === this.STATE.FINAL) {
@@ -377,13 +378,13 @@ export default class Connection extends EventEmitter {
         if (message) {
           return this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
         } else {
-          return this.connectOnPort(port);
+          return this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
       }, this.config.options.connectTimeout);
     }
   }
 
-  connectOnPort(port) {
+  connectOnPort(port, multiSubnetFailover) {
     this.socket = new Socket({});
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
@@ -392,7 +393,25 @@ export default class Connection extends EventEmitter {
     if (this.config.options.localAddress) {
       connectOpts.localAddress = this.config.options.localAddress;
     }
-    this.socket.connect(connectOpts);
+    
+    if (!multiSubnetFailover) {
+        this.socket.connect(connectOpts);
+    }
+    else {
+      Dns.resolve4(connectOpts.host, (err, addresses) => {
+        if(typeof addresses !== 'undefined' && addresses.length > 0)
+        {
+          this.multiConnect(addresses, port, (opts) =>{
+            this.socket.connect(opts);
+          });
+        }
+        else
+        {
+          this.socket.connect(connectOpts);
+        } 
+      });
+    }
+
     this.socket.on('error', this.socketError);
     this.socket.on('connect', this.socketConnect);
     this.socket.on('close', this.socketClose);
@@ -403,6 +422,32 @@ export default class Connection extends EventEmitter {
       return this.dispatchEvent('message');
     });
     return this.messageIo.on('secure', this.emit.bind(this, 'secure'));
+  }
+
+  multiConnect(addresses, port, callback) {
+    var foundReachableIP = false;
+    addresses.forEach (function(currentValue, index, array){
+      var newSocket = new Socket({});
+      
+      var options = {
+        port: port,
+        host: currentValue
+      };
+              
+      newSocket.connect(options);
+      newSocket.on('connect', function(){
+        if (!foundReachableIP) {
+          newSocket.destroy();
+          callback(options); 
+          foundReachableIP = true;
+        }
+      });
+
+      newSocket.on('error', function(err){
+        this.debug.log("error to connect to ip address " + currentValue);
+        newSocket.destroy();
+      });
+    });
   }
 
   closeConnection() {
