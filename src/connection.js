@@ -403,10 +403,11 @@ class Connection extends EventEmitter {
         this.socket.connect(connectOpts);
     }
     else {
-      Dns.resolve4(connectOpts.host, (err, addresses) => {
+      //look up both ipv4 and ipv6 addresses
+      Dns.lookup(connectOpts.host, { all : true }, (err, addresses) => {
         if(typeof addresses !== 'undefined' && addresses.length > 1)
         {
-          this.multiConnect(addresses, connectOpts.port, (opts) => {
+          this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
             this.socket.connect(opts || connectOpts);
           });
         }
@@ -429,7 +430,7 @@ class Connection extends EventEmitter {
     return this.messageIo.on('secure', this.emit.bind(this, 'secure'));
   }
 
-  multiConnect(addresses, port, callback) {
+  multiConnectOnPort(addresses, port, callback) {
     var calledBack = false;
     var remainingSockets = new Set();
 
@@ -438,7 +439,7 @@ class Connection extends EventEmitter {
       remainingSockets.add(newSocket);
       var options = {
         port: port,
-        host: currentValue
+        host: currentValue.address
       };
 
       newSocket.connect(options);
@@ -452,13 +453,14 @@ class Connection extends EventEmitter {
       });
 
       newSocket.on('error', err => {
-        var message = "multiConnect failed to connect to " + currentValue + ":" + port + " - " + err.message;
+        var message = "multiConnectOnPort failed to connect to " + currentValue.address + ":" + port + " - " + err.message;
         this.debug.log(message);
         remainingSockets.delete(newSocket);
         newSocket.destroy();
-        if (!calledBack && remainingSockets.size == 0) {
+        if (!calledBack && remainingSockets.size === 0) {
+          //no availiable connect option if all sockets fail to connect
           calledBack = true;
-          callback(undefined); //error for all addresses
+          callback(undefined);
         }
       });
     });
