@@ -404,10 +404,10 @@ class Connection extends EventEmitter {
     }
     else {
       Dns.resolve4(connectOpts.host, (err, addresses) => {
-        if(typeof addresses !== 'undefined' && addresses.length > 0)
+        if(typeof addresses !== 'undefined' && addresses.length > 1)
         {
-          this.multiConnect(addresses, port, (opts) =>{
-            this.socket.connect(opts);
+          this.multiConnect(addresses, connectOpts.port, (opts) => {
+            this.socket.connect(opts || connectOpts);
           });
         }
         else
@@ -430,27 +430,36 @@ class Connection extends EventEmitter {
   }
 
   multiConnect(addresses, port, callback) {
-    var foundReachableIP = false;
-    addresses.forEach (function(currentValue, index, array){
-      var newSocket = new Socket({});
+    var calledBack = false;
+    var remainingSockets = new Set();
 
+    addresses.forEach ((currentValue, index, array) => {
+      var newSocket = new Socket({});
+      remainingSockets.add(newSocket);
       var options = {
         port: port,
         host: currentValue
       };
 
       newSocket.connect(options);
-      newSocket.on('connect', function(){
-        if (!foundReachableIP) {
-          newSocket.destroy();
+      newSocket.on('connect', () => {
+        if (!calledBack) {
+          calledBack = true;
+          remainingSockets.forEach(v => { v.destroy(); });
+          remainingSockets.clear();
           callback(options);
-          foundReachableIP = true;
         }
       });
 
-      newSocket.on('error', function(err){
-        this.debug.log("error to connect to ip address " + currentValue);
+      newSocket.on('error', err => {
+        var message = "multiConnect failed to connect to " + currentValue + ":" + port + " - " + err.message;
+        this.debug.log(message);
+        remainingSockets.delete(newSocket);
         newSocket.destroy();
+        if (!calledBack && remainingSockets.size == 0) {
+          calledBack = true;
+          callback(undefined); //error for all addresses
+        }
       });
     });
   }
