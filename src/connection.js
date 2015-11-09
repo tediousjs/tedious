@@ -404,15 +404,12 @@ class Connection extends EventEmitter {
     }
     else {
       //look up both ipv4 and ipv6 addresses
-      Dns.lookup(connectOpts.host, { all : true }, (err, addresses) => {
-        if(typeof addresses !== 'undefined' && addresses.length > 1)
-        {
+      this.resolveIPaddresses(connectOpts.host, (addresses) => {
+        if(typeof addresses !== 'undefined' && addresses.length > 1) {
           this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
             this.socket.connect(opts || connectOpts);
           });
-        }
-        else
-        {
+        } else {
           this.socket.connect(connectOpts);
         }
       });
@@ -430,16 +427,36 @@ class Connection extends EventEmitter {
     return this.messageIo.on('secure', this.emit.bind(this, 'secure'));
   }
 
+  resolveIPaddresses(host, callback) {
+    let ipv4Addresses = undefined;
+    let ipv6Addresses = undefined;
+    //resolve IPV4
+    Dns.resolve4(host, (err, addresses) => {
+      ipv4Addresses = addresses || new Array();
+      if (ipv6Addresses) {
+        callback(ipv4Addresses.concat(ipv6Addresses));
+      }
+    });
+
+    //resolve IPV6
+    Dns.resolve6(host, (err, addresses) => {
+      ipv6Addresses = addresses || new Array();
+      if (ipv4Addresses) {
+        callback(ipv4Addresses.concat(ipv6Addresses));
+      }
+    });
+  }
+
   multiConnectOnPort(addresses, port, callback) {
-    var calledBack = false;
-    var remainingSockets = new Set();
+    let calledBack = false;
+    const remainingSockets = new Set();
 
     addresses.forEach ((currentValue, index, array) => {
-      var newSocket = new Socket({});
+      const newSocket = new Socket({});
       remainingSockets.add(newSocket);
-      var options = {
+      const options = {
         port: port,
-        host: currentValue.address
+        host: currentValue
       };
 
       newSocket.connect(options);
@@ -453,7 +470,7 @@ class Connection extends EventEmitter {
       });
 
       newSocket.on('error', err => {
-        var message = "multiConnectOnPort failed to connect to " + currentValue.address + ":" + port + " - " + err.message;
+        const message = "multiConnectOnPort failed to connect to " + currentValue + ":" + port + " - " + err.message;
         this.debug.log(message);
         remainingSockets.delete(newSocket);
         newSocket.destroy();
