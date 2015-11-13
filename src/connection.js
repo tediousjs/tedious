@@ -407,7 +407,7 @@ export default class Connection extends EventEmitter {
         } else {
           this.socket.connect(connectOpts);
         }
-      })  
+      });  
     }
 
     this.socket.on('error', this.socketError);
