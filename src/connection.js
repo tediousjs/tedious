@@ -12,7 +12,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Socket } from 'net';
-import Dns from 'dns';
+import dns from 'dns';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL } from './transaction';
 import crypto from 'crypto';
@@ -396,11 +396,10 @@ export default class Connection extends EventEmitter {
     
     if (!multiSubnetFailover) {
         this.socket.connect(connectOpts);
-    }
-    else {
+    } else {
       //look up both ipv4 and ipv6 addresses
       this.resolveIPaddresses(connectOpts.host, (addresses) => {
-        if(typeof addresses !== 'undefined' && addresses.length > 1) {
+        if (addresses && addresses.length > 1) {
           this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
             this.socket.connect(opts || connectOpts);
           });
@@ -426,7 +425,7 @@ export default class Connection extends EventEmitter {
     let ipv4Addresses = undefined;
     let ipv6Addresses = undefined;
     //resolve IPV4
-    Dns.resolve4(host, (err, addresses) => {
+    dns.resolve4(host, (err, addresses) => {
       ipv4Addresses = addresses || new Array();
       if (ipv6Addresses) {
         callback(ipv4Addresses.concat(ipv6Addresses));
@@ -434,7 +433,7 @@ export default class Connection extends EventEmitter {
     });
     
     //resolve IPV6
-    Dns.resolve6(host, (err, addresses) => {
+    dns.resolve6(host, (err, addresses) => {
       ipv6Addresses = addresses || new Array();
       if (ipv4Addresses) {
         callback(ipv4Addresses.concat(ipv6Addresses));
