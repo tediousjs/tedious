@@ -11,7 +11,7 @@ import Request from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
-import { Socket } from 'net';
+import { Socket, isIP } from 'net';
 import dns from 'dns';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL } from './transaction';
@@ -394,7 +394,9 @@ export default class Connection extends EventEmitter {
       connectOpts.localAddress = this.config.options.localAddress;
     }
     
-    if (!multiSubnetFailover) {
+    if (isIP(connectOpts.host) || !multiSubnetFailover) {
+        //if no multiSubnetFailver or host is an ip address
+        //directly connect to first resolved ip address(by using socket.connect)
         this.socket.connect(connectOpts);
     } else {
       //look up both ipv4 and ipv6 addresses
