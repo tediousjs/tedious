@@ -15,6 +15,7 @@ const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
 const MessageIO = require('./message-io');
 const Socket = require('net').Socket;
+const isIP = require('net').isIP;
 const dns = require('dns');
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
@@ -399,7 +400,9 @@ class Connection extends EventEmitter {
       connectOpts.localAddress = this.config.options.localAddress;
     }
 
-    if (!multiSubnetFailover) {
+    if (isIP(connectOpts.host) || !multiSubnetFailover) {
+        //if no multiSubnetFailver or host is an ip address
+        //directly connect to first resolved ip address(by using socket.connect)
         this.socket.connect(connectOpts);
     } else {
       //look up both ipv4 and ipv6 addresses
