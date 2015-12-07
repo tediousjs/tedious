@@ -406,13 +406,20 @@ class Connection extends EventEmitter {
         this.socket.connect(connectOpts);
     } else {
       //look up both ipv4 and ipv6 addresses
-      this.resolveIPaddresses(connectOpts.host, (addresses) => {
+      this.resolveIPaddresses(connectOpts.host, (resolve4Err, resolve6Err, addresses) => {
+        var message = resolve4Err ? ("Error in IPV4 address resolution: " + resolve4Err.message) : null; 
+        message += resolve6Err ? ("\nError in IPV6 address resolution: " + resolve6Err.message) : null;
+        if(message)
+        {
+          this.debug.log(message);
+        }
+        
         if (addresses && addresses.length > 1) {
           this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
             this.socket.connect(opts || connectOpts);
           });
         } else {
-          this.socket.connect(connectOpts);
+          return this.emit('connect', ConnectionError(message, 'ERESOLVEIPADDR'));
         }
       });
     }
@@ -432,19 +439,23 @@ class Connection extends EventEmitter {
   resolveIPaddresses(host, callback) {
     let ipv4Addresses = undefined;
     let ipv6Addresses = undefined;
+    let resolve4Err = undefined;
+    let resolve6Err = undefined;
     //resolve IPV4
     dns.resolve4(host, (err, addresses) => {
+      resolve4Err = err;
       ipv4Addresses = addresses || new Array();
       if (ipv6Addresses) {
-        callback(ipv4Addresses.concat(ipv6Addresses));
+        callback(resolve4Err, resolve6Err, ipv4Addresses.concat(ipv6Addresses));
       }
     });
 
     //resolve IPV6
     dns.resolve6(host, (err, addresses) => {
+      resolve6Err = err;
       ipv6Addresses = addresses || new Array();
       if (ipv4Addresses) {
-        callback(ipv4Addresses.concat(ipv6Addresses));
+        callback(resolve4Err, resolve6Err, ipv4Addresses.concat(ipv6Addresses));
       }
     });
   }
