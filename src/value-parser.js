@@ -1,6 +1,8 @@
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf';
+import { TYPE } from './data-type';
 import * as guidParser from './guid-parser';
+import { readPrecision, readScale, readCollation } from './metadata-parser';
 import { convertLEBytesToString } from './tracking-buffer/bigint';
 
 const NULL = (1 << 16) - 1;
@@ -33,6 +35,10 @@ function readTextPointerNull(parser, type, callback) {
 function readDataLength(parser, type, metaData, textPointerNull, callback) {
   if (textPointerNull) {
     return callback(0);
+  }
+  
+  if (metaData.isVariantValue) {
+	return callback(metaData.dataLength);
   }
 
   // s2.2.4.2.1
@@ -68,7 +74,7 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
   }
 }
 
-export default function(parser, metaData, options, callback) {
+export default function valueParse(parser, metaData, options, callback) {
   const type = metaData.type;
 
   readTextPointerNull(parser, type, (textPointerNull) => {
@@ -234,40 +240,32 @@ export default function(parser, metaData, options, callback) {
           }
 
         case 'TimeN':
-          return parser.readUInt8((dataLength) => {
-            if (dataLength === 0) {
-              return callback(null);
-            } else {
-              return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
-            }
-          });
+          if (dataLength === 0) {
+            return callback(null);
+          } else {
+            return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
+          }
 
         case 'DateN':
-          return parser.readUInt8((dataLength) => {
-            if (dataLength === 0) {
-              return callback(null);
-            } else {
-              return readDate(parser, options.useUTC, callback);
-            }
-          });
+          if (dataLength === 0) {
+            return callback(null);
+          } else {
+            return readDate(parser, options.useUTC, callback);
+          }
 
         case 'DateTime2N':
-          return parser.readUInt8((dataLength) => {
-            if (dataLength === 0) {
-              return callback(null);
-            } else {
-              return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
-            }
-          });
+          if (dataLength === 0) {
+            return callback(null);
+          } else {
+            return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
+          }
 
         case 'DateTimeOffsetN':
-          return parser.readUInt8((dataLength) => {
-            if (dataLength === 0) {
-              return callback(null);
-            } else {
-              return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
-            }
-          });
+          if (dataLength === 0) {
+            return callback(null);
+          } else {
+            return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
+          }
 
         case 'NumericN':
         case 'DecimalN':
@@ -317,6 +315,33 @@ export default function(parser, metaData, options, callback) {
 
         case 'UDT':
           return readMaxBinary(parser, callback);
+        
+        case 'Variant':
+          let valueMetaData = metaData.valueMetaData = {};
+          Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});
+          return parser.readUInt8((baseType) => {
+            return parser.readUInt8((propBytes) => {
+	          valueMetaData.dataLength = dataLength - propBytes - 2;
+	          valueMetaData.type = TYPE[baseType];
+	          return readPrecision(parser, valueMetaData.type, (precision) => {
+	            valueMetaData.precision = precision;
+	            return readScale(parser, valueMetaData.type, (scale) => {
+			      valueMetaData.scale = scale;
+	              return readCollation(parser, valueMetaData.type, (collation) => {
+		            valueMetaData.collation = collation;
+		            if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
+		              return readDataLength(parser, valueMetaData.type, {}, null, (maxDataLength) => {
+	                    valueMetaData.dataLength = maxDataLength;
+	                    return valueParse(parser, valueMetaData, options, callback);
+	                  });
+	                } else {
+		              return valueParse(parser, valueMetaData, options, callback);
+	                }
+	              });
+	            });
+	          });
+            });
+          });
 
         default:
           return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
