@@ -377,7 +377,11 @@ function readMaxChars(parser, codepage, callback) {
 
 function readMaxNChars(parser, callback) {
   readMax(parser, (data) => {
-    callback(data.toString('ucs2'))
+    if (data) {
+      callback(data.toString('ucs2'));
+    } else {
+      callback(null);
+    }
   });
 }
 
