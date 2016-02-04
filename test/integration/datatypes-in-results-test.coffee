@@ -254,6 +254,24 @@ exports.guid = (test) ->
 exports.guidNull = (test) ->
   execSql(test, "select cast(null as uniqueidentifier)", null)
 
+exports.variantInt = (test) ->
+  execSql(test, "select cast(11 as sql_variant)", 11, '7_2')
+
+exports.variantNumeric = (test) ->
+  execSql(test, "select cast(11.16 as sql_variant)", 11.16, '7_2')
+
+exports.variantVarChar = (test) ->
+  execSql(test, "select cast('abc' as sql_variant)", 'abc', '7_2')
+
+exports.variantVarBin = (test) ->
+  execSql(test, "select cast(0x1234 as sql_variant)", new Buffer [0x12, 0x34], '7_2')
+
+exports.variantDateTimeOffset = (test) ->
+  execSql(test, "select cast(cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset) as sql_variant)", new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)), '7_3_A')
+
+exports.variantNull = (test) ->
+  execSql(test, "select cast(null as sql_variant)", null, '7_2')
+
 exports.xml = (test) ->
   xml = '<root><child attr="attr-value"/></root>'
   execSql(test, "select cast('#{xml}' as xml)", xml, '7_2')

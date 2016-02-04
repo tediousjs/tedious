@@ -6,6 +6,12 @@ function readDataLength(parser, type, callback) {
   if ((type.id & 0x30) === 0x20) {
     // xx10xxxx - s2.2.4.2.1.3
     // Variable length
+    if (type.dataLengthFromScale) {
+      return callback(0); // dataLength is resolved from scale
+    } else if (type.fixedDataLength) {
+      return callback(type.fixedDataLength);
+    }
+    
     switch (type.dataLengthLength) {
       case 0:
         return callback(undefined);
@@ -27,7 +33,7 @@ function readDataLength(parser, type, callback) {
   }
 }
 
-function readPrecision(parser, type, callback) {
+export function readPrecision(parser, type, callback) {
   if (type.hasPrecision) {
     parser.readUInt8(callback);
   } else {
@@ -35,7 +41,7 @@ function readPrecision(parser, type, callback) {
   }
 }
 
-function readScale(parser, type, callback) {
+export function readScale(parser, type, callback) {
   if (type.hasScale) {
     parser.readUInt8(callback);
   } else {
@@ -43,7 +49,7 @@ function readScale(parser, type, callback) {
   }
 }
 
-function readCollation(parser, type, callback) {
+export function readCollation(parser, type, callback) {
   if (type.hasCollation) {
     // s2.2.5.1.2
     parser.readBuffer(5, (collationData) => {

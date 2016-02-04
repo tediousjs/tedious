@@ -1229,7 +1229,7 @@ export const TYPE = {
     name: 'TimeN',
     aliases: ['Time'],
     hasScale: true,
-    dataLengthLength: 0,
+    dataLengthLength: 1,
 
     dataLengthFromScale: function(scale) {
       switch (scale) {
@@ -1315,7 +1315,8 @@ export const TYPE = {
     type: 'DATEN',
     name: 'DateN',
     aliases: ['Date'],
-    dataLengthLength: 0,
+    dataLengthLength: 1,
+    fixedDataLength: 3,
 
     declaration: function() {
       return "date";
@@ -1358,7 +1359,7 @@ export const TYPE = {
     name: 'DateTime2N',
     aliases: ['DateTime2'],
     hasScale: true,
-    dataLengthLength: 0,
+    dataLengthLength: 1,
 
     dataLengthFromScale: function(scale) {
       switch (scale) {
@@ -1452,7 +1453,7 @@ export const TYPE = {
     name: 'DateTimeOffsetN',
     aliases: ['DateTimeOffset'],
     hasScale: true,
-    dataLengthLength: 0,
+    dataLengthLength: 1,
     dataLengthFromScale: function(scale) {
       switch (scale) {
         case 0:
@@ -1611,6 +1612,16 @@ export const TYPE = {
       }
 
       return value;
+    }
+  },
+
+  0x62: {
+    type: 'SSVARIANTTYPE',
+    name: 'Variant',
+    dataLengthLength: 4,
+    
+    declaration: function(parameter) {
+      return "sql_variant";
     }
   }
 };
