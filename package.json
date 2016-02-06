@@ -49,6 +49,7 @@
     "babel": "^5.8.19",
     "benchmark": "^1.0.0",
     "coffee-script": "^1.9.3",
+    "eslint": "^1.10.3",
     "nodeunit": "^0.9.1"
   },
   "scripts": {
