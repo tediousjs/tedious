@@ -1,3 +1,5 @@
+'use strict';
+
 import { sprintf } from 'sprintf';
 import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
 

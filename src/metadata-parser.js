@@ -1,3 +1,5 @@
+'use strict';
+
 import { codepageByLcid } from './collation';
 import { TYPE } from './data-type';
 import { sprintf } from 'sprintf';
@@ -11,7 +13,7 @@ function readDataLength(parser, type, callback) {
     } else if (type.fixedDataLength) {
       return callback(type.fixedDataLength);
     }
-    
+
     switch (type.dataLengthLength) {
       case 0:
         return callback(undefined);

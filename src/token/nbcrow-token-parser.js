@@ -1,3 +1,5 @@
+'use strict';
+
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
 import valueParse from '../value-parser';

@@ -1,3 +1,5 @@
+'use strict';
+
 import * as guidParser from './guid-parser';
 
 const NULL = (1 << 16) - 1;
@@ -1619,7 +1621,7 @@ export const TYPE = {
     type: 'SSVARIANTTYPE',
     name: 'Variant',
     dataLengthLength: 4,
-    
+
     declaration: function(parameter) {
       return "sql_variant";
     }

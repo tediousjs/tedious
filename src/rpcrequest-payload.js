@@ -1,3 +1,5 @@
+'use strict';
+
 import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
 import { writeToTrackingBuffer as writeAllHeaders } from './all-headers';
 

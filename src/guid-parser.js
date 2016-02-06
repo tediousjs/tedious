@@ -1,3 +1,5 @@
+'use strict';
+
 function formatHex(number) {
   let hex = number.toString(16);
   if (hex.length === 1) {

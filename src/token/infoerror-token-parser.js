@@ -1,3 +1,5 @@
+'use strict';
+
 function parseToken(parser, options, callback) {
   // length
   parser.readUInt16LE(() => {

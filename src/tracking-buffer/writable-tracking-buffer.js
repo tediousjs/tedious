@@ -1,3 +1,5 @@
+'use strict';
+
 import * as bigint from './bigint';
 import {} from '../buffertools';
 

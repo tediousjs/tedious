@@ -1,3 +1,5 @@
+'use strict';
+
 import { EventEmitter } from 'events';
 import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';

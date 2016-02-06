@@ -1,3 +1,5 @@
+'use strict';
+
 import { Transform } from "readable-stream";
 import { TYPE } from "./token";
 

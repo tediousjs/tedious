@@ -1,3 +1,5 @@
+'use strict';
+
 export const TYPE = {
   ALTMETADATA: 0x88,
   ALTROW: 0xD3,

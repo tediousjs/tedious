@@ -1,3 +1,5 @@
+'use strict';
+
 import util from 'util';
 
 export function ConnectionError(message, code) {

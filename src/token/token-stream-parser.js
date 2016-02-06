@@ -1,3 +1,5 @@
+'use strict';
+
 import { EventEmitter } from 'events';
 import StreamParser from "./stream-parser";
 

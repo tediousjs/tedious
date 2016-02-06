@@ -1,3 +1,5 @@
+'use strict';
+
 tls = require('tls')
 crypto = require('crypto')
 

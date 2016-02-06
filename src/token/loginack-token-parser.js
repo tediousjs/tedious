@@ -1,3 +1,5 @@
+'use strict';
+
 import { versionsByValue as versions } from '../tds-versions';
 
 const interfaceTypes = {

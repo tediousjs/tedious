@@ -1,3 +1,5 @@
+'use strict';
+
 import {} from './buffertools';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import os from 'os';

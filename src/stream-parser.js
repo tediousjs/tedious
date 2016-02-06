@@ -1,3 +1,5 @@
+'use strict';
+
 import stream from 'readable-stream';
 import BufferList from 'bl';
 

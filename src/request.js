@@ -1,3 +1,5 @@
+'use strict';
+
 import { EventEmitter } from 'events';
 import { typeByName as TYPES } from './data-type';
 import { RequestError } from './errors';

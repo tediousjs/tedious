@@ -1,3 +1,5 @@
+'use strict';
+
 export default {
   Sp_Cursor: 1,
   Sp_CursorOpen: 2,

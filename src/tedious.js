@@ -1,3 +1,5 @@
+'use strict';
+
 import BulkLoad from './bulk-load';
 import Connection from './connection';
 import Request from './request';

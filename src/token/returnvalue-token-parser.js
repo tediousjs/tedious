@@ -1,3 +1,5 @@
+'use strict';
+
 // s2.2.7.16
 
 import metadataParse from '../metadata-parser';

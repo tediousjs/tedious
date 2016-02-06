@@ -1,3 +1,5 @@
+'use strict';
+
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf';
 import { TYPE } from './data-type';

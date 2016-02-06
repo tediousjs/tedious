@@ -1,3 +1,5 @@
+'use strict';
+
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import crypto from 'crypto';
 import { n as BigInteger } from 'big-number';

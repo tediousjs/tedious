@@ -1,3 +1,5 @@
+'use strict';
+
 import {} from './buffertools';
 import BulkLoad from './bulk-load';
 import Debug from './debug';

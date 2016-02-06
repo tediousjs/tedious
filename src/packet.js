@@ -1,3 +1,5 @@
+'use strict';
+
 import {} from './buffertools';
 import { sprintf } from 'sprintf';
 

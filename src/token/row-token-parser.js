@@ -1,3 +1,5 @@
+'use strict';
+
 // s2.2.7.17
 
 import valueParse from '../value-parser';

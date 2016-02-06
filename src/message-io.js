@@ -1,3 +1,5 @@
+'use strict';
+
 import tls from 'tls';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';

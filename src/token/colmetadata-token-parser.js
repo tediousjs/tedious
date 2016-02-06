@@ -1,3 +1,5 @@
+'use strict';
+
 import metadataParse from '../metadata-parser';
 
 function readTableName(parser, options, metadata, callback) {

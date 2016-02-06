@@ -1,3 +1,5 @@
+'use strict';
+
 import dgram from 'dgram';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
