@@ -439,7 +439,7 @@ function readMax(parser, callback) {
 function readMaxKnownLength(parser, totalLength, callback) {
   const data = new Buffer(totalLength);
 
-  let offset = 0, chunkLength;
+  let offset = 0;
   function next(done) {
     parser.readUInt32LE((chunkLength) => {
       if (!chunkLength) {
