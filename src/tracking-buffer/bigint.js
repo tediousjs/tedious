@@ -42,7 +42,7 @@ function invert(array) {
 }
 
 module.exports.convertLEBytesToString = convertLEBytesToString;
-function convertLEBytesToString (buffer) {
+function convertLEBytesToString(buffer) {
   const array = Array.prototype.slice.call(buffer, 0, buffer.length);
   if (isZero(array)) {
     return '0';
