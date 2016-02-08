@@ -3,24 +3,21 @@
 const Transform = require('readable-stream').Transform;
 const TYPE = require('./token').TYPE;
 
-const tokenParsers = {
-  [TYPE.COLMETADATA]: require('./colmetadata-token-parser'),
-
-  [TYPE.DONE]: require('./done-token-parser').doneParser,
-  [TYPE.DONEINPROC]: require('./done-token-parser').doneInProcParser,
-  [TYPE.DONEPROC]: require('./done-token-parser').doneProcParser,
-
-  [TYPE.ENVCHANGE]: require('./env-change-token-parser'),
-  [TYPE.ERROR]: require('./infoerror-token-parser').errorParser,
-  [TYPE.INFO]: require('./infoerror-token-parser').infoParser,
-  [TYPE.LOGINACK]: require('./loginack-token-parser'),
-  [TYPE.ORDER]: require('./order-token-parser'),
-  [TYPE.RETURNSTATUS]: require('./returnstatus-token-parser'),
-  [TYPE.RETURNVALUE]: require('./returnvalue-token-parser'),
-  [TYPE.ROW]: require('./row-token-parser'),
-  [TYPE.NBCROW]: require('./nbcrow-token-parser'),
-  [TYPE.SSPI]: require('./sspi-token-parser')
-};
+const tokenParsers = {};
+tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser');
+tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser;
+tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
+tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;
+tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser');
+tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser;
+tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser;
+tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser');
+tokenParsers[TYPE.ORDER] = require('./order-token-parser');
+tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser');
+tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser');
+tokenParsers[TYPE.ROW] = require('./row-token-parser');
+tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser');
+tokenParsers[TYPE.SSPI] = require('./sspi-token-parser');
 
 module.exports = class Parser extends Transform {
   constructor(debug, colMetadata, options) {
