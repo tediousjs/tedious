@@ -542,7 +542,7 @@ class Connection extends EventEmitter {
       return preloginPayload.toString('  ');
     });
 
-    if ( preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+    if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       return this.dispatchEvent('tls');
     } else {
       return this.dispatchEvent('noTls');
