@@ -22,7 +22,7 @@ class Parser extends EventEmitter {
     this.options = options;
 
     this.parser = new StreamParser(this.debug, this.colMetadata, this.options);
-    this.parser.on("data", (token) => {
+    this.parser.on('data', (token) => {
       if (token.event) {
         this.emit(token.event, token);
       }

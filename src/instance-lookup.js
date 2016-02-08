@@ -26,7 +26,7 @@ function instanceLookup(server, instanceName, callback, timeout, retries) {
     if (port) {
       return callback(undefined, port);
     } else {
-      return callback("Port for " + instanceName + " not found in " + message);
+      return callback('Port for ' + instanceName + ' not found in ' + message);
     }
   }
 
@@ -36,7 +36,7 @@ function instanceLookup(server, instanceName, callback, timeout, retries) {
       timer = undefined;
     }
     socket.close();
-    return callback("Failed to lookup instance on " + server + " - " + err.message);
+    return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
   }
 
   function onTimeout() {
@@ -55,7 +55,7 @@ function instanceLookup(server, instanceName, callback, timeout, retries) {
       socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server);
       return timer = setTimeout(onTimeout, timeout);
     } else {
-      return callback("Failed to get response from SQL Server Browser on " + server);
+      return callback('Failed to get response from SQL Server Browser on ' + server);
     }
   }
 

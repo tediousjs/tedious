@@ -21,6 +21,6 @@ module.exports = class SqlBatchPayload {
 
   toString(indent) {
     indent || (indent = '');
-    return indent + ("SQL Batch - " + this.sqlText);
+    return indent + ('SQL Batch - ' + this.sqlText);
   }
 };

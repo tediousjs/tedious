@@ -26,7 +26,7 @@ exports.socketError = function(test) {
   connection.on('connect', function(err) {
     test.ifError(err);
 
-    const request = new Request("WAITFOR 00:00:30", function(err) {
+    const request = new Request('WAITFOR 00:00:30', function(err) {
       test.ok(~err.message.indexOf('socket error'));
     });
 

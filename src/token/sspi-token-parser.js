@@ -2,7 +2,7 @@
 
 function parseChallenge(buffer) {
   const challenge = {};
-  challenge.magic = buffer.slice(0, 8).toString("utf8");
+  challenge.magic = buffer.slice(0, 8).toString('utf8');
   challenge.type = buffer.readInt32LE(8);
   challenge.domainLen = buffer.readInt16LE(12);
   challenge.domainMax = buffer.readInt16LE(14);

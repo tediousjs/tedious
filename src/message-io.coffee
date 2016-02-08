@@ -41,7 +41,7 @@ class MessageIO extends EventEmitter
 
   packetSize: (packetSize) ->
     if arguments.length > 0
-      @debug.log("Packet size changed from #{@_packetSize} to #{packetSize}")
+      @debug.log('Packet size changed from #{@_packetSize} to #{packetSize}')
       @_packetSize = packetSize
       @packetDataSize = @_packetSize - packetHeaderLength
 
@@ -58,7 +58,7 @@ class MessageIO extends EventEmitter
 
     @securePair.on 'secure', =>
       cipher = @securePair.cleartext.getCipher()
-      @debug.log("TLS negotiated (#{cipher.name}, #{cipher.version})")
+      @debug.log('TLS negotiated (#{cipher.name}, #{cipher.version})')
 
       @emit('secure', @securePair.cleartext)
       @encryptAllFutureTraffic()

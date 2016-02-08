@@ -1,7 +1,7 @@
 'use strict';
 
-const Transform = require("readable-stream").Transform;
-const TYPE = require("./token").TYPE;
+const Transform = require('readable-stream').Transform;
+const TYPE = require('./token').TYPE;
 
 const tokenParsers = {
   [TYPE.COLMETADATA]: require('./colmetadata-token-parser'),
@@ -82,7 +82,7 @@ module.exports = class Parser extends Transform {
       if (tokenParsers[type]) {
         tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
       } else {
-        this.emit('error', new Error("Unknown type: " + type));
+        this.emit('error', new Error('Unknown type: ' + type));
       }
     }
 
@@ -324,7 +324,7 @@ module.exports = class Parser extends Transform {
   readBVarChar(callback) {
     this.readUInt8((length) => {
       this.readBuffer(length * 2, (data) => {
-        callback(data.toString("ucs2"));
+        callback(data.toString('ucs2'));
       });
     });
   }
@@ -333,7 +333,7 @@ module.exports = class Parser extends Transform {
   readUsVarChar(callback) {
     this.readUInt16LE((length) => {
       this.readBuffer(length * 2, (data) => {
-        callback(data.toString("ucs2"));
+        callback(data.toString('ucs2'));
       });
     });
   }

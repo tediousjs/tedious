@@ -50,7 +50,7 @@ class Transaction {
     return {
       data: buffer.data,
       toString: () => {
-        return "Begin Transaction: name=" + this.name + ", isolationLevel=" + isolationLevelByValue[this.isolationLevel];
+        return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
       }
     };
   }
@@ -67,7 +67,7 @@ class Transaction {
     return {
       data: buffer.data,
       toString: () => {
-        return "Commit Transaction: name=" + this.name;
+        return 'Commit Transaction: name=' + this.name;
       }
     };
   }
@@ -84,7 +84,7 @@ class Transaction {
     return {
       data: buffer.data,
       toString: () => {
-        return "Rollback Transaction: name=" + this.name;
+        return 'Rollback Transaction: name=' + this.name;
       }
     };
   }
@@ -99,7 +99,7 @@ class Transaction {
     return {
       data: buffer.data,
       toString: () =>  {
-        return "Save Transaction: name=" + this.name;
+        return 'Save Transaction: name=' + this.name;
       }
     };
   }

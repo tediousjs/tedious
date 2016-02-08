@@ -30,7 +30,7 @@ module.exports = class ReadableTrackingBuffer {
     this.previousPosition = this.position;
     const available = this.buffer.length - this.position;
     if (available < lengthRequired) {
-      const e = new Error("required : " + lengthRequired + ", available : " + available);
+      const e = new Error('required : ' + lengthRequired + ', available : ' + available);
       e.code = 'oob';
       throw e;
     }
@@ -149,7 +149,7 @@ module.exports = class ReadableTrackingBuffer {
     const low = this.readUInt32LE();
     const high = this.readUInt32LE();
     if (high >= (2 << (53 - 32))) {
-      console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
+      console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
     }
     return low + (0x100000000 * high);
   }

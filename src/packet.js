@@ -201,7 +201,7 @@ class Packet {
   }
 
   payloadString() {
-    return "";
+    return '';
   }
 }
 module.exports.Packet = Packet;

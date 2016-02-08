@@ -21,7 +21,7 @@ function parseToken(parser, options, callback) {
     const serverError = !!(status & STATUS.SRVERROR);
 
     parser.readUInt16LE((curCmd) => {
-      (options.tdsVersion < "7_2" ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
+      (options.tdsVersion < '7_2' ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
         callback({
           name: 'DONE',
           event: 'done',

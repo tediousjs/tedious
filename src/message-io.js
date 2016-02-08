@@ -13,7 +13,7 @@ const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
 class ReadablePacketStream extends Transform {
   constructor() {
-    super({ "objectMode": true });
+    super({ 'objectMode': true });
 
     this.buffer = new Buffer(0);
     this.position = 0;
@@ -78,7 +78,7 @@ module.exports = class MessageIO extends EventEmitter {
 
   packetSize(packetSize) {
     if (arguments.length > 0) {
-      this.debug.log("Packet size changed from " + this._packetSize + " to " + packetSize);
+      this.debug.log('Packet size changed from ' + this._packetSize + ' to ' + packetSize);
       this._packetSize = packetSize;
       this.packetDataSize = this._packetSize - packetHeaderLength;
     }
@@ -93,7 +93,7 @@ module.exports = class MessageIO extends EventEmitter {
 
     this.securePair.on('secure', () => {
       const cipher = this.securePair.cleartext.getCipher();
-      this.debug.log("TLS negotiated (" + cipher.name + ", " + cipher.version + ")");
+      this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
       this.emit('secure', this.securePair.cleartext);
       this.encryptAllFutureTraffic();
     });

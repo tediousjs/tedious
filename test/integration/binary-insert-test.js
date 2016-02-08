@@ -24,13 +24,13 @@ exports.insertBinary = function(test) {
   connection.on('connect', function(err) {
     test.ifError(err)
 
-    const request = new Request("CREATE TABLE #test ([data] binary(4))", function(err) {
+    const request = new Request('CREATE TABLE #test ([data] binary(4))', function(err) {
       test.ifError(err);
 
-      const request = new Request("INSERT INTO #test ([data]) VALUES (@p1)", function(err) {
+      const request = new Request('INSERT INTO #test ([data]) VALUES (@p1)', function(err) {
         test.ifError(err);
 
-        const request = new Request("SELECT [data] FROM #test", function(err) {
+        const request = new Request('SELECT [data] FROM #test', function(err) {
           test.ifError(err);
           connection.close();
         });
@@ -42,7 +42,7 @@ exports.insertBinary = function(test) {
         connection.execSql(request);
       });
 
-      request.addParameter("p1", TYPES.Binary, new Buffer([0x12, 0x34, 0x00, 0xce]));
+      request.addParameter('p1', TYPES.Binary, new Buffer([0x12, 0x34, 0x00, 0xce]));
       connection.execSql(request);
     });
 

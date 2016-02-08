@@ -33,7 +33,7 @@ function readDataLength(parser, type, callback) {
         return parser.readUInt32LE(callback);
 
       default:
-        return parser.emit(new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name));
+        return parser.emit(new Error('Unsupported dataLengthLength ' + type.dataLengthLength + ' for data type ' + type.name));
     }
   } else {
     callback(undefined);
@@ -134,7 +134,7 @@ function readUDTInfo(parser, type, callback) {
 }
 
 function metadataParse(parser, options, callback) {
-  (options.tdsVersion < "7_2" ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {
         const type = TYPE[typeNumber];

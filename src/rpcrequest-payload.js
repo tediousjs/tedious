@@ -88,6 +88,6 @@ module.exports = class RpcRequestPayload {
 
   toString(indent) {
     indent || (indent = '');
-    return indent + ("RPC Request - " + this.procedure);
+    return indent + ('RPC Request - ' + this.procedure);
   }
 };

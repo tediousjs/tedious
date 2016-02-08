@@ -68,7 +68,7 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
             return parser.readUInt32LE(callback);
 
           default:
-            return parser.emit('error', new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name));
+            return parser.emit('error', new Error('Unsupported dataLengthLength ' + type.dataLengthLength + ' for data type ' + type.name));
         }
       } else {
         return callback(undefined);
@@ -119,7 +119,7 @@ function valueParse(parser, metaData, options, callback) {
               });
 
             default:
-              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for IntN"));
+              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
           }
 
         case 'Real':
@@ -138,7 +138,7 @@ function valueParse(parser, metaData, options, callback) {
               return parser.readDoubleLE(callback);
 
             default:
-              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for FloatN"));
+              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
           }
 
         case 'Money':
@@ -159,7 +159,7 @@ function valueParse(parser, metaData, options, callback) {
               });
 
             default:
-              return parser.emit('error', new Error("Unsupported dataLength " + dataLength + " for MoneyN"));
+              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
           }
 
         case 'Bit':
@@ -383,7 +383,7 @@ function readNChars(parser, dataLength, callback) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, (data) => {
-      callback(data.toString("ucs2"));
+      callback(data.toString('ucs2'));
     });
   }
 }
@@ -427,7 +427,7 @@ function readMax(parser, callback) {
       const high = type.readUInt32LE(4);
 
       if (high >= (2 << (53 - 32))) {
-        console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
+        console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
       }
 
       const expectedLength = low + (0x100000000 * high);
@@ -457,7 +457,7 @@ function readMaxKnownLength(parser, totalLength, callback) {
 
   next(() => {
     if (offset !== totalLength) {
-      parser.emit('error', new Error("Partially Length-prefixed Bytes unmatched lengths : expected " + totalLength + ", but got " + offset + " bytes"));
+      parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes'));
     }
 
     callback(data);
@@ -553,7 +553,7 @@ function readTime(parser, dataLength, scale, useUTC, callback) {
     } else {
       date = new Date(1970, 0, 1, 0, 0, 0, value / 10000);
     }
-    Object.defineProperty(date, "nanosecondsDelta", {
+    Object.defineProperty(date, 'nanosecondsDelta', {
       enumerable: false,
       value: (value % 10000) / Math.pow(10, 7)
     });
@@ -580,7 +580,7 @@ function readDateTime2(parser, dataLength, scale, useUTC, callback) {
       } else {
         date = new Date(2000, 0, days - 730118, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds());
       }
-      Object.defineProperty(date, "nanosecondsDelta", {
+      Object.defineProperty(date, 'nanosecondsDelta', {
         enumerable: false,
         value: time.nanosecondsDelta
       });
@@ -595,7 +595,7 @@ function readDateTimeOffset(parser, dataLength, scale, callback) {
       // offset
       parser.readInt16LE(() => {
         const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time));
-        Object.defineProperty(date, "nanosecondsDelta", {
+        Object.defineProperty(date, 'nanosecondsDelta', {
           enumerable: false,
           value: time.nanosecondsDelta
         });

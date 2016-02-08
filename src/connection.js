@@ -144,10 +144,10 @@ class Connection extends EventEmitter {
     if (!this.config.options.port && !this.config.options.instanceName) {
       this.config.options.port = DEFAULT_PORT;
     } else if (this.config.options.port && this.config.options.instanceName) {
-      throw new Error("Port and instanceName are mutually exclusive, but " + this.config.options.port + " and " + this.config.options.instanceName + " provided");
+      throw new Error('Port and instanceName are mutually exclusive, but ' + this.config.options.port + ' and ' + this.config.options.instanceName + ' provided');
     } else if (this.config.options.port) {
       if (this.config.options.port < 0 || this.config.options.port > 65536) {
-        throw new RangeError("Port should be > 0 and < 65536");
+        throw new RangeError('Port should be > 0 and < 65536');
       }
     }
 
@@ -184,7 +184,7 @@ class Connection extends EventEmitter {
           this.request.error = RequestError(token.message, 'EREQUEST');
           this.request.error.number = token.number;
           this.request.error.state = token.state;
-          this.request.error["class"] = token["class"];
+          this.request.error['class'] = token['class'];
           this.request.error.serverName = token.serverName;
           this.request.error.procName = token.procName;
           return this.request.error.lineNumber = token.lineNumber;
@@ -209,14 +209,14 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
-        this.loginError = ConnectionError("Server responded with unknown TDS version.", 'ETDS');
+        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
         this.loggedIn = false;
         return;
       }
 
-      if (!token["interface"]) {
+      if (!token['interface']) {
         // unsupported interface
-        this.loginError = ConnectionError("Server responded with unsupported interface.", 'EINTERFACENOTSUPP');
+        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
         return;
       }
@@ -345,7 +345,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('done', (token) => {
       if (this.request) {
         if (token.attention) {
-          this.dispatchEvent("attention");
+          this.dispatchEvent('attention');
         }
         if (token.sqlError && !this.request.error) {
           // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
@@ -427,7 +427,7 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
-    const message = "Failed to connect to " + this.config.server + ":" + this.config.options.port + " in " + this.config.options.connectTimeout + "ms";
+    const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = void 0;
@@ -454,7 +454,7 @@ class Connection extends EventEmitter {
 
   transitionTo(newState) {
     if (this.state === newState) {
-      this.debug.log("State is already " + newState.name);
+      this.debug.log('State is already ' + newState.name);
       return;
     }
 
@@ -462,7 +462,7 @@ class Connection extends EventEmitter {
       this.state.exit.apply(this);
     }
 
-    this.debug.log("State change: " + (this.state ? this.state.name : undefined) + " -> " + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -474,18 +474,18 @@ class Connection extends EventEmitter {
     if (this.state.events[eventName]) {
       return this.state.events[eventName].apply(this, args);
     } else {
-      this.emit('error', new Error("No event '" + eventName + "' in state '" + this.state.name + "'"));
+      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
       return this.close();
     }
   }
 
   socketError(error) {
     if (this.state === this.STATE.CONNECTING) {
-      const message = "Failed to connect to " + this.config.server + ":" + this.config.options.port + " - " + error.message;
+      const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', ConnectionError(message, 'ESOCKET'));
     } else {
-      const message = "Connection lost - " + error.message;
+      const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
       this.emit('error', ConnectionError(message, 'ESOCKET'));
     }
@@ -495,19 +495,19 @@ class Connection extends EventEmitter {
   socketConnect() {
     this.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
     this.closed = false;
-    this.debug.log("connected to " + this.config.server + ":" + this.config.options.port);
+    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
     return this.dispatchEvent('socketConnect');
   }
 
   socketEnd() {
-    this.debug.log("socket ended");
+    this.debug.log('socket ended');
     return this.transitionTo(this.STATE.FINAL);
   }
 
   socketClose() {
-    this.debug.log("connection to " + this.config.server + ":" + this.config.options.port + " closed");
+    this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log("Rerouting to " + this.routingData.server + ":" + this.routingData.port);
+      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
       return this.dispatchEvent('reconnect');
     } else {
       return this.transitionTo(this.STATE.FINAL);
@@ -597,7 +597,7 @@ class Connection extends EventEmitter {
   getInitialSql() {
     const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
     const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
-    return "set textsize " + this.config.options.textsize + "\nset quoted_identifier on\nset arithabort off\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on " + enableAnsiNullDefault + "\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst 7\nset transaction isolation level " + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + "\nset xact_abort " + xact_abort;
+    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort off\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst 7\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
   }
 
   processedInitialSql() {
@@ -713,8 +713,8 @@ class Connection extends EventEmitter {
   beginTransaction(callback, name, isolationLevel) {
     isolationLevel || (isolationLevel = this.config.options.isolationLevel);
     const transaction = new Transaction(name || '', isolationLevel);
-    if (this.config.options.tdsVersion < "7_2") {
-      return this.execSqlBatch(new Request("SET TRANSACTION ISOLATION LEVEL " + (transaction.isolationLevelToTSQL()) + ";BEGIN TRAN " + transaction.name, callback));
+    if (this.config.options.tdsVersion < '7_2') {
+      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, callback));
     }
     const request = new Request(void 0, (err) => {
       return callback(err, this.currentTransactionDescriptor());
@@ -724,8 +724,8 @@ class Connection extends EventEmitter {
 
   commitTransaction(callback, name) {
     const transaction = new Transaction(name || '');
-    if (this.config.options.tdsVersion < "7_2") {
-      return this.execSqlBatch(new Request("COMMIT TRAN " + transaction.name, callback));
+    if (this.config.options.tdsVersion < '7_2') {
+      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, callback));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
@@ -733,8 +733,8 @@ class Connection extends EventEmitter {
 
   rollbackTransaction(callback, name) {
     const transaction = new Transaction(name || '');
-    if (this.config.options.tdsVersion < "7_2") {
-      return this.execSqlBatch(new Request("ROLLBACK TRAN " + transaction.name, callback));
+    if (this.config.options.tdsVersion < '7_2') {
+      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, callback));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
@@ -742,8 +742,8 @@ class Connection extends EventEmitter {
 
   saveTransaction(callback, name) {
     const transaction = new Transaction(name);
-    if (this.config.options.tdsVersion < "7_2") {
-      return this.execSqlBatch(new Request("SAVE TRAN " + transaction.name, callback));
+    if (this.config.options.tdsVersion < '7_2') {
+      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, callback));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
@@ -754,7 +754,7 @@ class Connection extends EventEmitter {
       throw new TypeError('`cb` must be a function');
     }
     const useSavepoint = this.inTransaction;
-    const name = "_tedious_" + (crypto.randomBytes(10).toString('hex'));
+    const name = '_tedious_' + (crypto.randomBytes(10).toString('hex'));
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
@@ -788,7 +788,7 @@ class Connection extends EventEmitter {
           return cb(err);
         }
         if (isolationLevel) {
-          return this.execSqlBatch(new Request("SET transaction isolation level " + this.getIsolationLevelText(isolationLevel), function(err) {
+          return this.execSqlBatch(new Request('SET transaction isolation level ' + this.getIsolationLevelText(isolationLevel), function(err) {
             return cb(err, txDone);
           }));
         } else {
@@ -807,7 +807,7 @@ class Connection extends EventEmitter {
 
   makeRequest(request, packetType, payload) {
     if (this.state !== this.STATE.LOGGED_IN) {
-      const message = "Requests can only be made in the " + this.STATE.LOGGED_IN.name + " state, not the " + this.state.name + " state";
+      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       return request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else {
@@ -827,7 +827,7 @@ class Connection extends EventEmitter {
 
   cancel() {
     if (this.state !== this.STATE.SENT_CLIENT_REQUEST) {
-      const message = "Requests can only be canceled in the " + this.STATE.SENT_CLIENT_REQUEST.name + " state, not the " + this.state.name + " state";
+      const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       return false;
     } else {
@@ -1103,9 +1103,9 @@ Connection.prototype.STATE = {
           this.request = void 0;
           this.transitionTo(this.STATE.LOGGED_IN);
           if (sqlRequest.canceled) {
-            return sqlRequest.callback(RequestError("Canceled.", 'ECANCEL'));
+            return sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           } else {
-            const message = "Timeout: Request failed to complete in " + this.config.options.requestTimeout + "ms";
+            const message = 'Timeout: Request failed to complete in ' + this.config.options.requestTimeout + 'ms';
             return sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
           }
         }

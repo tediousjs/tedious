@@ -22,7 +22,7 @@ function ConnectionError(message, code) {
 
 util.inherits(ConnectionError, Error);
 
-ConnectionError.prototype.name = "ConnectionError";
+ConnectionError.prototype.name = 'ConnectionError';
 
 module.exports.RequestError = RequestError;
 function RequestError(message, code) {
@@ -44,4 +44,4 @@ function RequestError(message, code) {
 
 util.inherits(RequestError, Error);
 
-RequestError.prototype.name = "RequestError";
+RequestError.prototype.name = 'RequestError';

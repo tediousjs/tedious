@@ -22,7 +22,7 @@ module.exports = function(parser, colMetadata, options, callback) {
                   callback({
                     name: 'LOGINACK',
                     event: 'loginack',
-                    "interface": interfaceType,
+                    'interface': interfaceType,
                     tdsVersion: tdsVersion,
                     progName: progName,
                     progVersion: {

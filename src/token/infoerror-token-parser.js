@@ -13,7 +13,7 @@ function parseToken(parser, options, callback) {
                   callback({
                     number: number,
                     state: state,
-                    "class": clazz,
+                    'class': clazz,
                     message: message,
                     serverName: serverName,
                     procName: procName,

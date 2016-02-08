@@ -114,7 +114,7 @@ function readNewAndOldValue(parser, length, type, callback) {
       break;
 
     default:
-      console.error("Tedious > Unsupported ENVCHANGE type " + type.name);
+      console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
       // skip unknown bytes
       parser.readBuffer(length - 1, () => {
         callback(undefined, undefined);
@@ -128,7 +128,7 @@ module.exports = function(parser, colMetadata, options, callback) {
       const type = types[typeNumber];
 
       if (!type) {
-        console.error("Tedious > Unsupported ENVCHANGE type " + typeNumber);
+        console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
         // skip unknown bytes
         return parser.readBuffer(length - 1, () => {
           callback();
