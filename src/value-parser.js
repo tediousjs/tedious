@@ -43,7 +43,7 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
   }
 
   if (metaData.isVariantValue) {
-	return callback(metaData.dataLength);
+    return callback(metaData.dataLength);
   }
 
   // s2.2.4.2.1
@@ -327,25 +327,25 @@ function valueParse(parser, metaData, options, callback) {
           Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});
           return parser.readUInt8((baseType) => {
             return parser.readUInt8((propBytes) => {
-	          valueMetaData.dataLength = dataLength - propBytes - 2;
-	          valueMetaData.type = TYPE[baseType];
-	          return readPrecision(parser, valueMetaData.type, (precision) => {
-	            valueMetaData.precision = precision;
-	            return readScale(parser, valueMetaData.type, (scale) => {
-			      valueMetaData.scale = scale;
-	              return readCollation(parser, valueMetaData.type, (collation) => {
-		            valueMetaData.collation = collation;
-		            if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
-		              return readDataLength(parser, valueMetaData.type, {}, null, (maxDataLength) => {
-	                    valueMetaData.dataLength = maxDataLength;
-	                    return valueParse(parser, valueMetaData, options, callback);
-	                  });
-	                } else {
-		              return valueParse(parser, valueMetaData, options, callback);
-	                }
-	              });
-	            });
-	          });
+              valueMetaData.dataLength = dataLength - propBytes - 2;
+              valueMetaData.type = TYPE[baseType];
+              return readPrecision(parser, valueMetaData.type, (precision) => {
+                valueMetaData.precision = precision;
+                return readScale(parser, valueMetaData.type, (scale) => {
+                  valueMetaData.scale = scale;
+                  return readCollation(parser, valueMetaData.type, (collation) => {
+                    valueMetaData.collation = collation;
+                    if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
+                      return readDataLength(parser, valueMetaData.type, {}, null, (maxDataLength) => {
+                        valueMetaData.dataLength = maxDataLength;
+                        return valueParse(parser, valueMetaData, options, callback);
+                      });
+                    } else {
+                      return valueParse(parser, valueMetaData, options, callback);
+                    }
+                  });
+                });
+              });
             });
           });
 
