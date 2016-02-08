@@ -80,7 +80,7 @@ class StreamParser extends stream.Transform {
 
     super(options);
 
-    this.buffer = new BufferList;
+    this.buffer = new BufferList();
     this.generator = undefined;
     this.currentStep = undefined;
   }

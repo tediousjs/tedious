@@ -60,7 +60,7 @@ module.exports = class NTLMResponsePayload {
     data.writeString(username, 'ucs2');
     const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
     data.copyFrom(lmv2Data);
-    const genTime = (new Date).getTime();
+    const genTime = new Date().getTime();
     ntlmData = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
     data.copyFrom(ntlmData);
     data.writeUInt32LE(0x0101);
