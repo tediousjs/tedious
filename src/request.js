@@ -1,10 +1,10 @@
 'use strict';
 
-import { EventEmitter } from 'events';
-import { typeByName as TYPES } from './data-type';
-import { RequestError } from './errors';
+const EventEmitter = require('events').EventEmitter;
+const TYPES = require('./data-type').typeByName;
+const RequestError = require('./errors').RequestError;
 
-export default class Request extends EventEmitter {
+module.exports = class Request extends EventEmitter {
   constructor(sqlTextOrProcedure, callback) {
     super();
 
@@ -136,4 +136,4 @@ export default class Request extends EventEmitter {
     }
     return null;
   }
-}
+};

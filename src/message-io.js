@@ -1,12 +1,15 @@
 'use strict';
 
-import tls from 'tls';
-import crypto from 'crypto';
-import { EventEmitter } from 'events';
-import { Transform } from 'readable-stream';
+const tls = require('tls');
+const crypto = require('crypto');
+const EventEmitter = require('events').EventEmitter;
+const Transform = require('readable-stream').Transform;
 
-import {} from './buffertools';
-import { Packet, TYPE, HEADER_LENGTH as packetHeaderLength } from './packet';
+require('./buffertools');
+
+const Packet = require('./packet').Packet;
+const TYPE = require('./packet').TYPE;
+const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
 class ReadablePacketStream extends Transform {
   constructor() {
@@ -51,7 +54,7 @@ class ReadablePacketStream extends Transform {
   }
 }
 
-export default class MessageIO extends EventEmitter {
+module.exports = class MessageIO extends EventEmitter {
   constructor(socket, _packetSize, debug) {
     super();
 
@@ -164,4 +167,4 @@ export default class MessageIO extends EventEmitter {
     this.debug.packet(direction, packet);
     return this.debug.data(packet);
   }
-}
+};

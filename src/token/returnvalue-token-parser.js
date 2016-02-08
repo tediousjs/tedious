@@ -2,10 +2,10 @@
 
 // s2.2.7.16
 
-import metadataParse from '../metadata-parser';
-import valueParse from '../value-parser';
+const metadataParse = require('../metadata-parser');
+const valueParse = require('../value-parser');
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((paramOrdinal) => {
     parser.readBVarChar((paramName) => {
       if (paramName.charAt(0) === '@') {
@@ -29,4 +29,4 @@ export default function(parser, colMetadata, options, callback) {
       });
     });
   });
-}
+};

@@ -1,23 +1,26 @@
 'use strict';
 
-import {} from './buffertools';
-import BulkLoad from './bulk-load';
-import Debug from './debug';
-import { EventEmitter } from 'events';
-import { instanceLookup } from './instance-lookup';
-import { TYPE } from './packet';
-import PreloginPayload from './prelogin-payload';
-import Login7Payload from './login7-payload';
-import NTLMResponsePayload from './ntlm-payload';
-import Request from './request';
-import RpcRequestPayload from './rpcrequest-payload';
-import SqlBatchPayload from './sqlbatch-payload';
-import MessageIO from './message-io';
-import { Socket } from 'net';
-import { Parser as TokenStreamParser } from './token/token-stream-parser';
-import { Transaction, ISOLATION_LEVEL } from './transaction';
-import crypto from 'crypto';
-import { ConnectionError, RequestError } from './errors';
+require('./buffertools');
+
+const BulkLoad = require('./bulk-load');
+const Debug = require('./debug');
+const EventEmitter = require('events').EventEmitter;
+const instanceLookup = require('./instance-lookup').instanceLookup;
+const TYPE = require('./packet').TYPE;
+const PreloginPayload = require('./prelogin-payload');
+const Login7Payload = require('./login7-payload');
+const NTLMResponsePayload = require('./ntlm-payload');
+const Request = require('./request');
+const RpcRequestPayload = require('./rpcrequest-payload');
+const SqlBatchPayload = require('./sqlbatch-payload');
+const MessageIO = require('./message-io');
+const Socket = require('net').Socket;
+const TokenStreamParser = require('./token/token-stream-parser').Parser;
+const Transaction = require('./transaction').Transaction;
+const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
+const crypto = require('crypto');
+const ConnectionError = require('./errors').ConnectionError;
+const RequestError = require('./errors').RequestError;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -31,7 +34,7 @@ const DEFAULT_TEXTSIZE = '2147483647';
 const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
 
-export default class Connection extends EventEmitter {
+class Connection extends EventEmitter {
   constructor(config) {
     super();
 
@@ -862,6 +865,8 @@ export default class Connection extends EventEmitter {
     }
   }
 }
+
+module.exports = Connection;
 
 Connection.prototype.STATE = {
   CONNECTING: {

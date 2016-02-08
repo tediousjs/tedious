@@ -1,8 +1,9 @@
 'use strict';
 
-import util from 'util';
+const util = require('util');
 
-export function ConnectionError(message, code) {
+module.exports.ConnectionError = ConnectionError;
+function ConnectionError(message, code) {
   if (!(this instanceof ConnectionError)) {
     if (message instanceof ConnectionError) {
       return message;
@@ -23,7 +24,8 @@ util.inherits(ConnectionError, Error);
 
 ConnectionError.prototype.name = "ConnectionError";
 
-export function RequestError(message, code) {
+module.exports.RequestError = RequestError;
+function RequestError(message, code) {
   if (!(this instanceof RequestError)) {
     if (message instanceof RequestError) {
       return message;

@@ -1,7 +1,7 @@
 'use strict';
 
-import { EventEmitter } from 'events';
-import StreamParser from "./stream-parser";
+const EventEmitter = require('events').EventEmitter;
+const StreamParser = require('./stream-parser');
 
 /*
   Buffers are thrown at the parser (by calling addBuffer).
@@ -13,7 +13,7 @@ import StreamParser from "./stream-parser";
   The partial token and the new buffer are concatenated, and the token
   parsing resumes.
  */
-export class Parser extends EventEmitter {
+class Parser extends EventEmitter {
   constructor(debug, colMetadata, options) {
     super();
 
@@ -37,3 +37,4 @@ export class Parser extends EventEmitter {
     return this.parser.buffer.length === this.parser.position;
   }
 }
+module.exports.Parser = Parser;

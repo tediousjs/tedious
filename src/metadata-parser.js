@@ -1,8 +1,13 @@
 'use strict';
 
-import { codepageByLcid } from './collation';
-import { TYPE } from './data-type';
-import { sprintf } from 'sprintf';
+const codepageByLcid = require('./collation').codepageByLcid;
+const TYPE = require('./data-type').TYPE;
+const sprintf = require('sprintf').sprintf;
+
+module.exports = metadataParse;
+module.exports.readPrecision = readPrecision;
+module.exports.readScale = readScale;
+module.exports.readCollation = readCollation;
 
 function readDataLength(parser, type, callback) {
   if ((type.id & 0x30) === 0x20) {
@@ -35,7 +40,7 @@ function readDataLength(parser, type, callback) {
   }
 }
 
-export function readPrecision(parser, type, callback) {
+function readPrecision(parser, type, callback) {
   if (type.hasPrecision) {
     parser.readUInt8(callback);
   } else {
@@ -43,7 +48,7 @@ export function readPrecision(parser, type, callback) {
   }
 }
 
-export function readScale(parser, type, callback) {
+function readScale(parser, type, callback) {
   if (type.hasScale) {
     parser.readUInt8(callback);
   } else {
@@ -51,7 +56,7 @@ export function readScale(parser, type, callback) {
   }
 }
 
-export function readCollation(parser, type, callback) {
+function readCollation(parser, type, callback) {
   if (type.hasCollation) {
     // s2.2.5.1.2
     parser.readBuffer(5, (collationData) => {
@@ -128,7 +133,7 @@ function readUDTInfo(parser, type, callback) {
   }
 }
 
-export default function(parser, options, callback) {
+function metadataParse(parser, options, callback) {
   (options.tdsVersion < "7_2" ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {

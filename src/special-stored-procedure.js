@@ -1,6 +1,6 @@
 'use strict';
 
-export default {
+module.exports = {
   Sp_Cursor: 1,
   Sp_CursorOpen: 2,
   Sp_CursorPrepare: 3,

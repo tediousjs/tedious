@@ -1,7 +1,7 @@
 'use strict';
 
-import { Transform } from "readable-stream";
-import { TYPE } from "./token";
+const Transform = require("readable-stream").Transform;
+const TYPE = require("./token").TYPE;
 
 const tokenParsers = {
   [TYPE.COLMETADATA]: require('./colmetadata-token-parser'),
@@ -22,7 +22,7 @@ const tokenParsers = {
   [TYPE.SSPI]: require('./sspi-token-parser')
 };
 
-export default class Parser extends Transform {
+module.exports = class Parser extends Transform {
   constructor(debug, colMetadata, options) {
     super({ objectMode: true });
 
@@ -351,4 +351,4 @@ export default class Parser extends Transform {
       this.readBuffer(length, callback);
     });
   }
-}
+};

@@ -1,12 +1,12 @@
 'use strict';
 
-import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
-import { writeToTrackingBuffer as writeAllHeaders } from './all-headers';
+const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
 
 /*
   s2.2.6.6
  */
-export default class SqlBatchPayload {
+module.exports = class SqlBatchPayload {
   constructor(sqlText, txnDescriptor, options) {
     this.sqlText = sqlText;
 
@@ -23,4 +23,4 @@ export default class SqlBatchPayload {
     indent || (indent = '');
     return indent + ("SQL Batch - " + this.sqlText);
   }
-}
+};

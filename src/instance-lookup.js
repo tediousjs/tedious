@@ -1,6 +1,6 @@
 'use strict';
 
-import dgram from 'dgram';
+const dgram = require('dgram');
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -9,7 +9,8 @@ const RETRIES = 3;
 const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
-export function instanceLookup(server, instanceName, callback, timeout, retries) {
+module.exports.instanceLookup = instanceLookup;
+function instanceLookup(server, instanceName, callback, timeout, retries) {
   let socket, timer;
   timeout = timeout || TIMEOUT;
   let retriesLeft = retries || RETRIES;
@@ -61,7 +62,8 @@ export function instanceLookup(server, instanceName, callback, timeout, retries)
   return makeAttempt();
 }
 
-export function parseBrowserResponse(response, instanceName) {
+module.exports.parseBrowserResponse = parseBrowserResponse;
+function parseBrowserResponse(response, instanceName) {
   let getPort;
 
   const instances = response.split(';;');

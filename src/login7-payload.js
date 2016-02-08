@@ -1,11 +1,12 @@
 'use strict';
 
-import {} from './buffertools';
-import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import os from 'os';
-import { sprintf } from 'sprintf';
-import { name as libraryName } from './library';
-import { versions } from './tds-versions';
+require('./buffertools');
+
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
+const os = require('os');
+const sprintf = require('sprintf').sprintf;
+const libraryName = require('./library').name;
+const versions = require('./tds-versions').versions;
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -96,7 +97,7 @@ const NTLMFlags = {
 /*
   s2.2.6.3
  */
-export default class Login7Payload {
+module.exports = class Login7Payload {
   constructor(loginData) {
     this.loginData = loginData;
 
@@ -286,4 +287,4 @@ export default class Login7Payload {
         this.loginData.language, this.loginData.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
-}
+};

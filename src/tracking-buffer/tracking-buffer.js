@@ -1,6 +1,4 @@
 'use strict';
 
-import ReadableTrackingBuffer from './readable-tracking-buffer';
-import WritableTrackingBuffer from './writable-tracking-buffer';
-
-export { ReadableTrackingBuffer, WritableTrackingBuffer };
+module.exports.ReadableTrackingBuffer = require('./readable-tracking-buffer');
+module.exports.WritableTrackingBuffer = require('./writable-tracking-buffer');

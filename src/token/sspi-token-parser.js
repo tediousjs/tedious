@@ -19,7 +19,7 @@ function parseChallenge(buffer) {
   return challenge;
 }
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUsVarByte((buffer) => {
     callback({
       name: 'SSPICHALLENGE',
@@ -27,4 +27,4 @@ export default function(parser, colMetadata, options, callback) {
       ntlmpacket: parseChallenge(buffer)
     });
   });
-}
+};

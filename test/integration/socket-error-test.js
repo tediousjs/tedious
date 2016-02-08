@@ -1,6 +1,8 @@
-import Connection from '../../src/connection';
-import Request from '../../src/request';
-import fs from 'fs';
+'use strict';
+
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;

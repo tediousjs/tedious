@@ -1,6 +1,6 @@
 'use strict';
 
-import * as guidParser from './guid-parser';
+const guidParser = require('./guid-parser');
 
 const NULL = (1 << 16) - 1;
 const EPOCH_DATE = new Date(1900, 0, 1);
@@ -9,9 +9,9 @@ const YEAR_ONE = new Date(2000, 0, -730118);
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 const MAX = (1 << 16) - 1;
 
-export const typeByName = {};
+const typeByName = module.exports.typeByName = {};
 
-export const TYPE = {
+const TYPE = module.exports.TYPE = {
   0x1F: {
     type: 'NULL',
     name: 'Null'

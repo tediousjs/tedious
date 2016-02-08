@@ -1,6 +1,6 @@
 'use strict';
 
-import { convertLEBytesToString } from './bigint';
+const convertLEBytesToString = require('./bigint').convertLEBytesToString;
 
 /*
   A Buffer-like class that tracks position.
@@ -9,7 +9,7 @@ import { convertLEBytesToString } from './bigint';
   When reading, if the read would pass the end of the buffer, an error object is thrown.
  */
 
-export default class ReadableTrackingBuffer {
+module.exports = class ReadableTrackingBuffer {
   constructor(buffer, encoding) {
     this.buffer = buffer;
     this.encoding = encoding;
@@ -215,4 +215,4 @@ export default class ReadableTrackingBuffer {
   readAsStringInt64LE() {
     return this.readAsStringBigIntLE(8);
   }
-}
+};

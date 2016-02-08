@@ -41,7 +41,8 @@ function invert(array) {
   }
 }
 
-export function convertLEBytesToString(buffer) {
+module.exports.convertLEBytesToString = convertLEBytesToString;
+function convertLEBytesToString (buffer) {
   const array = Array.prototype.slice.call(buffer, 0, buffer.length);
   if (isZero(array)) {
     return '0';
@@ -62,7 +63,8 @@ export function convertLEBytesToString(buffer) {
   }
 }
 
-export function numberToInt64LE(num) {
+module.exports.numberToInt64LE = numberToInt64LE;
+function numberToInt64LE(num) {
   // adapted from https://github.com/broofa/node-int64
   const negate = num < 0;
   let hi = Math.abs(num);

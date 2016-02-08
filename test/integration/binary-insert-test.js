@@ -1,7 +1,9 @@
-import Connection from '../../src/connection';
-import Request from '../../src/request';
-import fs from 'fs';
-import { typeByName as TYPES } from '../../src/data-type';
+'use strict';
+
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
+const TYPES = require('../../src/data-type').typeByName;
 
 const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
 

@@ -29,7 +29,8 @@ function parseToken(parser, options, callback) {
   });
 }
 
-export function infoParser(parser, colMetadata, options, callback) {
+module.exports.infoParser = infoParser;
+function infoParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'INFO';
     token.event = 'infoMessage';
@@ -37,7 +38,8 @@ export function infoParser(parser, colMetadata, options, callback) {
   });
 }
 
-export function errorParser(parser, colMetadata, options, callback) {
+module.exports.errorParser = errorParser;
+function errorParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'ERROR';
     token.event = 'errorMessage';

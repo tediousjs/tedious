@@ -1,11 +1,14 @@
 'use strict';
 
-import iconv from 'iconv-lite';
-import { sprintf } from 'sprintf';
-import { TYPE } from './data-type';
-import * as guidParser from './guid-parser';
-import { readPrecision, readScale, readCollation } from './metadata-parser';
-import { convertLEBytesToString } from './tracking-buffer/bigint';
+const iconv = require('iconv-lite');
+const sprintf = require('sprintf').sprintf;
+const TYPE = require('./data-type').TYPE;
+const guidParser = require('./guid-parser');
+
+const readPrecision = require('./metadata-parser').readPrecision;
+const readScale = require('./metadata-parser').readScale;
+const readCollation = require('./metadata-parser').readCollation;
+const convertLEBytesToString = require('./tracking-buffer/bigint').convertLEBytesToString;
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -38,7 +41,7 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
   if (textPointerNull) {
     return callback(0);
   }
-  
+
   if (metaData.isVariantValue) {
 	return callback(metaData.dataLength);
   }
@@ -76,7 +79,8 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
   }
 }
 
-export default function valueParse(parser, metaData, options, callback) {
+module.exports = valueParse;
+function valueParse(parser, metaData, options, callback) {
   const type = metaData.type;
 
   readTextPointerNull(parser, type, (textPointerNull) => {
@@ -317,7 +321,7 @@ export default function valueParse(parser, metaData, options, callback) {
 
         case 'UDT':
           return readMaxBinary(parser, callback);
-        
+
         case 'Variant':
           let valueMetaData = metaData.valueMetaData = {};
           Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});

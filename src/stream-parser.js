@@ -1,7 +1,7 @@
 'use strict';
 
-import stream from 'readable-stream';
-import BufferList from 'bl';
+const stream = require('readable-stream');
+const BufferList = require('bl');
 
 class Job {
   constructor(length, execute) {
@@ -70,7 +70,7 @@ const JOBS = {
   })
 };
 
-export default class StreamParser extends stream.Transform {
+class StreamParser extends stream.Transform {
   constructor(options) {
     options = options || {};
 
@@ -139,6 +139,8 @@ export default class StreamParser extends stream.Transform {
     return new Job(length, function() {});
   }
 }
+
+module.exports = StreamParser;
 
 Object.keys(JOBS).forEach(function(jobName) {
   return StreamParser.prototype[jobName] = function() {

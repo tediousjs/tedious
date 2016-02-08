@@ -122,7 +122,7 @@ function readNewAndOldValue(parser, length, type, callback) {
   }
 }
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
@@ -146,4 +146,4 @@ export default function(parser, colMetadata, options, callback) {
       });
     });
   });
-}
+};

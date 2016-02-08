@@ -1,11 +1,12 @@
 'use strict';
 
-import {} from './buffertools';
-import { sprintf } from 'sprintf';
+require('./buffertools');
 
-export const HEADER_LENGTH = 8;
+const sprintf = require('sprintf').sprintf;
 
-export const TYPE = {
+const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
+
+const TYPE = module.exports.TYPE = {
   SQL_BATCH: 0x01,
   RPC_REQUEST: 0x03,
   TABULAR_RESULT: 0x04,
@@ -31,7 +32,7 @@ const STATUS = {
   RESETCONNECTIONSKIPTRAN: 0x10
 };
 
-export const OFFSET = {
+const OFFSET = module.exports.OFFSET = {
   Type: 0,
   Status: 1,
   Length: 2,
@@ -48,7 +49,7 @@ const DEFAULT_WINDOW = 0;
 
 const NL = '\n';
 
-export class Packet {
+class Packet {
   constructor(typeOrBuffer) {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
@@ -203,8 +204,10 @@ export class Packet {
     return "";
   }
 }
+module.exports.Packet = Packet;
 
-export function isPacketComplete(potentialPacketBuffer) {
+module.exports.isPacketComplete = isPacketComplete;
+function isPacketComplete(potentialPacketBuffer) {
   if (potentialPacketBuffer.length < HEADER_LENGTH) {
     return false;
   } else {
@@ -212,6 +215,7 @@ export function isPacketComplete(potentialPacketBuffer) {
   }
 }
 
-export function packetLength(potentialPacketBuffer) {
+module.exports.packetLength = packetLength;
+function packetLength(potentialPacketBuffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 }

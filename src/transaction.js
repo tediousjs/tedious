@@ -7,7 +7,7 @@ const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
   s2.2.6.8
  */
 
-export const OPERATION_TYPE = {
+const OPERATION_TYPE = module.exports.OPERATION_TYPE = {
   TM_GET_DTC_ADDRESS: 0x00,
   TM_PROPAGATE_XACT: 0x01,
   TM_BEGIN_XACT: 0x05,
@@ -17,7 +17,7 @@ export const OPERATION_TYPE = {
   TM_SAVE_XACT: 0x09
 };
 
-export const ISOLATION_LEVEL = {
+const ISOLATION_LEVEL = module.exports.ISOLATION_LEVEL = {
   NO_CHANGE: 0x00,
   READ_UNCOMMITTED: 0x01,
   READ_COMMITTED: 0x02,
@@ -32,7 +32,7 @@ for (const name in ISOLATION_LEVEL) {
   isolationLevelByValue[value] = name;
 }
 
-export class Transaction {
+class Transaction {
   constructor(name, isolationLevel) {
     this.name = name;
     this.isolationLevel = isolationLevel;
@@ -120,3 +120,4 @@ export class Transaction {
     return '';
   }
 }
+module.exports.Transaction = Transaction;

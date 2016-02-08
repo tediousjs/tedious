@@ -1,9 +1,9 @@
 'use strict';
 
-import { EventEmitter } from 'events';
-import util from 'util';
+const EventEmitter = require('events').EventEmitter;
+const util = require('util');
 
-export default class Debug extends EventEmitter {
+module.exports = class Debug extends EventEmitter {
   /*
     @options    Which debug details should be sent.
                 data    - dump of packet data
@@ -54,4 +54,4 @@ export default class Debug extends EventEmitter {
   log(text) {
     this.emit('debug', text);
   }
-}
+};

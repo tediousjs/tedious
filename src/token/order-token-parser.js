@@ -2,7 +2,7 @@
 
 // s2.2.7.14
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((length) => {
     const columnCount = length / 2;
     const orderColumns = [];
@@ -30,4 +30,4 @@ export default function(parser, colMetadata, options, callback) {
       });
     });
   });
-}
+};

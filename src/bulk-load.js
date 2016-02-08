@@ -1,8 +1,8 @@
 'use strict';
 
-import { EventEmitter } from 'events';
-import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
-import { TYPE as TOKEN_TYPE } from './token/token';
+const EventEmitter = require('events').EventEmitter;
+const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const TOKEN_TYPE = require('./token/token').TYPE;
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -28,7 +28,7 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-export default class BulkLoad extends EventEmitter {
+module.exports = class BulkLoad extends EventEmitter {
   constructor(table, options1, callback) {
     super();
 
@@ -211,4 +211,4 @@ export default class BulkLoad extends EventEmitter {
     }
     return tBuf.data;
   }
-}
+};

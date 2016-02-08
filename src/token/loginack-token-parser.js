@@ -1,6 +1,6 @@
 'use strict';
 
-import { versionsByValue as versions } from '../tds-versions';
+const versions = require('../tds-versions').versionsByValue;
 
 const interfaceTypes = {
   0: 'SQL_DFLT',

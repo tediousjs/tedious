@@ -1,6 +1,6 @@
 'use strict';
 
-import metadataParse from '../metadata-parser';
+const metadataParse = require('../metadata-parser');
 
 function readTableName(parser, options, metadata, callback) {
   if (metadata.type.hasTableName) {
@@ -70,7 +70,7 @@ function readColumn(parser, options, index, callback) {
   });
 }
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((columnCount) => {
     const columns = [];
 
@@ -96,4 +96,4 @@ export default function(parser, colMetadata, options, callback) {
       });
     });
   });
-}
+};
