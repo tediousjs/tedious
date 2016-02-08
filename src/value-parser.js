@@ -403,7 +403,7 @@ function readMaxChars(parser, codepage, callback) {
     } else {
       callback(null);
     }
-  })
+  });
 }
 
 function readMaxNChars(parser, callback) {

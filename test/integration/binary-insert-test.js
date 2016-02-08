@@ -22,7 +22,7 @@ exports.insertBinary = function(test) {
   });
 
   connection.on('connect', function(err) {
-    test.ifError(err)
+    test.ifError(err);
 
     const request = new Request('CREATE TABLE #test ([data] binary(4))', function(err) {
       test.ifError(err);
