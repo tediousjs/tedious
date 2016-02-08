@@ -14,58 +14,58 @@ class Job {
 // This should reduce GC pressure a bit (as less objects will be
 // created and garbage collected during stream parsing).
 const JOBS = {
-  'readInt8': new Job(1, function(buffer, offset) {
+  readInt8: new Job(1, function(buffer, offset) {
     return buffer.readInt8(offset);
   }),
-  'readUInt8': new Job(1, function(buffer, offset) {
+  readUInt8: new Job(1, function(buffer, offset) {
     return buffer.readUInt8(offset);
   }),
-  'readInt16LE': new Job(2, function(buffer, offset) {
+  readInt16LE: new Job(2, function(buffer, offset) {
     return buffer.readInt16LE(offset);
   }),
-  'readInt16BE': new Job(2, function(buffer, offset) {
+  readInt16BE: new Job(2, function(buffer, offset) {
     return buffer.readInt16BE(offset);
   }),
-  'readUInt16LE': new Job(2, function(buffer, offset) {
+  readUInt16LE: new Job(2, function(buffer, offset) {
     return buffer.readUInt16LE(offset);
   }),
-  'readUInt16BE': new Job(2, function(buffer, offset) {
+  readUInt16BE: new Job(2, function(buffer, offset) {
     return buffer.readUInt16BE(offset);
   }),
-  'readInt32LE': new Job(4, function(buffer, offset) {
+  readInt32LE: new Job(4, function(buffer, offset) {
     return buffer.readInt32LE(offset);
   }),
-  'readInt32BE': new Job(4, function(buffer, offset) {
+  readInt32BE: new Job(4, function(buffer, offset) {
     return buffer.readInt32BE(offset);
   }),
-  'readUInt32LE': new Job(4, function(buffer, offset) {
+  readUInt32LE: new Job(4, function(buffer, offset) {
     return buffer.readUInt32LE(offset);
   }),
-  'readUInt32BE': new Job(4, function(buffer, offset) {
+  readUInt32BE: new Job(4, function(buffer, offset) {
     return buffer.readUInt32BE(offset);
   }),
-  'readInt64LE': new Job(8, function(buffer, offset) {
+  readInt64LE: new Job(8, function(buffer, offset) {
     return Math.pow(2, 32) * buffer.readInt32LE(offset + 4) + (buffer[offset + 4] & 0x80 === 0x80 ? 1 : -1) * buffer.readUInt32LE(offset);
   }),
-  'readInt64BE': new Job(8, function(buffer, offset) {
+  readInt64BE: new Job(8, function(buffer, offset) {
     return Math.pow(2, 32) * buffer.readInt32BE(offset) + (buffer[offset] & 0x80 === 0x80 ? 1 : -1) * buffer.readUInt32BE(offset + 4);
   }),
-  'readUInt64LE': new Job(8, function(buffer, offset) {
+  readUInt64LE: new Job(8, function(buffer, offset) {
     return Math.pow(2, 32) * buffer.readUInt32LE(offset + 4) + buffer.readUInt32LE(offset);
   }),
-  'readUInt64BE': new Job(8, function(buffer, offset) {
+  readUInt64BE: new Job(8, function(buffer, offset) {
     return Math.pow(2, 32) * buffer.readUInt32BE(offset) + buffer.readUInt32BE(offset + 4);
   }),
-  'readFloatLE': new Job(4, function(buffer, offset) {
+  readFloatLE: new Job(4, function(buffer, offset) {
     return buffer.readFloatLE(offset);
   }),
-  'readFloatBE': new Job(4, function(buffer, offset) {
+  readFloatBE: new Job(4, function(buffer, offset) {
     return buffer.readFloatBE(offset);
   }),
-  'readDoubleLE': new Job(8, function(buffer, offset) {
+  readDoubleLE: new Job(8, function(buffer, offset) {
     return buffer.readDoubleLE(offset);
   }),
-  'readDoubleBE': new Job(8, function(buffer, offset) {
+  readDoubleBE: new Job(8, function(buffer, offset) {
     return buffer.readDoubleBE(offset);
   })
 };

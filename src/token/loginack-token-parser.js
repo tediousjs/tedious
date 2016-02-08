@@ -20,12 +20,12 @@ module.exports = function(parser, colMetadata, options, callback) {
               parser.readUInt8((buildNumHi) => {
                 parser.readUInt8((buildNumLow) => {
                   callback({
-                    name: 'LOGINACK',
-                    event: 'loginack',
+                    'name': 'LOGINACK',
+                    'event': 'loginack',
                     'interface': interfaceType,
-                    tdsVersion: tdsVersion,
-                    progName: progName,
-                    progVersion: {
+                    'tdsVersion': tdsVersion,
+                    'progName': progName,
+                    'progVersion': {
                       major: major,
                       minor: minor,
                       buildNumHi: buildNumHi,

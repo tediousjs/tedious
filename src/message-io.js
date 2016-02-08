@@ -13,7 +13,7 @@ const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
 class ReadablePacketStream extends Transform {
   constructor() {
-    super({ 'objectMode': true });
+    super({ objectMode: true });
 
     this.buffer = new Buffer(0);
     this.position = 0;
