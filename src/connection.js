@@ -470,8 +470,12 @@ class Connection extends EventEmitter {
     }
   }
 
-  dispatchEvent(eventName, ...args) {
+  dispatchEvent(eventName) {
     if (this.state.events[eventName]) {
+      const args = new Array(arguments.length - 1);
+      for (let i = 0; i < args.length;) {
+        args[i++] = arguments[i];
+      }
       return this.state.events[eventName].apply(this, args);
     } else {
       this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
@@ -755,10 +759,16 @@ class Connection extends EventEmitter {
     }
     const useSavepoint = this.inTransaction;
     const name = '_tedious_' + (crypto.randomBytes(10).toString('hex'));
-    const txDone = (err, done, ...args) => {
+    const self = this;
+    const txDone = function(err, done) {
+      const args = new Array(arguments.length - 2);
+      for (let i = 0; i < args.length;) {
+        args[i++] = arguments[i + 1];
+      }
+
       if (err) {
-        if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction(function(txErr) {
+        if (self.inTransaction && self.state === self.STATE.LOGGED_IN) {
+          return self.rollbackTransaction(function(txErr) {
             args.unshift(txErr || err);
             return done.apply(null, args);
           }, name);
@@ -775,7 +785,7 @@ class Connection extends EventEmitter {
             return done.apply(null, args);
           });
         } else {
-          return this.commitTransaction(function(txErr) {
+          return self.commitTransaction(function(txErr) {
             args.unshift(txErr);
             return done.apply(null, args);
           }, name);
