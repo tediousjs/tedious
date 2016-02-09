@@ -1,10 +1,10 @@
-import BulkLoad from './bulk-load';
-import Connection from './connection';
-import Request from './request';
-import library from './library';
+'use strict';
 
-export { typeByName as TYPES } from './data-type';
-export { ISOLATION_LEVEL } from './transaction';
-export { versions as TDS_VERSION } from './tds-versions';
+module.exports.BulkLoad = require('./bulk-load');
+module.exports.Connection = require('./connection');
+module.exports.Request = require('./request');
+module.exports.library = require('./library');
 
-export { BulkLoad, Connection, Request, library };
+module.exports.TYPES = require('./data-type').typeByName;
+module.exports.ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
+module.exports.TDS_VERSION = require('./tds-versions').versions;

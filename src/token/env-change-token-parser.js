@@ -1,3 +1,5 @@
+'use strict';
+
 const types = {
   1: {
     name: 'DATABASE',
@@ -112,7 +114,7 @@ function readNewAndOldValue(parser, length, type, callback) {
       break;
 
     default:
-      console.error("Tedious > Unsupported ENVCHANGE type " + type.name);
+      console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
       // skip unknown bytes
       parser.readBuffer(length - 1, () => {
         callback(undefined, undefined);
@@ -120,13 +122,13 @@ function readNewAndOldValue(parser, length, type, callback) {
   }
 }
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
 
       if (!type) {
-        console.error("Tedious > Unsupported ENVCHANGE type " + typeNumber);
+        console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
         // skip unknown bytes
         return parser.readBuffer(length - 1, () => {
           callback();
@@ -144,4 +146,4 @@ export default function(parser, colMetadata, options, callback) {
       });
     });
   });
-}
+};

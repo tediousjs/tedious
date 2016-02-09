@@ -1,3 +1,5 @@
+'use strict';
+
 function formatHex(number) {
   let hex = number.toString(16);
   if (hex.length === 1) {
@@ -6,7 +8,8 @@ function formatHex(number) {
   return hex;
 }
 
-export function arrayToGuid(array) {
+module.exports.arrayToGuid = arrayToGuid;
+function arrayToGuid(array) {
   return (
     formatHex(array[3]) +
     formatHex(array[2]) +
@@ -31,7 +34,8 @@ export function arrayToGuid(array) {
   ).toUpperCase();
 }
 
-export function guidToArray(guid) {
+module.exports.guidToArray = guidToArray;
+function guidToArray(guid) {
   return [
     parseInt(guid.substring(6, 8), 16),
     parseInt(guid.substring(4, 6), 16),

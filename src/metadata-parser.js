@@ -1,6 +1,13 @@
-import { codepageByLcid } from './collation';
-import { TYPE } from './data-type';
-import { sprintf } from 'sprintf';
+'use strict';
+
+const codepageByLcid = require('./collation').codepageByLcid;
+const TYPE = require('./data-type').TYPE;
+const sprintf = require('sprintf').sprintf;
+
+module.exports = metadataParse;
+module.exports.readPrecision = readPrecision;
+module.exports.readScale = readScale;
+module.exports.readCollation = readCollation;
 
 function readDataLength(parser, type, callback) {
   if ((type.id & 0x30) === 0x20) {
@@ -11,7 +18,7 @@ function readDataLength(parser, type, callback) {
     } else if (type.fixedDataLength) {
       return callback(type.fixedDataLength);
     }
-    
+
     switch (type.dataLengthLength) {
       case 0:
         return callback(undefined);
@@ -26,14 +33,14 @@ function readDataLength(parser, type, callback) {
         return parser.readUInt32LE(callback);
 
       default:
-        return parser.emit(new Error("Unsupported dataLengthLength " + type.dataLengthLength + " for data type " + type.name));
+        return parser.emit(new Error('Unsupported dataLengthLength ' + type.dataLengthLength + ' for data type ' + type.name));
     }
   } else {
     callback(undefined);
   }
 }
 
-export function readPrecision(parser, type, callback) {
+function readPrecision(parser, type, callback) {
   if (type.hasPrecision) {
     parser.readUInt8(callback);
   } else {
@@ -41,7 +48,7 @@ export function readPrecision(parser, type, callback) {
   }
 }
 
-export function readScale(parser, type, callback) {
+function readScale(parser, type, callback) {
   if (type.hasScale) {
     parser.readUInt8(callback);
   } else {
@@ -49,7 +56,7 @@ export function readScale(parser, type, callback) {
   }
 }
 
-export function readCollation(parser, type, callback) {
+function readCollation(parser, type, callback) {
   if (type.hasCollation) {
     // s2.2.5.1.2
     parser.readBuffer(5, (collationData) => {
@@ -126,8 +133,8 @@ function readUDTInfo(parser, type, callback) {
   }
 }
 
-export default function(parser, options, callback) {
-  (options.tdsVersion < "7_2" ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+function metadataParse(parser, options, callback) {
+  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {
         const type = TYPE[typeNumber];

@@ -1,4 +1,6 @@
-import dgram from 'dgram';
+'use strict';
+
+const dgram = require('dgram');
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -7,7 +9,8 @@ const RETRIES = 3;
 const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
-export function instanceLookup(server, instanceName, callback, timeout, retries) {
+module.exports.instanceLookup = instanceLookup;
+function instanceLookup(server, instanceName, callback, timeout, retries) {
   let socket, timer;
   timeout = timeout || TIMEOUT;
   let retriesLeft = retries || RETRIES;
@@ -23,7 +26,7 @@ export function instanceLookup(server, instanceName, callback, timeout, retries)
     if (port) {
       return callback(undefined, port);
     } else {
-      return callback("Port for " + instanceName + " not found in " + message);
+      return callback('Port for ' + instanceName + ' not found in ' + message);
     }
   }
 
@@ -33,7 +36,7 @@ export function instanceLookup(server, instanceName, callback, timeout, retries)
       timer = undefined;
     }
     socket.close();
-    return callback("Failed to lookup instance on " + server + " - " + err.message);
+    return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
   }
 
   function onTimeout() {
@@ -52,14 +55,15 @@ export function instanceLookup(server, instanceName, callback, timeout, retries)
       socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server);
       return timer = setTimeout(onTimeout, timeout);
     } else {
-      return callback("Failed to get response from SQL Server Browser on " + server);
+      return callback('Failed to get response from SQL Server Browser on ' + server);
     }
   }
 
   return makeAttempt();
 }
 
-export function parseBrowserResponse(response, instanceName) {
+module.exports.parseBrowserResponse = parseBrowserResponse;
+function parseBrowserResponse(response, instanceName) {
   let getPort;
 
   const instances = response.split(';;');

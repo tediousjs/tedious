@@ -1,10 +1,12 @@
-import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import crypto from 'crypto';
-import { n as BigInteger } from 'big-number';
+'use strict';
+
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
+const crypto = require('crypto');
+const BigInteger = require('big-number').n;
 
 const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
-export default class NTLMResponsePayload {
+module.exports = class NTLMResponsePayload {
   constructor(loginData) {
     this.data = this.createResponse(loginData);
   }
@@ -58,7 +60,7 @@ export default class NTLMResponsePayload {
     data.writeString(username, 'ucs2');
     const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
     data.copyFrom(lmv2Data);
-    const genTime = (new Date).getTime();
+    const genTime = new Date().getTime();
     ntlmData = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
     data.copyFrom(ntlmData);
     data.writeUInt32LE(0x0101);
@@ -166,4 +168,4 @@ export default class NTLMResponsePayload {
       return new Buffer(result, 'ascii').slice(0, 16);
     }
   }
-}
+};

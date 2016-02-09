@@ -1,5 +1,7 @@
+'use strict';
+
 // http://technet.microsoft.com/en-us/library/aa176553(v=sql.80).aspx
-export const codepageByLcid = {
+module.exports.codepageByLcid = {
   0x436: 'CP1252',
   0x401: 'CP1256',
   0x801: 'CP1256',

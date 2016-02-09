@@ -1,8 +1,10 @@
-import { EventEmitter } from 'events';
-import { typeByName as TYPES } from './data-type';
-import { RequestError } from './errors';
+'use strict';
 
-export default class Request extends EventEmitter {
+const EventEmitter = require('events').EventEmitter;
+const TYPES = require('./data-type').typeByName;
+const RequestError = require('./errors').RequestError;
+
+module.exports = class Request extends EventEmitter {
   constructor(sqlTextOrProcedure, callback) {
     super();
 
@@ -55,7 +57,7 @@ export default class Request extends EventEmitter {
       if (paramsParameter.length > 0) {
         paramsParameter += ', ';
       }
-      paramsParameter += "@" + parameter.name + " ";
+      paramsParameter += '@' + parameter.name + ' ';
       paramsParameter += parameter.type.declaration(parameter);
       if (parameter.output) {
         paramsParameter += ' OUTPUT';
@@ -95,7 +97,7 @@ export default class Request extends EventEmitter {
       if (name === 'handle') {
         return this.handle = value;
       } else {
-        return this.error = RequestError("Tedious > Unexpected output parameter " + name + " from sp_prepare");
+        return this.error = RequestError('Tedious > Unexpected output parameter ' + name + ' from sp_prepare');
       }
     });
   }
@@ -128,10 +130,10 @@ export default class Request extends EventEmitter {
       const parameter = this.parameters[i];
       const value = parameter.type.validate(parameter.value);
       if (value instanceof TypeError) {
-        return this.error = new RequestError("Validation failed for parameter '" + parameter.name + "'. " + value.message, "EPARAM");
+        return this.error = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + value.message, 'EPARAM');
       }
       parameter.value = value;
     }
     return null;
   }
-}
+};

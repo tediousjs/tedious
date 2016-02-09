@@ -1,6 +1,9 @@
-import util from 'util';
+'use strict';
 
-export function ConnectionError(message, code) {
+const util = require('util');
+
+module.exports.ConnectionError = ConnectionError;
+function ConnectionError(message, code) {
   if (!(this instanceof ConnectionError)) {
     if (message instanceof ConnectionError) {
       return message;
@@ -19,9 +22,10 @@ export function ConnectionError(message, code) {
 
 util.inherits(ConnectionError, Error);
 
-ConnectionError.prototype.name = "ConnectionError";
+ConnectionError.prototype.name = 'ConnectionError';
 
-export function RequestError(message, code) {
+module.exports.RequestError = RequestError;
+function RequestError(message, code) {
   if (!(this instanceof RequestError)) {
     if (message instanceof RequestError) {
       return message;
@@ -40,4 +44,4 @@ export function RequestError(message, code) {
 
 util.inherits(RequestError, Error);
 
-RequestError.prototype.name = "RequestError";
+RequestError.prototype.name = 'RequestError';

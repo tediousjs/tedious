@@ -1,5 +1,8 @@
-import * as bigint from './bigint';
-import {} from '../buffertools';
+'use strict';
+
+const bigint = require('./bigint');
+
+require('../buffertools');
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -11,7 +14,7 @@ const UNKNOWN_PLP_LEN = new Buffer([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x
   As values are written, the position advances by the size of the written data.
   When writing, automatically allocates new buffers if there's not enough space.
  */
-export default class WritableTrackingBuffer {
+module.exports = class WritableTrackingBuffer {
   constructor(initialSize, encoding, doubleSizeGrowth) {
     this.initialSize = initialSize;
     this.encoding = encoding;
@@ -271,4 +274,4 @@ export default class WritableTrackingBuffer {
     this.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32));
     return this.writeInt32LE(value & -1);
   }
-}
+};

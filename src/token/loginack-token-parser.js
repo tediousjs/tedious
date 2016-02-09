@@ -1,4 +1,6 @@
-import { versionsByValue as versions } from '../tds-versions';
+'use strict';
+
+const versions = require('../tds-versions').versionsByValue;
 
 const interfaceTypes = {
   0: 'SQL_DFLT',
@@ -18,12 +20,12 @@ module.exports = function(parser, colMetadata, options, callback) {
               parser.readUInt8((buildNumHi) => {
                 parser.readUInt8((buildNumLow) => {
                   callback({
-                    name: 'LOGINACK',
-                    event: 'loginack',
-                    "interface": interfaceType,
-                    tdsVersion: tdsVersion,
-                    progName: progName,
-                    progVersion: {
+                    'name': 'LOGINACK',
+                    'event': 'loginack',
+                    'interface': interfaceType,
+                    'tdsVersion': tdsVersion,
+                    'progName': progName,
+                    'progVersion': {
                       major: major,
                       minor: minor,
                       buildNumHi: buildNumHi,

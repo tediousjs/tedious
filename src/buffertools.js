@@ -1,3 +1,5 @@
+'use strict';
+
 if (!Buffer.concat) {
   Buffer.concat = function(buffers) {
     const buffersCount = buffers.length;

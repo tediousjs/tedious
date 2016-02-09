@@ -1,12 +1,14 @@
+'use strict';
+
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
-import valueParse from '../value-parser';
+const valueParse = require('../value-parser');
 
 function nullHandler(parser, columnMetaData, options, callback) {
   callback(null);
 }
 
-export default function(parser, columnsMetaData, options, callback) {
+module.exports = function(parser, columnsMetaData, options, callback) {
   const length = Math.ceil(columnsMetaData.length / 8);
   parser.readBuffer(length, (bytes) => {
     const bitmap = [];
@@ -56,4 +58,4 @@ export default function(parser, columnsMetaData, options, callback) {
       });
     });
   });
-}
+};

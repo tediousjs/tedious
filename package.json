@@ -42,6 +42,7 @@
     "bl": "^1.0.0",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.0.2",
+    "semver": "^5.1.0",
     "sprintf": "0.1.5"
   },
   "devDependencies": {
@@ -49,11 +50,15 @@
     "babel": "^5.8.19",
     "benchmark": "^1.0.0",
     "coffee-script": "^1.9.3",
+    "eslint": "^1.10.3",
     "nodeunit": "^0.9.1"
   },
   "scripts": {
+    "pretest": "eslint src test",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "pretest-all": "eslint src test",
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
     "prepublish": "coffee scripts/build.coffee"
   },

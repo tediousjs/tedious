@@ -1,4 +1,6 @@
-import { convertLEBytesToString } from './bigint';
+'use strict';
+
+const convertLEBytesToString = require('./bigint').convertLEBytesToString;
 
 /*
   A Buffer-like class that tracks position.
@@ -7,7 +9,7 @@ import { convertLEBytesToString } from './bigint';
   When reading, if the read would pass the end of the buffer, an error object is thrown.
  */
 
-export default class ReadableTrackingBuffer {
+module.exports = class ReadableTrackingBuffer {
   constructor(buffer, encoding) {
     this.buffer = buffer;
     this.encoding = encoding;
@@ -28,7 +30,7 @@ export default class ReadableTrackingBuffer {
     this.previousPosition = this.position;
     const available = this.buffer.length - this.position;
     if (available < lengthRequired) {
-      const e = new Error("required : " + lengthRequired + ", available : " + available);
+      const e = new Error('required : ' + lengthRequired + ', available : ' + available);
       e.code = 'oob';
       throw e;
     }
@@ -147,7 +149,7 @@ export default class ReadableTrackingBuffer {
     const low = this.readUInt32LE();
     const high = this.readUInt32LE();
     if (high >= (2 << (53 - 32))) {
-      console.warn("Read UInt64LE > 53 bits : high=" + high + ", low=" + low);
+      console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
     }
     return low + (0x100000000 * high);
   }
@@ -213,4 +215,4 @@ export default class ReadableTrackingBuffer {
   readAsStringInt64LE() {
     return this.readAsStringBigIntLE(8);
   }
-}
+};

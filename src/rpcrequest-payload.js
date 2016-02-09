@@ -1,5 +1,7 @@
-import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
-import { writeToTrackingBuffer as writeAllHeaders } from './all-headers';
+'use strict';
+
+const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -15,7 +17,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-export default class RpcRequestPayload {
+module.exports = class RpcRequestPayload {
   constructor(request, txnDescriptor, options) {
     this.request = request;
     this.procedure = this.request.sqlTextOrProcedure;
@@ -86,6 +88,6 @@ export default class RpcRequestPayload {
 
   toString(indent) {
     indent || (indent = '');
-    return indent + ("RPC Request - " + this.procedure);
+    return indent + ('RPC Request - ' + this.procedure);
   }
-}
+};

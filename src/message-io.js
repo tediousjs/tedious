@@ -1,14 +1,19 @@
-import tls from 'tls';
-import crypto from 'crypto';
-import { EventEmitter } from 'events';
-import { Transform } from 'readable-stream';
+'use strict';
 
-import {} from './buffertools';
-import { Packet, TYPE, HEADER_LENGTH as packetHeaderLength } from './packet';
+const tls = require('tls');
+const crypto = require('crypto');
+const EventEmitter = require('events').EventEmitter;
+const Transform = require('readable-stream').Transform;
+
+require('./buffertools');
+
+const Packet = require('./packet').Packet;
+const TYPE = require('./packet').TYPE;
+const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
 class ReadablePacketStream extends Transform {
   constructor() {
-    super({ "objectMode": true });
+    super({ objectMode: true });
 
     this.buffer = new Buffer(0);
     this.position = 0;
@@ -49,7 +54,7 @@ class ReadablePacketStream extends Transform {
   }
 }
 
-export default class MessageIO extends EventEmitter {
+module.exports = class MessageIO extends EventEmitter {
   constructor(socket, _packetSize, debug) {
     super();
 
@@ -73,7 +78,7 @@ export default class MessageIO extends EventEmitter {
 
   packetSize(packetSize) {
     if (arguments.length > 0) {
-      this.debug.log("Packet size changed from " + this._packetSize + " to " + packetSize);
+      this.debug.log('Packet size changed from ' + this._packetSize + ' to ' + packetSize);
       this._packetSize = packetSize;
       this.packetDataSize = this._packetSize - packetHeaderLength;
     }
@@ -88,7 +93,7 @@ export default class MessageIO extends EventEmitter {
 
     this.securePair.on('secure', () => {
       const cipher = this.securePair.cleartext.getCipher();
-      this.debug.log("TLS negotiated (" + cipher.name + ", " + cipher.version + ")");
+      this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
       this.emit('secure', this.securePair.cleartext);
       this.encryptAllFutureTraffic();
     });
@@ -162,4 +167,4 @@ export default class MessageIO extends EventEmitter {
     this.debug.packet(direction, packet);
     return this.debug.data(packet);
   }
-}
+};

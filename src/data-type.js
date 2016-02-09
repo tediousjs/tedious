@@ -1,4 +1,6 @@
-import * as guidParser from './guid-parser';
+'use strict';
+
+const guidParser = require('./guid-parser');
 
 const NULL = (1 << 16) - 1;
 const EPOCH_DATE = new Date(1900, 0, 1);
@@ -7,9 +9,9 @@ const YEAR_ONE = new Date(2000, 0, -730118);
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 const MAX = (1 << 16) - 1;
 
-export const typeByName = {};
+const typeByName = module.exports.typeByName = {};
 
-export const TYPE = {
+const TYPE = module.exports.TYPE = {
   0x1F: {
     type: 'NULL',
     name: 'Null'
@@ -43,10 +45,10 @@ export const TYPE = {
       }
       value = parseInt(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       if (value < 0 || value > 255) {
-        return new TypeError("Value must be between 0 and 255.");
+        return new TypeError('Value must be between 0 and 255.');
       }
       return value;
     }
@@ -114,10 +116,10 @@ export const TYPE = {
       }
       value = parseInt(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       if (value < -32768 || value > 32767) {
-        return new TypeError("Value must be between -32768 and 32767.");
+        return new TypeError('Value must be between -32768 and 32767.');
       }
       return value;
     }
@@ -151,10 +153,10 @@ export const TYPE = {
       }
       value = parseInt(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       if (value < -2147483648 || value > 2147483647) {
-        return new TypeError("Value must be between -2147483648 and 2147483647.");
+        return new TypeError('Value must be between -2147483648 and 2147483647.');
       }
       return value;
     }
@@ -204,7 +206,7 @@ export const TYPE = {
       }
 
       if (isNaN(value)) {
-        return new TypeError("Invalid date.");
+        return new TypeError('Invalid date.');
       }
 
       return value;
@@ -239,7 +241,7 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       return value;
     }
@@ -250,7 +252,7 @@ export const TYPE = {
     name: 'Money',
 
     declaration: function() {
-      return "money";
+      return 'money';
     },
 
     writeTypeInfo: function(buffer) {
@@ -273,7 +275,7 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       return value;
     }
@@ -330,7 +332,7 @@ export const TYPE = {
         value = Date.parse(value);
       }
       if (isNaN(value)) {
-        return new TypeError("Invalid date.");
+        return new TypeError('Invalid date.');
       }
       return value;
     }
@@ -364,7 +366,7 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       return value;
     }
@@ -377,7 +379,7 @@ export const TYPE = {
     hasScale: true,
 
     declaration: function(parameter) {
-      return "decimal(" + (this.resolvePrecision(parameter)) + ", " + (this.resolveScale(parameter)) + ")";
+      return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
     },
 
     resolvePrecision: function(parameter) {
@@ -448,7 +450,7 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       return value;
     }
@@ -461,7 +463,7 @@ export const TYPE = {
     hasScale: true,
 
     declaration: function(parameter) {
-      return "numeric(" + (this.resolvePrecision(parameter)) + ", " + (this.resolveScale(parameter)) + ")";
+      return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
     },
 
     resolvePrecision: function(parameter) {
@@ -532,7 +534,7 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       return value;
     }
@@ -543,7 +545,7 @@ export const TYPE = {
     name: 'SmallMoney',
 
     declaration: function() {
-      return "smallmoney";
+      return 'smallmoney';
     },
 
     writeTypeInfo: function(buffer) {
@@ -566,10 +568,10 @@ export const TYPE = {
       }
       value = parseFloat(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid number.");
+        return new TypeError('Invalid number.');
       }
       if (value < -214748.3648 || value > 214748.3647) {
-        return new TypeError("Value must be between -214748.3648 and 214748.3647.");
+        return new TypeError('Value must be between -214748.3648 and 214748.3647.');
       }
       return value;
     }
@@ -644,7 +646,7 @@ export const TYPE = {
         return null;
       }
       if (!Buffer.isBuffer(value)) {
-        return new TypeError("Invalid buffer.");
+        return new TypeError('Invalid buffer.');
       }
       return value;
     }
@@ -691,7 +693,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -733,7 +735,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -814,9 +816,9 @@ export const TYPE = {
       }
 
       if (length <= this.maximumLength) {
-        return "varbinary(" + length + ")";
+        return 'varbinary(' + length + ')';
       } else {
-        return "varbinary(max)";
+        return 'varbinary(max)';
       }
     },
 
@@ -861,7 +863,7 @@ export const TYPE = {
         return null;
       }
       if (!Buffer.isBuffer(value)) {
-        return new TypeError("Invalid buffer.");
+        return new TypeError('Invalid buffer.');
       }
       return value;
     }
@@ -887,9 +889,9 @@ export const TYPE = {
       }
 
       if (length <= this.maximumLength) {
-        return "varchar(" + length + ")";
+        return 'varchar(' + length + ')';
       } else {
-        return "varchar(max)";
+        return 'varchar(max)';
       }
     },
 
@@ -940,7 +942,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -965,7 +967,7 @@ export const TYPE = {
       } else {
         length = this.maximumLength;
       }
-      return "binary(" + length + ")";
+      return 'binary(' + length + ')';
     },
 
     resolveLength: function(parameter) {
@@ -995,7 +997,7 @@ export const TYPE = {
         return null;
       }
       if (!Buffer.isBuffer(value)) {
-        return new TypeError("Invalid buffer.");
+        return new TypeError('Invalid buffer.');
       }
       return value;
     }
@@ -1021,9 +1023,9 @@ export const TYPE = {
       }
 
       if (length < this.maximumLength) {
-        return "char(" + length + ")";
+        return 'char(' + length + ')';
       } else {
-        return "char(" + this.maximumLength + ")";
+        return 'char(' + this.maximumLength + ')';
       }
     },
 
@@ -1061,7 +1063,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -1089,9 +1091,9 @@ export const TYPE = {
       }
 
       if (length <= this.maximumLength) {
-        return "nvarchar(" + length + ")";
+        return 'nvarchar(' + length + ')';
       } else {
-        return "nvarchar(max)";
+        return 'nvarchar(max)';
       }
     },
 
@@ -1142,7 +1144,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -1170,9 +1172,9 @@ export const TYPE = {
       }
 
       if (length < this.maximumLength) {
-        return "nchar(" + length + ")";
+        return 'nchar(' + length + ')';
       } else {
-        return "nchar(" + this.maximumLength + ")";
+        return 'nchar(' + this.maximumLength + ')';
       }
     },
 
@@ -1210,7 +1212,7 @@ export const TYPE = {
       }
       if (typeof value !== 'string') {
         if (typeof value.toString !== 'function') {
-          return TypeError("Invalid string.");
+          return TypeError('Invalid string.');
         }
         value = value.toString();
       }
@@ -1248,7 +1250,7 @@ export const TYPE = {
     },
 
     declaration: function(parameter) {
-      return "time(" + (this.resolveScale(parameter)) + ")";
+      return 'time(' + (this.resolveScale(parameter)) + ')';
     },
 
     resolveScale: function(parameter) {
@@ -1305,7 +1307,7 @@ export const TYPE = {
       }
       value = Date.parse(value);
       if (isNaN(value)) {
-        return new TypeError("Invalid time.");
+        return new TypeError('Invalid time.');
       }
       return value;
     }
@@ -1319,7 +1321,7 @@ export const TYPE = {
     fixedDataLength: 3,
 
     declaration: function() {
-      return "date";
+      return 'date';
     },
 
     writeTypeInfo: function(buffer) {
@@ -1348,7 +1350,7 @@ export const TYPE = {
         value = Date.parse(value);
       }
       if (isNaN(value)) {
-        return new TypeError("Invalid date.");
+        return new TypeError('Invalid date.');
       }
       return value;
     }
@@ -1378,7 +1380,7 @@ export const TYPE = {
     },
 
     declaration: function(parameter) {
-      return "datetime2(" + (this.resolveScale(parameter)) + ")";
+      return 'datetime2(' + (this.resolveScale(parameter)) + ')';
     },
 
     resolveScale: function(parameter) {
@@ -1442,7 +1444,7 @@ export const TYPE = {
         value = Date.parse(value);
       }
       if (isNaN(value)) {
-        return new TypeError("Invalid date.");
+        return new TypeError('Invalid date.');
       }
       return value;
     }
@@ -1470,7 +1472,7 @@ export const TYPE = {
       }
     },
     declaration: function(parameter) {
-      return "datetimeoffset(" + (this.resolveScale(parameter)) + ")";
+      return 'datetimeoffset(' + (this.resolveScale(parameter)) + ')';
     },
     resolveScale: function(parameter) {
       if (parameter.scale != null) {
@@ -1525,7 +1527,7 @@ export const TYPE = {
         value = Date.parse(value);
       }
       if (isNaN(value)) {
-        return new TypeError("Invalid date.");
+        return new TypeError('Invalid date.');
       }
       return value;
     }
@@ -1542,15 +1544,15 @@ export const TYPE = {
     name: 'TVP',
 
     declaration: function(parameter) {
-      return parameter.value.name + " readonly";
+      return parameter.value.name + ' readonly';
     },
 
     writeTypeInfo: function(buffer, parameter) {
       let ref, ref1, ref2, ref3;
       buffer.writeUInt8(this.id);
-      buffer.writeBVarchar("");
-      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : void 0) != null ? ref : "");
-      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : void 0) != null ? ref2 : "");
+      buffer.writeBVarchar('');
+      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : void 0) != null ? ref : '');
+      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : void 0) != null ? ref2 : '');
     },
 
     writeParameterData: function(buffer, parameter, options) {
@@ -1569,7 +1571,7 @@ export const TYPE = {
         buffer.writeUInt32LE(0x00000000);
         buffer.writeUInt16LE(0x0000);
         column.type.writeTypeInfo(buffer, column);
-        buffer.writeBVarchar("");
+        buffer.writeBVarchar('');
       }
 
       buffer.writeUInt8(0x00);
@@ -1600,15 +1602,15 @@ export const TYPE = {
       }
 
       if (typeof value !== 'object') {
-        return new TypeError("Invalid table.");
+        return new TypeError('Invalid table.');
       }
 
       if (!Array.isArray(value.columns)) {
-        return new TypeError("Invalid table.");
+        return new TypeError('Invalid table.');
       }
 
       if (!Array.isArray(value.rows)) {
-        return new TypeError("Invalid table.");
+        return new TypeError('Invalid table.');
       }
 
       return value;
@@ -1619,9 +1621,9 @@ export const TYPE = {
     type: 'SSVARIANTTYPE',
     name: 'Variant',
     dataLengthLength: 4,
-    
+
     declaration: function(parameter) {
-      return "sql_variant";
+      return 'sql_variant';
     }
   }
 };

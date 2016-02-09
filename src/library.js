@@ -1,1 +1,3 @@
-export const name = 'Tedious';
+'use strict';
+
+module.exports.name = 'Tedious';

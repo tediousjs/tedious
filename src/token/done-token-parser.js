@@ -1,3 +1,5 @@
+'use strict';
+
 // s2.2.7.5/6/7
 
 const STATUS = {
@@ -19,7 +21,7 @@ function parseToken(parser, options, callback) {
     const serverError = !!(status & STATUS.SRVERROR);
 
     parser.readUInt16LE((curCmd) => {
-      (options.tdsVersion < "7_2" ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
+      (options.tdsVersion < '7_2' ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
         callback({
           name: 'DONE',
           event: 'done',
@@ -35,7 +37,8 @@ function parseToken(parser, options, callback) {
   });
 }
 
-export function doneParser(parser, colMetadata, options, callback) {
+module.exports.doneParser = doneParser;
+function doneParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'DONE';
     token.event = 'done';
@@ -43,7 +46,8 @@ export function doneParser(parser, colMetadata, options, callback) {
   });
 }
 
-export function doneInProcParser(parser, colMetadata, options, callback) {
+module.exports.doneInProcParser = doneInProcParser;
+function doneInProcParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'DONEINPROC';
     token.event = 'doneInProc';
@@ -51,7 +55,8 @@ export function doneInProcParser(parser, colMetadata, options, callback) {
   });
 }
 
-export function doneProcParser(parser, colMetadata, options, callback) {
+module.exports.doneProcParser = doneProcParser;
+function doneProcParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'DONEPROC';
     token.event = 'doneProc';

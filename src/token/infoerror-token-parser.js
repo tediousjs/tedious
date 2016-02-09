@@ -1,3 +1,5 @@
+'use strict';
+
 function parseToken(parser, options, callback) {
   // length
   parser.readUInt16LE(() => {
@@ -9,13 +11,13 @@ function parseToken(parser, options, callback) {
               parser.readBVarChar((procName) => {
                 (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber) => {
                   callback({
-                    number: number,
-                    state: state,
-                    "class": clazz,
-                    message: message,
-                    serverName: serverName,
-                    procName: procName,
-                    lineNumber: lineNumber
+                    'number': number,
+                    'state': state,
+                    'class': clazz,
+                    'message': message,
+                    'serverName': serverName,
+                    'procName': procName,
+                    'lineNumber': lineNumber
                   });
                 });
               });
@@ -27,7 +29,8 @@ function parseToken(parser, options, callback) {
   });
 }
 
-export function infoParser(parser, colMetadata, options, callback) {
+module.exports.infoParser = infoParser;
+function infoParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'INFO';
     token.event = 'infoMessage';
@@ -35,7 +38,8 @@ export function infoParser(parser, colMetadata, options, callback) {
   });
 }
 
-export function errorParser(parser, colMetadata, options, callback) {
+module.exports.errorParser = errorParser;
+function errorParser(parser, colMetadata, options, callback) {
   parseToken(parser, options, (token) => {
     token.name = 'ERROR';
     token.event = 'errorMessage';

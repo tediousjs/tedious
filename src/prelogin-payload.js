@@ -1,5 +1,7 @@
-import { sprintf } from 'sprintf';
-import { WritableTrackingBuffer } from './tracking-buffer/tracking-buffer';
+'use strict';
+
+const sprintf = require('sprintf').sprintf;
+const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
 
 const optionBufferSize = 20;
 
@@ -46,7 +48,7 @@ for (const name in MARS) {
 /*
   s2.2.6.4
  */
-export default class PreloginPayload {
+module.exports = class PreloginPayload {
   constructor(bufferOrOptions) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
@@ -199,4 +201,4 @@ export default class PreloginPayload {
     indent || (indent = '');
     return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0);
   }
-}
+};

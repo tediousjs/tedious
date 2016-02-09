@@ -1,6 +1,8 @@
-import Connection from '../../src/connection';
-import Request from '../../src/request';
-import fs from 'fs';
+'use strict';
+
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
@@ -24,7 +26,7 @@ exports.socketError = function(test) {
   connection.on('connect', function(err) {
     test.ifError(err);
 
-    const request = new Request("WAITFOR 00:00:30", function(err) {
+    const request = new Request('WAITFOR 00:00:30', function(err) {
       test.ok(~err.message.indexOf('socket error'));
     });
 

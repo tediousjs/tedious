@@ -1,8 +1,10 @@
+'use strict';
+
 // s2.2.7.17
 
-import valueParse from '../value-parser';
+const valueParse = require('../value-parser');
 
-export default function(parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   const columns = options.useColumnNames ? {} : [];
 
   const len = colMetadata.length;
@@ -42,4 +44,4 @@ export default function(parser, colMetadata, options, callback) {
       columns: columns
     });
   });
-}
+};

@@ -1,4 +1,6 @@
-export const TYPE = {
+'use strict';
+
+module.exports.TYPE = {
   ALTMETADATA: 0x88,
   ALTROW: 0xD3,
   COLMETADATA: 0x81,
