@@ -14,15 +14,13 @@ const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
 const MessageIO = require('./message-io');
-const Socket = require('net').Socket;
-const isIP = require('net').isIP;
-const dns = require('dns');
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
 const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
 const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
+const Connector = require('./connector').Connector;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -391,107 +389,27 @@ class Connection extends EventEmitter {
   }
 
   connectOnPort(port, multiSubnetFailover) {
-    this.socket = new Socket({});
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
-      port: this.routingData ? this.routingData.port : port
+      port: this.routingData ? this.routingData.port : port,
+      localAddress: this.config.options.localAddress
     };
-    if (this.config.options.localAddress) {
-      connectOpts.localAddress = this.config.options.localAddress;
-    }
 
-    if (isIP(connectOpts.host) || !multiSubnetFailover) {
-      //if no multiSubnetFailver or host is an ip address
-      //directly connect to first resolved ip address(by using socket.connect)
-      this.socket.connect(connectOpts);
-    } else {
-      //look up both ipv4 and ipv6 addresses
-      this.resolveIPaddresses(connectOpts.host, (resolve4Err, resolve6Err, addresses) => {
-        var message = resolve4Err ? ('Error in IPV4 address resolution: ' + resolve4Err.message) : null;
-        message += resolve6Err ? ('\nError in IPV6 address resolution: ' + resolve6Err.message) : null;
-        if (message) {
-          this.debug.log(message);
-        }
-
-        if (addresses && addresses.length > 1) {
-          this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
-            this.socket.connect(opts || connectOpts);
-          });
-        } else {
-          return this.emit('connect', ConnectionError(message, 'ERESOLVEIPADDR'));
-        }
-      });
-    }
-
-    this.socket.on('error', this.socketError);
-    this.socket.on('connect', this.socketConnect);
-    this.socket.on('close', this.socketClose);
-    this.socket.on('end', this.socketEnd);
-    this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-    this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-    this.messageIo.on('message', () => {
-      return this.dispatchEvent('message');
-    });
-    return this.messageIo.on('secure', this.emit.bind(this, 'secure'));
-  }
-
-  resolveIPaddresses(host, callback) {
-    let ipv4Addresses = undefined;
-    let ipv6Addresses = undefined;
-    let resolve4Err = undefined;
-    let resolve6Err = undefined;
-    //resolve IPV4
-    dns.resolve4(host, (err, addresses) => {
-      resolve4Err = err;
-      ipv4Addresses = addresses || new Array();
-      if (ipv6Addresses) {
-        callback(resolve4Err, resolve6Err, ipv4Addresses.concat(ipv6Addresses));
+    new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
+      if (err) {
+        return this.socketError(err);
       }
-    });
 
-    //resolve IPV6
-    dns.resolve6(host, (err, addresses) => {
-      resolve6Err = err;
-      ipv6Addresses = addresses || new Array();
-      if (ipv4Addresses) {
-        callback(resolve4Err, resolve6Err, ipv4Addresses.concat(ipv6Addresses));
-      }
-    });
-  }
+      this.socket = socket;
+      this.socket.on('error', this.socketError);
+      this.socket.on('close', this.socketClose);
+      this.socket.on('end', this.socketEnd);
+      this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
+      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
+      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+      this.messageIo.on('secure', this.emit.bind(this, 'secure'));
 
-  multiConnectOnPort(addresses, port, callback) {
-    let calledBack = false;
-    const remainingSockets = new Set();
-
-    addresses.forEach ((currentValue, index, array) => {
-      const newSocket = new Socket({});
-      remainingSockets.add(newSocket);
-      const options = {
-        port: port,
-        host: currentValue
-      };
-
-      newSocket.connect(options);
-      newSocket.on('connect', () => {
-        if (!calledBack) {
-          calledBack = true;
-          remainingSockets.forEach((v) => { v.destroy(); });
-          remainingSockets.clear();
-          callback(options);
-        }
-      });
-
-      newSocket.on('error', (err) => {
-        const message = 'multiConnectOnPort failed to connect to ' + currentValue + ':' + port + ' - ' + err.message;
-        this.debug.log(message);
-        remainingSockets.delete(newSocket);
-        newSocket.destroy();
-        if (!calledBack && remainingSockets.size === 0) {
-          //no availiable connect option if all sockets fail to connect
-          calledBack = true;
-          callback(undefined);
-        }
-      });
+      this.socketConnect();
     });
   }
 
