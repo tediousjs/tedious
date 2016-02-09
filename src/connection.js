@@ -401,19 +401,18 @@ class Connection extends EventEmitter {
     }
 
     if (isIP(connectOpts.host) || !multiSubnetFailover) {
-        //if no multiSubnetFailver or host is an ip address
-        //directly connect to first resolved ip address(by using socket.connect)
-        this.socket.connect(connectOpts);
+      //if no multiSubnetFailver or host is an ip address
+      //directly connect to first resolved ip address(by using socket.connect)
+      this.socket.connect(connectOpts);
     } else {
       //look up both ipv4 and ipv6 addresses
       this.resolveIPaddresses(connectOpts.host, (resolve4Err, resolve6Err, addresses) => {
-        var message = resolve4Err ? ("Error in IPV4 address resolution: " + resolve4Err.message) : null; 
-        message += resolve6Err ? ("\nError in IPV6 address resolution: " + resolve6Err.message) : null;
-        if(message)
-        {
+        var message = resolve4Err ? ('Error in IPV4 address resolution: ' + resolve4Err.message) : null;
+        message += resolve6Err ? ('\nError in IPV6 address resolution: ' + resolve6Err.message) : null;
+        if (message) {
           this.debug.log(message);
         }
-        
+
         if (addresses && addresses.length > 1) {
           this.multiConnectOnPort(addresses, connectOpts.port, (opts) => {
             this.socket.connect(opts || connectOpts);
@@ -476,14 +475,14 @@ class Connection extends EventEmitter {
       newSocket.on('connect', () => {
         if (!calledBack) {
           calledBack = true;
-          remainingSockets.forEach(v => { v.destroy(); });
+          remainingSockets.forEach((v) => { v.destroy(); });
           remainingSockets.clear();
           callback(options);
         }
       });
 
-      newSocket.on('error', err => {
-        const message = "multiConnectOnPort failed to connect to " + currentValue + ":" + port + " - " + err.message;
+      newSocket.on('error', (err) => {
+        const message = 'multiConnectOnPort failed to connect to ' + currentValue + ':' + port + ' - ' + err.message;
         this.debug.log(message);
         remainingSockets.delete(newSocket);
         newSocket.destroy();
