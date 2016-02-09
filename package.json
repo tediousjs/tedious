@@ -54,8 +54,11 @@
     "nodeunit": "^0.9.1"
   },
   "scripts": {
+    "pretest": "eslint src test",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "pretest-all": "eslint src test",
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
     "prepublish": "coffee scripts/build.coffee"
   },
