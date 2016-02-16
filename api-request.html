@@ -12,6 +12,7 @@ title: API - Request
 <ul class="toc">
   <li><a href="#function_newRequest">new Request(sql, callback)</a></li>
   <li><a href="#event_columnMetadata">Event: 'columnMetadata'</a></li>
+  <li><a href="#event_prepared">Event: 'prepared'</a></li>
   <li><a href="#event_row">Event: 'row'</a></li>
   <li><a href="#event_done">Event: 'done'</a></li>
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
@@ -143,6 +144,18 @@ request.on('columnMetadata', function (columns) { });
     </dl>
   </div>
 </div>
+
+<h2 id="event_prepared">Event: prepared</h2>
+{% highlight javascript %}
+request.on('prepared', function () { });
+{% endhighlight %}
+
+<p>
+  The request has been <a href="api-connection.html#function_prepare">prepared</a>
+  and can be used in subsequent calls to
+  <a href="api-connection.html#function_execute">execute</a> and
+  <a href="api-connection.html#function_unprepare">unprepare</a>.
+</p>
 
 <h2 id="event_row">Event: row</h2>
 {% highlight javascript %}
