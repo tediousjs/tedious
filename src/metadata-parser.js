@@ -1,5 +1,6 @@
 'use strict';
 
+const codepageBySortId = require('./collation').codepageBySortId;
 const codepageByLcid = require('./collation').codepageByLcid;
 const TYPE = require('./data-type').TYPE;
 const sprintf = require('sprintf').sprintf;
@@ -66,8 +67,6 @@ function readCollation(parser, type, callback) {
       collation.lcid |= collationData[1] << 8;
       collation.lcid |= collationData[0];
 
-      collation.codepage = codepageByLcid[collation.lcid];
-
       // This may not be extracting the correct nibbles in the correct order.
       collation.flags = collationData[3] >> 4;
       collation.flags |= collationData[2] & 0xF0;
@@ -76,6 +75,8 @@ function readCollation(parser, type, callback) {
       collation.version = collationData[3] & 0x0F;
 
       collation.sortId = collationData[4];
+
+      collation.codepage = codepageBySortId[collation.sortId] || codepageByLcid[collation.lcid] || 'CP1252';
 
       callback(collation);
     });
