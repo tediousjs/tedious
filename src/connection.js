@@ -959,10 +959,10 @@ Connection.prototype.STATE = {
       data: function(data) {
         return this.messageIo.tlsHandshakeData(data);
       },
-      message: function message() {
+      message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet();
-          if(this.config.domain){
+          if (this.config.domain) {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             return this.transitionTo (this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
