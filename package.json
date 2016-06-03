@@ -12,7 +12,7 @@
     "Phil Dodderidge <pdodde@poyntz.com>",
     "Zach Aller"
   ],
-  "name": "valid-tedious",
+  "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
   "keywords": [
     "sql",
