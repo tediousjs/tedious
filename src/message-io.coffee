@@ -47,7 +47,7 @@ class MessageIO extends EventEmitter
 
     @_packetSize
 
-  startTls: (credentialsDetails) ->
+  startTls: (credentialsDetails, trustServerCertificate) ->
     credentials = if tls.createSecureContext
       tls.createSecureContext(credentialsDetails)
     else
@@ -57,6 +57,12 @@ class MessageIO extends EventEmitter
     @tlsNegotiationComplete = false
 
     @securePair.on 'secure', =>
+
+      if !trustServerCertificate
+        verifyError = this.ssl.verifyError()
+        if verifyError
+          throw verifyError
+        
       cipher = @securePair.cleartext.getCipher()
       @debug.log('TLS negotiated (#{cipher.name}, #{cipher.version})')
 
