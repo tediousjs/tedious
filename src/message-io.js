@@ -86,30 +86,30 @@ module.exports = class MessageIO extends EventEmitter {
   }
 
   startTls(credentialsDetails, trustServerCertificate) {
+    const messageIO = this;
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
     this.securePair = tls.createSecurePair(credentials);
     this.tlsNegotiationComplete = false;
 
-    this.securePair.on('secure', ((_this) => {
-      return function() {
-        const cipher = _this.securePair.cleartext.getCipher();
 
-        if (!trustServerCertificate) {
-          const verifyError = this.ssl.verifyError();
-          if (verifyError) {
-            _this.securePair.destroy();
-            _this.socket.destroy();
-            _this.emit('error', verifyError);
-            return;
-          }
+    this.securePair.on('secure', function() {
+      const cipher = messageIO.securePair.cleartext.getCipher();
+
+      if (!trustServerCertificate) {
+        const verifyError = this.ssl.verifyError();
+        if (verifyError) {
+          messageIO.securePair.destroy();
+          messageIO.socket.destroy();
+          messageIO.emit('error', verifyError);
+          return;
         }
+      }
 
-        _this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
-        _this.emit('secure', _this.securePair.cleartext);
-        _this.encryptAllFutureTraffic();
-      };
-    })(this));
+      messageIO.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+      messageIO.emit('secure', messageIO.securePair.cleartext);
+      messageIO.encryptAllFutureTraffic();
+    });
 
     this.securePair.encrypted.on('data', (data) => {
       this.sendMessage(TYPE.PRELOGIN, data);
