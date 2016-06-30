@@ -61,6 +61,7 @@ class MessageIO extends EventEmitter
       if !trustServerCertificate
         verifyError = this.ssl.verifyError()
         if verifyError
+          @securePair.destroy()
           throw verifyError
         
       cipher = @securePair.cleartext.getCipher()
