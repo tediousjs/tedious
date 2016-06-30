@@ -99,6 +99,7 @@ module.exports = class MessageIO extends EventEmitter {
           const verifyError = this.ssl.verifyError();
           if (verifyError) {
             _this.securePair.destroy();
+            _this.socket.destroy();
             _this.emit('error', verifyError);
           }
         }
