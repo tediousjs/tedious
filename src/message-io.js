@@ -91,7 +91,7 @@ module.exports = class MessageIO extends EventEmitter {
     this.securePair = tls.createSecurePair(credentials);
     this.tlsNegotiationComplete = false;
 
-    this.securePair.on('secure', (_this) => {
+    this.securePair.on('secure', ((_this) => {
       return function() {
         const cipher = _this.securePair.cleartext.getCipher();
 
@@ -99,15 +99,15 @@ module.exports = class MessageIO extends EventEmitter {
           const verifyError = this.ssl.verifyError();
           if (verifyError) {
             _this.securePair.destroy();
-            throw verifyError;
+            _this.emit('error', verifyError);
           }
         }
 
         _this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
         _this.emit('secure', _this.securePair.cleartext);
         _this.encryptAllFutureTraffic();
-      }
-    }(this));
+      };
+    })(this));
 
     this.securePair.encrypted.on('data', (data) => {
       this.sendMessage(TYPE.PRELOGIN, data);
