@@ -101,6 +101,7 @@ module.exports = class MessageIO extends EventEmitter {
             _this.securePair.destroy();
             _this.socket.destroy();
             _this.emit('error', verifyError);
+            return;
           }
         }
 
