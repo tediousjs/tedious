@@ -962,7 +962,11 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet();
-          return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          if (this.config.domain) {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            return this.transitionTo (this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
         }
       }
     }
