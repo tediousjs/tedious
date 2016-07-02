@@ -73,7 +73,6 @@ function readDataLength(parser, type, metaData, textPointerNull, callback) {
       } else {
         return callback(undefined);
       }
-      break;
 
     case 0x30:
       return callback(1 << ((type.id & 0x0C) >> 2));
@@ -122,7 +121,6 @@ function valueParse(parser, metaData, options, callback) {
             default:
               return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
           }
-          break;
 
         case 'Real':
           return parser.readFloatLE(callback);
@@ -142,7 +140,6 @@ function valueParse(parser, metaData, options, callback) {
             default:
               return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
           }
-          break;
 
         case 'Money':
         case 'SmallMoney':
@@ -164,7 +161,6 @@ function valueParse(parser, metaData, options, callback) {
             default:
               return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
           }
-          break;
 
         case 'Bit':
           return parser.readUInt8((value) => {
@@ -180,7 +176,6 @@ function valueParse(parser, metaData, options, callback) {
                 callback(!!value);
               });
           }
-          break;
 
         case 'VarChar':
         case 'Char':
@@ -190,7 +185,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readChars(parser, dataLength, codepage, callback);
           }
-          break;
 
         case 'NVarChar':
         case 'NChar':
@@ -199,7 +193,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readNChars(parser, dataLength, callback);
           }
-          break;
 
         case 'VarBinary':
         case 'Binary':
@@ -208,7 +201,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readBinary(parser, dataLength, callback);
           }
-          break;
 
         case 'Text':
           if (textPointerNull) {
@@ -216,7 +208,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readChars(parser, dataLength, metaData.collation.codepage, callback);
           }
-          break;
 
         case 'NText':
           if (textPointerNull) {
@@ -224,7 +215,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readNChars(parser, dataLength, callback);
           }
-          break;
 
         case 'Image':
           if (textPointerNull) {
@@ -232,7 +222,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readBinary(parser, dataLength, callback);
           }
-          break;
 
         case 'Xml':
           return readMaxNChars(parser, callback);
@@ -252,7 +241,6 @@ function valueParse(parser, metaData, options, callback) {
             case 8:
               return readDateTime(parser, options.useUTC, callback);
           }
-          break;
 
         case 'TimeN':
           if (dataLength === 0) {
@@ -260,7 +248,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
           }
-          break;
 
         case 'DateN':
           if (dataLength === 0) {
@@ -268,7 +255,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readDate(parser, options.useUTC, callback);
           }
-          break;
 
         case 'DateTime2N':
           if (dataLength === 0) {
@@ -276,7 +262,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
           }
-          break;
 
         case 'DateTimeOffsetN':
           if (dataLength === 0) {
@@ -284,7 +269,6 @@ function valueParse(parser, metaData, options, callback) {
           } else {
             return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
           }
-          break;
 
         case 'NumericN':
         case 'DecimalN':
@@ -317,7 +301,6 @@ function valueParse(parser, metaData, options, callback) {
               });
             });
           }
-          break;
 
         case 'UniqueIdentifierN':
           switch (dataLength) {
@@ -331,7 +314,6 @@ function valueParse(parser, metaData, options, callback) {
             default:
               return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
           }
-          break;
 
         case 'UDT':
           return readMaxBinary(parser, callback);

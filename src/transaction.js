@@ -98,7 +98,7 @@ class Transaction {
 
     return {
       data: buffer.data,
-      toString: () =>  {
+      toString: () => {
         return 'Save Transaction: name=' + this.name;
       }
     };
