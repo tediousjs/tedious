@@ -53,7 +53,7 @@
     "babel-register": "^6.9.0",
     "benchmark": "^2.1.0",
     "coffee-script": "^1.9.3",
-    "eslint": "^1.10.3",
+    "eslint": "^2.13.1",
     "nodeunit": "^0.9.1"
   },
   "scripts": {
