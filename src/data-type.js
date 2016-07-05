@@ -1305,9 +1305,9 @@ const TYPE = module.exports.TYPE = {
       if (value instanceof Date) {
         return value;
       }
-      value = Date.parse(value);
-      if (!isNaN(value)) {
-        return value;
+      var dateValue = Date.parse(value);
+      if (!isNaN(dateValue)) {
+        return dateValue;
       }
       var timespan = (function(input) {
         var regex = /^([0-9]{1}|(?:0[0-9]|1[0-9]|2[0-3])+):([0-5]?[0-9])(?::([0-5]?[0-9])(?:\.(\d{1,9}))?)?$/;
