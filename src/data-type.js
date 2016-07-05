@@ -1306,7 +1306,7 @@ const TYPE = module.exports.TYPE = {
         return value;
       }
       value = Date.parse(value);
-      if (!isNaN(value)){
+      if (!isNaN(value)) {
         return value;
       }
       var timespan = (function(input) {
