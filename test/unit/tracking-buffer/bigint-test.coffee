@@ -36,6 +36,12 @@ module.exports.powersOf10 = (test) ->
   
   test.done()
 
+module.exports.bigStringFromNumberString = (test) ->
+  test.strictEqual('9223372036854775807', convertLEBytesToString(numberToInt64LE('9223372036854775807')))
+  test.strictEqual('-9223372036854775808', convertLEBytesToString(numberToInt64LE('-9223372036854775808')))
+
+  test.done()
+
 module.exports.toInt64LE= (test) ->
   assertBuffer(test, numberToInt64LE(-3500000000), [0x00, 0x3d, 0x62, 0x2f, 0xff, 0xff, 0xff, 0xff])
   assertBuffer(test, numberToInt64LE(3500000000), [0x00, 0xc3, 0x9d, 0xd0, 0x00, 0x00, 0x00, 0x00])
@@ -46,6 +52,8 @@ module.exports.toInt64LE= (test) ->
   assertBuffer(test, numberToInt64LE(5000000000), [0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00])
   assertBuffer(test, numberToInt64LE(5201683247893), [0x15, 0x73, 0x7b, 0x1c, 0xbb, 0x04, 0x00, 0x00])
   assertBuffer(test, numberToInt64LE(-5201683247893), [0xeb, 0x8c, 0x84, 0xe3, 0x44, 0xfb, 0xff, 0xff])
+  assertBuffer(test, numberToInt64LE('9223372036854775807'), [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f])
+  assertBuffer(test, numberToInt64LE('-9223372036854775808'), [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80])
   
   test.done()
 

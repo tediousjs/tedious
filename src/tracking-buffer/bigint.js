@@ -1,3 +1,5 @@
+const BigInteger = require('biginteger').BigInteger;
+
 function isZero(array) {
   for (let j = 0, len = array.length; j < len; j++) {
     const byte = array[j];
@@ -64,15 +66,27 @@ function convertLEBytesToString(buffer) {
 module.exports.numberToInt64LE = numberToInt64LE;
 function numberToInt64LE(num) {
   // adapted from https://github.com/broofa/node-int64
-  const negate = num < 0;
-  let hi = Math.abs(num);
-  let lo = hi % 0x100000000;
-  hi = (hi / 0x100000000) | 0;
+  let hi, lo;
+  let negate = false;
+  if (typeof num === 'number') {
+    negate = num < 0;
+    hi = Math.abs(num);
+    lo = hi % 0x100000000;
+    hi = (hi / 0x100000000) | 0;
+  } else {
+    hi = BigInteger(num).toString(16); // lacks '0x' prefix
+    lo = hi.substr(-8);
+    hi = hi.length > 8 ? hi.substr(0, hi.length - 8) : '';
+    hi = parseInt(hi, 16);
+    lo = parseInt(lo, 16);
+  }
+
   const buf = new Buffer(8);
   for (let i = 0; i <= 7; i++) {
     buf[i] = lo & 0xff;
     lo = i === 3 ? hi : lo >>> 8;
   }
+
   if (negate) {
     let carry = 1;
     for (let i = 0; i <= 7; i++) {
@@ -81,5 +95,6 @@ function numberToInt64LE(num) {
       carry = v >> 8;
     }
   }
+
   return buf;
 }
