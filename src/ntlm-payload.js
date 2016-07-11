@@ -1,6 +1,6 @@
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
-const BigInteger = require('big-number').n;
+const BigInteger = require('biginteger').BigInteger;
 
 const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
@@ -99,12 +99,14 @@ module.exports = class NTLMResponsePayload {
   }
 
   createTimestamp(time) {
-    const tenthsOfAMicrosecond = new BigInteger(time).plus(11644473600).multiply(10000000);
+    let tenthsOfAMicrosecond = BigInteger(time).add(11644473600).multiply(10000000);
     const hexArray = [];
 
     let pair = [];
-    while (tenthsOfAMicrosecond.val() !== '0') {
-      const idx = tenthsOfAMicrosecond.mod(16);
+    while (tenthsOfAMicrosecond.toString() !== '0') {
+      const dividendAndRemainder = BigInteger.divRem(tenthsOfAMicrosecond, 16);
+      tenthsOfAMicrosecond = dividendAndRemainder[0];
+      const idx = dividendAndRemainder[1];
       pair.unshift(hex[idx]);
       if (pair.length === 2) {
         hexArray.push(pair.join(''));

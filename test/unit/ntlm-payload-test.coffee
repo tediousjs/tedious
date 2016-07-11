@@ -39,6 +39,11 @@ exports.respondToChallenge = (test) ->
     test.strictEqual(userName, 'username')
     test.strictEqual(targetData, 'aaaaaaaa')
     
+    # in lieu of mocking Date().getTime(), use constant values for independent validation
+    epoch = 1468267310129
+    tsbuf = response.createTimestamp(epoch)
+    test.strictEqual('804ed190430761cd', tsbuf.toString('hex'))
+
     test.strictEqual(expectedLength, response.data.length)
 
     test.done()
