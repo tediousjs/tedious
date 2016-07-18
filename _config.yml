@@ -1,2 +1,2 @@
 destination: site
-pygments: true
+highlighter: rouge
