@@ -1,16 +1,16 @@
 # Tedious (node implementation of TDS)
-[![Dependency Status](https://david-dm.org/pekim/tedious.svg)](https://david-dm.org/pekim/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/pekim/tedious.svg)](http://travis-ci.org/pekim/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/pekim/tedious)
+[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/pekim/tedious.svg)](http://travis-ci.org/pekim/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/pekim/tedious)
 
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
 **NOTE: New columns are nullable by default as of version 1.11.0**
 
-Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/pekim/tedious/pull/230).
+Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/tediousjs/tedious/pull/230).
 
 **NOTE: Default login behavior has changed slightly as of version 1.2**
 
-See the [changelog](http://pekim.github.io/tedious/changelog.html) for version history.
+See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for version history.
 
 
 ### Supported TDS versions
@@ -28,7 +28,7 @@ See the [changelog](http://pekim.github.io/tedious/changelog.html) for version h
 
 <a name="documentation" />
 ## Documentation
-More documentation is available at [pekim.github.io/tedious/](http://pekim.github.io/tedious/)
+More documentation is available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
 <a name="discussion" />
 ## Discussion
