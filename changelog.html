@@ -5,6 +5,149 @@ title: ChangeLog
 
 <h1>Change Log</h1>
 
+<h3>v1.14.0 <span class="date">2016-04-10</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/350">#350</a>
+        Add Variant data type support
+        (Patrik Simek)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/376">#376</a>
+        Fix parsing of SQL collations
+        (Patrik Simek)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/361">#361</a>
+        Align to code style used in Node 4+.
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.13.2 <span class="date">2015-12-31</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/340">#340</a>
+        Fix for nvarchar(max) columns on sql 2005.
+        (Jonas Budelmann)
+    </li>
+</ul>
+
+<h3>v1.13.1 <span class="date">2015-10-28</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/336">#336</a>
+        Fix issues with DateTime2 parameters.
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.13.0 <span class="date">2015-10-27</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/308">#308</a>
+        Fix token and received packet debug output.
+        (Arthur Schreiber)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/290">#290</a>
+        Convert codebase from CoffeeScript to ES2016.
+        (Arthur Schreiber)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/322">#322</a>
+        Fix for binary data being truncated on insert.
+        (Bruno Jouhier)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/330">#330</a>
+        Forward socket errors to request callbacks.
+        (ashelley and Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.12.3 <span class="date">2015-09-07</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/309">#309</a>
+        Don't overwrite configuration with routing data.
+        (Arthur Schreiber)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/310">#310</a>
+        Send correct servername in Login7 after rerouting.
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.12.2 <span class="date">2015-08-11</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/297">#297</a>
+        Fix for Windows Domain Authentication no longer working.
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.12.1 <span class="date">2015-08-01</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/commit/fe9249acb0cafeee359c2902970719ac5ded25fe">fe9249a</a>
+        Fix TypeError: Cannot read property 'useUTC' of undefined inadvertently introduced in 1.12.0.
+        (Evan Lucas)
+    </li>
+</ul>
+
+<h3>v1.12.0 <span class="date">2015-07-31</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/288">#288</a>
+        Upgraded dependencies.
+        (Arthur Schreiber)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/285">#285</a>
+        Stream Parser using Generators to make Tedious faster and use less memory using the magic of generators.
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.11.5 <span class="date">2015-09-07</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/309">#309</a>
+        Don't overwrite configuration with routing data. (Fix was backported from v1.12.3.)
+        (Arthur Schreiber)
+    </li>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/310">#310</a>
+        Send correct servername in Login7 after rerouting. (Fix was backported from v1.12.3.)
+        (Arthur Schreiber)
+    </li>
+</ul>
+
+<h3>v1.11.4 <span class="date">2015-07-31</span></h3>
+<ul>
+    <li>
+        Fixed issue with NPM package publishing failing due to npmjs.com API change.
+    </li>
+    <li>
+        No other change from 1.11.3.
+    </li>
+</ul>
+
+<h3>v1.11.3 <span class="date">2015-07-31</span></h3>
+<ul>
+    <li>
+        <a href="https://github.com/tediousjs/tedious/pull/278">#276/#278</a>
+        Do not let invalid dates pass the data validation check.
+        (Bret Copeland)
+    </li>
+    <li>
+        Minor fixes
+    </li>
+</ul>
+
 <h3>v1.11.2 <span class="date">2015-06-17</span></h3>
 <ul>
   <li>
