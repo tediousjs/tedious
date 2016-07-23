@@ -1,5 +1,5 @@
 # Tedious (node implementation of TDS)
-[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/pekim/tedious.svg)](http://travis-ci.org/pekim/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/pekim/tedious)
+[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious)
 
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
