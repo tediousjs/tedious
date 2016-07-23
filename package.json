@@ -24,14 +24,14 @@
     "msnodesql",
     "azure"
   ],
-  "homepage": "https://github.com/pekim/tedious",
-  "bugs": "https://github.com/pekim/tedious/issues",
+  "homepage": "https://github.com/tediousjs/tedious",
+  "bugs": "https://github.com/tediousjs/tedious/issues",
   "license": "MIT",
   "version": "1.14.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pekim/tedious.git"
+    "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
     "node": ">= 0.10"
