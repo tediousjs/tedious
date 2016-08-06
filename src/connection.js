@@ -121,6 +121,10 @@ class Connection extends EventEmitter {
       this.config.options.cryptoCredentialsDetails = {};
     }
 
+    if (this.config.options.trustServerCertificate === undefined) {
+      this.config.options.trustServerCertificate = true;
+    }
+
     if (this.config.options.useUTC == undefined) {
       this.config.options.useUTC = true;
     }
@@ -924,7 +928,7 @@ Connection.prototype.STATE = {
         }
       },
       tls: function() {
-        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails);
+        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.options.trustServerCertificate);
         return this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
       }
     }

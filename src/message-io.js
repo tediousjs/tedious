@@ -85,7 +85,7 @@ module.exports = class MessageIO extends EventEmitter {
     return this._packetSize;
   }
 
-  startTls(credentialsDetails) {
+  startTls(credentialsDetails, trustServerCertificate) {
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
     this.securePair = tls.createSecurePair(credentials);
@@ -93,6 +93,17 @@ module.exports = class MessageIO extends EventEmitter {
 
     this.securePair.on('secure', () => {
       const cipher = this.securePair.cleartext.getCipher();
+
+      if (!trustServerCertificate) {
+        const verifyError = this.securePair.ssl.verifyError();
+
+        if (verifyError) {
+          this.securePair.destroy();
+          this.socket.destroy(verifyError);
+          return;
+        }
+      }
+
       this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
       this.emit('secure', this.securePair.cleartext);
       this.encryptAllFutureTraffic();
