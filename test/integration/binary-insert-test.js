@@ -15,7 +15,7 @@ config.options.debug = {
   log: true
 };
 
-config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 exports.insertBinary = function(test) {
   const connection = new Connection(config);
