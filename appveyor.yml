@@ -40,10 +40,19 @@ test_script:
 
       powershell %cd%\scripts\appveyor\config.ps1 SQL2016
 
-      TEDIOUS_TDS_VERSION=7_4 npm run-script test-integration || SET EXITVAL=1
-      TEDIOUS_TDS_VERSION=7_3_B npm run-script test-integration || SET EXITVAL=1
-      TEDIOUS_TDS_VERSION=7_3_A npm run-script test-integration || SET EXITVAL=1
-      TEDIOUS_TDS_VERSION=7_2 npm run-script test-integration || SET EXITVAL=1
-      TEDIOUS_TDS_VERSION=7_1 npm run-script test-integration || SET EXITVAL=1
+      SET TEDIOUS_TDS_VERSION=7_4
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_3_B
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_3_A
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_2
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_1
+      npm run-script test-integration || SET EXITVAL=1
 
       EXIT /B %EXITVAL%
