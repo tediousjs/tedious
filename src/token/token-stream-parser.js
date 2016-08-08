@@ -33,7 +33,7 @@ class Parser extends EventEmitter {
     return this.parser.write(buffer);
   }
 
-  isEnd()  {
+  isEnd() {
     return this.parser.buffer.length === this.parser.position;
   }
 }

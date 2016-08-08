@@ -104,13 +104,6 @@ module.exports = class WritableTrackingBuffer {
     return this.position += length;
   }
 
-  writeUInt64LE(value) {
-    const low = value % 0x100000000;
-    const high = Math.floor(value / 0x100000000);
-    this.writeUInt32LE(low);
-    return this.writeUInt32LE(high);
-  }
-
   writeInt64LE(value) {
     const buf = bigint.numberToInt64LE(value);
     return this.copyFrom(buf);

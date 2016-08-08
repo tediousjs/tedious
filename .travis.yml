@@ -7,6 +7,7 @@ node_js:
   - "0.12"
   - "4"
   - "5"
+  - "6"
 
 branches:
   only:
@@ -26,5 +27,5 @@ deploy:
     secure: pSwLyKvYC3sxv0qxvbZy2W4ENXeE7/7emnnFJ8BMEYBTel/g+An0fN9lbtZSPoOaCEUVWEa2DzCHvU0jZ+qiOB1iZ+Swav9Ka0aOW54mtiig7oQY3GZpNvMkBhMPmkyIloECjFKNpxnZyi/ZHUjJLhu04o36xcAWASowfs3Mdwg=
   on:
     tags: true
-    repo: pekim/tedious
+    repo: tediousjs/tedious
     node: "0.10"
