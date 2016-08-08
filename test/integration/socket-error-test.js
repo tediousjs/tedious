@@ -15,6 +15,8 @@ function getConfig() {
     log: true
   };
 
+  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+
   return config;
 }
 
