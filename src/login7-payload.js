@@ -161,8 +161,8 @@ module.exports = class Login7Payload {
       this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
     }
     const variableData = {
-      offsetsAndLengths: new WritableTrackingBuffer(200),
-      data: new WritableTrackingBuffer(200, 'ucs2'),
+      offsetsAndLengths: new WritableTrackingBuffer(400),
+      data: new WritableTrackingBuffer(400, 'ucs2'),
       offset: offset + this.variableLengthsLength
     };
     this.hostname = os.hostname();
