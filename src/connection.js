@@ -41,6 +41,12 @@ class Connection extends EventEmitter {
     this.config = config;
 
     if (typeof (config.domain) === 'string') {
+      // Assigning 'config' passed in directly to 'this.config' will have
+      // 'config' and 'this.config' referring to the same object. Now modifying
+      // this.config.domain would also modify config.domain which would be an
+      // unexpected side effect on the input parameter. JSON serializing and
+      // deserializing creates a new object thus protecting the input parameter
+      // from side-effects.
       this.config = JSON.parse(JSON.stringify(config));
       this.config.domain = this.config.domain.toUpperCase();
     }
