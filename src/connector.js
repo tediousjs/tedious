@@ -8,10 +8,16 @@ const semver = require('semver');
 let lookupAll;
 if (semver.lt(process.version, '1.2.0')) {
   lookupAll = function lookupAll(domain, family, callback) {
-    const req = dns.lookup(domain, family, callback);
+    const req = dns.lookup(domain, family, function(err, address, family) {
+      if (err) {
+        return callback(err);
+      }
+
+      callback(null, [ { address: address, family: family } ]);
+    });
     const oldHandler = req.oncomplete;
 
-    if (oldHandler.length == 2) {
+    if (oldHandler && oldHandler.length == 2) {
       req.oncomplete = function onlookupall(err, addresses) {
         if (err) {
           return oldHandler.call(this, err);
