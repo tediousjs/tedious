@@ -191,7 +191,13 @@ exports.connectByInvalidInstanceName = (test) ->
     #console.log(text)
   )
 
-exports.ntlm = (test) ->
+DomainCaseEnum = {
+    AsIs: 0,
+    Lower: 1,
+    Upper: 2
+}
+
+runNtlmTest = (test, domainCase) ->
   if !getNtlmConfig()
     console.log('Skipping ntlm test')
     test.done()
@@ -204,7 +210,12 @@ exports.ntlm = (test) ->
 
   config.userName = ntlmConfig.userName
   config.password = ntlmConfig.password
-  config.domain = ntlmConfig.domain
+
+  switch domainCase
+    when DomainCaseEnum.AsIs then config.domain = ntlmConfig.domain
+    when DomainCaseEnum.Lower then config.domain = ntlmConfig.domain.toLowerCase()
+    when DomainCaseEnum.Upper then config.domain = ntlmConfig.domain.toUpperCase()
+    else test.ok(false, 'Unexpected value for domainCase: ' + domainCase)
 
   connection = new Connection(config)
 
@@ -225,6 +236,15 @@ exports.ntlm = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
+
+exports.ntlm = (test) ->
+  runNtlmTest test, DomainCaseEnum.AsIs 
+
+exports.ntlmLower = (test) ->
+  runNtlmTest test, DomainCaseEnum.Lower
+
+exports.ntlmUpper = (test) ->
+  runNtlmTest test, DomainCaseEnum.Upper
 
 exports.encrypt = (test) ->
   test.expect(5)

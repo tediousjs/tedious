@@ -39,6 +39,11 @@ class Connection extends EventEmitter {
     super();
 
     this.config = config;
+
+    if (typeof (config.domain) === 'string') {
+      this.config.domain = this.config.domain.toUpperCase();
+    }
+
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
