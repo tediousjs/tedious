@@ -45,24 +45,41 @@ function arrayToGuid(array) {
   );
 }
 
+const CHARCODEMAP = {};
+
+const hexDigits = [
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  'a', 'b', 'c', 'd', 'e', 'f',
+  'A', 'B', 'C', 'D', 'E', 'F'
+].map((d) => d.charCodeAt(0));
+
+for (let i = 0; i < hexDigits.length; i++) {
+  const map = CHARCODEMAP[hexDigits[i]] = {};
+  for (let j = 0; j < hexDigits.length; j++) {
+    const hex = String.fromCharCode(hexDigits[i], hexDigits[j]);
+    const value = parseInt(hex, 16);
+    map[hexDigits[j]] = value;
+  }
+}
+
 module.exports.guidToArray = guidToArray;
 function guidToArray(guid) {
   return [
-    parseInt(guid.substring(6, 8), 16),
-    parseInt(guid.substring(4, 6), 16),
-    parseInt(guid.substring(2, 4), 16),
-    parseInt(guid.substring(0, 2), 16),
-    parseInt(guid.substring(11, 13), 16),
-    parseInt(guid.substring(9, 11), 16),
-    parseInt(guid.substring(16, 18), 16),
-    parseInt(guid.substring(14, 16), 16),
-    parseInt(guid.substring(19, 21), 16),
-    parseInt(guid.substring(21, 23), 16),
-    parseInt(guid.substring(24, 26), 16),
-    parseInt(guid.substring(26, 28), 16),
-    parseInt(guid.substring(28, 30), 16),
-    parseInt(guid.substring(30, 32), 16),
-    parseInt(guid.substring(32, 34), 16),
-    parseInt(guid.substring(34, 36), 16)
+    CHARCODEMAP[guid.charCodeAt(6)][guid.charCodeAt(7)],
+    CHARCODEMAP[guid.charCodeAt(4)][guid.charCodeAt(5)],
+    CHARCODEMAP[guid.charCodeAt(2)][guid.charCodeAt(3)],
+    CHARCODEMAP[guid.charCodeAt(0)][guid.charCodeAt(1)],
+    CHARCODEMAP[guid.charCodeAt(11)][guid.charCodeAt(12)],
+    CHARCODEMAP[guid.charCodeAt(9)][guid.charCodeAt(10)],
+    CHARCODEMAP[guid.charCodeAt(16)][guid.charCodeAt(17)],
+    CHARCODEMAP[guid.charCodeAt(14)][guid.charCodeAt(15)],
+    CHARCODEMAP[guid.charCodeAt(19)][guid.charCodeAt(20)],
+    CHARCODEMAP[guid.charCodeAt(21)][guid.charCodeAt(22)],
+    CHARCODEMAP[guid.charCodeAt(24)][guid.charCodeAt(25)],
+    CHARCODEMAP[guid.charCodeAt(26)][guid.charCodeAt(27)],
+    CHARCODEMAP[guid.charCodeAt(28)][guid.charCodeAt(29)],
+    CHARCODEMAP[guid.charCodeAt(30)][guid.charCodeAt(31)],
+    CHARCODEMAP[guid.charCodeAt(32)][guid.charCodeAt(33)],
+    CHARCODEMAP[guid.charCodeAt(34)][guid.charCodeAt(35)]
   ];
 }
