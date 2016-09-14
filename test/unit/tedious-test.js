@@ -23,3 +23,42 @@ exports.connection = function(test) {
 
   test.done();
 };
+
+exports.connectionDeepCopiesConfig = function (test) {
+  var userName = "sa";
+  var password = "sapwd";
+  var port = 1234;
+  var ciphers = "RC4-MD5";
+
+  var config = {};
+  config.userName = userName;
+  config.password = password;
+  config.options = {}
+  config.options.port = port;
+  config.options.cryptoCredentialsDetails = {};
+  config.options.cryptoCredentialsDetails.ciphers = ciphers;
+
+  var configStr = JSON.stringify(config);
+  var connection = new Connection(config);
+
+  // Verify that Connection constructor did not change config object.
+  test.ok(configStr === JSON.stringify(config));
+
+  // Verify that Connection constructor copied fields correctly.
+  test.ok(connection.config.userName === userName);
+  test.ok(connection.config.password === password);
+  test.ok(connection.config.options.port === port);
+  test.ok(connection.config.options.cryptoCredentialsDetails.ciphers === ciphers);
+
+  // Verify that Connection constructor did a deep copy of the config object.
+  config.userName = "";
+  config.password = "";
+  config.options.port = 0
+  config.options.cryptoCredentialsDetails.ciphers = "";
+  test.ok(connection.config.userName === userName);
+  test.ok(connection.config.password === password);
+  test.ok(connection.config.options.port === port);
+  test.ok(connection.config.options.cryptoCredentialsDetails.ciphers === ciphers);
+
+  test.done();
+};

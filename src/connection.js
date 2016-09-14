@@ -21,6 +21,7 @@ const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
 const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
+const DeepCopy = require('./helper-functions').DeepCopy;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -38,7 +39,8 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    this.config = config;
+    this.config = {};
+    DeepCopy(this.config, config);
 
     if (typeof (config.domain) === 'string') {
       this.config.domain = this.config.domain.toUpperCase();
