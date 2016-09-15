@@ -14,4 +14,4 @@ function DeepCopy(destination, source) {
     }
   }
   return destination;
-};
+}
