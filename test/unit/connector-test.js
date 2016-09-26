@@ -9,15 +9,13 @@ const invalidIpv4Address2 = { address: '240.1.2.4', family: 4 };
 const invalidIpv6Address1 = { address: '2002:20:0:0:0:0:1:2', family: 6 };
 const invalidIpv6Address2 = { address: '2002:20:0:0:0:0:1:3', family: 6 };
 
-const microsoftIpv4AddressRaw = '23.96.52.53';
-const bingIpv4AddressRaw = '204.79.197.200';
-const googleIpv6AdddressRaw = '2607:f8b0:400a:806::200e';
-const akamaiIpv6AddressRaw = '2600:1406:1a:388::22df';
+const ipv4LoopbackAddress = '127.0.0.1';
+const ipv6LoopbackAddress = '::1';
 
-const validIpv4Address1 = { address: microsoftIpv4AddressRaw, family: 4 };
-const validIpv4Address2 = { address: bingIpv4AddressRaw, family: 4 };
-const validIpv6Address1 = { address: googleIpv6AdddressRaw, family: 6 };
-const validIpv6Address2 = { address: akamaiIpv6AddressRaw, family: 6 };
+const validIpv4Address1 = { address: ipv4LoopbackAddress, family: 4 };
+const validIpv4Address2 = { address: ipv4LoopbackAddress, family: 4 };
+const validIpv6Address1 = { address: ipv6LoopbackAddress, family: 6 };
+const validIpv6Address2 = { address: ipv6LoopbackAddress, family: 6 };
 
 let isDnsLookupCalled = false;
 
