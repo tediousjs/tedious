@@ -39,8 +39,7 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    this.config = {};
-    DeepCopy(this.config, config);
+    this.config = DeepCopy(config);
 
     if (typeof (config.domain) === 'string') {
       this.config.domain = this.config.domain.toUpperCase();
