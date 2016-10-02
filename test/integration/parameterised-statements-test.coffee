@@ -105,8 +105,12 @@ exports.intNull = (test) ->
 exports.varChar = (test) ->
   execSql(test, TYPES.VarChar, 'qaz')
 
+### Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and beyond. ###
 exports.varCharN = (test) ->
-  execSql(test, TYPES.VarChar, 'qaz', null, {length: 8001})
+  execSql(test, TYPES.VarChar, 'qaz', null, {length: 8000})
+
+exports.varCharN_7_2_AndLater = (test) ->
+  execSql(test, TYPES.VarChar, 'qaz', '7_2', {length: 8001})
 
 exports.varCharEmptyString = (test) ->
   execSql(test, TYPES.VarChar, '')
@@ -122,13 +126,24 @@ exports.varCharMax = (test) ->
   execSql(test, TYPES.VarChar, longString, '7_2')
 
 exports.varCharMaxEmptyString = (test) ->
-  execSql(test, TYPES.VarChar, '', null, {length: 8001})
+  execSql(test, TYPES.VarChar, '', null, {length: 8000})
+
+exports.varCharMaxEmptyString = (test) ->
+  execSql(test, TYPES.VarChar, '', '7_2', {length: 8001})
 
 exports.nVarChar = (test) ->
   execSql(test, TYPES.NVarChar, 'qaz')
 
+###
+Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and
+beyond. Since NVarChar is unicode, that'd be 4000. More explict in:
+https://msdn.microsoft.com/en-us/library/ms186939.aspx
+###
 exports.nVarCharN = (test) ->
-  execSql(test, TYPES.NVarChar, 'qaz', null, {length: 4001})
+  execSql(test, TYPES.NVarChar, 'qaz', null, {length: 4000})
+
+exports.nVarCharN_7_2_AndLater = (test) ->
+  execSql(test, TYPES.NVarChar, 'qaz', '7_2', {length: 4001})
 
 exports.nVarCharEmptyString = (test) ->
   execSql(test, TYPES.NVarChar, '')
@@ -144,7 +159,10 @@ exports.nVarCharMax = (test) ->
   execSql(test, TYPES.NVarChar, longString, '7_2')
 
 exports.nVarCharMaxEmptyString = (test) ->
-  execSql(test, TYPES.NVarChar, '', null, {length: 4001})
+  execSql(test, TYPES.NVarChar, '', null, {length: 4000})
+
+exports.nVarCharMaxEmptyString_7_2_AndLater = (test) ->
+  execSql(test, TYPES.NVarChar, '', '7_2', {length: 4001})
 
 exports.Char = (test) ->
   execSql(test, TYPES.Char, 'qaz')
@@ -191,10 +209,10 @@ exports.dateTimeNull = (test) ->
   execSql(test, TYPES.DateTime, null)
 
 exports.dateTime2 = (test) ->
-  execSql(test, TYPES.DateTime2, new Date('December 4, 2011 10:04:23'))
+  execSql(test, TYPES.DateTime2, new Date('December 4, 2011 10:04:23'), '7_3_A')
 
 exports.dateTime2Null = (test) ->
-  execSql(test, TYPES.DateTime2, null)
+  execSql(test, TYPES.DateTime2, null, '7_3_A')
 
 exports.outputBitTrue = (test) ->
   execSqlOutput(test, TYPES.Bit, true)
@@ -395,6 +413,7 @@ exports.callProcedureWithParameters = (test) ->
   )
 
 execSql = (test, type, value, tdsVersion, options) ->
+
   config = getConfig()
   #config.options.packetSize = 32768
 

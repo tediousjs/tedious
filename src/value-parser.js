@@ -319,6 +319,10 @@ function valueParse(parser, metaData, options, callback) {
           return readMaxBinary(parser, callback);
 
         case 'Variant':
+          if (dataLength === 0) {
+            return callback(null);
+          }
+
           const valueMetaData = metaData.valueMetaData = {};
           Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});
           return parser.readUInt8((baseType) => {
