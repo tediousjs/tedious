@@ -854,7 +854,7 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       return request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else {
-      if (packetType == TYPE.SQL_BATCH) {
+      if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
       } else {
         this.isSqlBatch = false;
