@@ -52,7 +52,6 @@
     "babel-preset-es2015": "^6.0.0",
     "babel-register": "^6.9.0",
     "benchmark": "^2.1.0",
-    "coffee-script": "^1.9.3",
     "eslint": "^2.13.1",
     "nodeunit": "^0.9.1"
   },
@@ -63,7 +62,7 @@
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
-    "prepublish": "coffee scripts/build.coffee"
+    "prepublish": "babel src --out-dir lib"
   },
   "babel": {
     "presets": [ "es2015" ],
