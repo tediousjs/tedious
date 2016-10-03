@@ -52,6 +52,10 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
+
+    // These fields are used for managing transactions in TDS versions below 7.1.
+    this.transactionDepth = 0;
+    this.isSqlBatch = false;
   }
 
   close() {
@@ -718,8 +722,16 @@ class Connection extends EventEmitter {
     isolationLevel || (isolationLevel = this.config.options.isolationLevel);
     const transaction = new Transaction(name || '', isolationLevel);
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, callback));
+      const self = this;
+      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, function() {
+        self.transactionDepth++;
+        if (self.transactionDepth === 1) {
+          self.inTransaction = true;
+        }
+        return callback.apply(this, arguments);
+      }));
     }
+
     const request = new Request(void 0, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
@@ -729,7 +741,14 @@ class Connection extends EventEmitter {
   commitTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, callback));
+      const self = this;
+      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, function() {
+        self.transactionDepth--;
+        if (self.transactionDepth === 0) {
+          self.inTransaction = false;
+        }
+        return callback.apply(this, arguments);
+      }));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
@@ -738,7 +757,14 @@ class Connection extends EventEmitter {
   rollbackTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, callback));
+      const self = this;
+      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, function() {
+        self.transactionDepth--;
+        if (self.transactionDepth === 0) {
+          self.inTransaction = false;
+        }
+        return callback.apply(this, arguments);
+      }));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
@@ -747,7 +773,11 @@ class Connection extends EventEmitter {
   saveTransaction(callback, name) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, callback));
+      const self = this;
+      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, function() {
+        self.transactionDepth++;
+        return callback.apply(this, arguments);
+      }));
     }
     const request = new Request(void 0, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
@@ -821,6 +851,12 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       return request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else {
+      if (packetType == TYPE.SQL_BATCH) {
+        this.isSqlBatch = true;
+      } else {
+        this.isSqlBatch = false;
+      }
+
       this.request = request;
       this.request.rowCount = 0;
       this.request.rows = [];
@@ -849,7 +885,11 @@ class Connection extends EventEmitter {
   }
 
   reset(callback) {
+    const self = this;
     const request = new Request(this.getInitialSql(), function(err) {
+      if (self.config.options.tdsVersion < '7_2') {
+        self.inTransaction = false;
+      }
       return callback(err);
     });
     this.resetConnectionOnNextRequest = true;
@@ -1090,6 +1130,9 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
         this.request = void 0;
+        if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+          this.inTransaction = false;
+        }
         return sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
       }
     }

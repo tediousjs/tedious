@@ -219,7 +219,13 @@ exports.nestedTransactionInProcRollbackOuter = (test) ->
   ])
 
 exports.firesRollbackTransactionEventWithXactAbort = (test) ->
-  test.expect(5)
+  # From 2.2.7.8, ENVCHANGE_TOKEN type Begin Transaction (8) is only supported
+  # in TDS version 7.2 and above. 'rollbackTransaction' event fires in response
+  # to that token type and hence won't be firing for lower versions.
+  if config.options.tdsVersion < '7_2'
+    test.expect(4)
+  else
+    test.expect(5)
 
   connection = new Connection(config)
   connection.on('end', (info) => test.done())
