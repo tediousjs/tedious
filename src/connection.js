@@ -728,7 +728,7 @@ class Connection extends EventEmitter {
         if (self.transactionDepth === 1) {
           self.inTransaction = true;
         }
-        return callback.apply(this, arguments);
+        return callback.apply(null, arguments);
       }));
     }
 
@@ -747,7 +747,7 @@ class Connection extends EventEmitter {
         if (self.transactionDepth === 0) {
           self.inTransaction = false;
         }
-        return callback.apply(this, arguments);
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
@@ -763,7 +763,7 @@ class Connection extends EventEmitter {
         if (self.transactionDepth === 0) {
           self.inTransaction = false;
         }
-        return callback.apply(this, arguments);
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
@@ -776,7 +776,7 @@ class Connection extends EventEmitter {
       const self = this;
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, function() {
         self.transactionDepth++;
-        return callback.apply(this, arguments);
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
