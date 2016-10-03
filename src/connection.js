@@ -811,7 +811,7 @@ class Connection extends EventEmitter {
       } else {
         if (useSavepoint) {
           return process.nextTick(function() {
-            if (this.config.options.tdsVersion < '7_2') {
+            if (self.config.options.tdsVersion < '7_2') {
               self.transactionDepth--;
             }
             args.unshift(null);
