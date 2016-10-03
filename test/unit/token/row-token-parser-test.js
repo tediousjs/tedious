@@ -424,10 +424,9 @@ module.exports.varCharMaxKnownLengthWrong = function(test) {
     }, colMetaData, options);
     parser.write(buffer.data);
     parser.read();
-    return test.ok(false);
+    test.ok(false);
   } catch (error) {
-    test.ifError(error);
-    return test.done();
+    test.done();
   }
 };
 
