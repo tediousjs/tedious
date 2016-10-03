@@ -1,48 +1,60 @@
 'use strict';
 
-function parseToken(parser, options, callback) {
-  // length
-  parser.readUInt16LE(() => {
-    parser.readUInt32LE((number) => {
-      parser.readUInt8((state) => {
-        parser.readUInt8((clazz) => {
-          parser.readUsVarChar((message) => {
-            parser.readBVarChar((serverName) => {
-              parser.readBVarChar((procName) => {
-                (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber) => {
-                  callback({
-                    'number': number,
-                    'state': state,
-                    'class': clazz,
-                    'message': message,
-                    'serverName': serverName,
-                    'procName': procName,
-                    'lineNumber': lineNumber
-                  });
-                });
-              });
-            });
-          });
-        });
-      });
-    });
+function parseToken(name, event) {
+  if (!this.bytesAvailable(2)) {
+    return;
+  }
+
+  const length = this.readUInt16LE();
+
+  if (!this.bytesAvailable(2 + length)) {
+    return;
+  }
+
+  const number = this.readUInt32LE(2);
+  const state = this.readUInt8(6);
+  const clazz = this.readUInt8(7);
+
+  this.consumeBytes(8);
+
+  const messageLength = this.readUInt16LE();
+  const message = this.buffer.toString('ucs2', this.position + 2, this.position + 2 + messageLength);
+
+  this.consumeBytes(2 + messageLength);
+
+  const serverNameLength = this.readUInt8();
+  const serverName = this.buffer.toString('ucs2', this.position + 1, this.position + 1 + serverNameLength);
+
+  this.consumeBytes(1 + serverNameLength);
+
+  const procNameLength = this.readUInt8();
+  const procName = this.buffer.toString('ucs2', this.position + 1, this.position + 1 + procNameLength);
+
+  this.consumeBytes(1 + procNameLength);
+
+  const lineNumber = this.options.tdsVersion < '7_2' ? this.readUInt16LE() : this.readUInt32LE();
+
+  this.push({
+    'name': name,
+    'event': event,
+    'number': number,
+    'state': state,
+    'class': clazz,
+    'message': message,
+    'serverName': serverName,
+    'procName': procName,
+    'lineNumber': lineNumber
   });
+
+  return this.parseNextToken;
 }
 
 module.exports.infoParser = infoParser;
-function infoParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'INFO';
-    token.event = 'infoMessage';
-    callback(token);
-  });
+function infoParser() {
+  return parseToken.call(this, 'INFO', 'infoMessage');
 }
 
 module.exports.errorParser = errorParser;
-function errorParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'ERROR';
-    token.event = 'errorMessage';
-    callback(token);
-  });
+function errorParser() {
+  return parseToken.call(this, 'ERROR', 'errorMessage');
 }

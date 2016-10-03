@@ -2,32 +2,31 @@
 
 // s2.2.7.14
 
-module.exports = function(parser, colMetadata, options, callback) {
-  parser.readUInt16LE((length) => {
-    const columnCount = length / 2;
-    const orderColumns = [];
+module.exports = function() {
+  if (!this.bytesAvailable(2)) {
+    return;
+  }
 
-    let i = 0;
-    function next(done) {
-      if (i === columnCount) {
-        return done();
-      }
+  const length = this.readUInt16LE();
+  if (!this.bytesAvailable(2 + length)) {
+    return;
+  }
 
-      parser.readUInt16LE((column) => {
-        orderColumns.push(column);
+  const orderColumns = [];
 
-        i++;
+  let offset = 2;
+  for (let i = 0, len = length / 2; i < len; i++) {
+    orderColumns.push(this.readUInt16LE(offset));
+    offset += 2;
+  }
 
-        next(done);
-      });
-    }
+  this.consumeBytes(offset);
 
-    next(() => {
-      callback({
-        name: 'ORDER',
-        event: 'order',
-        orderColumns: orderColumns
-      });
-    });
+  this.push({
+    name: 'ORDER',
+    event: 'order',
+    orderColumns: orderColumns
   });
+
+  return this.parseNextToken;
 };

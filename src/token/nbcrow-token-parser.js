@@ -10,52 +10,64 @@ function nullHandler(parser, columnMetaData, options, callback) {
 
 module.exports = function(parser, columnsMetaData, options, callback) {
   const length = Math.ceil(columnsMetaData.length / 8);
-  parser.readBuffer(length, (bytes) => {
-    const bitmap = [];
 
-    for (let i = 0, len = bytes.length; i < len; i++) {
-      const byte = bytes[i];
-      for (let j = 0; j <= 7; j++) {
-        bitmap.push(byte & (1 << j) ? true : false);
-      }
+  if (!this.bytesAvailable(length)) {
+    return;
+  }
+
+  const bytes = this.readBuffer(0, length);
+  const bitmap = [];
+
+  for (let i = 0, len = bytes.length; i < len; i++) {
+    const byte = bytes[i];
+    for (let j = 0; j <= 7; j++) {
+      bitmap.push(byte & (1 << j) ? true : false);
     }
+  }
 
-    const columns = options.useColumnNames ? {} : [];
-
-    const len = columnsMetaData.length;
-    let i = 0;
-    function next(done) {
-      if (i === len) {
-        return done();
-      }
-
-      const columnMetaData = columnsMetaData[i];
-
-      (bitmap[i] ? nullHandler : valueParse)(parser, columnMetaData, options, (value) => {
-        const column = {
-          value: value,
-          metadata: columnMetaData
-        };
-
-        if (options.useColumnNames) {
-          if (columns[columnMetaData.colName] == null) {
-            columns[columnMetaData.colName] = column;
-          }
-        } else {
-          columns.push(column);
-        }
-
-        i++;
-        next(done);
-      });
-    }
-
-    next(() => {
-      callback({
-        name: 'NBCROW',
-        event: 'row',
-        columns: columns
-      });
-    });
-  });
+  this.parser.push({ columns: [], bitmap: bitmap });
+  return readColumnValue;
 };
+
+function readColumnValue() {
+  const state = this.currentState();
+
+  if (state.columns.length === this.colMetadata.length) {
+    return finishParseToken;
+  }
+
+  const columnMetaData = this.colMetadata[state.columns.length];
+  this.pushState({ metadata: columnMetaData });
+
+  if (state.bitmap[i]) {
+    this.pushState({ value: null });
+    return afterReadColumnValue;
+  } else {
+    return valueParse(this, columnMetaData, afterReadColumnValue)
+  }
+}
+
+function afterReadColumnValue() {
+  const column = {
+    value: this.popState().value,
+    metadata: this.popState().metadata
+  };
+
+  this.currentState().columns.push(column);
+
+  return readColumnValue;
+}
+
+function finishParseToken() {
+  const state = this.popState();
+
+  // TODO: Handle options.useColumnNames
+
+  this.push({
+    name: 'NBCROW',
+    event: 'row',
+    columns: state.columns
+  });
+
+  return this.parseNextToken;
+}

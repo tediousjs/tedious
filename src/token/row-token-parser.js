@@ -4,44 +4,46 @@
 
 const valueParse = require('../value-parser');
 
-module.exports = function(parser, colMetadata, options, callback) {
-  const columns = options.useColumnNames ? {} : [];
+module.exports = function parseToken(parser, colMetadata, options, callback) {
+  this.pushState({ columns: [] });
 
-  const len = colMetadata.length;
-  let i = 0;
+  return readColumnValue;
+};
 
-  function next(done) {
-    if (i === len) {
-      return done();
-    }
+function readColumnValue() {
+  const state = this.currentState();
 
-
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
-      const column = {
-        value: value,
-        metadata: columnMetaData
-      };
-
-      if (options.useColumnNames) {
-        if (columns[columnMetaData.colName] == null) {
-          columns[columnMetaData.colName] = column;
-        }
-      } else {
-        columns.push(column);
-      }
-
-      i++;
-
-      next(done);
-    });
+  if (state.columns.length === this.colMetadata.length) {
+    return finishParseToken;
   }
 
-  next(() => {
-    callback({
-      name: 'ROW',
-      event: 'row',
-      columns: columns
-    });
+  const columnMetaData = this.colMetadata[state.columns.length];
+  this.pushState({ metadata: columnMetaData });
+
+  return valueParse(this, columnMetaData, afterReadColumnValue);
+}
+
+function afterReadColumnValue() {
+  const column = {
+    value: this.popState().value,
+    metadata: this.popState().metadata
+  };
+
+  this.currentState().columns.push(column);
+
+  return readColumnValue;
+}
+
+function finishParseToken() {
+  const state = this.popState();
+
+  // TODO: Handle options.useColumnNames
+
+  this.push({
+    name: 'ROW',
+    event: 'row',
+    columns: state.columns
   });
-};
+
+  return this.parseNextToken;
+}

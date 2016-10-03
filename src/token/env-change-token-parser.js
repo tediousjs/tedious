@@ -50,100 +50,120 @@ const types = {
   }
 };
 
-function readNewAndOldValue(parser, length, type, callback) {
+function readBVarCharValues(type, length) {
+  const newValueLength = this.readUInt8(0);
+  let newValue = this.buffer.toString('ucs2', 1, 1 + newValueLength);
+
+  const oldValueLength = this.readUInt8(1 + newValueLength);
+  let oldValue = this.buffer.toString('ucs2', 1 + newValueLength + 1, 1 + newValueLength + 1 + oldValueLength);
+
+  if (type.name === 'PACKET_SIZE') {
+    newValue = parseInt(newValue, 10);
+    oldValue = parseInt(oldValue, 10);
+  }
+
+  parser.push({
+    name: 'ENVCHANGE',
+    type: type.name,
+    event: type.event,
+    oldValue: oldValue,
+    newValue: newValue
+  });
+
+  this.consumeBytes(length);
+  return this.parseNextToken;
+}
+
+function readBVarByteValues(type, length) {
+  const newValueLength = this.readUInt8(0);
+  const newValue = this.buffer.slice(this.position + 1, this.position + 1 + newValueLength);
+
+  const oldValueLength = this.readUInt8(1 + newValueLength);
+  const oldValue = this.buffer.slice(this.position + 1 + newValueLength + 1, this.position + 1 + newValueLength + 1 + oldValueLength);
+
+  parser.push({
+    name: 'ENVCHANGE',
+    type: type.name,
+    event: type.event,
+    oldValue: oldValue,
+    newValue: newValue
+  });
+
+  this.consumeBytes(length);
+  return this.parseNextToken;
+}
+
+function readRoutingValues(type, length) {
+  const valueLength = this.readUInt16LE();
+
+  // Routing Change:
+  // Byte 1: Protocol (must be 0)
+  // Bytes 2-3 (USHORT): Port number
+  // Bytes 4-5 (USHORT): Length of server data in unicode (2byte chars)
+  // Bytes 6-*: Server name in unicode characters
+  const protocol = this.readUInt8(2);
+
+  if (protocol !== 0) {
+    return parser.emit('error', new Error('Unknown protocol byte in routing change event'));
+  }
+
+  const port = this.readUInt16LE(3);
+  const serverLen = this.readUInt16LE(5);
+  // 2 bytes per char, starting at offset 5
+  const server = this.toString('ucs2', this.position + 7, this.position + 7 + (serverLen * 2));
+
+  newValue = {
+    protocol: protocol,
+    port: port,
+    server: server
+  };
+
+  const oldValueLength = this.readUInt16LE(7 + (serverLen * 2));
+  oldValue = undefined;
+}
+
+module.exports = function(parser, colMetadata, options, callback) {
+  if (!this.bytesAvailable(2)) {
+    return;
+  }
+
+  const length = this.readUInt16LE();
+  if (!this.bytesAvailable(2 + length)) {
+    return;
+  }
+
+  const typeNumber = this.readUInt8(2);
+  const type = types[typeNumber];
+
+  this.consumeBytes(3);
+
+  if (!type) {
+    console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
+    this.consumeBytes(length - 1);
+    return this.parseNextToken;
+  }
+
   switch (type.name) {
     case 'DATABASE':
     case 'LANGUAGE':
     case 'CHARSET':
     case 'PACKET_SIZE':
     case 'DATABASE_MIRRORING_PARTNER':
-      return parser.readBVarChar((newValue) => {
-        parser.readBVarChar((oldValue) => {
-          if (type.name === 'PACKET_SIZE') {
-            callback(parseInt(newValue), parseInt(oldValue));
-          } else {
-            callback(newValue, oldValue);
-          }
-        });
-      });
+      return readBVarCharValues.call(this, type, length - 1);
 
     case 'SQL_COLLATION':
     case 'BEGIN_TXN':
     case 'COMMIT_TXN':
     case 'ROLLBACK_TXN':
     case 'RESET_CONNECTION':
-      return parser.readBVarByte((newValue) => {
-        parser.readBVarByte((oldValue) => {
-          callback(newValue, oldValue);
-        });
-      });
+      return readBVarByteValues.call(this, type, length - 1);
 
     case 'ROUTING_CHANGE':
-      parser.readUInt16LE((valueLength) => {
-        // Routing Change:
-        // Byte 1: Protocol (must be 0)
-        // Bytes 2-3 (USHORT): Port number
-        // Bytes 4-5 (USHORT): Length of server data in unicode (2byte chars)
-        // Bytes 6-*: Server name in unicode characters
-        parser.readBuffer(valueLength, (routePacket) => {
-          const protocol = routePacket.readUInt8(0);
-
-          if (protocol !== 0) {
-            return parser.emit('error', new Error('Unknown protocol byte in routing change event'));
-          }
-
-          const port = routePacket.readUInt16LE(1);
-          const serverLen = routePacket.readUInt16LE(3);
-          // 2 bytes per char, starting at offset 5
-          const server = routePacket.toString('ucs2', 5, 5 + (serverLen * 2));
-
-          const newValue = {
-            protocol: protocol,
-            port: port,
-            server: server
-          };
-
-          parser.readUInt16LE((oldValueLength) => {
-            parser.readBuffer(oldValueLength, (oldValue) => {
-              callback(newValue, oldValue);
-            });
-          });
-        });
-      });
-
-      break;
+      return readRoutingValues.call(this, type, length - 1);
 
     default:
       console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
-      // skip unknown bytes
-      parser.readBuffer(length - 1, () => {
-        callback(undefined, undefined);
-      });
+      this.consumeBytes(length - 1);
+      return this.parseNextToken;
   }
-}
-
-module.exports = function(parser, colMetadata, options, callback) {
-  parser.readUInt16LE((length) => {
-    parser.readUInt8((typeNumber) => {
-      const type = types[typeNumber];
-
-      if (!type) {
-        console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
-        // skip unknown bytes
-        return parser.readBuffer(length - 1, () => {
-          callback();
-        });
-      }
-
-      readNewAndOldValue(parser, length, type, (newValue, oldValue) => {
-        callback({
-          name: 'ENVCHANGE',
-          type: type.name,
-          event: type.event,
-          oldValue: oldValue,
-          newValue: newValue
-        });
-      });
-    });
-  });
 };

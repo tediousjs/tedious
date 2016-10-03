@@ -12,54 +12,72 @@ const STATUS = {
   SRVERROR: 0x0100
 };
 
-function parseToken(parser, options, callback) {
-  parser.readUInt16LE((status) => {
-    const more = !!(status & STATUS.MORE);
-    const sqlError = !!(status & STATUS.ERROR);
-    const rowCountValid = !!(status & STATUS.COUNT);
-    const attention = !!(status & STATUS.ATTN);
-    const serverError = !!(status & STATUS.SRVERROR);
+function readUInt64LE(offset, noAssert) {
+  const low = this.readUInt32LE(offset, noAssert);
+  const high = this.readUInt32LE(offset + 4, noAssert);
 
-    parser.readUInt16LE((curCmd) => {
-      (options.tdsVersion < '7_2' ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
-        callback({
-          name: 'DONE',
-          event: 'done',
-          more: more,
-          sqlError: sqlError,
-          attention: attention,
-          serverError: serverError,
-          rowCount: rowCountValid ? rowCount : undefined,
-          curCmd: curCmd
-        });
-      });
-    });
+  if (high) {
+    return Math.pow(2, 32) * high + low;
+  } else {
+    return low;
+  }
+}
+
+function parseToken(name, event) {
+  let status, curCmd, rowCount;
+  if (this.options.tdsVersion < '7_2') {
+    if (!this.bytesAvailable(8)) {
+      return;
+    }
+
+    status = this.readUInt16LE();
+    curCmd = this.readUInt16LE(2);
+    rowCount = this.readUInt32LE(4);
+
+    this.consumeBytes(8);
+  } else {
+    if (!this.bytesAvailable(12)) {
+      return;
+    }
+
+    status = this.readUInt16LE();
+    curCmd = this.readUInt16LE(2);
+    rowCount = readUInt64LE.call(this.buffer, this.position, true);
+
+    this.consumeBytes(12);
+  }
+
+  const more = !!(status & STATUS.MORE);
+  const sqlError = !!(status & STATUS.ERROR);
+  const rowCountValid = !!(status & STATUS.COUNT);
+  const attention = !!(status & STATUS.ATTN);
+  const serverError = !!(status & STATUS.SRVERROR);
+
+  this.push({
+    name: name,
+    event: event,
+    more: more,
+    sqlError: sqlError,
+    attention: attention,
+    serverError: serverError,
+    rowCount: rowCountValid ? rowCount : undefined,
+    curCmd: curCmd
   });
+
+  return this.parseNextToken;
 }
 
 module.exports.doneParser = doneParser;
-function doneParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONE';
-    token.event = 'done';
-    callback(token);
-  });
+function doneParser() {
+  return parseToken.call(this, 'DONE', 'done');
 }
 
 module.exports.doneInProcParser = doneInProcParser;
-function doneInProcParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONEINPROC';
-    token.event = 'doneInProc';
-    callback(token);
-  });
+function doneInProcParser() {
+  return parseToken.call(this, 'DONEINPROC', 'doneInProc');
 }
 
 module.exports.doneProcParser = doneProcParser;
-function doneProcParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'DONEPROC';
-    token.event = 'doneProc';
-    callback(token);
-  });
+function doneProcParser() {
+  return parseToken.call(this, 'DONEPROC', 'doneProc');
 }

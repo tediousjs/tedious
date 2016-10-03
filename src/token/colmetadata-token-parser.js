@@ -2,98 +2,145 @@
 
 const metadataParse = require('../metadata-parser');
 
-function readTableName(parser, options, metadata, callback) {
-  if (metadata.type.hasTableName) {
-    if (options.tdsVersion >= '7_2') {
-      parser.readUInt8((numberOfTableNameParts) => {
-        const tableName = [];
+function readColumn() {
+  const state = this.currentState();
 
-        let i = 0;
-        function next(done) {
-          if (numberOfTableNameParts === i) {
-            return done();
-          }
-
-          parser.readUsVarChar((part) => {
-            tableName.push(part);
-
-            i++;
-
-            next(done);
-          });
-        }
-
-        next(() => {
-          callback(tableName);
-        });
-      });
-    } else {
-      parser.readUsVarChar(callback);
-    }
-  } else {
-    callback(undefined);
+  if (state.columns.length === state.columnCount) {
+    return finishParseToken;
   }
-}
 
-function readColumnName(parser, options, index, metadata, callback) {
-  parser.readBVarChar((colName) => {
-    if (options.columnNameReplacer) {
-      callback(options.columnNameReplacer(colName, index, metadata));
-    } else if (options.camelCaseColumns) {
-      callback(colName.replace(/^[A-Z]/, function(s) {
-        return s.toLowerCase();
-      }));
-    } else {
-      callback(colName);
-    }
+  this.pushState({
+    index: state.columns.length,
+    userType: undefined,
+    flags: undefined,
+    type: undefined,
+    colName: undefined,
+    collation: undefined,
+    precision: undefined,
+    scale: undefined,
+    udtInfo: undefined,
+    dataLength: undefined,
+    tableName: undefined
   });
+
+  return metadataParse.call(this, this, afterMetadata);
 }
 
-function readColumn(parser, options, index, callback) {
-  metadataParse(parser, options, (metadata) => {
-    readTableName(parser, options, metadata, (tableName) => {
-      readColumnName(parser, options, index, metadata, (colName) => {
-        callback({
-          userType: metadata.userType,
-          flags: metadata.flags,
-          type: metadata.type,
-          colName: colName,
-          collation: metadata.collation,
-          precision: metadata.precision,
-          scale: metadata.scale,
-          udtInfo: metadata.udtInfo,
-          dataLength: metadata.dataLength,
-          tableName: tableName
-        });
-      });
+function afterMetadata() {
+  const metadata = this.popState();
+  const column = this.currentState();
+
+  column.userType = metadata.userType;
+  column.flags = metadata.flags;
+  column.type = metadata.type;
+  column.collation = metadata.collation;
+  column.precision = metadata.precision;
+  column.scale = metadata.scale;
+  column.udtInfo = metadata.udtInfo;
+  column.dataLength = metadata.dataLength;
+
+  return readTableName;
+}
+
+function readTableName() {
+  const column = this.currentState();
+
+  // if (column.type.hasTableName) {
+  //   if (options.tdsVersion >= '7_2') {
+  //     parser.readUInt8((numberOfTableNameParts) => {
+  //       const tableName = [];
+  //
+  //       let i = 0;
+  //       function next(done) {
+  //         if (numberOfTableNameParts === i) {
+  //           return done();
+  //         }
+  //
+  //         parser.readUsVarChar((part) => {
+  //           tableName.push(part);
+  //
+  //           i++;
+  //
+  //           next(done);
+  //         });
+  //       }
+  //
+  //       next(() => {
+  //         callback(tableName);
+  //       });
+  //     });
+  //   } else {
+  //     parser.readUsVarChar(callback);
+  //   }
+  // } else {
+  //   callback(undefined);
+  //   return readColumnName;
+  // }
+
+  return readColumnName;
+}
+
+function readColumnName() {
+  if (!this.bytesAvailable(1)) {
+    return;
+  }
+
+  const length = this.readUInt8() * 2;
+  if (!this.bytesAvailable(1 + length)) {
+    return;
+  }
+
+  const column = this.currentState();
+  const colName = this.readString('ucs2', 1, length);
+
+  this.consumeBytes(1 + length);
+
+  if (this.options.columnNameReplacer) {
+    // TODO: Pass a fake metadata object here
+    column.colName = this.options.columnNameReplacer(colName, column.index, column);
+  } else if (this.options.camelCaseColumns) {
+    column.colName = colName.replace(/^[A-Z]/, function(s) {
+      return s.toLowerCase();
     });
-  });
+  } else {
+    column.colName = colName;
+  }
+
+  return finishReadColumn;
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
-  parser.readUInt16LE((columnCount) => {
-    const columns = [];
+function finishReadColumn() {
+  const column = this.popState();
+  this.currentState().columns.push(column);
 
-    let i = 0;
-    function next(done) {
-      if (i === columnCount) {
-        return done();
-      }
+  return readColumn;
+}
 
-      readColumn(parser, options, i, (column) => {
-        columns.push(column);
+function finishParseToken() {
+  const state = this.popState();
 
-        i++;
-        next(done);
-      });
-    }
-
-    next(() => {
-      callback({
-        name: 'COLMETADATA',
-        event: 'columnMetadata',
-        columns: columns
-      });
-    });
+  this.push({
+    name: 'COLMETADATA',
+    event: 'columnMetadata',
+    columns: state.columns
   });
+
+  this.colMetadata = state.columns;
+
+  return this.parseNextToken;
+}
+
+module.exports = function() {
+  if (!this.bytesAvailable(2)) {
+    return;
+  }
+
+  this.pushState({
+    columns: [],
+    columnCount: this.readUInt16LE(),
+  });
+
+  this.consumeBytes(2);
+
+  return readColumn;
 };
