@@ -63,7 +63,7 @@
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
-    "prepublish": "coffee scripts/build.coffee"
+    "prepublish": "babel src --out-dir lib"
   },
   "babel": {
     "presets": [ "es2015" ],
