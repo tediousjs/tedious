@@ -12,11 +12,6 @@ fs = require('fs');
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
 
-if (config.options.tdsVersion < '7_3_A') {
-  console.log('TVP is not supported on TDS ' + config.options.tdsVersion + '.');
-  return;
-}
-
 TEST_SETUP_1 = 'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
 
 TEST_SETUP_2 = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
@@ -35,6 +30,11 @@ getConfig = function() {
 };
 
 exports.callProcedureWithTVP = function(test) {
+  if (config.options.tdsVersion < '7_3_A') {
+    console.log('TVP is not supported on TDS ' + config.options.tdsVersion + '.');
+    return test.done();
+  }
+
   var connection, request, request2, request3, request4, table;
   test.expect(13);
   config = getConfig();
