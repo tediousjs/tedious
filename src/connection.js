@@ -53,9 +53,15 @@ class Connection extends EventEmitter {
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
 
-    // These fields are used for managing transactions in TDS versions below 7.1.
-    this.transactionDepth = 0;
-    this.isSqlBatch = false;
+    if (this.config.options.tdsVersion < '7_2') {
+      // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
+      // events are utilized to maintain inTransaction property state which in
+      // turn is used in managing transactions. These events are only fired for
+      // TDS version 7.2 and beyond. The properties below are used to emulate
+      // equivalent behavior for TDS versions before 7.2.
+      this.transactionDepth = 0;
+      this.isSqlBatch = false;
+    }
   }
 
   close() {
