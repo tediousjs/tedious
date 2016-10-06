@@ -728,12 +728,13 @@ class Connection extends EventEmitter {
     isolationLevel || (isolationLevel = this.config.options.isolationLevel);
     const transaction = new Transaction(name || '', isolationLevel);
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (...args) => {
-        this.transactionDepth++;
-        if (this.transactionDepth === 1) {
-          this.inTransaction = true;
+      const self = this;
+      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, function() {
+        self.transactionDepth++;
+        if (self.transactionDepth === 1) {
+          self.inTransaction = true;
         }
-        return callback.apply(null, args);
+        return callback.apply(null, arguments);
       }));
     }
 
@@ -746,12 +747,13 @@ class Connection extends EventEmitter {
   commitTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (...args) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+      const self = this;
+      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, function() {
+        self.transactionDepth--;
+        if (self.transactionDepth === 0) {
+          self.inTransaction = false;
         }
-        return callback.apply(null, args);
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
@@ -761,12 +763,13 @@ class Connection extends EventEmitter {
   rollbackTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (...args) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+      const self = this;
+      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, function() {
+        self.transactionDepth--;
+        if (self.transactionDepth === 0) {
+          self.inTransaction = false;
         }
-        return callback.apply(null, args);
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
@@ -776,9 +779,10 @@ class Connection extends EventEmitter {
   saveTransaction(callback, name) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (...args) => {
-        this.transactionDepth++;
-        return callback.apply(null, args);
+      const self = this;
+      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, function() {
+        self.transactionDepth++;
+        return callback.apply(null, arguments);
       }));
     }
     const request = new Request(void 0, callback);
