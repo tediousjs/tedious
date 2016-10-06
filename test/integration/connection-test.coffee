@@ -14,6 +14,8 @@ getConfig = ->
     token: true
     log: true
 
+  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
   config
 
 process.on 'uncaughtException', (err) ->
@@ -997,7 +999,7 @@ exports.testAnsiNullDefault = (test) ->
       insert #testAnsiNullDefault values (null);
       drop table #testAnsiNullDefault;
     """
-    
+
     runSqlBatch test, getConfig(), sql, (err) ->
         test.ifError(err)
 
@@ -1014,8 +1016,7 @@ exports.disableAnsiNullDefault = (test) ->
 
     config = getConfig()
     config.options.enableAnsiNullDefault = false
-    
+
     runSqlBatch test, config, sql, (err) ->
         test.ok(err instanceof Error)
         test.strictEqual err?.number, 515 # Cannot insert the value NULL
-
