@@ -2,62 +2,7 @@
 
 const Socket = require('net').Socket;
 const isIP = require('net').isIP;
-const dns = require('dns');
-const semver = require('semver');
-
-let lookupAll;
-if (semver.lt(process.version, '1.2.0')) {
-  lookupAll = function lookupAll(domain, family, callback) {
-    const req = dns.lookup(domain, family, function(err, address, family) {
-      if (err) {
-        return callback(err);
-      }
-
-      callback(null, [ { address: address, family: family } ]);
-    });
-    const oldHandler = req.oncomplete;
-
-    if (oldHandler && oldHandler.length == 2) {
-      req.oncomplete = function onlookupall(err, addresses) {
-        if (err) {
-          return oldHandler.call(this, err);
-        }
-
-        const results = [];
-        for (let i = 0; i < addresses.length; i++) {
-          results.push({
-            address: addresses[i],
-            family: family || (addresses[i].indexOf(':') >= 0 ? 6 : 4)
-          });
-        }
-
-        callback(null, results);
-      };
-    } else {
-      req.oncomplete = function onlookupall(addresses) {
-        if (!addresses) {
-          return oldHandler.call(this, addresses);
-        }
-
-        const results = [];
-        for (let i = 0; i < addresses.length; i++) {
-          results.push({
-            address: addresses[i],
-            family: family || (addresses[i].indexOf(':') >= 0 ? 6 : 4)
-          });
-        }
-
-        callback(null, results);
-      };
-    }
-
-    return req;
-  };
-} else {
-  lookupAll = function lookupAll(domain, family, callback) {
-    return dns.lookup(domain, { family: family, all: true }, callback);
-  };
-}
+const lookupAll = require('dns-lookup-all');
 
 class Connector {
   constructor(options, multiSubnetFailover) {
