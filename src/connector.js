@@ -46,6 +46,7 @@ class Connector {
   _connectInSequence(addresses, cb) {
     if (!addresses.length) {
       cb(new Error('Could not connect (sequence)'));
+      return;
     }
 
     const socket = new Socket({});
@@ -76,6 +77,7 @@ class Connector {
 
       if (errorCount === addresses.length) {
         cb(new Error('Could not connect (parallel)'));
+        return;
       }
     };
 
