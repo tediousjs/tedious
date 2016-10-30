@@ -54,11 +54,14 @@ exports.connectionDeepCopiesConfig = function(test) {
   config.userName = '';
   config.password = '';
   config.options.port = 0;
-  config.options.cryptoCredentialsDetails.ciphers = '';
-  test.ok(connection.config.userName === userName);
-  test.ok(connection.config.password === password);
-  test.ok(connection.config.options.port === port);
-  test.ok(connection.config.options.cryptoCredentialsDetails.ciphers === ciphers);
+
+  test.strictEqual(connection.config.userName, userName);
+  test.strictEqual(connection.config.password, password);
+  test.strictEqual(connection.config.options.port, port);
+
+  // Test that we did not do a deep copy of the cryptoCredentialsDetails,
+  // as we never modify that value inside tedious.
+  test.strictEqual(connection.config.options.cryptoCredentialsDetails, config.options.cryptoCredentialsDetails);
 
   test.done();
 };
