@@ -38,10 +38,159 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    this.config = config;
+    this.config = {
+      server: config.server,
+      userName: config.userName,
+      password: config.password,
+      domain: config.domain && config.domain.toUpperCase(),
+      options: {
+        abortTransactionOnError: false,
+        appName: undefined,
+        camelCaseColumns: false,
+        cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
+        columnNameReplacer: undefined,
+        connectTimeout: DEFAULT_CONNECT_TIMEOUT,
+        connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
+        cryptoCredentialsDetails: {},
+        database: undefined,
+        enableAnsiNullDefault: true,
+        encrypt: false,
+        fallbackToDefaultDb: false,
+        instanceName: undefined,
+        isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
+        localAddress: undefined,
+        packetSize: DEFAULT_PACKET_SIZE,
+        port: DEFAULT_PORT,
+        readOnlyIntent: false,
+        requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
+        rowCollectionOnDone: false,
+        rowCollectionOnRequestCompletion: false,
+        tdsVersion: DEFAULT_TDS_VERSION,
+        textsize: DEFAULT_TEXTSIZE,
+        trustServerCertificate: true,
+        useColumnNames: false,
+        useUTC: true
+      }
+    };
 
-    if (typeof (config.domain) === 'string') {
-      this.config.domain = this.config.domain.toUpperCase();
+    if (config.options) {
+      if (config.options.port && config.options.instanceName) {
+        throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
+      }
+
+      if (config.options.abortTransactionOnError != undefined) {
+        this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
+      }
+
+      if (config.options.appName != undefined) {
+        this.config.options.appName = config.options.appName;
+      }
+
+      if (config.options.camelCaseColumns != undefined) {
+        this.config.options.camelCaseColumns = config.options.camelCaseColumns;
+      }
+
+      if (config.options.cancelTimeout != undefined) {
+        this.config.options.cancelTimeout = config.options.cancelTimeout;
+      }
+
+      if (config.options.columnNameReplacer) {
+        if (typeof config.options.columnNameReplacer !== 'function') {
+          throw new TypeError('options.columnNameReplacer must be a function or null.');
+        }
+
+        this.config.options.columnNameReplacer = config.options.columnNameReplacer;
+      }
+
+      if (config.options.connectTimeout) {
+        this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.connectionIsolationLevel) {
+        this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
+      }
+
+      if (config.options.cryptoCredentialsDetails) {
+        this.config.options.cryptoCredentialsDetails = config.options.cryptoCredentialsDetails;
+      }
+
+      if (config.options.cancelTimeout != undefined) {
+        this.config.options.database = config.options.database;
+      }
+
+      if (config.options.enableAnsiNullDefault != undefined) {
+        this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
+      }
+
+      if (config.options.encrypt != undefined) {
+        this.config.options.encrypt = config.options.encrypt;
+      }
+
+      if (config.options.fallbackToDefaultDb != undefined) {
+        this.config.options.fallbackToDefaultDb = config.options.fallbackToDefaultDb;
+      }
+
+      if (config.options.instanceName != undefined) {
+        this.config.options.instanceName = config.options.instanceName;
+        this.config.options.port = undefined;
+      }
+
+      if (config.options.isolationLevel) {
+        this.config.options.isolationLevel = config.options.isolationLevel;
+      }
+
+      if (config.options.localAddress != undefined) {
+        this.config.options.localAddress = config.options.localAddress;
+      }
+
+      if (config.options.packetSize) {
+        this.config.options.packetSize = config.options.packetSize;
+      }
+
+      if (config.options.port) {
+        if (config.options.port < 0 || config.options.port > 65536) {
+          throw new RangeError('Port should be > 0 and < 65536');
+        }
+
+        this.config.options.port = config.options.port;
+        this.config.options.instanceName = undefined;
+      }
+
+      if (config.options.readOnlyIntent != undefined) {
+        this.config.options.readOnlyIntent = config.options.readOnlyIntent;
+      }
+
+      if (config.options.requestTimeout != undefined) {
+        this.config.options.requestTimeout = config.options.requestTimeout;
+      }
+
+      if (config.options.rowCollectionOnDone != undefined) {
+        this.config.options.rowCollectionOnDone = config.options.rowCollectionOnDone;
+      }
+
+      if (config.options.rowCollectionOnRequestCompletion != undefined) {
+        this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
+      }
+
+      if (config.options.tdsVersion) {
+        this.config.options.tdsVersion = config.options.tdsVersion;
+      }
+
+      if (config.options.textsize) {
+        this.config.options.textsize = config.options.textsize;
+      }
+
+      if (config.options.trustServerCertificate != undefined) {
+        this.config.options.trustServerCertificate = config.options.trustServerCertificate;
+      }
+
+      if (config.options.useColumnNames != undefined) {
+        this.config.options.useColumnNames = config.options.useColumnNames;
+      }
+
+      if (config.options.useUTC != undefined) {
+        this.config.options.useUTC = config.options.useUTC;
+      }
     }
 
     this.reset = this.reset.bind(this);
@@ -51,7 +200,6 @@ class Connection extends EventEmitter {
     this.socketError = this.socketError.bind(this);
     this.requestTimeout = this.requestTimeout.bind(this);
     this.connectTimeout = this.connectTimeout.bind(this);
-    this.defaultConfig();
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
@@ -92,86 +240,6 @@ class Connection extends EventEmitter {
       this.closed = true;
       this.loggedIn = false;
       return this.loginError = null;
-    }
-  }
-
-  defaultConfig() {
-    if (!this.config.options) {
-      this.config.options = {};
-    }
-
-    if (!this.config.options.textsize) {
-      this.config.options.textsize = DEFAULT_TEXTSIZE;
-    }
-
-    if (!this.config.options.connectTimeout) {
-      this.config.options.connectTimeout = DEFAULT_CONNECT_TIMEOUT;
-    }
-
-    if (this.config.options.requestTimeout == undefined) {
-      this.config.options.requestTimeout = DEFAULT_CLIENT_REQUEST_TIMEOUT;
-    }
-
-    if (this.config.options.cancelTimeout == undefined) {
-      this.config.options.cancelTimeout = DEFAULT_CANCEL_TIMEOUT;
-    }
-
-    if (!this.config.options.packetSize) {
-      this.config.options.packetSize = DEFAULT_PACKET_SIZE;
-    }
-
-    if (!this.config.options.tdsVersion) {
-      this.config.options.tdsVersion = DEFAULT_TDS_VERSION;
-    }
-
-    if (!this.config.options.isolationLevel) {
-      this.config.options.isolationLevel = ISOLATION_LEVEL.READ_COMMITTED;
-    }
-
-    if (this.config.options.encrypt == undefined) {
-      this.config.options.encrypt = false;
-    }
-
-    if (!this.config.options.cryptoCredentialsDetails) {
-      this.config.options.cryptoCredentialsDetails = {};
-    }
-
-    if (this.config.options.trustServerCertificate === undefined) {
-      this.config.options.trustServerCertificate = true;
-    }
-
-    if (this.config.options.useUTC == undefined) {
-      this.config.options.useUTC = true;
-    }
-
-    if (this.config.options.useColumnNames == undefined) {
-      this.config.options.useColumnNames = false;
-    }
-
-    if (!this.config.options.connectionIsolationLevel) {
-      this.config.options.connectionIsolationLevel = ISOLATION_LEVEL.READ_COMMITTED;
-    }
-
-    if (this.config.options.readOnlyIntent == undefined) {
-      this.config.options.readOnlyIntent = false;
-    }
-
-    if (this.config.options.enableAnsiNullDefault == undefined) {
-      this.config.options.enableAnsiNullDefault = true;
-    }
-
-    if (!this.config.options.port && !this.config.options.instanceName) {
-      this.config.options.port = DEFAULT_PORT;
-    } else if (this.config.options.port && this.config.options.instanceName) {
-      throw new Error('Port and instanceName are mutually exclusive, but ' + this.config.options.port + ' and ' + this.config.options.instanceName + ' provided');
-    } else if (this.config.options.port) {
-      if (this.config.options.port < 0 || this.config.options.port > 65536) {
-        throw new RangeError('Port should be > 0 and < 65536');
-      }
-    }
-
-    if (this.config.options.columnNameReplacer && typeof this.config.options.columnNameReplacer !== 'function') {
-      throw new TypeError('options.columnNameReplacer must be a function or null.');
     }
   }
 
