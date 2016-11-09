@@ -114,7 +114,7 @@ class Connection extends EventEmitter {
         this.config.options.cryptoCredentialsDetails = config.options.cryptoCredentialsDetails;
       }
 
-      if (config.options.cancelTimeout != undefined) {
+      if (config.options.database != undefined) {
         this.config.options.database = config.options.database;
       }
 
