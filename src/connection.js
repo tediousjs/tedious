@@ -38,6 +38,14 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
+    if (!config) {
+      throw new TypeError('No connection configuration given');
+    }
+
+    if (typeof config.server !== 'string') {
+      throw new TypeError('Invalid server: ' + config.server);
+    }
+
     this.config = {
       server: config.server,
       userName: config.userName,

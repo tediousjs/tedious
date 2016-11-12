@@ -26,6 +26,7 @@ exports.connection = function(test) {
 
 exports.connectionDoesNotModifyPassedConfig = function(test) {
   var config = {
+    server: 'localhost',
     userName: 'sa',
     password: 'sapwd',
     options: {
