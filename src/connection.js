@@ -59,6 +59,7 @@ class Connection extends EventEmitter {
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         localAddress: undefined,
+        multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
         port: DEFAULT_PORT,
         readOnlyIntent: false,
@@ -141,6 +142,10 @@ class Connection extends EventEmitter {
 
       if (config.options.localAddress != undefined) {
         this.config.options.localAddress = config.options.localAddress;
+      }
+
+      if (config.options.multiSubnetFailover != undefined) {
+        this.config.options.multiSubnetFailover = !!config.options.multiSubnetFailover;
       }
 
       if (config.options.packetSize) {
