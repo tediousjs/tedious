@@ -26,19 +26,19 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
     npm install tedious
 
 
-<a name="documentation" />
+<a name="documentation"></a>
 ## Documentation
 More documentation is available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
-<a name="discussion" />
+<a name="discussion"></a>
 ## Discussion
 Google Group - http://groups.google.com/group/node-tedious
 
-<a name="name" />
+<a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
-<a name="license" />
+<a name="license"></a>
 ## Licence
 
 Copyright (c) 2010-2014 Mike D Pilsbury

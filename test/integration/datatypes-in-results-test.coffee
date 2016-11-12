@@ -18,6 +18,8 @@ if (debug)
 else
   config.options.debug = {}
 
+config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
 exports.null = (test) ->
   execSql(test, 'select null', null)
 

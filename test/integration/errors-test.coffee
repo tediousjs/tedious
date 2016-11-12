@@ -18,6 +18,8 @@ if (debug)
 else
   config.options.debug = {}
 
+config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
 exports.uniqueConstraint = (test) ->
   sql = """
   create table #testUnique (id int unique);
@@ -30,7 +32,7 @@ exports.uniqueConstraint = (test) ->
   execSql test, sql, (err) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 2627)
-    
+
 exports.nullable = (test) ->
   sql = """
   create table #testNullable (id int not null);
@@ -42,7 +44,7 @@ exports.nullable = (test) ->
   execSql test, sql, (err) ->
     test.ok(err instanceof Error)
     test.strictEqual(err.number, 515)
-    
+
 exports.cannotDropProcedure = (test) ->
   sql = """
   drop procedure #nonexistentProcedure;
@@ -55,7 +57,7 @@ exports.cannotDropProcedure = (test) ->
 
 # Create a temporary stored procedure to test that err.procName,
 # err.lineNumber, err.class, and err.state are correct.
-# 
+#
 # We can't really test serverName reliably, other than that it exists.
 exports.extendedErrorInfo = (test) ->
   connection = new Connection(config)
@@ -76,7 +78,7 @@ exports.extendedErrorInfo = (test) ->
     test.ok(err.procName?.indexOf("#testExtendedErrorInfo") == 0,
       "err.procName should begin with #testExtendedErrorInfo, was actually #{err.procName}")
     test.strictEqual(err.lineNumber, 1, "err.lineNumber should be 1")
-      
+
     connection.close()
 
   createProc = new Request "create procedure #testExtendedErrorInfo as raiserror('test error message', 14, 42)", (err) ->
@@ -90,7 +92,7 @@ exports.extendedErrorInfo = (test) ->
   connection.on 'end', (info) ->
     test.done()
 
-  if debug 
+  if debug
     connection.on 'debug', (message) -> console.log(message)
 
 execSql = (test, sql, requestCallback) ->
@@ -107,5 +109,5 @@ execSql = (test, sql, requestCallback) ->
   connection.on 'end', (info) ->
     test.done()
 
-  if debug 
+  if debug
     connection.on 'debug', (message) -> console.log(message)
