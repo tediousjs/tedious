@@ -45,7 +45,7 @@ class Connector {
 
   _connectInSequence(addresses, cb) {
     if (!addresses.length) {
-      cb(new Error('Could not connect (sequence)'));
+      return cb(new Error('Could not connect (sequence)'));
     }
 
     const socket = new Socket({});
