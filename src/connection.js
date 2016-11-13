@@ -1058,7 +1058,7 @@ Connection.prototype.STATE = {
         }
       },
       tls: function() {
-        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.options.trustServerCertificate);
+        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
         return this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
       }
     }
