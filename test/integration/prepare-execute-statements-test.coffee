@@ -13,6 +13,8 @@ getConfig = ->
     token: false
     log: true
 
+  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
   config
 
 exports.prepareExecute = (test) ->

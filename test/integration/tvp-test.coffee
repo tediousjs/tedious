@@ -5,6 +5,7 @@ TYPES = require('../../src/tedious').TYPES
 fs = require('fs')
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
+config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
 if config.options.tdsVersion < '7_3_A'
   console.log "TVP is not supported on TDS #{config.options.tdsVersion}."
   return
@@ -31,15 +32,15 @@ exports.callProcedureWithTVP = (test) ->
   request = new Request(TEST_SETUP_1, (err, rowCount) ->
     connection.execSqlBatch(request2)
   )
-  
+
   request2 = new Request(TEST_SETUP_2, (err, rowCount) ->
     connection.execSqlBatch(request3)
   )
-  
+
   request3 = new Request(TEST_SETUP_3, (err, rowCount) ->
     connection.callProcedure(request4)
   )
-  
+
   request4 = new Request('__tediousTvpTest', (err, rowCount) ->
     connection.close()
   )
@@ -61,7 +62,7 @@ exports.callProcedureWithTVP = (test) ->
     test.strictEqual(columns[8].value, 'asdf')
     test.strictEqual(+columns[9].value, +new Date(Date.UTC(2014, 0, 1)))
   )
-  
+
   table =
     columns: [
       name: 'a'
@@ -100,7 +101,7 @@ exports.callProcedureWithTVP = (test) ->
     rows: [
       [false, 1, 2, 3, 4, 5.5, 6.6, 'asdf', 'asdf', new Date(Date.UTC(2014, 0, 1))]
     ]
-  
+
   request4.addParameter('tvp', TYPES.TVP, table, {});
 
   connection = new Connection(config)

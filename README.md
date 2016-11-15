@@ -1,5 +1,7 @@
 # Tedious (node implementation of TDS)
-[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious)
+[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Join the chat at https://gitter.im/gitterHQ/gitterHQ.github.io](https://badges.gitter.im/tediousjs/Lobby.svg)](https://gitter.im/tediousjs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+
 
 Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
@@ -26,19 +28,19 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
     npm install tedious
 
 
-<a name="documentation" />
+<a name="documentation"></a>
 ## Documentation
 More documentation is available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
-<a name="discussion" />
+<a name="discussion"></a>
 ## Discussion
 Google Group - http://groups.google.com/group/node-tedious
 
-<a name="name" />
+<a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
-<a name="license" />
+<a name="license"></a>
 ## Licence
 
 Copyright (c) 2010-2014 Mike D Pilsbury

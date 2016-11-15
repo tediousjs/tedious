@@ -13,6 +13,8 @@ getConfig = ->
     token: true
     log: true
 
+  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
   config
 
 exports.execProcVarChar = (test) ->

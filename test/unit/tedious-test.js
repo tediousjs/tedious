@@ -23,3 +23,28 @@ exports.connection = function(test) {
 
   test.done();
 };
+
+exports.connectionDoesNotModifyPassedConfig = function(test) {
+  var config = {
+    server: 'localhost',
+    userName: 'sa',
+    password: 'sapwd',
+    options: {
+      port: 1234,
+      cryptoCredentialsDetails: {
+        ciphers: 'RC4-MD5'
+      }
+    }
+  };
+
+  var connection = new Connection(config);
+
+  test.notStrictEqual(connection.config, config);
+  test.notStrictEqual(connection.config.options, config.options);
+
+  // Test that we did not do a deep copy of the cryptoCredentialsDetails,
+  // as we never modify that value inside tedious.
+  test.strictEqual(connection.config.options.cryptoCredentialsDetails, config.options.cryptoCredentialsDetails);
+
+  test.done();
+};

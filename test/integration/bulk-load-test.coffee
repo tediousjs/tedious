@@ -13,6 +13,8 @@ getConfig = ->
     token: false
     log: true
 
+  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
+
   config
 
 exports.bulkLoad = (test) ->
@@ -22,10 +24,10 @@ exports.bulkLoad = (test) ->
 
   connection.on('connect', (err) ->
     test.ifError(err)
-    
+
     bulk = connection.newBulkLoad('#tmpTestTable', (err, rowCount) ->
       test.ifError(err)
-      
+
       test.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
       connection.close()
     )
@@ -33,7 +35,7 @@ exports.bulkLoad = (test) ->
     bulk.addColumn('nnn', TYPES.Int, { nullable: false })
     bulk.addColumn('sss', TYPES.NVarChar, { length: 50, nullable: true })
     bulk.addColumn('ddd', TYPES.DateTime, { nullable: false })
-    
+
     # create temporary table
     request = new Request(bulk.getTableCreationSql(), (err) ->
       test.ifError(err)
@@ -43,10 +45,10 @@ exports.bulkLoad = (test) ->
       bulk.addRow(203, "one zero three", new Date(2013, 7, 12))
       bulk.addRow({ nnn: 204, sss: "one zero four", ddd: new Date() })
       bulk.addRow({ nnn: 205, sss: "one zero five", ddd: new Date() })
-      
+
       connection.execBulkLoad(bulk)
     )
-    
+
     connection.execSqlBatch(request)
   )
 
@@ -93,4 +95,3 @@ exports.bulkLoadError = (test) ->
   connection.on('debug', (text) ->
     #console.log(text)
   )
- 
