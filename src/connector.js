@@ -20,9 +20,10 @@ class Connector {
   executeForIP(cb) {
     const socket = net.connect(this.options);
 
-    socket.on('error', cb);
-    socket.on('connect', function() {
+    socket.once('error', cb);
+    socket.once('connect', function() {
       this.removeListener('error', cb);
+
       cb(null, this);
     });
   }
