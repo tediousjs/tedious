@@ -116,6 +116,8 @@ class SequentialConnectionStrategy {
       socket.removeListener('error', onError);
       socket.removeListener('connect', onConnect);
 
+      socket.destroy();
+
       this.connect(callback);
     };
 

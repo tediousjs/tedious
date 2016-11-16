@@ -156,7 +156,9 @@ exports['SequentialConnectionStrategy'] = {
       socket.on('error', handler);
 
       if (options.host !== '127.0.0.4') {
-        socket.destroy(new Error());
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
       }
     });
 
@@ -191,7 +193,9 @@ exports['SequentialConnectionStrategy'] = {
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
       if (opts.host !== '127.0.0.4') {
-        socket.destroy(new Error());
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
       } else {
         expectedSocket = socket;
       }
@@ -238,7 +242,9 @@ exports['SequentialConnectionStrategy'] = {
     ], { port: 12345, localAddress: '192.168.0.1' });
 
     this.mitm.on('connect', function(socket) {
-      socket.destroy(new Error());
+      process.nextTick(() => {
+        socket.emit('error', new Error());
+      });
     });
 
     strategy.connect(function(err, socket) {
@@ -261,7 +267,9 @@ exports['SequentialConnectionStrategy'] = {
       attemptedSockets.push(socket);
 
       if (options.host !== '127.0.0.4') {
-        socket.destroy(new Error());
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
       }
     });
 
@@ -335,7 +343,9 @@ exports['ParallelConnectionStrategy'] = {
     ], { port: 12345, localAddress: '192.168.0.1' });
 
     this.mitm.on('connect', function(socket) {
-      socket.destroy(new Error());
+      process.nextTick(() => {
+        socket.emit('error', new Error());
+      });
     });
 
     strategy.connect(function(err, socket) {
@@ -355,7 +365,9 @@ exports['ParallelConnectionStrategy'] = {
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
       if (opts.host !== '127.0.0.4') {
-        socket.destroy(new Error());
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
       } else {
         expectedSocket = socket;
       }
