@@ -1,223 +1,382 @@
 'use strict';
 
-const Connector = require('../../src/connector');
-const Dns = require('dns');
-const Sinon = require('sinon');
+const Mitm = require('mitm');
+const sinon = require('sinon');
 
-const invalidIpv4Address1 = { address: '240.1.2.3', family: 4 };
-const invalidIpv4Address2 = { address: '240.1.2.4', family: 4 };
-const invalidIpv6Address1 = { address: '2002:20:0:0:0:0:1:2', family: 6 };
-const invalidIpv6Address2 = { address: '2002:20:0:0:0:0:1:3', family: 6 };
+const ParallelConnectionStrategy = require('../../src/connector').ParallelConnectionStrategy;
+const SequentialConnectionStrategy = require('../../src/connector').SequentialConnectionStrategy;
+const Connector = require('../../src/connector').Connector;
 
-const ipv4LoopbackAddress = '127.0.0.1';
-const ipv6LoopbackAddress = '::1';
+exports['Connector with MultiSubnetFailover'] = {
+  setUp: function(done) {
+    this.mitm = new Mitm();
+    this.mitm.enable();
 
-const validIpv4Address1 = { address: ipv4LoopbackAddress, family: 4 };
-const validIpv4Address2 = { address: ipv4LoopbackAddress, family: 4 };
-const validIpv6Address1 = { address: ipv6LoopbackAddress, family: 6 };
-const validIpv6Address2 = { address: ipv6LoopbackAddress, family: 6 };
+    this.sinon = sinon.sandbox.create();
 
-let isDnsLookupCalled = false;
+    done();
+  },
 
-const successCase = true;
-const multiSubnetFailoverEnabled = true;
+  tearDown: function(done) {
+    this.mitm.disable();
+    this.sinon.restore();
 
-function stubDns(addresses) {
-  restoreDns();
-  Sinon.stub(Dns, 'lookup', function(domain, options, callback) {
-    if (isDnsLookupCalled)
-      throw ('Dns lookup called a second time');
+    done();
+  },
 
-    isDnsLookupCalled = true;
-    callback(null, addresses);
-  });
-}
+  'connects directly if given an IP address': function(test) {
+    const connectionOptions = {
+      host: '127.0.0.1',
+      port: 12345,
+      localAddress: '192.168.0.1'
+    };
+    const connector = new Connector(connectionOptions, true);
 
-function restoreDns() {
-  if (Dns.lookup.restore !== undefined)
-    Dns.lookup.restore();
-}
+    let expectedSocket;
+    this.mitm.once('connect', function(socket, options) {
+      expectedSocket = socket;
 
-function testImpl(addresses, isMultiSubnetFailoverEnabled, isSuccessCase, test) {
-  const domainName1 = 'anyDomain';
-  const port1 = '80';
-  isDnsLookupCalled = false;
-  stubDns(addresses);
-  const connector = new Connector.Connector(
-    {host: domainName1, port: port1 }, isMultiSubnetFailoverEnabled);
-  connector.execute(function(err, socket) {
-    restoreDns();
-    if (isSuccessCase) {
-      test.ok(err === null);
-      socket.destroy();
-    } else {
-      test.ok(err !== null && err.message.length !== 0);
-    }
-    test.done();
-  });
-}
+      test.strictEqual(options, connectionOptions);
+    });
 
+    connector.execute(function(err, socket) {
+      test.ifError(err);
 
-////////// Success test cases begin. //////////
+      test.strictEqual(socket, expectedSocket);
 
-exports.singleGoodIpv4NoMultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, successCase, test);
+      test.done();
+    });
+  },
+
+  'uses a parallel connection strategy': function(test) {
+    const connector = new Connector({ host: 'localhost', port: 12345 }, true);
+
+    const spy = this.sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
+
+    connector.execute(function(err, socket) {
+      test.ifError(err);
+
+      test.strictEqual(spy.callCount, 1);
+
+      test.done();
+    });
+  }
 };
 
-exports.singleGoodIpv6NoMultiSuccess = function(test) {
-  const addresses = [
-    validIpv6Address1
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, successCase, test);
+exports['Connector without MultiSubnetFailover'] = {
+  setUp: function(done) {
+    this.mitm = new Mitm();
+    this.mitm.enable();
+
+    this.sinon = sinon.sandbox.create();
+
+    done();
+  },
+
+  tearDown: function(done) {
+    this.mitm.disable();
+    this.sinon.restore();
+
+    done();
+  },
+
+  'connects directly if given an IP address': function(test) {
+    const connectionOptions = {
+      host: '127.0.0.1',
+      port: 12345,
+      localAddress: '192.168.0.1'
+    };
+    const connector = new Connector(connectionOptions, false);
+
+    let expectedSocket;
+    this.mitm.once('connect', function(socket, options) {
+      expectedSocket = socket;
+
+      test.strictEqual(options, connectionOptions);
+    });
+
+    connector.execute(function(err, socket) {
+      test.ifError(err);
+
+      test.strictEqual(socket, expectedSocket);
+
+      test.done();
+    });
+  },
+
+  'uses a sequential connection strategy': function(test) {
+    const connector = new Connector({ host: 'localhost', port: 12345 }, false);
+
+    const spy = this.sinon.spy(SequentialConnectionStrategy.prototype, 'connect');
+
+    connector.execute(function(err, socket) {
+      test.ifError(err);
+
+      test.strictEqual(spy.callCount, 1);
+
+      test.done();
+    });
+  }
 };
 
-exports.multipleGoodIpv4NoMultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1,
-    validIpv4Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, successCase, test);
+exports['SequentialConnectionStrategy'] = {
+  setUp: function(done) {
+    this.mitm = new Mitm();
+    this.mitm.enable();
+
+    done();
+  },
+
+  tearDown: function(done) {
+    this.mitm.disable();
+
+    done();
+  },
+
+  'tries to connect to all addresses in sequence': function(test) {
+    const strategy = new SequentialConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ], 12345, '192.168.0.1');
+
+    const attemptedConnections = [];
+    this.mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
+
+      const expectedConnectionCount = attemptedConnections.length;
+      const handler = () => {
+        socket.removeListener('connect', handler);
+        socket.removeListener('error', handler);
+
+        test.strictEqual(attemptedConnections.length, expectedConnectionCount);
+      };
+
+      socket.on('connect', handler);
+      socket.on('error', handler);
+
+      if (options.host !== '127.0.0.4') {
+        socket.destroy(new Error());
+      }
+    });
+
+    strategy.connect(function(err) {
+      test.ifError(err);
+
+      test.strictEqual(attemptedConnections.length, 3);
+
+      test.deepEqual([
+        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
+        { host: '127.0.0.3', port: 12345, localAddress: '192.168.0.1' },
+        { host: '127.0.0.4', port: 12345, localAddress: '192.168.0.1' },
+      ], attemptedConnections);
+
+      test.done();
+    });
+  },
+
+  'passes the first succesfully connected socket to the callback': function(test) {
+    const strategy = new SequentialConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ]);
+
+    let expectedSocket;
+    this.mitm.on('connect', function(socket, opts) {
+      if (opts.host !== '127.0.0.4') {
+        socket.destroy(new Error());
+      } else {
+        expectedSocket = socket;
+      }
+    });
+
+    strategy.connect(function(err, socket) {
+      test.strictEqual(expectedSocket, socket);
+
+      test.done();
+    });
+  },
+
+  'only attempts new connections until the first successful connection': function(test) {
+    const strategy = new SequentialConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ], 12345, '192.168.0.1');
+
+    const attemptedConnections = [];
+
+    this.mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
+    });
+
+    strategy.connect(function(err) {
+      test.ifError(err);
+
+      test.strictEqual(attemptedConnections.length, 1);
+
+      test.deepEqual([
+        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
+      ], attemptedConnections);
+
+      test.done();
+    });
+  },
+
+  'fails if all sequential connections fail': function(test) {
+    const strategy = new SequentialConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ]);
+
+    this.mitm.on('connect', function(socket) {
+      socket.destroy(new Error());
+    });
+
+    strategy.connect(function(err, socket) {
+      test.equal('Could not connect (sequence)', err.message);
+
+      test.done();
+    });
+  },
+
+  'destroys all sockets except for the first succesfully connected socket': function(test) {
+    const strategy = new SequentialConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ], 12345, '192.168.0.1');
+
+    const attemptedSockets = [];
+
+    this.mitm.on('connect', function(socket, options) {
+      attemptedSockets.push(socket);
+
+      if (options.host !== '127.0.0.4') {
+        socket.destroy(new Error());
+      }
+    });
+
+    strategy.connect(function(err, socket) {
+      test.ifError(err);
+
+      test.ok(attemptedSockets[0].destroyed);
+      test.ok(attemptedSockets[1].destroyed);
+      test.ok(!attemptedSockets[2].destroyed);
+
+      test.done();
+    });
+  }
 };
 
-exports.multipleGoodIpv6NoMultiSuccess = function(test) {
-  const addresses = [
-    validIpv6Address1,
-    validIpv6Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, successCase, test);
-};
+exports['ParallelConnectionStrategy'] = {
+  setUp: function(done) {
+    this.mitm = new Mitm();
+    this.mitm.enable();
 
-exports.multipleGoodIpv4v6NoMultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1,
-    validIpv4Address2,
-    validIpv6Address1,
-    validIpv6Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, successCase, test);
-};
+    done();
+  },
 
-exports.singleGoodIpv4MultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, successCase, test);
-};
+  tearDown: function(done) {
+    this.mitm.disable();
 
-exports.singleGoodIpv6MultiSuccess = function(test) {
-  const addresses = [
-    validIpv6Address1
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, successCase, test);
-};
+    done();
+  },
 
-exports.multipleGoodIpv4MultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1,
-    validIpv4Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, successCase, test);
-};
+  'tries to connect to all addresses in parallel': function(test) {
+    const strategy = new ParallelConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ], 12345, '192.168.0.1');
 
-exports.multipleGoodIpv6MultiSuccess = function(test) {
-  const addresses = [
-    validIpv6Address1,
-    validIpv6Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, successCase, test);
-};
+    const attemptedConnections = [];
 
-exports.multipleGoodIpv4v6MultiSuccess = function(test) {
-  const addresses = [
-    validIpv4Address1,
-    validIpv4Address2,
-    validIpv6Address1,
-    validIpv6Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, successCase, test);
-};
+    this.mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
 
-////////// Failure test cases begin. //////////
+      socket.once('connect', function() {
+        test.strictEqual(attemptedConnections.length, 3);
+      });
+    });
 
-exports.singleBadIpv4NoMultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, !successCase, test);
-};
+    strategy.connect(function(err, socket) {
+      test.ifError(err);
 
-exports.singleBadIpv6NoMultiFailure = function(test) {
-  const addresses = [
-    invalidIpv6Address1
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, !successCase, test);
-};
+      test.deepEqual([
+        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
+        { host: '127.0.0.3', port: 12345, localAddress: '192.168.0.1' },
+        { host: '127.0.0.4', port: 12345, localAddress: '192.168.0.1' }
+      ], attemptedConnections);
 
-exports.multipleBadIpv4NoMultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1,
-    invalidIpv4Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, !successCase, test);
-};
+      test.done();
+    });
+  },
 
-exports.multipleBadIpv6NoMultiFailure = function(test) {
-  const addresses = [
-    invalidIpv6Address1,
-    invalidIpv6Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, !successCase, test);
-};
+  'fails if all parallel connections fail': function(test) {
+    const strategy = new ParallelConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ]);
 
-exports.multipleBadIpv4v6NoMultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1,
-    invalidIpv4Address2,
-    invalidIpv6Address1,
-    invalidIpv6Address2
-  ];
-  testImpl(addresses, !multiSubnetFailoverEnabled, !successCase, test);
-};
+    this.mitm.on('connect', function(socket) {
+      socket.destroy(new Error());
+    });
 
-exports.singleBadIpv4MultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, !successCase, test);
-};
+    strategy.connect(function(err, socket) {
+      test.equal('Could not connect (parallel)', err.message);
 
-exports.singleBadIpv6MultiFailure = function(test) {
-  const addresses = [
-    invalidIpv6Address1
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, !successCase, test);
-};
+      test.done();
+    });
+  },
 
-exports.multipleBadIpv4MultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1,
-    invalidIpv4Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, !successCase, test);
-};
+  'passes the first succesfully connected socket to the callback': function(test) {
+    const strategy = new ParallelConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ]);
 
-exports.multipleBadIpv6MultiFailure = function(test) {
-  const addresses = [
-    invalidIpv6Address1,
-    invalidIpv6Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, !successCase, test);
-};
+    let expectedSocket;
+    this.mitm.on('connect', function(socket, opts) {
+      if (opts.host !== '127.0.0.4') {
+        socket.destroy(new Error());
+      } else {
+        expectedSocket = socket;
+      }
+    });
 
-exports.multipleBadIpv4v6MultiFailure = function(test) {
-  const addresses = [
-    invalidIpv4Address1,
-    invalidIpv4Address2,
-    invalidIpv6Address1,
-    invalidIpv6Address2
-  ];
-  testImpl(addresses, multiSubnetFailoverEnabled, !successCase, test);
+    strategy.connect(function(err, socket) {
+      test.strictEqual(expectedSocket, socket);
+
+      test.done();
+    });
+  },
+
+  'destroys all sockets except for the first succesfully connected socket': function(test) {
+    const strategy = new ParallelConnectionStrategy([
+      { address: '127.0.0.2' },
+      { address: '127.0.0.3' },
+      { address: '127.0.0.4' }
+    ], 12345, '192.168.0.1');
+
+    const attemptedSockets = [];
+
+    this.mitm.on('connect', function(socket) {
+      attemptedSockets.push(socket);
+    });
+
+    strategy.connect(function(err, socket) {
+      test.ifError(err);
+
+      test.ok(!attemptedSockets[0].destroyed);
+      test.ok(attemptedSockets[1].destroyed);
+      test.ok(attemptedSockets[2].destroyed);
+
+      test.done();
+    });
+  }
 };

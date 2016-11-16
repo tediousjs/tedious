@@ -1,7 +1,6 @@
 'use strict';
 
-const Socket = require('net').Socket;
-const isIP = require('net').isIP;
+const net = require('net');
 const lookupAll = require('dns-lookup-all');
 
 class Connector {
@@ -11,7 +10,7 @@ class Connector {
   }
 
   execute(cb) {
-    if (isIP(this.options.host)) {
+    if (net.isIP(this.options.host)) {
       this.executeForIP(cb);
     } else {
       this.executeForHostname(cb);
@@ -19,8 +18,7 @@ class Connector {
   }
 
   executeForIP(cb) {
-    const socket = new Socket({});
-    socket.connect(this.options);
+    const socket = net.connect(this.options);
 
     socket.on('error', cb);
     socket.on('connect', function() {
@@ -35,48 +33,38 @@ class Connector {
         return cb(err);
       }
 
+      const port = this.options.port;
+      const localAddress = this.options.localAddress;
+
       if (this.multiSubnetFailover) {
-        this._connectInParallel(addresses, cb);
+        new ParallelConnectionStrategy(addresses, port, localAddress).connect(cb);
       } else {
-        this._connectInSequence(addresses, cb);
+        new SequentialConnectionStrategy(addresses, port, localAddress).connect(cb);
       }
     });
   }
+}
 
-  _connectInSequence(addresses, cb) {
-    if (!addresses.length) {
-      cb(new Error('Could not connect (sequence)'));
-      return;
-    }
-
-    const socket = new Socket({});
-    const next = addresses.pop();
-
-    socket.connect({
-      host: next.address,
-      port: this.options.port,
-      localAddress: this.options.localAddress
-    });
-
-    const onError = () => {
-      this._connectInSequence(addresses, cb);
-    };
-    socket.on('error', onError);
-    socket.on('connect', function() {
-      this.removeListener('error', onError);
-      cb(null, this);
-    });
+class ParallelConnectionStrategy {
+  constructor(addresses, port, localAddress) {
+    this.addresses = addresses;
+    this.port = port;
+    this.localAddress = localAddress;
   }
 
-  _connectInParallel(addresses, cb) {
+  connect(callback) {
+    const addresses = this.addresses;
     const sockets = new Array(addresses.length);
 
     let errorCount = 0;
     const onError = function(err) {
       errorCount += 1;
 
+      this.removeListener('error', onError);
+      this.removeListener('connect', onConnect);
+
       if (errorCount === addresses.length) {
-        cb(new Error('Could not connect (parallel)'));
+        callback(new Error('Could not connect (parallel)'));
         return;
       }
     };
@@ -94,15 +82,14 @@ class Connector {
         socket.destroy();
       }
 
-      cb(null, this);
+      callback(null, this);
     };
 
-    for (let i = 0; i < addresses.length; i++) {
-      const socket = sockets[i] = new Socket({});
-      socket.connect({
+    for (let i = 0, len = addresses.length; i < len; i++) {
+      const socket = sockets[i] = net.connect({
         host: addresses[i].address,
-        port: this.options.port,
-        localAddress: this.options.localAddress
+        port: this.port,
+        localAddress: this.localAddress
       });
 
       socket.on('error', onError);
@@ -111,4 +98,48 @@ class Connector {
   }
 }
 
+class SequentialConnectionStrategy {
+  constructor(addresses, port, localAddress) {
+    this.addresses = addresses;
+    this.port = port;
+    this.localAddress = localAddress;
+  }
+
+  connect(cb) {
+    const addresses = this.addresses;
+
+    if (!addresses.length) {
+      cb(new Error('Could not connect (sequence)'));
+      return;
+    }
+
+    const next = addresses.shift();
+
+    const socket = net.connect({
+      host: next.address,
+      port: this.port,
+      localAddress: this.localAddress
+    });
+
+    const onError = (err) => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
+
+      this.connect(cb);
+    };
+
+    const onConnect = () => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
+
+      cb(null, socket);
+    };
+
+    socket.on('error', onError);
+    socket.on('connect', onConnect);
+  }
+}
+
 module.exports.Connector = Connector;
+module.exports.ParallelConnectionStrategy = ParallelConnectionStrategy;
+module.exports.SequentialConnectionStrategy = SequentialConnectionStrategy;
