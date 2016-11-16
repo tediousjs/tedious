@@ -138,7 +138,7 @@ exports['SequentialConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ], 12345, '192.168.0.1');
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     const attemptedConnections = [];
     this.mitm.on('connect', function(socket, options) {
@@ -165,11 +165,17 @@ exports['SequentialConnectionStrategy'] = {
 
       test.strictEqual(attemptedConnections.length, 3);
 
-      test.deepEqual([
-        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
-        { host: '127.0.0.3', port: 12345, localAddress: '192.168.0.1' },
-        { host: '127.0.0.4', port: 12345, localAddress: '192.168.0.1' },
-      ], attemptedConnections);
+      test.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+      test.strictEqual(attemptedConnections[0].port, 12345);
+      test.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+
+      test.strictEqual(attemptedConnections[1].host, '127.0.0.3');
+      test.strictEqual(attemptedConnections[1].port, 12345);
+      test.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
+
+      test.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+      test.strictEqual(attemptedConnections[2].port, 12345);
+      test.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
 
       test.done();
     });
@@ -180,7 +186,7 @@ exports['SequentialConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ]);
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
@@ -203,7 +209,7 @@ exports['SequentialConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ], 12345, '192.168.0.1');
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     const attemptedConnections = [];
 
@@ -216,9 +222,9 @@ exports['SequentialConnectionStrategy'] = {
 
       test.strictEqual(attemptedConnections.length, 1);
 
-      test.deepEqual([
-        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
-      ], attemptedConnections);
+      test.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+      test.strictEqual(attemptedConnections[0].port, 12345);
+      test.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
       test.done();
     });
@@ -229,7 +235,7 @@ exports['SequentialConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ]);
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     this.mitm.on('connect', function(socket) {
       socket.destroy(new Error());
@@ -247,7 +253,7 @@ exports['SequentialConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ], 12345, '192.168.0.1');
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     const attemptedSockets = [];
 
@@ -290,7 +296,7 @@ exports['ParallelConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ], 12345, '192.168.0.1');
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     const attemptedConnections = [];
 
@@ -305,11 +311,17 @@ exports['ParallelConnectionStrategy'] = {
     strategy.connect(function(err, socket) {
       test.ifError(err);
 
-      test.deepEqual([
-        { host: '127.0.0.2', port: 12345, localAddress: '192.168.0.1' },
-        { host: '127.0.0.3', port: 12345, localAddress: '192.168.0.1' },
-        { host: '127.0.0.4', port: 12345, localAddress: '192.168.0.1' }
-      ], attemptedConnections);
+      test.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+      test.strictEqual(attemptedConnections[0].port, 12345);
+      test.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+
+      test.strictEqual(attemptedConnections[1].host, '127.0.0.3');
+      test.strictEqual(attemptedConnections[1].port, 12345);
+      test.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
+
+      test.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+      test.strictEqual(attemptedConnections[2].port, 12345);
+      test.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
 
       test.done();
     });
@@ -320,7 +332,7 @@ exports['ParallelConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ]);
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     this.mitm.on('connect', function(socket) {
       socket.destroy(new Error());
@@ -338,7 +350,7 @@ exports['ParallelConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ]);
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
@@ -361,7 +373,7 @@ exports['ParallelConnectionStrategy'] = {
       { address: '127.0.0.2' },
       { address: '127.0.0.3' },
       { address: '127.0.0.4' }
-    ], 12345, '192.168.0.1');
+    ], { port: 12345, localAddress: '192.168.0.1' });
 
     const attemptedSockets = [];
 

@@ -33,23 +33,19 @@ class Connector {
         return cb(err);
       }
 
-      const port = this.options.port;
-      const localAddress = this.options.localAddress;
-
       if (this.multiSubnetFailover) {
-        new ParallelConnectionStrategy(addresses, port, localAddress).connect(cb);
+        new ParallelConnectionStrategy(addresses, this.options).connect(cb);
       } else {
-        new SequentialConnectionStrategy(addresses, port, localAddress).connect(cb);
+        new SequentialConnectionStrategy(addresses, this.options).connect(cb);
       }
     });
   }
 }
 
 class ParallelConnectionStrategy {
-  constructor(addresses, port, localAddress) {
+  constructor(addresses, options) {
     this.addresses = addresses;
-    this.port = port;
-    this.localAddress = localAddress;
+    this.options = options;
   }
 
   connect(callback) {
@@ -85,11 +81,9 @@ class ParallelConnectionStrategy {
     };
 
     for (let i = 0, len = addresses.length; i < len; i++) {
-      const socket = sockets[i] = net.connect({
-        host: addresses[i].address,
-        port: this.port,
-        localAddress: this.localAddress
-      });
+      const socket = sockets[i] = net.connect(Object.create(this.options, {
+        host: { value: addresses[i].address }
+      }));
 
       socket.on('error', onError);
       socket.on('connect', onConnect);
@@ -98,10 +92,9 @@ class ParallelConnectionStrategy {
 }
 
 class SequentialConnectionStrategy {
-  constructor(addresses, port, localAddress) {
+  constructor(addresses, options) {
     this.addresses = addresses;
-    this.port = port;
-    this.localAddress = localAddress;
+    this.options = options;
   }
 
   connect(callback) {
@@ -114,11 +107,9 @@ class SequentialConnectionStrategy {
 
     const next = addresses.shift();
 
-    const socket = net.connect({
-      host: next.address,
-      port: this.port,
-      localAddress: this.localAddress
-    });
+    const socket = net.connect(Object.create(this.options, {
+      host: { value: next.address }
+    }));
 
     const onError = (err) => {
       socket.removeListener('error', onError);
