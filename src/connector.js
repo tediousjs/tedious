@@ -24,6 +24,8 @@ class Connector {
       socket.removeListener('error', onError);
       socket.removeListener('connect', onConnect);
 
+      socket.destroy();
+
       cb(err);
     };
 
