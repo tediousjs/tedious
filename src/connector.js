@@ -20,12 +20,22 @@ class Connector {
   executeForIP(cb) {
     const socket = net.connect(this.options);
 
-    socket.once('error', cb);
-    socket.once('connect', function() {
-      this.removeListener('error', cb);
+    const onError = (err) => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
 
-      cb(null, this);
-    });
+      cb(err);
+    };
+
+    const onConnect = () => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
+
+      cb(null, socket);
+    };
+
+    socket.on('error', onError);
+    socket.on('connect', onConnect);
   }
 
   executeForHostname(cb) {
