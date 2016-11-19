@@ -7,6 +7,30 @@ const ParallelConnectionStrategy = require('../../src/connector').ParallelConnec
 const SequentialConnectionStrategy = require('../../src/connector').SequentialConnectionStrategy;
 const Connector = require('../../src/connector').Connector;
 
+const connectToIpTestImpl = function(hostIp, localIp, mitm, test) {
+  const connectionOptions = {
+    host: hostIp,
+    port: 12345,
+    localAddress: localIp
+  };
+  const connector = new Connector(connectionOptions, true);
+
+  let expectedSocket;
+  mitm.once('connect', function(socket, options) {
+    expectedSocket = socket;
+
+    test.strictEqual(options, connectionOptions);
+  });
+
+  connector.execute(function(err, socket) {
+    test.ifError(err);
+
+    test.strictEqual(socket, expectedSocket);
+
+    test.done();
+  });
+};
+
 exports['Connector with MultiSubnetFailover'] = {
   setUp: function(done) {
     this.mitm = new Mitm();
@@ -24,28 +48,12 @@ exports['Connector with MultiSubnetFailover'] = {
     done();
   },
 
-  'connects directly if given an IP address': function(test) {
-    const connectionOptions = {
-      host: '127.0.0.1',
-      port: 12345,
-      localAddress: '192.168.0.1'
-    };
-    const connector = new Connector(connectionOptions, true);
+  'connects directly if given an IP v4 address': function(test) {
+    connectToIpTestImpl('127.0.0.1', '192.168.0.1', this.mitm, test);
+  },
 
-    let expectedSocket;
-    this.mitm.once('connect', function(socket, options) {
-      expectedSocket = socket;
-
-      test.strictEqual(options, connectionOptions);
-    });
-
-    connector.execute(function(err, socket) {
-      test.ifError(err);
-
-      test.strictEqual(socket, expectedSocket);
-
-      test.done();
-    });
+  'connects directly if given an IP v6 address': function(test) {
+    connectToIpTestImpl('::1', '2002:20:0:0:0:0:1:2', this.mitm, test);
   },
 
   'uses a parallel connection strategy': function(test) {
@@ -136,7 +144,7 @@ exports['SequentialConnectionStrategy'] = {
   'tries to connect to all addresses in sequence': function(test) {
     const strategy = new SequentialConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -171,7 +179,7 @@ exports['SequentialConnectionStrategy'] = {
       test.strictEqual(attemptedConnections[0].port, 12345);
       test.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
-      test.strictEqual(attemptedConnections[1].host, '127.0.0.3');
+      test.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
       test.strictEqual(attemptedConnections[1].port, 12345);
       test.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
 
@@ -186,7 +194,7 @@ exports['SequentialConnectionStrategy'] = {
   'passes the first succesfully connected socket to the callback': function(test) {
     const strategy = new SequentialConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -211,7 +219,7 @@ exports['SequentialConnectionStrategy'] = {
   'only attempts new connections until the first successful connection': function(test) {
     const strategy = new SequentialConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -237,7 +245,7 @@ exports['SequentialConnectionStrategy'] = {
   'fails if all sequential connections fail': function(test) {
     const strategy = new SequentialConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -257,7 +265,7 @@ exports['SequentialConnectionStrategy'] = {
   'destroys all sockets except for the first succesfully connected socket': function(test) {
     const strategy = new SequentialConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -302,7 +310,7 @@ exports['ParallelConnectionStrategy'] = {
   'tries to connect to all addresses in parallel': function(test) {
     const strategy = new ParallelConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -323,7 +331,7 @@ exports['ParallelConnectionStrategy'] = {
       test.strictEqual(attemptedConnections[0].port, 12345);
       test.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
-      test.strictEqual(attemptedConnections[1].host, '127.0.0.3');
+      test.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
       test.strictEqual(attemptedConnections[1].port, 12345);
       test.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
 
@@ -338,7 +346,7 @@ exports['ParallelConnectionStrategy'] = {
   'fails if all parallel connections fail': function(test) {
     const strategy = new ParallelConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -358,7 +366,7 @@ exports['ParallelConnectionStrategy'] = {
   'passes the first succesfully connected socket to the callback': function(test) {
     const strategy = new ParallelConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 
@@ -383,7 +391,7 @@ exports['ParallelConnectionStrategy'] = {
   'destroys all sockets except for the first succesfully connected socket': function(test) {
     const strategy = new ParallelConnectionStrategy([
       { address: '127.0.0.2' },
-      { address: '127.0.0.3' },
+      { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ], { port: 12345, localAddress: '192.168.0.1' });
 

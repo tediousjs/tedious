@@ -41,7 +41,7 @@ class Connector {
   }
 
   executeForHostname(cb) {
-    lookupAll(this.options.host, 4, (err, addresses) => {
+    lookupAll(this.options.host, (err, addresses) => {
       if (err) {
         return cb(err);
       }
