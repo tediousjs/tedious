@@ -273,6 +273,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('sspichallenge', (token) => {
       if (token.ntlmpacket) {
         this.ntlmpacket = token.ntlmpacket;
+        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
       }
       return this.emit('sspichallenge', token);
     });
@@ -659,8 +660,8 @@ class Connection extends EventEmitter {
         const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
         console.log('SPN: ', spn);
 
-        const sspiClient = new SspiClientApi.SspiClient(spn);
-        sspiClient.getNextBlob(null, 0, (clientResponse, isDone, errorCode, errorString) => {
+        this.sspiClient = new SspiClientApi.SspiClient(spn);
+        this.sspiClient.getNextBlob(null, 0, (clientResponse, isDone, errorCode, errorString) => {
           //console.log('errorCode: ', errorCode);
           //console.log('errorString: ', errorString);
           //console.log('isDone: ', isDone);
@@ -716,22 +717,46 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendNTLMResponsePacket() {
-    const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    return this.debug.payload(function () {
-      return payload.toString('  ');
-    });
+  sendNTLMResponsePacket(cb) {
+    if (this.sspiClient) {
+      console.log('Sspi path. ntlmpacketBuffer length = ', this.ntlmpacketBuffer.length);
+      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+        console.log('errorCode: ', errorCode);
+        console.log('errorString: ', errorString);
+        console.log('isDone: ', isDone);
+        console.log('clientResonse length: ', clientResponse.length);
+        console.log('clientResponse: ', clientResponse);
+
+        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
+        this.debug.payload(function () {
+          return payload.toString('  ');
+        });
+
+        console.log('callback invoked.');
+        cb();
+      });
+    } else {
+      console.log('NTLM path.');
+      const payload = new NTLMResponsePayload({
+        domain: this.config.domain,
+        userName: this.config.userName,
+        password: this.config.password,
+        database: this.config.options.database,
+        appName: this.config.options.appName,
+        packetSize: this.config.options.packetSize,
+        tdsVersion: this.config.options.tdsVersion,
+        ntlmpacket: this.ntlmpacket,
+        additional: this.additional
+      });
+
+      this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+      this.debug.payload(function () {
+        return payload.toString('  ');
+      });
+
+      console.log('callback invoked.');
+      cb();
+    }
   }
 
   sendDataToTokenStreamParser(data) {
@@ -1209,8 +1234,9 @@ Connection.prototype.STATE = {
       },
       receivedChallenge: function () {
         console.log('NTLM: receivedChallenge');
-        this.sendNTLMResponsePacket();
-        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        this.sendNTLMResponsePacket(() => {
+          return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        });
       },
       loginFailed: function () {
         console.log('NTLM: loginFailed');
@@ -1265,8 +1291,9 @@ Connection.prototype.STATE = {
       },
       receivedChallenge: function () {
         console.log('SSPI: receivedChallenge');
-        this.sendNTLMResponsePacket();
-        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        this.sendNTLMResponsePacket(() => {
+          return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        });
       },
       loginFailed: function () {
         console.log('SSPI: loginFailed');

@@ -24,7 +24,8 @@ module.exports = function(parser, colMetadata, options, callback) {
     callback({
       name: 'SSPICHALLENGE',
       event: 'sspichallenge',
-      ntlmpacket: parseChallenge(buffer)
+      ntlmpacket: parseChallenge(buffer),
+      ntlmpacketBuffer: buffer
     });
   });
 };
