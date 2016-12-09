@@ -658,16 +658,9 @@ class Connection extends EventEmitter {
         }
 
         const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
-        console.log('SPN: ', spn);
 
         this.sspiClient = new SspiClientApi.SspiClient(spn);
         this.sspiClient.getNextBlob(null, 0, (clientResponse, isDone, errorCode, errorString) => {
-          //console.log('errorCode: ', errorCode);
-          //console.log('errorString: ', errorString);
-          //console.log('isDone: ', isDone);
-          //console.log('clientResonse length: ', clientResponse.length);
-          //console.log('clientResponse: ', clientResponse);
-
           const payload = new Login7Payload({
             domain: this.config.domain,
             userName: this.config.userName,
@@ -717,26 +710,21 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendNTLMResponsePacket(cb) {
+  sendNTLMResponsePacket() {
     if (this.sspiClient) {
-      console.log('Sspi path. ntlmpacketBuffer length = ', this.ntlmpacketBuffer.length);
       this.sspiClient.getNextBlob(this.ntlmpacketBuffer, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
-        console.log('errorCode: ', errorCode);
-        console.log('errorString: ', errorString);
-        console.log('isDone: ', isDone);
-        console.log('clientResonse length: ', clientResponse.length);
-        console.log('clientResponse: ', clientResponse);
+        if (errorCode) {
+          throw new Error(errorString);
+        }
 
-        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
-        this.debug.payload(function () {
-          return payload.toString('  ');
-        });
-
-        console.log('callback invoked.');
-        cb();
+        if (clientResponse.length) {
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
+          this.debug.payload(function () {
+            return '  SSPI Auth';
+          });
+        }
       });
     } else {
-      console.log('NTLM path.');
       const payload = new NTLMResponsePayload({
         domain: this.config.domain,
         userName: this.config.userName,
@@ -753,9 +741,6 @@ class Connection extends EventEmitter {
       this.debug.payload(function () {
         return payload.toString('  ');
       });
-
-      console.log('callback invoked.');
-      cb();
     }
   }
 
@@ -1130,7 +1115,7 @@ Connection.prototype.STATE = {
             if (this.config.password) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else if (os.type() === 'Windows_NT') {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_SSPI);
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             }
           } else {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1177,11 +1162,10 @@ Connection.prototype.STATE = {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
             if (this.config.domain) {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
               if (this.config.password) {
                 return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
               } else if (os.type() === 'Windows_NT') {
-                return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_SSPI);
+                return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
               }
             } else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1221,29 +1205,28 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithNTLMLogin',
     events: {
       socketError: function () {
-        console.log('NTLM: socketError');
+        console.log('NTLM Login7: socketError');
         return this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function () {
-        console.log('NTLM: connectTimeout');
+        console.log('NTLM Login7: connectTimeout');
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function (data) {
-        console.log('NTLM: data');
+        console.log('NTLM Login7: data');
         return this.sendDataToTokenStreamParser(data);
       },
       receivedChallenge: function () {
-        console.log('NTLM: receivedChallenge');
-        this.sendNTLMResponsePacket(() => {
-          return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-        });
+        console.log('NTLM Login7: receivedChallenge');
+        this.sendNTLMResponsePacket();
+        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
       },
       loginFailed: function () {
-        console.log('NTLM: loginFailed');
+        console.log('NTLM Login7: loginFailed');
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function () {
-        console.log('NTLM: message');
+        console.log('NTLM Login7: message');
         return this.processLogin7NTLMResponse();
       }
     }
@@ -1252,56 +1235,32 @@ Connection.prototype.STATE = {
     name: 'SentNTLMResponse',
     events: {
       socketError: function() {
+        console.log('NTLM Reseponse: socketError');
         return this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
+        console.log('NTLM Reseponse: connectTimeout');
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
+        console.log('NTLM Reseponse: data');
         return this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
+        console.log('NTLM Reseponse: loggedIn');
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
       loginFailed: function() {
+        console.log('NTLM Reseponse: loginFailed');
         return this.transitionTo(this.STATE.FINAL);
       },
       routingChange: function() {
+        console.log('NTLM Reseponse: routingChange');
         return this.transitionTo(this.STATE.REROUTING);
       },
       message: function() {
+        console.log('NTLM Reseponse: message');
         return this.processLogin7NTLMAck();
-      }
-    }
-  },
-  SENT_LOGIN7_WITH_SSPI: {
-    name: 'SentLogin7WithSSPILogin',
-    events: {
-      socketError: function () {
-        console.log('SSPI: socketError');
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function () {
-        console.log('SSPI: connectTimeout');
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function (data) {
-        console.log('SSPI: data');
-        return this.sendDataToTokenStreamParser(data);
-      },
-      receivedChallenge: function () {
-        console.log('SSPI: receivedChallenge');
-        this.sendNTLMResponsePacket(() => {
-          return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-        });
-      },
-      loginFailed: function () {
-        console.log('SSPI: loginFailed');
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      message: function () {
-        console.log('SSPI: message');
-        return this.processLogin7NTLMResponse();
       }
     }
   },
