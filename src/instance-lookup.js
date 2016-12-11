@@ -10,10 +10,32 @@ const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 module.exports.instanceLookup = instanceLookup;
-function instanceLookup(server, instanceName, callback, timeout, retries) {
-  let socket, timer;
-  timeout = timeout || TIMEOUT;
-  let retriesLeft = retries || RETRIES;
+function instanceLookup(options, callback) {
+  const server = options.server;
+  if (typeof server !== 'string') {
+    throw new TypeError('Invalid arguments: "server" must be a string');
+  }
+
+  const instanceName = options.instanceName;
+  if (typeof instanceName !== 'string') {
+    throw new TypeError('Invalid arguments: "instanceName" must be a string');
+  }
+
+  const timeout = options.retries === undefined ? TIMEOUT : options.timeout;
+  if (typeof timeout !== 'number') {
+    throw new TypeError('Invalid arguments: "retries" must be a number');
+  }
+
+  const retries = options.retries === undefined ? RETRIES : options.retries;
+  if (typeof retries !== 'number') {
+    throw new TypeError('Invalid arguments: "retries" must be a number');
+  }
+
+  if (typeof callback !== 'function') {
+    throw new TypeError('Invalid arguments: "callback" must be a function');
+  }
+
+  let socket, timer, retriesLeft = retries;
 
   function onMessage(message) {
     if (timer) {

@@ -22,7 +22,7 @@ exports.goodInstance = (test) ->
 
     test.done()
 
-  instanceLookup(config.server, config.instanceName, callback)
+  instanceLookup({ server: config.server, instanceName: config.instanceName }, callback)
 
 exports.badInstance = (test) ->
   config = getConfig()
@@ -33,7 +33,7 @@ exports.badInstance = (test) ->
 
     test.done()
 
-  instanceLookup(config.server, 'badInstanceName', callback, 100, 1)
+  instanceLookup({ server: config.server, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
 
 exports.badServer = (test) ->
   config = getConfig()
@@ -44,4 +44,4 @@ exports.badServer = (test) ->
 
     test.done()
 
-  instanceLookup(RESERVED_IP_ADDRESS, config.instanceName, callback, 100, 1)
+  instanceLookup({ server: RESERVED_IP_ADDRESS, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
