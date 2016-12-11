@@ -38,13 +38,12 @@ function instanceLookup(options, callback) {
   let socket, timer, retriesLeft = retries;
 
   function onMessage(message) {
-    if (timer) {
-      clearTimeout(timer);
-      timer = undefined;
-    }
+    clearTimeout(timer);
+    socket.close();
+
     message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
     const port = parseBrowserResponse(message, instanceName);
-    socket.close();
+
     if (port) {
       return callback(undefined, port);
     } else {
@@ -53,17 +52,15 @@ function instanceLookup(options, callback) {
   }
 
   function onError(err) {
-    if (timer) {
-      clearTimeout(timer);
-      timer = undefined;
-    }
+    clearTimeout(timer);
     socket.close();
+
     return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
   }
 
   function onTimeout() {
-    timer = undefined;
     socket.close();
+
     return makeAttempt();
   }
 
