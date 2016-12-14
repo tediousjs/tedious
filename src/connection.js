@@ -56,6 +56,7 @@ class Connection extends EventEmitter {
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
+      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -659,7 +660,8 @@ class Connection extends EventEmitter {
 
         const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
 
-        this.sspiClient = new SspiClientApi.SspiClient(spn);
+        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
+
         this.sspiClient.getNextBlob(null, 0, (clientResponse, isDone, errorCode, errorString) => {
           const payload = new Login7Payload({
             domain: this.config.domain,
