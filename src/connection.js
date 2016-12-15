@@ -662,7 +662,7 @@ class Connection extends EventEmitter {
 
         this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
 
-        this.sspiClient.getNextBlob(null, 0, (clientResponse, isDone, errorCode, errorString) => {
+        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
           const payload = new Login7Payload({
             domain: this.config.domain,
             userName: this.config.userName,
@@ -714,7 +714,7 @@ class Connection extends EventEmitter {
 
   sendNTLMResponsePacket() {
     if (this.sspiClient) {
-      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
         if (errorCode) {
           throw new Error(errorString);
         }
