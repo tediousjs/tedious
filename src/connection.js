@@ -663,6 +663,11 @@ class Connection extends EventEmitter {
         this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
 
         this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
+          console.log(
+            'sendLogin7Packet: errorCode=', errorCode,
+            ', isDone=', isDone,
+            ', clientResponse: ', clientResponse.length, ' bytes');
+
           const payload = new Login7Payload({
             domain: this.config.domain,
             userName: this.config.userName,
@@ -715,6 +720,12 @@ class Connection extends EventEmitter {
   sendNTLMResponsePacket() {
     if (this.sspiClient) {
       this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+        console.log(
+          'sendNTLMResponsePacket: errorCode=', errorCode,
+          ', isDone=', isDone,
+          ', clientResponse: ', clientResponse.length, ' bytes',
+          ', serverResponse length: ', this.ntlmpacketBuffer.length, ' bytes');
+
         if (errorCode) {
           throw new Error(errorString);
         }
@@ -1074,6 +1085,10 @@ class Connection extends EventEmitter {
 
 module.exports = Connection;
 
+let numNtlmResponsesSent = 0;
+let dataOnce = 0;
+let dataPending = false;
+
 Connection.prototype.STATE = {
   CONNECTING: {
     name: 'Connecting',
@@ -1215,13 +1230,31 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function (data) {
-        console.log('NTLM Login7: data');
-        return this.sendDataToTokenStreamParser(data);
+        console.log('NTLM Login7: data, getNextBlobInProgress=', this.sspiClient.getNextBlobInProgress);
+        //if (dataOnce == 0) {
+        //  // console.log('Dispatch event: ', this.dispatchEvent);
+        //  let boundDispatchEvent = this.dispatchEvent.bind(this);
+        //  // console.log('bound Dispatch event: ', boundDispatchEvent);
+        //  process.nextTick(boundDispatchEvent, 'data', data);
+        //  dataOnce++;
+        //  dataPending = true;
+        //  return;
+        //} else {
+        //  dataOnce = 0;
+        //  dataPending = false;
+          return this.sendDataToTokenStreamParser(data);
+        //}
       },
       receivedChallenge: function () {
         console.log('NTLM Login7: receivedChallenge');
         this.sendNTLMResponsePacket();
-        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+
+        numNtlmResponsesSent++;
+        if (numNtlmResponsesSent == 2) {
+          return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        } else {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        }
       },
       loginFailed: function () {
         console.log('NTLM Login7: loginFailed');
@@ -1229,7 +1262,12 @@ Connection.prototype.STATE = {
       },
       message: function () {
         console.log('NTLM Login7: message');
-        return this.processLogin7NTLMResponse();
+        //if (dataPending) {
+        //  let boundDispatchEvent = this.dispatchEvent.bind(this);
+        //  process.nextTick(boundDispatchEvent, 'message');
+        //} else {
+          return this.processLogin7NTLMResponse();
+        //}
       }
     }
   },
