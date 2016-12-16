@@ -187,10 +187,10 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
     if (this.loginData.domain) {
-      if (this.loginData.password) {
-        this.ntlmPacket = this.createNTLMRequest(this.loginData);
-      } else {
+      if (this.loginData.sspiBlob) {
         this.ntlmPacket = this.loginData.sspiBlob;
+      } else {
+        this.ntlmPacket = this.createNTLMRequest(this.loginData);
       }
 
       this.sspiLong = this.ntlmPacket.length;
