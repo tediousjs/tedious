@@ -696,7 +696,7 @@ class Connection extends EventEmitter {
           this.routingData = undefined;
           this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
 
-          this.debug.payload(function () {
+          this.debug.payload(function() {
             return payload.toString('  ');
           });
 
@@ -720,7 +720,7 @@ class Connection extends EventEmitter {
       this.routingData = undefined;
       this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
 
-      this.debug.payload(function () {
+      this.debug.payload(function() {
         return payload.toString('  ');
       });
 
@@ -742,7 +742,7 @@ class Connection extends EventEmitter {
 
         if (clientResponse.length) {
           this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
-          this.debug.payload(function () {
+          this.debug.payload(function() {
             return '  SSPI Auth';
           });
         }
@@ -765,11 +765,11 @@ class Connection extends EventEmitter {
       });
 
       this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-      this.debug.payload(function () {
+      this.debug.payload(function() {
         return payload.toString('  ');
       });
 
-      let boundTransitionTo = this.transitionTo.bind(this);
+      const boundTransitionTo = this.transitionTo.bind(this);
       process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
     }
   }
@@ -1226,40 +1226,40 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     events: {
-      socketError: function () {
+      socketError: function() {
         console.log('NTLM Login7: socketError');
         return this.transitionTo(this.STATE.FINAL);
       },
-      connectTimeout: function () {
+      connectTimeout: function() {
         console.log('NTLM Login7: connectTimeout');
         return this.transitionTo(this.STATE.FINAL);
       },
-      data: function (data) {
+      data: function(data) {
         if (this.sspiClientResponsePending) {
           console.log('NTLM Login7: data queued');
           // SspiClientResponse may change the state. Can't process until
           // the response comes back.
-          let boundDispatchEvent = this.dispatchEvent.bind(this);
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'data', data);
         } else {
           console.log('NTLM Login7: data processed');
           return this.sendDataToTokenStreamParser(data);
         }
       },
-      receivedChallenge: function () {
+      receivedChallenge: function() {
         console.log('NTLM Login7: receivedChallenge');
         return this.sendNTLMResponsePacket();
       },
-      loginFailed: function () {
+      loginFailed: function() {
         console.log('NTLM Login7: loginFailed');
         return this.transitionTo(this.STATE.FINAL);
       },
-      message: function () {
+      message: function() {
         if (this.sspiClientResponsePending) {
           console.log('NTLM Login7: message queued');
           // SspiClientResponse may change the state. Can't process until
           // the response comes back.
-          let boundDispatchEvent = this.dispatchEvent.bind(this);
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'message');
         } else {
           console.log('NTLM Login7: message processed');

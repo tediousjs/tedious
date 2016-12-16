@@ -21,7 +21,7 @@ function parseChallenge(buffer) {
   return challenge;
 }
 
-module.exports = function (parser, colMetadata, options, callback) {
+module.exports = function(parser, colMetadata, options, callback) {
   parser.readUsVarByte((buffer) => {
     callback({
       name: 'SSPICHALLENGE',
