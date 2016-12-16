@@ -1227,42 +1227,34 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithNTLMLogin',
     events: {
       socketError: function() {
-        console.log('NTLM Login7: socketError');
         return this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        console.log('NTLM Login7: connectTimeout');
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
         if (this.sspiClientResponsePending) {
-          console.log('NTLM Login7: data queued');
           // SspiClientResponse may change the state. Can't process until
           // the response comes back.
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'data', data);
         } else {
-          console.log('NTLM Login7: data processed');
           return this.sendDataToTokenStreamParser(data);
         }
       },
       receivedChallenge: function() {
-        console.log('NTLM Login7: receivedChallenge');
         return this.sendNTLMResponsePacket();
       },
       loginFailed: function() {
-        console.log('NTLM Login7: loginFailed');
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
         if (this.sspiClientResponsePending) {
-          console.log('NTLM Login7: message queued');
           // SspiClientResponse may change the state. Can't process until
           // the response comes back.
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'message');
         } else {
-          console.log('NTLM Login7: message processed');
           return this.processLogin7NTLMResponse();
         }
       }
@@ -1272,31 +1264,24 @@ Connection.prototype.STATE = {
     name: 'SentNTLMResponse',
     events: {
       socketError: function() {
-        console.log('NTLM Response: socketError');
         return this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        console.log('NTLM Reseponse: connectTimeout');
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        console.log('NTLM Response: data');
         return this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
-        console.log('NTLM Response: loggedIn');
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
       loginFailed: function() {
-        console.log('NTLM Response: loginFailed');
         return this.transitionTo(this.STATE.FINAL);
       },
       routingChange: function() {
-        console.log('NTLM Response: routingChange');
         return this.transitionTo(this.STATE.REROUTING);
       },
       message: function() {
-        console.log('NTLM Response: message');
         return this.processLogin7NTLMAck();
       }
     }
