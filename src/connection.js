@@ -475,7 +475,10 @@ class Connection extends EventEmitter {
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     } else {
-      return instanceLookup(this.config.server, this.config.options.instanceName, (message, port) => {
+      return instanceLookup({
+        server: this.config.server,
+        instanceName: this.config.options.instanceName
+      }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
         }
