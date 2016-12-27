@@ -21,9 +21,9 @@ function instanceLookup(options, callback) {
     throw new TypeError('Invalid arguments: "instanceName" must be a string');
   }
 
-  const timeout = options.retries === undefined ? TIMEOUT : options.timeout;
+  const timeout = options.timeout === undefined ? TIMEOUT : options.timeout;
   if (typeof timeout !== 'number') {
-    throw new TypeError('Invalid arguments: "retries" must be a number');
+    throw new TypeError('Invalid arguments: "timeout" must be a number');
   }
 
   const retries = options.retries === undefined ? RETRIES : options.retries;
