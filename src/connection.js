@@ -21,11 +21,11 @@ const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
 const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
-const os = require('os');
 
-const SspiClientApi = require('../../sspi-client/src_js/index.js');
-const Fqdn = require('../../sspi-client/src_js/fqdn.js');
-const MakeSpn = require('../../sspi-client/src_js/make_spn.js');
+const SspiModuleSupported = require('../../sspi-client/src_js/index').ModuleSupported;
+const SspiClientApi = require('../../sspi-client/src_js/index').SspiClientApi;
+const Fqdn = require('../../sspi-client/src_js/index.js').Fqdn;
+const MakeSpn = require('../../sspi-client/src_js/index.js').MakeSpn;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -207,7 +207,7 @@ class Connection extends EventEmitter {
       }
     }
 
-    if (this.config.domain && !this.config.password && os.type() === 'Windows_NT') {
+    if (this.config.domain && !this.config.password && SspiModuleSupported) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
@@ -660,7 +660,7 @@ class Connection extends EventEmitter {
     if (this.config.options.useWindowsIntegratedAuth) {
       Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
         if (err) {
-          throw new Error('Error getting Fqdn.');
+          throw new Error('Error getting Fqdn. Error details: ' + err.message);
         }
 
         const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
