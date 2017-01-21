@@ -477,7 +477,8 @@ class Connection extends EventEmitter {
     } else {
       return instanceLookup({
         server: this.config.server,
-        instanceName: this.config.options.instanceName
+        instanceName: this.config.options.instanceName,
+        timeout: this.config.options.connectTimeout
       }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
@@ -487,7 +488,7 @@ class Connection extends EventEmitter {
         } else {
           return this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
-      }, this.config.options.connectTimeout);
+      });
     }
   }
 
