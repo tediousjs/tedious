@@ -1,6 +1,7 @@
 'use strict';
 
 const dgram = require('dgram');
+const lookupAll = require('dns-lookup-all');
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -35,6 +36,7 @@ function instanceLookup(options, callback) {
     throw new TypeError('Invalid arguments: "callback" must be a function');
   }
 
+  const multiSubnetFailover = options.multiSubnetFailover !== undefined && options.multiSubnetFailover;
   let socket, timer, retriesLeft = retries;
 
   function onMessage(message) {
@@ -71,7 +73,23 @@ function instanceLookup(options, callback) {
       socket = dgram.createSocket('udp4');
       socket.on('error', onError);
       socket.on('message', onMessage);
-      socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server);
+
+      if (multiSubnetFailover) {
+        // TODO: Support both IPv4 and IPv6 here.
+        lookupAll(server, 4, (err, addresses) => {
+          if (err) {
+            return callback(err.message);
+          }
+
+          const len = addresses.length;
+          for (let i = 0; i < len; i++) {
+            socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, addresses[i].address);
+          }
+        });
+      } else {
+        socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server);
+      }
+
       return timer = setTimeout(onTimeout, timeout);
     } else {
       return callback('Failed to get response from SQL Server Browser on ' + server);
