@@ -22,10 +22,10 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 
-const SspiModuleSupported = require('../../sspi-client/src_js/index').ModuleSupported;
-const SspiClientApi = require('../../sspi-client/src_js/index').SspiClientApi;
-const Fqdn = require('../../sspi-client/src_js/index.js').Fqdn;
-const MakeSpn = require('../../sspi-client/src_js/index.js').MakeSpn;
+const SspiModuleSupported = require('sspi-client').ModuleSupported;
+const SspiClientApi = require('sspi-client').SspiClientApi;
+const Fqdn = require('sspi-client').Fqdn;
+const MakeSpn = require('sspi-client').MakeSpn;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
