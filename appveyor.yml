@@ -37,6 +37,8 @@ test_script:
   - cmd: |
       SET EXITVAL=0
 
+      npm install -g npm
+
       npm run-script test || SET EXITVAL=1
 
       powershell %cd%\scripts\appveyor\config.ps1 SQL2016
