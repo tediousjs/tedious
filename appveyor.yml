@@ -17,6 +17,7 @@ branches:
 
 install:
   - ps: Install-Product node $env:nodejs_version
+  - npm install -g npm
   - npm install
 
 cache:
@@ -36,8 +37,6 @@ test_script:
 
   - cmd: |
       SET EXITVAL=0
-
-      npm install -g npm
 
       npm run-script test || SET EXITVAL=1
 
