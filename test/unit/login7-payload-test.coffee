@@ -98,3 +98,42 @@ exports.createNTLM = (test) ->
   test.ok(payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected))
 
   test.done()
+
+exports.createSSPI = (test) ->
+  loginData =
+    userName: ''
+    password: ''
+    appName: 'app'
+    serverName: 'server'
+    domain: 'domain'
+    workstation: 'workstation'
+    language: 'lang'
+    database: 'db'
+    packetSize: 1024
+    tdsVersion: '7_2'
+    sspiBlob: new Buffer([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9])
+
+  payload = new Login7Payload(loginData)
+
+  expectedLength =
+    4 +                                               # Length
+    32 +                                              # Variable
+    2 + 2 + (2 * payload.hostname.length) +
+    2 + 2 + (2 * loginData.userName.length) +
+    2 + 2 + (2 * loginData.password.length) +
+    2 + 2 + (2 * loginData.appName.length) +
+    2 + 2 + (2 * loginData.serverName.length) +
+    2 + 2 + (2 * 0) +                                 # Reserved
+    2 + 2 + (2 * payload.libraryName.length) +
+    2 + 2 + (2 * loginData.language.length) +
+    2 + 2 + (2 * loginData.database.length) +
+    payload.clientId.length +
+    2 + 2 + payload.ntlmPacket.length +               # NTLM
+    2 + 2 + (2 * payload.attachDbFile.length) +
+    2 + 2 + (2 * payload.changePassword.length) +
+    4                                                 # cbSSPILong
+
+  test.strictEqual(payload.data.length, expectedLength)
+  test.strictEqual(payload.ntlmPacket, loginData.sspiBlob)
+
+  test.done()

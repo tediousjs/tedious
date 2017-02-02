@@ -46,4 +46,26 @@ exports.parseChallenge = (test) ->
 
     test.deepEqual(challenge.ntlmpacket, expected)
 
+    # Skip token (first byte) and length of VarByte (2 bytes).
+    test.ok(challenge.ntlmpacketBuffer.equals(data.slice(3)))
+
+    test.done()
+
+exports.parseChallengeSSPI = (test) ->
+    anyData = new Buffer([0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08])
+    source = new WriteBuffer(68)
+    source.writeUInt8(0xED)
+    source.writeUInt16LE(anyData.length)
+    source.copyFrom(anyData)
+
+    parser = new Parser({ token: -> }, {}, { useWindowsIntegratedAuth: true })
+    parser.write(source.data)
+    challenge = parser.read()
+
+    expected = {}
+
+    test.deepEqual(challenge.ntlmpacket, expected)
+
+    test.ok(challenge.ntlmpacketBuffer.equals(anyData))
+
     test.done()
