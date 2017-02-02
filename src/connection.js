@@ -207,7 +207,7 @@ class Connection extends EventEmitter {
       }
     }
 
-    if (this.config.domain && !this.config.password && SspiModuleSupported) {
+    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
@@ -657,53 +657,7 @@ class Connection extends EventEmitter {
   }
 
   sendLogin7Packet(cb) {
-    if (this.config.options.useWindowsIntegratedAuth) {
-      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
-        if (err) {
-          throw new Error('Error getting Fqdn. Error details: ' + err.message);
-        }
-
-        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
-
-        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
-
-        this.sspiClientResponsePending = true;
-        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
-          if (errorCode) {
-            throw new Error(errorString);
-          }
-
-          if (isDone) {
-            throw new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.');
-          }
-
-          this.sspiClientResponsePending = false;
-
-          const payload = new Login7Payload({
-            domain: this.config.domain,
-            userName: this.config.userName,
-            password: this.config.password,
-            database: this.config.options.database,
-            serverName: this.routingData ? this.routingData.server : this.config.server,
-            appName: this.config.options.appName,
-            packetSize: this.config.options.packetSize,
-            tdsVersion: this.config.options.tdsVersion,
-            initDbFatal: !this.config.options.fallbackToDefaultDb,
-            readOnlyIntent: this.config.options.readOnlyIntent,
-            sspiBlob: clientResponse
-          });
-
-          this.routingData = undefined;
-          this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
-
-          this.debug.payload(function() {
-            return payload.toString('  ');
-          });
-
-          cb();
-        });
-      });
-    } else {
+    const sendPayload = function(clientResponse) {
       const payload = new Login7Payload({
         domain: this.config.domain,
         userName: this.config.userName,
@@ -714,7 +668,8 @@ class Connection extends EventEmitter {
         packetSize: this.config.options.packetSize,
         tdsVersion: this.config.options.tdsVersion,
         initDbFatal: !this.config.options.fallbackToDefaultDb,
-        readOnlyIntent: this.config.options.readOnlyIntent
+        readOnlyIntent: this.config.options.readOnlyIntent,
+        sspiBlob: clientResponse
       });
 
       this.routingData = undefined;
@@ -723,7 +678,38 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
+    };
 
+    if (this.config.options.useWindowsIntegratedAuth) {
+      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
+        if (err) {
+          this.emit('error', new Error('Error getting Fqdn. Error details: ' + err.message));
+          return this.close();
+        }
+
+        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
+
+        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
+
+        this.sspiClientResponsePending = true;
+        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
+          if (errorCode) {
+            this.emit('error', new Error(errorString));
+            return this.close();
+          }
+
+          if (isDone) {
+            this.emit('error', new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.'));
+            return this.close();
+          }
+
+          this.sspiClientResponsePending = false;
+          sendPayload.call(this, clientResponse);
+          cb();
+        });
+      });
+    } else {
+      sendPayload.call(this);
       process.nextTick(cb);
     }
   }
@@ -735,7 +721,8 @@ class Connection extends EventEmitter {
       this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
 
         if (errorCode) {
-          throw new Error(errorString);
+          this.emit('error', new Error(errorString));
+          return this.close();
         }
 
         this.sspiClientResponsePending = false;
@@ -1234,8 +1221,10 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         if (this.sspiClientResponsePending) {
-          // SspiClientResponse may change the state. Can't process until
-          // the response comes back.
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'data', data);
         } else {
@@ -1250,8 +1239,10 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.sspiClientResponsePending) {
-          // SspiClientResponse may change the state. Can't process until
-          // the response comes back.
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'message');
         } else {
