@@ -5,7 +5,7 @@ require('./buffertools');
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
-const instanceLookup = require('./instance-lookup').instanceLookup;
+const InstanceLookup = require('./instance-lookup').InstanceLookup;
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
 const Login7Payload = require('./login7-payload');
@@ -475,7 +475,7 @@ class Connection extends EventEmitter {
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     } else {
-      return instanceLookup({
+      return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName,
         timeout: this.config.options.connectTimeout,

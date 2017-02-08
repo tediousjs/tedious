@@ -1,5 +1,5 @@
 fs = require('fs')
-instanceLookup = require('../../src/instance-lookup').instanceLookup
+InstanceLookup = require('../../src/instance-lookup').InstanceLookup
 
 RESERVED_IP_ADDRESS = '192.0.2.0'     # Can never be used, so guaranteed to fail.
 
@@ -22,7 +22,7 @@ exports.goodInstance = (test) ->
 
     test.done()
 
-  instanceLookup({ server: config.server, instanceName: config.instanceName }, callback)
+  new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, callback)
 
 exports.badInstance = (test) ->
   config = getConfig()
@@ -33,7 +33,7 @@ exports.badInstance = (test) ->
 
     test.done()
 
-  instanceLookup({ server: config.server, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
+  new InstanceLookup().instanceLookup({ server: config.server, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
 
 exports.badServer = (test) ->
   config = getConfig()
@@ -44,4 +44,4 @@ exports.badServer = (test) ->
 
     test.done()
 
-  instanceLookup({ server: RESERVED_IP_ADDRESS, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
+  new InstanceLookup().instanceLookup({ server: RESERVED_IP_ADDRESS, instanceName: 'badInstanceName', timeout: 100, retries: 1 }, callback)
