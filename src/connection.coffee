@@ -202,6 +202,7 @@ class Connection extends EventEmitter
     @config.options.cryptoCredentialsDetails ||= {}
     @config.options.useUTC ?= true
     @config.options.useColumnNames ?= false
+    @config.options.useArithAbort ?= false
 
     if !@config.options.port && !@config.options.instanceName
       @config.options.port = DEFAULT_PORT
@@ -500,9 +501,9 @@ class Connection extends EventEmitter
     @messageIo.sendMessage(TYPE.SQL_BATCH, payload.data)
 
   getInitialSql: ->
-    'set textsize ' + @config.options.textsize + '''
+    'set textsize ' + @config.options.textsize +  '\n' +
+    'set arithabort ' + if @config.options.useArithAbort is true then 'on' else 'off' + '''
 set quoted_identifier on
-set arithabort off
 set numeric_roundabort off
 set ansi_warnings on
 set ansi_padding on
