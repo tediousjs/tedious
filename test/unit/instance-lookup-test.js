@@ -74,8 +74,7 @@ exports['instanceLookup functional unit tests'] = {
       server: 'server',
       instanceName: 'instance',
       timeout: 1000,
-      retries: 3,
-      multiSubnetFailover: true
+      retries: 3
     };
 
     this.anyPort = 1234;
@@ -90,7 +89,7 @@ exports['instanceLookup functional unit tests'] = {
     // to override the execute method on Sender so we can test instance lookup code
     // without triggering network activity.
     this.testSender = this.instanceLookup.createSender(
-      this.options.server, this.anyPort, this.anyRequest, this.options.multiSubnetFailover);
+      this.options.server, this.anyPort, this.anyRequest);
     this.createSenderStub = this.sinon.stub(this.instanceLookup, 'createSender');
     this.createSenderStub.returns(this.testSender);
     this.senderExecuteStub = this.sinon.stub(this.testSender, 'execute');
@@ -118,7 +117,7 @@ exports['instanceLookup functional unit tests'] = {
 
       test.ok(this.createSenderStub.calledOnce);
       test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3], this.options.multiSubnetFailover);
+      test.strictEqual(this.createSenderStub.args[0][3]);
 
       test.ok(this.senderExecuteStub.calledOnce);
       test.ok(this.parseStub.calledOnce);
@@ -135,7 +134,7 @@ exports['instanceLookup functional unit tests'] = {
 
       test.ok(this.createSenderStub.calledOnce);
       test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3], this.options.multiSubnetFailover);
+      test.strictEqual(this.createSenderStub.args[0][3]);
 
       test.ok(this.senderExecuteStub.calledOnce);
       test.strictEqual(this.parseStub.callCount, 0);
@@ -153,7 +152,7 @@ exports['instanceLookup functional unit tests'] = {
 
       test.ok(this.createSenderStub.calledOnce);
       test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3], this.options.multiSubnetFailover);
+      test.strictEqual(this.createSenderStub.args[0][3]);
 
       test.ok(this.senderExecuteStub.calledOnce);
       test.ok(this.parseStub.calledOnce);
@@ -176,7 +175,7 @@ exports['instanceLookup functional unit tests'] = {
       test.ok(this.createSenderStub.callCount, 2);
       for (let j = 0; j < this.createSenderStub.callCount; j++) {
         test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3], this.options.multiSubnetFailover);
+        test.strictEqual(this.createSenderStub.args[j][3]);
       }
 
       // Execute called twice but parse only called once as the first call to execute times out.
@@ -215,7 +214,7 @@ exports['instanceLookup functional unit tests'] = {
       test.strictEqual(this.createSenderStub.callCount, this.options.retries);
       for (let j = 0; j < this.createSenderStub.callCount; j++) {
         test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3], this.options.multiSubnetFailover);
+        test.strictEqual(this.createSenderStub.args[j][3]);
       }
 
       // Execute called 'retries' number of times but parse is never called because

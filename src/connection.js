@@ -478,8 +478,7 @@ class Connection extends EventEmitter {
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName,
-        timeout: this.config.options.connectTimeout,
-        multiSubnetFailover: this.config.options.multiSubnetFailover
+        timeout: this.config.options.connectTimeout
       }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
