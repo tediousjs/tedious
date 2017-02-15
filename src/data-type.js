@@ -611,6 +611,8 @@ const TYPE = module.exports.TYPE = {
         // Number.MIN_SAFE_INTEGER = -9007199254740991
         // Number.MAX_SAFE_INTEGER = 9007199254740991
         // 9007199254740991 = (2**53) - 1
+        // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
+        // as these constants are not available in node 0.10.
         return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
           ' For bigger numbers, use VarChar type.');
       }
