@@ -245,6 +245,11 @@ class Connection extends EventEmitter {
       } else {
         this.emit('rerouting');
       }
+      if (this.request) {
+        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+        this.request.callback(err);
+        this.request = void 0;
+      }
       this.closed = true;
       this.loggedIn = false;
       return this.loginError = null;
