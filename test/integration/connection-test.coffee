@@ -1132,5 +1132,29 @@ exports.testDatefirstDefault = (test) ->
   connection.on 'end', (info) ->
     test.done()
 
-# Test that the DATEFISRT setting can be changed via an optional configuration
+# Test that the DATEFIRST setting can be changed via an optional configuration
+exports.testDatefirstDefault = (test) ->
+  test.expect(3)
+
+  config = getConfig()
+  config.options.datefirst = 3
+
+  connection = new Connection(config)
+
+  request = new Request('select @@datefirst', (err) ->
+    test.ifError(err)
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    dateFirst = columns[0].value
+    test.strictEqual(dateFirst, 3)
+  )
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
 
