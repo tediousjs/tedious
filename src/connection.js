@@ -37,7 +37,7 @@ const DEFAULT_TDS_VERSION = '7_4';
 const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
 
-function options(config) {
+const options = function(config) {
   if (!config) {
     throw new TypeError('No connection configuration given');
   }
@@ -148,7 +148,8 @@ function options(config) {
     if (config.options.enableQuotedIdentifier !== undefined) {
       if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
         throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
-        
+      }
+
       this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
     }
 
@@ -313,7 +314,7 @@ function options(config) {
     if (config.options.dateFormat != undefined) {
       this.config.options.dateFormat = config.options.dateFormat;
     }
-      
+
     if (config.options.debug) {
       if (config.options.debug.data != undefined) {
         this.config.options.debug.data = config.options.debug.data;
@@ -329,8 +330,7 @@ function options(config) {
       }
     }
   }
-}
-
+};
 
 class Connection extends EventEmitter {
   constructor(config) {
