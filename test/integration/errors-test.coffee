@@ -6,7 +6,7 @@ fs = require('fs')
 debug = false
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
-config.options.textsize = 8 * 1024
+config.options.textSize = 8 * 1024
 
 if (debug)
   config.options.debug =

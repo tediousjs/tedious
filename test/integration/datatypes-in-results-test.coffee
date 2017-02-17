@@ -6,7 +6,7 @@ fs = require('fs')
 debug = false
 
 config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config
-config.options.textsize = 8 * 1024
+config.options.textSize = 8 * 1024
 
 if (debug)
   config.options.debug =
@@ -190,7 +190,7 @@ exports.varcharNull = (test) ->
   execSql(test, "select cast(null as varchar(10))", null)
 
 exports.varcharCollation = (test) ->
-  # The codepage used is WINDOWS-1251.
+# The codepage used is WINDOWS-1251.
   sql = """
     create table #tab1 (col1 nvarchar(10) collate Cyrillic_General_CS_AS);
     insert into #tab1 values(N'abcdШ');
@@ -213,10 +213,10 @@ exports.varcharMaxLongAsTextSize = (test) ->
 
 exports.varcharMaxLargerThanTextSize = (test) ->
   longString = ''
-  for i in [1..config.options.textsize + 10]
+  for i in [1..config.options.textSize + 10]
     longString += 'x'
 
-  execSql(test, "select cast('#{longString}' as varchar(max))", longString.slice(0, config.options.textsize), '7_2')
+  execSql(test, "select cast('#{longString}' as varchar(max))", longString.slice(0, config.options.textSize), '7_2')
 
 exports.nvarchar = (test) ->
   execSql(test, "select cast('abc' as nvarchar(10))", 'abc')
@@ -316,8 +316,8 @@ exports.xmlNull = (test) ->
   execSql(test, "select cast(null as xml)", null, '7_2')
 
 exports.xmlWithSchema = (test) ->
-  # Cannot use temp tables, as schema collections as not available to them.
-  # Schema must be created manually in database in order to make this test work properly (sql 2012)
+# Cannot use temp tables, as schema collections as not available to them.
+# Schema must be created manually in database in order to make this test work properly (sql 2012)
 
   xml = '<root/>'
 
@@ -356,7 +356,7 @@ exports.udtNull = (test) ->
 
 execSql = (test, sql, expectedValue, tdsVersion) ->
   if tdsVersion and tdsVersion > config.options.tdsVersion
-  	return test.done()
+    return test.done()
 
   test.expect(3)
 

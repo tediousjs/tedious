@@ -42,7 +42,7 @@ exports.badServer = (test) ->
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.badPort = (test) ->
@@ -76,23 +76,23 @@ exports.badCredentials = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
+#console.log("#{error.number} : #{error.message}")
     test.ok(~error.message.indexOf('failed'))
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.connectByPort = (test) ->
   config = getConfig()
 
   unless config.options?.port?
-    # Config says don't do this test (probably because ports are dynamic).
+# Config says don't do this test (probably because ports are dynamic).
     console.log('Skipping connectByPort test')
     test.done()
     return
@@ -116,16 +116,16 @@ exports.connectByPort = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.connectByInstanceName = (test) ->
   if !getInstanceName()
-    # Config says don't do this test (probably because SQL Server Browser is not available).
+# Config says don't do this test (probably because SQL Server Browser is not available).
     console.log('Skipping connectByInstanceName test')
     test.done()
     return
@@ -153,16 +153,16 @@ exports.connectByInstanceName = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.connectByInvalidInstanceName = (test) ->
   if !getInstanceName()
-    # Config says don't do this test (probably because SQL Server Browser is not available).
+# Config says don't do this test (probably because SQL Server Browser is not available).
     console.log('Skipping connectByInvalidInstanceName test')
     test.done()
     return
@@ -186,17 +186,17 @@ exports.connectByInvalidInstanceName = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 DomainCaseEnum = {
-    AsIs: 0,
-    Lower: 1,
-    Upper: 2
+  AsIs: 0,
+  Lower: 1,
+  Upper: 2
 }
 
 runNtlmTest = (test, domainCase) ->
@@ -232,11 +232,11 @@ runNtlmTest = (test, domainCase) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.ntlm = (test) ->
@@ -281,11 +281,11 @@ exports.encrypt = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execSql = (test) ->
@@ -294,42 +294,42 @@ exports.execSql = (test) ->
   config = getConfig()
 
   request = new Request('select 8 as C1', (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 1)
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-      test.strictEqual(rowCount, 1)
+    test.ok(more)
+    test.strictEqual(rowCount, 1)
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
+    test.strictEqual(columnsMetadata.length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 8)
+    test.strictEqual(columns.length, 1)
+    test.strictEqual(columns[0].value, 8)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.numericColumnName = (test) ->
@@ -339,37 +339,37 @@ exports.numericColumnName = (test) ->
   config.options.useColumnNames = true
 
   request = new Request('select 8 as [123]', (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 1)
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(Object.keys(columnsMetadata).length, 1)
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(Object.keys(columns).length, 1)
-      test.strictEqual(columns[123].value, 8)
+    test.strictEqual(Object.keys(columns).length, 1)
+    test.strictEqual(columns[123].value, 8)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.duplicateColumnNames = (test) ->
@@ -379,39 +379,39 @@ exports.duplicateColumnNames = (test) ->
   config.options.useColumnNames = true
 
   request = new Request('select 1 as abc, 2 as xyz, \'3\' as abc', (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 1)
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(Object.keys(columnsMetadata).length, 2)
+    test.strictEqual(Object.keys(columnsMetadata).length, 2)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(Object.keys(columns).length, 2)
+    test.strictEqual(Object.keys(columns).length, 2)
 
-      test.strictEqual(columns.abc.value, 1)
-      test.strictEqual(columns.xyz.value, 2)
+    test.strictEqual(columns.abc.value, 1)
+    test.strictEqual(columns.xyz.value, 2)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execSqlMultipleTimes = (test) ->
@@ -428,25 +428,25 @@ exports.execSqlMultipleTimes = (test) ->
       return
 
     request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ifError(err)
-        test.strictEqual(rowCount, 1)
+      test.ifError(err)
+      test.strictEqual(rowCount, 1)
 
-        sqlExecCount++
-        execSql()
+      sqlExecCount++
+      execSql()
     )
 
     request.on('doneInProc', (rowCount, more) ->
-        test.ok(more)
-        test.strictEqual(rowCount, 1)
+      test.ok(more)
+      test.strictEqual(rowCount, 1)
     )
 
     request.on('columnMetadata', (columnsMetadata) ->
-        test.strictEqual(columnsMetadata.length, 1)
+      test.strictEqual(columnsMetadata.length, 1)
     )
 
     request.on('row', (columns) ->
-        test.strictEqual(columns.length, 1)
-        test.strictEqual(columns[0].value, 8)
+      test.strictEqual(columns.length, 1)
+      test.strictEqual(columns[0].value, 8)
     )
 
     connection.execSql(request)
@@ -458,15 +458,15 @@ exports.execSqlMultipleTimes = (test) ->
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execSqlWithOrder = (test) ->
@@ -476,25 +476,25 @@ exports.execSqlWithOrder = (test) ->
 
   sql = "select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id"
   request = new Request(sql, (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 2)
+    test.ifError(err)
+    test.strictEqual(rowCount, 2)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
-      test.strictEqual(rowCount, 2)
+    test.ok(more)
+    test.strictEqual(rowCount, 2)
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 4)
+    test.strictEqual(columnsMetadata.length, 4)
   )
 
   request.on('order', (orderColumns) ->
-      test.strictEqual(orderColumns.length, 2)
-      test.strictEqual(orderColumns[0], 2)
-      test.strictEqual(orderColumns[1], 4)
+    test.strictEqual(orderColumns.length, 2)
+    test.strictEqual(orderColumns[0], 2)
+    test.strictEqual(orderColumns[1], 4)
   )
 
   request.on('row', (columns) ->
@@ -504,23 +504,23 @@ exports.execSqlWithOrder = (test) ->
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
+#console.log("#{error.number} : #{error.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execSqlMultipleTimes = (test) ->
@@ -535,20 +535,20 @@ exports.execSqlMultipleTimes = (test) ->
       return
 
     request = new Request('select 8 as C1', (err, rowCount) ->
-        test.ifError(err)
-        test.strictEqual(rowCount, 1)
+      test.ifError(err)
+      test.strictEqual(rowCount, 1)
 
-        requestsToMake--
-        makeRequest()
+      requestsToMake--
+      makeRequest()
     )
 
     request.on('doneInProc', (rowCount, more) ->
-        test.strictEqual(rowCount, 1)
-        #makeRequest()
+      test.strictEqual(rowCount, 1)
+#makeRequest()
     )
 
     request.on('row', (columns) ->
-        test.strictEqual(columns.length, 1)
+      test.strictEqual(columns.length, 1)
     )
 
     connection.execSql(request)
@@ -560,15 +560,15 @@ exports.execSqlMultipleTimes = (test) ->
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execBadSql = (test) ->
@@ -577,28 +577,28 @@ exports.execBadSql = (test) ->
   config = getConfig()
 
   request = new Request('bad syntax here', (err) ->
-      test.ok(err)
+    test.ok(err)
 
-      connection.close()
+    connection.close()
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('errorMessage', (error) ->
-    #console.log("#{error.number} : #{error.message}")
+#console.log("#{error.number} : #{error.message}")
     test.ok(error)
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.closeConnectionRequestPending = (test) ->
@@ -623,15 +623,15 @@ exports.closeConnectionRequestPending = (test) ->
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.sqlWithMultipleResultSets = (test) ->
@@ -641,40 +641,40 @@ exports.sqlWithMultipleResultSets = (test) ->
   row = 0
 
   request = new Request('select 1; select 2;', (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 2)
+    test.ifError(err)
+    test.strictEqual(rowCount, 2)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.strictEqual(rowCount, 1)
+    test.strictEqual(rowCount, 1)
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
+    test.strictEqual(columnsMetadata.length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns[0].value, ++row)
+    test.strictEqual(columns[0].value, ++row)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.rowCountForUpdate = (test) ->
@@ -692,27 +692,27 @@ exports.rowCountForUpdate = (test) ->
   """
 
   request = new Request(setupSql, (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 5)
-      connection.close()
+    test.ifError(err)
+    test.strictEqual(rowCount, 5)
+    connection.close()
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.rowCollectionOnRequestCompletion = (test) ->
@@ -743,11 +743,11 @@ exports.rowCollectionOnRequestCompletion = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.rowCollectionOnDone = (test) ->
@@ -785,11 +785,11 @@ exports.rowCollectionOnDone = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.execProcAsSql = (test) ->
@@ -798,41 +798,41 @@ exports.execProcAsSql = (test) ->
   config = getConfig()
 
   request = new Request('exec sp_help int', (err, rowCount) ->
-      test.ifError(err)
-      test.strictEqual(rowCount, 0)
+    test.ifError(err)
+    test.strictEqual(rowCount, 0)
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneProc', (rowCount, more, returnStatus) ->
-      test.ok(!more)
-      test.strictEqual(returnStatus, 0)
+    test.ok(!more)
+    test.strictEqual(returnStatus, 0)
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.ok(more)
+    test.ok(more)
   )
 
   request.on('row', (columns) ->
-      test.ok(true)
+    test.ok(true)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.resetConnection = (test) ->
@@ -879,7 +879,7 @@ exports.resetConnection = (test) ->
       (callback) ->
         connection.reset (err) ->
           if connection.config.options.tdsVersion < '7_2'
-            # TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
+# TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
             test.ok(true)
 
           callback err
@@ -895,11 +895,11 @@ exports.resetConnection = (test) ->
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.cancelRequest = (test) ->
@@ -908,32 +908,32 @@ exports.cancelRequest = (test) ->
   config = getConfig()
 
   request = new Request('select 1 as C1;waitfor delay \'00:00:05\';select 2 as C2', (err, rowCount, rows) ->
-      test.strictEqual err.message, 'Canceled.'
+    test.strictEqual err.message, 'Canceled.'
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.ok false
+    test.ok false
   )
 
   request.on('doneProc', (rowCount, more) ->
-      test.ok !rowCount
-      test.strictEqual more, false
+    test.ok !rowCount
+    test.strictEqual more, false
   )
 
   request.on('done', (rowCount, more, rows) ->
-      test.ok !rowCount
-      test.strictEqual more, false
+    test.ok !rowCount
+    test.strictEqual more, false
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
+    test.strictEqual(columnsMetadata.length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 1)
+    test.strictEqual(columns.length, 1)
+    test.strictEqual(columns[0].value, 1)
   )
 
   connection = new Connection(config)
@@ -944,15 +944,15 @@ exports.cancelRequest = (test) ->
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 exports.requestTimeout = (test) ->
@@ -962,50 +962,50 @@ exports.requestTimeout = (test) ->
   config.options.requestTimeout = 1000
 
   request = new Request('select 1 as C1;waitfor delay \'00:00:05\';select 2 as C2', (err, rowCount, rows) ->
-      test.equal err.message, 'Timeout: Request failed to complete in 1000ms'
+    test.equal err.message, 'Timeout: Request failed to complete in 1000ms'
 
-      connection.close()
+    connection.close()
   )
 
   request.on('doneInProc', (rowCount, more) ->
-      test.ok false
+    test.ok false
   )
 
   request.on('doneProc', (rowCount, more) ->
-      test.ok !rowCount
-      test.strictEqual more, false
+    test.ok !rowCount
+    test.strictEqual more, false
   )
 
   request.on('done', (rowCount, more, rows) ->
-      test.ok !rowCount
-      test.strictEqual more, false
+    test.ok !rowCount
+    test.strictEqual more, false
   )
 
   request.on('columnMetadata', (columnsMetadata) ->
-      test.strictEqual(columnsMetadata.length, 1)
+    test.strictEqual(columnsMetadata.length, 1)
   )
 
   request.on('row', (columns) ->
-      test.strictEqual(columns.length, 1)
-      test.strictEqual(columns[0].value, 1)
+    test.strictEqual(columns.length, 1)
+    test.strictEqual(columns[0].value, 1)
   )
 
   connection = new Connection(config)
 
   connection.on('connect', (err) ->
-      connection.execSql(request)
+    connection.execSql(request)
   )
 
   connection.on('end', (info) ->
-      test.done()
+    test.done()
   )
 
   connection.on('infoMessage', (info) ->
-    #console.log("#{info.number} : #{info.message}")
+#console.log("#{info.number} : #{info.message}")
   )
 
   connection.on('debug', (text) ->
-    #console.log(text)
+#console.log(text)
   )
 
 runSqlBatch = (test, config, sql, requestCallback) ->
@@ -1025,34 +1025,81 @@ runSqlBatch = (test, config, sql, requestCallback) ->
 # Test that the default behavior allows adding null values to a
 # temporary table where the nullability is not explicitly declared.
 exports.testAnsiNullDefault = (test) ->
-    test.expect(2)
+  test.expect(2)
 
-    sql = """
+  sql = """
       create table #testAnsiNullDefault (id int);
       insert #testAnsiNullDefault values (null);
       drop table #testAnsiNullDefault;
     """
 
-    runSqlBatch test, getConfig(), sql, (err) ->
-        test.ifError(err)
+  runSqlBatch test, getConfig(), sql, (err) ->
+    test.ifError(err)
 
 # Test that the default behavior can be overridden (so that temporary
 # table columns are non-nullable by default).
 exports.disableAnsiNullDefault = (test) ->
-    test.expect(3)
+  test.expect(3)
 
-    sql = """
+  sql = """
       create table #testAnsiNullDefaults (id int);
       insert #testAnsiNullDefaults values (null);
       drop table #testAnsiNullDefaults;
     """
 
-    config = getConfig()
-    config.options.enableAnsiNullDefault = false
+  config = getConfig()
+  config.options.enableAnsiNullDefault = false
 
-    runSqlBatch test, config, sql, (err) ->
-        test.ok(err instanceof Error)
-        test.strictEqual err?.number, 515 # Cannot insert the value NULL
+  runSqlBatch test, config, sql, (err) ->
+    test.ok(err instanceof Error)
+    test.strictEqual err?.number, 515 # Cannot insert the value NULL
+
+
+testQuotedIdentifier = (test, setting) ->
+  config = getConfig()
+  config.options.enableQuotedIdentifier = setting if typeof setting is 'boolean'
+
+  request = new Request('select SESSIONPROPERTY(\'QUOTED_IDENTIFIER\') AS QuotedIdentifierSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current QUOTED_IDENTIFIER default setting in Tedious is ON
+    test.strictEqual(columns[0].value, if setting is true or setting == undefined then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
+exports.testQuotedIdentifierDefault = (test) ->
+  testQuotedIdentifier(test, undefined)
+
+exports.testQuotedIdentifierOn = (test) ->
+  testQuotedIdentifier(test, true)
+
+exports.testQuotedIdentifierOff = (test) ->
+  testQuotedIdentifier(test, false)
+
+exports.badQuotedIdentifier = (test) ->
+  config = getConfig()
+  config.options.enableQuotedIdentifier = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
 
 testArithAbort = (test, setting) ->
   test.expect(5)
@@ -1106,11 +1153,272 @@ exports.badArithAbort = (test) ->
 
   test.done()
 
-testDateFirstImpl = (test, datefirst) =>
-  datefirst = datefirst || 7
+testNumericRoundAbort = (test, setting) ->
+  test.expect(5)
+  config = getConfig()
+  config.options.enableNumericRoundabort = setting if typeof setting is 'boolean'
+
+  request = new Request('SELECT SESSIONPROPERTY(\'NUMERIC_ROUNDABORT\') AS NumericRoundabortSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current NUMERIC_ROUNDABORT default setting in Tedious is OFF
+    test.strictEqual(columns[0].value, if setting is true then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+exports.testNumericRoundabortDefault = (test) ->
+  testNumericRoundAbort(test, undefined)
+
+exports.testNumericRoundabortOn = (test) ->
+  testNumericRoundAbort(test, true)
+
+exports.testNumericRoundabortOff = (test) ->
+  testNumericRoundAbort(test, false)
+
+exports.badNumericRoundabort= (test) ->
+  config = getConfig()
+  config.options.enableNumericRoundabort = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+testAnsiWarnings = (test, setting) ->
+  test.expect(5)
+  config = getConfig()
+  config.options.enableAnsiWarnings = setting if typeof setting is 'boolean'
+
+  request = new Request('SELECT SESSIONPROPERTY(\'ANSI_WARNINGS\') AS AnsiWarningsSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current ANSI_WARNINGS default setting in Tedious is ON
+    test.strictEqual(columns[0].value, if setting is true or setting == undefined then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+exports.testAnsiWarningsDefault = (test) ->
+  testAnsiWarnings(test, undefined)
+
+exports.testAnsiWarningsOn = (test) ->
+  testAnsiWarnings(test, true)
+
+exports.testAnsiWarningsOff = (test) ->
+  testAnsiWarnings(test, false)
+
+exports.badAnsiWarnings= (test) ->
+  config = getConfig()
+  config.options.enableAnsiWarnings = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+
+testAnsiPadding = (test, setting) ->
+  test.expect(5)
+  config = getConfig()
+  config.options.enableAnsiPadding = setting if typeof setting is 'boolean'
+
+  request = new Request('SELECT SESSIONPROPERTY(\'ANSI_PADDING\') AS AnsiPaddingSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current ANSI_PADDING default setting in Tedious is ON
+    test.strictEqual(columns[0].value, if setting is true or setting == undefined then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+exports.testAnsiPaddingDefault = (test) ->
+  testAnsiPadding(test, undefined)
+
+exports.testAnsiPaddingOn = (test) ->
+  testAnsiPadding(test, true)
+
+exports.testAnsiPaddingOff = (test) ->
+  testAnsiPadding(test, false)
+
+exports.badAnsiPadding = (test) ->
+  config = getConfig()
+  config.options.enableAnsiPadding = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+testAnsiNull = (test, setting) ->
+  test.expect(5)
+  config = getConfig()
+  config.options.enableAnsiNull = setting if typeof setting is 'boolean'
+
+  request = new Request('SELECT SESSIONPROPERTY(\'ANSI_NULLS\') AS AnsiNullSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current ANSI_NULL default setting in Tedious is ON
+    test.strictEqual(columns[0].value, if setting is true or setting == undefined then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+exports.testAnsiNullDefault = (test) ->
+  testAnsiNull(test, undefined)
+
+exports.testAnsiNullOn = (test) ->
+  testAnsiNull(test, true)
+
+exports.testAnsiNullOff = (test) ->
+  testAnsiNull(test, false)
+
+exports.badAnsiNull = (test) ->
+  config = getConfig()
+  config.options.enableAnsiNull = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+testConcatNullYeldsNull = (test, setting) ->
+  test.expect(5)
+  config = getConfig()
+  config.options.enableConcatNullYeldsNull = setting if typeof setting is 'boolean'
+
+  request = new Request('SELECT SESSIONPROPERTY(\'CONCAT_NULL_YIELDS_NULL\') AS ConcatNullYeldsNullSetting', (err, rowCount) ->
+    test.ifError(err)
+    test.strictEqual(rowCount, 1)
+
+    connection.close()
+  )
+
+  request.on('columnMetadata', (columnsMetadata) ->
+    test.strictEqual(Object.keys(columnsMetadata).length, 1)
+  )
+
+  request.on('row', (columns) ->
+    test.strictEqual(Object.keys(columns).length, 1)
+    # The current ANSI_NULL default setting in Tedious is ON
+    test.strictEqual(columns[0].value, if setting is true or setting == undefined then 1 else 0)
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    connection.execSql(request)
+  )
+
+  connection.on('end', (info) ->
+    test.done()
+  )
+
+exports.testConcatNullYeldsNullDefault = (test) ->
+  testConcatNullYeldsNull(test, undefined)
+
+exports.testConcatNullYeldsNullOn = (test) ->
+  testConcatNullYeldsNull(test, true)
+
+exports.testConcatNullYeldsNullOff = (test) ->
+  testConcatNullYeldsNull(test, false)
+
+exports.badConcatNullYeldsNull = (test) ->
+  config = getConfig()
+  config.options.enableConcatNullYeldsNull = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+testDateFirstImpl = (test, dateFirst) =>
+  dateFirst = dateFirst || 7
   test.expect(3)
   config = getConfig()
-  config.options.datefirst = datefirst
+  config.options.dateFirst = dateFirst
 
   connection = new Connection(config)
 
@@ -1121,7 +1429,7 @@ testDateFirstImpl = (test, datefirst) =>
 
   request.on('row', (columns) ->
     dateFirstActual = columns[0].value
-    test.strictEqual(dateFirstActual, datefirst)
+    test.strictEqual(dateFirstActual, dateFirst)
   )
 
   connection.on 'connect', (err) ->
@@ -1132,18 +1440,18 @@ testDateFirstImpl = (test, datefirst) =>
     test.done()
 
 # Test that the default setting for DATEFIRST is 7
-exports.testDatefirstDefault = (test) ->
+exports.testDateFirstDefault = (test) ->
   testDateFirstImpl(test, undefined)
 
 # Test that the DATEFIRST setting can be changed via an optional configuration
-exports.testDatefirstCustom = (test) ->
+exports.testDateFirstCustom = (test) ->
   testDateFirstImpl(test, 3)
 
 # Test that an invalid DATEFIRST setting throws
-exports.badDatefirst = (test) ->
+exports.badDateFirst = (test) ->
   test.expect(1)
   config = getConfig()
-  config.options.datefirst = -1
+  config.options.dateFirst = -1
 
   connection = null
 
@@ -1151,3 +1459,70 @@ exports.badDatefirst = (test) ->
     connection = new Connection(config)
 
   test.done()
+
+testLanguage = (test, language) =>
+  language = language || 'us_english'
+  test.expect(3)
+  config = getConfig()
+  config.options.language = language
+
+  connection = new Connection(config)
+
+  request = new Request('select @@language', (err) ->
+    test.ifError(err)
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    languageActual = columns[0].value
+    test.strictEqual(languageActual, language)
+  )
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
+# Test that the default setting for LANGUAGE is us_english
+exports.testLanguageDefault = (test) ->
+  testLanguage(test, undefined)
+
+# Test that the LANGUAGE setting can be changed via an optional configuration
+exports.testLanguageCustom = (test) ->
+  testLanguage(test, 'Deutsch')
+
+
+testDateFormat = (test, dateFormat) =>
+  dateFormat = dateFormat || 'mdy'
+  test.expect(3)
+  config = getConfig()
+  config.options.dateFormat = dateFormat
+
+  connection = new Connection(config)
+
+  request = new Request('select	date_format from	sys.dm_exec_sessions where session_id = @@SPID ', (err) ->
+    test.ifError(err)
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    dateFormatActual = columns[0].value
+    test.strictEqual(dateFormatActual, dateFormat)
+  )
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
+# Test that the default setting for DATEFORMAT is mdy
+exports.testDateFormatDefault = (test) ->
+  testDateFormat(test, undefined)
+
+# Test that the DATEFORMAT setting can be changed via an optional configuration
+exports.testDateFormatCustom = (test) ->
+  testDateFormat(test, 'dmy')
