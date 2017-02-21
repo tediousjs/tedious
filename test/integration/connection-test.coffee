@@ -1072,7 +1072,7 @@ exports.testArithAbortDefault = (test) ->
 
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, 0)
+		test.strictEqual(columns[0].value, false)
 	)
 
 	connection = new Connection(config)
@@ -1090,7 +1090,7 @@ exports.testArithAbortCanBeSetToOn = (test) ->
 	test.expect(6)
 
 	config = getConfig()
-	get.options.enableArithAbort = true
+	config.options.enableArithAbort = true
 
 	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
 		test.ifError(err) 
@@ -1105,7 +1105,7 @@ exports.testArithAbortCanBeSetToOn = (test) ->
 
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, 1)
+		test.strictEqual(columns[0].value, true)
 	)
 
 	connection = new Connection(config)
