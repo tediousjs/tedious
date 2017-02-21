@@ -1076,6 +1076,16 @@ exports.testArithAbortDefault = (test) ->
 		test.strictEqual(columns['ArithAbortSetting'].value, 0)
 	)
 
+	connection = new Connection(config)
+
+	connection.on('connect', (err) ->
+		connection.execSql(request)
+	)
+
+	connection.on('end', (info) ->
+		test.done()
+	)
+
 # Test that ARITHABORT can be set to on
 exports.testArithAbortCanBeSetToOn = (test) ->
 	test.expect(6)
@@ -1099,4 +1109,14 @@ exports.testArithAbortCanBeSetToOn = (test) ->
 		test.strictEqual(columnNames.length, 1)
 		test.strictEqual(columnNames[0], 'ArithAbortSetting')
 		test.strictEqual(columns['ArithAbortSetting'].value, 1)
+	)
+
+	connection = new Connection(config)
+
+	connection.on('connect', (err) ->
+		connection.execSql(request)
+	)
+
+	connection.on('end', (info) ->
+		test.done()
 	)
