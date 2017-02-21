@@ -1074,7 +1074,7 @@ exports.testArithAbortDefault = (test) ->
 		columnNames = Object.keys(columns)
 		test.strictEqual(columnNames.length, 1)
 		test.strictEqual(columnNames[0], 'ArithAbortSetting')
-		test.strictEqual(columns.ArithAbortSetting.value, 0)
+		test.strictEqual(columns[0].value, 0)
 	)
 
 	connection = new Connection(config)
@@ -1109,7 +1109,7 @@ exports.testArithAbortCanBeSetToOn = (test) ->
 		columnNames = Object.keys(columns)
 		test.strictEqual(columnNames.length, 1)
 		test.strictEqual(columnNames[0], 'ArithAbortSetting')
-		test.strictEqual(columns.ArithAbortSetting.value, 1)
+		test.strictEqual(columns[0].value, 1)
 	)
 
 	connection = new Connection(config)
