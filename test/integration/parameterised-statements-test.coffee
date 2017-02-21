@@ -52,13 +52,13 @@ exports.int = (test) ->
   execSql(test, TYPES.Int, 8)
 
 exports.bigint = (test) ->
-  execSql(test, TYPES.BigInt, 9007199254740992)
+  execSql(test, TYPES.BigInt, 9007199254740991)
 
 exports.bigint1 = (test) ->
   execSql(test, TYPES.BigInt, 1)
 
 exports.bigintsmall = (test) ->
-  execSql(test, TYPES.BigInt, -9007199254740992)
+  execSql(test, TYPES.BigInt, -9007199254740991)
 
 exports.bigintsmall1 = (test) ->
   execSql(test, TYPES.BigInt, -1)
@@ -242,13 +242,13 @@ exports.outputInt = (test) ->
   execSqlOutput(test, TYPES.Int, 3)
 
 exports.outputBigInt = (test) ->
-  execSqlOutput(test, TYPES.BigInt, 9007199254740992)
+  execSqlOutput(test, TYPES.BigInt, 9007199254740991)
 
 exports.outputBigInt1 = (test) ->
   execSqlOutput(test, TYPES.BigInt, 1)
 
 exports.outputBigIntSmall = (test) ->
-  execSqlOutput(test, TYPES.BigInt, -9007199254740992)
+  execSqlOutput(test, TYPES.BigInt, -9007199254740991)
 
 exports.outputBigIntSmall1 = (test) ->
   execSqlOutput(test, TYPES.BigInt, -1)

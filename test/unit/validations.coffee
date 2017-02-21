@@ -67,6 +67,18 @@ exports.BigInt = (test) ->
   value = TYPE.BigInt.validate 2147483647
   test.strictEqual value, 2147483647
 
+  value = TYPE.BigInt.validate -9007199254740991
+  test.strictEqual value, -9007199254740991
+
+  value = TYPE.BigInt.validate 9007199254740991
+  test.strictEqual value, 9007199254740991
+
+  value = TYPE.BigInt.validate -9007199254740992
+  test.ok value instanceof TypeError
+  
+  value = TYPE.BigInt.validate 9007199254740992
+  test.ok value instanceof TypeError
+
   test.done()
 
 exports.SmallDateTime = (test) ->
