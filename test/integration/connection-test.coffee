@@ -1056,7 +1056,7 @@ exports.disableAnsiNullDefault = (test) ->
 
 # Test that the default behaviour has ARITHABORT set to off
 exports.testArithAbortDefault = (test) ->
-	test.expect(6)
+	test.expect(5)
 
 	config = getConfig()
 	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
@@ -1072,7 +1072,7 @@ exports.testArithAbortDefault = (test) ->
 
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, false)
+		test.strictEqual(columns[0].value, 0)
 	)
 
 	connection = new Connection(config)
@@ -1087,7 +1087,7 @@ exports.testArithAbortDefault = (test) ->
 
 # Test that ARITHABORT can be set to on
 exports.testArithAbortCanBeSetToOn = (test) ->
-	test.expect(6)
+	test.expect(5)
 
 	config = getConfig()
 	config.options.enableArithAbort = true
@@ -1105,7 +1105,7 @@ exports.testArithAbortCanBeSetToOn = (test) ->
 
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, true)
+		test.strictEqual(columns[0].value, 1)
 	)
 
 	connection = new Connection(config)
