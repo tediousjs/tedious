@@ -601,6 +601,39 @@ exports.execBadSql = (test) ->
     #console.log(text)
   )
 
+exports.closeConnectionRequestPending = (test) ->
+  test.expect(1)
+
+  config = getConfig()
+
+  request = new Request('select 8 as C1', (err, rowCount) ->
+    test.ok(err)
+    test.strictEqual(err.code, 'ECLOSE')
+  )
+
+  connection = new Connection(config)
+
+  connection.on('connect', (err) ->
+    test.ifError(err);
+    connection.execSql(request)
+
+    # This should trigger request callback with error as there is
+    # request pending now.
+    connection.close()
+  )
+
+  connection.on('end', (info) ->
+      test.done()
+  )
+
+  connection.on('infoMessage', (info) ->
+    #console.log("#{info.number} : #{info.message}")
+  )
+
+  connection.on('debug', (text) ->
+    #console.log(text)
+  )
+
 exports.sqlWithMultipleResultSets = (test) ->
   test.expect(8)
 
