@@ -1058,6 +1058,7 @@ exports.disableAnsiNullDefault = (test) ->
 exports.testArithAbortDefault = (test) ->
 	test.expect(6)
 
+	config = getConfig()
 	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
 		test.ifError(err)
 		test.strictEqual(rowCount, 1)
