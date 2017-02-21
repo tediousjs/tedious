@@ -1053,3 +1053,50 @@ exports.disableAnsiNullDefault = (test) ->
     runSqlBatch test, config, sql, (err) ->
         test.ok(err instanceof Error)
         test.strictEqual err?.number, 515 # Cannot insert the value NULL
+
+# Test that the default behaviour has ARITHABORT set to off
+exports.testArithAbortDefault = (test) ->
+	test.expect(6)
+
+	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
+		test.ifError(err)
+		test.strictEqual(rowCount, 1)
+
+		connection.close()
+	)
+
+	request.on('columnMetadata', (columnsMetadata) ->
+		test.strictEqual(Object.keys(columnsMetadata).length, 1)
+	)
+
+	request.on('row', (columns) ->
+		columnNames = Object.keys(columns)
+		test.strictEqual(columnNames.length, 1)
+		test.strictEqual(columnNames[0], 'ArithAbortSetting')
+		test.strictEqual(columns['ArithAbortSetting'].value, 0)
+	)
+
+# Test that ARITHABORT can be set to on
+exports.testArithAbortCanBeSetToOn = (test) ->
+	test.expect(6)
+
+	config = getConfig()
+	get.options.enableArithAbort = true
+
+	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
+		test.ifError(err)
+		test.strictEqual(rowCount, 1)
+
+		connection.close()
+	)
+
+	request.on('columnMetadata', (columnsMetadata) ->
+		test.strictEqual(Object.keys(columnsMetadata).length, 1)
+	)
+
+	request.on('row', (columns) ->
+		columnNames = Object.keys(columns)
+		test.strictEqual(columnNames.length, 1)
+		test.strictEqual(columnNames[0], 'ArithAbortSetting')
+		test.strictEqual(columns['ArithAbortSetting'].value, 1)
+	)
