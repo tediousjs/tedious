@@ -61,6 +61,7 @@ class Connection extends EventEmitter {
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
+        enableArithAbort: false,
         enableAnsiNullDefault: true,
         encrypt: false,
         fallbackToDefaultDb: false,
@@ -128,6 +129,14 @@ class Connection extends EventEmitter {
 
       if (config.options.enableAnsiNullDefault != undefined) {
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
+      }
+
+      if (config.options.enableArithAbort !== undefined) {
+        if (typeof config.options.enableArithAbort !== 'boolean') {
+          throw new TypeError('options.enableArithAbort must be a boolean (true or false).');
+        }
+
+        this.config.options.enableArithAbort = config.options.enableArithAbort;
       }
 
       if (config.options.encrypt != undefined) {
@@ -701,7 +710,8 @@ class Connection extends EventEmitter {
   getInitialSql() {
     const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
     const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
-    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort off\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst 7\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
+    const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
+    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort ' + enableArithAbort + '\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst 7\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
   }
 
   processedInitialSql() {
