@@ -1054,6 +1054,7 @@ exports.disableAnsiNullDefault = (test) ->
         test.ok(err instanceof Error)
         test.strictEqual err?.number, 515 # Cannot insert the value NULL
 
+<<<<<<< HEAD
 testArithAbort = (test, setting) ->
   test.expect(5)
 
@@ -1107,54 +1108,35 @@ exports.badArithAbort = (test) ->
 
   test.done()
 
+testDateFirstImpl = (test, dateFirst) =>
+  test.expect(3)
+
+  config = getConfig()
+  config.options.datefirst = dateFirst
+
+  connection = new Connection(config)
+
+  request = new Request('select @@datefirst', (err) ->
+    test.ifError(err)
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    dateFirst = columns[0].value
+    test.strictEqual(dateFirst, dateFirst || 7)
+  )
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
 # Test that the default setting for DATEFIRST is 7
 exports.testDatefirstDefault = (test) ->
-  test.expect(3)
-
-  config = getConfig()
-
-  connection = new Connection(config)
-
-  request = new Request('select @@datefirst', (err) ->
-    test.ifError(err)
-    connection.close()
-  )
-
-  request.on('row', (columns) ->
-    dateFirst = columns[0].value
-    test.strictEqual(dateFirst, 7)
-  )
-
-  connection.on 'connect', (err) ->
-    test.ifError(err)
-    connection.execSql(request)
-
-  connection.on 'end', (info) ->
-    test.done()
+  testDateFirstImpl(test, undefined)
 
 # Test that the DATEFIRST setting can be changed via an optional configuration
-exports.testDatefirstDefault = (test) ->
-  test.expect(3)
-
-  config = getConfig()
-  config.options.datefirst = 3
-
-  connection = new Connection(config)
-
-  request = new Request('select @@datefirst', (err) ->
-    test.ifError(err)
-    connection.close()
-  )
-
-  request.on('row', (columns) ->
-    dateFirst = columns[0].value
-    test.strictEqual(dateFirst, 3)
-  )
-
-  connection.on 'connect', (err) ->
-    test.ifError(err)
-    connection.execSql(request)
-
-  connection.on 'end', (info) ->
-    test.done()
-
+exports.testDatefirstCustom = (test) ->
+  testDateFirstImpl(test, 3)
