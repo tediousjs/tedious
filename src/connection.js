@@ -135,7 +135,7 @@ class Connection extends EventEmitter {
         if (typeof config.options.enableArithAbort !== 'boolean') {
           throw new TypeError('options.enableArithAbort must be a boolean (true or false).');
         }
-        
+
         this.config.options.enableArithAbort = config.options.enableArithAbort;
       }
 
