@@ -1021,12 +1021,12 @@ exports.disableAnsiNullDefault = (test) ->
         test.ok(err instanceof Error)
         test.strictEqual err?.number, 515 # Cannot insert the value NULL
 
-
-# Test that the default behaviour has ARITHABORT set to off
-exports.testArithAbortDefault = (test) ->
+testArithAbort = (test, setting) ->
 	test.expect(5)
-
+	
 	config = getConfig()
+	config.options.enableArithAbort = setting if typeof setting is 'boolean'
+
 	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
 		test.ifError(err)
 		test.strictEqual(rowCount, 1)
@@ -1040,7 +1040,8 @@ exports.testArithAbortDefault = (test) ->
 
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, 0)
+		# The current ARITHABORT default setting in Tedious is OFF
+		test.strictEqual(columns[0].value, if setting === true then 1 else 0)
 	)
 
 	connection = new Connection(config)
@@ -1053,35 +1054,11 @@ exports.testArithAbortDefault = (test) ->
 		test.done()
 	)
 
-# Test that ARITHABORT can be set to on
-exports.testArithAbortCanBeSetToOn = (test) ->
-	test.expect(5)
+exports.testArithAbortDefault = (test) ->
+	testArithAbort(test, undefined)
 
-	config = getConfig()
-	config.options.enableArithAbort = true
+exports.testArithAbortOn = (test) ->
+	testArithAbort(test, true)
 
-	request = new Request('SELECT SESSIONPROPERTY(\'ARITHABORT\') AS ArithAbortSetting', (err, rowCount) ->
-		test.ifError(err) 
-		test.strictEqual(rowCount, 1)
-
-		connection.close()
-	)
-
-	request.on('columnMetadata', (columnsMetadata) ->
-		test.strictEqual(Object.keys(columnsMetadata).length, 1)
-	)
-
-	request.on('row', (columns) ->
-		test.strictEqual(Object.keys(columns).length, 1)
-		test.strictEqual(columns[0].value, 1)
-	)
-
-	connection = new Connection(config)
-
-	connection.on('connect', (err) ->
-		connection.execSql(request)
-	)
-
-	connection.on('end', (info) ->
-		test.done()
-	)
+exports.testArithAbortOf = (test) ->
+	testArithAbort(test, false)
