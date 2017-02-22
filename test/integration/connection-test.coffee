@@ -1041,7 +1041,7 @@ testArithAbort = (test, setting) ->
 	request.on('row', (columns) ->
 		test.strictEqual(Object.keys(columns).length, 1)
 		# The current ARITHABORT default setting in Tedious is OFF
-		test.strictEqual(columns[0].value, if setting === true then 1 else 0)
+		test.strictEqual(columns[0].value, if setting is true then 1 else 0)
 	)
 
 	connection = new Connection(config)
@@ -1060,5 +1060,5 @@ exports.testArithAbortDefault = (test) ->
 exports.testArithAbortOn = (test) ->
 	testArithAbort(test, true)
 
-exports.testArithAbortOf = (test) ->
+exports.testArithAbortOff = (test) ->
 	testArithAbort(test, false)
