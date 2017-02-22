@@ -2,6 +2,7 @@
 
 function parseChallenge(buffer) {
   const challenge = {};
+
   challenge.magic = buffer.slice(0, 8).toString('utf8');
   challenge.type = buffer.readInt32LE(8);
   challenge.domainLen = buffer.readInt16LE(12);
@@ -16,6 +17,7 @@ function parseChallenge(buffer) {
   challenge.oddData = buffer.slice(48, 56);
   challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2');
   challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen);
+
   return challenge;
 }
 
@@ -24,7 +26,8 @@ module.exports = function(parser, colMetadata, options, callback) {
     callback({
       name: 'SSPICHALLENGE',
       event: 'sspichallenge',
-      ntlmpacket: parseChallenge(buffer)
+      ntlmpacket: options.useWindowsIntegratedAuth ? {} : parseChallenge(buffer),
+      ntlmpacketBuffer: buffer
     });
   });
 };

@@ -17,6 +17,7 @@ branches:
 
 install:
   - ps: Install-Product node $env:nodejs_version
+  - npm install -g npm
   - npm install
 
 cache:

@@ -199,7 +199,7 @@ DomainCaseEnum = {
     Upper: 2
 }
 
-runNtlmTest = (test, domainCase) ->
+runNtlmTest = (test, domainCase, isIntegratedAuth, securityPackage) ->
   if !getNtlmConfig()
     console.log('Skipping ntlm test')
     test.done()
@@ -210,8 +210,13 @@ runNtlmTest = (test, domainCase) ->
   config = getConfig()
   ntlmConfig = getNtlmConfig()
 
-  config.userName = ntlmConfig.userName
-  config.password = ntlmConfig.password
+  if isIntegratedAuth
+    config.userName = ''
+    config.password = ''
+    config.securityPackage = securityPackage
+  else
+    config.userName = ntlmConfig.userName
+    config.password = ntlmConfig.password
 
   switch domainCase
     when DomainCaseEnum.AsIs then config.domain = ntlmConfig.domain
@@ -240,13 +245,49 @@ runNtlmTest = (test, domainCase) ->
   )
 
 exports.ntlm = (test) ->
-  runNtlmTest test, DomainCaseEnum.AsIs 
+  runNtlmTest test, DomainCaseEnum.AsIs, false
 
 exports.ntlmLower = (test) ->
-  runNtlmTest test, DomainCaseEnum.Lower
+  runNtlmTest test, DomainCaseEnum.Lower, false
 
 exports.ntlmUpper = (test) ->
-  runNtlmTest test, DomainCaseEnum.Upper
+  runNtlmTest test, DomainCaseEnum.Upper, false
+
+exports.integratedAuthDefault = (test) ->
+  runNtlmTest test, DomainCaseEnum.AsIs, true
+
+exports.integratedAuthDefaultLower = (test) ->
+  runNtlmTest test, DomainCaseEnum.Lower, true
+
+exports.integratedAuthDefaultUpper = (test) ->
+  runNtlmTest test, DomainCaseEnum.Upper, true
+
+exports.integratedAuthNegotiate = (test) ->
+  runNtlmTest test, DomainCaseEnum.AsIs, true, 'negotiate'
+
+exports.integratedAuthNegotiateLower = (test) ->
+  runNtlmTest test, DomainCaseEnum.Lower, true, 'negotiate'
+
+exports.integratedAuthNegotiateUpper = (test) ->
+  runNtlmTest test, DomainCaseEnum.Upper, true, 'negotiate'
+
+exports.integratedAuthKerberos = (test) ->
+  runNtlmTest test, DomainCaseEnum.AsIs, true, 'kerberos'
+
+exports.integratedAuthKerberosLower = (test) ->
+  runNtlmTest test, DomainCaseEnum.Lower, true, 'kerberos'
+
+exports.integratedAuthKerberosUpper = (test) ->
+  runNtlmTest test, DomainCaseEnum.Upper, true, 'kerberos'
+
+exports.integratedAuthNtlm = (test) ->
+  runNtlmTest test, DomainCaseEnum.AsIs, true, 'ntlm'
+
+exports.integratedAuthNtlmLower = (test) ->
+  runNtlmTest test, DomainCaseEnum.Lower, true, 'ntlm'
+
+exports.integratedAuthNtlmUpper = (test) ->
+  runNtlmTest test, DomainCaseEnum.Upper, true, 'ntlm'
 
 exports.encrypt = (test) ->
   test.expect(5)
