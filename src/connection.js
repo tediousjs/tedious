@@ -131,7 +131,11 @@ class Connection extends EventEmitter {
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
       }
 
-      if (config.options.enableArithAbort != undefined) {
+      if (config.options.enableArithAbort !== undefined) {
+        if (typeof config.options.enableArithAbort !== 'boolean') {
+          throw new TypeError('options.enableArithAbort must be a boolean (true or false).');
+        }
+        
         this.config.options.enableArithAbort = config.options.enableArithAbort;
       }
 
