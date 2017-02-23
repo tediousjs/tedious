@@ -129,7 +129,11 @@ class Connection extends EventEmitter {
         this.config.options.database = config.options.database;
       }
 
-      if (config.options.datefirst != undefined) {
+      if (config.options.datefirst) {
+        if (config.options.datefirst < 1 || config.options.port > 7) {
+          throw new RangeError('DateFirst should be >= 1 and <= 7');
+        }
+
         this.config.options.datefirst = config.options.datefirst;
       }
 

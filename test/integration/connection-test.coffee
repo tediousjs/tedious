@@ -1140,3 +1140,16 @@ exports.testDatefirstDefault = (test) ->
 # Test that the DATEFIRST setting can be changed via an optional configuration
 exports.testDatefirstCustom = (test) ->
   testDateFirstImpl(test, 3)
+
+# Test that an invalid DATEFIRST setting throws
+exports.badDatefirst = (test) ->
+  test.expect(1)
+  config = getConfig()
+  config.options.datefirst = -1
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
