@@ -1054,10 +1054,8 @@ exports.disableAnsiNullDefault = (test) ->
         test.ok(err instanceof Error)
         test.strictEqual err?.number, 515 # Cannot insert the value NULL
 
-<<<<<<< HEAD
 testArithAbort = (test, setting) ->
   test.expect(5)
-
   config = getConfig()
   config.options.enableArithAbort = setting if typeof setting is 'boolean'
 
@@ -1110,7 +1108,6 @@ exports.badArithAbort = (test) ->
 
 testDateFirstImpl = (test, dateFirst) =>
   test.expect(3)
-
   config = getConfig()
   config.options.datefirst = dateFirst
 
