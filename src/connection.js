@@ -652,6 +652,11 @@ class Connection extends EventEmitter {
     });
 
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+      if (!this.config.options.encrypt) {
+        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true."));
+        return this.close();
+      }
+
       return this.dispatchEvent('tls');
     } else {
       return this.dispatchEvent('noTls');
