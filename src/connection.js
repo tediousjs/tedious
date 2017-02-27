@@ -31,6 +31,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000;
 const DEFAULT_CANCEL_TIMEOUT = 5 * 1000;
 const DEFAULT_PACKET_SIZE = 4 * 1024;
 const DEFAULT_TEXTSIZE = '2147483647';
+const DEFAULT_DATEFIRST = 7;
 const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
 
@@ -61,6 +62,7 @@ class Connection extends EventEmitter {
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
+        datefirst: DEFAULT_DATEFIRST,
         enableArithAbort: false,
         enableAnsiNullDefault: true,
         encrypt: false,
@@ -125,6 +127,14 @@ class Connection extends EventEmitter {
 
       if (config.options.database != undefined) {
         this.config.options.database = config.options.database;
+      }
+
+      if (config.options.datefirst) {
+        if (config.options.datefirst < 1 || config.options.port > 7) {
+          throw new RangeError('DateFirst should be >= 1 and <= 7');
+        }
+
+        this.config.options.datefirst = config.options.datefirst;
       }
 
       if (config.options.enableAnsiNullDefault != undefined) {
@@ -711,7 +721,7 @@ class Connection extends EventEmitter {
     const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
     const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
     const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
-    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort ' + enableArithAbort + '\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst 7\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
+    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort ' + enableArithAbort + '\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst ' + this.config.options.datefirst + '\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
   }
 
   processedInitialSql() {

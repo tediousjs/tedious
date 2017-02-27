@@ -240,7 +240,7 @@ runNtlmTest = (test, domainCase) ->
   )
 
 exports.ntlm = (test) ->
-  runNtlmTest test, DomainCaseEnum.AsIs 
+  runNtlmTest test, DomainCaseEnum.AsIs
 
 exports.ntlmLower = (test) ->
   runNtlmTest test, DomainCaseEnum.Lower
@@ -1056,7 +1056,6 @@ exports.disableAnsiNullDefault = (test) ->
 
 testArithAbort = (test, setting) ->
   test.expect(5)
-	
   config = getConfig()
   config.options.enableArithAbort = setting if typeof setting is 'boolean'
 
@@ -1099,6 +1098,52 @@ exports.testArithAbortOff = (test) ->
 exports.badArithAbort = (test) ->
   config = getConfig()
   config.options.enableArithAbort = 'on'
+
+  connection = null
+
+  test.throws ->
+    connection = new Connection(config)
+
+  test.done()
+
+testDateFirstImpl = (test, datefirst) =>
+  datefirst = datefirst || 7
+  test.expect(3)
+  config = getConfig()
+  config.options.datefirst = datefirst
+
+  connection = new Connection(config)
+
+  request = new Request('select @@datefirst', (err) ->
+    test.ifError(err)
+    connection.close()
+  )
+
+  request.on('row', (columns) ->
+    dateFirstActual = columns[0].value
+    test.strictEqual(dateFirstActual, datefirst)
+  )
+
+  connection.on 'connect', (err) ->
+    test.ifError(err)
+    connection.execSql(request)
+
+  connection.on 'end', (info) ->
+    test.done()
+
+# Test that the default setting for DATEFIRST is 7
+exports.testDatefirstDefault = (test) ->
+  testDateFirstImpl(test, undefined)
+
+# Test that the DATEFIRST setting can be changed via an optional configuration
+exports.testDatefirstCustom = (test) ->
+  testDateFirstImpl(test, 3)
+
+# Test that an invalid DATEFIRST setting throws
+exports.badDatefirst = (test) ->
+  test.expect(1)
+  config = getConfig()
+  config.options.datefirst = -1
 
   connection = null
 
