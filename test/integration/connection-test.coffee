@@ -1106,10 +1106,11 @@ exports.badArithAbort = (test) ->
 
   test.done()
 
-testDateFirstImpl = (test, dateFirst) =>
+testDateFirstImpl = (test, datefirst) =>
+  datefirst = datefirst || 7
   test.expect(3)
   config = getConfig()
-  config.options.datefirst = dateFirst
+  config.options.datefirst = datefirst
 
   connection = new Connection(config)
 
@@ -1119,8 +1120,8 @@ testDateFirstImpl = (test, dateFirst) =>
   )
 
   request.on('row', (columns) ->
-    dateFirst = columns[0].value
-    test.strictEqual(dateFirst, dateFirst || 7)
+    dateFirstActual = columns[0].value
+    test.strictEqual(dateFirstActual, datefirst)
   )
 
   connection.on 'connect', (err) ->
