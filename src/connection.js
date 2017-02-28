@@ -653,7 +653,7 @@ class Connection extends EventEmitter {
 
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
-        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true."));
+        this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
         return this.close();
       }
 
