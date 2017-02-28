@@ -208,6 +208,40 @@ exports.dateTime = (test) ->
 exports.dateTimeNull = (test) ->
   execSql(test, TYPES.DateTime, null)
 
+# The tests below validates DateTime precision on the input side, as described in
+#  the section "Rounding of datetime Fractional Second Precision" from
+# https://msdn.microsoft.com/en-us/library/ms187819.aspx
+
+exports.dateTimePrecision_0 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.990'), null, null, new Date('January 1, 1998 23:59:59.990'))
+
+exports.dateTimePrecision_1 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.991'), null, null, new Date('January 1, 1998 23:59:59.990'))
+
+exports.dateTimePrecision_2 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.992'), null, null, new Date('January 1, 1998 23:59:59.993'))
+
+exports.dateTimePrecision_3 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.993'), null, null, new Date('January 1, 1998 23:59:59.993'))
+
+exports.dateTimePrecision_4 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.994'), null, null, new Date('January 1, 1998 23:59:59.993'))
+
+exports.dateTimePrecision_5 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.995'), null, null, new Date('January 1, 1998 23:59:59.997'))
+
+exports.dateTimePrecision_6 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.996'), null, null, new Date('January 1, 1998 23:59:59.997'))
+
+exports.dateTimePrecision_7 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.997'), null, null, new Date('January 1, 1998 23:59:59.997'))
+
+exports.dateTimePrecision_8 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.998'), null, null, new Date('January 1, 1998 23:59:59.997'))
+
+exports.dateTimePrecision_9 = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
+
 exports.dateTime2 = (test) ->
   execSql(test, TYPES.DateTime2, new Date('December 4, 2011 10:04:23'), '7_3_A')
 
@@ -285,6 +319,40 @@ exports.outputDateTime = (test) ->
 
 exports.outputDateTimeNull = (test) ->
   execSqlOutput(test, TYPES.DateTime, null)
+
+# The tests below validates DateTime precision on the output side, as described in
+#  the section "Rounding of datetime Fractional Second Precision" from
+# https://msdn.microsoft.com/en-us/library/ms187819.aspx
+
+exports.outputDatePrecision_0 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.990'), new Date('January 1, 1998 23:59:59.990'))
+
+exports.outputDatePrecision_1 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.991'), new Date('January 1, 1998 23:59:59.990'))
+
+exports.outputDatePrecision_2 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.992'), new Date('January 1, 1998 23:59:59.993'))
+
+exports.outputDatePrecision_3 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.993'), new Date('January 1, 1998 23:59:59.993'))
+
+exports.outputDatePrecision_4 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.994'), new Date('January 1, 1998 23:59:59.993'))
+
+exports.outputDatePrecision_5 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.995'), new Date('January 1, 1998 23:59:59.997'))
+
+exports.outputDatePrecision_6 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.996'), new Date('January 1, 1998 23:59:59.997'))
+
+exports.outputDatePrecision_7 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.997'), new Date('January 1, 1998 23:59:59.997'))
+
+exports.outputDatePrecision_8 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.998'), new Date('January 1, 1998 23:59:59.997'))
+
+exports.outputDatePrecision_9 = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
 
 exports.multipleParameters = (test) ->
   test.expect(7)
@@ -412,7 +480,7 @@ exports.callProcedureWithParameters = (test) ->
     #console.log(text)
   )
 
-execSql = (test, type, value, tdsVersion, options) ->
+execSql = (test, type, value, tdsVersion, options, expectedValue) ->
 
   config = getConfig()
   #config.options.packetSize = 32768
@@ -438,14 +506,17 @@ execSql = (test, type, value, tdsVersion, options) ->
   request.on('row', (columns) ->
       test.strictEqual(columns.length, 1)
 
+      if (!expectedValue)
+        expectedValue = value;
+
       if (value instanceof Date)
-        test.strictEqual(columns[0].value.getTime(), value.getTime())
+        test.strictEqual(columns[0].value.getTime(), expectedValue.getTime())
       else if (type == TYPES.BigInt)
-        test.strictEqual(columns[0].value, value.toString())
+        test.strictEqual(columns[0].value, expectedValue.toString())
       else if (type == TYPES.UniqueIdentifierN)
-        test.deepEqual(columns[0].value, value)
+        test.deepEqual(columns[0].value, expectedValue)
       else
-        test.strictEqual(columns[0].value, value)
+        test.strictEqual(columns[0].value, expectedValue)
   )
 
   connection = new Connection(config)
@@ -467,7 +538,7 @@ execSql = (test, type, value, tdsVersion, options) ->
     #console.log(text)
   )
 
-execSqlOutput = (test, type, value) ->
+execSqlOutput = (test, type, value, expectedValue) ->
   test.expect(7)
 
   config = getConfig()
@@ -489,14 +560,17 @@ execSqlOutput = (test, type, value) ->
   request.on('returnValue', (name, returnValue, metadata) ->
     test.strictEqual(name, 'paramOut')
 
+    if (!expectedValue)
+      expectedValue = value;
+
     if (value instanceof Date)
-      test.strictEqual(returnValue.getTime(), value.getTime())
+      test.strictEqual(returnValue.getTime(), expectedValue.getTime())
     else if (type == TYPES.BigInt)
-      test.strictEqual(returnValue, value.toString())
+      test.strictEqual(returnValue, expectedValue.toString())
     else if (type == TYPES.UniqueIdentifierN)
-      test.deepEqual(returnValue, value)
+      test.deepEqual(returnValue, expectedValue)
     else
-      test.strictEqual(returnValue, value)
+      test.strictEqual(returnValue, expectedValue)
 
     test.ok(metadata)
   )
