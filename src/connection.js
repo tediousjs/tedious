@@ -130,7 +130,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.datefirst) {
-        if (config.options.datefirst < 1 || config.options.port > 7) {
+        if (config.options.datefirst < 1 || config.options.datefirst > 7) {
           throw new RangeError('DateFirst should be >= 1 and <= 7');
         }
 
