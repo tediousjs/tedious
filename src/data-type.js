@@ -313,7 +313,7 @@ const TYPE = module.exports.TYPE = {
         }
 
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-        threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond);
+        threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
 
         buffer.writeUInt8(8);
         buffer.writeInt32LE(days);
