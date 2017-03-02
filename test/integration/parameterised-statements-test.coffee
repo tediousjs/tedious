@@ -208,7 +208,7 @@ exports.dateTime = (test) ->
 exports.dateTimeNull = (test) ->
   execSql(test, TYPES.DateTime, null)
 
-# The tests below validates DateTime precision on the input side, as described in
+# The tests below validate DateTime precision on the input side, as described in
 #  the section "Rounding of datetime Fractional Second Precision" from
 # https://msdn.microsoft.com/en-us/library/ms187819.aspx
 
@@ -239,8 +239,18 @@ exports.dateTimePrecision_7 = (test) ->
 exports.dateTimePrecision_8 = (test) ->
   execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.998'), null, null, new Date('January 1, 1998 23:59:59.997'))
 
-exports.dateTimePrecision_9 = (test) ->
-  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
+exports.dateTimePrecision_9_sec_flip = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:58.999'), null, null, new Date('January 1, 1998 23:59:59.000'))
+
+exports.dateTimePrecision_9_min_flip = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:58:59.999'), null, null, new Date('January 1, 1998 23:59:00.000'))
+
+exports.dateTimePrecision_9_hr_flip = (test) ->
+  execSql(test, TYPES.DateTime, new Date('January 1, 1998 22:59:59.999'), null, null, new Date('January 1, 1998 23:00:00.000'))
+
+# This test fails on the version of SQL Server in AppVeyor.
+#exports.dateTimePrecision_9_day_flip = (test) ->
+#  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
 
 exports.dateTime2 = (test) ->
   execSql(test, TYPES.DateTime2, new Date('December 4, 2011 10:04:23'), '7_3_A')
@@ -320,7 +330,7 @@ exports.outputDateTime = (test) ->
 exports.outputDateTimeNull = (test) ->
   execSqlOutput(test, TYPES.DateTime, null)
 
-# The tests below validates DateTime precision on the output side, as described in
+# The tests below validate DateTime precision on the output side, as described in
 #  the section "Rounding of datetime Fractional Second Precision" from
 # https://msdn.microsoft.com/en-us/library/ms187819.aspx
 
@@ -351,8 +361,18 @@ exports.outputDatePrecision_7 = (test) ->
 exports.outputDatePrecision_8 = (test) ->
   execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.998'), new Date('January 1, 1998 23:59:59.997'))
 
-exports.outputDatePrecision_9 = (test) ->
-  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
+exports.outputDatePrecision_9_sec_flip = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:58.999'), new Date('January 1, 1998 23:59:59.000'))
+
+exports.outputDatePrecision_9_min_flip = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:58:59.999'), new Date('January 1, 1998 23:59:00.000'))
+
+exports.outputDatePrecision_9_hr_flip = (test) ->
+  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 22:59:59.999'), new Date('January 1, 1998 23:00:00.000'))
+
+# This test fails on the version of SQL Server in AppVeyor.
+#exports.outputDatePrecision_9_day_flip = (test) ->
+#  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
 
 exports.multipleParameters = (test) ->
   test.expect(7)
