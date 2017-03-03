@@ -77,6 +77,40 @@ exports.datetime = (test) ->
 exports.datetimeNull = (test) ->
   execSql(test, "select cast(null as datetime)", null)
 
+# The tests below validates DateTime precision as described in the section
+# "Rounding of datetime Fractional Second Precision" from
+# https://msdn.microsoft.com/en-us/library/ms187819.aspx
+
+exports.dateTimePrecision_0 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.990' as datetime)", new Date('January 1, 1998 23:59:59.990 GMT'))
+
+exports.dateTimePrecision_1 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.991' as datetime)", new Date('January 1, 1998 23:59:59.990 GMT'))
+
+exports.dateTimePrecision_2 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.992' as datetime)", new Date('January 1, 1998 23:59:59.993 GMT'))
+
+exports.dateTimePrecision_3 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.993' as datetime)", new Date('January 1, 1998 23:59:59.993 GMT'))
+
+exports.dateTimePrecision_4 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.994' as datetime)", new Date('January 1, 1998 23:59:59.993 GMT'))
+
+exports.dateTimePrecision_5 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.995' as datetime)", new Date('January 1, 1998 23:59:59.997 GMT'))
+
+exports.dateTimePrecision_6 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.996' as datetime)", new Date('January 1, 1998 23:59:59.997 GMT'))
+
+exports.dateTimePrecision_7 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.997' as datetime)", new Date('January 1, 1998 23:59:59.997 GMT'))
+
+exports.dateTimePrecision_8 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.998' as datetime)", new Date('January 1, 1998 23:59:59.997 GMT'))
+
+exports.dateTimePrecision_9 = (test) ->
+  execSql(test, "select cast('1998-1-1 23:59:59.999' as datetime)", new Date('January 2, 1998 00:00:00.000 GMT'))
+
 exports.smallDatetime = (test) ->
   execSql(test, "select cast('2011-12-4 10:04:23' as smalldatetime)", new Date('December 4, 2011 10:04:00 GMT'))
 
