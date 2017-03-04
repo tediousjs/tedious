@@ -1129,7 +1129,7 @@ Connection.prototype.STATE = {
           if (this.config.domain) {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
-            return this.transitionTo (this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
         }
       }
