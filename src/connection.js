@@ -524,7 +524,30 @@ class Connection extends EventEmitter {
     this.socket.on('close', this.socketClose);
     this.socket.on('end', this.socketEnd);
     this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-    this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
+
+    this.messageIo.incomingMessageStream.on('data', (message) => {
+      const Transform = require('readable-stream').Transform;
+      const packetUnwrapper = new Transform({
+        objectMode: true,
+        transform: function(packet, encoding, callback) {
+          this.push(packet.data());
+          callback();
+        }
+      });
+
+      if (this.state.name == 'SentClientRequest') {
+        packetUnwrapper.pipe(this.tokenStreamParser.parser, { end: false });
+
+        message.pipe(packetUnwrapper);
+      } else {
+        packetUnwrapper.on('data', (chunk) => {
+          this.dispatchEvent('data', chunk);
+        });
+
+        message.pipe(packetUnwrapper);
+      }
+    });
+
     this.messageIo.on('message', () => {
       return this.dispatchEvent('message');
     });
