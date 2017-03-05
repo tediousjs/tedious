@@ -3,56 +3,14 @@
 const tls = require('tls');
 const crypto = require('crypto');
 const EventEmitter = require('events').EventEmitter;
-const Transform = require('readable-stream').Transform;
 
 require('./buffertools');
+
+const IncomingMessageStream = require('./message/incoming-message-stream');
 
 const Packet = require('./packet').Packet;
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;
-
-class ReadablePacketStream extends Transform {
-  constructor() {
-    super({ objectMode: true });
-
-    this.buffer = new Buffer(0);
-    this.position = 0;
-  }
-
-  _transform(chunk, encoding, callback) {
-    if (this.position === this.buffer.length) {
-      // If we have fully consumed the previous buffer,
-      // we can just replace it with the new chunk
-      this.buffer = chunk;
-    } else {
-      // If we haven't fully consumed the previous buffer,
-      // we simply concatenate the leftovers and the new chunk.
-      this.buffer = Buffer.concat([
-        this.buffer.slice(this.position), chunk
-      ], (this.buffer.length - this.position) + chunk.length);
-    }
-
-    this.position = 0;
-
-    // The packet header is always 8 bytes of length.
-    while (this.buffer.length >= this.position + packetHeaderLength) {
-      // Get the full packet length
-      const length = this.buffer.readUInt16BE(this.position + 2);
-
-      if (this.buffer.length >= this.position + length) {
-        const data = this.buffer.slice(this.position, this.position + length);
-        this.position += length;
-        this.push(new Packet(data));
-      } else {
-        // Not enough data to provide the next packet. Stop here and wait for
-        // the next call to `_transform`.
-        break;
-      }
-    }
-
-    callback();
-  }
-}
 
 module.exports = class MessageIO extends EventEmitter {
   constructor(socket, _packetSize, debug) {
@@ -63,16 +21,19 @@ module.exports = class MessageIO extends EventEmitter {
     this.debug = debug;
     this.sendPacket = this.sendPacket.bind(this);
 
-    this.packetStream = new ReadablePacketStream();
-    this.packetStream.on('data', (packet) => {
-      this.logPacket('Received', packet);
-      this.emit('data', packet.data());
-      if (packet.isLast()) {
+    this.incomingMessageStream = new IncomingMessageStream();
+    this.incomingMessageStream.on('data', (message) => {
+      message.on('data', (packet) => {
+        this.logPacket('Received', packet);
+        this.emit('data', packet.data());
+      });
+
+      message.on('end', () => {
         this.emit('message');
-      }
+      });
     });
 
-    this.socket.pipe(this.packetStream);
+    this.socket.pipe(this.incomingMessageStream);
     this.packetDataSize = this._packetSize - packetHeaderLength;
   }
 
@@ -126,11 +87,11 @@ module.exports = class MessageIO extends EventEmitter {
   }
 
   encryptAllFutureTraffic() {
-    this.socket.unpipe(this.packetStream);
+    this.socket.unpipe(this.incomingMessageStream);
     this.securePair.encrypted.removeAllListeners('data');
     this.socket.pipe(this.securePair.encrypted);
     this.securePair.encrypted.pipe(this.socket);
-    this.securePair.cleartext.pipe(this.packetStream);
+    this.securePair.cleartext.pipe(this.incomingMessageStream);
     this.tlsNegotiationComplete = true;
   }
 
@@ -141,6 +102,7 @@ module.exports = class MessageIO extends EventEmitter {
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage(packetType, data, resetConnection) {
+
     let numberOfPackets;
     if (data) {
       numberOfPackets = (Math.floor((data.length - 1) / this.packetDataSize)) + 1;
