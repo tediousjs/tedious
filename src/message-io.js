@@ -7,8 +7,8 @@ const EventEmitter = require('events').EventEmitter;
 require('./buffertools');
 
 const IncomingMessageStream = require('./message/incoming-message-stream');
+const OutgoingMessage = require('./message/outgoing-message');
 
-const Packet = require('./packet').Packet;
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
@@ -102,34 +102,11 @@ module.exports = class MessageIO extends EventEmitter {
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage(packetType, data, resetConnection) {
-
-    let numberOfPackets;
-    if (data) {
-      numberOfPackets = (Math.floor((data.length - 1) / this.packetDataSize)) + 1;
-    } else {
-      numberOfPackets = 1;
-      data = new Buffer(0);
-    }
-
-    for (let packetNumber = 0; packetNumber < numberOfPackets; packetNumber++) {
-      const payloadStart = packetNumber * this.packetDataSize;
-
-      let payloadEnd;
-      if (packetNumber < numberOfPackets - 1) {
-        payloadEnd = payloadStart + this.packetDataSize;
-      } else {
-        payloadEnd = data.length;
-      }
-
-      const packetPayload = data.slice(payloadStart, payloadEnd);
-
-      const packet = new Packet(packetType);
-      packet.last(packetNumber === numberOfPackets - 1);
-      packet.resetConnection(resetConnection);
-      packet.packetId(packetNumber + 1);
-      packet.addData(packetPayload);
+    const message = new OutgoingMessage(packetType, resetConnection, this.packetDataSize);
+    message.on('data', (packet) => {
       this.sendPacket(packet);
-    }
+    });
+    message.end(data);
   }
 
   sendPacket(packet) {
