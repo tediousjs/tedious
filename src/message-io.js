@@ -76,7 +76,9 @@ module.exports = class MessageIO extends EventEmitter {
     });
 
     this.securePair.encrypted.on('data', (data) => {
-      this.sendMessage(TYPE.PRELOGIN, data);
+      const message = new OutgoingMessage(TYPE.PRELOGIN, false, this.packetSize());
+      this.sendMessage(message);
+      message.end(data);
     });
 
     // On Node >= 0.12, the encrypted stream automatically starts spewing out
@@ -101,12 +103,10 @@ module.exports = class MessageIO extends EventEmitter {
 
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
-  sendMessage(packetType, data, resetConnection) {
-    const message = new OutgoingMessage(packetType, resetConnection, this.packetDataSize);
+  sendMessage(message) {
     message.on('data', (packet) => {
       this.sendPacket(packet);
     });
-    message.end(data);
   }
 
   sendPacket(packet) {

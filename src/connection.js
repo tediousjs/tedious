@@ -22,6 +22,8 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 
+const OutgoingMessage = require('./message/outgoing-message');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -555,8 +557,12 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = void 0;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    return this.transitionTo(this.STATE.SENT_ATTENTION);
+
+    const message = new OutgoingMessage(TYPE.ATTENTION, false, this.messageIo.packetSize());
+    this.messageIo.sendMessage(message);
+    message.end();
+
+    this.transitionTo(this.STATE.SENT_ATTENTION);
   }
 
   clearConnectTimer() {
@@ -641,7 +647,11 @@ class Connection extends EventEmitter {
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt
     });
-    this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
+
+    const message = new OutgoingMessage(TYPE.PRELOGIN, false, this.messageIo.packetSize());
+    this.messageIo.sendMessage(message);
+    message.end(payload.data);
+
     return this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -688,7 +698,10 @@ class Connection extends EventEmitter {
     });
 
     this.routingData = undefined;
-    this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+
+    const message = new OutgoingMessage(TYPE.LOGIN7, false, this.messageIo.packetSize());
+    this.messageIo.sendMessage(message);
+    message.end(payload.data);
 
     return this.debug.payload(function() {
       return payload.toString('  ');
@@ -707,7 +720,11 @@ class Connection extends EventEmitter {
       ntlmpacket: this.ntlmpacket,
       additional: this.additional
     });
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+
+    const message = new OutgoingMessage(TYPE.NTLMAUTH_PKT, false, this.messageIo.packetSize());
+    this.messageIo.sendMessage(message);
+    message.end(payload.data);
+
     return this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -719,7 +736,10 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    return this.messageIo.sendMessage(TYPE.SQL_BATCH, payload.data);
+
+    const message = new OutgoingMessage(TYPE.SQL_BATCH, false, this.messageIo.packetSize());
+    this.messageIo.sendMessage(message);
+    message.end(payload.data);
   }
 
   getInitialSql() {
@@ -986,7 +1006,11 @@ class Connection extends EventEmitter {
       this.request.rows = [];
       this.request.rst = [];
       this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+
+      const message = new OutgoingMessage(packetType, this.resetConnectionOnNextRequest, this.messageIo.packetSize());
+      this.messageIo.sendMessage(message);
+      message.end(payload.data);
+
       this.resetConnectionOnNextRequest = false;
       this.debug.payload(function() {
         return payload.toString('  ');
@@ -1002,8 +1026,13 @@ class Connection extends EventEmitter {
       return false;
     } else {
       this.request.canceled = true;
-      this.messageIo.sendMessage(TYPE.ATTENTION);
+
+      const message = new OutgoingMessage(TYPE.ATTENTION, false, this.messageIo.packetSize());
+      this.messageIo.sendMessage(message);
+      message.end();
+
       this.transitionTo(this.STATE.SENT_ATTENTION);
+
       return true;
     }
   }
