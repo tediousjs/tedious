@@ -1001,6 +1001,7 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       return false;
     } else {
+      this.clearRequestTimer();
       this.request.canceled = true;
       this.messageIo.sendMessage(TYPE.ATTENTION);
       this.transitionTo(this.STATE.SENT_ATTENTION);
