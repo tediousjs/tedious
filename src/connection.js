@@ -577,8 +577,10 @@ class Connection extends EventEmitter {
 
           message.pipe(packetUnwrapper);
         }
+
+        message.on('end', () => { this.dispatchEvent('message'); });
       });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+
       this.messageIo.on('secure', this.emit.bind(this, 'secure'));
 
       this.socketConnect();
