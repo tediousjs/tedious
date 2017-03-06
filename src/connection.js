@@ -538,21 +538,7 @@ class Connection extends EventEmitter {
       if (this.state.name == 'SentClientRequest') {
         packetUnwrapper.pipe(this.tokenStreamParser.parser, { end: false });
 
-        const time = Date.now();
-
         message.pipe(packetUnwrapper);
-
-        console.log(time, 'Pausing');
-
-        message.pause();
-        this.tokenStreamParser.parser.pause();
-
-        setTimeout(() => {
-          this.tokenStreamParser.parser.resume();
-          message.resume();
-
-          console.log(time, 'Resuming');
-        }, 3000);
       } else {
         packetUnwrapper.on('data', (chunk) => {
           this.dispatchEvent('data', chunk);
