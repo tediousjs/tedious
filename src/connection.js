@@ -522,7 +522,10 @@ class Connection extends EventEmitter {
     this.socket.on('close', this.socketClose);
     this.socket.on('end', this.socketEnd);
     this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-    this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
+    this.messageIo.on('data', (data) => {
+      this.clearRequestTimer();
+      this.dispatchEvent('data', data);
+    });
     this.messageIo.on('message', () => {
       return this.dispatchEvent('message');
     });
@@ -567,7 +570,8 @@ class Connection extends EventEmitter {
 
   clearRequestTimer() {
     if (this.requestTimer) {
-      return clearTimeout(this.requestTimer);
+      clearTimeout(this.requestTimer);
+      this.requestTimer = undefined;
     }
   }
 
