@@ -1563,8 +1563,8 @@ const TYPE = module.exports.TYPE = {
       let ref, ref1, ref2, ref3;
       buffer.writeUInt8(this.id);
       buffer.writeBVarchar('');
-      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : void 0) != null ? ref : '');
-      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : void 0) != null ? ref2 : '');
+      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : undefined) != null ? ref : '');
+      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
     },
 
     writeParameterData: function(buffer, parameter, options) {

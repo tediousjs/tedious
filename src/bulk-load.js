@@ -138,7 +138,7 @@ module.exports = class BulkLoad extends EventEmitter {
         sql += ',\n';
       }
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
-      if (c.nullable !== void 0) {
+      if (c.nullable !== undefined) {
         sql += ' ' + (c.nullable ? 'NULL' : 'NOT NULL');
       }
     }
@@ -198,7 +198,7 @@ module.exports = class BulkLoad extends EventEmitter {
       let flags = FLAGS.updateableReadWrite;
       if (c.nullable) {
         flags |= FLAGS.nullable;
-      } else if (c.nullable === void 0 && this.options.tdsVersion >= '7_2') {
+      } else if (c.nullable === undefined && this.options.tdsVersion >= '7_2') {
         flags |= FLAGS.nullableUnknown;
       }
       tBuf.writeUInt16LE(flags);
