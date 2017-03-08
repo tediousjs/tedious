@@ -267,7 +267,7 @@ class Connection extends EventEmitter {
       if (this.request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
         this.request.callback(err);
-        this.request = void 0;
+        this.request = undefined;
       }
       this.closed = true;
       this.loggedIn = false;
@@ -283,7 +283,7 @@ class Connection extends EventEmitter {
   }
 
   createTokenStreamParser() {
-    this.tokenStreamParser = new TokenStreamParser(this.debug, void 0, this.config.options);
+    this.tokenStreamParser = new TokenStreamParser(this.debug, undefined, this.config.options);
 
     this.tokenStreamParser.on('infoMessage', (token) => {
       return this.emit('infoMessage', token);
@@ -439,8 +439,8 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('doneProc', (token) => {
       if (this.request) {
         this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = void 0;
-        if (token.rowCount !== void 0) {
+        this.procReturnStatusValue = undefined;
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -452,7 +452,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('doneInProc', (token) => {
       if (this.request) {
         this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== void 0) {
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -471,7 +471,7 @@ class Connection extends EventEmitter {
           this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
         }
         this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== void 0) {
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -549,12 +549,12 @@ class Connection extends EventEmitter {
     const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = void 0;
+    this.connectTimer = undefined;
     return this.dispatchEvent('connectTimeout');
   }
 
   requestTimeout() {
-    this.requestTimer = void 0;
+    this.requestTimer = undefined;
     this.messageIo.sendMessage(TYPE.ATTENTION);
     return this.transitionTo(this.STATE.SENT_ATTENTION);
   }
@@ -853,7 +853,7 @@ class Connection extends EventEmitter {
       }));
     }
 
-    const request = new Request(void 0, (err) => {
+    const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
@@ -871,7 +871,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
   }
 
@@ -887,7 +887,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
   }
 
@@ -900,7 +900,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
 
@@ -1243,7 +1243,7 @@ Connection.prototype.STATE = {
     events: {
       socketError: function(err) {
         const sqlRequest = this.request;
-        this.request = void 0;
+        this.request = undefined;
         sqlRequest.callback(err);
         return this.transitionTo(this.STATE.FINAL);
       },
@@ -1254,7 +1254,7 @@ Connection.prototype.STATE = {
         this.clearRequestTimer();
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
-        this.request = void 0;
+        this.request = undefined;
         if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
           this.inTransaction = false;
         }
@@ -1282,7 +1282,7 @@ Connection.prototype.STATE = {
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
           const sqlRequest = this.request;
-          this.request = void 0;
+          this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
           if (sqlRequest.canceled) {
             return sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
