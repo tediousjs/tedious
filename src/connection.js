@@ -522,7 +522,9 @@ class Connection extends EventEmitter {
     this.socket.on('close', this.socketClose);
     this.socket.on('end', this.socketEnd);
     this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-    this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
+    this.messageIo.on('data', (data) => {
+      this.dispatchEvent('data', data);
+    });
     this.messageIo.on('message', () => {
       return this.dispatchEvent('message');
     });
@@ -540,6 +542,7 @@ class Connection extends EventEmitter {
   }
 
   createRequestTimer() {
+    this.clearRequestTimer();                              // release old timer, just to be safe
     if (this.config.options.requestTimeout) {
       return this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
     }
@@ -567,7 +570,8 @@ class Connection extends EventEmitter {
 
   clearRequestTimer() {
     if (this.requestTimer) {
-      return clearTimeout(this.requestTimer);
+      clearTimeout(this.requestTimer);
+      this.requestTimer = undefined;
     }
   }
 
@@ -1001,7 +1005,6 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       return false;
     } else {
-      this.clearRequestTimer();
       this.request.canceled = true;
       this.messageIo.sendMessage(TYPE.ATTENTION);
       this.transitionTo(this.STATE.SENT_ATTENTION);
@@ -1240,6 +1243,9 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
+    exit: function() {
+      this.clearRequestTimer();
+    },
     events: {
       socketError: function(err) {
         const sqlRequest = this.request;
@@ -1248,10 +1254,10 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
+        this.clearRequestTimer();                          // request timer is stopped on first data package
         return this.sendDataToTokenStreamParser(data);
       },
       message: function() {
-        this.clearRequestTimer();
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
         this.request = undefined;
