@@ -509,7 +509,7 @@ function readSmallDateTime(parser, useUTC, callback) {
 function readDateTime(parser, useUTC, callback) {
   parser.readInt32LE((days) => {
     parser.readUInt32LE((threeHundredthsOfSecond) => {
-      const milliseconds = threeHundredthsOfSecond * THREE_AND_A_THIRD;
+      const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
 
       let value;
       if (useUTC) {

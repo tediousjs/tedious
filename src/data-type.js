@@ -313,7 +313,7 @@ const TYPE = module.exports.TYPE = {
         }
 
         threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-        threeHundredthsOfSecond = Math.floor(threeHundredthsOfSecond);
+        threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
 
         buffer.writeUInt8(8);
         buffer.writeInt32LE(days);
@@ -603,6 +603,18 @@ const TYPE = module.exports.TYPE = {
     validate: function(value) {
       if (value == null) {
         return null;
+      }
+      if (isNaN(value)) {
+        return new TypeError('Invalid number.');
+      }
+      if (value < -9007199254740991 || value > 9007199254740991) {
+        // Number.MIN_SAFE_INTEGER = -9007199254740991
+        // Number.MAX_SAFE_INTEGER = 9007199254740991
+        // 9007199254740991 = (2**53) - 1
+        // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
+        // as these constants are not available in node 0.10.
+        return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
+          ' For bigger numbers, use VarChar type.');
       }
       return value;
     }
@@ -1551,8 +1563,8 @@ const TYPE = module.exports.TYPE = {
       let ref, ref1, ref2, ref3;
       buffer.writeUInt8(this.id);
       buffer.writeBVarchar('');
-      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : void 0) != null ? ref : '');
-      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : void 0) != null ? ref2 : '');
+      buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : undefined) != null ? ref : '');
+      buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
     },
 
     writeParameterData: function(buffer, parameter, options) {
