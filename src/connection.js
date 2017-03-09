@@ -549,7 +549,14 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
-    const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
+    let tail = '';
+    if(!!this.config.options.instanceName) {
+      tail = '\\' + this.config.options.instanceName;
+    }
+    if(!!this.config.options.port) {
+      tail = ':' + this.config.options.port;
+    }
+    const message = 'Failed to connect to ' + this.config.server + tail + ' in ' + this.config.options.connectTimeout + 'ms';
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
