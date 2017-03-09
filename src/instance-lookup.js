@@ -1,7 +1,6 @@
 'use strict';
 
-const dgram = require('dgram');
-const lookupAll = require('dns-lookup-all');
+const Sender = require('./sender').Sender;
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -10,120 +9,104 @@ const RETRIES = 3;
 const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
-module.exports.instanceLookup = instanceLookup;
-function instanceLookup(options, callback) {
-  const server = options.server;
-  if (typeof server !== 'string') {
-    throw new TypeError('Invalid arguments: "server" must be a string');
+class InstanceLookup {
+  constructor() { }
+
+  // Wrapper allows for stubbing Sender when unit testing instance-lookup.
+  createSender(host, port, request) {
+    return new Sender(host, port, request);
   }
 
-  const instanceName = options.instanceName;
-  if (typeof instanceName !== 'string') {
-    throw new TypeError('Invalid arguments: "instanceName" must be a string');
-  }
-
-  const timeout = options.timeout === undefined ? TIMEOUT : options.timeout;
-  if (typeof timeout !== 'number') {
-    throw new TypeError('Invalid arguments: "timeout" must be a number');
-  }
-
-  const retries = options.retries === undefined ? RETRIES : options.retries;
-  if (typeof retries !== 'number') {
-    throw new TypeError('Invalid arguments: "retries" must be a number');
-  }
-
-  if (typeof callback !== 'function') {
-    throw new TypeError('Invalid arguments: "callback" must be a function');
-  }
-
-  const multiSubnetFailover = options.multiSubnetFailover !== undefined && options.multiSubnetFailover;
-  let socket, timer, retriesLeft = retries;
-
-  function onMessage(message) {
-    clearTimeout(timer);
-    socket.close();
-
-    message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
-    const port = parseBrowserResponse(message, instanceName);
-
-    if (port) {
-      return callback(undefined, port);
-    } else {
-      return callback('Port for ' + instanceName + ' not found in ' + message);
+  instanceLookup(options, callback) {
+    const server = options.server;
+    if (typeof server !== 'string') {
+      throw new TypeError('Invalid arguments: "server" must be a string');
     }
-  }
 
-  function onError(err) {
-    clearTimeout(timer);
-    socket.close();
+    const instanceName = options.instanceName;
+    if (typeof instanceName !== 'string') {
+      throw new TypeError('Invalid arguments: "instanceName" must be a string');
+    }
 
-    return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
-  }
+    const timeout = options.timeout === undefined ? TIMEOUT : options.timeout;
+    if (typeof timeout !== 'number') {
+      throw new TypeError('Invalid arguments: "timeout" must be a number');
+    }
 
-  function onTimeout() {
-    socket.close();
+    const retries = options.retries === undefined ? RETRIES : options.retries;
+    if (typeof retries !== 'number') {
+      throw new TypeError('Invalid arguments: "retries" must be a number');
+    }
+
+    if (typeof callback !== 'function') {
+      throw new TypeError('Invalid arguments: "callback" must be a function');
+    }
+
+    let sender, timer, retriesLeft = retries;
+
+    const onTimeout = () => {
+      sender.cancel();
+      return makeAttempt();
+    };
+
+    const makeAttempt = () => {
+      if (retriesLeft > 0) {
+        retriesLeft--;
+
+        const request = new Buffer([0x02]);
+        sender = this.createSender(options.server, SQL_SERVER_BROWSER_PORT, request);
+        sender.execute((err, message) => {
+          clearTimeout(timer);
+          if (err) {
+            return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
+          } else {
+            message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
+            const port = this.parseBrowserResponse(message, instanceName);
+
+            if (port) {
+              return callback(undefined, port);
+            } else {
+              return callback('Port for ' + instanceName + ' not found in ' + message);
+            }
+          }
+        });
+
+        return timer = setTimeout(onTimeout, timeout);
+      } else {
+        return callback('Failed to get response from SQL Server Browser on ' + server);
+      }
+    };
 
     return makeAttempt();
   }
 
-  function makeAttempt() {
-    if (retriesLeft > 0) {
-      retriesLeft--;
-      const request = new Buffer([0x02]);
-      socket = dgram.createSocket('udp4');
-      socket.on('error', onError);
-      socket.on('message', onMessage);
+  parseBrowserResponse(response, instanceName) {
+    let getPort;
 
-      if (multiSubnetFailover) {
-        // TODO: Support both IPv4 and IPv6 here.
-        lookupAll(server, 4, (err, addresses) => {
-          if (err) {
-            return callback(err.message);
+    const instances = response.split(';;');
+    for (let i = 0, len = instances.length; i < len; i++) {
+      const instance = instances[i];
+      const parts = instance.split(';');
+
+      for (let p = 0, partsLen = parts.length; p < partsLen; p += 2) {
+        const name = parts[p];
+        const value = parts[p + 1];
+
+        if (name === 'tcp' && getPort) {
+          const port = parseInt(value, 10);
+          return port;
+        }
+
+        if (name === 'InstanceName') {
+          if (value.toUpperCase() === instanceName.toUpperCase()) {
+            getPort = true;
+          } else {
+            getPort = false;
           }
-
-          const len = addresses.length;
-          for (let i = 0; i < len; i++) {
-            socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, addresses[i].address);
-          }
-        });
-      } else {
-        socket.send(request, 0, request.length, SQL_SERVER_BROWSER_PORT, server);
-      }
-
-      return timer = setTimeout(onTimeout, timeout);
-    } else {
-      return callback('Failed to get response from SQL Server Browser on ' + server);
-    }
-  }
-
-  return makeAttempt();
-}
-
-module.exports.parseBrowserResponse = parseBrowserResponse;
-function parseBrowserResponse(response, instanceName) {
-  let getPort;
-
-  const instances = response.split(';;');
-  for (let i = 0, len = instances.length; i < len; i++) {
-    const instance = instances[i];
-    const parts = instance.split(';');
-
-    for (let p = 0, partsLen = parts.length; p < partsLen; p += 2) {
-      const name = parts[p];
-      const value = parts[p + 1];
-
-      if (name === 'tcp' && getPort) {
-        const port = parseInt(value, 10);
-        return port;
-      }
-
-      if (name === 'InstanceName') {
-        if (value.toUpperCase() === instanceName.toUpperCase()) {
-          getPort = true;
-        } else {
-          getPort = false;
         }
       }
     }
   }
 }
+
+module.exports.InstanceLookup = InstanceLookup;
