@@ -550,10 +550,10 @@ class Connection extends EventEmitter {
 
   connectTimeout() {
     let tail = '';
-    if(!!this.config.options.instanceName) {
+    if (this.config.options.instanceName) {
       tail = '\\' + this.config.options.instanceName;
     }
-    if(!!this.config.options.port) {
+    if (this.config.options.port) {
       tail = ':' + this.config.options.port;
     }
     const message = 'Failed to connect to ' + this.config.server + tail + ' in ' + this.config.options.connectTimeout + 'ms';
