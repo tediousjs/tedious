@@ -21,11 +21,11 @@ const sendResultCancel = 2;
 // Stub function to mimic socket emitting 'error' and 'message' events.
 const emitEvent = function() {
   if (this.sendResult === sendResultError) {
-    if (this.listenerCount('error') > 0) {
+    if (this.listeners('error') && this.listeners('error').length > 0) {
       this.emit('error', this);
     }
   } else {
-    if (this.listenerCount('message') > 0) {
+    if (this.listeners('message') && this.listeners('message').length > 0) {
       this.emit('message', this);
     }
   }
