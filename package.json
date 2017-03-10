@@ -34,7 +34,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">= 0.10"
+    "node": ">= 4"
   },
   "dependencies": {
     "babel-runtime": "^6.9.2",
