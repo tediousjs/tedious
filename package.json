@@ -42,7 +42,7 @@
     "bl": "^1.0.0",
     "dns-lookup-all": "^1.0.2",
     "iconv-lite": "^0.4.11",
-    "readable-stream": "^2.0.2",
+    "readable-stream": "^2.2.6",
     "sprintf": "0.1.5"
   },
   "devDependencies": {
