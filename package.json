@@ -40,9 +40,9 @@
     "babel-runtime": "^6.9.2",
     "big-number": "0.3.1",
     "bl": "^1.0.0",
+    "dns-lookup-all": "^1.0.2",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.0.2",
-    "semver": "^5.1.0",
     "sprintf": "0.1.5"
   },
   "devDependencies": {
@@ -54,7 +54,10 @@
     "benchmark": "^2.1.0",
     "coffee-script": "^1.9.3",
     "eslint": "^2.13.1",
-    "nodeunit": "^0.9.1"
+    "mitm": "^1.3.2",
+    "nodeunit": "^0.9.1",
+    "semver": "^5.1.0",
+    "sinon": "^1.17.5"
   },
   "scripts": {
     "pretest": "eslint src test",
@@ -66,7 +69,11 @@
     "prepublish": "coffee scripts/build.coffee"
   },
   "babel": {
-    "presets": [ "es2015" ],
-    "plugins": [ "transform-runtime" ]
+    "presets": [
+      "es2015"
+    ],
+    "plugins": [
+      "transform-runtime"
+    ]
   }
 }
