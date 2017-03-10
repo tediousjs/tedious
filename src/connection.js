@@ -14,7 +14,7 @@ const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
 const MessageIO = require('./message-io');
-const Socket = require('net').Socket;
+const net = require('net');
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
 const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
@@ -508,7 +508,6 @@ class Connection extends EventEmitter {
   }
 
   connectOnPort(port) {
-    this.socket = new Socket({});
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port
@@ -516,7 +515,7 @@ class Connection extends EventEmitter {
     if (this.config.options.localAddress) {
       connectOpts.localAddress = this.config.options.localAddress;
     }
-    this.socket.connect(connectOpts);
+    this.socket = net.connect(connectOpts);
     this.socket.on('error', this.socketError);
     this.socket.on('connect', this.socketConnect);
     this.socket.on('close', this.socketClose);
