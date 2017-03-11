@@ -30,9 +30,6 @@ class Connector {
     };
 
     const onConnect = () => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
       cb(null, socket);
     };
 
@@ -134,9 +131,6 @@ class SequentialConnectionStrategy {
     };
 
     const onConnect = () => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
       callback(null, socket);
     };
 
