@@ -10,6 +10,7 @@ const semver = require('semver');
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  config.options.requestTimeout = 250;                     // 250 ms timeout until the first response package is received
   return config;
 }
 
@@ -48,6 +49,8 @@ exports.tearDown = function(tearDownDone) {
 //  - The socket and the two transforms are stopped during the pause.
 //  - No large amounts of data are accumulated within the transforms during the pause.
 //  - No data is lost.
+//  - The request timer does not cancel the query when it takes longer to
+//    receive all the rows.
 exports.testLargeQuery = function(test) {
   const debugMode = false;
   const totalRows = 200000;                                // total number of rows to read
@@ -161,12 +164,14 @@ exports.testLargeQuery = function(test) {
 //    the token parser transform.
 //  - No more 'row' events are emitted after a paused request has been canceled.
 //  - The internal data flow is resumed after a paused request has been canceled.
+//  - A request can be paused before Connection.execSql() is called.
 exports.testTransitions = function(test) {
-  const totalRequests = 3;
+  const totalRequests = 4;
   const rowsPerRequest = 4;
   const delayTime = 100;                                   // pause delay time in ms
   const requestToCancel = 2;                               // 1-based position of request to be canceled
   const rowToCancel = 2;                                   // 1-based position of row at which connection.cancel() will be called
+  const requestToStartPaused = 4;                          // 1-based position of request to start paused
   const connection = this.connection;
   let request;
   let requestCount = 0;
@@ -189,6 +194,9 @@ exports.testTransitions = function(test) {
     rowCount = 0;
     paused = false;
     canceled = false;
+    if (requestCount === requestToStartPaused - 1) {
+      pause();
+    }
     connection.execSql(request);
   }
 
@@ -213,6 +221,10 @@ exports.testTransitions = function(test) {
     test.ok(!paused, 'Row received in paused state, requestCount=' + requestCount + ' rowCount=' + rowCount);
     rowCount++;
     test.equal(columns[0].value, rowCount);
+    pause();
+  }
+
+  function pause() {
     paused = true;
     request.pause();
     setTimeout(afterDelay, delayTime);
