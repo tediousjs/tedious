@@ -63,6 +63,12 @@ class Connection extends EventEmitter {
         cryptoCredentialsDetails: {},
         database: undefined,
         datefirst: DEFAULT_DATEFIRST,
+        debug: {
+          data: false,
+          packet: false,
+          payload: false,
+          token: false
+        },
         enableArithAbort: false,
         enableAnsiNullDefault: true,
         encrypt: false,
@@ -136,6 +142,21 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.datefirst = config.options.datefirst;
+      }
+
+      if (config.options.debug) {
+        if (config.options.debug.data != undefined) {
+          this.config.options.debug.data = config.options.debug.data;
+        }
+        if (config.options.debug.packet != undefined) {
+          this.config.options.debug.packet = config.options.debug.packet;
+        }
+        if (config.options.debug.payload != undefined) {
+          this.config.options.debug.payload = config.options.debug.payload;
+        }
+        if (config.options.debug.token != undefined) {
+          this.config.options.debug.token = config.options.debug.token;
+        }
       }
 
       if (config.options.enableAnsiNullDefault != undefined) {
