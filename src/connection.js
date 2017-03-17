@@ -37,7 +37,6 @@ const DEFAULT_TDS_VERSION = '7_4';
 const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
 
-
 function options(config) {
   if (!config) {
     throw new TypeError('No connection configuration given');
@@ -91,7 +90,13 @@ function options(config) {
       useColumnNames: false,
       useUTC: true,
       language: DEFAULT_LANGUAGE,
-      dateFormat: DEFAULT_DATEFORMAT
+      dateFormat: DEFAULT_DATEFORMAT,
+      debug: {
+        data: false,
+        packet: false,
+        payload: false,
+        token: false
+      }
     }
   };
 
@@ -143,8 +148,7 @@ function options(config) {
     if (config.options.enableQuotedIdentifier !== undefined) {
       if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
         throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
-      }
-
+        
       this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
     }
 
@@ -309,7 +313,21 @@ function options(config) {
     if (config.options.dateFormat != undefined) {
       this.config.options.dateFormat = config.options.dateFormat;
     }
-
+      
+    if (config.options.debug) {
+      if (config.options.debug.data != undefined) {
+        this.config.options.debug.data = config.options.debug.data;
+      }
+      if (config.options.debug.packet != undefined) {
+        this.config.options.debug.packet = config.options.debug.packet;
+      }
+      if (config.options.debug.payload != undefined) {
+        this.config.options.debug.payload = config.options.debug.payload;
+      }
+      if (config.options.debug.token != undefined) {
+        this.config.options.debug.token = config.options.debug.token;
+      }
+    }
   }
 }
 
