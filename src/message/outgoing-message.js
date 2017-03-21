@@ -3,6 +3,7 @@
 const Transform = require('readable-stream').Transform;
 
 const Packet = require('../packet').Packet;
+const HEADER_LENGTH = require('../packet').HEADER_LENGTH;
 
 /**
   OutgoingMessage
@@ -16,7 +17,7 @@ module.exports = class OutgoingMessage extends Transform {
 
     this.type = type;
     this.resetConnection = resetConnection;
-    this.packetDataSize = packetDataSize;
+    this.packetDataSize = packetDataSize - HEADER_LENGTH;
     this.packetNumber = 0;
 
     this.buffer = new Buffer(0);
