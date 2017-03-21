@@ -2,6 +2,7 @@ Debug = require('../../src/debug')
 Duplex = require('stream').Duplex
 require('../../src/buffertools')
 MessageIO = require('../../src/message-io')
+OutgoingMessage = require('../../src/message/outgoing-message')
 Packet = require('../../src/packet').Packet
 require('../../src/buffertools')
 
@@ -29,7 +30,9 @@ exports.sendSmallerThanOnePacket = (test) ->
   )
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+  message = new OutgoingMessage(packetType, false, packetSize)
+  io.sendMessage(message)
+  message.end(payload)
 
 exports.sendExactlyPacket = (test) ->
   payload = new Buffer([1, 2, 3, 4])
@@ -44,7 +47,9 @@ exports.sendExactlyPacket = (test) ->
   )
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+  message = new OutgoingMessage(packetType, false, packetSize)
+  io.sendMessage(message)
+  message.end(payload)
 
 exports.sendOneLongerThanPacket = (test) ->
   payload = new Buffer([1, 2, 3, 4, 5])
@@ -52,6 +57,8 @@ exports.sendOneLongerThanPacket = (test) ->
 
   connection = new Connection()
   connection.on('packet', (packet) ->
+    console.log('packet', packet)
+
     packetNumber++
 
     test.strictEqual(packet.type(), packetType)
@@ -70,7 +77,9 @@ exports.sendOneLongerThanPacket = (test) ->
   )
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+  message = new OutgoingMessage(packetType, false, packetSize)
+  io.sendMessage(message)
+  message.end(payload)
 
 exports.receiveOnePacket = (test) ->
   test.expect(1)
