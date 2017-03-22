@@ -71,4 +71,14 @@ module.exports = class IncomingMessageStream extends Transform {
 
     callback();
   }
+
+  _flush(callback) {
+    if (this.position !== this.buffer.length) {
+      // If the buffer was not fully consumed, the message stream
+      // ended prematurely.
+      return callback(new Error('Incoming message stream ended prematurely'));
+    }
+
+    callback();
+  }
 };
