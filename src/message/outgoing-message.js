@@ -40,6 +40,8 @@ module.exports = class OutgoingMessage extends Transform {
       this.buffer = newBuffer;
     }
 
+    this.bufferOffset = 0;
+
     const bufferLength = this.buffer.length;
 
     // We use `<` instead of `<=` here so we always
