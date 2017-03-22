@@ -28,10 +28,13 @@ module.exports = class IncomingMessageStream extends Transform {
       this.buffer = chunk;
     } else {
       // If we haven't fully consumed the previous buffer,
-      // we simply concatenate the leftovers and the new chunk.
-      this.buffer = Buffer.concat([
-        this.buffer.slice(this.position), chunk
-      ], (this.buffer.length - this.position) + chunk.length);
+      // we create a new buffer to hold the leftovers and the new chunk.
+      const newBuffer = new Buffer(chunk.length + this.buffer.length - this.position);
+
+      this.buffer.copy(newBuffer, 0, this.position);
+      chunk.copy(newBuffer, this.buffer.length - this.position);
+
+      this.buffer = newBuffer;
     }
 
     this.position = 0;
