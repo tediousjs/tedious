@@ -25,16 +25,19 @@ module.exports = class OutgoingMessage extends Transform {
   }
 
   _transform(chunk, encoding, callback) {
-    if (this.buffer.length) {
+    if (this.bufferOffset === this.buffer.length) {
+      // If we have fully consumed the previous buffer,
+      // we can just replace it with the new chunk
+      this.buffer = chunk;
+    } else {
+      // If we haven't fully consumed the previous buffer,
+      // we create a new buffer to hold the leftovers and the new chunk.
       const newBuffer = new Buffer(chunk.length + this.buffer.length - this.bufferOffset);
 
       this.buffer.copy(newBuffer, 0, this.bufferOffset);
-      chunk.copy(newBuffer, this.bufferOffset);
+      chunk.copy(newBuffer, this.buffer.length - this.bufferOffset);
 
       this.buffer = newBuffer;
-      this.bufferOffset = 0;
-    } else {
-      this.buffer = chunk;
     }
 
     const bufferLength = this.buffer.length;
