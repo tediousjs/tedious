@@ -5,7 +5,7 @@ require('./buffertools');
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
-const instanceLookup = require('./instance-lookup').instanceLookup;
+const InstanceLookup = require('./instance-lookup').InstanceLookup;
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
 const Login7Payload = require('./login7-payload');
@@ -14,13 +14,13 @@ const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
 const MessageIO = require('./message-io');
-const Socket = require('net').Socket;
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
 const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
 const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
+const Connector = require('./connector').Connector;
 
 const OutgoingMessage = require('./message/outgoing-message');
 
@@ -65,6 +65,12 @@ class Connection extends EventEmitter {
         cryptoCredentialsDetails: {},
         database: undefined,
         datefirst: DEFAULT_DATEFIRST,
+        debug: {
+          data: false,
+          packet: false,
+          payload: false,
+          token: false
+        },
         enableArithAbort: false,
         enableAnsiNullDefault: true,
         encrypt: false,
@@ -72,6 +78,7 @@ class Connection extends EventEmitter {
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         localAddress: undefined,
+        multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
         port: DEFAULT_PORT,
         readOnlyIntent: false,
@@ -139,6 +146,21 @@ class Connection extends EventEmitter {
         this.config.options.datefirst = config.options.datefirst;
       }
 
+      if (config.options.debug) {
+        if (config.options.debug.data != undefined) {
+          this.config.options.debug.data = config.options.debug.data;
+        }
+        if (config.options.debug.packet != undefined) {
+          this.config.options.debug.packet = config.options.debug.packet;
+        }
+        if (config.options.debug.payload != undefined) {
+          this.config.options.debug.payload = config.options.debug.payload;
+        }
+        if (config.options.debug.token != undefined) {
+          this.config.options.debug.token = config.options.debug.token;
+        }
+      }
+
       if (config.options.enableAnsiNullDefault != undefined) {
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
       }
@@ -170,6 +192,10 @@ class Connection extends EventEmitter {
 
       if (config.options.localAddress != undefined) {
         this.config.options.localAddress = config.options.localAddress;
+      }
+
+      if (config.options.multiSubnetFailover != undefined) {
+        this.config.options.multiSubnetFailover = !!config.options.multiSubnetFailover;
       }
 
       if (config.options.packetSize) {
@@ -269,7 +295,7 @@ class Connection extends EventEmitter {
       if (this.request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
         this.request.callback(err);
-        this.request = void 0;
+        this.request = undefined;
       }
       this.closed = true;
       this.loggedIn = false;
@@ -285,7 +311,7 @@ class Connection extends EventEmitter {
   }
 
   createTokenStreamParser() {
-    this.tokenStreamParser = new TokenStreamParser(this.debug, void 0, this.config.options);
+    this.tokenStreamParser = new TokenStreamParser(this.debug, undefined, this.config.options);
 
     this.tokenStreamParser.on('infoMessage', (token) => {
       return this.emit('infoMessage', token);
@@ -441,8 +467,8 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('doneProc', (token) => {
       if (this.request) {
         this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = void 0;
-        if (token.rowCount !== void 0) {
+        this.procReturnStatusValue = undefined;
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -454,7 +480,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('doneInProc', (token) => {
       if (this.request) {
         this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== void 0) {
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -473,7 +499,7 @@ class Connection extends EventEmitter {
           this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
         }
         this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== void 0) {
+        if (token.rowCount !== undefined) {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
@@ -494,64 +520,69 @@ class Connection extends EventEmitter {
 
   connect() {
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     } else {
-      return instanceLookup(this.config.server, this.config.options.instanceName, (message, port) => {
+      return new InstanceLookup().instanceLookup({
+        server: this.config.server,
+        instanceName: this.config.options.instanceName,
+        timeout: this.config.options.connectTimeout
+      }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
         }
         if (message) {
           return this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
         } else {
-          return this.connectOnPort(port);
+          return this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
-      }, this.config.options.connectTimeout);
+      });
     }
   }
 
-  connectOnPort(port) {
-    this.socket = new Socket({});
+  connectOnPort(port, multiSubnetFailover) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
-      port: this.routingData ? this.routingData.port : port
+      port: this.routingData ? this.routingData.port : port,
+      localAddress: this.config.options.localAddress
     };
-    if (this.config.options.localAddress) {
-      connectOpts.localAddress = this.config.options.localAddress;
-    }
-    this.socket.connect(connectOpts);
-    this.socket.on('error', this.socketError);
-    this.socket.on('connect', this.socketConnect);
-    this.socket.on('close', this.socketClose);
-    this.socket.on('end', this.socketEnd);
-    this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
 
-    this.messageIo.incomingMessageStream.on('data', (message) => {
-      const Transform = require('readable-stream').Transform;
-      const packetUnwrapper = new Transform({
-        objectMode: true,
-        transform: function(packet, encoding, callback) {
-          this.push(packet.data());
-          callback();
-        }
-      });
+    new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
+      if (err) {
+        return this.socketError(err);
+      }
 
-      if (this.state.name == 'SentClientRequest') {
-        packetUnwrapper.pipe(this.tokenStreamParser.parser, { end: false });
-
-        message.pipe(packetUnwrapper);
-      } else {
-        packetUnwrapper.on('data', (chunk) => {
-          this.dispatchEvent('data', chunk);
+      this.socket = socket;
+      this.socket.on('error', this.socketError);
+      this.socket.on('close', this.socketClose);
+      this.socket.on('end', this.socketEnd);
+      this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
+      this.messageIo.incomingMessageStream.on('data', (message) => {
+        const Transform = require('readable-stream').Transform;
+        const packetUnwrapper = new Transform({
+          objectMode: true,
+          transform: function(packet, encoding, callback) {
+            this.push(packet.data());
+            callback();
+          }
         });
 
-        message.pipe(packetUnwrapper);
-      }
-    });
+        if (this.state.name == 'SentClientRequest') {
+          packetUnwrapper.pipe(this.tokenStreamParser.parser, { end: false });
 
-    this.messageIo.on('message', () => {
-      return this.dispatchEvent('message');
+          message.pipe(packetUnwrapper);
+        } else {
+          packetUnwrapper.on('data', (chunk) => {
+            this.dispatchEvent('data', chunk);
+          });
+
+          message.pipe(packetUnwrapper);
+        }
+      });
+      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+      this.messageIo.on('secure', this.emit.bind(this, 'secure'));
+
+      this.socketConnect();
     });
-    return this.messageIo.on('secure', this.emit.bind(this, 'secure'));
   }
 
   closeConnection() {
@@ -565,6 +596,7 @@ class Connection extends EventEmitter {
   }
 
   createRequestTimer() {
+    this.clearRequestTimer();                              // release old timer, just to be safe
     if (this.config.options.requestTimeout) {
       return this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
     }
@@ -574,12 +606,12 @@ class Connection extends EventEmitter {
     const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = void 0;
+    this.connectTimer = undefined;
     return this.dispatchEvent('connectTimeout');
   }
 
   requestTimeout() {
-    this.requestTimer = void 0;
+    this.requestTimer = undefined;
 
     const message = new OutgoingMessage(TYPE.ATTENTION, false, this.messageIo.packetSize());
     this.messageIo.sendMessage(message);
@@ -596,7 +628,8 @@ class Connection extends EventEmitter {
 
   clearRequestTimer() {
     if (this.requestTimer) {
-      return clearTimeout(this.requestTimer);
+      clearTimeout(this.requestTimer);
+      this.requestTimer = undefined;
     }
   }
 
@@ -896,7 +929,7 @@ class Connection extends EventEmitter {
       }));
     }
 
-    const request = new Request(void 0, (err) => {
+    const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
@@ -914,7 +947,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
   }
 
@@ -930,7 +963,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
   }
 
@@ -943,7 +976,7 @@ class Connection extends EventEmitter {
         return callback.apply(null, arguments);
       }));
     }
-    const request = new Request(void 0, callback);
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
 
@@ -1291,21 +1324,24 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
+    exit: function() {
+      this.clearRequestTimer();
+    },
     events: {
       socketError: function(err) {
         const sqlRequest = this.request;
-        this.request = void 0;
+        this.request = undefined;
         sqlRequest.callback(err);
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
+        this.clearRequestTimer();                          // request timer is stopped on first data package
         return this.sendDataToTokenStreamParser(data);
       },
       message: function() {
-        this.clearRequestTimer();
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
-        this.request = void 0;
+        this.request = undefined;
         if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
           this.inTransaction = false;
         }
@@ -1333,7 +1369,7 @@ Connection.prototype.STATE = {
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
           const sqlRequest = this.request;
-          this.request = void 0;
+          this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
           if (sqlRequest.canceled) {
             return sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));

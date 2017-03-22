@@ -15,7 +15,7 @@ module.exports = class ReadableTrackingBuffer {
     this.encoding = encoding;
     if (!this.buffer) {
       this.buffer = new Buffer(0);
-      this.encoding = void 0;
+      this.encoding = undefined;
     }
     this.encoding || (this.encoding = 'utf8');
     this.position = 0;

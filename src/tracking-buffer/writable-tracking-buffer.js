@@ -7,6 +7,7 @@ require('../buffertools');
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = new Buffer([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const ZERO_LENGTH_BUFFER = new Buffer(0);
 
 /*
   A Buffer-like class that tracks position.
@@ -40,7 +41,7 @@ module.exports = class WritableTrackingBuffer {
   makeRoomFor(requiredLength) {
     if (this.buffer.length - this.position < requiredLength) {
       if (this.doubleSizeGrowth) {
-        let size = this.buffer.length * 2;
+        let size = Math.max(128, this.buffer.length * 2);
         while (size < requiredLength) {
           size *= 2;
         }
@@ -52,14 +53,13 @@ module.exports = class WritableTrackingBuffer {
   }
 
   newBuffer(size) {
-    size || (size = this.initialSize);
     const buffer = this.buffer.slice(0, this.position);
     if (this.compositeBuffer) {
       this.compositeBuffer = Buffer.concat([this.compositeBuffer, buffer]);
     } else {
       this.compositeBuffer = buffer;
     }
-    this.buffer = new Buffer(size);
+    this.buffer = (size === 0) ? ZERO_LENGTH_BUFFER : new Buffer(size);
     return this.position = 0;
   }
 
