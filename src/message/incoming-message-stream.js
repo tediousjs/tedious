@@ -19,26 +19,11 @@ module.exports = class IncomingMessageStream extends Transform {
     this.currentMessage = undefined;
     this.buffer = new Buffer(0);
     this.position = 0;
+
+    this.waitForNextChunk = undefined;
   }
 
-  _transform(chunk, encoding, callback) {
-    if (this.position === this.buffer.length) {
-      // If we have fully consumed the previous buffer,
-      // we can just replace it with the new chunk
-      this.buffer = chunk;
-    } else {
-      // If we haven't fully consumed the previous buffer,
-      // we create a new buffer to hold the leftovers and the new chunk.
-      const newBuffer = new Buffer(chunk.length + this.buffer.length - this.position);
-
-      this.buffer.copy(newBuffer, 0, this.position);
-      chunk.copy(newBuffer, this.buffer.length - this.position);
-
-      this.buffer = newBuffer;
-    }
-
-    this.position = 0;
-
+  processBufferedData() {
     // The packet header is always 8 bytes of length.
     while (this.buffer.length >= this.position + packetHeaderLength) {
       // Get the full packet length
@@ -60,16 +45,45 @@ module.exports = class IncomingMessageStream extends Transform {
           this.currentMessage.end(packet);
           this.currentMessage = undefined;
         } else {
-          this.currentMessage.write(packet);
+          // If too much data is buffering up in the
+          // current message, wait for it to drain.
+          if (!this.currentMessage.write(packet)) {
+            this.currentMessage.once('drain', () => {
+              this.processBufferedData();
+            });
+            return;
+          }
         }
       } else {
-        // Not enough data to read the next packet. Stop here and wait for
-        // the next call to `_transform`.
         break;
       }
     }
 
-    callback();
+    // Not enough data to read the next packet. Stop here and wait for
+    // the next call to `_transform`.
+    this.waitForNextChunk();
+  }
+
+  _transform(chunk, encoding, callback) {
+    if (this.position === this.buffer.length) {
+      // If we have fully consumed the previous buffer,
+      // we can just replace it with the new chunk
+      this.buffer = chunk;
+    } else {
+      // If we haven't fully consumed the previous buffer,
+      // we create a new buffer to hold the leftovers and the new chunk.
+      const newBuffer = new Buffer(chunk.length + this.buffer.length - this.position);
+
+      this.buffer.copy(newBuffer, 0, this.position);
+      chunk.copy(newBuffer, this.buffer.length - this.position);
+
+      this.buffer = newBuffer;
+    }
+
+    this.position = 0;
+    this.waitForNextChunk = () => { callback(); };
+
+    this.processBufferedData(callback);
   }
 
   _flush(callback) {
