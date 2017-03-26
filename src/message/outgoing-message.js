@@ -17,6 +17,14 @@ module.exports = class OutgoingMessage extends Transform {
   constructor(type, resetConnection, packetSize) {
     super({ readableObjectMode: true });
 
+    if (typeof type !== 'number' || type < 1 || type > 18) {
+      throw new TypeError('"type" must be a number between 1 and 18');
+    }
+
+    if (typeof packetSize !== 'number' || packetSize <= 8) {
+      throw new TypeError('"packetSize" must be a number greater than 8');
+    }
+
     this.type = type;
     this.resetConnection = resetConnection;
     this.packetDataSize = packetSize - HEADER_LENGTH;
