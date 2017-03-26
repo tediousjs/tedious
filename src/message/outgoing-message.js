@@ -5,6 +5,8 @@ const Transform = require('readable-stream').Transform;
 const Packet = require('../packet').Packet;
 const HEADER_LENGTH = require('../packet').HEADER_LENGTH;
 
+const BufferList = require('bl');
+
 /**
   OutgoingMessage
 
@@ -20,44 +22,21 @@ module.exports = class OutgoingMessage extends Transform {
     this.packetDataSize = packetSize - HEADER_LENGTH;
     this.packetNumber = 0;
 
-    this.buffer = new Buffer(0);
-    this.bufferOffset = 0;
+    this.bl = new BufferList();
   }
 
   _transform(chunk, encoding, callback) {
-    if (this.bufferOffset === this.buffer.length) {
-      // If we have fully consumed the previous buffer,
-      // we can just replace it with the new chunk
-      this.buffer = chunk;
-    } else {
-      // If we haven't fully consumed the previous buffer,
-      // we create a new buffer to hold the leftovers and the new chunk.
-      const newBuffer = new Buffer(chunk.length + this.buffer.length - this.bufferOffset);
+    this.bl.append(chunk);
 
-      this.buffer.copy(newBuffer, 0, this.bufferOffset);
-      chunk.copy(newBuffer, this.buffer.length - this.bufferOffset);
-
-      this.buffer = newBuffer;
-    }
-
-    this.bufferOffset = 0;
-
-    const bufferLength = this.buffer.length;
-
-    // We use `<` instead of `<=` here so we always
-    // have a bit of data leftover that can be flushed
-    // when the transform is `end()`ed via `_flush()`
-    // and thus will be marked as the `last`
-    // packet in the message.
-    while (this.bufferOffset + this.packetDataSize < bufferLength) {
-      // TODO: Remove use of `Packet`, pushing buffers instead.
+    while (this.packetDataSize < this.bl.length) {
       const packet = new Packet(this.type);
       packet.last(false);
       packet.resetConnection(this.resetConnection);
       packet.packetId(this.packetNumber += 1);
-      packet.addData(this.buffer.slice(this.bufferOffset, this.bufferOffset += this.packetDataSize));
-
+      packet.addData(this.bl.slice(0, this.packetDataSize));
       this.push(packet);
+
+      this.bl.consume(this.packetDataSize);
     }
 
     callback();
@@ -66,11 +45,12 @@ module.exports = class OutgoingMessage extends Transform {
   _flush(callback) {
     const packet = new Packet(this.type);
     packet.last(true);
-    packet.resetConnection(this.resetConnection);
     packet.packetId(this.packetNumber + 1);
-    packet.addData(this.buffer.slice(this.bufferOffset));
-    this.push(packet);
+    packet.resetConnection(this.resetConnection);
+    packet.addData(this.bl.slice());
+    this.bl.consume(this.bl.length);
 
+    this.push(packet);
     callback();
   }
 };
