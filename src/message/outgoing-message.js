@@ -47,7 +47,7 @@ module.exports = class OutgoingMessage extends Transform {
       this.bl.consume(this.packetDataSize);
     }
 
-    callback();
+    process.nextTick(callback);
   }
 
   _flush(callback) {
@@ -59,6 +59,6 @@ module.exports = class OutgoingMessage extends Transform {
     this.bl.consume(this.bl.length);
 
     this.push(packet);
-    callback();
+    process.nextTick(callback);
   }
 };
