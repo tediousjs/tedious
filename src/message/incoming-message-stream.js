@@ -13,8 +13,10 @@ const packetHeaderLength = require('../packet').HEADER_LENGTH;
   Transform received TDS data into individual IncomingMessage streams.
 */
 module.exports = class IncomingMessageStream extends Transform {
-  constructor() {
+  constructor(debug) {
     super({ readableObjectMode: true });
+
+    this.debug = debug;
 
     this.currentMessage = undefined;
     this.buffer = new Buffer(0);
@@ -35,6 +37,8 @@ module.exports = class IncomingMessageStream extends Transform {
 
         // TODO: Get rid of creating `Packet` instances here.
         const packet = new Packet(data);
+        this.debug.packet('Received', packet);
+        this.debug.data(packet);
 
         if (this.currentMessage === undefined) {
           this.currentMessage = new IncomingMessage(packet.type());
