@@ -12,12 +12,12 @@ const HEADER_LENGTH = require('../packet').HEADER_LENGTH;
   TDS message into a stream of TDS packets.
 */
 module.exports = class OutgoingMessage extends Transform {
-  constructor(type, resetConnection, packetDataSize) {
+  constructor(type, resetConnection, packetSize) {
     super({ readableObjectMode: true });
 
     this.type = type;
     this.resetConnection = resetConnection;
-    this.packetDataSize = packetDataSize - HEADER_LENGTH;
+    this.packetDataSize = packetSize - HEADER_LENGTH;
     this.packetNumber = 0;
 
     this.buffer = new Buffer(0);
