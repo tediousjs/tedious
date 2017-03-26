@@ -4,6 +4,8 @@ const Transform = require('readable-stream').Transform;
 
 const IncomingMessage = require('./incoming-message');
 
+const BufferList = require('bl');
+
 const Packet = require('../packet').Packet;
 const packetHeaderLength = require('../packet').HEADER_LENGTH;
 
@@ -19,21 +21,20 @@ module.exports = class IncomingMessageStream extends Transform {
     this.debug = debug;
 
     this.currentMessage = undefined;
-    this.buffer = new Buffer(0);
-    this.position = 0;
+    this.bl = new BufferList();
 
     this.waitForNextChunk = undefined;
   }
 
   processBufferedData() {
     // The packet header is always 8 bytes of length.
-    while (this.buffer.length >= this.position + packetHeaderLength) {
+    while (this.bl.length >= packetHeaderLength) {
       // Get the full packet length
-      const length = this.buffer.readUInt16BE(this.position + 2);
+      const length = this.bl.readUInt16BE(2);
 
-      if (this.buffer.length >= this.position + length) {
-        const data = this.buffer.slice(this.position, this.position + length);
-        this.position += length;
+      if (this.bl.length >= length) {
+        const data = this.bl.slice(0, length);
+        this.bl.consume(length);
 
         // TODO: Get rid of creating `Packet` instances here.
         const packet = new Packet(data);
@@ -69,29 +70,14 @@ module.exports = class IncomingMessageStream extends Transform {
   }
 
   _transform(chunk, encoding, callback) {
-    if (this.position === this.buffer.length) {
-      // If we have fully consumed the previous buffer,
-      // we can just replace it with the new chunk
-      this.buffer = chunk;
-    } else {
-      // If we haven't fully consumed the previous buffer,
-      // we create a new buffer to hold the leftovers and the new chunk.
-      const newBuffer = new Buffer(chunk.length + this.buffer.length - this.position);
+    this.bl.append(chunk);
 
-      this.buffer.copy(newBuffer, 0, this.position);
-      chunk.copy(newBuffer, this.buffer.length - this.position);
-
-      this.buffer = newBuffer;
-    }
-
-    this.position = 0;
     this.waitForNextChunk = () => { callback(); };
-
-    this.processBufferedData(callback);
+    this.processBufferedData();
   }
 
   _flush(callback) {
-    if (this.position !== this.buffer.length) {
+    if (this.bl.length) {
       // If the buffer was not fully consumed, the message stream
       // ended prematurely.
       return callback(new Error('Incoming message stream ended prematurely'));
