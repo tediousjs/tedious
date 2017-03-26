@@ -1,7 +1,7 @@
 'use strict';
 
 const net = require('net');
-const lookupAll = require('dns-lookup-all');
+const dns = require('dns');
 
 class Connector {
   constructor(options, multiSubnetFailover) {
@@ -41,7 +41,7 @@ class Connector {
   }
 
   executeForHostname(cb) {
-    lookupAll(this.options.host, (err, addresses) => {
+    dns.lookup(this.options.host, { all: true }, (err, addresses) => {
       if (err) {
         return cb(err);
       }
