@@ -22,16 +22,6 @@ module.exports = class MessageIO extends EventEmitter {
     this.sendPacket = this.sendPacket.bind(this);
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageStream.on('data', (message) => {
-      message.on('data', (packet) => {
-        this.emit('data', packet.data());
-      });
-
-      message.on('end', () => {
-        this.emit('message');
-      });
-    });
-
     this.socket.pipe(this.incomingMessageStream);
     this.packetDataSize = this._packetSize - packetHeaderLength;
   }
