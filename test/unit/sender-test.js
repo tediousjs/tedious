@@ -1,5 +1,3 @@
-'use strict';
-
 const Dgram = require('dgram');
 const Sender = require('../../src/sender').Sender;
 const ParallelSendStrategy = require('../../src/sender').ParallelSendStrategy;

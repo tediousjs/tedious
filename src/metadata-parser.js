@@ -1,5 +1,3 @@
-'use strict';
-
 const codepageBySortId = require('./collation').codepageBySortId;
 const codepageByLcid = require('./collation').codepageByLcid;
 const TYPE = require('./data-type').TYPE;

@@ -1,5 +1,3 @@
-'use strict';
-
 // s2.2.7.5/6/7
 
 const STATUS = {

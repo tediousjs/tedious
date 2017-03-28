@@ -1,5 +1,3 @@
-'use strict';
-
 const TYPE = {
   QUERY_NOTIFICATIONS: 1,
   TXN_DESCRIPTOR: 2,

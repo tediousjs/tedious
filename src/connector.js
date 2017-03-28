@@ -1,5 +1,3 @@
-'use strict';
-
 const net = require('net');
 const dns = require('dns');
 

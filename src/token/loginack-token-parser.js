@@ -1,5 +1,3 @@
-'use strict';
-
 const versions = require('../tds-versions').versionsByValue;
 
 const interfaceTypes = {

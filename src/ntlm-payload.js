@@ -1,5 +1,3 @@
-'use strict';
-
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
 const BigInteger = require('big-number').n;

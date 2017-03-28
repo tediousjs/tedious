@@ -1,5 +1,3 @@
-'use strict';
-
 const iconv = require('iconv-lite');
 const sprintf = require('sprintf').sprintf;
 const TYPE = require('./data-type').TYPE;

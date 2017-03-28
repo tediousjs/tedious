@@ -1,5 +1,3 @@
-'use strict';
-
 const tls = require('tls');
 const crypto = require('crypto');
 const EventEmitter = require('events').EventEmitter;
