@@ -24,11 +24,14 @@ exports.receiveOnePacket = (test) ->
   connection = new Connection()
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
+  io.incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
       test.ok(data.equals(payload))
-  )
-  io.on('message', ->
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
 
   packet = new Packet(packetType)
@@ -43,11 +46,14 @@ exports.receiveOnePacketInTwoChunks = (test) ->
   connection = new Connection()
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    test.ok(data.equals(payload))
-  )
-  io.on('message', ->
+  io.incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      test.ok(data.equals(payload))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
 
   packet = new Packet(packetType)
@@ -67,17 +73,20 @@ exports.receiveTwoPackets = (test) ->
   receivedPacketCount = 0
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
+  io.incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedPacketCount++
 
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
+      switch receivedPacketCount
+        when 1
+          test.ok(data.equals(payload1))
+        when 2
+          test.ok(data.equals(payload2))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
 
   packet = new Packet(packetType)
@@ -100,17 +109,20 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   receivedPacketCount = 0
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
+  io.incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedPacketCount++
 
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
+      switch receivedPacketCount
+        when 1
+          test.ok(data.equals(payload1))
+        when 2
+          test.ok(data.equals(payload2))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
 
   packet1 = new Packet(packetType)
@@ -136,13 +148,15 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
   receivedData = new Buffer(0)
 
   io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedData = Buffer.concat([receivedData, data])
-  )
+  io.incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedData = Buffer.concat([receivedData, data])
+    )
 
-  io.on('message', ->
+    message.on('end', ->
       test.deepEqual(payload, receivedData)
       test.done()
+    )
   )
 
   packet1 = new Packet(packetType)
