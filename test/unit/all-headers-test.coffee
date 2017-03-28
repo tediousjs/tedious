@@ -1,5 +1,4 @@
 WritableTrackingBuffer = require('../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
-require('../../src/buffertools')
 writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer
 
 exports.headers = (test) ->
