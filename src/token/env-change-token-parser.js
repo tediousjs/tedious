@@ -1,5 +1,3 @@
-'use strict';
-
 const types = {
   1: {
     name: 'DATABASE',

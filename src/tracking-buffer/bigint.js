@@ -1,5 +1,3 @@
-'use strict';
-
 function isZero(array) {
   for (let j = 0, len = array.length; j < len; j++) {
     const byte = array[j];

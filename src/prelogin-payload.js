@@ -1,5 +1,3 @@
-'use strict';
-
 const sprintf = require('sprintf').sprintf;
 const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
 

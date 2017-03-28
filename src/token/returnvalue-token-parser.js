@@ -1,5 +1,3 @@
-'use strict';
-
 // s2.2.7.16
 
 const metadataParse = require('../metadata-parser');

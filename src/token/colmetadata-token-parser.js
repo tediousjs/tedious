@@ -1,5 +1,3 @@
-'use strict';
-
 const metadataParse = require('../metadata-parser');
 
 function readTableName(parser, options, metadata, callback) {

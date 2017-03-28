@@ -1,5 +1,3 @@
-'use strict';
-
 const Transform = require('readable-stream').Transform;
 const TYPE = require('./token').TYPE;
 

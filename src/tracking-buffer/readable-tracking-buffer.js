@@ -1,5 +1,3 @@
-'use strict';
-
 const convertLEBytesToString = require('./bigint').convertLEBytesToString;
 
 /*

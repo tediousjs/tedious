@@ -1,5 +1,3 @@
-'use strict';
-
 const EventEmitter = require('events').EventEmitter;
 const TYPES = require('./data-type').typeByName;
 const RequestError = require('./errors').RequestError;

@@ -1,5 +1,3 @@
-'use strict';
-
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
 const valueParse = require('../value-parser');

@@ -1,5 +1,3 @@
-'use strict';
-
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;

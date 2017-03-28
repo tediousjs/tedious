@@ -1,5 +1,3 @@
-'use strict';
-
 const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const Sinon = require('sinon');
 
@@ -268,4 +266,3 @@ exports['parseBrowserResponse'] = {
     test.done();
   }
 };
-

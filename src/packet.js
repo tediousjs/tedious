@@ -1,5 +1,3 @@
-'use strict';
-
 const sprintf = require('sprintf').sprintf;
 
 const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;

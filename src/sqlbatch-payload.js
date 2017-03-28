@@ -1,5 +1,3 @@
-'use strict';
-
 const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
 const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
 

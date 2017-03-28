@@ -1,5 +1,3 @@
-'use strict';
-
 const util = require('util');
 
 module.exports.ConnectionError = ConnectionError;

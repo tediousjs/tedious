@@ -1,5 +1,3 @@
-'use strict';
-
 const Mitm = require('mitm');
 const sinon = require('sinon');
 
