@@ -27,7 +27,7 @@
   "homepage": "https://github.com/tediousjs/tedious",
   "bugs": "https://github.com/tediousjs/tedious/issues",
   "license": "MIT",
-  "version": "1.15.0",
+  "version": "2.0.0",
   "main": "./lib/tedious.js",
   "repository": {
     "type": "git",
