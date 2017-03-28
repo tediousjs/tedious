@@ -69,7 +69,7 @@
   },
   "babel": {
     "presets": [
-      "es2016-node4"
+      ["env", { "targets": { "node": 4 } }]
     ],
     "plugins": [
       "transform-runtime"
