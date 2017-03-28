@@ -5,8 +5,6 @@ const crypto = require('crypto');
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 
-require('./buffertools');
-
 const Packet = require('./packet').Packet;
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;

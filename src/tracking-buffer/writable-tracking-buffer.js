@@ -2,8 +2,6 @@
 
 const bigint = require('./bigint');
 
-require('../buffertools');
-
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = new Buffer([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
