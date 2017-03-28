@@ -47,10 +47,10 @@
   },
   "devDependencies": {
     "async": "^1.4.0",
-    "babel-cli": "^6.23.0",
+    "babel-cli": "^6.24.0",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-es2016-node4": "^6.0.1",
-    "babel-register": "^6.23.0",
+    "babel-register": "^6.24.0",
     "benchmark": "^2.1.0",
     "coffee-script": "^1.9.3",
     "eslint": "^3.18.0",
