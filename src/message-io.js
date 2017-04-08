@@ -1,14 +1,10 @@
-'use strict';
-
 const tls = require('tls');
 const crypto = require('crypto');
 const EventEmitter = require('events').EventEmitter;
 
-require('./buffertools');
-
 const IncomingMessageStream = require('./message/incoming-message-stream');
 const OutgoingMessage = require('./message/outgoing-message');
-
+const Packet = require('./packet').Packet;
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;
 

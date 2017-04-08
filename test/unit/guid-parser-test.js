@@ -1,4 +1,3 @@
-'use strict';
 const guidParser = require('../../src/guid-parser');
 
 const lowerGuids = [

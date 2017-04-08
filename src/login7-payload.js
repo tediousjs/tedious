@@ -1,7 +1,3 @@
-'use strict';
-
-require('./buffertools');
-
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const os = require('os');
 const sprintf = require('sprintf').sprintf;

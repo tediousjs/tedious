@@ -1,5 +1,3 @@
-'use strict';
-
 // s2.2.7.14
 
 module.exports = function(parser, colMetadata, options, callback) {

@@ -1,10 +1,8 @@
 Debug = require('../../src/debug')
 Duplex = require('stream').Duplex
-require('../../src/buffertools')
 MessageIO = require('../../src/message-io')
 OutgoingMessage = require('../../src/message/outgoing-message')
 Packet = require('../../src/packet').Packet
-require('../../src/buffertools')
 
 class Connection extends Duplex
   _read: (size) ->

@@ -1,5 +1,3 @@
-'use strict';
-
 function parseChallenge(buffer) {
   const challenge = {};
   challenge.magic = buffer.slice(0, 8).toString('utf8');

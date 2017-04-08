@@ -1,7 +1,5 @@
-'use strict';
-
 const dgram = require('dgram');
-const lookupAll = require('dns-lookup-all');
+const dns = require('dns');
 const net = require('net');
 
 class Sender {
@@ -27,7 +25,7 @@ class Sender {
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
   invokeLookupAll(host, cb) {
-    lookupAll(host, cb);
+    dns.lookup(host, { all: true }, cb);
   }
 
   executeForHostname(cb) {

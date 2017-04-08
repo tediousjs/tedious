@@ -1,5 +1,3 @@
-'use strict';
-
 const Sender = require('./sender').Sender;
 
 const SQL_SERVER_BROWSER_PORT = 1434;

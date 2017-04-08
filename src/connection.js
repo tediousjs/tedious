@@ -1,7 +1,3 @@
-'use strict';
-
-require('./buffertools');
-
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;

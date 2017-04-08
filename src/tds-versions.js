@@ -1,5 +1,3 @@
-'use strict';
-
 const versions = module.exports.versions = {
   '7_1': 0x71000001,
   '7_2': 0x72090002,

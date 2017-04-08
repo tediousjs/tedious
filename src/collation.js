@@ -1,5 +1,3 @@
-'use strict';
-
 // http://technet.microsoft.com/en-us/library/aa176553(v=sql.80).aspx
 module.exports.codepageByLcid = {
   0x436: 'CP1252',

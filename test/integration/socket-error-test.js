@@ -1,5 +1,3 @@
-'use strict';
-
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const fs = require('fs');

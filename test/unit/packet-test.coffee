@@ -1,5 +1,3 @@
-require('../../src/buffertools')
-
 Packet = require('../../src/packet').Packet
 TYPE = require('../../src/packet').TYPE
 isPacketComplete = require('../../src/packet').isPacketComplete

@@ -1,5 +1,3 @@
-'use strict';
-
 const guidParser = require('./guid-parser');
 
 const NULL = (1 << 16) - 1;

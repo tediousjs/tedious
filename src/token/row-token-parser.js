@@ -1,5 +1,3 @@
-'use strict';
-
 // s2.2.7.17
 
 const valueParse = require('../value-parser');

@@ -1,5 +1,3 @@
-'use strict';
-
 module.exports.BulkLoad = require('./bulk-load');
 module.exports.Connection = require('./connection');
 module.exports.Request = require('./request');

@@ -1,5 +1,3 @@
-'use strict';
-
 const Connection = require('../../src/tedious').Connection;
 const ISOLATION_LEVEL = require('../../src/tedious').ISOLATION_LEVEL;
 const TYPES = require('../../src/tedious').TYPES;
