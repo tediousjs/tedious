@@ -13,7 +13,7 @@ const BufferList = require('bl');
 */
 module.exports = class OutgoingMessage extends Transform {
   constructor(type, resetConnection, packetSize, debug) {
-    super({ readableObjectMode: true });
+    super();
 
     if (typeof type !== 'number' || type < 1 || type > 18) {
       throw new TypeError('"type" must be a number between 1 and 18');
@@ -47,7 +47,7 @@ module.exports = class OutgoingMessage extends Transform {
       this.debug.packet('Sent', packet);
       this.debug.data(packet);
 
-      this.push(packet);
+      this.push(packet.buffer);
     }
 
     process.nextTick(callback);
@@ -64,7 +64,7 @@ module.exports = class OutgoingMessage extends Transform {
     this.debug.packet('Sent', packet);
     this.debug.data(packet);
 
-    this.push(packet);
+    this.push(packet.buffer);
     process.nextTick(callback);
   }
 };

@@ -14,7 +14,6 @@ module.exports = class MessageIO extends EventEmitter {
     this.socket = socket;
     this._packetSize = _packetSize;
     this.debug = debug;
-    this.sendPacket = this.sendPacket.bind(this);
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
     this.socket.pipe(this.incomingMessageStream);
@@ -88,16 +87,10 @@ module.exports = class MessageIO extends EventEmitter {
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage(message) {
-    message.on('data', (packet) => {
-      this.sendPacket(packet);
-    });
-  }
-
-  sendPacket(packet) {
     if (this.securePair && this.tlsNegotiationComplete) {
-      this.securePair.cleartext.write(packet.buffer);
+      message.pipe(this.securePair.cleartext, { end: false });
     } else {
-      this.socket.write(packet.buffer);
+      message.pipe(this.socket, { end: false });
     }
   }
 };
