@@ -12,7 +12,7 @@ const BufferList = require('bl');
   TDS message into a stream of TDS packets.
 */
 module.exports = class OutgoingMessage extends Transform {
-  constructor(type, resetConnection, packetSize) {
+  constructor(type, resetConnection, packetSize, debug) {
     super({ readableObjectMode: true });
 
     if (typeof type !== 'number' || type < 1 || type > 18) {
@@ -28,6 +28,8 @@ module.exports = class OutgoingMessage extends Transform {
     this.packetDataSize = packetSize - HEADER_LENGTH;
     this.packetNumber = 0;
 
+    this.debug = debug;
+
     this.bl = new BufferList();
   }
 
@@ -42,6 +44,9 @@ module.exports = class OutgoingMessage extends Transform {
       packet.addData(this.bl.slice(0, this.packetDataSize));
       this.bl.consume(this.packetDataSize);
 
+      this.debug.packet('Sent', packet);
+      this.debug.data(packet);
+
       this.push(packet);
     }
 
@@ -55,6 +60,9 @@ module.exports = class OutgoingMessage extends Transform {
     packet.resetConnection(this.resetConnection);
     packet.addData(this.bl.slice());
     this.bl.consume(this.bl.length);
+
+    this.debug.packet('Sent', packet);
+    this.debug.data(packet);
 
     this.push(packet);
     process.nextTick(callback);

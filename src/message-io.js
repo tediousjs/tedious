@@ -60,7 +60,7 @@ module.exports = class MessageIO extends EventEmitter {
     });
 
     this.securePair.encrypted.on('data', (data) => {
-      const message = new OutgoingMessage(TYPE.PRELOGIN, false, this.packetSize());
+      const message = new OutgoingMessage(TYPE.PRELOGIN, false, this.packetSize(), this.debug);
       this.sendMessage(message);
       message.end(data);
     });
@@ -94,16 +94,10 @@ module.exports = class MessageIO extends EventEmitter {
   }
 
   sendPacket(packet) {
-    this.logPacket('Sent', packet);
     if (this.securePair && this.tlsNegotiationComplete) {
       this.securePair.cleartext.write(packet.buffer);
     } else {
       this.socket.write(packet.buffer);
     }
-  }
-
-  logPacket(direction, packet) {
-    this.debug.packet(direction, packet);
-    return this.debug.data(packet);
   }
 };
