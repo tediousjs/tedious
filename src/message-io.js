@@ -84,7 +84,6 @@ module.exports = class MessageIO extends EventEmitter {
     this.securePair.encrypted.write(data);
   }
 
-  // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage(message) {
     if (this.securePair && this.tlsNegotiationComplete) {
