@@ -1,5 +1,3 @@
-'use strict';
-
 const OutgoingMessage = require('../../../src/message/outgoing-message');
 
 module.exports.OutgoingMessage = {

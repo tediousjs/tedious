@@ -1,5 +1,3 @@
-'use strict';
-
 const Transform = require('readable-stream').Transform;
 
 const Packet = require('../packet').Packet;
