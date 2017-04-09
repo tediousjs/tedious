@@ -40,9 +40,9 @@ module.exports = class OutgoingMessage extends Transform {
       packet.resetConnection(this.resetConnection);
       packet.packetId(this.packetNumber += 1);
       packet.addData(this.bl.slice(0, this.packetDataSize));
-      this.push(packet);
-
       this.bl.consume(this.packetDataSize);
+
+      this.push(packet);
     }
 
     process.nextTick(callback);
