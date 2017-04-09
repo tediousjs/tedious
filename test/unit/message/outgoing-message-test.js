@@ -1,27 +1,33 @@
 const OutgoingMessage = require('../../../src/message/outgoing-message');
+const Debug = require('../../../src/debug');
+const Packet = require('../../../src/packet').Packet;
 
 module.exports.OutgoingMessage = {
   'requires packetSize to be bigger than 8': function(test) {
+    const debug = new Debug();
+
     test.throws(function() {
-      new OutgoingMessage(1, false, 8);
+      new OutgoingMessage(1, false, 8, debug);
     }, TypeError);
 
     test.throws(function() {
-      new OutgoingMessage(1, false, 1);
+      new OutgoingMessage(1, false, 1, debug);
     }, TypeError);
 
     test.throws(function() {
-      new OutgoingMessage(1, false, -30);
+      new OutgoingMessage(1, false, -30, debug);
     }, TypeError);
 
     test.done();
   },
 
   'transforms the written data into packets of the given type': function(test) {
-    const message = new OutgoingMessage(1, false, 20);
+    const debug = new Debug();
+    const message = new OutgoingMessage(1, false, 20, debug);
     const data = Buffer.from('12345');
 
-    message.on('data', function(packet) {
+    message.on('data', function(packetData) {
+      const packet = new Packet(packetData);
       test.strictEqual(1, packet.type());
       test.strictEqual(1, packet.packetId());
       test.ok(packet.isLast());
@@ -36,12 +42,15 @@ module.exports.OutgoingMessage = {
   },
 
   'splits the written data into multiple packets': function(test) {
-    const message = new OutgoingMessage(1, false, 20);
+    const debug = new Debug();
+    const message = new OutgoingMessage(1, false, 20, debug);
     const data = Buffer.from('123456789|123456789|123456789');
 
     const packets = [];
 
-    message.on('data', function(packet) {
+    message.on('data', function(packetData) {
+      const packet = new Packet(packetData);
+
       packets.push(packet);
     });
 
@@ -72,12 +81,15 @@ module.exports.OutgoingMessage = {
   },
 
   'transforms the data as soon as possible': function(test) {
-    const message = new OutgoingMessage(1, false, 20);
+    const debug = new Debug();
+    const message = new OutgoingMessage(1, false, 20, debug);
     const data = Buffer.from('123456789|123456789|123456789');
 
     const packets = [];
 
-    message.on('data', function(packet) {
+    message.on('data', function(packetData) {
+      const packet = new Packet(packetData);
+
       packets.push(packet);
     });
 
@@ -123,12 +135,15 @@ module.exports.OutgoingMessage = {
   },
 
   'buffers writes until a packet can be filled up': function(test) {
-    const message = new OutgoingMessage(1, false, 20);
+    const debug = new Debug();
+    const message = new OutgoingMessage(1, false, 20, debug);
     const data = Buffer.from('123456789|123456789|123456789');
 
     const packets = [];
 
-    message.on('data', function(packet) {
+    message.on('data', function(packetData) {
+      const packet = new Packet(packetData);
+
       packets.push(packet);
     });
 
