@@ -594,14 +594,12 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    return this.transitionTo(this.STATE.SENT_ATTENTION);
+    this.cancel();
   }
 
   cancelTimeout() {
     this.cancelTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    return this.transitionTo(this.STATE.SENT_ATTENTION);
+    return this.close();
   }
 
   clearConnectTimer() {
