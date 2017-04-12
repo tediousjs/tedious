@@ -1,4 +1,4 @@
-const Transform = require('readable-stream').Transform;
+const PassThrough = require('readable-stream').PassThrough;
 
 /**
   IncomingMessage
@@ -6,14 +6,10 @@ const Transform = require('readable-stream').Transform;
   A stream containing the raw contents of a TDS message,
   extracted from a stream of TDS packets.
 */
-module.exports = class IncomingMessage extends Transform {
+module.exports = class IncomingMessage extends PassThrough {
   constructor(type) {
-    super({ writableObjectMode: true });
+    super();
 
     this.type = type;
-  }
-
-  _transform(packet, encoding, callback) {
-    callback(null, packet.data());
   }
 };

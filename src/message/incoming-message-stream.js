@@ -40,12 +40,12 @@ module.exports = class IncomingMessageStream extends Transform {
         }
 
         if (packet.isLast()) {
-          this.currentMessage.end(packet);
+          this.currentMessage.end(packet.data());
           this.currentMessage = undefined;
         } else {
           // If too much data is buffering up in the
           // current message, wait for it to drain.
-          if (!this.currentMessage.write(packet)) {
+          if (!this.currentMessage.write(packet.data())) {
             this.currentMessage.once('drain', () => {
               this.processBufferedData(callback);
             });
