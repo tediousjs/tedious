@@ -1,9 +1,26 @@
 const Transform = require('readable-stream').Transform;
 
-const Packet = require('../packet').Packet;
-const HEADER_LENGTH = require('../packet').HEADER_LENGTH;
+const { Packet, HEADER_LENGTH, TYPE } = require('../packet');
 
 const BufferList = require('bl');
+
+function isValidType(type) {
+  switch (type) {
+    case TYPE.SQL_BATCH:
+    case TYPE.RPC_REQUEST:
+    case TYPE.TABULAR_RESULT:
+    case TYPE.ATTENTION:
+    case TYPE.BULK_LOAD:
+    case TYPE.TRANSACTION_MANAGER:
+    case TYPE.LOGIN7:
+    case TYPE.NTLMAUTH_PKT:
+    case TYPE.PRELOGIN:
+      return true;
+
+    default:
+      return false;
+  }
+}
 
 /**
   OutgoingMessage
@@ -15,8 +32,8 @@ module.exports = class OutgoingMessage extends Transform {
   constructor(type, resetConnection, packetSize, debug) {
     super();
 
-    if (typeof type !== 'number' || type < 1 || type > 18) {
-      throw new TypeError('"type" must be a number between 1 and 18');
+    if (typeof type !== 'number' || !isValidType(type)) {
+      throw new TypeError('"type" must be a a supported TDS message type');
     }
 
     if (typeof packetSize !== 'number' || packetSize <= 8) {
