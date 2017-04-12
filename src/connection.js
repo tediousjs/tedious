@@ -553,7 +553,10 @@ class Connection extends EventEmitter {
       this.socket.on('end', this.socketEnd);
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
       this.messageIo.incomingMessageStream.on('data', (message) => {
-        if (this.state.name == 'SentClientRequest') {
+        // Pre-Login responses from the server are sent in Tabular Result messages,
+        // but do not contain a token stream. All other Tabular Result messages
+        // contain a token stream.
+        if (message.type === TYPE.TABULAR_RESULT && this.state.name !== 'SentPrelogin') {
           message.pipe(this.tokenStreamParser.parser, { end: false });
         } else {
           message.on('data', (chunk) => { this.dispatchEvent('data', chunk); });
