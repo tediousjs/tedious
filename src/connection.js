@@ -1206,9 +1206,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
       loggedIn: function() {
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
@@ -1232,9 +1229,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
       receivedChallenge: function() {
         this.sendNTLMResponsePacket();
         return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
@@ -1255,9 +1249,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -1281,9 +1272,6 @@ Connection.prototype.STATE = {
     events: {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       message: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
@@ -1334,9 +1322,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       attention: function() {
         return this.attentionReceived = true;
