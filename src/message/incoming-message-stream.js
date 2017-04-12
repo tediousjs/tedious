@@ -20,11 +20,9 @@ module.exports = class IncomingMessageStream extends Transform {
 
     this.currentMessage = undefined;
     this.bl = new BufferList();
-
-    this.waitForNextChunk = undefined;
   }
 
-  processBufferedData() {
+  processBufferedData(callback) {
     // The packet header is always 8 bytes of length.
     while (this.bl.length >= packetHeaderLength) {
       // Get the full packet length
@@ -52,7 +50,7 @@ module.exports = class IncomingMessageStream extends Transform {
           // current message, wait for it to drain.
           if (!this.currentMessage.write(packet)) {
             this.currentMessage.once('drain', () => {
-              this.processBufferedData();
+              this.processBufferedData(callback);
             });
             return;
           }
@@ -64,14 +62,12 @@ module.exports = class IncomingMessageStream extends Transform {
 
     // Not enough data to read the next packet. Stop here and wait for
     // the next call to `_transform`.
-    this.waitForNextChunk();
+    process.nextTick(callback);
   }
 
   _transform(chunk, encoding, callback) {
     this.bl.append(chunk);
-
-    this.waitForNextChunk = () => { process.nextTick(callback); };
-    this.processBufferedData();
+    this.processBufferedData(callback);
   }
 
   _flush(callback) {
