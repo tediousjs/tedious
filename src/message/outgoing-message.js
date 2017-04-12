@@ -37,34 +37,32 @@ module.exports = class OutgoingMessage extends Transform {
     this.bl.append(chunk);
 
     while (this.packetDataSize < this.bl.length) {
-      const packet = new Packet(this.type);
-      packet.last(false);
-      packet.resetConnection(this.resetConnection);
-      packet.packetId(this.packetNumber += 1);
-      packet.addData(this.bl.slice(0, this.packetDataSize));
-      this.bl.consume(this.packetDataSize);
-
-      this.debug.packet('Sent', packet);
-      this.debug.data(packet);
-
-      this.push(packet.buffer);
+      this.transformNextPacket();
     }
 
     process.nextTick(callback);
   }
 
-  _flush(callback) {
-    const packet = new Packet(this.type);
-    packet.last(true);
-    packet.packetId(this.packetNumber + 1);
-    packet.resetConnection(this.resetConnection);
-    packet.addData(this.bl.slice());
-    this.bl.consume(this.bl.length);
-
+  logPacket(packet) {
     this.debug.packet('Sent', packet);
     this.debug.data(packet);
+  }
+
+  transformNextPacket(isLast = false) {
+    const packet = new Packet(this.type);
+    packet.last(isLast);
+    packet.resetConnection(this.resetConnection);
+    packet.packetId(this.packetNumber += 1);
+    packet.addData(this.bl.slice(0, this.packetDataSize));
+    this.bl.consume(this.packetDataSize);
+
+    this.logPacket(packet);
 
     this.push(packet.buffer);
+  }
+
+  _flush(callback) {
+    this.transformNextPacket(true);
     process.nextTick(callback);
   }
 };
