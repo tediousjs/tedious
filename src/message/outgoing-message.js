@@ -36,8 +36,8 @@ module.exports = class OutgoingMessage extends Transform {
       throw new TypeError('"type" must be a a supported TDS message type');
     }
 
-    if (typeof packetSize !== 'number' || packetSize <= 8) {
-      throw new TypeError('"packetSize" must be a number greater than 8');
+    if (typeof packetSize !== 'number' || packetSize <= HEADER_LENGTH) {
+      throw new TypeError(`"packetSize" must be a number greater than ${HEADER_LENGTH}`);
     }
 
     this.type = type;
