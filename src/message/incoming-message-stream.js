@@ -1,11 +1,8 @@
 const Transform = require('readable-stream').Transform;
-
-const IncomingMessage = require('./incoming-message');
-
 const BufferList = require('bl');
 
-const Packet = require('../packet').Packet;
-const packetHeaderLength = require('../packet').HEADER_LENGTH;
+const IncomingMessage = require('./incoming-message');
+const { Packet, HEADER_LENGTH } = require('../packet');
 
 /**
   IncomingMessageStream
@@ -24,7 +21,7 @@ module.exports = class IncomingMessageStream extends Transform {
 
   processBufferedData(callback) {
     // The packet header is always 8 bytes of length.
-    while (this.bl.length >= packetHeaderLength) {
+    while (this.bl.length >= HEADER_LENGTH) {
       // Get the full packet length
       const length = this.bl.readUInt16BE(2);
 
