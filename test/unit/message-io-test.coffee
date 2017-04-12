@@ -2,6 +2,7 @@ Debug = require('../../src/debug')
 Duplex = require('stream').Duplex
 MessageIO = require('../../src/message-io')
 OutgoingMessage = require('../../src/message/outgoing-message')
+IncomingMessageStream = require('../../src/message/incoming-message-stream')
 Packet = require('../../src/packet').Packet
 
 class Connection extends Duplex
@@ -20,9 +21,10 @@ exports.receiveOnePacket = (test) ->
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.incomingMessageStream.on('data', (message) ->
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
     message.on('data', (data) ->
       test.ok(data.equals(payload))
     )
@@ -31,6 +33,8 @@ exports.receiveOnePacket = (test) ->
       test.done()
     )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.last(true)
@@ -42,9 +46,10 @@ exports.receiveOnePacketInTwoChunks = (test) ->
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.incomingMessageStream.on('data', (message) ->
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
     message.on('data', (data) ->
       test.ok(data.equals(payload))
     )
@@ -53,6 +58,8 @@ exports.receiveOnePacketInTwoChunks = (test) ->
       test.done()
     )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.last(true)
@@ -68,10 +75,12 @@ exports.receiveTwoPackets = (test) ->
   payload2 = payload.slice(2, 3)
 
   connection = new Connection()
+  debug = new Debug()
+  incomingMessageStream = new IncomingMessageStream(debug)
+
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.incomingMessageStream.on('data', (message) ->
+  incomingMessageStream.on('data', (message) ->
     message.on('data', (data) ->
       receivedPacketCount++
 
@@ -86,6 +95,8 @@ exports.receiveTwoPackets = (test) ->
       test.done()
     )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.addData(payload1)
@@ -104,10 +115,12 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   payload2 = payload.slice(2, 4)
 
   connection = new Connection()
+  debug = new Debug()
+  incomingMessageStream = new IncomingMessageStream(debug)
+
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.incomingMessageStream.on('data', (message) ->
+  incomingMessageStream.on('data', (message) ->
     message.on('data', (data) ->
       receivedPacketCount++
 
@@ -122,6 +135,8 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
       test.done()
     )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet1 = new Packet(packetType)
   packet1.addData(payload.slice(0, 2))
@@ -144,9 +159,10 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
 
   connection = new Connection()
   receivedData = new Buffer(0)
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.incomingMessageStream.on('data', (message) ->
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
     message.on('data', (data) ->
       receivedData = Buffer.concat([receivedData, data])
     )
@@ -156,6 +172,8 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
       test.done()
     )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet1 = new Packet(packetType)
   packet1.addData(payload.slice(0, 2))

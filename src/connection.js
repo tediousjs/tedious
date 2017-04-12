@@ -18,6 +18,8 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
+const IncomingMessageStream = require('./message/incoming-message-stream');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -549,8 +551,9 @@ class Connection extends EventEmitter {
       this.socket.on('error', this.socketError);
       this.socket.on('close', this.socketClose);
       this.socket.on('end', this.socketEnd);
-      this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-      this.messageIo.incomingMessageStream.on('data', (message) => {
+
+      this.incomingMessageStream = new IncomingMessageStream(this.debug);
+      this.incomingMessageStream.on('data', (message) => {
         // Pre-Login responses from the server are sent in Tabular Result messages,
         // but do not contain a token stream. All other Tabular Result messages
         // contain a token stream.
@@ -563,6 +566,7 @@ class Connection extends EventEmitter {
         message.on('end', () => { this.dispatchEvent('message'); });
       });
 
+      this.messageIo = new MessageIO(this.socket, this.incomingMessageStream, this.config.options.packetSize, this.debug);
       this.messageIo.on('secure', this.emit.bind(this, 'secure'));
 
       this.socketConnect();

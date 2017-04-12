@@ -2,20 +2,19 @@ const tls = require('tls');
 const crypto = require('crypto');
 const EventEmitter = require('events').EventEmitter;
 
-const IncomingMessageStream = require('./message/incoming-message-stream');
 const OutgoingMessage = require('./message/outgoing-message');
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
 module.exports = class MessageIO extends EventEmitter {
-  constructor(socket, _packetSize, debug) {
+  constructor(socket, incomingMessageStream, _packetSize, debug) {
     super();
 
     this.socket = socket;
     this._packetSize = _packetSize;
     this.debug = debug;
 
-    this.incomingMessageStream = new IncomingMessageStream(this.debug);
+    this.incomingMessageStream = incomingMessageStream;
     this.socket.pipe(this.incomingMessageStream);
     this.packetDataSize = this._packetSize - packetHeaderLength;
   }
