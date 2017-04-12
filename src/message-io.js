@@ -84,6 +84,12 @@ module.exports = class MessageIO extends EventEmitter {
     this.securePair.encrypted.write(data);
   }
 
+  startOutgoingMessage(type, resetConnection) {
+    const message = new OutgoingMessage(type, resetConnection, this.packetSize(), this.debug);
+    this.sendMessage(message);
+    return message;
+  }
+
   // TODO implement incomplete request cancelation (2.2.1.6)
   sendMessage(message) {
     if (this.securePair && this.tlsNegotiationComplete) {

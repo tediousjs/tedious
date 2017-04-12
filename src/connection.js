@@ -18,8 +18,6 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
-const OutgoingMessage = require('./message/outgoing-message');
-
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -599,8 +597,7 @@ class Connection extends EventEmitter {
   requestTimeout() {
     this.requestTimer = undefined;
 
-    const message = new OutgoingMessage(TYPE.ATTENTION, false, this.messageIo.packetSize(), this.debug);
-    this.messageIo.sendMessage(message);
+    const message = this.messageIo.startOutgoingMessage(TYPE.ATTENTION, false);
     message.end();
 
     this.transitionTo(this.STATE.SENT_ATTENTION);
@@ -690,8 +687,7 @@ class Connection extends EventEmitter {
       encrypt: this.config.options.encrypt
     });
 
-    const message = new OutgoingMessage(TYPE.PRELOGIN, false, this.messageIo.packetSize(), this.debug);
-    this.messageIo.sendMessage(message);
+    const message = this.messageIo.startOutgoingMessage(TYPE.PRELOGIN, false);
     message.end(payload.data);
 
     return this.debug.payload(function() {
@@ -741,8 +737,7 @@ class Connection extends EventEmitter {
 
     this.routingData = undefined;
 
-    const message = new OutgoingMessage(TYPE.LOGIN7, false, this.messageIo.packetSize(), this.debug);
-    this.messageIo.sendMessage(message);
+    const message = this.messageIo.startOutgoingMessage(TYPE.LOGIN7, false);
     message.end(payload.data);
 
     return this.debug.payload(function() {
@@ -763,8 +758,7 @@ class Connection extends EventEmitter {
       additional: this.additional
     });
 
-    const message = new OutgoingMessage(TYPE.NTLMAUTH_PKT, false, this.messageIo.packetSize(), this.debug);
-    this.messageIo.sendMessage(message);
+    const message = this.messageIo.startOutgoingMessage(TYPE.NTLMAUTH_PKT, false);
     message.end(payload.data);
 
     return this.debug.payload(function() {
@@ -779,8 +773,7 @@ class Connection extends EventEmitter {
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
-    const message = new OutgoingMessage(TYPE.SQL_BATCH, false, this.messageIo.packetSize(), this.debug);
-    this.messageIo.sendMessage(message);
+    const message = this.messageIo.startOutgoingMessage(TYPE.SQL_BATCH, false);
     message.end(payload.data);
   }
 
@@ -1049,8 +1042,7 @@ class Connection extends EventEmitter {
       this.request.rst = [];
       this.createRequestTimer();
 
-      const message = new OutgoingMessage(packetType, this.resetConnectionOnNextRequest, this.messageIo.packetSize(), this.debug);
-      this.messageIo.sendMessage(message);
+      const message = this.messageIo.startOutgoingMessage(packetType, this.resetConnectionOnNextRequest);
       message.end(payload.data);
 
       this.resetConnectionOnNextRequest = false;
@@ -1069,8 +1061,7 @@ class Connection extends EventEmitter {
     } else {
       this.request.canceled = true;
 
-      const message = new OutgoingMessage(TYPE.ATTENTION, false, this.messageIo.packetSize(), this.debug);
-      this.messageIo.sendMessage(message);
+      const message = this.messageIo.startOutgoingMessage(TYPE.ATTENTION, false);
       message.end();
 
       this.transitionTo(this.STATE.SENT_ATTENTION);
