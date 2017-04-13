@@ -42,6 +42,27 @@ module.exports.OutgoingMessage = {
     });
   },
 
+  'can signal a connection reset': function(test) {
+    const debug = new Debug();
+    const message = new OutgoingMessage(1, true, 20, debug);
+    const data = Buffer.from('12345');
+
+    message.on('data', function(packetData) {
+      const packet = new Packet(packetData);
+      test.strictEqual(1, packet.type());
+      test.strictEqual(1, packet.packetId());
+      test.ok(packet.isLast());
+      test.ok(packet.resetConnection());
+      test.strictEqual(13, packet.length());
+      test.deepEqual(data, packet.data());
+    });
+
+    message.write(data);
+    message.end(function() {
+      test.done();
+    });
+  },
+
   'splits the written data into multiple packets': function(test) {
     const debug = new Debug();
     const message = new OutgoingMessage(1, false, 20, debug);
