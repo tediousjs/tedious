@@ -211,6 +211,29 @@ function isPacketComplete(potentialPacketBuffer) {
   }
 }
 
+module.exports.isValidType = isValidType;
+function isValidType(type) {
+  if (typeof type !== 'number') {
+    return false;
+  }
+
+  switch (type) {
+    case TYPE.SQL_BATCH:
+    case TYPE.RPC_REQUEST:
+    case TYPE.TABULAR_RESULT:
+    case TYPE.ATTENTION:
+    case TYPE.BULK_LOAD:
+    case TYPE.TRANSACTION_MANAGER:
+    case TYPE.LOGIN7:
+    case TYPE.NTLMAUTH_PKT:
+    case TYPE.PRELOGIN:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
 module.exports.packetLength = packetLength;
 function packetLength(potentialPacketBuffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
