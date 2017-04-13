@@ -1,6 +1,5 @@
 Packet = require('../../src/packet').Packet
 TYPE = require('../../src/packet').TYPE
-isPacketComplete = require('../../src/packet').isPacketComplete
 
 exports.createEmpty = (test) ->
   packet = new Packet(TYPE.PRELOGIN)
@@ -120,32 +119,5 @@ exports.dataToStringMultipleLines = (test) ->
   expectedTextLine2b = '  012'
   expectedText = expectedTextLine1a + expectedTextLine1b + expectedTextLine1c + expectedTextLine2a + expectedTextLine2b
   test.strictEqual(packet.dataToString('--'), expectedText)
-
-  test.done()
-
-exports.packetCompleteShorterThanHeader = (test) ->
-  buffer = new Buffer(7)
-  test.ok(!isPacketComplete(buffer))
-
-  test.done()
-
-exports.packetCompleteJustHeader = (test) ->
-  buffer = new Packet(TYPE.PRELOGIN).buffer
-
-  test.ok(isPacketComplete(buffer))
-
-  test.done()
-
-exports.packetCompleteTooShort = (test) ->
-  buffer = new Buffer([0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-
-  test.ok(!isPacketComplete(buffer))
-
-  test.done()
-
-exports.packetCompleteLongEnough = (test) ->
-  buffer = new Buffer([0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-
-  test.ok(isPacketComplete(buffer))
 
   test.done()

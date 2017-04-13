@@ -202,15 +202,6 @@ class Packet {
 }
 module.exports.Packet = Packet;
 
-module.exports.isPacketComplete = isPacketComplete;
-function isPacketComplete(potentialPacketBuffer) {
-  if (potentialPacketBuffer.length < HEADER_LENGTH) {
-    return false;
-  } else {
-    return potentialPacketBuffer.length >= potentialPacketBuffer.readUInt16BE(OFFSET.Length);
-  }
-}
-
 module.exports.isValidType = isValidType;
 function isValidType(type) {
   if (typeof type !== 'number') {
