@@ -31,6 +31,7 @@ module.exports.OutgoingMessage = {
       test.strictEqual(1, packet.type());
       test.strictEqual(1, packet.packetId());
       test.ok(packet.isLast());
+      test.ok(!packet.resetConnection());
       test.strictEqual(13, packet.length());
       test.deepEqual(data, packet.data());
     });
@@ -61,18 +62,21 @@ module.exports.OutgoingMessage = {
       test.strictEqual(1, packets[0].packetId());
       test.strictEqual(1, packets[0].type());
       test.ok(!packets[0].isLast());
+      test.ok(!packets[0].resetConnection());
       test.strictEqual(20, packets[0].length());
       test.deepEqual(Buffer.from('123456789|12'), packets[0].data());
 
       test.strictEqual(2, packets[1].packetId());
       test.strictEqual(1, packets[1].type());
       test.ok(!packets[1].isLast());
+      test.ok(!packets[1].resetConnection());
       test.strictEqual(20, packets[1].length());
       test.deepEqual(Buffer.from('3456789|1234'), packets[1].data());
 
       test.strictEqual(3, packets[2].packetId());
       test.strictEqual(1, packets[2].type());
       test.ok(packets[2].isLast());
+      test.ok(!packets[2].resetConnection());
       test.strictEqual(13, packets[2].length());
       test.deepEqual(Buffer.from('56789'), packets[2].data());
 
@@ -99,12 +103,14 @@ module.exports.OutgoingMessage = {
       test.strictEqual(1, packets[0].packetId());
       test.strictEqual(1, packets[0].type());
       test.ok(!packets[0].isLast());
+      test.ok(!packets[0].resetConnection());
       test.strictEqual(20, packets[0].length());
       test.deepEqual(Buffer.from('123456789|12'), packets[0].data());
 
       test.strictEqual(2, packets[1].packetId());
       test.strictEqual(1, packets[1].type());
       test.ok(!packets[1].isLast());
+      test.ok(!packets[1].resetConnection());
       test.strictEqual(20, packets[1].length());
       test.deepEqual(Buffer.from('3456789|1234'), packets[1].data());
     });
@@ -115,18 +121,21 @@ module.exports.OutgoingMessage = {
       test.strictEqual(1, packets[0].packetId());
       test.strictEqual(1, packets[0].type());
       test.ok(!packets[0].isLast());
+      test.ok(!packets[0].resetConnection());
       test.strictEqual(20, packets[0].length());
       test.deepEqual(Buffer.from('123456789|12'), packets[0].data());
 
       test.strictEqual(2, packets[1].packetId());
       test.strictEqual(1, packets[1].type());
       test.ok(!packets[1].isLast());
+      test.ok(!packets[1].resetConnection());
       test.strictEqual(20, packets[1].length());
       test.deepEqual(Buffer.from('3456789|1234'), packets[1].data());
 
       test.strictEqual(3, packets[2].packetId());
       test.strictEqual(1, packets[2].type());
       test.ok(packets[2].isLast());
+      test.ok(!packets[2].resetConnection());
       test.strictEqual(13, packets[2].length());
       test.deepEqual(Buffer.from('56789'), packets[2].data());
 
@@ -159,6 +168,7 @@ module.exports.OutgoingMessage = {
           test.strictEqual(1, packets[0].packetId());
           test.strictEqual(1, packets[0].type());
           test.ok(!packets[0].isLast());
+          test.ok(!packets[0].resetConnection());
           test.strictEqual(20, packets[0].length());
           test.deepEqual(Buffer.from('123456789|12'), packets[0].data());
 
@@ -168,12 +178,14 @@ module.exports.OutgoingMessage = {
             test.strictEqual(1, packets[0].packetId());
             test.strictEqual(1, packets[0].type());
             test.ok(!packets[0].isLast());
+            test.ok(!packets[0].resetConnection());
             test.strictEqual(20, packets[0].length());
             test.deepEqual(Buffer.from('123456789|12'), packets[0].data());
 
             test.strictEqual(2, packets[1].packetId());
             test.strictEqual(1, packets[1].type());
             test.ok(packets[1].isLast());
+            test.ok(!packets[1].resetConnection());
             test.strictEqual(14, packets[1].length());
             test.deepEqual(Buffer.from('345678'), packets[1].data());
 
