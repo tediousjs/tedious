@@ -3,7 +3,7 @@ Duplex = require('stream').Duplex
 MessageIO = require('../../src/message-io')
 OutgoingMessage = require('../../src/message/outgoing-message')
 IncomingMessageStream = require('../../src/message/incoming-message-stream')
-Packet = require('../../src/packet').Packet
+{ Packet, TYPE } = require('../../src/packet')
 
 class Connection extends Duplex
   _read: (size) ->
@@ -13,7 +13,7 @@ class Connection extends Duplex
     @emit('packet', packet)
     callback()
 
-packetType = 2
+packetType = TYPE.SQL_BATCH
 packetSize = 8 + 4
 
 exports.receiveOnePacket = (test) ->
@@ -191,3 +191,22 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
 
   connection.push(data1)
   connection.push(data2)
+
+exports.startOutgoingMessage = (test) ->
+  connection = new Connection()
+  connection.on('packet', (packet) ->
+    test.ok(packet.last())
+    test.strictEqual(packet.type(), packetType)
+    test.ok(packet.data().equals(payload))
+
+    test.done()
+  )
+  debug = new Debug()
+
+  incomingMessageStream = new IncomingMessageStream(debug)
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
+
+  payload = new Buffer([1, 2, 3])
+
+  message = io.startOutgoingMessage(packetType, false)
+  message.end(payload)
