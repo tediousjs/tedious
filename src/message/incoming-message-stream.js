@@ -66,14 +66,4 @@ module.exports = class IncomingMessageStream extends Transform {
     this.bl.append(chunk);
     this.processBufferedData(callback);
   }
-
-  _flush(callback) {
-    if (this.bl.length) {
-      // If the buffer was not fully consumed, the message stream
-      // ended prematurely.
-      return process.nextTick(callback, new Error('Incoming message stream ended prematurely'));
-    }
-
-    process.nextTick(callback);
-  }
 };
