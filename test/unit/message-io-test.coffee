@@ -3,7 +3,7 @@ Duplex = require('stream').Duplex
 MessageIO = require('../../src/message-io')
 OutgoingMessage = require('../../src/message/outgoing-message')
 IncomingMessageStream = require('../../src/message/incoming-message-stream')
-{ Packet, TYPE } = require('../../src/packet')
+{ Packet, TYPE, HEADER_LENGTH } = require('../../src/packet')
 
 class Connection extends Duplex
   _read: (size) ->
@@ -14,7 +14,7 @@ class Connection extends Duplex
     callback()
 
 packetType = TYPE.SQL_BATCH
-packetSize = 8 + 4
+packetSize = HEADER_LENGTH + 4
 
 exports.receiveOnePacket = (test) ->
   test.expect(1)
