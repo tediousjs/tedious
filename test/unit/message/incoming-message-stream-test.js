@@ -31,7 +31,7 @@ module.exports.IncomingMessageStream = {
     incomingMessageStream.write(packet.buffer);
   },
 
-  'it correctly supports data spread over multiple packets': function(test) {
+  'correctly supports data spread over multiple packets': function(test) {
     test.expect(2);
 
     const payload = new Buffer([1, 2, 3, 4, 5, 6]);
