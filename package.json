@@ -61,11 +61,11 @@
   },
   "scripts": {
     "pretest": "eslint src test",
-    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test": "nodeunit -r --reporter minimal test/setup.js test/unit/",
     "pretest-all": "eslint src test",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test-all": "nodeunit -r --reporter minimal test/setup.js test/unit/ test/integration/",
     "pretest-integration": "eslint src test",
-    "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
+    "test-integration": "nodeunit -r --reporter minimal test/setup.js test/integration/",
     "prepublish": "coffee scripts/build.coffee"
   },
   "babel": {

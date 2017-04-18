@@ -1,7 +1,9 @@
 Debug = require('../../src/debug')
 Duplex = require('stream').Duplex
 MessageIO = require('../../src/message-io')
-Packet = require('../../src/packet').Packet
+OutgoingMessage = require('../../src/message/outgoing-message')
+IncomingMessageStream = require('../../src/message/incoming-message-stream')
+{ Packet, TYPE, HEADER_LENGTH } = require('../../src/packet')
 
 class Connection extends Duplex
   _read: (size) ->
@@ -11,78 +13,28 @@ class Connection extends Duplex
     @emit('packet', packet)
     callback()
 
-packetType = 2
-packetSize = 8 + 4
-
-exports.sendSmallerThanOnePacket = (test) ->
-  payload = new Buffer([1, 2, 3])
-
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    test.ok(packet.last())
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
-
-    test.done()
-  )
-
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
-
-exports.sendExactlyPacket = (test) ->
-  payload = new Buffer([1, 2, 3, 4])
-
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    test.ok(packet.last())
-    test.strictEqual(packet.type(), packetType)
-    test.ok(packet.data().equals(payload))
-
-    test.done()
-  )
-
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
-
-exports.sendOneLongerThanPacket = (test) ->
-  payload = new Buffer([1, 2, 3, 4, 5])
-  packetNumber = 0
-
-  connection = new Connection()
-  connection.on('packet', (packet) ->
-    packetNumber++
-
-    test.strictEqual(packet.type(), packetType)
-
-    switch packetNumber
-      when 1
-        test.ok(!packet.last())
-        test.strictEqual(packet.packetId(), packetNumber)
-        test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])))
-      when 2
-        test.ok(packet.last())
-        test.strictEqual(packet.packetId(), packetNumber)
-        test.ok(packet.data().equals(new Buffer([5])))
-
-        test.done()
-  )
-
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.sendMessage(packetType, payload)
+packetType = TYPE.SQL_BATCH
+packetSize = HEADER_LENGTH + 4
 
 exports.receiveOnePacket = (test) ->
   test.expect(1)
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
       test.ok(data.equals(payload))
-  )
-  io.on('message', ->
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.last(true)
@@ -94,14 +46,20 @@ exports.receiveOnePacketInTwoChunks = (test) ->
 
   payload = new Buffer([1, 2, 3])
   connection = new Connection()
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    test.ok(data.equals(payload))
-  )
-  io.on('message', ->
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      test.ok(data.equals(payload))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.last(true)
@@ -117,21 +75,28 @@ exports.receiveTwoPackets = (test) ->
   payload2 = payload.slice(2, 3)
 
   connection = new Connection()
+  debug = new Debug()
+  incomingMessageStream = new IncomingMessageStream(debug)
+
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
+  incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedPacketCount++
 
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
+      switch receivedPacketCount
+        when 1
+          test.ok(data.equals(payload1))
+        when 2
+          test.ok(data.equals(payload2))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet = new Packet(packetType)
   packet.addData(payload1)
@@ -150,21 +115,28 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = (test) ->
   payload2 = payload.slice(2, 4)
 
   connection = new Connection()
+  debug = new Debug()
+  incomingMessageStream = new IncomingMessageStream(debug)
+
   receivedPacketCount = 0
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedPacketCount++
+  incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedPacketCount++
 
-    switch receivedPacketCount
-      when 1
-        test.ok(data.equals(payload1))
-      when 2
-        test.ok(data.equals(payload2))
-  )
-  io.on('message', ->
+      switch receivedPacketCount
+        when 1
+          test.ok(data.equals(payload1))
+        when 2
+          test.ok(data.equals(payload2))
+    )
+
+    message.on('end', ->
       test.done()
+    )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet1 = new Packet(packetType)
   packet1.addData(payload.slice(0, 2))
@@ -187,16 +159,21 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
 
   connection = new Connection()
   receivedData = new Buffer(0)
+  debug = new Debug()
 
-  io = new MessageIO(connection, packetSize, new Debug())
-  io.on('data', (data) ->
-    receivedData = Buffer.concat([receivedData, data])
-  )
+  incomingMessageStream = new IncomingMessageStream(debug)
+  incomingMessageStream.on('data', (message) ->
+    message.on('data', (data) ->
+      receivedData = Buffer.concat([receivedData, data])
+    )
 
-  io.on('message', ->
+    message.on('end', ->
       test.deepEqual(payload, receivedData)
       test.done()
+    )
   )
+
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
 
   packet1 = new Packet(packetType)
   packet1.addData(payload.slice(0, 2))
@@ -214,3 +191,22 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = (test) ->
 
   connection.push(data1)
   connection.push(data2)
+
+exports.startOutgoingMessage = (test) ->
+  connection = new Connection()
+  connection.on('packet', (packet) ->
+    test.ok(packet.last())
+    test.strictEqual(packet.type(), packetType)
+    test.ok(packet.data().equals(payload))
+
+    test.done()
+  )
+  debug = new Debug()
+
+  incomingMessageStream = new IncomingMessageStream(debug)
+  io = new MessageIO(connection, incomingMessageStream, packetSize, debug)
+
+  payload = new Buffer([1, 2, 3])
+
+  message = io.startOutgoingMessage(packetType, false)
+  message.end(payload)

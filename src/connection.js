@@ -18,6 +18,8 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
+const IncomingMessageStream = require('./message/incoming-message-stream');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -549,9 +551,22 @@ class Connection extends EventEmitter {
       this.socket.on('error', this.socketError);
       this.socket.on('close', this.socketClose);
       this.socket.on('end', this.socketEnd);
-      this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+
+      this.incomingMessageStream = new IncomingMessageStream(this.debug);
+      this.incomingMessageStream.on('data', (message) => {
+        // Pre-Login responses from the server are sent in Tabular Result messages,
+        // but do not contain a token stream. All other Tabular Result messages
+        // contain a token stream.
+        if (message.type === TYPE.TABULAR_RESULT && this.state.name !== 'SentPrelogin') {
+          message.pipe(this.tokenStreamParser.parser, { end: false });
+        } else {
+          message.on('data', (chunk) => { this.dispatchEvent('data', chunk); });
+        }
+
+        message.on('end', () => { this.dispatchEvent('message'); });
+      });
+
+      this.messageIo = new MessageIO(this.socket, this.incomingMessageStream, this.config.options.packetSize, this.debug);
       this.messageIo.on('secure', this.emit.bind(this, 'secure'));
 
       this.socketConnect();
@@ -585,8 +600,11 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    return this.transitionTo(this.STATE.SENT_ATTENTION);
+
+    const message = this.messageIo.startOutgoingMessage(TYPE.ATTENTION, false);
+    message.end();
+
+    this.transitionTo(this.STATE.SENT_ATTENTION);
   }
 
   clearConnectTimer() {
@@ -672,7 +690,10 @@ class Connection extends EventEmitter {
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt
     });
-    this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
+
+    const message = this.messageIo.startOutgoingMessage(TYPE.PRELOGIN, false);
+    message.end(payload.data);
+
     return this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -719,7 +740,9 @@ class Connection extends EventEmitter {
     });
 
     this.routingData = undefined;
-    this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+
+    const message = this.messageIo.startOutgoingMessage(TYPE.LOGIN7, false);
+    message.end(payload.data);
 
     return this.debug.payload(function() {
       return payload.toString('  ');
@@ -738,7 +761,10 @@ class Connection extends EventEmitter {
       ntlmpacket: this.ntlmpacket,
       additional: this.additional
     });
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+
+    const message = this.messageIo.startOutgoingMessage(TYPE.NTLMAUTH_PKT, false);
+    message.end(payload.data);
+
     return this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -750,7 +776,9 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    return this.messageIo.sendMessage(TYPE.SQL_BATCH, payload.data);
+
+    const message = this.messageIo.startOutgoingMessage(TYPE.SQL_BATCH, false);
+    message.end(payload.data);
   }
 
   getInitialSql() {
@@ -1017,7 +1045,10 @@ class Connection extends EventEmitter {
       this.request.rows = [];
       this.request.rst = [];
       this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+
+      const message = this.messageIo.startOutgoingMessage(packetType, this.resetConnectionOnNextRequest);
+      message.end(payload.data);
+
       this.resetConnectionOnNextRequest = false;
       this.debug.payload(function() {
         return payload.toString('  ');
@@ -1033,8 +1064,12 @@ class Connection extends EventEmitter {
       return false;
     } else {
       this.request.canceled = true;
-      this.messageIo.sendMessage(TYPE.ATTENTION);
+
+      const message = this.messageIo.startOutgoingMessage(TYPE.ATTENTION, false);
+      message.end();
+
       this.transitionTo(this.STATE.SENT_ATTENTION);
+
       return true;
     }
   }
@@ -1175,9 +1210,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
       loggedIn: function() {
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
@@ -1201,9 +1233,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
       receivedChallenge: function() {
         this.sendNTLMResponsePacket();
         return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
@@ -1224,9 +1253,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -1250,9 +1276,6 @@ Connection.prototype.STATE = {
     events: {
       connectTimeout: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       message: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
@@ -1303,9 +1326,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
       },
       attention: function() {
         return this.attentionReceived = true;
