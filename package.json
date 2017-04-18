@@ -36,6 +36,9 @@
   "engines": {
     "node": ">= 4"
   },
+  "publishConfig": {
+    "tag": "next"
+  },
   "dependencies": {
     "babel-runtime": "^6.23.0",
     "big-number": "0.3.1",
