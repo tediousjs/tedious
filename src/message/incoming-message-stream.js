@@ -59,7 +59,7 @@ module.exports = class IncomingMessageStream extends Transform {
 
     // Not enough data to read the next packet. Stop here and wait for
     // the next call to `_transform`.
-    process.nextTick(callback);
+    callback();
   }
 
   _transform(chunk, encoding, callback) {
