@@ -289,8 +289,19 @@ class Connection extends EventEmitter {
         this.emit('rerouting');
       }
       if (this.request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
+        if (this.request.timedOut && this.request.cancelTimedOut) {
+          const total = this.config.options.requestTimeout + this.config.options.cancelTimeout
+          const err = RequestError('Timeout: Request and Cancelation failed to complete in ' + total + 'ms', 'ECLOSE');
+          this.request.callback(err);
+        }
+        else if (this.request.cancelTimedOut) {
+          const err = RequestError('Timeout: Cancelation failed to complete in ' + this.config.options.cancelTimeout + 'ms', 'ECLOSE');
+          this.request.callback(err);
+        }
+        else {
+          const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+          this.request.callback(err);
+        }
         this.request = undefined;
       }
       this.closed = true;
@@ -593,13 +604,15 @@ class Connection extends EventEmitter {
   }
 
   requestTimeout() {
+    this.request.timedOut = true;
     this.requestTimer = undefined;
     this.cancel();
   }
 
   cancelTimeout() {
+    this.request.cancelTimedOut = true;
     this.cancelTimer = undefined;
-    return this.close();
+    this.close();
   }
 
   clearConnectTimer() {
@@ -1338,8 +1351,8 @@ Connection.prototype.STATE = {
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            this.clearCancelTimer();
+          this.clearCancelTimer();
+          if (sqlRequest.canceled && !sqlRequest.timedOut) {
             return sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           } else {
             const message = 'Timeout: Request failed to complete in ' + this.config.options.requestTimeout + 'ms';
