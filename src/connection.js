@@ -290,7 +290,7 @@ class Connection extends EventEmitter {
       }
       if (this.request) {
         if (this.request.timedOut && this.request.cancelTimedOut) {
-          const total = this.config.options.requestTimeout + this.config.options.cancelTimeout
+          const total = this.config.options.requestTimeout + this.config.options.cancelTimeout;
           const err = RequestError('Timeout: Request and Cancelation failed to complete in ' + total + 'ms', 'ECLOSE');
           this.request.callback(err);
         }
