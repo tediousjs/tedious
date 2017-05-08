@@ -313,9 +313,7 @@ class Connection extends EventEmitter {
       this.closeConnection();
       if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
         this.emit('rerouting');
-      } else if (cleanupTypeEnum === this.cleanupTypeEnum.RETRY) {
-        this.emit('retry');
-      } else {
+      } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
         this.emit('end');
       }
       if (this.request) {
@@ -634,6 +632,7 @@ class Connection extends EventEmitter {
 
   retryTimeout() {
     this.retryTimer = undefined;
+    this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
   }
 
