@@ -358,16 +358,16 @@ class Connection extends EventEmitter {
           this.request.error['class'] = token['class'];
           this.request.error.serverName = token.serverName;
           this.request.error.procName = token.procName;
-          return this.request.error.lineNumber = token.lineNumber;
+          this.request.error.lineNumber = token.lineNumber;
         }
       } else {
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
           this.debug.log('Initiating retry on transient error = ', token.number);
-          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        } else {
+          this.loginError = ConnectionError(token.message, 'ELOGIN');
         }
-
-        return this.loginError = ConnectionError(token.message, 'ELOGIN');
       }
     });
 

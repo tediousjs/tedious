@@ -14,6 +14,7 @@ const getConfig = function() {
 
 exports['connection retry tests'] = {
   setUp: function(done) {
+    this.invalidLoginError = 18456;
     this.sinon = Sinon.sandbox.create();
     done();
   },
@@ -27,8 +28,8 @@ exports['connection retry tests'] = {
     const config = getConfig();
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', () => {
-      return true;
+    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+      return error === this.invalidLoginError;
     });
 
     const connection = new Connection(config);
@@ -50,8 +51,8 @@ exports['connection retry tests'] = {
     const config = getConfig();
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', () => {
-      return false;
+    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+      return error !== this.invalidLoginError;
     });
 
     const connection = new Connection(config);
@@ -77,8 +78,8 @@ exports['connection retry tests'] = {
 
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', () => {
-      return true;
+    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+      return error === this.invalidLoginError;
     });
 
     const connection = new Connection(config);

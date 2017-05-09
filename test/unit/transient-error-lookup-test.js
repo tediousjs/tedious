@@ -1,5 +1,7 @@
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
 
+// This test is simply a set of assertions to ensure any additions to or deletions
+// from the list of transient errors is intentional.
 exports['Connection configuration validation'] = {
   'transient errors': function(test) {
     const transientErrorLookup = new TransientErrorLookup(this.config);
