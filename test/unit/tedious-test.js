@@ -31,7 +31,9 @@ exports.connectionDoesNotModifyPassedConfig = function(test) {
       port: 1234,
       cryptoCredentialsDetails: {
         ciphers: 'RC4-MD5'
-      }
+      },
+      language: 'German',
+      dateFormat: 'dmy'
     }
   };
 
@@ -42,7 +44,9 @@ exports.connectionDoesNotModifyPassedConfig = function(test) {
 
   // Test that we did not do a deep copy of the cryptoCredentialsDetails,
   // as we never modify that value inside tedious.
-  test.strictEqual(connection.config.options.cryptoCredentialsDetails, config.options.cryptoCredentialsDetails);
+  test.deepEqual(connection.config.options.cryptoCredentialsDetails, config.options.cryptoCredentialsDetails);
 
+  test.equal(connection.config.options.language, config.options.language);
+  test.equal(connection.config.options.dateFormat, config.options.dateFormat);
   test.done();
 };
