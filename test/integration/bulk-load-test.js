@@ -6,7 +6,9 @@ const TYPES = require('../../src/data-type').typeByName;
 const debugMode = false;
 
 function getConfig() {
-  const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+  const config = JSON.parse(
+    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+  ).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
   if (debugMode) {
     config.options.debug = {
@@ -34,8 +36,12 @@ exports.setUp = function(setUpDone) {
   });
   if (debugMode) {
     connection.on('debug', (message) => console.log(message));
-    connection.on('infoMessage', (info) => console.log('Info: ' + info.number + ' - ' + info.message));
-    connection.on('errorMessage', (error) => console.log('Error: ' + error.number + ' - ' + error.message));
+    connection.on('infoMessage', (info) =>
+      console.log('Info: ' + info.number + ' - ' + info.message)
+    );
+    connection.on('errorMessage', (error) =>
+      console.log('Error: ' + error.number + ' - ' + error.message)
+    );
   }
 };
 
@@ -53,7 +59,10 @@ exports.tearDown = function(tearDownDone) {
 
 exports.bulkLoad = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable', function(err, rowCount) {
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable', function(
+    err,
+    rowCount
+  ) {
     test.ifError(err);
     test.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
     test.done();
@@ -94,8 +103,14 @@ exports.bulkLoad = function(test) {
 
 exports.bulkLoadError = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(err, rowCount) {
-    test.ok(err, 'An error should have been thrown to indicate the incorrect table format.');
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(
+    err,
+    rowCount
+  ) {
+    test.ok(
+      err,
+      'An error should have been thrown to indicate the incorrect table format.'
+    );
     test.done();
   });
   bulkLoad.addColumn('x', TYPES.Int, {
@@ -104,13 +119,16 @@ exports.bulkLoadError = function(test) {
   bulkLoad.addColumn('y', TYPES.Int, {
     nullable: false
   });
-  const request = new Request('CREATE TABLE #tmpTestTable2 ([id] int not null)', function(err) {
-    test.ifError(err);
-    bulkLoad.addRow({
-      x: 1,
-      y: 1
-    });
-    connection.execBulkLoad(bulkLoad);
-  });
+  const request = new Request(
+    'CREATE TABLE #tmpTestTable2 ([id] int not null)',
+    function(err) {
+      test.ifError(err);
+      bulkLoad.addRow({
+        x: 1,
+        y: 1
+      });
+      connection.execBulkLoad(bulkLoad);
+    }
+  );
   connection.execSqlBatch(request);
 };

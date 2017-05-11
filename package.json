@@ -70,7 +70,7 @@
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
-    "prepublish": "coffee scripts/build.coffee",
+    "prepublish": "node scripts/build.js",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post"
   },
   "babel": {
