@@ -1,6 +1,4 @@
 Parser = require('../../../src/token/stream-parser')
-SSPIParser = require('../../../src/token/sspi-token-parser')
-ReadBuffer = require( '../../../src/tracking-buffer/readable-tracking-buffer')
 WriteBuffer = require( '../../../src/tracking-buffer/writable-tracking-buffer')
 
 exports.parseChallenge = (test) ->

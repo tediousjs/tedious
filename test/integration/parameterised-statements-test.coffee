@@ -1,7 +1,6 @@
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')
-guidParser = require('../../src/guid-parser')
 TYPES = require('../../src/data-type').typeByName
 
 getConfig = ->

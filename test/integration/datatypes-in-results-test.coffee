@@ -1,4 +1,3 @@
-async = require('async')
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 fs = require('fs')

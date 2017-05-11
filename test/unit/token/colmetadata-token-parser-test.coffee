@@ -1,4 +1,3 @@
-parser = require('../../../src/token/colmetadata-token-parser')
 dataTypeByName = require('../../../src/data-type').typeByName
 WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer').WritableTrackingBuffer
 

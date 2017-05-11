@@ -1,4 +1,3 @@
-async = require('async')
 Connection = require('../../src/connection')
 Request = require('../../src/request')
 TYPES = require('../../src/tedious').TYPES
