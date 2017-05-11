@@ -79,7 +79,7 @@ exports.tokenEnabled = (test) ->
 
   debug.token({name: 'test'})
 
-exports.payloadNotEnabled = (test) ->
+exports.payloadNotEnabledTest = (test) ->
   debug = new Debug()
   debug.on('debug', (token) ->
     test.ok(false)

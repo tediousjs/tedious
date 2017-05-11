@@ -523,7 +523,7 @@ exports.execSqlWithOrder = (test) ->
     #console.log(text)
   )
 
-exports.execSqlMultipleTimes = (test) ->
+exports.execSqlMultipleTimes2 = (test) ->
   test.expect(20)
 
   requestsToMake = 5;

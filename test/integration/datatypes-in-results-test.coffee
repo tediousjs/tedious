@@ -20,7 +20,7 @@ else
 
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION
 
-exports.null = (test) ->
+exports.dbnull = (test) ->
   execSql(test, 'select null', null)
 
 exports.tinyint = (test) ->

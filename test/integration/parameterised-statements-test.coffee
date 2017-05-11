@@ -128,7 +128,7 @@ exports.varCharMax = (test) ->
 exports.varCharMaxEmptyString = (test) ->
   execSql(test, TYPES.VarChar, '', null, {length: 8000})
 
-exports.varCharMaxEmptyString = (test) ->
+exports.varCharMaxEmptyString_7_2_AndLater = (test) ->
   execSql(test, TYPES.VarChar, '', '7_2', {length: 8001})
 
 exports.nVarChar = (test) ->

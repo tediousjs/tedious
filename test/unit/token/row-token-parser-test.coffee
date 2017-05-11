@@ -5,7 +5,7 @@ options =
   useUTC: false
   tdsVersion: '7_2'
 
-module.exports.null = (test) ->
+module.exports.dbnull = (test) ->
   colMetaData = [type: dataTypeByName.Null]
 
   buffer = new WritableTrackingBuffer(0, 'ucs2')

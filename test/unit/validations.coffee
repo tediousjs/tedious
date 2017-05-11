@@ -112,23 +112,7 @@ exports.DateTime = (test) ->
   test.ok value instanceof TypeError
 
   test.done()
-
-exports.DateTime = (test) ->
-  value = TYPE.DateTime.validate null
-  test.strictEqual value, null
   
-  date = new Date()
-  value = TYPE.DateTime.validate date
-  test.strictEqual +value, +date
-  
-  value = TYPE.DateTime.validate "2015-02-12T16:43:13.632Z"
-  test.strictEqual +value, 1423759393632
-  
-  value = TYPE.DateTime.validate "xxx"
-  test.ok value instanceof TypeError
-
-  test.done()
-
 exports.DateTime2 = (test) ->
   value = TYPE.DateTime2.validate null
   test.strictEqual value, null
