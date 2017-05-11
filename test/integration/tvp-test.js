@@ -7,10 +7,6 @@ var config = JSON.parse(
   fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
 ).config;
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-if (config.options.tdsVersion < '7_3_A') {
-  console.log(`TVP is not supported on TDS ${config.options.tdsVersion}.`);
-  process.exit(-1);
-}
 
 var TEST_SETUP_1 =
   'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
@@ -35,6 +31,10 @@ exports.callProcedureWithTVP = function(test) {
   test.expect(13);
 
   config = getConfig();
+  if (config.options.tdsVersion < '7_3_A') {
+    console.log(`TVP is not supported on TDS ${config.options.tdsVersion}.`);
+    process.exit(-1);
+  }
 
   var request = new Request(TEST_SETUP_1, function(err, rowCount) {
     return connection.execSqlBatch(request2);
