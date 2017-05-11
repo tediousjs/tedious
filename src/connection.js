@@ -2,6 +2,7 @@ const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
 const InstanceLookup = require('./instance-lookup').InstanceLookup;
+const TransientErrorLookup = require('./transient-error-lookup.js').TransientErrorLookup;
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
 const Login7Payload = require('./login7-payload');
@@ -25,6 +26,7 @@ const KEEP_ALIVE_INITIAL_DELAY = 30 * 1000;
 const DEFAULT_CONNECT_TIMEOUT = 15 * 1000;
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000;
 const DEFAULT_CANCEL_TIMEOUT = 5 * 1000;
+const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
 const DEFAULT_PACKET_SIZE = 4 * 1024;
 const DEFAULT_TEXTSIZE = '2147483647';
 const DEFAULT_DATEFIRST = 7;
@@ -77,6 +79,8 @@ class Connection extends EventEmitter {
         port: DEFAULT_PORT,
         readOnlyIntent: false,
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
+        maxRetriesOnTransientErrors: 3,
+        connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
         tdsVersion: DEFAULT_TDS_VERSION,
@@ -198,7 +202,7 @@ class Connection extends EventEmitter {
 
       if (config.options.port) {
         if (config.options.port < 0 || config.options.port > 65536) {
-          throw new RangeError('Port should be > 0 and < 65536');
+          throw new RangeError('Port must be > 0 and < 65536');
         }
 
         this.config.options.port = config.options.port;
@@ -211,6 +215,22 @@ class Connection extends EventEmitter {
 
       if (config.options.requestTimeout != undefined) {
         this.config.options.requestTimeout = config.options.requestTimeout;
+      }
+
+      if (config.options.maxRetriesOnTransientErrors != undefined) {
+        if (!Number.isInteger(config.options.maxRetriesOnTransientErrors) || config.options.maxRetriesOnTransientErrors < 0) {
+          throw new RangeError('options.maxRetriesOnTransientErrors must be a non-negative integer.');
+        }
+
+        this.config.options.maxRetriesOnTransientErrors = config.options.maxRetriesOnTransientErrors;
+      }
+
+      if (config.options.connectionRetryInterval != undefined) {
+        if (!Number.isInteger(config.options.connectionRetryInterval) || config.options.connectionRetryInterval <= 0) {
+          throw new TypeError('options.connectionRetryInterval must be a non-zero positive integer.');
+        }
+
+        this.config.options.connectionRetryInterval = config.options.connectionRetryInterval;
       }
 
       if (config.options.rowCollectionOnDone != undefined) {
@@ -249,6 +269,7 @@ class Connection extends EventEmitter {
     this.socketError = this.socketError.bind(this);
     this.requestTimeout = this.requestTimeout.bind(this);
     this.connectTimeout = this.connectTimeout.bind(this);
+    this.retryTimeout = this.retryTimeout.bind(this);
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
@@ -264,6 +285,15 @@ class Connection extends EventEmitter {
       this.transactionDepth = 0;
       this.isSqlBatch = false;
     }
+
+    this.curTransientRetryCount = 0;
+    this.transientErrorLookup = new TransientErrorLookup();
+
+    this.cleanupTypeEnum = {
+      NORMAL: 0,
+      REDIRECT: 1,
+      RETRY: 2
+    };
   }
 
   close() {
@@ -275,16 +305,16 @@ class Connection extends EventEmitter {
     return this.createConnectTimer();
   }
 
-  cleanupConnection(redirect) {
-    this.redirect = redirect;
+  cleanupConnection(cleanupTypeEnum) {
     if (!this.closed) {
       this.clearConnectTimer();
       this.clearRequestTimer();
+      this.clearRetryTimer();
       this.closeConnection();
-      if (!this.redirect) {
-        this.emit('end');
-      } else {
+      if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
         this.emit('rerouting');
+      } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
+        this.emit('end');
       }
       if (this.request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
@@ -331,6 +361,12 @@ class Connection extends EventEmitter {
           return this.request.error.lineNumber = token.lineNumber;
         }
       } else {
+        const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
+        if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
+          this.debug.log('Initiating retry on transient error = ', token.number);
+          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        }
+
         return this.loginError = ConnectionError(token.message, 'ELOGIN');
       }
     });
@@ -575,6 +611,11 @@ class Connection extends EventEmitter {
     }
   }
 
+  createRetryTimer() {
+    this.clearRetryTimer();
+    this.retryTimer = setTimeout(this.retryTimeout, this.config.options.connectionRetryInterval);
+  }
+
   connectTimeout() {
     const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
     this.debug.log(message);
@@ -589,6 +630,12 @@ class Connection extends EventEmitter {
     return this.transitionTo(this.STATE.SENT_ATTENTION);
   }
 
+  retryTimeout() {
+    this.retryTimer = undefined;
+    this.emit('retry');
+    this.transitionTo(this.STATE.CONNECTING);
+  }
+
   clearConnectTimer() {
     if (this.connectTimer) {
       return clearTimeout(this.connectTimer);
@@ -599,6 +646,13 @@ class Connection extends EventEmitter {
     if (this.requestTimer) {
       clearTimeout(this.requestTimer);
       this.requestTimer = undefined;
+    }
+  }
+
+  clearRetryTimer() {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = undefined;
     }
   }
 
@@ -663,6 +717,12 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
       return this.dispatchEvent('reconnect');
+    } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
+      const server = this.routingData ? this.routingData.server : this.server;
+      const port = this.routingData ? this.routingData.port : this.config.options.port;
+      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+      return this.dispatchEvent('retry');
     } else {
       return this.transitionTo(this.STATE.FINAL);
     }
@@ -1127,7 +1187,7 @@ Connection.prototype.STATE = {
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
-      return this.cleanupConnection(true);
+      return this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
       message: function() {},
@@ -1139,6 +1199,25 @@ Connection.prototype.STATE = {
       },
       reconnect: function() {
         return this.transitionTo(this.STATE.CONNECTING);
+      }
+    }
+  },
+  TRANSIENT_FAILURE_RETRY: {
+    name: 'TRANSIENT_FAILURE_RETRY',
+    enter: function() {
+      this.curTransientRetryCount++;
+      return this.cleanupConnection(this.cleanupTypeEnum.RETRY);
+    },
+    events: {
+      message: function() {},
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      retry: function() {
+        this.createRetryTimer();
       }
     }
   },
@@ -1330,7 +1409,7 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     enter: function() {
-      return this.cleanupConnection();
+      return this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
     },
     events: {
       loginFailed: function() {
