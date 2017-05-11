@@ -33,7 +33,8 @@ exports.callProcedureWithTVP = function(test) {
   config = getConfig();
   if (config.options.tdsVersion < '7_3_A') {
     console.log(`TVP is not supported on TDS ${config.options.tdsVersion}.`);
-    process.exit(-1);
+    test.done();
+    return;
   }
 
   var request = new Request(TEST_SETUP_1, function(err, rowCount) {
