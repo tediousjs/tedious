@@ -58,6 +58,7 @@
     "eslint": "^3.19.0",
     "mitm": "^1.3.2",
     "nodeunit": "^0.11.0",
+    "rimraf": "^2.6.1",
     "semantic-release": "^6.3.2",
     "sinon": "^1.17.5",
     "source-map-support": "^0.4.14"
@@ -69,7 +70,8 @@
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
-    "prepublish": "node scripts/build.js",
+    "build": "rimraf lib && babel src --out-dir lib",
+    "prepublish": "npm run build",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post"
   },
   "babel": {
