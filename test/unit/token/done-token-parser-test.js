@@ -16,7 +16,7 @@ var parse = function(status, curCmd, doneRowCount) {
 
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
-  parser.read();
+  return parser.read();
 };
 
 module.exports.done = function(test) {
