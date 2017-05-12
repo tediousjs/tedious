@@ -1,8 +1,10 @@
 const Mitm = require('mitm');
 const sinon = require('sinon');
 
-const ParallelConnectionStrategy = require('../../src/connector').ParallelConnectionStrategy;
-const SequentialConnectionStrategy = require('../../src/connector').SequentialConnectionStrategy;
+const ParallelConnectionStrategy = require('../../src/connector')
+  .ParallelConnectionStrategy;
+const SequentialConnectionStrategy = require('../../src/connector')
+  .SequentialConnectionStrategy;
 const Connector = require('../../src/connector').Connector;
 
 const connectToIpTestImpl = function(hostIp, localIp, mitm, test) {
@@ -113,7 +115,10 @@ exports['Connector without MultiSubnetFailover'] = {
   'uses a sequential connection strategy': function(test) {
     const connector = new Connector({ host: 'localhost', port: 12345 }, false);
 
-    const spy = this.sinon.spy(SequentialConnectionStrategy.prototype, 'connect');
+    const spy = this.sinon.spy(
+      SequentialConnectionStrategy.prototype,
+      'connect'
+    );
 
     connector.execute(function(err, socket) {
       test.ifError(err);
@@ -140,11 +145,14 @@ exports['SequentialConnectionStrategy'] = {
   },
 
   'tries to connect to all addresses in sequence': function(test) {
-    const strategy = new SequentialConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+    const strategy = new SequentialConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     const attemptedConnections = [];
     this.mitm.on('connect', function(socket, options) {
@@ -189,12 +197,17 @@ exports['SequentialConnectionStrategy'] = {
     });
   },
 
-  'passes the first succesfully connected socket to the callback': function(test) {
-    const strategy = new SequentialConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+  'passes the first succesfully connected socket to the callback': function(
+    test
+  ) {
+    const strategy = new SequentialConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
@@ -214,12 +227,17 @@ exports['SequentialConnectionStrategy'] = {
     });
   },
 
-  'only attempts new connections until the first successful connection': function(test) {
-    const strategy = new SequentialConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+  'only attempts new connections until the first successful connection': function(
+    test
+  ) {
+    const strategy = new SequentialConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     const attemptedConnections = [];
 
@@ -241,11 +259,14 @@ exports['SequentialConnectionStrategy'] = {
   },
 
   'fails if all sequential connections fail': function(test) {
-    const strategy = new SequentialConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+    const strategy = new SequentialConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     this.mitm.on('connect', function(socket) {
       process.nextTick(() => {
@@ -260,12 +281,17 @@ exports['SequentialConnectionStrategy'] = {
     });
   },
 
-  'destroys all sockets except for the first succesfully connected socket': function(test) {
-    const strategy = new SequentialConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+  'destroys all sockets except for the first succesfully connected socket': function(
+    test
+  ) {
+    const strategy = new SequentialConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     const attemptedSockets = [];
 
@@ -306,11 +332,14 @@ exports['ParallelConnectionStrategy'] = {
   },
 
   'tries to connect to all addresses in parallel': function(test) {
-    const strategy = new ParallelConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+    const strategy = new ParallelConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     const attemptedConnections = [];
 
@@ -342,11 +371,14 @@ exports['ParallelConnectionStrategy'] = {
   },
 
   'fails if all parallel connections fail': function(test) {
-    const strategy = new ParallelConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+    const strategy = new ParallelConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     this.mitm.on('connect', function(socket) {
       process.nextTick(() => {
@@ -361,12 +393,17 @@ exports['ParallelConnectionStrategy'] = {
     });
   },
 
-  'passes the first succesfully connected socket to the callback': function(test) {
-    const strategy = new ParallelConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+  'passes the first succesfully connected socket to the callback': function(
+    test
+  ) {
+    const strategy = new ParallelConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     let expectedSocket;
     this.mitm.on('connect', function(socket, opts) {
@@ -386,12 +423,17 @@ exports['ParallelConnectionStrategy'] = {
     });
   },
 
-  'destroys all sockets except for the first succesfully connected socket': function(test) {
-    const strategy = new ParallelConnectionStrategy([
-      { address: '127.0.0.2' },
-      { address: '2002:20:0:0:0:0:1:3' },
-      { address: '127.0.0.4' }
-    ], { port: 12345, localAddress: '192.168.0.1' });
+  'destroys all sockets except for the first succesfully connected socket': function(
+    test
+  ) {
+    const strategy = new ParallelConnectionStrategy(
+      [
+        { address: '127.0.0.2' },
+        { address: '2002:20:0:0:0:0:1:3' },
+        { address: '127.0.0.4' }
+      ],
+      { port: 12345, localAddress: '192.168.0.1' }
+    );
 
     const attemptedSockets = [];
 
