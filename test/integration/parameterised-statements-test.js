@@ -811,6 +811,7 @@ var execSql = function(test, type, value, tdsVersion, options, expectedValue) {
 
   if (tdsVersion && tdsVersion > config.options.tdsVersion) {
     test.done();
+    return;
   }
 
   test.expect(6);

@@ -47,11 +47,11 @@ exports.badServer = function(test) {
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    return test.ok(err);
+    test.ok(err);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   return connection.on('debug', function(text) {
@@ -70,7 +70,7 @@ exports.badPort = function(test) {
     connection = new Connection(config);
   });
 
-  return test.done();
+  test.done();
 };
 
 exports.badCredentials = function(test) {
@@ -454,7 +454,7 @@ exports.duplicateColumnNames = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -512,7 +512,7 @@ exports.execSqlMultipleTimes = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -568,7 +568,7 @@ exports.execSqlWithOrder = function(test) {
     //console.log("#{error.number} : #{error.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -650,7 +650,7 @@ exports.execBadSql = function(test) {
     test.ok(error);
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -684,7 +684,7 @@ exports.closeConnectionRequestPending = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -728,7 +728,7 @@ exports.sqlWithMultipleResultSets = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -767,7 +767,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -807,7 +807,7 @@ exports.rowCollectionOnRequestCompletion = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -857,7 +857,7 @@ exports.rowCollectionOnDone = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -901,7 +901,7 @@ exports.execProcAsSql = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -1034,7 +1034,7 @@ exports.cancelRequest = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };
@@ -1091,7 +1091,7 @@ exports.requestTimeout = function(test) {
     //console.log("#{info.number} : #{info.message}")
   });
 
-  return connection.on('debug', function(text) {
+  connection.on('debug', function(text) {
     //console.log(text)
   });
 };

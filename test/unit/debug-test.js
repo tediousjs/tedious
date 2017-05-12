@@ -66,7 +66,7 @@ exports.dataEnable = function(test) {
     test.done();
   });
 
-  return debug.data(new Packet());
+  debug.data(new Packet());
 };
 
 exports.dataNotEnabled = function(test) {
@@ -88,7 +88,7 @@ exports.tokenEnabled = function(test) {
     test.done();
   });
 
-  return debug.token({ name: 'test' });
+  debug.token({ name: 'test' });
 };
 
 exports.payloadNotEnabledTest = function(test) {
