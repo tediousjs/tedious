@@ -625,6 +625,7 @@ exports.udtNull = function(test) {
 var execSql = function(test, sql, expectedValue, tdsVersion) {
   if (tdsVersion && tdsVersion > config.options.tdsVersion) {
     test.done();
+    return;
   }
 
   test.expect(3);
