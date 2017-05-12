@@ -19,7 +19,7 @@ exports.Bit = function(test) {
   value = TYPE.Bit.validate(0);
   test.strictEqual(value, false);
 
-  return test.done();
+  test.done();
 };
 
 exports.TinyInt = function(test) {
@@ -35,7 +35,7 @@ exports.TinyInt = function(test) {
   value = TYPE.TinyInt.validate(256);
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.SmallInt = function(test) {
@@ -48,7 +48,7 @@ exports.SmallInt = function(test) {
   value = TYPE.SmallInt.validate(-32769);
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Int = function(test) {
@@ -61,7 +61,7 @@ exports.Int = function(test) {
   value = TYPE.Int.validate(2147483648);
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.BigInt = function(test) {
@@ -83,7 +83,7 @@ exports.BigInt = function(test) {
   value = TYPE.BigInt.validate(9007199254740992);
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.SmallDateTime = function(test) {
@@ -100,7 +100,7 @@ exports.SmallDateTime = function(test) {
   value = TYPE.SmallDateTime.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.DateTime = function(test) {
@@ -117,7 +117,7 @@ exports.DateTime = function(test) {
   value = TYPE.DateTime.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.DateTime2 = function(test) {
@@ -134,7 +134,7 @@ exports.DateTime2 = function(test) {
   value = TYPE.DateTime2.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Time = function(test) {
@@ -151,7 +151,7 @@ exports.Time = function(test) {
   value = TYPE.Time.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.DateTimeOffset = function(test) {
@@ -168,7 +168,7 @@ exports.DateTimeOffset = function(test) {
   value = TYPE.DateTimeOffset.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Real = function(test) {
@@ -184,7 +184,7 @@ exports.Real = function(test) {
   value = TYPE.Real.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Float = function(test) {
@@ -200,7 +200,7 @@ exports.Float = function(test) {
   value = TYPE.Float.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Decimal = function(test) {
@@ -216,7 +216,7 @@ exports.Decimal = function(test) {
   value = TYPE.Decimal.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Numeric = function(test) {
@@ -232,7 +232,7 @@ exports.Numeric = function(test) {
   value = TYPE.Numeric.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Money = function(test) {
@@ -248,7 +248,7 @@ exports.Money = function(test) {
   value = TYPE.Money.validate('xxx');
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.SmallMoney = function(test) {
@@ -261,7 +261,7 @@ exports.SmallMoney = function(test) {
   value = TYPE.SmallMoney.validate(214748.3648);
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Image = function(test) {
@@ -275,7 +275,7 @@ exports.Image = function(test) {
   value = TYPE.Image.validate({});
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Binary = function(test) {
@@ -289,7 +289,7 @@ exports.Binary = function(test) {
   value = TYPE.Binary.validate({});
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.VarBinary = function(test) {
@@ -303,7 +303,7 @@ exports.VarBinary = function(test) {
   value = TYPE.VarBinary.validate({});
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Text = function(test) {
@@ -319,7 +319,7 @@ exports.Text = function(test) {
   value = TYPE.Text.validate({ toString: null });
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.VarChar = function(test) {
@@ -335,7 +335,7 @@ exports.VarChar = function(test) {
   value = TYPE.VarChar.validate({ toString: null });
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.NVarChar = function(test) {
@@ -351,7 +351,7 @@ exports.NVarChar = function(test) {
   value = TYPE.NVarChar.validate({ toString: null });
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.Char = function(test) {
@@ -367,7 +367,7 @@ exports.Char = function(test) {
   value = TYPE.Char.validate({ toString: null });
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.NChar = function(test) {
@@ -383,7 +383,7 @@ exports.NChar = function(test) {
   value = TYPE.NChar.validate({ toString: null });
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };
 
 exports.TVP = function(test) {
@@ -397,5 +397,5 @@ exports.TVP = function(test) {
   value = TYPE.TVP.validate({});
   test.ok(value instanceof TypeError);
 
-  return test.done();
+  test.done();
 };

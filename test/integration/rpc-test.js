@@ -13,7 +13,7 @@ var getConfig = function() {
     data: true,
     payload: true,
     token: true,
-    log: true
+    log: true,
   };
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
@@ -22,47 +22,47 @@ var getConfig = function() {
 };
 
 exports.execProcVarChar = function(test) {
-  return testProc(test, TYPES.VarChar, 'varchar(10)', 'test');
+  testProc(test, TYPES.VarChar, 'varchar(10)', 'test');
 };
 
 exports.execProcVarCharNull = function(test) {
-  return testProc(test, TYPES.VarChar, 'varchar(10)', null);
+  testProc(test, TYPES.VarChar, 'varchar(10)', null);
 };
 
 exports.execProcNVarChar = function(test) {
-  return testProc(test, TYPES.NVarChar, 'nvarchar(10)', 'test');
+  testProc(test, TYPES.NVarChar, 'nvarchar(10)', 'test');
 };
 
 exports.execProcNVarCharNull = function(test) {
-  return testProc(test, TYPES.NVarChar, 'nvarchar(10)', null);
+  testProc(test, TYPES.NVarChar, 'nvarchar(10)', null);
 };
 
 exports.execProcTinyInt = function(test) {
-  return testProc(test, TYPES.TinyInt, 'tinyint', 3);
+  testProc(test, TYPES.TinyInt, 'tinyint', 3);
 };
 
 exports.execProcTinyIntNull = function(test) {
-  return testProc(test, TYPES.TinyInt, 'tinyint', null);
+  testProc(test, TYPES.TinyInt, 'tinyint', null);
 };
 
 exports.execProcSmallInt = function(test) {
-  return testProc(test, TYPES.SmallInt, 'smallint', 3);
+  testProc(test, TYPES.SmallInt, 'smallint', 3);
 };
 
 exports.execProcSmallIntNull = function(test) {
-  return testProc(test, TYPES.SmallInt, 'smallint', null);
+  testProc(test, TYPES.SmallInt, 'smallint', null);
 };
 
 exports.execProcInt = function(test) {
-  return testProc(test, TYPES.Int, 'int', 3);
+  testProc(test, TYPES.Int, 'int', 3);
 };
 
 exports.execProcIntNull = function(test) {
-  return testProc(test, TYPES.Int, 'int', null);
+  testProc(test, TYPES.Int, 'int', null);
 };
 
 exports.execProcSmallDateTime = function(test) {
-  return testProc(
+  testProc(
     test,
     TYPES.SmallDateTime,
     'smalldatetime',
@@ -71,11 +71,11 @@ exports.execProcSmallDateTime = function(test) {
 };
 
 exports.execProcSmallDateTimeNull = function(test) {
-  return testProc(test, TYPES.SmallDateTime, 'smalldatetime', null);
+  testProc(test, TYPES.SmallDateTime, 'smalldatetime', null);
 };
 
 exports.execProcDateTime = function(test) {
-  return testProc(
+  testProc(
     test,
     TYPES.DateTime,
     'datetime',
@@ -84,51 +84,51 @@ exports.execProcDateTime = function(test) {
 };
 
 exports.execProcDateTimeNull = function(test) {
-  return testProc(test, TYPES.DateTime, 'datetime', null);
+  testProc(test, TYPES.DateTime, 'datetime', null);
 };
 
 exports.execProcOutputVarChar = function(test) {
-  return testProcOutput(test, TYPES.VarChar, 'varchar(10)', 'test');
+  testProcOutput(test, TYPES.VarChar, 'varchar(10)', 'test');
 };
 
 exports.execProcOutputVarCharNull = function(test) {
-  return testProcOutput(test, TYPES.VarChar, 'varchar(10)', null);
+  testProcOutput(test, TYPES.VarChar, 'varchar(10)', null);
 };
 
 exports.execProcOutputNVarChar = function(test) {
-  return testProcOutput(test, TYPES.NVarChar, 'varchar(10)', 'test');
+  testProcOutput(test, TYPES.NVarChar, 'varchar(10)', 'test');
 };
 
 exports.execProcOutputNVarCharNull = function(test) {
-  return testProcOutput(test, TYPES.NVarChar, 'varchar(10)', null);
+  testProcOutput(test, TYPES.NVarChar, 'varchar(10)', null);
 };
 
 exports.execProcOutputTinyInt = function(test) {
-  return testProcOutput(test, TYPES.TinyInt, 'tinyint', 3);
+  testProcOutput(test, TYPES.TinyInt, 'tinyint', 3);
 };
 
 exports.execProcOutputTinyIntNull = function(test) {
-  return testProcOutput(test, TYPES.TinyInt, 'tinyint', null);
+  testProcOutput(test, TYPES.TinyInt, 'tinyint', null);
 };
 
 exports.execProcOutputSmallInt = function(test) {
-  return testProcOutput(test, TYPES.SmallInt, 'smallint', 3);
+  testProcOutput(test, TYPES.SmallInt, 'smallint', 3);
 };
 
 exports.execProcOutputSmallIntNull = function(test) {
-  return testProcOutput(test, TYPES.SmallInt, 'smallint', null);
+  testProcOutput(test, TYPES.SmallInt, 'smallint', null);
 };
 
 exports.execProcOutputInt = function(test) {
-  return testProcOutput(test, TYPES.Int, 'int', 3);
+  testProcOutput(test, TYPES.Int, 'int', 3);
 };
 
 exports.execProcOutputIntNull = function(test) {
-  return testProcOutput(test, TYPES.Int, 'int', null);
+  testProcOutput(test, TYPES.Int, 'int', null);
 };
 
 exports.execProcOutputSmallDateTime = function(test) {
-  return testProcOutput(
+  testProcOutput(
     test,
     TYPES.SmallDateTime,
     'smalldatetime',
@@ -137,11 +137,11 @@ exports.execProcOutputSmallDateTime = function(test) {
 };
 
 exports.execProcOutputSmallDateTimeNull = function(test) {
-  return testProcOutput(test, TYPES.SmallDateTime, 'smalldatetime', null);
+  testProcOutput(test, TYPES.SmallDateTime, 'smalldatetime', null);
 };
 
 exports.execProcOutputDateTime = function(test) {
-  return testProcOutput(
+  testProcOutput(
     test,
     TYPES.DateTime,
     'datetime',
@@ -150,7 +150,7 @@ exports.execProcOutputDateTime = function(test) {
 };
 
 exports.execProcOutputDateTimeNull = function(test) {
-  return testProcOutput(test, TYPES.DateTime, 'datetime', null);
+  testProcOutput(test, TYPES.DateTime, 'datetime', null);
 };
 
 exports.execProcWithBadName = function(test) {
@@ -161,29 +161,29 @@ exports.execProcWithBadName = function(test) {
   var request = new Request('bad_proc_name', function(err) {
     test.ok(err);
 
-    return connection.close();
+    connection.close();
   });
 
   request.on('doneProc', function(rowCount, more, returnStatus) {
-    return test.ok(!more);
+    test.ok(!more);
   });
 
   request.on('doneInProc', function(rowCount, more) {
-    return test.ok(more);
+    test.ok(more);
   });
 
   request.on('row', function(columns) {
-    return test.ok(false);
+    test.ok(false);
   });
 
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    return connection.callProcedure(request);
+    connection.callProcedure(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   connection.on(
@@ -194,10 +194,10 @@ exports.execProcWithBadName = function(test) {
 
   connection.on('errorMessage', function(error) {
     //console.log("#{error.number} : #{error.message}")
-    return test.ok(error);
+    test.ok(error);
   });
 
-  return connection.on(
+  connection.on(
     'debug',
     function(text) {}
     //console.log(text)
@@ -210,22 +210,22 @@ exports.procReturnValue = function(test) {
   var config = getConfig();
 
   var request = new Request('#test_proc', function(err) {
-    return connection.close();
+    connection.close();
   });
 
   request.on('doneProc', function(rowCount, more, returnStatus) {
     test.ok(!more);
-    return test.strictEqual(returnStatus, -1); // Non-zero indicates a failure.
+    test.strictEqual(returnStatus, -1); // Non-zero indicates a failure.
   });
 
   request.on('doneInProc', function(rowCount, more) {
-    return test.ok(more);
+    test.ok(more);
   });
 
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    return execSqlBatch(
+    execSqlBatch(
       test,
       connection,
       '\
@@ -234,13 +234,13 @@ AS \
 return -1\
 ',
       function() {
-        return connection.callProcedure(request);
+        connection.callProcedure(request);
       }
     );
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   connection.on(
@@ -251,10 +251,10 @@ return -1\
 
   connection.on('errorMessage', function(error) {
     //console.log("#{error.number} : #{error.message}")
-    return test.ok(error);
+    test.ok(error);
   });
 
-  return connection.on(
+  connection.on(
     'debug',
     function(text) {}
     //console.log(text)
@@ -268,10 +268,10 @@ var execSqlBatch = function(test, connection, sql, doneCallback) {
       test.ok(false);
     }
 
-    return doneCallback();
+    doneCallback();
   });
 
-  return connection.execSqlBatch(request);
+  connection.execSqlBatch(request);
 };
 
 var testProc = function(test, type, typeAsString, value) {
@@ -282,32 +282,32 @@ var testProc = function(test, type, typeAsString, value) {
   var request = new Request('#test_proc', function(err) {
     test.ifError(err);
 
-    return connection.close();
+    connection.close();
   });
 
   request.addParameter('param', type, value);
 
   request.on('doneProc', function(rowCount, more, returnStatus) {
     test.ok(!more);
-    return test.strictEqual(returnStatus, 0);
+    test.strictEqual(returnStatus, 0);
   });
 
   request.on('doneInProc', function(rowCount, more) {
-    return test.ok(more);
+    test.ok(more);
   });
 
   request.on('row', function(columns) {
     if (value instanceof Date) {
-      return test.strictEqual(columns[0].value.getTime(), value.getTime());
+      test.strictEqual(columns[0].value.getTime(), value.getTime());
     } else {
-      return test.strictEqual(columns[0].value, value);
+      test.strictEqual(columns[0].value, value);
     }
   });
 
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    return execSqlBatch(
+    execSqlBatch(
       test,
       connection,
       `\
@@ -317,13 +317,13 @@ AS \
 select @param\
 `,
       function() {
-        return connection.callProcedure(request);
+        connection.callProcedure(request);
       }
     );
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   connection.on(
@@ -333,10 +333,10 @@ select @param\
   );
 
   connection.on('errorMessage', function(error) {
-    return console.log(`${error.number} : ${error.message}`);
+    console.log(`${error.number} : ${error.message}`);
   });
 
-  return connection.on(
+  connection.on(
     'debug',
     function(text) {}
     //console.log(text)
@@ -351,7 +351,7 @@ var testProcOutput = function(test, type, typeAsString, value) {
   var request = new Request('#test_proc', function(err) {
     test.ifError(err);
 
-    return connection.close();
+    connection.close();
   });
 
   request.addParameter('paramIn', type, value);
@@ -359,11 +359,11 @@ var testProcOutput = function(test, type, typeAsString, value) {
 
   request.on('doneProc', function(rowCount, more, returnStatus) {
     test.ok(!more);
-    return test.strictEqual(returnStatus, 0);
+    test.strictEqual(returnStatus, 0);
   });
 
   request.on('doneInProc', function(rowCount, more) {
-    return test.ok(more);
+    test.ok(more);
   });
 
   request.on('returnValue', function(name, returnValue, metadata) {
@@ -373,13 +373,13 @@ var testProcOutput = function(test, type, typeAsString, value) {
     } else {
       test.strictEqual(returnValue, value);
     }
-    return test.ok(metadata);
+    test.ok(metadata);
   });
 
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    return execSqlBatch(
+    execSqlBatch(
       test,
       connection,
       `\
@@ -390,28 +390,24 @@ AS \
 set @paramOut = @paramIn\
 `,
       function() {
-        return connection.callProcedure(request);
+        connection.callProcedure(request);
       }
     );
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
-  connection.on(
-    'infoMessage',
-    function(info) {}
+  connection.on('infoMessage', function(info) {
     //console.log("#{info.number} : #{info.message}")
-  );
+  });
 
   connection.on('errorMessage', function(error) {
-    return console.log(`${error.number} : ${error.message}`);
+    console.log(`${error.number} : ${error.message}`);
   });
 
-  return connection.on(
-    'debug',
-    function(text) {}
+  connection.on('debug', function(text) {
     //console.log(text)
-  );
+  });
 };

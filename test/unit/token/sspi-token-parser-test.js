@@ -45,5 +45,5 @@ exports.parseChallenge = function(test) {
 
   test.deepEqual(challenge.ntlmpacket, expected);
 
-  return test.done();
+  test.done();
 };

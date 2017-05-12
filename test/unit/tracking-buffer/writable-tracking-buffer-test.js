@@ -7,7 +7,7 @@ exports.create = function(test) {
   test.ok(buffer);
   test.strictEqual(0, buffer.data.length);
 
-  return test.done();
+  test.done();
 };
 
 exports.writeUnsignedInt = function(test) {
@@ -44,7 +44,7 @@ exports.writeUnsignedInt = function(test) {
     0x00
   ]);
 
-  return test.done();
+  test.done();
 };
 
 exports.writeSignedInt = function(test) {
@@ -81,7 +81,7 @@ exports.writeSignedInt = function(test) {
     0xff
   ]);
 
-  return test.done();
+  test.done();
 };
 
 exports.writeString = function(test) {
@@ -91,7 +91,7 @@ exports.writeString = function(test) {
 
   assertBuffer(test, buffer, [0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
 
-  return test.done();
+  test.done();
 };
 
 exports.writeBVarchar = function(test) {
@@ -101,7 +101,7 @@ exports.writeBVarchar = function(test) {
 
   assertBuffer(test, buffer, [0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
 
-  return test.done();
+  test.done();
 };
 
 exports.writeUsVarchar = function(test) {
@@ -111,7 +111,7 @@ exports.writeUsVarchar = function(test) {
 
   assertBuffer(test, buffer, [0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
 
-  return test.done();
+  test.done();
 };
 
 exports.copyFrom = function(test) {
@@ -123,7 +123,7 @@ exports.copyFrom = function(test) {
 
   assertBuffer(test, buffer, [0x01, 0x02, 0x03, 0x04, 0x05]);
 
-  return test.done();
+  test.done();
 };
 
 var assertBuffer = function(test, actual, expected) {
@@ -134,6 +134,6 @@ var assertBuffer = function(test, actual, expected) {
   if (!comparisonResult) {
     console.log('actual  ', actual);
     console.log('expected', expected);
-    return test.ok(false);
+    test.ok(false);
   }
 };

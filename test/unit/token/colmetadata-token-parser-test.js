@@ -32,7 +32,7 @@ module.exports.int = function(test) {
   test.strictEqual(token.columns[0].type.name, 'Int');
   test.strictEqual(token.columns[0].colName, 'name');
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varchar = function(test) {
@@ -73,5 +73,5 @@ module.exports.varchar = function(test) {
   test.strictEqual(token.columns[0].colName, 'name');
   test.strictEqual(token.columns[0].dataLength, length);
 
-  return test.done();
+  test.done();
 };

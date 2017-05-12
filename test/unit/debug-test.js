@@ -22,10 +22,10 @@ exports.packet = function(test) {
 
     switch (emitCount) {
       case 2:
-        return test.ok(/dir/.test(text));
+        test.ok(/dir/.test(text));
       case 3:
         test.ok(/header/.test(text));
-        return test.done();
+        test.done();
     }
   });
 
@@ -37,7 +37,7 @@ exports.payloadEnabled = function(test) {
   debug.on('debug', function(text) {
     test.strictEqual(text, payload);
 
-    return test.done();
+    test.done();
   });
 
   return debug.payload(function() {
@@ -48,12 +48,12 @@ exports.payloadEnabled = function(test) {
 exports.payloadNotEnabled = function(test) {
   var debug = new Debug();
   debug.on('debug', function(text) {
-    return test.ok(false);
+    test.ok(false);
   });
 
   debug.payload(payload);
 
-  return test.done();
+  test.done();
 };
 
 exports.dataEnable = function(test) {
@@ -61,7 +61,7 @@ exports.dataEnable = function(test) {
   debug.on('debug', function(text) {
     test.strictEqual(text, 'data');
 
-    return test.done();
+    test.done();
   });
 
   return debug.data(new Packet());
@@ -70,12 +70,12 @@ exports.dataEnable = function(test) {
 exports.dataNotEnabled = function(test) {
   var debug = new Debug();
   debug.on('debug', function(text) {
-    return test.ok(false);
+    test.ok(false);
   });
 
   debug.data(new Packet());
 
-  return test.done();
+  test.done();
 };
 
 exports.tokenEnabled = function(test) {
@@ -83,7 +83,7 @@ exports.tokenEnabled = function(test) {
   debug.on('debug', function(token) {
     test.ok(token.indexOf('test') !== 0);
 
-    return test.done();
+    test.done();
   });
 
   return debug.token({ name: 'test' });
@@ -92,10 +92,10 @@ exports.tokenEnabled = function(test) {
 exports.payloadNotEnabledTest = function(test) {
   var debug = new Debug();
   debug.on('debug', function(token) {
-    return test.ok(false);
+    test.ok(false);
   });
 
   debug.token({ name: 'test' });
 
-  return test.done();
+  test.done();
 };

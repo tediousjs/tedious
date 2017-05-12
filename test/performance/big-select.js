@@ -14,11 +14,12 @@ exports.smallRows = function(test) {
 
   var createTableSql =
     'create table #many_rows (id int, first_name varchar(20), last_name varchar(20))';
-  var insertRowSql = '\
-insert into #many_rows (id, first_name, last_name) values(@count, \'MyFirstName\', \'YourLastName\')\
-';
+  var insertRowSql =
+    "\
+insert into #many_rows (id, first_name, last_name) values(@count, 'MyFirstName', 'YourLastName')\
+";
 
-  return createInsertSelect(test, rows, createTableSql, insertRowSql);
+  createInsertSelect(test, rows, createTableSql, insertRowSql);
 };
 
 exports.mediumRows = function(test) {
@@ -35,7 +36,7 @@ exports.mediumRows = function(test) {
 insert into #many_rows (id, first_name, last_name, medium) values(@count, 'MyFirstName', 'YourLastName', '${medium}')\
 `;
 
-  return createInsertSelect(test, rows, createTableSql, insertRowSql);
+  createInsertSelect(test, rows, createTableSql, insertRowSql);
 };
 
 var createInsertSelect = function(test, rows, createTableSql, insertRowSql) {
@@ -58,20 +59,20 @@ end\
 
   var createTable = function(callback) {
     var request = new Request(createTableSql, function(err, rowCount) {
-      return callback(err);
+      callback(err);
     });
 
     console.log('Creating table');
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   };
 
   var insertRows = function(callback) {
     var request = new Request(insertRowsSql, function(err, rowCount) {
-      return callback(err);
+      callback(err);
     });
 
     console.log('Inserting rows');
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   };
 
   var select = function(callback) {
@@ -86,51 +87,43 @@ end\
         `${rows * insertRowSql.length / (durationMillis / 1000)} bytes/sec`
       );
 
-      return callback(err);
+      callback(err);
     });
 
-    request.on(
-      'row',
-      function(columns) {}
+    request.on('row', function(columns) {
       //console.log(columns[0].value)
-    );
+    });
 
     console.log('Selecting rows');
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   };
 
   connection.on('connect', function(err) {
     test.ok(!err);
 
-    return async.series([
+    async.series([
       createTable,
       insertRows,
       select,
       function() {
-        return connection.close();
-      }
+        connection.close();
+      },
     ]);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
-  connection.on(
-    'infoMessage',
-    function(info) {}
+  connection.on('infoMessage', function(info) {
     //console.log("#{info.number} : #{info.message}")
-  );
+  });
 
-  connection.on(
-    'errorMessage',
-    function(error) {}
+  connection.on('errorMessage', function(error) {
     //console.log("#{error.number} : #{error.message}")
-  );
+  });
 
-  return connection.on(
-    'debug',
-    function(text) {}
+  connection.on('debug', function(text) {
     //console.log(text)
-  );
+  });
 };

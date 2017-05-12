@@ -13,14 +13,14 @@ module.exports.envChange = function(test) {
 
   var parser = new Parser(debug);
   parser.on('databaseChange', function(event) {
-    return test.ok(event);
+    test.ok(event);
   });
 
   parser.addBuffer(buffer);
 
   test.ok(parser.isEnd());
 
-  return test.done();
+  test.done();
 };
 
 module.exports.tokenSplitAcrossBuffers = function(test) {
@@ -30,7 +30,7 @@ module.exports.tokenSplitAcrossBuffers = function(test) {
 
   var parser = new Parser(debug);
   parser.on('databaseChange', function(event) {
-    return test.ok(event);
+    test.ok(event);
   });
 
   parser.addBuffer(buffer.slice(0, 6));
@@ -38,7 +38,7 @@ module.exports.tokenSplitAcrossBuffers = function(test) {
 
   test.ok(parser.isEnd());
 
-  return test.done();
+  test.done();
 };
 
 var createDbChangeBuffer = function() {

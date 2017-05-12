@@ -43,5 +43,5 @@ exports.headers = function(test) {
 
   test.ok(buffer.data.equals(expected));
 
-  return test.done();
+  test.done();
 };

@@ -15,7 +15,7 @@ var getConfig = function() {
     data: true,
     payload: true,
     token: false,
-    log: true
+    log: true,
   };
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
@@ -31,7 +31,7 @@ exports.prepareExecute = function(test) {
 
   var request = new Request('select @param', function(err) {
     test.ifError(err);
-    return connection.close();
+    connection.close();
   });
   request.addParameter('param', TYPES.Int);
 
@@ -39,28 +39,26 @@ exports.prepareExecute = function(test) {
 
   request.on('prepared', function() {
     test.ok(request.handle);
-    return connection.execute(request, { param: value });
+    connection.execute(request, {param: value});
   });
 
   request.on('row', function(columns) {
     test.strictEqual(columns.length, 1);
-    return test.strictEqual(columns[0].value, value);
+    test.strictEqual(columns[0].value, value);
   });
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.prepare(request);
+    connection.prepare(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
-  return connection.on(
-    'debug',
-    function(text) {}
+  connection.on('debug', function(text) {
     //console.log(text)
-  );
+  });
 };
 
 exports.unprepare = function(test) {
@@ -71,28 +69,26 @@ exports.unprepare = function(test) {
 
   var request = new Request('select 3', function(err) {
     test.ifError(err);
-    return connection.close();
+    connection.close();
   });
 
   var connection = new Connection(config);
 
   request.on('prepared', function() {
     test.ok(request.handle);
-    return connection.unprepare(request);
+    connection.unprepare(request);
   });
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.prepare(request);
+    connection.prepare(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
-  return connection.on(
-    'debug',
-    function(text) {}
+  connection.on('debug', function(text) {
     //console.log(text)
-  );
+  });
 };

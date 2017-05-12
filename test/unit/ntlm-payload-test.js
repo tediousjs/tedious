@@ -43,5 +43,5 @@ exports.respondToChallenge = function(test) {
 
   test.strictEqual(expectedLength, response.data.length);
 
-  return test.done();
+  test.done();
 };

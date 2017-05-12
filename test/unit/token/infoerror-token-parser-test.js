@@ -38,5 +38,5 @@ module.exports.info = function(test) {
   test.strictEqual(token.procName, procName);
   test.strictEqual(token.lineNumber, lineNumber);
 
-  return test.done();
+  test.done();
 };

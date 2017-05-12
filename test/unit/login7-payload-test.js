@@ -72,7 +72,7 @@ exports.create = function(test) {
 
   //console.log(payload.toString(''))
 
-  return test.done();
+  test.done();
 };
 
 exports.createNTLM = function(test) {
@@ -156,5 +156,5 @@ exports.createNTLM = function(test) {
     payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected)
   );
 
-  return test.done();
+  test.done();
 };

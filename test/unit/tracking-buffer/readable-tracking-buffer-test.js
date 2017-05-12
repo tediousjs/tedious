@@ -7,7 +7,7 @@ exports.createNoArgs = function(test) {
   test.strictEqual(buffer.buffer.length, 0);
   test.strictEqual(buffer.encoding, 'utf8');
 
-  return test.done();
+  test.done();
 };
 
 exports.createWithBuffer = function(test) {
@@ -17,7 +17,7 @@ exports.createWithBuffer = function(test) {
   test.strictEqual(buffer.buffer, inputBuffer);
   test.strictEqual(buffer.encoding, 'utf8');
 
-  return test.done();
+  test.done();
 };
 
 exports.createWithEncoding = function(test) {
@@ -27,7 +27,7 @@ exports.createWithEncoding = function(test) {
   test.strictEqual(buffer.buffer, inputBuffer);
   test.strictEqual(buffer.encoding, 'ucs2');
 
-  return test.done();
+  test.done();
 };
 
 exports.notEnoughLeft = function(test) {
@@ -41,7 +41,7 @@ exports.notEnoughLeft = function(test) {
     test.strictEqual(error.code, 'oob');
   }
 
-  return test.done();
+  test.done();
 };
 
 exports.addBuffer = function(test) {
@@ -59,7 +59,7 @@ exports.addBuffer = function(test) {
   buffer.add(data.slice(2, 4));
   test.strictEqual(buffer.readUInt32LE(), 4);
 
-  return test.done();
+  test.done();
 };
 
 exports.readUnsignedInt = function(test) {
@@ -96,7 +96,7 @@ exports.readUnsignedInt = function(test) {
   test.strictEqual(buffer.readUInt32BE(), 5);
   test.strictEqual(buffer.readUInt64LE(), 6);
 
-  return test.done();
+  test.done();
 };
 
 exports.readSignedInt = function(test) {
@@ -125,7 +125,7 @@ exports.readSignedInt = function(test) {
   test.strictEqual(buffer.readInt32LE(), -4);
   test.strictEqual(buffer.readInt32BE(), -5);
 
-  return test.done();
+  test.done();
 };
 
 exports.readString = function(test) {
@@ -134,7 +134,7 @@ exports.readString = function(test) {
 
   test.strictEqual(buffer.readString(data.length), 'abc');
 
-  return test.done();
+  test.done();
 };
 
 exports.readBVarchar = function(test) {
@@ -143,7 +143,7 @@ exports.readBVarchar = function(test) {
 
   test.strictEqual(buffer.readBVarchar(), 'abc');
 
-  return test.done();
+  test.done();
 };
 
 exports.readUsVarchar = function(test) {
@@ -152,7 +152,7 @@ exports.readUsVarchar = function(test) {
 
   test.strictEqual(buffer.readUsVarchar(), 'abc');
 
-  return test.done();
+  test.done();
 };
 
 exports.readBuffer = function(test) {
@@ -162,7 +162,7 @@ exports.readBuffer = function(test) {
   buffer.readInt8();
   test.ok(buffer.readBuffer(2).equals(new Buffer([0x02, 0x03])));
 
-  return test.done();
+  test.done();
 };
 
 exports.readAsStringInt64LE = function(test) {
@@ -171,7 +171,7 @@ exports.readAsStringInt64LE = function(test) {
 
   test.strictEqual(buffer.readAsStringInt64LE(), '513');
 
-  return test.done();
+  test.done();
 };
 
 exports.readRollback = function(test) {
@@ -184,5 +184,5 @@ exports.readRollback = function(test) {
   test.strictEqual(buffer.readUInt16LE(), 2);
   test.strictEqual(buffer.readUInt16LE(), 3);
 
-  return test.done();
+  test.done();
 };

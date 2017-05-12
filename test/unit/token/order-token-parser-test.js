@@ -22,7 +22,7 @@ module.exports.oneColumn = function(test) {
   test.strictEqual(token.orderColumns.length, 1);
   test.strictEqual(token.orderColumns[0], column);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.twoColumns = function(test) {
@@ -48,5 +48,5 @@ module.exports.twoColumns = function(test) {
   test.strictEqual(token.orderColumns[0], column1);
   test.strictEqual(token.orderColumns[1], column2);
 
-  return test.done();
+  test.done();
 };

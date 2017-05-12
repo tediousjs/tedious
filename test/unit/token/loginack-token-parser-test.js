@@ -38,5 +38,5 @@ module.exports.info = function(test) {
   test.strictEqual(token.progName, progName);
   test.deepEqual(token.progVersion, progVersion);
 
-  return test.done();
+  test.done();
 };

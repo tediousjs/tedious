@@ -15,7 +15,7 @@ if (debug) {
     data: true,
     payload: true,
     token: true,
-    log: true
+    log: true,
   };
 } else {
   config.options.debug = {};
@@ -24,75 +24,75 @@ if (debug) {
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 exports.dbnull = function(test) {
-  return execSql(test, 'select null', null);
+  execSql(test, 'select null', null);
 };
 
 exports.tinyint = function(test) {
-  return execSql(test, 'select cast(8 as tinyint)', 8);
+  execSql(test, 'select cast(8 as tinyint)', 8);
 };
 
 exports.tinyintLarge = function(test) {
-  return execSql(test, 'select cast(252 as tinyint)', 252);
+  execSql(test, 'select cast(252 as tinyint)', 252);
 };
 
 exports.tinyintNull = function(test) {
-  return execSql(test, 'select cast(null as tinyint)', null);
+  execSql(test, 'select cast(null as tinyint)', null);
 };
 
 exports.smallint = function(test) {
-  return execSql(test, 'select cast(8 as smallint)', 8);
+  execSql(test, 'select cast(8 as smallint)', 8);
 };
 
 exports.smallintNull = function(test) {
-  return execSql(test, 'select cast(null as smallint)', null);
+  execSql(test, 'select cast(null as smallint)', null);
 };
 
 exports.int = function(test) {
-  return execSql(test, 'select cast(8 as int)', 8);
+  execSql(test, 'select cast(8 as int)', 8);
 };
 
 exports.intNull = function(test) {
-  return execSql(test, 'select cast(null as int)', null);
+  execSql(test, 'select cast(null as int)', null);
 };
 
 exports.real = function(test) {
-  return execSql(test, 'select cast(9.5 as real)', 9.5);
+  execSql(test, 'select cast(9.5 as real)', 9.5);
 };
 
 exports.realNull = function(test) {
-  return execSql(test, 'select cast(null as real)', null);
+  execSql(test, 'select cast(null as real)', null);
 };
 
 exports.float = function(test) {
-  return execSql(test, 'select cast(9.5 as float)', 9.5);
+  execSql(test, 'select cast(9.5 as float)', 9.5);
 };
 
 exports.floatNull = function(test) {
-  return execSql(test, 'select cast(null as float)', null);
+  execSql(test, 'select cast(null as float)', null);
 };
 
 exports.bigint = function(test) {
-  return execSql(test, 'select cast(8 as bigint)', '8');
+  execSql(test, 'select cast(8 as bigint)', '8');
 };
 
 exports.bigintNull = function(test) {
-  return execSql(test, 'select cast(null as bigint)', null);
+  execSql(test, 'select cast(null as bigint)', null);
 };
 
 exports.bitFalse = function(test) {
-  return execSql(test, "select cast('false' as bit)", false);
+  execSql(test, "select cast('false' as bit)", false);
 };
 
 exports.bitTrue = function(test) {
-  return execSql(test, "select cast('true' as bit)", true);
+  execSql(test, "select cast('true' as bit)", true);
 };
 
 exports.bitNull = function(test) {
-  return execSql(test, 'select cast(null as bit)', null);
+  execSql(test, 'select cast(null as bit)', null);
 };
 
 exports.datetime = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('2011-12-4 10:04:23' as datetime)",
     new Date('December 4, 2011 10:04:23 GMT')
@@ -100,7 +100,7 @@ exports.datetime = function(test) {
 };
 
 exports.datetimeNull = function(test) {
-  return execSql(test, 'select cast(null as datetime)', null);
+  execSql(test, 'select cast(null as datetime)', null);
 };
 
 // The tests below validates DateTime precision as described in the section
@@ -108,7 +108,7 @@ exports.datetimeNull = function(test) {
 // https://msdn.microsoft.com/en-us/library/ms187819.aspx
 
 exports.dateTimePrecision_0 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.990' as datetime)",
     new Date('January 1, 1998 23:59:59.990 GMT')
@@ -116,7 +116,7 @@ exports.dateTimePrecision_0 = function(test) {
 };
 
 exports.dateTimePrecision_1 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.991' as datetime)",
     new Date('January 1, 1998 23:59:59.990 GMT')
@@ -124,7 +124,7 @@ exports.dateTimePrecision_1 = function(test) {
 };
 
 exports.dateTimePrecision_2 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.992' as datetime)",
     new Date('January 1, 1998 23:59:59.993 GMT')
@@ -132,7 +132,7 @@ exports.dateTimePrecision_2 = function(test) {
 };
 
 exports.dateTimePrecision_3 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.993' as datetime)",
     new Date('January 1, 1998 23:59:59.993 GMT')
@@ -140,7 +140,7 @@ exports.dateTimePrecision_3 = function(test) {
 };
 
 exports.dateTimePrecision_4 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.994' as datetime)",
     new Date('January 1, 1998 23:59:59.993 GMT')
@@ -148,7 +148,7 @@ exports.dateTimePrecision_4 = function(test) {
 };
 
 exports.dateTimePrecision_5 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.995' as datetime)",
     new Date('January 1, 1998 23:59:59.997 GMT')
@@ -156,7 +156,7 @@ exports.dateTimePrecision_5 = function(test) {
 };
 
 exports.dateTimePrecision_6 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.996' as datetime)",
     new Date('January 1, 1998 23:59:59.997 GMT')
@@ -164,7 +164,7 @@ exports.dateTimePrecision_6 = function(test) {
 };
 
 exports.dateTimePrecision_7 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.997' as datetime)",
     new Date('January 1, 1998 23:59:59.997 GMT')
@@ -172,7 +172,7 @@ exports.dateTimePrecision_7 = function(test) {
 };
 
 exports.dateTimePrecision_8 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.998' as datetime)",
     new Date('January 1, 1998 23:59:59.997 GMT')
@@ -180,7 +180,7 @@ exports.dateTimePrecision_8 = function(test) {
 };
 
 exports.dateTimePrecision_9 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('1998-1-1 23:59:59.999' as datetime)",
     new Date('January 2, 1998 00:00:00.000 GMT')
@@ -188,7 +188,7 @@ exports.dateTimePrecision_9 = function(test) {
 };
 
 exports.smallDatetime = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('2011-12-4 10:04:23' as smalldatetime)",
     new Date('December 4, 2011 10:04:00 GMT')
@@ -196,11 +196,11 @@ exports.smallDatetime = function(test) {
 };
 
 exports.smallDatetimeNull = function(test) {
-  return execSql(test, 'select cast(null as smalldatetime)', null);
+  execSql(test, 'select cast(null as smalldatetime)', null);
 };
 
 exports.datetime2 = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('2011-12-4 10:04:23' as datetime2)",
     new Date('December 4, 2011 10:04:23 +00'),
@@ -209,11 +209,11 @@ exports.datetime2 = function(test) {
 };
 
 exports.datetime2Null = function(test) {
-  return execSql(test, 'select cast(null as datetime2)', null, '7_3_A');
+  execSql(test, 'select cast(null as datetime2)', null, '7_3_A');
 };
 
 exports.time = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('10:04:23' as time)",
     new Date(Date.UTC(1970, 0, 1, 10, 4, 23)),
@@ -222,11 +222,11 @@ exports.time = function(test) {
 };
 
 exports.timeNull = function(test) {
-  return execSql(test, 'select cast(null as time)', null, '7_3_A');
+  execSql(test, 'select cast(null as time)', null, '7_3_A');
 };
 
 exports.date = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('2014-03-08' as date)",
     new Date(Date.UTC(2014, 2, 8)),
@@ -235,11 +235,11 @@ exports.date = function(test) {
 };
 
 exports.dateNull = function(test) {
-  return execSql(test, 'select cast(null as date)', null, '7_3_A');
+  execSql(test, 'select cast(null as date)', null, '7_3_A');
 };
 
 exports.dateTimeOffset = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset)",
     new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
@@ -248,23 +248,19 @@ exports.dateTimeOffset = function(test) {
 };
 
 exports.dateTimeOffsetNull = function(test) {
-  return execSql(test, 'select cast(null as datetimeoffset)', null);
+  execSql(test, 'select cast(null as datetimeoffset)', null);
 };
 
 exports.numericSmallValue = function(test) {
-  return execSql(test, 'select cast(9.3 as numeric(3,2))', 9.3);
+  execSql(test, 'select cast(9.3 as numeric(3,2))', 9.3);
 };
 
 exports.numericLargeValue = function(test) {
-  return execSql(
-    test,
-    'select cast(9876543.3456 as numeric(12,5))',
-    9876543.3456
-  );
+  execSql(test, 'select cast(9876543.3456 as numeric(12,5))', 9876543.3456);
 };
 
 exports.numericVeryLargeValue = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(9876543219876543.3456 as numeric(25,5))',
     9876543219876543.3456
@@ -272,7 +268,7 @@ exports.numericVeryLargeValue = function(test) {
 };
 
 exports.numericExtremelyLargeValue = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(98765432198765432198765432.3456 as numeric(35,5))',
     98765432198765432198765432.3456
@@ -280,39 +276,35 @@ exports.numericExtremelyLargeValue = function(test) {
 };
 
 exports.numericNull = function(test) {
-  return execSql(test, 'select cast(null as numeric(3,2))', null);
+  execSql(test, 'select cast(null as numeric(3,2))', null);
 };
 
 exports.smallMoney = function(test) {
-  return execSql(test, 'select cast(1.22229 as smallmoney)', 1.2223);
+  execSql(test, 'select cast(1.22229 as smallmoney)', 1.2223);
 };
 
 exports.smallMoneyNegative = function(test) {
-  return execSql(test, 'select cast(-1.22229 as smallmoney)', -1.2223);
+  execSql(test, 'select cast(-1.22229 as smallmoney)', -1.2223);
 };
 
 exports.smallMoneyNull = function(test) {
-  return execSql(test, 'select cast(null as smallmoney)', null);
+  execSql(test, 'select cast(null as smallmoney)', null);
 };
 
 exports.money = function(test) {
-  return execSql(test, 'select cast(1.22229 as money)', 1.2223);
+  execSql(test, 'select cast(1.22229 as money)', 1.2223);
 };
 
 exports.moneyNegative = function(test) {
-  return execSql(test, 'select cast(-1.22229 as money)', -1.2223);
+  execSql(test, 'select cast(-1.22229 as money)', -1.2223);
 };
 
 exports.moneyLarge = function(test) {
-  return execSql(
-    test,
-    'select cast(123456789012345.11 as money)',
-    123456789012345.11
-  );
+  execSql(test, 'select cast(123456789012345.11 as money)', 123456789012345.11);
 };
 
 exports.moneyLargeNegative = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(-123456789012345.11 as money)',
     -123456789012345.11
@@ -320,19 +312,19 @@ exports.moneyLargeNegative = function(test) {
 };
 
 exports.moneyNull = function(test) {
-  return execSql(test, 'select cast(null as money)', null);
+  execSql(test, 'select cast(null as money)', null);
 };
 
 exports.varchar = function(test) {
-  return execSql(test, "select cast('abcde' as varchar(10))", 'abcde');
+  execSql(test, "select cast('abcde' as varchar(10))", 'abcde');
 };
 
 exports.varcharEmpty = function(test) {
-  return execSql(test, "select cast('' as varchar(10))", '');
+  execSql(test, "select cast('' as varchar(10))", '');
 };
 
 exports.varcharNull = function(test) {
-  return execSql(test, 'select cast(null as varchar(10))', null);
+  execSql(test, 'select cast(null as varchar(10))', null);
 };
 
 exports.varcharCollation = function(test) {
@@ -342,15 +334,15 @@ create table #tab1 (col1 nvarchar(10) collate Cyrillic_General_CS_AS);
 insert into #tab1 values(N'abcdШ');
 select cast(col1 as varchar(10)) from #tab1\
 `;
-  return execSql(test, sql, 'abcdШ');
+  execSql(test, sql, 'abcdШ');
 };
 
 exports.varcharMax = function(test) {
-  return execSql(test, "select cast('abc' as varchar(max))", 'abc', '7_2');
+  execSql(test, "select cast('abc' as varchar(max))", 'abc', '7_2');
 };
 
 exports.varcharMaxNull = function(test) {
-  return execSql(test, 'select cast(null as varchar(max))', null, '7_2');
+  execSql(test, 'select cast(null as varchar(max))', null, '7_2');
 };
 
 exports.varcharMaxLongAsTextSize = function(test) {
@@ -363,7 +355,7 @@ exports.varcharMaxLongAsTextSize = function(test) {
     longString += 'x';
   }
 
-  return execSql(
+  execSql(
     test,
     `select cast('${longString}' as varchar(max))`,
     longString,
@@ -381,7 +373,7 @@ exports.varcharMaxLargerThanTextSize = function(test) {
     longString += 'x';
   }
 
-  return execSql(
+  execSql(
     test,
     `select cast('${longString}' as varchar(max))`,
     longString.slice(0, config.options.textsize),
@@ -390,23 +382,23 @@ exports.varcharMaxLargerThanTextSize = function(test) {
 };
 
 exports.nvarchar = function(test) {
-  return execSql(test, "select cast('abc' as nvarchar(10))", 'abc');
+  execSql(test, "select cast('abc' as nvarchar(10))", 'abc');
 };
 
 exports.nvarcharNull = function(test) {
-  return execSql(test, 'select cast(null as nvarchar(10))', null);
+  execSql(test, 'select cast(null as nvarchar(10))', null);
 };
 
 exports.nvarcharMax = function(test) {
-  return execSql(test, "select cast('abc' as nvarchar(max))", 'abc', '7_2');
+  execSql(test, "select cast('abc' as nvarchar(max))", 'abc', '7_2');
 };
 
 exports.nvarcharMaxNull = function(test) {
-  return execSql(test, 'select cast(null as nvarchar(max))', null, '7_2');
+  execSql(test, 'select cast(null as nvarchar(max))', null, '7_2');
 };
 
 exports.varbinary = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(0x1234 as varbinary(4))',
     new Buffer([0x12, 0x34])
@@ -414,11 +406,11 @@ exports.varbinary = function(test) {
 };
 
 exports.varbinaryNull = function(test) {
-  return execSql(test, 'select cast(null as varbinary(10))', null);
+  execSql(test, 'select cast(null as varbinary(10))', null);
 };
 
 exports.binary = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(0x1234 as binary(4))',
     new Buffer([0x12, 0x34, 0x00, 0x00])
@@ -426,11 +418,11 @@ exports.binary = function(test) {
 };
 
 exports.binaryNull = function(test) {
-  return execSql(test, 'select cast(null as binary(10))', null);
+  execSql(test, 'select cast(null as binary(10))', null);
 };
 
 exports.varbinaryMax = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(0x1234 as varbinary(max))',
     new Buffer([0x12, 0x34]),
@@ -439,63 +431,59 @@ exports.varbinaryMax = function(test) {
 };
 
 exports.varbinaryMaxNull = function(test) {
-  return execSql(test, 'select cast(null as varbinary(max))', null, '7_2');
+  execSql(test, 'select cast(null as varbinary(max))', null, '7_2');
 };
 
 exports.char = function(test) {
-  return execSql(test, "select cast('abc' as char(5))", 'abc  ');
+  execSql(test, "select cast('abc' as char(5))", 'abc  ');
 };
 
 exports.charNull = function(test) {
-  return execSql(test, 'select cast(null as char(5))', null);
+  execSql(test, 'select cast(null as char(5))', null);
 };
 
 exports.nchar = function(test) {
-  return execSql(test, "select cast('abc' as nchar(5))", 'abc  ');
+  execSql(test, "select cast('abc' as nchar(5))", 'abc  ');
 };
 
 exports.ncharNull = function(test) {
-  return execSql(test, 'select cast(null as nchar(5))', null);
+  execSql(test, 'select cast(null as nchar(5))', null);
 };
 
 exports.text = function(test) {
-  return execSql(test, "select cast('abc' as text) as text", 'abc');
+  execSql(test, "select cast('abc' as text) as text", 'abc');
 };
 
 exports.textEmpty = function(test) {
-  return execSql(test, "select cast('' as text) as text", '');
+  execSql(test, "select cast('' as text) as text", '');
 };
 
 exports.textNull = function(test) {
-  return execSql(test, 'select cast(null as text) as text', null);
+  execSql(test, 'select cast(null as text) as text', null);
 };
 
 exports.ntext = function(test) {
-  return execSql(test, "select cast('abc' as ntext) as text", 'abc');
+  execSql(test, "select cast('abc' as ntext) as text", 'abc');
 };
 
 exports.ntextEmpty = function(test) {
-  return execSql(test, "select cast('' as ntext) as text", '');
+  execSql(test, "select cast('' as ntext) as text", '');
 };
 
 exports.ntextNull = function(test) {
-  return execSql(test, 'select cast(null as ntext) as text', null);
+  execSql(test, 'select cast(null as ntext) as text', null);
 };
 
 exports.image = function(test) {
-  return execSql(
-    test,
-    'select cast(0x1234 as image)',
-    new Buffer([0x12, 0x34])
-  );
+  execSql(test, 'select cast(0x1234 as image)', new Buffer([0x12, 0x34]));
 };
 
 exports.imageNull = function(test) {
-  return execSql(test, 'select cast(null as image)', null);
+  execSql(test, 'select cast(null as image)', null);
 };
 
 exports.guid = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)",
     '01234567-89AB-CDEF-0123-456789ABCDEF'
@@ -503,23 +491,23 @@ exports.guid = function(test) {
 };
 
 exports.guidNull = function(test) {
-  return execSql(test, 'select cast(null as uniqueidentifier)', null);
+  execSql(test, 'select cast(null as uniqueidentifier)', null);
 };
 
 exports.variantInt = function(test) {
-  return execSql(test, 'select cast(11 as sql_variant)', 11, '7_2');
+  execSql(test, 'select cast(11 as sql_variant)', 11, '7_2');
 };
 
 exports.variantNumeric = function(test) {
-  return execSql(test, 'select cast(11.16 as sql_variant)', 11.16, '7_2');
+  execSql(test, 'select cast(11.16 as sql_variant)', 11.16, '7_2');
 };
 
 exports.variantVarChar = function(test) {
-  return execSql(test, "select cast('abc' as sql_variant)", 'abc', '7_2');
+  execSql(test, "select cast('abc' as sql_variant)", 'abc', '7_2');
 };
 
 exports.variantVarBin = function(test) {
-  return execSql(
+  execSql(
     test,
     'select cast(0x1234 as sql_variant)',
     new Buffer([0x12, 0x34], '7_2')
@@ -527,7 +515,7 @@ exports.variantVarBin = function(test) {
 };
 
 exports.variantDateTimeOffset = function(test) {
-  return execSql(
+  execSql(
     test,
     "select cast(cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset) as sql_variant)",
     new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
@@ -536,16 +524,16 @@ exports.variantDateTimeOffset = function(test) {
 };
 
 exports.variantNull = function(test) {
-  return execSql(test, 'select cast(null as sql_variant)', null, '7_2');
+  execSql(test, 'select cast(null as sql_variant)', null, '7_2');
 };
 
 exports.xml = function(test) {
   var xml = '<root><child attr="attr-value"/></root>';
-  return execSql(test, `select cast('${xml}' as xml)`, xml, '7_2');
+  execSql(test, `select cast('${xml}' as xml)`, xml, '7_2');
 };
 
 exports.xmlNull = function(test) {
-  return execSql(test, 'select cast(null as xml)', null, '7_2');
+  execSql(test, 'select cast(null as xml)', null, '7_2');
 };
 
 exports.xmlWithSchema = function(test) {
@@ -579,11 +567,11 @@ INSERT INTO [${tableName}] ([xml]) VALUES ('${xml}');
 SELECT [xml] FROM [${tableName}];\
 `;
 
-  return execSql(test, sql, xml, '7_2');
+  execSql(test, sql, xml, '7_2');
 };
 
 exports.udt = function(test) {
-  return execSql(
+  execSql(
     test,
     "select geography::STGeomFromText('LINESTRING(-122.360 47.656, -122.343 47.656 )', 4326) as geo",
     new Buffer([
@@ -624,19 +612,19 @@ exports.udt = function(test) {
       243,
       149,
       94,
-      192
+      192,
     ]),
     '7_2'
   );
 };
 
 exports.udtNull = function(test) {
-  return execSql(test, 'select cast(null as geography)', null, '7_2');
+  execSql(test, 'select cast(null as geography)', null, '7_2');
 };
 
 var execSql = function(test, sql, expectedValue, tdsVersion) {
   if (tdsVersion && tdsVersion > config.options.tdsVersion) {
-    return test.done();
+    test.done();
   }
 
   test.expect(3);
@@ -644,22 +632,19 @@ var execSql = function(test, sql, expectedValue, tdsVersion) {
   var request = new Request(sql, function(err) {
     test.ifError(err);
 
-    return connection.close();
+    connection.close();
   });
 
   request.on('row', function(columns) {
     if (expectedValue instanceof Date) {
-      return test.strictEqual(
-        columns[0].value.getTime(),
-        expectedValue.getTime()
-      );
+      test.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (
       expectedValue instanceof Array ||
       expectedValue instanceof Buffer
     ) {
-      return test.deepEqual(columns[0].value, expectedValue);
+      test.deepEqual(columns[0].value, expectedValue);
     } else {
-      return test.strictEqual(columns[0].value, expectedValue);
+      test.strictEqual(columns[0].value, expectedValue);
     }
   });
 
@@ -667,20 +652,20 @@ var execSql = function(test, sql, expectedValue, tdsVersion) {
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   connection.on('errorMessage', function(error) {
-    return console.log(`${error.number} : ${error.message}`);
+    console.log(`${error.number} : ${error.message}`);
   });
 
-  return connection.on('debug', function(message) {
+  connection.on('debug', function(message) {
     if (debug) {
-      return console.log(message);
+      console.log(message);
     }
   });
 };

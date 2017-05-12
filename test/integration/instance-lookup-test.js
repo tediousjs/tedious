@@ -34,10 +34,10 @@ exports.goodInstance = function(test) {
     test.ifError(err);
     test.ok(port);
 
-    return test.done();
+    test.done();
   };
 
-  return new InstanceLookup().instanceLookup(
+  new InstanceLookup().instanceLookup(
     { server: config.server, instanceName: config.instanceName },
     callback
   );
@@ -50,10 +50,10 @@ exports.badInstance = function(test) {
     test.ok(err);
     test.ok(!port);
 
-    return test.done();
+    test.done();
   };
 
-  return new InstanceLookup().instanceLookup(
+  new InstanceLookup().instanceLookup(
     {
       server: config.server,
       instanceName: 'badInstanceName',
@@ -71,10 +71,10 @@ exports.badServer = function(test) {
     test.ok(err);
     test.ok(!port);
 
-    return test.done();
+    test.done();
   };
 
-  return new InstanceLookup().instanceLookup(
+  new InstanceLookup().instanceLookup(
     {
       server: RESERVED_IP_ADDRESS,
       instanceName: 'badInstanceName',

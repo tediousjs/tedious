@@ -32,9 +32,9 @@ drop table #testUnique;\
 `;
 
   test.expect(3);
-  return execSql(test, sql, function(err) {
+  execSql(test, sql, function(err) {
     test.ok(err instanceof Error);
-    return test.strictEqual(err.number, 2627);
+    test.strictEqual(err.number, 2627);
   });
 };
 
@@ -46,9 +46,9 @@ drop table #testNullable;\
 `;
 
   test.expect(3);
-  return execSql(test, sql, function(err) {
+  execSql(test, sql, function(err) {
     test.ok(err instanceof Error);
-    return test.strictEqual(err.number, 515);
+    test.strictEqual(err.number, 515);
   });
 };
 
@@ -58,9 +58,9 @@ drop procedure #nonexistentProcedure;\
 ';
 
   test.expect(3);
-  return execSql(test, sql, function(err) {
+  execSql(test, sql, function(err) {
     test.ok(err instanceof Error);
-    return test.strictEqual(err.number, 3701);
+    test.strictEqual(err.number, 3701);
   });
 };
 
@@ -92,29 +92,29 @@ exports.extendedErrorInfo = function(test) {
     );
     test.strictEqual(err.lineNumber, 1, 'err.lineNumber should be 1');
 
-    return connection.close();
+    connection.close();
   });
 
   var createProc = new Request(
     "create procedure #testExtendedErrorInfo as raiserror('test error message', 14, 42)",
     function(err) {
       test.ifError(err);
-      return connection.callProcedure(execProc);
+      connection.callProcedure(execProc);
     }
   );
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.execSqlBatch(createProc);
+    connection.execSqlBatch(createProc);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   if (debug) {
-    return connection.on('debug', function(message) {
-      return console.log(message);
+    connection.on('debug', function(message) {
+      console.log(message);
     });
   }
 };
@@ -124,21 +124,21 @@ var execSql = function(test, sql, requestCallback) {
 
   var request = new Request(sql, function() {
     requestCallback.apply(this, arguments);
-    return connection.close();
+    connection.close();
   });
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   if (debug) {
-    return connection.on('debug', function(message) {
-      return console.log(message);
+    connection.on('debug', function(message) {
+      console.log(message);
     });
   }
 };

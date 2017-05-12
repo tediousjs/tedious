@@ -25,7 +25,7 @@ module.exports.database = function(test) {
   test.strictEqual(token.oldValue, 'old');
   test.strictEqual(token.newValue, 'new');
 
-  return test.done();
+  test.done();
 };
 
 module.exports.packetSize = function(test) {
@@ -51,7 +51,7 @@ module.exports.packetSize = function(test) {
   test.strictEqual(token.oldValue, 1024);
   test.strictEqual(token.newValue, 2048);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.badType = function(test) {
@@ -69,5 +69,5 @@ module.exports.badType = function(test) {
   var token = parser.read();
 
   test.strictEqual(token, null);
-  return test.done();
+  test.done();
 };

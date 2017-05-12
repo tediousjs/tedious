@@ -38,24 +38,24 @@ exports.callProcedureWithTVP = function(test) {
   test.expect(13);
 
   var request = new Request(TEST_SETUP_1, function(err, rowCount) {
-    return connection.execSqlBatch(request2);
+    connection.execSqlBatch(request2);
   });
 
   var request2 = new Request(TEST_SETUP_2, function(err, rowCount) {
-    return connection.execSqlBatch(request3);
+    connection.execSqlBatch(request3);
   });
 
   var request3 = new Request(TEST_SETUP_3, function(err, rowCount) {
-    return connection.callProcedure(request4);
+    connection.callProcedure(request4);
   });
 
   var request4 = new Request('__tediousTvpTest', function(err, rowCount) {
-    return connection.close();
+    connection.close();
   });
 
   request4.on('doneInProc', function(rowCount, more) {
     test.ok(more);
-    return test.strictEqual(rowCount, 1);
+    test.strictEqual(rowCount, 1);
   });
 
   request4.on('row', function(columns) {
@@ -68,7 +68,7 @@ exports.callProcedureWithTVP = function(test) {
     test.strictEqual(columns[6].value, 6.6);
     test.strictEqual(columns[7].value, 'asdf');
     test.strictEqual(columns[8].value, 'asdf');
-    return test.strictEqual(+columns[9].value, +new Date(Date.UTC(2014, 0, 1)));
+    test.strictEqual(+columns[9].value, +new Date(Date.UTC(2014, 0, 1)));
   });
 
   var table = {
@@ -139,11 +139,11 @@ exports.callProcedureWithTVP = function(test) {
 
   connection.on('connect', function(err) {
     test.ifError(err);
-    return connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   });
 
   connection.on('end', function(info) {
-    return test.done();
+    test.done();
   });
 
   connection.on(
@@ -152,7 +152,7 @@ exports.callProcedureWithTVP = function(test) {
     //console.log("#{info.number} : #{info.message}")
   );
 
-  return connection.on(
+  connection.on(
     'debug',
     function(text) {}
     //console.log(text)

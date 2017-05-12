@@ -10,7 +10,7 @@ exports.createEmpty = function(test) {
     packet.buffer.equals(new Buffer([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
   );
 
-  return test.done();
+  test.done();
 };
 
 exports.last = function(test) {
@@ -22,7 +22,7 @@ exports.last = function(test) {
   packet.last(true);
   test.ok(packet.last());
 
-  return test.done();
+  test.done();
 };
 
 exports.packetId = function(test) {
@@ -32,7 +32,7 @@ exports.packetId = function(test) {
   packet.packetId(2);
   test.strictEqual(packet.packetId(), 2);
 
-  return test.done();
+  test.done();
 };
 
 exports.data = function(test) {
@@ -52,7 +52,7 @@ exports.data = function(test) {
   test.strictEqual(packet.length(), 8 + allData.length);
   test.ok(packet.data().equals(allData));
 
-  return test.done();
+  test.done();
 };
 
 exports.createFromBuffer = function(test) {
@@ -74,7 +74,7 @@ exports.createFromBuffer = function(test) {
   test.ok(packet.isLast());
   test.ok(packet.data().equals(new Buffer([0x01, 0xff])));
 
-  return test.done();
+  test.done();
 };
 
 exports.headerToString = function(test) {
@@ -96,7 +96,7 @@ exports.headerToString = function(test) {
     '--type:0x12(PRELOGIN), status:0x03(EOM IGNORE), length:0x000A, spid:0x0001, packetId:0x02, window:0x03';
   test.strictEqual(packet.headerToString('--'), expectedText);
 
-  return test.done();
+  test.done();
 };
 
 exports.dataToStringShort = function(test) {
@@ -108,7 +108,7 @@ exports.dataToStringShort = function(test) {
   var expectedText = '--0000  010203  ...';
   test.strictEqual(packet.dataToString('--'), expectedText);
 
-  return test.done();
+  test.done();
 };
 
 exports.dataExactLinesWorth = function(test) {
@@ -130,7 +130,7 @@ exports.dataExactLinesWorth = function(test) {
     expectedTextLine1a + expectedTextLine1b + expectedTextLine1c;
   test.strictEqual(packet.dataToString('--'), expectedText);
 
-  return test.done();
+  test.done();
 };
 
 exports.dataToStringMultipleLines = function(test) {
@@ -160,14 +160,14 @@ exports.dataToStringMultipleLines = function(test) {
     expectedTextLine2b;
   test.strictEqual(packet.dataToString('--'), expectedText);
 
-  return test.done();
+  test.done();
 };
 
 exports.packetCompleteShorterThanHeader = function(test) {
   var buffer = new Buffer(7);
   test.ok(!isPacketComplete(buffer));
 
-  return test.done();
+  test.done();
 };
 
 exports.packetCompleteJustHeader = function(test) {
@@ -175,7 +175,7 @@ exports.packetCompleteJustHeader = function(test) {
 
   test.ok(isPacketComplete(buffer));
 
-  return test.done();
+  test.done();
 };
 
 exports.packetCompleteTooShort = function(test) {
@@ -194,7 +194,7 @@ exports.packetCompleteTooShort = function(test) {
 
   test.ok(!isPacketComplete(buffer));
 
-  return test.done();
+  test.done();
 };
 
 exports.packetCompleteLongEnough = function(test) {
@@ -215,5 +215,5 @@ exports.packetCompleteLongEnough = function(test) {
 
   test.ok(isPacketComplete(buffer));
 
-  return test.done();
+  test.done();
 };

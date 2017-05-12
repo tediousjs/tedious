@@ -16,7 +16,7 @@ var parse = function(status, curCmd, doneRowCount) {
 
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
-  return parser.read();
+  parser.read();
 };
 
 module.exports.done = function(test) {
@@ -30,7 +30,7 @@ module.exports.done = function(test) {
   test.strictEqual(token.curCmd, curCmd);
   test.ok(!token.rowCount);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.more = function(test) {
@@ -44,7 +44,7 @@ module.exports.more = function(test) {
   test.strictEqual(token.curCmd, curCmd);
   test.ok(!token.rowCount);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.doneRowCount = function(test) {
@@ -58,5 +58,5 @@ module.exports.doneRowCount = function(test) {
   test.strictEqual(token.curCmd, 1);
   test.strictEqual(token.rowCount, doneRowCount);
 
-  return test.done();
+  test.done();
 };

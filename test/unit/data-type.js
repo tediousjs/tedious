@@ -20,7 +20,7 @@ exports.noTypeOverridesByAliases = function(test) {
     }
   }
 
-  return test.done();
+  test.done();
 };
 
 // Test some aliases
@@ -39,7 +39,7 @@ exports.knownAliases = function(test) {
     );
   }
 
-  return test.done();
+  test.done();
 };
 
 // Test date calculation for non utc date during daylight savings period
@@ -57,7 +57,7 @@ exports.smallDateTimeDaylightSaving = function(test) {
     type.writeParameterData(buffer, parameter, { useUTC: false });
     test.strictEqual(buffer.buffer.readUInt16LE(1), expectedNoOfDays);
   }
-  return test.done();
+  test.done();
 };
 
 exports.dateTimeDaylightSaving = function(test) {
@@ -74,7 +74,7 @@ exports.dateTimeDaylightSaving = function(test) {
     type.writeParameterData(buffer, parameter, { useUTC: false });
     test.strictEqual(buffer.buffer.readInt32LE(1), expectedNoOfDays);
   }
-  return test.done();
+  test.done();
 };
 
 exports.dateTime2DaylightSaving = function(test) {
@@ -94,7 +94,7 @@ exports.dateTime2DaylightSaving = function(test) {
     rBuffer.readUInt24LE();
     test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
   }
-  return test.done();
+  test.done();
 };
 
 exports.dateDaylightSaving = function(test) {
@@ -113,5 +113,5 @@ exports.dateDaylightSaving = function(test) {
     rBuffer.readUInt8();
     test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
   }
-  return test.done();
+  test.done();
 };

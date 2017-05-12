@@ -9,7 +9,7 @@ class Connection extends Duplex {
   _write(chunk, encoding, callback) {
     var packet = new Packet(chunk);
     this.emit('packet', packet);
-    return callback();
+    callback();
   }
 }
 
@@ -25,11 +25,11 @@ exports.sendSmallerThanOnePacket = function(test) {
     test.strictEqual(packet.type(), packetType);
     test.ok(packet.data().equals(payload));
 
-    return test.done();
+    test.done();
   });
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  return io.sendMessage(packetType, payload);
+  io.sendMessage(packetType, payload);
 };
 
 exports.sendExactlyPacket = function(test) {
@@ -41,11 +41,11 @@ exports.sendExactlyPacket = function(test) {
     test.strictEqual(packet.type(), packetType);
     test.ok(packet.data().equals(payload));
 
-    return test.done();
+    test.done();
   });
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  return io.sendMessage(packetType, payload);
+  io.sendMessage(packetType, payload);
 };
 
 exports.sendOneLongerThanPacket = function(test) {
@@ -62,18 +62,18 @@ exports.sendOneLongerThanPacket = function(test) {
       case 1:
         test.ok(!packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
-        return test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])));
+        test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])));
       case 2:
         test.ok(packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
         test.ok(packet.data().equals(new Buffer([5])));
 
-        return test.done();
+        test.done();
     }
   });
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  return io.sendMessage(packetType, payload);
+  io.sendMessage(packetType, payload);
 };
 
 exports.receiveOnePacket = function(test) {
@@ -84,16 +84,16 @@ exports.receiveOnePacket = function(test) {
 
   var io = new MessageIO(connection, packetSize, new Debug());
   io.on('data', function(data) {
-    return test.ok(data.equals(payload));
+    test.ok(data.equals(payload));
   });
   io.on('message', function() {
-    return test.done();
+    test.done();
   });
 
   var packet = new Packet(packetType);
   packet.last(true);
   packet.addData(payload);
-  return connection.push(packet.buffer);
+  connection.push(packet.buffer);
 };
 
 exports.receiveOnePacketInTwoChunks = function(test) {
@@ -104,17 +104,17 @@ exports.receiveOnePacketInTwoChunks = function(test) {
 
   var io = new MessageIO(connection, packetSize, new Debug());
   io.on('data', function(data) {
-    return test.ok(data.equals(payload));
+    test.ok(data.equals(payload));
   });
   io.on('message', function() {
-    return test.done();
+    test.done();
   });
 
   var packet = new Packet(packetType);
   packet.last(true);
   packet.addData(payload);
   connection.push(packet.buffer.slice(0, 4));
-  return connection.push(packet.buffer.slice(4));
+  connection.push(packet.buffer.slice(4));
 };
 
 exports.receiveTwoPackets = function(test) {
@@ -133,13 +133,13 @@ exports.receiveTwoPackets = function(test) {
 
     switch (receivedPacketCount) {
       case 1:
-        return test.ok(data.equals(payload1));
+        test.ok(data.equals(payload1));
       case 2:
-        return test.ok(data.equals(payload2));
+        test.ok(data.equals(payload2));
     }
   });
   io.on('message', function() {
-    return test.done();
+    test.done();
   });
 
   var packet = new Packet(packetType);
@@ -149,7 +149,7 @@ exports.receiveTwoPackets = function(test) {
   packet = new Packet(packetType);
   packet.last(true);
   packet.addData(payload2);
-  return connection.push(packet.buffer);
+  connection.push(packet.buffer);
 };
 
 exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
@@ -168,13 +168,13 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
 
     switch (receivedPacketCount) {
       case 1:
-        return test.ok(data.equals(payload1));
+        test.ok(data.equals(payload1));
       case 2:
-        return test.ok(data.equals(payload2));
+        test.ok(data.equals(payload2));
     }
   });
   io.on('message', function() {
-    return test.done();
+    test.done();
   });
 
   var packet1 = new Packet(packetType);
@@ -188,7 +188,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
   connection.push(
     Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)])
   );
-  return connection.push(packet2.buffer.slice(4));
+  connection.push(packet2.buffer.slice(4));
 };
 
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
@@ -206,12 +206,12 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
 
   var io = new MessageIO(connection, packetSize, new Debug());
   io.on('data', function(data) {
-    return (receivedData = Buffer.concat([receivedData, data]));
+    receivedData = Buffer.concat([receivedData, data]);
   });
 
   io.on('message', function() {
     test.deepEqual(payload, receivedData);
-    return test.done();
+    test.done();
   });
 
   var packet1 = new Packet(packetType);
@@ -229,5 +229,5 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
   var data2 = allData.slice(5);
 
   connection.push(data1);
-  return connection.push(data2);
+  connection.push(data2);
 };

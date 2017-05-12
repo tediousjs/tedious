@@ -9,7 +9,7 @@ module.exports.zero = function(test) {
     convertLEBytesToString(new Buffer([0, 0, 0, 0, 0, 0, 0, 0]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.smallPositive = function(test) {
@@ -22,7 +22,7 @@ module.exports.smallPositive = function(test) {
     convertLEBytesToString(new Buffer([2, 0, 0, 0, 0, 0, 0, 0]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.smallNegative = function(test) {
@@ -35,7 +35,7 @@ module.exports.smallNegative = function(test) {
     convertLEBytesToString(new Buffer([254, 255, 255, 255, 255, 255, 255, 255]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.bigPositive = function(test) {
@@ -44,7 +44,7 @@ module.exports.bigPositive = function(test) {
     convertLEBytesToString(new Buffer([255, 255, 255, 255, 255, 255, 255, 127]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.bigNegative = function(test) {
@@ -53,7 +53,7 @@ module.exports.bigNegative = function(test) {
     convertLEBytesToString(new Buffer([0, 0, 0, 0, 0, 0, 0, 128]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.powersOf10 = function(test) {
@@ -74,7 +74,7 @@ module.exports.powersOf10 = function(test) {
     convertLEBytesToString(new Buffer([16, 39, 0, 0, 0, 0, 0, 0]))
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.toInt64LE = function(test) {
@@ -169,7 +169,7 @@ module.exports.toInt64LE = function(test) {
     0xff
   ]);
 
-  return test.done();
+  test.done();
 };
 
 var assertBuffer = function(test, actual, expected) {

@@ -21,7 +21,7 @@ module.exports.dbnull = function(test) {
   test.strictEqual(token.columns[0].value, null);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.int = function(test) {
@@ -40,7 +40,7 @@ module.exports.int = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.bigint = function(test) {
@@ -64,7 +64,7 @@ module.exports.bigint = function(test) {
   test.strictEqual('1', token.columns[0].value);
   test.strictEqual('9223372036854775807', token.columns[1].value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.real = function(test) {
@@ -84,7 +84,7 @@ module.exports.real = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.float = function(test) {
@@ -106,7 +106,7 @@ module.exports.float = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.money = function(test) {
@@ -149,7 +149,7 @@ module.exports.money = function(test) {
   test.strictEqual(token.columns[4].value, value);
   test.strictEqual(token.columns[5].value, valueLarge);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharWithoutCodepage = function(test) {
@@ -177,7 +177,7 @@ module.exports.varCharWithoutCodepage = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharWithCodepage = function(test) {
@@ -205,7 +205,7 @@ module.exports.varCharWithCodepage = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.nVarChar = function(test) {
@@ -227,7 +227,7 @@ module.exports.nVarChar = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varBinary = function(test) {
@@ -249,7 +249,7 @@ module.exports.varBinary = function(test) {
   test.deepEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.binary = function(test) {
@@ -271,7 +271,7 @@ module.exports.binary = function(test) {
   test.deepEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharMaxNull = function(test) {
@@ -301,7 +301,7 @@ module.exports.varCharMaxNull = function(test) {
   test.strictEqual(token.columns[0].value, null);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharMaxUnknownLength = function(test) {
@@ -337,7 +337,7 @@ module.exports.varCharMaxUnknownLength = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharMaxKnownLength = function(test) {
@@ -371,7 +371,7 @@ module.exports.varCharMaxKnownLength = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharMaxWithCodepage = function(test) {
@@ -405,7 +405,7 @@ module.exports.varCharMaxWithCodepage = function(test) {
   test.strictEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varCharMaxKnownLengthWrong = function(test) {
@@ -433,9 +433,9 @@ module.exports.varCharMaxKnownLengthWrong = function(test) {
     /* eslint-disable */
     var token = parser.read();
     /* eslint-enable */
-    return test.ok(false);
+    test.ok(false);
   } catch (exception) {
-    return test.done();
+    test.done();
   }
 };
 
@@ -463,7 +463,7 @@ module.exports.varBinaryMaxNull = function(test) {
   test.strictEqual(token.columns[0].value, null);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.varBinaryMaxUnknownLength = function(test) {
@@ -496,7 +496,7 @@ module.exports.varBinaryMaxUnknownLength = function(test) {
   test.deepEqual(token.columns[0].value, value);
   test.strictEqual(token.columns[0].metadata, colMetaData[0]);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.intN = function(test) {
@@ -642,7 +642,7 @@ module.exports.intN = function(test) {
   test.strictEqual('1000', token.columns[10].value);
   test.strictEqual('10000', token.columns[11].value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.guidN = function(test) {
@@ -689,7 +689,7 @@ module.exports.guidN = function(test) {
     token.columns[1].value
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.floatN = function(test) {
@@ -732,7 +732,7 @@ module.exports.floatN = function(test) {
   test.strictEqual(9.5, token.columns[1].value);
   test.strictEqual(9.5, token.columns[2].value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.datetime = function(test) {
@@ -770,7 +770,7 @@ module.exports.datetime = function(test) {
     new Date('January 3, 1900 00:00:45 GMT').getTime()
   );
 
-  return test.done();
+  test.done();
 };
 
 module.exports.datetimeN = function(test) {
@@ -790,7 +790,7 @@ module.exports.datetimeN = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numeric4Bytes = function(test) {
@@ -820,7 +820,7 @@ module.exports.numeric4Bytes = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numeric4BytesNegative = function(test) {
@@ -850,7 +850,7 @@ module.exports.numeric4BytesNegative = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numeric8Bytes = function(test) {
@@ -881,7 +881,7 @@ module.exports.numeric8Bytes = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numeric12Bytes = function(test) {
@@ -913,7 +913,7 @@ module.exports.numeric12Bytes = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numeric16Bytes = function(test) {
@@ -951,7 +951,7 @@ module.exports.numeric16Bytes = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
 
-  return test.done();
+  test.done();
 };
 
 module.exports.numericNull = function(test) {
@@ -977,5 +977,5 @@ module.exports.numericNull = function(test) {
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);
 
-  return test.done();
+  test.done();
 };

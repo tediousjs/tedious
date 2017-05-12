@@ -7,12 +7,12 @@ exports.readableTrackingBuffer = function(test) {
   var buffer = new ReadableTrackingBuffer();
 
   test.ok(buffer);
-  return test.done();
+  test.done();
 };
 
 exports.writableTrackingBuffer = function(test) {
   var buffer = new WritableTrackingBuffer(1);
 
   test.ok(buffer);
-  return test.done();
+  test.done();
 };

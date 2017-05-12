@@ -5,7 +5,7 @@ exports.noEncrypt = function(test) {
 
   assertPayload(test, payload, 'NOT_SUP');
 
-  return test.done();
+  test.done();
 };
 
 exports.encrypt = function(test) {
@@ -13,7 +13,7 @@ exports.encrypt = function(test) {
 
   assertPayload(test, payload, 'ON');
 
-  return test.done();
+  test.done();
 };
 
 exports.createFromBuffer = function(test) {
@@ -22,7 +22,7 @@ exports.createFromBuffer = function(test) {
 
   assertPayload(test, payload, 'NOT_SUP');
 
-  return test.done();
+  test.done();
 };
 
 var assertPayload = function(test, payload, encryptionString) {
@@ -35,5 +35,5 @@ var assertPayload = function(test, payload, encryptionString) {
   test.strictEqual(payload.encryptionString, encryptionString);
   test.strictEqual(payload.instance, 0);
   test.strictEqual(payload.threadId, 0);
-  return test.strictEqual(payload.marsString, 'OFF');
+  test.strictEqual(payload.marsString, 'OFF');
 };
