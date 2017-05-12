@@ -23,9 +23,11 @@ exports.packet = function(test) {
     switch (emitCount) {
       case 2:
         test.ok(/dir/.test(text));
+        break;
       case 3:
         test.ok(/header/.test(text));
         test.done();
+        break;
     }
   });
 

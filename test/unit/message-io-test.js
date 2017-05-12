@@ -63,12 +63,13 @@ exports.sendOneLongerThanPacket = function(test) {
         test.ok(!packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
         test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])));
+        break;
       case 2:
         test.ok(packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
         test.ok(packet.data().equals(new Buffer([5])));
-
         test.done();
+        break;
     }
   });
 
@@ -134,8 +135,10 @@ exports.receiveTwoPackets = function(test) {
     switch (receivedPacketCount) {
       case 1:
         test.ok(data.equals(payload1));
+        break;
       case 2:
         test.ok(data.equals(payload2));
+        break;
     }
   });
   io.on('message', function() {
@@ -169,8 +172,10 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
     switch (receivedPacketCount) {
       case 1:
         test.ok(data.equals(payload1));
+        break;
       case 2:
         test.ok(data.equals(payload2));
+        break;
     }
   });
   io.on('message', function() {
