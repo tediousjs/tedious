@@ -835,9 +835,11 @@ exports.rowCollectionOnDone = function(test) {
       case 1:
         test.strictEqual(rows[0][0].metadata.colName, 'a');
         test.strictEqual(rows[0][0].value, 1);
+        break;
       case 2:
         test.strictEqual(rows[0][0].metadata.colName, 'b');
         test.strictEqual(rows[0][0].value, 2);
+        break;
     }
   });
 
