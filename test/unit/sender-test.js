@@ -54,7 +54,15 @@ const sendToIpCommonTestSetup = function(ipAddress, udpVersion, sendResult) {
 
 const sendToIpCommonTestValidation = function(test, ipAddress) {
   test.ok(this.createSocketStub.calledOnce);
-  test.ok(this.socketSendStub.withArgs(anyRequest, 0, anyRequest.length, anyPort, ipAddress).calledOnce);
+  test.ok(
+    this.socketSendStub.withArgs(
+      anyRequest,
+      0,
+      anyRequest.length,
+      anyPort,
+      ipAddress
+    ).calledOnce
+  );
 };
 
 exports['Sender send to IP address'] = {
@@ -125,13 +133,16 @@ exports['Sender send to IP address'] = {
   }
 };
 
-
 const sendToHostCommonTestSetup = function(lookupError) {
   // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
   // method(s) on the ParallelSendStrategy class are/is being invoked. So we stub out
   // the methods to validate they're invoked correctly.
-  const testStrategy = new ParallelSendStrategy(this.addresses, anyPort, anyRequest);
-  const callback = () => { };
+  const testStrategy = new ParallelSendStrategy(
+    this.addresses,
+    anyPort,
+    anyRequest
+  );
+  const callback = () => {};
   this.strategySendStub = this.sinon.stub(testStrategy, 'send');
   this.strategySendStub.withArgs(callback);
   this.strategyCancelStub = this.sinon.stub(testStrategy, 'cancel');
@@ -146,8 +157,13 @@ const sendToHostCommonTestSetup = function(lookupError) {
 
   // Stub the create strategy method for the test to return a strategy object created
   // exactly like the method would but with a few methods stubbed.
-  this.createStrategyStub = this.sinon.stub(this.sender, 'createParallelSendStrategy');
-  this.createStrategyStub.withArgs(this.addresses, anyPort, anyRequest).returns(testStrategy);
+  this.createStrategyStub = this.sinon.stub(
+    this.sender,
+    'createParallelSendStrategy'
+  );
+  this.createStrategyStub
+    .withArgs(this.addresses, anyPort, anyRequest)
+    .returns(testStrategy);
 
   this.sender.execute(callback);
 };
@@ -244,7 +260,6 @@ exports['Sender send to hostname'] = {
   }
 };
 
-
 const commonStrategyTestSetup = function() {
   // IP addresses returned by DNS reverse lookup and passed to the Strategy.
   this.testData = [
@@ -256,14 +271,21 @@ const commonStrategyTestSetup = function() {
 
   // Create sockets for IPv4 and IPv6 with send and close stubbed out to
   // prevent network activity.
-  this.testSockets = { };
+  this.testSockets = {};
   this.testSockets[udpIpv4] = Dgram.createSocket(udpIpv4);
   this.testSockets[udpIpv6] = Dgram.createSocket(udpIpv6);
 
   let key;
   for (key in this.testSockets) {
-    this.testSockets[key].socketSendStub = this.sinon.stub(this.testSockets[key], 'send', sendStub);
-    this.testSockets[key].socketCloseSpy = this.sinon.spy(this.testSockets[key], 'close');
+    this.testSockets[key].socketSendStub = this.sinon.stub(
+      this.testSockets[key],
+      'send',
+      sendStub
+    );
+    this.testSockets[key].socketCloseSpy = this.sinon.spy(
+      this.testSockets[key],
+      'close'
+    );
 
     // This allows emitEvent method to fire an 'error' or 'message' event appropriately.
     // A given test may overwrite this value for specific sockets to test different
@@ -281,7 +303,11 @@ const commonStrategyTestSetup = function() {
   this.createSocketStub.withArgs(udpIpv4).returns(this.testSockets[udpIpv4]);
   this.createSocketStub.withArgs(udpIpv6).returns(this.testSockets[udpIpv6]);
 
-  this.parallelSendStrategy = new ParallelSendStrategy(this.testData, anyPort, anyRequest);
+  this.parallelSendStrategy = new ParallelSendStrategy(
+    this.testData,
+    anyPort,
+    anyRequest
+  );
 };
 
 const commonStrategyTestValidation = function(test) {
@@ -360,7 +386,10 @@ exports['ParallelSendStrategy'] = {
 
     this.parallelSendStrategy.send((error, message) => {
       // All socket sends fail. We should get an error on the last socket fail.
-      test.strictEqual(error, this.testSockets[this.testData[this.testData.length - 1].udpVersion]);
+      test.strictEqual(
+        error,
+        this.testSockets[this.testData[this.testData.length - 1].udpVersion]
+      );
 
       test.strictEqual(message, undefined);
 
