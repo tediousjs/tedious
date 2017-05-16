@@ -3,7 +3,9 @@ const Request = require('../../src/request');
 const fs = require('fs');
 
 function getConfig() {
-  const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+  const config = JSON.parse(
+    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+  ).config;
 
   config.options.debug = {
     packet: true,
