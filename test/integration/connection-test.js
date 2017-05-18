@@ -1614,19 +1614,14 @@ exports.badConcatNullYieldsNull = function(test) {
   test.done();
 };
 
-var testCursorCloseOnCommit = function(test, setting) {
+var testBooleanConfigOption = function (test, config, optionFlag, setting, defaultOn) {
   test.expect(5);
-  var config = getConfig();
-  if (typeof setting === 'boolean') {
-    config.options.enableCursorCloseOnCommit = setting;
-  }
 
   var connection = new Connection(config);
 
-  var cursorCloseOnCommitOptionValue = 4;
   var request = new Request(
-    `SELECT (${cursorCloseOnCommitOptionValue} & @@OPTIONS) AS CURSOR_CLOSE_ON_COMMIT;`,
-    function(err, rowCount) {
+    `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
+    function (err, rowCount) {
       test.ifError(err);
       test.strictEqual(rowCount, 1);
 
@@ -1634,17 +1629,16 @@ var testCursorCloseOnCommit = function(test, setting) {
     }
   );
 
-  request.on('columnMetadata', function(columnsMetadata) {
+  request.on('columnMetadata', function (columnsMetadata) {
     test.strictEqual(Object.keys(columnsMetadata).length, 1);
   });
 
-  request.on('row', function(columns) {
+  request.on('row', function (columns) {
     test.strictEqual(Object.keys(columns).length, 1);
 
-    // The current ANSI_NULL default setting in Tedious is ON
     var expectedValue;
-    if (setting === true) {
-      expectedValue = cursorCloseOnCommitOptionValue;
+    if (setting === true || (setting === undefined && defaultOn)) {
+      expectedValue = optionFlag;
     } else {
       expectedValue = 0;
     }
@@ -1652,106 +1646,93 @@ var testCursorCloseOnCommit = function(test, setting) {
     test.strictEqual(columns[0].value, expectedValue);
   });
 
-  connection.on('connect', function(err) {
+  connection.on('connect', function (err) {
     connection.execSql(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function (info) {
     test.done();
   });
 };
 
-exports.testCursorCloseOnCommitDefault = function(test) {
-  testCursorCloseOnCommit(test, undefined);
+var testBadBooleanConfigOption = function (test, config) {
+  test.throws(function () {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+exports.testCursorCloseOnCommitDefault = function (test) {
+  var config = getConfig();
+  var optionFlag = 4;
+  var setting = undefined;
+  var defaultOn = false;
+
+  config.options.enableCursorCloseOnCommit = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, false);
 };
 
 exports.testCursorCloseOnCommitOn = function(test) {
-  testCursorCloseOnCommit(test, true);
+  var config = getConfig();
+  var optionFlag = 4;
+  var setting = true;
+  var defaultOn = false;
+
+  config.options.enableCursorCloseOnCommit = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, false);
 };
 
 exports.testCursorCloseOnCommitOff = function(test) {
-  testCursorCloseOnCommit(test, false);
+  var config = getConfig();
+  var optionFlag = 4;
+  var setting = false;
+  var defaultOn = false;
+
+  config.options.enableCursorCloseOnCommit = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, false);
 };
 
 exports.badCursorCloseOnCommit = function(test) {
   var config = getConfig();
   config.options.enableCursorCloseOnCommit = 'on';
-
-  test.throws(function() {
-    new Connection(config);
-  });
-
-  test.done();
-};
-
-var testImplicitTransactions = function(test, setting) {
-  test.expect(5);
-  var config = getConfig();
-  if (typeof setting === 'boolean') {
-    config.options.enableImplicitTransactions = setting;
-  }
-
-  var connection = new Connection(config);
-
-  var implicitTransactionsOptionValue = 2;
-  var request = new Request(
-    `SELECT (${implicitTransactionsOptionValue} & @@OPTIONS) AS IMPLICIT_TRANSACTIONS;`,
-    function(err, rowCount) {
-      test.ifError(err);
-      test.strictEqual(rowCount, 1);
-
-      connection.close();
-    }
-  );
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(Object.keys(columnsMetadata).length, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(Object.keys(columns).length, 1);
-
-    // The current ANSI_NULL default setting in Tedious is ON
-    var expectedValue;
-    if (setting === true) {
-      expectedValue = implicitTransactionsOptionValue;
-    } else {
-      expectedValue = 0;
-    }
-
-    test.strictEqual(columns[0].value, expectedValue);
-  });
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
+  testBadBooleanConfigOption(test, config);
 };
 
 exports.testImplicitTransactionsDefault = function(test) {
-  testImplicitTransactions(test, undefined);
+  var config = getConfig();
+  var optionFlag = 2;
+  var setting = undefined;
+  var defaultOn = false;
+
+  config.options.enableImplicitTransactions = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
 };
 
 exports.testImplicitTransactionsOn = function(test) {
-  testImplicitTransactions(test, true);
+  var config = getConfig();
+  var optionFlag = 2;
+  var setting = true;
+  var defaultOn = false;
+
+  config.options.enableImplicitTransactions = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
 };
 
 exports.testImplicitTransactionsOff = function(test) {
-  testImplicitTransactions(test, false);
+  var config = getConfig();
+  var optionFlag = 2;
+  var setting = false;
+  var defaultOn = false;
+
+  config.options.enableImplicitTransactions = setting;
+  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
 };
 
 exports.badImplicitTransactions = function(test) {
   var config = getConfig();
   config.options.enableImplicitTransactions = 'on';
-
-  test.throws(function() {
-    new Connection(config);
-  });
-
-  test.done();
+  testBadBooleanConfigOption(test, config);
 };
 
 var testLanguage = function(test, language) {
