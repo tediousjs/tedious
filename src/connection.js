@@ -109,6 +109,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.abortTransactionOnError != undefined) {
+        if (typeof config.options.abortTransactionOnError !== 'boolean') {
+          throw new TypeError('options.abortTransactionOnError must be a boolean (true or false).');
+        }
+
         this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
       }
 
@@ -184,6 +188,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.enableAnsiNullDefault != undefined) {
+        if (typeof config.options.enableAnsiNullDefault !== 'boolean') {
+          throw new TypeError('options.enableAnsiNullDefault must be a boolean (true or false).');
+        }
+
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
       }
 
