@@ -1614,6 +1614,146 @@ exports.badConcatNullYieldsNull = function(test) {
   test.done();
 };
 
+var testCursorCloseOnCommit = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableCursorCloseOnCommit = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var cursorCloseOnCommitOptionValue = 4;
+  var request = new Request(
+    `SELECT (${cursorCloseOnCommitOptionValue} & @@OPTIONS) AS CURSOR_CLOSE_ON_COMMIT;`,
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_NULL default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true) {
+      expectedValue = cursorCloseOnCommitOptionValue;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testCursorCloseOnCommitDefault = function(test) {
+  testCursorCloseOnCommit(test, undefined);
+};
+
+exports.testCursorCloseOnCommitOn = function(test) {
+  testCursorCloseOnCommit(test, true);
+};
+
+exports.testCursorCloseOnCommitOff = function(test) {
+  testCursorCloseOnCommit(test, false);
+};
+
+exports.badCursorCloseOnCommit = function(test) {
+  var config = getConfig();
+  config.options.enableCursorCloseOnCommit = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testImplicitTransactions = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableImplicitTransactions = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var implicitTransactionsOptionValue = 2;
+  var request = new Request(
+    `SELECT (${implicitTransactionsOptionValue} & @@OPTIONS) AS IMPLICIT_TRANSACTIONS;`,
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_NULL default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true) {
+      expectedValue = implicitTransactionsOptionValue;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testImplicitTransactionsDefault = function(test) {
+  testImplicitTransactions(test, undefined);
+};
+
+exports.testImplicitTransactionsOn = function(test) {
+  testImplicitTransactions(test, true);
+};
+
+exports.testImplicitTransactionsOff = function(test) {
+  testImplicitTransactions(test, false);
+};
+
+exports.badImplicitTransactions = function(test) {
+  var config = getConfig();
+  config.options.enableImplicitTransactions = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
 var testLanguage = function(test, language) {
   language = language || 'us_english';
   test.expect(3);
