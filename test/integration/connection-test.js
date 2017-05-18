@@ -1202,3 +1202,493 @@ exports.badDatefirst = function(test) {
 
   test.done();
 };
+
+var testQuotedIdentifier = function(test, setting) {
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableQuotedIdentifier = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'QUOTED_IDENTIFIER\') AS QuotedIdentifierSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current QUOTED_IDENTIFIER default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true || setting === undefined) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testQuotedIdentifierDefault = function(test) {
+  testQuotedIdentifier(test, undefined);
+};
+
+exports.testQuotedIdentifierOn = function(test) {
+  testQuotedIdentifier(test, true);
+};
+
+exports.testQuotedIdentifierOff = function(test) {
+  testQuotedIdentifier(test, false);
+};
+
+exports.badQuotedIdentifier = function(test) {
+  var config = getConfig();
+  config.options.enableQuotedIdentifier = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testNumericRoundAbort = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableNumericRoundabort = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'NUMERIC_ROUNDABORT\') AS NumericRoundabortSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current NUMERIC_ROUNDABORT default setting in Tedious is OFF
+    var expectedValue;
+    if (setting === true) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testNumericRoundabortDefault = function(test) {
+  testNumericRoundAbort(test, undefined);
+};
+
+exports.testNumericRoundabortOn = function(test) {
+  testNumericRoundAbort(test, true);
+};
+
+exports.testNumericRoundabortOff = function(test) {
+  testNumericRoundAbort(test, false);
+};
+
+exports.badNumericRoundabort = function(test) {
+  var config = getConfig();
+  config.options.enableNumericRoundabort = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testAnsiWarnings = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableAnsiWarnings = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'ANSI_WARNINGS\') AS AnsiWarningsSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_WARNINGS default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true || setting === undefined) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testAnsiWarningsDefault = function(test) {
+  testAnsiWarnings(test, undefined);
+};
+
+exports.testAnsiWarningsOn = function(test) {
+  testAnsiWarnings(test, true);
+};
+
+exports.testAnsiWarningsOff = function(test) {
+  testAnsiWarnings(test, false);
+};
+
+exports.badAnsiWarnings = function(test) {
+  var config = getConfig();
+  config.options.enableAnsiWarnings = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testAnsiPadding = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableAnsiPadding = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'ANSI_PADDING\') AS AnsiPaddingSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_PADDING default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true || setting === undefined) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testAnsiPaddingDefault = function(test) {
+  testAnsiPadding(test, undefined);
+};
+
+exports.testAnsiPaddingOn = function(test) {
+  testAnsiPadding(test, true);
+};
+
+exports.testAnsiPaddingOff = function(test) {
+  testAnsiPadding(test, false);
+};
+
+exports.badAnsiPadding = function(test) {
+  var config = getConfig();
+  config.options.enableAnsiPadding = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testAnsiNull = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableAnsiNull = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'ANSI_NULLS\') AS AnsiNullSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_NULL default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true || setting === undefined) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testAnsiNullDefault = function(test) {
+  testAnsiNull(test, undefined);
+};
+
+exports.testAnsiNullOn = function(test) {
+  testAnsiNull(test, true);
+};
+
+exports.testAnsiNullOff = function(test) {
+  testAnsiNull(test, false);
+};
+
+exports.badAnsiNull = function(test) {
+  var config = getConfig();
+  config.options.enableAnsiNull = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testConcatNullYieldsNull = function(test, setting) {
+  test.expect(5);
+  var config = getConfig();
+  if (typeof setting === 'boolean') {
+    config.options.enableConcatNullYieldsNull = setting;
+  }
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT SESSIONPROPERTY(\'CONCAT_NULL_YIELDS_NULL\') AS ConcatNullYieldsNullSetting',
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    // The current ANSI_NULL default setting in Tedious is ON
+    var expectedValue;
+    if (setting === true || setting === undefined) {
+      expectedValue = 1;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+exports.testConcatNullYieldsNullDefault = function(test) {
+  testConcatNullYieldsNull(test, undefined);
+};
+
+exports.testConcatNullYieldsNullOn = function(test) {
+  testConcatNullYieldsNull(test, true);
+};
+
+exports.testConcatNullYieldsNullOff = function(test) {
+  testConcatNullYieldsNull(test, false);
+};
+
+exports.badConcatNullYieldsNull = function(test) {
+  var config = getConfig();
+  config.options.enableConcatNullYieldsNull = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+var testLanguage = function(test, language) {
+  language = language || 'us_english';
+  test.expect(3);
+  var config = getConfig();
+  config.options.language = language;
+
+  var connection = new Connection(config);
+
+  var request = new Request('select @@language', function(err) {
+    test.ifError(err);
+    connection.close();
+  });
+
+  request.on('row', function(columns) {
+    var languageActual = columns[0].value;
+    test.strictEqual(languageActual, language);
+  });
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+// Test that the default setting for LANGUAGE is us_english
+exports.testLanguageDefault = function(test) {
+  testLanguage(test, undefined);
+};
+
+// Test that the LANGUAGE setting can be changed via an optional configuration
+exports.testLanguageCustom = function(test) {
+  testLanguage(test, 'Deutsch');
+};
+
+var testDateFormat = function(test, dateFormat) {
+  dateFormat = dateFormat || 'mdy';
+  test.expect(3);
+  var config = getConfig();
+  config.options.dateFormat = dateFormat;
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT DATE_FORMAT FROM sys.dm_exec_sessions WHERE SESSION_ID = @@SPID ',
+    function(err) {
+      test.ifError(err);
+      connection.close();
+    }
+  );
+
+  request.on('row', function(columns) {
+    var dateFormatActual = columns[0].value;
+    test.strictEqual(dateFormatActual, dateFormat);
+  });
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+// Test that the default setting for DATEFORMAT is mdy
+exports.testDateFormatDefault = function(test) {
+  testDateFormat(test, undefined);
+};
+
+// Test that the DATEFORMAT setting can be changed via an optional configuration
+exports.testDateFormatCustom = function(test) {
+  testDateFormat(test, 'dmy');
+};
