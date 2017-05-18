@@ -1614,14 +1614,16 @@ exports.badConcatNullYieldsNull = function(test) {
   test.done();
 };
 
-var testBooleanConfigOption = function (test, config, optionFlag, setting, defaultOn) {
+var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag, defaultOn) {
   test.expect(5);
 
+  var config = getConfig();
+  config.options[optionName] = optionValue;
   var connection = new Connection(config);
 
   var request = new Request(
     `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
-    function (err, rowCount) {
+    function(err, rowCount) {
       test.ifError(err);
       test.strictEqual(rowCount, 1);
 
@@ -1629,15 +1631,15 @@ var testBooleanConfigOption = function (test, config, optionFlag, setting, defau
     }
   );
 
-  request.on('columnMetadata', function (columnsMetadata) {
+  request.on('columnMetadata', function(columnsMetadata) {
     test.strictEqual(Object.keys(columnsMetadata).length, 1);
   });
 
-  request.on('row', function (columns) {
+  request.on('row', function(columns) {
     test.strictEqual(Object.keys(columns).length, 1);
 
     var expectedValue;
-    if (setting === true || (setting === undefined && defaultOn)) {
+    if (optionValue === true || (optionValue === undefined && defaultOn)) {
       expectedValue = optionFlag;
     } else {
       expectedValue = 0;
@@ -1646,93 +1648,56 @@ var testBooleanConfigOption = function (test, config, optionFlag, setting, defau
     test.strictEqual(columns[0].value, expectedValue);
   });
 
-  connection.on('connect', function (err) {
+  connection.on('connect', function(err) {
     connection.execSql(request);
   });
 
-  connection.on('end', function (info) {
+  connection.on('end', function(info) {
     test.done();
   });
 };
 
-var testBadBooleanConfigOption = function (test, config) {
-  test.throws(function () {
+var testBadBooleanConfigOption = function(test, optionName) {
+  var config = getConfig();
+  config.options[optionName] = 'on';
+
+  test.throws(function() {
     new Connection(config);
   });
 
   test.done();
 };
 
-exports.testCursorCloseOnCommitDefault = function (test) {
-  var config = getConfig();
-  var optionFlag = 4;
-  var setting = undefined;
-  var defaultOn = false;
-
-  config.options.enableCursorCloseOnCommit = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, false);
+exports.testCursorCloseOnCommitDefault = function(test) {
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', undefined, 4, false);
 };
 
 exports.testCursorCloseOnCommitOn = function(test) {
-  var config = getConfig();
-  var optionFlag = 4;
-  var setting = true;
-  var defaultOn = false;
-
-  config.options.enableCursorCloseOnCommit = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, false);
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', true, 4, false);
 };
 
 exports.testCursorCloseOnCommitOff = function(test) {
-  var config = getConfig();
-  var optionFlag = 4;
-  var setting = false;
-  var defaultOn = false;
-
-  config.options.enableCursorCloseOnCommit = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, false);
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', false, 4, false);
 };
 
 exports.badCursorCloseOnCommit = function(test) {
-  var config = getConfig();
-  config.options.enableCursorCloseOnCommit = 'on';
-  testBadBooleanConfigOption(test, config);
+  testBadBooleanConfigOption(test, 'enableCursorCloseOnCommit');
 };
 
 exports.testImplicitTransactionsDefault = function(test) {
-  var config = getConfig();
-  var optionFlag = 2;
-  var setting = undefined;
-  var defaultOn = false;
-
-  config.options.enableImplicitTransactions = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
+  testBooleanConfigOption(test, 'enableImplicitTransactions', undefined, 2, false);
 };
 
 exports.testImplicitTransactionsOn = function(test) {
-  var config = getConfig();
-  var optionFlag = 2;
-  var setting = true;
-  var defaultOn = false;
-
-  config.options.enableImplicitTransactions = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
+  testBooleanConfigOption(test, 'enableImplicitTransactions', true, 2, false);
 };
 
 exports.testImplicitTransactionsOff = function(test) {
-  var config = getConfig();
-  var optionFlag = 2;
-  var setting = false;
-  var defaultOn = false;
-
-  config.options.enableImplicitTransactions = setting;
-  testBooleanConfigOption(test, config, optionFlag, setting, defaultOn);
+  testBooleanConfigOption(test, 'enableImplicitTransactions', false, 2, false);
 };
 
 exports.badImplicitTransactions = function(test) {
-  var config = getConfig();
-  config.options.enableImplicitTransactions = 'on';
-  testBadBooleanConfigOption(test, config);
+  testBadBooleanConfigOption(test, 'enableImplicitTransactions');
 };
 
 var testLanguage = function(test, language) {
