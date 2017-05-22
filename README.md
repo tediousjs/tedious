@@ -40,6 +40,13 @@ Google Group - http://groups.google.com/group/node-tedious
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
+## Developer Survey
+
+We'd like to learn more about how you use tedious:
+
+<a href="https://aka.ms/j5twwp">Take the survey!</a>
+
+
 <a name="license"></a>
 ## Licence
 
