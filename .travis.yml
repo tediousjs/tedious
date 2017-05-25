@@ -51,4 +51,6 @@ jobs:
   include:
     - stage: release
       node_js: 7
+      before_install: skip
+      before_script: skip
       script: npm run semantic-release || true
