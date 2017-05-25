@@ -51,4 +51,4 @@ jobs:
   include:
     - stage: release
       node_js: 7
-      script: npm run semantic-release
+      script: npm run semantic-release || true
