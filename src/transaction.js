@@ -48,7 +48,7 @@ class Transaction {
     return {
       data: buffer.data,
       toString: () => {
-        return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
+        return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + (isolationLevelByValue[this.isolationLevel] || this.isolationLevel);
       }
     };
   }
