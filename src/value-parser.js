@@ -335,7 +335,8 @@ function valueParse(parser, metaData, options, callback) {
                     valueMetaData.collation = collation;
                     if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
                       return readDataLength(parser, valueMetaData.type, {}, null, (maxDataLength) => {
-                        valueMetaData.dataLength = maxDataLength;
+                        // skip the 2-byte max length sent for BIGVARCHRTYPE, BIGCHARTYPE, NVARCHARTYPE, NCHARTYPE, BIGVARBINTYPE and BIGBINARYTYPE types 
+                        // and parse based on the length of actual data 
                         return valueParse(parser, valueMetaData, options, callback);
                       });
                     } else {
