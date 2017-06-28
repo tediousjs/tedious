@@ -506,6 +506,10 @@ exports.variantVarChar = function(test) {
   execSql(test, "select cast('abc' as sql_variant)", 'abc', '7_2');
 };
 
+exports.variantVarChar2 = function(test) {
+  execSql(test, "select SERVERPROPERTY('LicenseType') as LicenseType", 'DISABLED', '7_2');
+};
+
 exports.variantVarBin = function(test) {
   execSql(
     test,
