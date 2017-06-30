@@ -1286,7 +1286,8 @@ const TYPE = module.exports.TYPE = {
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        time = ( time + ( ref * 1000 ) ) * Math.pow( 10, parameter.scale - 3 )
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1416,7 +1417,8 @@ const TYPE = module.exports.TYPE = {
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        time = ( time + ( ref * 1000 ) ) * Math.pow( 10, parameter.scale - 3 )
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1503,7 +1505,8 @@ const TYPE = module.exports.TYPE = {
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = (+time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        time = ( time + ( ref * 1000 ) ) * Math.pow( 10, parameter.scale - 3 )
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
