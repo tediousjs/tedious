@@ -1506,7 +1506,7 @@ const TYPE = module.exports.TYPE = {
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = (time+(ref*1000))* Math.pow(10, parameter.scale - 3);
+        time = (time + (ref * 1000)) * Math.pow(10, parameter.scale - 3);
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
