@@ -1280,13 +1280,25 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        let time = new Date(+parameter.value),
+            scale = parameter.scale - 3;
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = (time + (ref * 1000));
+        while (scale > 0)
+        {
+            time = time * 10;
+            scale--;
+        }
+        while (scale < 0)
+        {
+            time = time / 10;
+            scale++;
+        }
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1410,13 +1422,25 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        let time = new Date(+parameter.value),
+            scale = parameter.scale - 3;
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = (time + (ref * 1000));
+        while (scale > 0)
+        {
+            time = time * 10;
+            scale--;
+        }
+        while (scale < 0)
+        {
+            time = time / 10;
+            scale++;
+        }
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1499,11 +1523,23 @@ const TYPE = module.exports.TYPE = {
     },
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const ref = parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0;
+        let time = new Date(+parameter.value),
+            scale = parameter.scale - 3;
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = (+time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = (time + (ref * 1000));
+        while (scale > 0)
+        {
+            time = time * 10;
+            scale--;
+        }
+        while (scale < 0)
+        {
+            time = time / 10;
+            scale++;
+        }
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
