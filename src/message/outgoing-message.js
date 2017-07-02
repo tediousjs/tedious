@@ -39,7 +39,7 @@ module.exports = class OutgoingMessage extends Transform {
       this.transformNextPacket();
     }
 
-    process.nextTick(callback);
+    callback();
   }
 
   logPacket(packet) {
@@ -62,6 +62,6 @@ module.exports = class OutgoingMessage extends Transform {
 
   _flush(callback) {
     this.transformNextPacket(true);
-    process.nextTick(callback);
+    callback();
   }
 };
