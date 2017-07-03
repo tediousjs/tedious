@@ -1280,13 +1280,14 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        let time = new Date(+parameter.value);
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = Math.round(time * Math.pow(10, parameter.scale - 3));
+        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1410,13 +1411,14 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        let time = new Date(+parameter.value);
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = Math.round(time * Math.pow(10, parameter.scale - 3));
+        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1499,11 +1501,12 @@ const TYPE = module.exports.TYPE = {
     },
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        let time = new Date(+parameter.value);
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = (+time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+        time = Math.round(time * Math.pow(10, parameter.scale - 3));
+        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
