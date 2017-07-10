@@ -542,7 +542,13 @@ exports.variantMultipleDatatypes = function(test) {
   insert into #tab1 ([c1]) select cast('abcde' as varchar(10));
   select [c1] from #tab1 ORDER BY [c0];
   `;
-  const expectedValues = ['abcdШ', 3148.29, new Buffer([0x12, 0x34]), '01234567-89AB-CDEF-0123-456789ABCDEF', 0.00000090000000000, new Date('December 4, 2011 10:04:23 GMT'), 'abcde'];
+  const expectedValues = ['abcdШ',
+    3148.29,
+    new Buffer([0x12, 0x34]),
+    '01234567-89AB-CDEF-0123-456789ABCDEF',
+    0.00000090000000000,
+    new Date('December 4, 2011 10:04:23 GMT'),
+    'abcde'];
   execSql(test, sql, expectedValues);
 };
 
