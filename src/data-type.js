@@ -1315,10 +1315,30 @@ const TYPE = module.exports.TYPE = {
       if (value instanceof Date) {
         return value;
       }
-      value = Date.parse(value);
-      if (isNaN(value)) {
+      var dateValue = Date.parse(value);
+      if (!isNaN(dateValue)) {
+        return dateValue;
+      }
+      var timespan = (function(input) {
+        var regex = /^([0-9]{1}|(?:0[0-9]|1[0-9]|2[0-3])+):([0-5]?[0-9])(?::([0-5]?[0-9])(?:\.(\d{1,9}))?)?$/;
+        var result = (regex.exec(input) || []).slice(1, 5);
+
+        if (result[0] == null) {
+          return null;
+        }
+
+        return {
+          hours: result[0] || 0,
+          minutes: result[1] || 0,
+          seconds: result[2] || 0,
+          milliseconds: result[3] || 0
+        };
+      })(value);
+
+      if (timespan == null) {
         return new TypeError('Invalid time.');
       }
+      value = new Date(0, 0, 0, timespan.hours, timespan.minutes, timespan.seconds, timespan.milliseconds);
       return value;
     }
   },
