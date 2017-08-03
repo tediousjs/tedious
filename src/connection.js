@@ -22,6 +22,7 @@ const SspiModuleSupported = require('sspi-client').ModuleSupported;
 const SspiClientApi = require('sspi-client').SspiClientApi;
 const Fqdn = require('sspi-client').Fqdn;
 const MakeSpn = require('sspi-client').MakeSpn;
+const Kerberos = require('../../kerberos/lib/kerberos.js').Kerberos;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -271,6 +272,10 @@ class Connection extends EventEmitter {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
+    if (this.config.domain && process.platform === 'linux') {
+      this.config.options.useKerberosIntegratedAuth = true;
+    }
+
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
@@ -284,7 +289,7 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
-    this.sspiClientResponsePending = false;
+    this.gssClientResponsePending = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -810,7 +815,7 @@ class Connection extends EventEmitter {
 
         this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
 
-        this.sspiClientResponsePending = true;
+        this.gssClientResponsePending = true;
         this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
           if (errorCode) {
             this.emit('error', new Error(errorString));
@@ -822,12 +827,34 @@ class Connection extends EventEmitter {
             return this.close();
           }
 
-          this.sspiClientResponsePending = false;
+          this.gssClientResponsePending = false;
           sendPayload.call(this, clientResponse);
           cb();
         });
       });
-    } else {
+    } else if (this.config.options.useKerberosIntegratedAuth) {
+      this.kerberos = new Kerberos();
+      const spn = 'MSSQLSvc/' + this.config.server;
+      this.gssClientResponsePending = true;
+      this.kerberos.authGSSClientInitDefault(spn, Kerberos.GSS_C_MUTUAL_FLAG | Kerberos.GSS_C_INTEG_FLAG, (err, context) => {
+        if (err) {
+          this.emit('error', new Error(err.toString()));
+          return this.close();
+        }
+
+        this.kerberos.authGSSClientStep(context, '', (err, result) => {
+          if (err) {
+            this.emit('error', new Error(err.toString()));
+            return this.close();
+          }
+          this.context = context;
+          this.gssClientResponsePending = false;
+          sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
+          cb();
+        });
+      });
+    }
+    else {
       sendPayload.call(this);
       process.nextTick(cb);
     }
@@ -835,7 +862,7 @@ class Connection extends EventEmitter {
 
   sendNTLMResponsePacket() {
     if (this.sspiClient) {
-      this.sspiClientResponsePending = true;
+      this.gssClientResponsePending = true;
 
       this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
 
@@ -844,7 +871,7 @@ class Connection extends EventEmitter {
           return this.close();
         }
 
-        this.sspiClientResponsePending = false;
+        this.gssClientResponsePending = false;
 
         if (clientResponse.length) {
           this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
@@ -857,6 +884,19 @@ class Connection extends EventEmitter {
           this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
         }
       });
+    } else if (this.kerberos) {
+      this.gssClientResponsePending = true;
+      this.kerberos.authGSSClientStep(this.context,
+        this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
+          if (err) {
+            this.emit('error', new Error(err.toString()));
+            return this.close();
+          }
+            // TODO: verify if result retued is GSS_C_COMPLETE
+            // if GSS_C_COMPLETE there is no Response to send back, should driver transition to someother state?
+          this.gssClientResponsePending = false;
+          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        });
     } else {
       const payload = new NTLMResponsePayload({
         domain: this.config.domain,
@@ -1359,7 +1399,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        if (this.sspiClientResponsePending) {
+        if (this.gssClientResponsePending) {
           // We got data from the server while we're waiting for getNextBlob()
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
@@ -1377,7 +1417,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        if (this.sspiClientResponsePending) {
+        if (this.gssClientResponsePending) {
           // We got data from the server while we're waiting for getNextBlob()
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
