@@ -848,6 +848,8 @@ class Connection extends EventEmitter {
             return this.close();
           }
           this.context = context;
+          //TODO: verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
+          //TODO: consider posiblity of using gss_delete_sec_context dung connection close/failure
           this.gssClientResponsePending = false;
           sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
           cb();
@@ -896,6 +898,7 @@ class Connection extends EventEmitter {
             // if GSS_C_COMPLETE there is no Response to send back, should driver transition to someother state?
           this.gssClientResponsePending = false;
           this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+          //TODO: destroy context
         });
     } else {
       const payload = new NTLMResponsePayload({
