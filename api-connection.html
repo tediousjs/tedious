@@ -618,9 +618,13 @@ var connection = new Connection(config);
   Execute the SQL represented by <code>request</code>.
 </p>
 <p>
-  As <code>sp_executesql</code> is used to execute the SQL,
-  if the same SQL is executed multiples times using this function,
-  the SQL Server query optimizer is likely to reuse the execution plan it generates for the first execution.
+  As <code>sp_executesql</code> is used to execute the SQL, if the same SQL is executed multiples times 
+  using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates 
+  for the first execution.  This may also result in SQL server treating the request like a stored procedure 
+  which can result in the <a href="api-request.html#event_doneInProc"><code>doneInProc</code></a> or 
+  <a href="api-request.html#event_doneProc"><code>doneProc</code></a> events being emitted instead of the 
+  <a href="api-request.html#event_done"><code>done</code></a> event you might expect.  Using 
+  <code>execSqlBatch</code> will prevent this from occurring but may have a negative performance impact.
 </p>
 <p>
   Beware of the way that scoping rules apply, and how they may
