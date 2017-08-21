@@ -848,7 +848,13 @@ class Connection extends EventEmitter {
             return this.close();
           }
           this.context = context;
-          //TODO: verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
+
+          // //verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
+          // if (!((null != result) && ('number' === typeof (result)) && (0 === result /* GSS_S_CONTINUE_NEEDED */))) {
+          //   this.emit('error', new Error('Expected GSS_S_CONTINUE_NEEDED flag not received, kerberos authentication failed'));
+          //   return this.close();
+          // }
+
           //TODO: consider posiblity of using gss_delete_sec_context dung connection close/failure
           this.gssClientResponsePending = false;
           sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
@@ -886,20 +892,6 @@ class Connection extends EventEmitter {
           this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
         }
       });
-    } else if (this.kerberos) {
-      this.gssClientResponsePending = true;
-      this.kerberos.authGSSClientStep(this.context,
-        this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
-          if (err) {
-            this.emit('error', new Error(err.toString()));
-            return this.close();
-          }
-            // TODO: verify if result retued is GSS_C_COMPLETE
-            // if GSS_C_COMPLETE there is no Response to send back, should driver transition to someother state?
-          this.gssClientResponsePending = false;
-          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-          //TODO: destroy context
-        });
     } else {
       const payload = new NTLMResponsePayload({
         domain: this.config.domain,
@@ -973,6 +965,42 @@ class Connection extends EventEmitter {
   processLogin7NTLMAck() {
     if (this.loggedIn) {
       return this.dispatchEvent('loggedIn');
+    } else {
+      if (this.loginError) {
+        this.emit('connect', this.loginError);
+      } else {
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+      }
+      return this.dispatchEvent('loginFailed');
+    }
+  }
+
+  processLogin7KerberosResponse() {
+    if (this.loggedIn) {
+      return this.dispatchEvent('loggedIn');
+    }
+    else if (this.ntlmpacket && this.kerberos) {
+      this.gssClientResponsePending = true;
+      this.kerberos.authGSSClientStep(this.context,
+      this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
+        if (err) {
+          this.emit('error', new Error(err.toString()));
+          return this.close();
+        }
+
+        // //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
+        // if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
+        //   this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
+        //   return this.close();
+        // }
+
+        this.gssClientResponsePending = false;
+
+        // clear the ntlmpacket
+        delete this.ntlmpacketBuffer;
+        delete this.ntlmpacket;
+        //TODO: destroy context
+      });
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
@@ -1291,7 +1319,9 @@ Connection.prototype.STATE = {
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
-          if (this.config.domain) {
+          if (this.config.domain && this.config.options.useKerberosIntegratedAuth) {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_KERBEROS);
+          } else if (this.config.domain) {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1356,7 +1386,9 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
+            if (this.config.domain && this.config.options.useKerberosIntegratedAuth) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_KERBEROS);
+            } else if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1456,6 +1488,39 @@ Connection.prototype.STATE = {
       },
       message: function() {
         return this.processLogin7NTLMAck();
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_KERBEROS: {
+    name: 'SentLogin7WithKerberosLogin',
+    events: {
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        if (this.gssClientResponsePending) {
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {
+          return this.sendDataToTokenStreamParser(data);
+        }
+      },
+      loggedIn: function() {
+        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      },
+      loginFailed: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      message: function() {
+        if (this.gssClientResponsePending) {
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {
+          return this.processLogin7KerberosResponse();
+        }
       }
     }
   },
