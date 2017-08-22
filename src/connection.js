@@ -322,23 +322,34 @@ class Connection extends EventEmitter {
 
   cleanupConnection(cleanupTypeEnum) {
     if (!this.closed) {
-      this.clearConnectTimer();
-      this.clearRequestTimer();
-      this.clearRetryTimer();
-      this.closeConnection();
-      if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
-        this.emit('rerouting');
-      } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-        this.emit('end');
+      const cleanConnection = () => {
+          this.clearConnectTimer();
+          this.clearRequestTimer();
+          this.clearRetryTimer();
+          this.closeConnection();
+
+          if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
+          this.emit('rerouting');
+        } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
+          this.emit('end');
+        }
+          if (this.request) {
+          const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+          this.request.callback(err);
+          this.request = undefined;
+        }
+          this.closed = true;
+          this.loggedIn = false;
+          return this.loginError = null;
+        };
+
+      // clean kerberos security context
+      if (this.kerberos) {
+        this.kerberos.authGSSClientClean(this.context, () => {cleanConnection();});
       }
-      if (this.request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
-        this.request = undefined;
+      else {
+        cleanConnection();
       }
-      this.closed = true;
-      this.loggedIn = false;
-      return this.loginError = null;
     }
   }
 
