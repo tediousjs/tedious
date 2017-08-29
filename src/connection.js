@@ -22,7 +22,7 @@ const SspiModuleSupported = require('sspi-client').ModuleSupported;
 const SspiClientApi = require('sspi-client').SspiClientApi;
 const Fqdn = require('sspi-client').Fqdn;
 const MakeSpn = require('sspi-client').MakeSpn;
-const Kerberos = require('../../kerberos/lib/kerberos.js').Kerberos;
+const Kerberos = require('kerberos').Kerberos;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -323,25 +323,25 @@ class Connection extends EventEmitter {
   cleanupConnection(cleanupTypeEnum) {
     if (!this.closed) {
       const cleanConnection = () => {
-          this.clearConnectTimer();
-          this.clearRequestTimer();
-          this.clearRetryTimer();
-          this.closeConnection();
+        this.clearConnectTimer();
+        this.clearRequestTimer();
+        this.clearRetryTimer();
+        this.closeConnection();
 
-          if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
+        if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
           this.emit('rerouting');
         } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-          this.emit('end');
-        }
-          if (this.request) {
+            this.emit('end');
+          }
+        if (this.request) {
           const err = RequestError('Connection closed before request completed.', 'ECLOSE');
           this.request.callback(err);
           this.request = undefined;
         }
-          this.closed = true;
-          this.loggedIn = false;
-          return this.loginError = null;
-        };
+        this.closed = true;
+        this.loggedIn = false;
+        return this.loginError = null;
+      };
 
       // clean kerberos security context
       if (this.kerberos) {
