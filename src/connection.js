@@ -331,8 +331,8 @@ class Connection extends EventEmitter {
         if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
           this.emit('rerouting');
         } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-            this.emit('end');
-          }
+          this.emit('end');
+        }
         if (this.request) {
           const err = RequestError('Connection closed before request completed.', 'ECLOSE');
           this.request.callback(err);
@@ -345,7 +345,7 @@ class Connection extends EventEmitter {
 
       // clean kerberos security context
       if (this.kerberos) {
-        this.kerberos.authGSSClientClean(this.context, () => {cleanConnection();});
+        this.kerberos.authGSSClientClean(this.context, () => { cleanConnection(); });
       }
       else {
         cleanConnection();
@@ -993,25 +993,25 @@ class Connection extends EventEmitter {
     else if (this.ntlmpacket && this.kerberos) {
       this.gssClientResponsePending = true;
       this.kerberos.authGSSClientStep(this.context,
-      this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
-        if (err) {
-          this.emit('error', new Error(err.toString()));
-          return this.close();
-        }
+        this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
+          if (err) {
+            this.emit('error', new Error(err.toString()));
+            return this.close();
+          }
 
-        // //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
-        // if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
-        //   this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
-        //   return this.close();
-        // }
+          // //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
+          // if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
+          //   this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
+          //   return this.close();
+          // }
 
-        this.gssClientResponsePending = false;
+          this.gssClientResponsePending = false;
 
-        // clear the ntlmpacket
-        delete this.ntlmpacketBuffer;
-        delete this.ntlmpacket;
-        //TODO: destroy context
-      });
+          // clear the ntlmpacket
+          delete this.ntlmpacketBuffer;
+          delete this.ntlmpacket;
+          //TODO: destroy context
+        });
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
@@ -1351,7 +1351,7 @@ Connection.prototype.STATE = {
       return this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
@@ -1370,7 +1370,7 @@ Connection.prototype.STATE = {
       return this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
