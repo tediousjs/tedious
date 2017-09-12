@@ -3,7 +3,7 @@
 
 
 
-Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
+Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
 
 **NOTE: New columns are nullable by default as of version 1.11.0**
@@ -27,6 +27,12 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
 
     npm install tedious
 
+## Getting Started
+- [Node.js + macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
+- [Node.js + Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
+- [Node.js + SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
+- [Node.js + Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
+- [Node.js + Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
 
 <a name="documentation"></a>
 ## Documentation
@@ -39,6 +45,13 @@ Google Group - http://groups.google.com/group/node-tedious
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
+
+## Developer Survey
+
+We'd like to learn more about how you use tedious:
+
+<a href="https://aka.ms/j5twwp">Take the survey!</a>
+
 
 <a name="license"></a>
 ## Licence
