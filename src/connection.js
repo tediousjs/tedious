@@ -74,7 +74,7 @@ class Connection extends EventEmitter {
         },
         enableArithAbort: false,
         enableAnsiNullDefault: true,
-        encrypt: false,
+        encrypt: undefined,
         fallbackToDefaultDb: false,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
@@ -726,7 +726,9 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+      if (typeof this.routingData !== 'undefined') {
+        this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+      }
       return this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.server;
@@ -764,12 +766,15 @@ class Connection extends EventEmitter {
     });
 
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-      if (!this.config.options.encrypt) {
+      if (this.config.options.encrypt === false) {
         this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
         return this.close();
+      } else if (typeof this.config.options.encrypt === 'undefined') {
+        this.config.options.encrypt = true;
+        return this.transitionTo(this.STATE.REROUTING);
+      } else {
+        return this.dispatchEvent('tls');
       }
-
-      return this.dispatchEvent('tls');
     } else {
       return this.dispatchEvent('noTls');
     }

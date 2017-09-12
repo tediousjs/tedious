@@ -14,8 +14,7 @@ var config = {
       token: false,
       log: true
     },
-    database: 'DBName',
-    encrypt: true // for Azure users
+    database: 'DBName'
   }
   */
 };
