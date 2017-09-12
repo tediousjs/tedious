@@ -1146,67 +1146,6 @@ exports.disableAnsiNullDefault = function(test) {
   }); // Cannot insert the value NULL
 };
 
-var testArithAbort = function(test, setting) {
-  test.expect(5);
-  var config = getConfig();
-  if (typeof setting === 'boolean') {
-    config.options.enableArithAbort = setting;
-  }
-
-  var request = new Request(
-    "SELECT SESSIONPROPERTY('ARITHABORT') AS ArithAbortSetting",
-    function(err, rowCount) {
-      test.ifError(err);
-      test.strictEqual(rowCount, 1);
-
-      connection.close();
-    }
-  );
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(Object.keys(columnsMetadata).length, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(Object.keys(columns).length, 1);
-    // The current ARITHABORT default setting in Tedious is OFF
-    test.strictEqual(columns[0].value, setting === true ? 1 : 0);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-};
-
-exports.testArithAbortDefault = function(test) {
-  testArithAbort(test, undefined);
-};
-
-exports.testArithAbortOn = function(test) {
-  testArithAbort(test, true);
-};
-
-exports.testArithAbortOff = function(test) {
-  testArithAbort(test, false);
-};
-
-exports.badArithAbort = function(test) {
-  var config = getConfig();
-  config.options.enableArithAbort = 'on';
-
-  test.throws(function() {
-    new Connection(config);
-  });
-
-  test.done();
-};
-
 var testDateFirstImpl = (test, datefirst) => {
   datefirst = datefirst || 7;
   test.expect(3);
@@ -1256,4 +1195,314 @@ exports.badDatefirst = function(test) {
   });
 
   test.done();
+};
+
+
+var testLanguage = function(test, language) {
+  language = language || 'us_english';
+  test.expect(3);
+  var config = getConfig();
+  config.options.language = language;
+
+  var connection = new Connection(config);
+
+  var request = new Request('select @@language', function(err) {
+    test.ifError(err);
+    connection.close();
+  });
+
+  request.on('row', function(columns) {
+    var languageActual = columns[0].value;
+    test.strictEqual(languageActual, language);
+  });
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+// Test that the default setting for LANGUAGE is us_english
+exports.testLanguageDefault = function(test) {
+  testLanguage(test, undefined);
+};
+
+// Test that the LANGUAGE setting can be changed via an optional configuration
+exports.testLanguageCustom = function(test) {
+  testLanguage(test, 'Deutsch');
+};
+
+var testDateFormat = function(test, dateFormat) {
+  dateFormat = dateFormat || 'mdy';
+  test.expect(3);
+  var config = getConfig();
+  config.options.dateFormat = dateFormat;
+
+  var connection = new Connection(config);
+
+  var request = new Request(
+    'SELECT DATE_FORMAT FROM sys.dm_exec_sessions WHERE SESSION_ID = @@SPID ',
+    function(err) {
+      test.ifError(err);
+      connection.close();
+    }
+  );
+
+  request.on('row', function(columns) {
+    var dateFormatActual = columns[0].value;
+    test.strictEqual(dateFormatActual, dateFormat);
+  });
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+// Test that the default setting for DATEFORMAT is mdy
+exports.testDateFormatDefault = function(test) {
+  testDateFormat(test, undefined);
+};
+
+// Test that the DATEFORMAT setting can be changed via an optional configuration
+exports.testDateFormatCustom = function(test) {
+  testDateFormat(test, 'dmy');
+};
+
+var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag, defaultOn) {
+  test.expect(5);
+
+  var config = getConfig();
+  config.options[optionName] = optionValue;
+  var connection = new Connection(config);
+
+  var request = new Request(
+    `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
+    function(err, rowCount) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 1);
+
+      connection.close();
+    }
+  );
+
+  request.on('columnMetadata', function(columnsMetadata) {
+    test.strictEqual(Object.keys(columnsMetadata).length, 1);
+  });
+
+  request.on('row', function(columns) {
+    test.strictEqual(Object.keys(columns).length, 1);
+
+    var expectedValue;
+    if (optionValue === true || (optionValue === undefined && defaultOn)) {
+      expectedValue = optionFlag;
+    } else {
+      expectedValue = 0;
+    }
+
+    test.strictEqual(columns[0].value, expectedValue);
+  });
+
+  connection.on('connect', function(err) {
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+};
+
+var testBadBooleanConfigOption = function(test, optionName) {
+  var config = getConfig();
+  config.options[optionName] = 'on';
+
+  test.throws(function() {
+    new Connection(config);
+  });
+
+  test.done();
+};
+
+exports.testAnsiNullDefault = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNull', undefined, 32, true);
+};
+
+exports.testAnsiNullOn = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNull', true, 32, true);
+};
+
+exports.testAnsiNullOff = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNull', false, 32, true);
+};
+
+exports.badAnsiNull = function(test) {
+  testBadBooleanConfigOption(test, 'enableAnsiNull');
+};
+
+exports.testAnsiNullDefaultDefault = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNullDefault', undefined, 1024, true);
+};
+
+exports.testAnsiNullDefaultOn = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNullDefault', true, 1024, true);
+};
+
+exports.testAnsiNullDefaultOff = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiNullDefault', false, 1024, true);
+};
+
+exports.badAnsiNullDefault = function(test) {
+  testBadBooleanConfigOption(test, 'enableAnsiNullDefault');
+};
+
+exports.testAnsiPaddingDefault = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiPadding', undefined, 16, true);
+};
+
+exports.testAnsiPaddingOn = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiPadding', true, 16, true);
+};
+
+exports.testAnsiPaddingOff = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiPadding', false, 16, true);
+};
+
+exports.badAnsiPadding = function(test) {
+  testBadBooleanConfigOption(test, 'enableAnsiPadding');
+};
+
+exports.testAnsiWarningsDefault = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiWarnings', undefined, 8, true);
+};
+
+exports.testAnsiWarningsOn = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiWarnings', true, 8, true);
+};
+
+exports.testAnsiWarningsOff = function(test) {
+  testBooleanConfigOption(test, 'enableAnsiWarnings', false, 8, true);
+};
+
+exports.badAnsiWarnings = function(test) {
+  testBadBooleanConfigOption(test, 'enableAnsiWarnings');
+};
+
+exports.testArithAbortDefault = function(test) {
+  testBooleanConfigOption(test, 'enableArithAbort', undefined, 64, false);
+};
+
+exports.testArithAbortOn = function(test) {
+  testBooleanConfigOption(test, 'enableArithAbort', true, 64, false);
+};
+
+exports.testArithAbortOff = function(test) {
+  testBooleanConfigOption(test, 'enableArithAbort', false, 64, false);
+};
+
+exports.badArithAbort = function(test) {
+  testBadBooleanConfigOption(test, 'enableArithAbort');
+};
+
+exports.testConcatNullYieldsNullDefault = function(test) {
+  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', undefined, 4096, true);
+};
+
+exports.testConcatNullYieldsNullOn = function(test) {
+  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', true, 4096, true);
+};
+
+exports.testConcatNullYieldsNullOff = function(test) {
+  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', false, 4096, true);
+};
+
+exports.badConcatNullYieldsNull = function(test) {
+  testBadBooleanConfigOption(test, 'enableConcatNullYieldsNull');
+};
+
+exports.testCursorCloseOnCommitDefault = function(test) {
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', undefined, 4, false);
+};
+
+exports.testCursorCloseOnCommitOn = function(test) {
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', true, 4, false);
+};
+
+exports.testCursorCloseOnCommitOff = function(test) {
+  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', false, 4, false);
+};
+
+exports.badCursorCloseOnCommit = function(test) {
+  testBadBooleanConfigOption(test, 'enableCursorCloseOnCommit');
+};
+
+exports.testImplicitTransactionsDefault = function(test) {
+  testBooleanConfigOption(test, 'enableImplicitTransactions', undefined, 2, false);
+};
+
+exports.testImplicitTransactionsOn = function(test) {
+  testBooleanConfigOption(test, 'enableImplicitTransactions', true, 2, false);
+};
+
+exports.testImplicitTransactionsOff = function(test) {
+  testBooleanConfigOption(test, 'enableImplicitTransactions', false, 2, false);
+};
+
+exports.badImplicitTransactions = function(test) {
+  testBadBooleanConfigOption(test, 'enableImplicitTransactions');
+};
+
+exports.testNumericRoundabortDefault = function(test) {
+  testBooleanConfigOption(test, 'enableNumericRoundabort', undefined, 8192, false);
+};
+
+exports.testNumericRoundabortOn = function(test) {
+  testBooleanConfigOption(test, 'enableNumericRoundabort', true, 8192, false);
+};
+
+exports.testNumericRoundabortOff = function(test) {
+  testBooleanConfigOption(test, 'enableNumericRoundabort', false, 8192, false);
+};
+
+exports.badNumericRoundabort = function(test) {
+  testBadBooleanConfigOption(test, 'enableNumericRoundabort');
+};
+
+exports.testQuotedIdentifierDefault = function(test) {
+  testBooleanConfigOption(test, 'enableQuotedIdentifier', undefined, 256, true);
+};
+
+exports.testQuotedIdentifierOn = function(test) {
+  testBooleanConfigOption(test, 'enableQuotedIdentifier', true, 256, true);
+};
+
+exports.testQuotedIdentifierOff = function(test) {
+  testBooleanConfigOption(test, 'enableQuotedIdentifier', false, 256, true);
+};
+
+exports.badQuotedIdentifier = function(test) {
+  testBadBooleanConfigOption(test, 'enableQuotedIdentifier');
+};
+
+exports.testAbortTransactionOnErrorDefault = function(test) {
+  testBooleanConfigOption(test, 'abortTransactionOnError', undefined, 16384, false);
+};
+
+exports.testAbortTransactionOnErrorOn = function(test) {
+  testBooleanConfigOption(test, 'abortTransactionOnError', true, 16384, false);
+};
+
+exports.testAbortTransactionOnErrorOff = function(test) {
+  testBooleanConfigOption(test, 'abortTransactionOnError', false, 16384, false);
+};
+
+exports.badAbortTransactionOnError = function(test) {
+  testBadBooleanConfigOption(test, 'abortTransactionOnError');
 };
