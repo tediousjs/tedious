@@ -22,7 +22,7 @@ const SspiModuleSupported = require('sspi-client').ModuleSupported;
 const SspiClientApi = require('sspi-client').SspiClientApi;
 const Fqdn = require('sspi-client').Fqdn;
 const MakeSpn = require('sspi-client').MakeSpn;
-const Kerberos = require('kerberos').Kerberos;
+const Kerberos = require('node-kerberos').Kerberos;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -952,14 +952,12 @@ class Connection extends EventEmitter {
             return this.close();
           }
           this.context = context;
+          //verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
+          if (!((null != result) && ('number' === typeof (result)) && (0 === result /* GSS_S_CONTINUE_NEEDED */))) {
+            this.emit('error', new Error('Expected GSS_S_CONTINUE_NEEDED flag not received, kerberos authentication failed'));
+            return this.close();
+          }
 
-          // //verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
-          // if (!((null != result) && ('number' === typeof (result)) && (0 === result /* GSS_S_CONTINUE_NEEDED */))) {
-          //   this.emit('error', new Error('Expected GSS_S_CONTINUE_NEEDED flag not received, kerberos authentication failed'));
-          //   return this.close();
-          // }
-
-          //TODO: consider posiblity of using gss_delete_sec_context dung connection close/failure
           this.gssClientResponsePending = false;
           sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
           cb();
@@ -1116,18 +1114,17 @@ class Connection extends EventEmitter {
             return this.close();
           }
 
-          // //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
-          // if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
-          //   this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
-          //   return this.close();
-          // }
+          //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
+          if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
+            this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
+            return this.close();
+          }
 
           this.gssClientResponsePending = false;
 
           // clear the ntlmpacket
           delete this.ntlmpacketBuffer;
           delete this.ntlmpacket;
-          //TODO: destroy context
         });
     } else {
       if (this.loginError) {
