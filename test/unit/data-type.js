@@ -120,10 +120,9 @@ exports.dateDaylightSaving = function(test) {
 exports.nanoSecondRounding = function(test) {
   var type = TYPES.typeByName['TimeN'];
   for (var testSet of [
-    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
-    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
-    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
-    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264]
+    [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, 624035036264],
+    [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, 54640124612],
+    [new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118, 7, 463483737118]
   ]) {
     var buffer = new WritableTrackingBuffer(16);
     var parameter = { value: testSet[0], scale: testSet[2] };
@@ -132,7 +131,7 @@ exports.nanoSecondRounding = function(test) {
     type.writeParameterData(buffer, parameter, { useUTC: false });
     var rBuffer = new ReadableTrackingBuffer(buffer.buffer);
     rBuffer.readUInt8();
-    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
+    test.strictEqual(rBuffer.readUInt40LE(), expectedTime);
   }
   test.done();
 };
