@@ -18,6 +18,10 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+const SspiModuleSupported = require('sspi-client').ModuleSupported;
+const SspiClientApi = require('sspi-client').SspiClientApi;
+const Fqdn = require('sspi-client').Fqdn;
+const MakeSpn = require('sspi-client').MakeSpn;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -32,6 +36,8 @@ const DEFAULT_TEXTSIZE = '2147483647';
 const DEFAULT_DATEFIRST = 7;
 const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
+const DEFAULT_LANGUAGE = 'us_english';
+const DEFAULT_DATEFORMAT = 'mdy';
 
 class Connection extends EventEmitter {
   constructor(config) {
@@ -50,37 +56,48 @@ class Connection extends EventEmitter {
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
+      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
         columnNameReplacer: undefined,
+        connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
         datefirst: DEFAULT_DATEFIRST,
+        dateFormat: DEFAULT_DATEFORMAT,
         debug: {
           data: false,
           packet: false,
           payload: false,
           token: false
         },
-        enableArithAbort: false,
+        enableAnsiNull: true,
         enableAnsiNullDefault: true,
+        enableAnsiPadding: true,
+        enableAnsiWarnings: true,
+        enableArithAbort: false,
+        enableConcatNullYieldsNull: true,
+        enableCursorCloseOnCommit: false,
+        enableImplicitTransactions: false,
+        enableNumericRoundabort: false,
+        enableQuotedIdentifier: true,
         encrypt: false,
         fallbackToDefaultDb: false,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
+        language: DEFAULT_LANGUAGE,
         localAddress: undefined,
+        maxRetriesOnTransientErrors: 3,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
         port: DEFAULT_PORT,
         readOnlyIntent: false,
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
-        maxRetriesOnTransientErrors: 3,
-        connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
         tdsVersion: DEFAULT_TDS_VERSION,
@@ -97,6 +114,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.abortTransactionOnError != undefined) {
+        if (typeof config.options.abortTransactionOnError !== 'boolean') {
+          throw new TypeError('options.abortTransactionOnError must be a boolean (true or false).');
+        }
+
         this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
       }
 
@@ -144,6 +165,10 @@ class Connection extends EventEmitter {
         this.config.options.datefirst = config.options.datefirst;
       }
 
+      if (config.options.dateFormat != undefined) {
+        this.config.options.dateFormat = config.options.dateFormat;
+      }
+
       if (config.options.debug) {
         if (config.options.debug.data != undefined) {
           this.config.options.debug.data = config.options.debug.data;
@@ -159,8 +184,36 @@ class Connection extends EventEmitter {
         }
       }
 
+      if (config.options.enableAnsiNull != undefined) {
+        if (typeof config.options.enableAnsiNull !== 'boolean') {
+          throw new TypeError('options.enableAnsiNull must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiNull = config.options.enableAnsiNull;
+      }
+
       if (config.options.enableAnsiNullDefault != undefined) {
+        if (typeof config.options.enableAnsiNullDefault !== 'boolean') {
+          throw new TypeError('options.enableAnsiNullDefault must be a boolean (true or false).');
+        }
+
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
+      }
+
+      if (config.options.enableAnsiPadding != undefined) {
+        if (typeof config.options.enableAnsiPadding !== 'boolean') {
+          throw new TypeError('options.enableAnsiPadding must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiPadding = config.options.enableAnsiPadding;
+      }
+
+      if (config.options.enableAnsiWarnings != undefined) {
+        if (typeof config.options.enableAnsiWarnings !== 'boolean') {
+          throw new TypeError('options.enableAnsiWarnings must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiWarnings = config.options.enableAnsiWarnings;
       }
 
       if (config.options.enableArithAbort !== undefined) {
@@ -169,6 +222,46 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
+      }
+
+      if (config.options.enableConcatNullYieldsNull != undefined) {
+        if (typeof config.options.enableConcatNullYieldsNull !== 'boolean') {
+          throw new TypeError('options.enableConcatNullYieldsNull must be a boolean (true or false).');
+        }
+
+        this.config.options.enableConcatNullYieldsNull = config.options.enableConcatNullYieldsNull;
+      }
+
+      if (config.options.enableCursorCloseOnCommit != undefined) {
+        if (typeof config.options.enableCursorCloseOnCommit !== 'boolean') {
+          throw new TypeError('options.enableCursorCloseOnCommit must be a boolean (true or false).');
+        }
+
+        this.config.options.enableCursorCloseOnCommit = config.options.enableCursorCloseOnCommit;
+      }
+
+      if (config.options.enableImplicitTransactions != undefined) {
+        if (typeof config.options.enableImplicitTransactions !== 'boolean') {
+          throw new TypeError('options.enableImplicitTransactions must be a boolean (true or false).');
+        }
+
+        this.config.options.enableImplicitTransactions = config.options.enableImplicitTransactions;
+      }
+
+      if (config.options.enableNumericRoundabort != undefined) {
+        if (typeof config.options.enableNumericRoundabort !== 'boolean') {
+          throw new TypeError('options.enableNumericRoundabort must be a boolean (true or false).');
+        }
+
+        this.config.options.enableNumericRoundabort = config.options.enableNumericRoundabort;
+      }
+
+      if (config.options.enableQuotedIdentifier !== undefined) {
+        if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
+          throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
+        }
+
+        this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
 
       if (config.options.encrypt != undefined) {
@@ -186,6 +279,10 @@ class Connection extends EventEmitter {
 
       if (config.options.isolationLevel) {
         this.config.options.isolationLevel = config.options.isolationLevel;
+      }
+
+      if (config.options.language != undefined) {
+        this.config.options.language = config.options.language;
       }
 
       if (config.options.localAddress != undefined) {
@@ -262,6 +359,10 @@ class Connection extends EventEmitter {
       }
     }
 
+    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
+      this.config.options.useWindowsIntegratedAuth = true;
+    }
+
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
@@ -275,6 +376,7 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
+    this.sspiClientResponsePending = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -344,6 +446,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('sspichallenge', (token) => {
       if (token.ntlmpacket) {
         this.ntlmpacket = token.ntlmpacket;
+        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
       }
       return this.emit('sspichallenge', token);
     });
@@ -764,44 +867,110 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendLogin7Packet() {
-    const payload = new Login7Payload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      serverName: this.routingData ? this.routingData.server : this.config.server,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      initDbFatal: !this.config.options.fallbackToDefaultDb,
-      readOnlyIntent: this.config.options.readOnlyIntent
-    });
+  sendLogin7Packet(cb) {
+    const sendPayload = function(clientResponse) {
+      const payload = new Login7Payload({
+        domain: this.config.domain,
+        userName: this.config.userName,
+        password: this.config.password,
+        database: this.config.options.database,
+        serverName: this.routingData ? this.routingData.server : this.config.server,
+        appName: this.config.options.appName,
+        packetSize: this.config.options.packetSize,
+        tdsVersion: this.config.options.tdsVersion,
+        initDbFatal: !this.config.options.fallbackToDefaultDb,
+        readOnlyIntent: this.config.options.readOnlyIntent,
+        sspiBlob: clientResponse,
+        language: this.config.options.language
+      });
 
-    this.routingData = undefined;
-    this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+      this.routingData = undefined;
+      this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
 
-    return this.debug.payload(function() {
-      return payload.toString('  ');
-    });
+      this.debug.payload(function() {
+        return payload.toString('  ');
+      });
+    };
+
+    if (this.config.options.useWindowsIntegratedAuth) {
+      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
+        if (err) {
+          this.emit('error', new Error('Error getting Fqdn. Error details: ' + err.message));
+          return this.close();
+        }
+
+        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
+
+        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
+
+        this.sspiClientResponsePending = true;
+        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
+          if (errorCode) {
+            this.emit('error', new Error(errorString));
+            return this.close();
+          }
+
+          if (isDone) {
+            this.emit('error', new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.'));
+            return this.close();
+          }
+
+          this.sspiClientResponsePending = false;
+          sendPayload.call(this, clientResponse);
+          cb();
+        });
+      });
+    } else {
+      sendPayload.call(this);
+      process.nextTick(cb);
+    }
   }
 
   sendNTLMResponsePacket() {
-    const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    return this.debug.payload(function() {
-      return payload.toString('  ');
-    });
+    if (this.sspiClient) {
+      this.sspiClientResponsePending = true;
+
+      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+
+        if (errorCode) {
+          this.emit('error', new Error(errorString));
+          return this.close();
+        }
+
+        this.sspiClientResponsePending = false;
+
+        if (clientResponse.length) {
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
+          this.debug.payload(function() {
+            return '  SSPI Auth';
+          });
+        }
+
+        if (isDone) {
+          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        }
+      });
+    } else {
+      const payload = new NTLMResponsePayload({
+        domain: this.config.domain,
+        userName: this.config.userName,
+        password: this.config.password,
+        database: this.config.options.database,
+        appName: this.config.options.appName,
+        packetSize: this.config.options.packetSize,
+        tdsVersion: this.config.options.tdsVersion,
+        ntlmpacket: this.ntlmpacket,
+        additional: this.additional
+      });
+
+      this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+      this.debug.payload(function() {
+        return payload.toString('  ');
+      });
+
+      const boundTransitionTo = this.transitionTo.bind(this);
+      process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+    }
   }
 
   sendDataToTokenStreamParser(data) {
@@ -814,10 +983,34 @@ class Connection extends EventEmitter {
   }
 
   getInitialSql() {
-    const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
+    const enableAnsiNull = this.config.options.enableAnsiNull ? 'on' : 'off';
     const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
+    const enableAnsiPadding = this.config.options.enableAnsiPadding ? 'on' : 'off';
+    const enableAnsiWarnings = this.config.options.enableAnsiWarnings ? 'on' : 'off';
     const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
-    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort ' + enableArithAbort + '\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst ' + this.config.options.datefirst + '\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
+    const enableConcatNullYieldsNull = this.config.options.enableConcatNullYieldsNull ? 'on' : 'off';
+    const enableCursorCloseOnCommit = this.config.options.enableCursorCloseOnCommit ? 'on' : 'off';
+    const enableImplicitTransactions = this.config.options.enableImplicitTransactions ? 'on' : 'off';
+    const enableNumericRoundabort = this.config.options.enableNumericRoundabort ? 'on' : 'off';
+    const enableQuotedIdentifier = this.config.options.enableQuotedIdentifier ? 'on' : 'off';
+    const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
+
+    return `set ansi_nulls ${enableAnsiNull}\n
+      set ansi_null_dflt_on ${enableAnsiNullDefault}\n
+      set ansi_padding ${enableAnsiPadding}\n 
+      set ansi_warnings ${enableAnsiWarnings}\n
+      set arithabort ${enableArithAbort}\n
+      set concat_null_yields_null ${enableConcatNullYieldsNull}\n
+      set cursor_close_on_commit ${enableCursorCloseOnCommit}\n
+      set datefirst ${this.config.options.datefirst}\n
+      set dateformat ${this.config.options.dateFormat}\n
+      set implicit_transactions ${enableImplicitTransactions}\n
+      set language ${this.config.options.language}\n
+      set numeric_roundabort ${enableNumericRoundabort}\n
+      set quoted_identifier ${enableQuotedIdentifier}\n
+      set textsize ${this.config.options.textsize}\n
+      set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}\n
+      set xact_abort ${xact_abort}`;
   }
 
   processedInitialSql() {
@@ -1171,12 +1364,13 @@ Connection.prototype.STATE = {
         return this.processPreLoginResponse();
       },
       noTls: function() {
-        this.sendLogin7Packet();
-        if (this.config.domain) {
-          return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        } else {
-          return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        }
+        this.sendLogin7Packet(() => {
+          if (this.config.domain) {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
+        });
       },
       tls: function() {
         this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
@@ -1235,12 +1429,13 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet();
-          if (this.config.domain) {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          } else {
-            return this.transitionTo (this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          }
+          this.sendLogin7Packet(() => {
+            if (this.config.domain) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            } else {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            }
+          });
         }
       }
     }
@@ -1281,17 +1476,34 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {
+          return this.sendDataToTokenStreamParser(data);
+        }
       },
       receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        return this.sendNTLMResponsePacket();
       },
       loginFailed: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        return this.processLogin7NTLMResponse();
+        if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {
+          return this.processLogin7NTLMResponse();
+        }
       }
     }
   },

@@ -506,6 +506,10 @@ exports.variantVarChar = function(test) {
   execSql(test, "select cast('abc' as sql_variant)", 'abc', '7_2');
 };
 
+exports.variantVarChar2 = function(test) {
+  execSql(test, "select SERVERPROPERTY('LicenseType') as LicenseType", 'DISABLED', '7_2');
+};
+
 exports.variantVarBin = function(test) {
   execSql(
     test,
@@ -521,6 +525,31 @@ exports.variantDateTimeOffset = function(test) {
     new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
     '7_3_A'
   );
+};
+
+
+exports.variantMultipleDatatypes = function(test) {
+  const sql = `\
+  create table #tab1 (
+  [c0] [int] IDENTITY(1,1),
+  [c1] [sql_variant] NULL);
+  insert into #tab1 ([c1]) values (N'abcdШ');
+  insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));	
+  insert into #tab1 ([c1]) select cast(0x1234 as varbinary(16));
+  insert into #tab1 ([c1]) select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier); 
+  insert into #tab1 ([c1]) values (0.00000090000000000);	--decimal(38,17);
+  insert into #tab1 ([c1]) select cast('2011-12-4 10:04:23' as datetime);
+  insert into #tab1 ([c1]) select cast('abcde' as varchar(10));
+  select [c1] from #tab1 ORDER BY [c0];
+  `;
+  const expectedValues = ['abcdШ',
+    3148.29,
+    new Buffer([0x12, 0x34]),
+    '01234567-89AB-CDEF-0123-456789ABCDEF',
+    0.00000090000000000,
+    new Date('December 4, 2011 10:04:23 GMT'),
+    'abcde'];
+  execSql(test, sql, expectedValues);
 };
 
 exports.variantNull = function(test) {
@@ -627,8 +656,8 @@ var execSql = function(test, sql, expectedValue, tdsVersion) {
     test.done();
     return;
   }
-
-  test.expect(3);
+  let rowProcessed = 0;
+  test.expect(2 + ((expectedValue instanceof Array) ? expectedValue.length : 1));
 
   var request = new Request(sql, function(err) {
     test.ifError(err);
@@ -637,15 +666,16 @@ var execSql = function(test, sql, expectedValue, tdsVersion) {
   });
 
   request.on('row', function(columns) {
-    if (expectedValue instanceof Date) {
-      test.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
+    const expectedRowVal = (expectedValue instanceof Array) ? expectedValue[rowProcessed++] : expectedValue;
+    if (expectedRowVal instanceof Date) {
+      test.strictEqual(columns[0].value.getTime(), expectedRowVal.getTime());
     } else if (
-      expectedValue instanceof Array ||
-      expectedValue instanceof Buffer
+      expectedRowVal instanceof Array ||
+      expectedRowVal instanceof Buffer
     ) {
-      test.deepEqual(columns[0].value, expectedValue);
+      test.deepEqual(columns[0].value, expectedRowVal);
     } else {
-      test.strictEqual(columns[0].value, expectedValue);
+      test.strictEqual(columns[0].value, expectedRowVal);
     }
   });
 
