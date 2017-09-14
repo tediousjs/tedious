@@ -435,8 +435,8 @@ class Connection extends EventEmitter {
         return this.loginError = null;
       };
 
-      // clean kerberos security context
-      if (this.kerberos) {
+      // clean kerberos security context if exists
+      if (this.kerberos && this.context) {
         this.kerberos.authGSSClientClean(this.context, () => { cleanConnection(); });
       }
       else {
