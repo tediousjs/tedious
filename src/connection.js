@@ -364,7 +364,7 @@ class Connection extends EventEmitter {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
-    if (this.config.domain && process.platform === 'linux') {
+    if (this.config.domain && !this.config.userName && !this.config.password && !SspiModuleSupported) {
       this.config.options.useKerberosIntegratedAuth = true;
     }
 
