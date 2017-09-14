@@ -381,7 +381,7 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
-    this.gssClientResponsePending = false;
+    this.sspiClientResponsePending = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -919,7 +919,7 @@ class Connection extends EventEmitter {
 
         this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
 
-        this.gssClientResponsePending = true;
+        this.sspiClientResponsePending = true;
         this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
           if (errorCode) {
             this.emit('error', new Error(errorString));
@@ -931,7 +931,7 @@ class Connection extends EventEmitter {
             return this.close();
           }
 
-          this.gssClientResponsePending = false;
+          this.sspiClientResponsePending = false;
           sendPayload.call(this, clientResponse);
           cb();
         });
@@ -939,7 +939,7 @@ class Connection extends EventEmitter {
     } else if (this.config.options.useKerberosIntegratedAuth) {
       this.kerberos = new Kerberos();
       const spn = 'MSSQLSvc/' + this.config.server;
-      this.gssClientResponsePending = true;
+      this.sspiClientResponsePending = true;
       this.kerberos.authGSSClientInitDefault(spn, Kerberos.GSS_C_MUTUAL_FLAG | Kerberos.GSS_C_INTEG_FLAG, (err, context) => {
         if (err) {
           this.emit('error', new Error(err.toString()));
@@ -958,7 +958,7 @@ class Connection extends EventEmitter {
             return this.close();
           }
 
-          this.gssClientResponsePending = false;
+          this.sspiClientResponsePending = false;
           sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
           cb();
         });
@@ -972,7 +972,7 @@ class Connection extends EventEmitter {
 
   sendNTLMResponsePacket() {
     if (this.sspiClient) {
-      this.gssClientResponsePending = true;
+      this.sspiClientResponsePending = true;
 
       this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
 
@@ -981,7 +981,7 @@ class Connection extends EventEmitter {
           return this.close();
         }
 
-        this.gssClientResponsePending = false;
+        this.sspiClientResponsePending = false;
 
         if (clientResponse.length) {
           this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
@@ -1106,7 +1106,7 @@ class Connection extends EventEmitter {
       return this.dispatchEvent('loggedIn');
     }
     else if (this.ntlmpacket && this.kerberos) {
-      this.gssClientResponsePending = true;
+      this.sspiClientResponsePending = true;
       this.kerberos.authGSSClientStep(this.context,
         this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
           if (err) {
@@ -1120,7 +1120,7 @@ class Connection extends EventEmitter {
             return this.close();
           }
 
-          this.gssClientResponsePending = false;
+          this.sspiClientResponsePending = false;
 
           // clear the ntlmpacket
           delete this.ntlmpacketBuffer;
@@ -1559,8 +1559,8 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        if (this.gssClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
+        if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob() or GSS-API
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
           // the call. Queue it for later.
@@ -1577,8 +1577,8 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        if (this.gssClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
+        if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob() or GSS-API
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
           // the call. Queue it for later.
@@ -1626,7 +1626,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        if (this.gssClientResponsePending) {
+        if (this.sspiClientResponsePending) {
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'data', data);
         } else {
@@ -1640,7 +1640,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        if (this.gssClientResponsePending) {
+        if (this.sspiClientResponsePending) {
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'message');
         } else {
