@@ -115,3 +115,24 @@ exports.dateDaylightSaving = function(test) {
   }
   test.done();
 };
+
+// Test rounding of nanosecondDelta
+exports.nanoSecondRounding = function(test) {
+  var type = TYPES.typeByName['TimeN'];
+  for (var testSet of [
+    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
+    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
+    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264],
+    [new Date(2017, 06, 29, 17, 20, 03, 503), 0.0006264, 0, 15013416035036264]
+  ]) {
+    var buffer = new WritableTrackingBuffer(16);
+    var parameter = { value: testSet[0], scale: testSet[2] };
+    parameter.value.nanosecondDelta = testSet[1];
+    var expectedTime = testSet[3];
+    type.writeParameterData(buffer, parameter, { useUTC: false });
+    var rBuffer = new ReadableTrackingBuffer(buffer.buffer);
+    rBuffer.readUInt8();
+    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
+  }
+  test.done();
+};

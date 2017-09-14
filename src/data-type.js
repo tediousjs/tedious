@@ -1286,8 +1286,9 @@ const TYPE = module.exports.TYPE = {
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = Math.round(time * Math.pow(10, parameter.scale - 3));
-        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
+        time = time * Math.pow(10, parameter.scale - 3);
+        time += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        time = Math.round(time);
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1417,8 +1418,9 @@ const TYPE = module.exports.TYPE = {
         } else {
           time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = Math.round(time * Math.pow(10, parameter.scale - 3));
-        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
+        time = time * Math.pow(10, parameter.scale - 3);
+        time += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        time = Math.round(time);
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1505,8 +1507,9 @@ const TYPE = module.exports.TYPE = {
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = Math.round(time * Math.pow(10, parameter.scale - 3));
-        time += Math.round((parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale));
+        time = time * Math.pow(10, parameter.scale - 3);
+        time += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        time = Math.round(time);
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
