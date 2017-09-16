@@ -209,6 +209,12 @@ request.on('done', function (rowCount, more, rows) { });
   For execution of SQL statements within stored procedures, <code>doneProc</code> and <code>doneInProc</code>
   events are used in place of <code>done</code> events.
 </p>
+<p>
+  If you are using <a href="api-connection.html#function_execSql">execSql</a> then SQL server may treat 
+  the multiple calls with the same query as a stored procedure.  When this occurs, the
+  <a href="#event_doneProc"><code>doneProc</code></a> or <a href="#event_doneInProc"><code>doneInProc</code></a>
+  events may be emitted instead.  You must handle both events to ensure complete coverage.
+</p>
 <div class="argument">
   <div class="name">rowCount</div>
   <div class="description">
@@ -250,6 +256,10 @@ request.on('doneInProc', function (rowCount, more, rows) { });
   Indicates the completion status of a SQL statement within a stored procedure. All rows from a statement
   in a stored procedure have been provided (through <code>row</code> events).
 </p>
+<p>
+  This event may also occur when executing multiple calls with the same query using 
+  <a href="api-connection.html#execSql"><code>execSql</code></a>.
+</p>
 <div class="argument">
   <div class="name">rowCount</div>
   <div class="description">
@@ -290,6 +300,10 @@ request.on('doneProc', function (rowCount, more, returnStatus, rows) { });
 <p>
   Indicates the completion status of a stored procedure. This is also generated for stored procedures
   executed through SQL statements.
+</p>
+<p>
+  This event may also occur when executing multiple calls with the same query using 
+  <a href="api-connection.html#execSql"><code>execSql</code></a>.
 </p>
 <div class="argument">
   <div class="name">rowCount</div>
