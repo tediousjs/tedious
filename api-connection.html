@@ -123,7 +123,7 @@ var connection = new Connection(config);
         <code>options.fallbackToDefaultDb</code>
       </dt>
       <dd>
-        By default, if the database requestion by <code>options.database</code> cannot be accessed,
+        By default, if the database requested by <code>options.database</code> cannot be accessed,
         the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
         set to <code>true</code>, then the user's default database will be used instead
         (Default: <code>false</code>).
@@ -191,7 +191,7 @@ var connection = new Connection(config);
         <code>options.localAddress</code>
       </dt>
       <dd>
-        A string indicating which network interface (ip addres) to use when connecting to SQL Server.
+        A string indicating which network interface (ip address) to use when connecting to SQL Server.
       </dd>
 
       <dt>
@@ -537,7 +537,7 @@ var connection = new Connection(config);
 <span class="function">function (databaseName) { }</span>
 <p>
   The server has reported that the active database has changed.
-  This may be as a result of a sucessful login, or a <code>use</code> statement.
+  This may be as a result of a successful login, or a <code>use</code> statement.
 </p>
 <div class="argument">
   <div class="name">databaseName</div>
@@ -608,7 +608,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to start the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -618,7 +618,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -680,7 +680,7 @@ var connection = new Connection(config);
   Closes the connection to the database.
 </p>
 <p>
-  The <a href="#event_end"><code>end</code></a> will be emmited once the connection has been closed.
+  The <a href="#event_end"><code>end</code></a> will be emitted once the connection has been closed.
 </p>
 
 <h2 id="function_execSql">connection.execSql(request)</h2>
@@ -727,7 +727,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to commit the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -737,7 +737,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -823,7 +823,7 @@ var connection = new Connection(config);
         <p>
             The callback is called when the connection reset has completed,
             either successfully or with an error.
-            If an error occured then <code>err</code> will describe the error.
+            If an error occurred then <code>err</code> will describe the error.
         </p>
         <p>
             As only one request at a time may be executed on a connection, another request should not
@@ -833,7 +833,7 @@ var connection = new Connection(config);
             <div class="name">err</div>
             <div class="description">
                 <p>
-                    If an error occured, a string with details of the error.
+                    If an error occurred, a string with details of the error.
                 </p>
             </div>
         </div>
@@ -855,7 +855,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to rollback the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -865,7 +865,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -887,7 +887,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to set a savepoint within the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -897,7 +897,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -922,8 +922,8 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to start a transaction (or create a savepoint, in
       the case of a nested transaction) has completed, either successfully or with an error.
-      If an error occured, then <code>err</code> will describe the error.
-      If no error occured, the callback should perform its work and eventually call
+      If an error occurred, then <code>err</code> will describe the error.
+      If no error occurred, the callback should perform its work and eventually call
       <code>done</code> with an error or null (to trigger a transaction rollback or a
       transaction commit) and an additional completion callback that will be called when the request
       to rollback or commit the current transaction has completed, either successfully or with an error.
@@ -937,14 +937,14 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
 
       <div class="name">done</div>
       <div class="description">
         <p>
-          If no error occured, a function to be called to commit or rollback
+          If no error occurred, a function to be called to commit or rollback
           the transaction.
         </p>
       </div>
