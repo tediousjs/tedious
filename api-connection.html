@@ -356,6 +356,76 @@ var connection = new Connection(config);
         </ul>
         (default: <code>7_4</code>).
       </dd>
+
+      <dt>
+          <code>options.connectionRetryInterval</code>
+      </dt>
+      <dd>
+          Number of milliseconds before retrying to establish connection in case of transient failure(default: <code>500</code>).
+      </dd>
+
+      <dt>
+          <code>options.dateFormat</code>
+      </dt>
+      <dd>
+          A string representing the position of month, day and year in temporal datatypes (default: <code>mdy</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiNull</code>
+      </dt>
+      <dd>
+          A boolean, controls the way null values should be used during comparison operation (default: <code>true</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiPadding</code>
+      </dt>
+      <dd>
+          A boolean, controls if padding should be applied for values shorter than the size of column defined (default: <code>true</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiWarnings</code>
+      </dt>
+      <dd>
+          If true, SQL Server will follow ISO standard behavior during various error conditions (default: <code>true</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableConcatNullYieldsNull</code>
+      </dt>
+      <dd>
+          A boolean, determines if concatenation with NULL should result in NULL or empty string value (default: <code>true</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableCursorCloseOnCommit</code>
+      </dt>
+      <dd>
+          A boolean, controls whether cursor should be closed, if transaction opening the cursor gets committed or rolled back(default: <code>false</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableImplicitTransactions</code>
+      </dt>
+      <dd>
+          A boolean, sets the connection to either implicit or autocommit transaction mode (default: <code>false</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableNumericRoundabort</code>
+      </dt>
+      <dd>
+          If false, error is not generated during loss of precession (default: <code>false</code>).
+      </dd>
+
+      <dt>
+          <code>options.enableQuotedIdentifier </code>
+      </dt>
+      <dd>
+          If true, characters enclosed in single quotes are treated as literals and those enclosed double quotes are treated as identifiers (default: <code>true</code>).
+      </dd>
     </dl>
   </div>
 </div>
