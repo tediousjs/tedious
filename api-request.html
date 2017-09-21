@@ -13,6 +13,7 @@ title: API - Request
   <li><a href="#function_newRequest">new Request(sql, callback)</a></li>
   <li><a href="#event_columnMetadata">Event: 'columnMetadata'</a></li>
   <li><a href="#event_prepared">Event: 'prepared'</a></li>
+  <li><a href="#event_requestCompleted">Event: 'requestCompleted'</a></li>
   <li><a href="#event_row">Event: 'row'</a></li>
   <li><a href="#event_done">Event: 'done'</a></li>
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
@@ -54,6 +55,7 @@ connection.execSql(request);
       As only one request at a time may be executed on a connection, another request should not
       be initiated until this callback is called.
     </p>
+    <p>This callback is called before <a href="#event_requestCompleted">requestCompleted</a> event is emitted.</p>
     <div class="argument">
       <div class="name">err</div>
       <div class="description">
@@ -156,6 +158,16 @@ request.on('prepared', function () { });
   <a href="api-connection.html#function_execute">execute</a> and
   <a href="api-connection.html#function_unprepare">unprepare</a>.
 </p>
+
+<h2 id="event_requestCompleted">Event: requestCompleted</h2>
+{% highlight javascript %}
+request.on('requestCompleted', function () { });
+{% endhighlight %}
+
+<p>
+    This is the final event emitted by a request. This is emitted after the callback passed in a <a href="#function_newRequest">request</a> is called.
+</p>
+
 
 <h2 id="event_row">Event: row</h2>
 {% highlight javascript %}
