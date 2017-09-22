@@ -27,8 +27,8 @@ var bulkLoad = connection.newBulkLoad('MyTable', function (error, rowCount) {
 });
 
 // setup your columns - always indicate whether the column is nullable
-bulk.addColumn('myInt', TYPES.Int, { nullable: false });
-bulk.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
+bulkLoad.addColumn('myInt', TYPES.Int, { nullable: false });
+bulkLoad.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
 
 // add rows
 bulkLoad.addRow({ myInt: 7, myString: 'hello' });
