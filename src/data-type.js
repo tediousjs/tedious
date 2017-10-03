@@ -1,15 +1,17 @@
-const guidParser = require('./guid-parser');
+'use strict';
 
-const NULL = (1 << 16) - 1;
-const EPOCH_DATE = new Date(1900, 0, 1);
-const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
-const YEAR_ONE = new Date(2000, 0, -730118);
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
-const MAX = (1 << 16) - 1;
+var guidParser = require('./guid-parser');
 
-const typeByName = module.exports.typeByName = {};
+var NULL = (1 << 16) - 1;
+var EPOCH_DATE = new Date(1900, 0, 1);
+var UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+var YEAR_ONE = new Date(2000, 0, -730118);
+var UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+var MAX = (1 << 16) - 1;
 
-const TYPE = module.exports.TYPE = {
+var typeByName = module.exports.typeByName = {};
+
+var TYPE = module.exports.TYPE = {
   0x1F: {
     type: 'NULL',
     name: 'Null'
@@ -19,16 +21,16 @@ const TYPE = module.exports.TYPE = {
     type: 'INT1',
     name: 'TinyInt',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'tinyint';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
       return buffer.writeUInt8(1);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(1);
         return buffer.writeUInt8(parseInt(parameter.value));
@@ -37,7 +39,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -56,16 +58,16 @@ const TYPE = module.exports.TYPE = {
     type: 'BIT',
     name: 'Bit',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'bit';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.BitN.id);
       return buffer.writeUInt8(1);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (typeof parameter.value === 'undefined' || parameter.value === null) {
         return buffer.writeUInt8(0);
       } else {
@@ -74,7 +76,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -90,16 +92,16 @@ const TYPE = module.exports.TYPE = {
     type: 'INT2',
     name: 'SmallInt',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'smallint';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
       return buffer.writeUInt8(2);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(2);
         return buffer.writeInt16LE(parseInt(parameter.value));
@@ -108,7 +110,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -127,16 +129,16 @@ const TYPE = module.exports.TYPE = {
     type: 'INT4',
     name: 'Int',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'int';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
       return buffer.writeUInt8(4);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
         return buffer.writeInt32LE(parseInt(parameter.value));
@@ -145,7 +147,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -164,25 +166,27 @@ const TYPE = module.exports.TYPE = {
     type: 'DATETIM4',
     name: 'SmallDateTime',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'smalldatetime';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.DateTimeN.id);
       return buffer.writeUInt8(4);
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value != null) {
-        let days, dstDiff, minutes;
+        var days = void 0,
+            dstDiff = void 0,
+            minutes = void 0;
         if (options.useUTC) {
           days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
+          minutes = parameter.value.getUTCHours() * 60 + parameter.value.getUTCMinutes();
         } else {
           dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
           days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
+          minutes = parameter.value.getHours() * 60 + parameter.value.getMinutes();
         }
 
         buffer.writeUInt8(4);
@@ -194,7 +198,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -215,16 +219,16 @@ const TYPE = module.exports.TYPE = {
     type: 'FLT4',
     name: 'Real',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'real';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.FloatN.id);
       return buffer.writeUInt8(4);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
         return buffer.writeFloatLE(parseFloat(parameter.value));
@@ -233,7 +237,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -249,16 +253,16 @@ const TYPE = module.exports.TYPE = {
     type: 'MONEY',
     name: 'Money',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'money';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.MoneyN.id);
       return buffer.writeUInt8(8);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(8);
         return buffer.writeMoney(parameter.value * 10000);
@@ -267,7 +271,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -283,34 +287,39 @@ const TYPE = module.exports.TYPE = {
     type: 'DATETIME',
     name: 'DateTime',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'datetime';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.DateTimeN.id);
       return buffer.writeUInt8(8);
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value != null) {
-        let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+        var days = void 0,
+            dstDiff = void 0,
+            milliseconds = void 0,
+            seconds = void 0,
+            threeHundredthsOfSecond = void 0,
+            time = new Date(+parameter.value);
         if (options.useUTC) {
-          days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getUTCHours() * 60 * 60;
-          seconds += parameter.value.getUTCMinutes() * 60;
-          seconds += parameter.value.getUTCSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
+          days = Math.floor((time.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+          seconds = time.getUTCHours() * 60 * 60;
+          seconds += time.getUTCMinutes() * 60;
+          seconds += time.getUTCSeconds();
+          milliseconds = seconds * 1000 + time.getUTCMilliseconds();
         } else {
-          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-          days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getHours() * 60 * 60;
-          seconds += parameter.value.getMinutes() * 60;
-          seconds += parameter.value.getSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
+          dstDiff = -(time.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+          days = Math.floor((time.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+          seconds = time.getHours() * 60 * 60;
+          seconds += time.getMinutes() * 60;
+          seconds += time.getSeconds();
+          milliseconds = seconds * 1000 + time.getMilliseconds();
         }
 
-        threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
+        threeHundredthsOfSecond = milliseconds / (3 + 1 / 3);
         threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
 
         buffer.writeUInt8(8);
@@ -322,7 +331,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -340,16 +349,16 @@ const TYPE = module.exports.TYPE = {
     type: 'FLT8',
     name: 'Float',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'float';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.FloatN.id);
       return buffer.writeUInt8(8);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(8);
         return buffer.writeDoubleLE(parseFloat(parameter.value));
@@ -358,7 +367,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -376,11 +385,11 @@ const TYPE = module.exports.TYPE = {
     hasPrecision: true,
     hasScale: true,
 
-    declaration: function(parameter) {
-      return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
+    declaration: function declaration(parameter) {
+      return 'decimal(' + this.resolvePrecision(parameter) + ', ' + this.resolveScale(parameter) + ')';
     },
 
-    resolvePrecision: function(parameter) {
+    resolvePrecision: function resolvePrecision(parameter) {
       if (parameter.precision != null) {
         return parameter.precision;
       } else if (parameter.value === null) {
@@ -390,7 +399,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveScale: function(parameter) {
+    resolveScale: function resolveScale(parameter) {
       if (parameter.scale != null) {
         return parameter.scale;
       } else {
@@ -398,7 +407,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(typeByName.DecimalN.id);
       if (parameter.precision <= 9) {
         buffer.writeUInt8(5);
@@ -413,10 +422,10 @@ const TYPE = module.exports.TYPE = {
       return buffer.writeUInt8(parameter.scale);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
-        const sign = parameter.value < 0 ? 0 : 1;
-        const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
+        var sign = parameter.value < 0 ? 0 : 1;
+        var value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
         if (parameter.precision <= 9) {
           buffer.writeUInt8(5);
           buffer.writeUInt8(sign);
@@ -442,7 +451,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -460,11 +469,11 @@ const TYPE = module.exports.TYPE = {
     hasPrecision: true,
     hasScale: true,
 
-    declaration: function(parameter) {
-      return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
+    declaration: function declaration(parameter) {
+      return 'numeric(' + this.resolvePrecision(parameter) + ', ' + this.resolveScale(parameter) + ')';
     },
 
-    resolvePrecision: function(parameter) {
+    resolvePrecision: function resolvePrecision(parameter) {
       if (parameter.precision != null) {
         return parameter.precision;
       } else if (parameter.value === null) {
@@ -474,7 +483,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveScale: function(parameter) {
+    resolveScale: function resolveScale(parameter) {
       if (parameter.scale != null) {
         return parameter.scale;
       } else {
@@ -482,7 +491,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(typeByName.NumericN.id);
       if (parameter.precision <= 9) {
         buffer.writeUInt8(5);
@@ -497,10 +506,10 @@ const TYPE = module.exports.TYPE = {
       return buffer.writeUInt8(parameter.scale);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
-        const sign = parameter.value < 0 ? 0 : 1;
-        const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
+        var sign = parameter.value < 0 ? 0 : 1;
+        var value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
         if (parameter.precision <= 9) {
           buffer.writeUInt8(5);
           buffer.writeUInt8(sign);
@@ -526,7 +535,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -542,16 +551,16 @@ const TYPE = module.exports.TYPE = {
     type: 'MONEY4',
     name: 'SmallMoney',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'smallmoney';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.MoneyN.id);
       return buffer.writeUInt8(4);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
         return buffer.writeInt32LE(parameter.value * 10000);
@@ -560,7 +569,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -579,18 +588,18 @@ const TYPE = module.exports.TYPE = {
     type: 'INT8',
     name: 'BigInt',
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'bigint';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
       return buffer.writeUInt8(8);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
-        const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
+        var val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
         buffer.writeUInt8(8);
         return buffer.writeInt64LE(val);
       } else {
@@ -598,7 +607,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -611,8 +620,7 @@ const TYPE = module.exports.TYPE = {
         // 9007199254740991 = (2**53) - 1
         // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
         // as these constants are not available in node 0.10.
-        return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
-          ' For bigger numbers, use VarChar type.');
+        return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' + ' For bigger numbers, use VarChar type.');
       }
       return value;
     }
@@ -625,11 +633,11 @@ const TYPE = module.exports.TYPE = {
     hasTextPointerAndTimestamp: true,
     dataLengthLength: 4,
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'image';
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.value != null) {
         return parameter.value.length;
       } else {
@@ -637,12 +645,12 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       return buffer.writeInt32LE(parameter.length);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeInt32LE(parameter.length);
         return buffer.writeBuffer(parameter.value);
@@ -651,7 +659,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -670,11 +678,11 @@ const TYPE = module.exports.TYPE = {
     hasTextPointerAndTimestamp: true,
     dataLengthLength: 4,
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'text';
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.value != null) {
         return parameter.value.length;
       } else {
@@ -682,12 +690,12 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(typeByName.Text.id);
       return buffer.writeInt32LE(parameter.length);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
       if (parameter.value != null) {
         buffer.writeInt32LE(parameter.length);
@@ -697,7 +705,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -717,20 +725,20 @@ const TYPE = module.exports.TYPE = {
     aliases: ['UniqueIdentifier'],
     dataLengthLength: 1,
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'uniqueidentifier';
     },
 
-    resolveLength: function() {
+    resolveLength: function resolveLength() {
       return 16;
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       buffer.writeUInt8(typeByName.UniqueIdentifierN.id);
       return buffer.writeUInt8(0x10);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(0x10);
         return buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
@@ -739,7 +747,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -813,8 +821,8 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 8000,
 
-    declaration: function(parameter) {
-      let length;
+    declaration: function declaration(parameter) {
+      var length = void 0;
       if (parameter.length) {
         length = parameter.length;
       } else if (parameter.value != null) {
@@ -832,7 +840,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.length != null) {
         return parameter.length;
       } else if (parameter.value != null) {
@@ -842,7 +850,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       if (parameter.length <= this.maximumLength) {
         return buffer.writeUInt16LE(this.maximumLength);
@@ -851,7 +859,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
           return buffer.writeUsVarbyte(parameter.value);
@@ -868,7 +876,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -886,8 +894,8 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 8000,
 
-    declaration: function(parameter) {
-      let length;
+    declaration: function declaration(parameter) {
+      var length = void 0;
       if (parameter.length) {
         length = parameter.length;
       } else if (parameter.value != null) {
@@ -905,7 +913,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.length != null) {
         return parameter.length;
       } else if (parameter.value != null) {
@@ -919,7 +927,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       if (parameter.length <= this.maximumLength) {
         buffer.writeUInt16LE(this.maximumLength);
@@ -929,7 +937,7 @@ const TYPE = module.exports.TYPE = {
       return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
           return buffer.writeUsVarbyte(parameter.value, 'ascii');
@@ -946,7 +954,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -966,7 +974,7 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 8000,
 
-    declaration: function(parameter) {
+    declaration: function declaration(parameter) {
       var length;
       if (parameter.length) {
         length = parameter.length;
@@ -980,7 +988,7 @@ const TYPE = module.exports.TYPE = {
       return 'binary(' + length + ')';
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.value != null) {
         return parameter.value.length;
       } else {
@@ -988,12 +996,12 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       return buffer.writeUInt16LE(parameter.length);
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt16LE(parameter.length);
         return buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
@@ -1002,7 +1010,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1020,8 +1028,8 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 8000,
 
-    declaration: function(parameter) {
-      let length;
+    declaration: function declaration(parameter) {
+      var length = void 0;
       if (parameter.length) {
         length = parameter.length;
       } else if (parameter.value != null) {
@@ -1039,7 +1047,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.length != null) {
         return parameter.length;
       } else if (parameter.value != null) {
@@ -1053,13 +1061,13 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       buffer.writeUInt16LE(parameter.length);
       return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         return buffer.writeUsVarbyte(parameter.value, 'ascii');
       } else {
@@ -1067,7 +1075,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1088,8 +1096,8 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 4000,
 
-    declaration: function(parameter) {
-      let length;
+    declaration: function declaration(parameter) {
+      var length = void 0;
       if (parameter.length) {
         length = parameter.length;
       } else if (parameter.value != null) {
@@ -1107,12 +1115,12 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.length != null) {
         return parameter.length;
       } else if (parameter.value != null) {
         if (Buffer.isBuffer(parameter.value)) {
-          return (parameter.value.length / 2) || 1;
+          return parameter.value.length / 2 || 1;
         } else {
           return parameter.value.toString().length || 1;
         }
@@ -1121,7 +1129,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       if (parameter.length <= this.maximumLength) {
         buffer.writeUInt16LE(parameter.length * 2);
@@ -1131,7 +1139,7 @@ const TYPE = module.exports.TYPE = {
       return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
           return buffer.writeUsVarbyte(parameter.value, 'ucs2');
@@ -1148,7 +1156,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1169,8 +1177,8 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 2,
     maximumLength: 4000,
 
-    declaration: function(parameter) {
-      let length;
+    declaration: function declaration(parameter) {
+      var length = void 0;
       if (parameter.length) {
         length = parameter.length;
       } else if (parameter.value != null) {
@@ -1188,12 +1196,12 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    resolveLength: function(parameter) {
+    resolveLength: function resolveLength(parameter) {
       if (parameter.length != null) {
         return parameter.length;
       } else if (parameter.value != null) {
         if (Buffer.isBuffer(parameter.value)) {
-          return (parameter.value.length / 2) || 1;
+          return parameter.value.length / 2 || 1;
         } else {
           return parameter.value.toString().length || 1;
         }
@@ -1202,13 +1210,13 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       buffer.writeUInt16LE(parameter.length * 2);
       return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
         return buffer.writeUsVarbyte(parameter.value, 'ucs2');
       } else {
@@ -1216,7 +1224,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1243,7 +1251,7 @@ const TYPE = module.exports.TYPE = {
     hasScale: true,
     dataLengthLength: 1,
 
-    dataLengthFromScale: function(scale) {
+    dataLengthFromScale: function dataLengthFromScale(scale) {
       switch (scale) {
         case 0:
         case 1:
@@ -1259,11 +1267,11 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    declaration: function(parameter) {
-      return 'time(' + (this.resolveScale(parameter)) + ')';
+    declaration: function declaration(parameter) {
+      return 'time(' + this.resolveScale(parameter) + ')';
     },
 
-    resolveScale: function(parameter) {
+    resolveScale: function resolveScale(parameter) {
       if (parameter.scale != null) {
         return parameter.scale;
       } else if (parameter.value === null) {
@@ -1273,14 +1281,15 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       return buffer.writeUInt8(parameter.scale);
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        var ref = void 0,
+            time = new Date(+parameter.value);
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
@@ -1308,7 +1317,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1330,21 +1339,21 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 1,
     fixedDataLength: 3,
 
-    declaration: function() {
+    declaration: function declaration() {
       return 'date';
     },
 
-    writeTypeInfo: function(buffer) {
+    writeTypeInfo: function writeTypeInfo(buffer) {
       return buffer.writeUInt8(this.id);
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value != null) {
         buffer.writeUInt8(3);
         if (options.useUTC) {
           return buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
         } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+          var dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
           return buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
         }
       } else {
@@ -1352,7 +1361,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1373,7 +1382,7 @@ const TYPE = module.exports.TYPE = {
     hasScale: true,
     dataLengthLength: 1,
 
-    dataLengthFromScale: function(scale) {
+    dataLengthFromScale: function dataLengthFromScale(scale) {
       switch (scale) {
         case 0:
         case 1:
@@ -1389,11 +1398,11 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    declaration: function(parameter) {
-      return 'datetime2(' + (this.resolveScale(parameter)) + ')';
+    declaration: function declaration(parameter) {
+      return 'datetime2(' + this.resolveScale(parameter) + ')';
     },
 
-    resolveScale: function(parameter) {
+    resolveScale: function resolveScale(parameter) {
       if (parameter.scale != null) {
         return parameter.scale;
       } else if (parameter.value === null) {
@@ -1403,14 +1412,15 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       return buffer.writeUInt8(parameter.scale);
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        var ref = void 0,
+            time = new Date(+parameter.value);
         if (options.useUTC) {
           time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
@@ -1438,7 +1448,7 @@ const TYPE = module.exports.TYPE = {
         if (options.useUTC) {
           return buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
         } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+          var dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
           return buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
         }
       } else {
@@ -1446,7 +1456,7 @@ const TYPE = module.exports.TYPE = {
       }
     },
 
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1466,7 +1476,7 @@ const TYPE = module.exports.TYPE = {
     aliases: ['DateTimeOffset'],
     hasScale: true,
     dataLengthLength: 1,
-    dataLengthFromScale: function(scale) {
+    dataLengthFromScale: function dataLengthFromScale(scale) {
       switch (scale) {
         case 0:
         case 1:
@@ -1481,10 +1491,10 @@ const TYPE = module.exports.TYPE = {
           return 5;
       }
     },
-    declaration: function(parameter) {
-      return 'datetimeoffset(' + (this.resolveScale(parameter)) + ')';
+    declaration: function declaration(parameter) {
+      return 'datetimeoffset(' + this.resolveScale(parameter) + ')';
     },
-    resolveScale: function(parameter) {
+    resolveScale: function resolveScale(parameter) {
       if (parameter.scale != null) {
         return parameter.scale;
       } else if (parameter.value === null) {
@@ -1493,18 +1503,19 @@ const TYPE = module.exports.TYPE = {
         return 7;
       }
     },
-    writeTypeInfo: function(buffer, parameter) {
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
       buffer.writeUInt8(this.id);
       return buffer.writeUInt8(parameter.scale);
     },
-    writeParameterData: function(buffer, parameter) {
+    writeParameterData: function writeParameterData(buffer, parameter) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        var ref = void 0,
+            time = new Date(+parameter.value);
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
         time = (+time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
-        const offset = -parameter.value.getTimezoneOffset();
+        var offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
           case 1:
@@ -1529,7 +1540,7 @@ const TYPE = module.exports.TYPE = {
         return buffer.writeUInt8(0);
       }
     },
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1553,19 +1564,22 @@ const TYPE = module.exports.TYPE = {
     type: 'TVPTYPE',
     name: 'TVP',
 
-    declaration: function(parameter) {
+    declaration: function declaration(parameter) {
       return parameter.value.name + ' readonly';
     },
 
-    writeTypeInfo: function(buffer, parameter) {
-      let ref, ref1, ref2, ref3;
+    writeTypeInfo: function writeTypeInfo(buffer, parameter) {
+      var ref = void 0,
+          ref1 = void 0,
+          ref2 = void 0,
+          ref3 = void 0;
       buffer.writeUInt8(this.id);
       buffer.writeBVarchar('');
       buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : undefined) != null ? ref : '');
       buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
     },
 
-    writeParameterData: function(buffer, parameter, options) {
+    writeParameterData: function writeParameterData(buffer, parameter, options) {
       if (parameter.value == null) {
         buffer.writeUInt16LE(0xFFFF);
         buffer.writeUInt8(0x00);
@@ -1575,9 +1589,9 @@ const TYPE = module.exports.TYPE = {
 
       buffer.writeUInt16LE(parameter.value.columns.length);
 
-      const ref = parameter.value.columns;
-      for (let i = 0, len = ref.length; i < len; i++) {
-        const column = ref[i];
+      var ref = parameter.value.columns;
+      for (var i = 0, len = ref.length; i < len; i++) {
+        var column = ref[i];
         buffer.writeUInt32LE(0x00000000);
         buffer.writeUInt16LE(0x0000);
         column.type.writeTypeInfo(buffer, column);
@@ -1586,15 +1600,15 @@ const TYPE = module.exports.TYPE = {
 
       buffer.writeUInt8(0x00);
 
-      const ref1 = parameter.value.rows;
-      for (let j = 0, len1 = ref1.length; j < len1; j++) {
-        const row = ref1[j];
+      var ref1 = parameter.value.rows;
+      for (var j = 0, len1 = ref1.length; j < len1; j++) {
+        var row = ref1[j];
 
         buffer.writeUInt8(0x01);
 
-        for (let k = 0, len2 = row.length; k < len2; k++) {
-          const value = row[k];
-          const param = {
+        for (var k = 0, len2 = row.length; k < len2; k++) {
+          var value = row[k];
+          var param = {
             value: value,
             length: parameter.value.columns[k].length,
             scale: parameter.value.columns[k].scale,
@@ -1606,7 +1620,7 @@ const TYPE = module.exports.TYPE = {
 
       buffer.writeUInt8(0x00);
     },
-    validate: function(value) {
+    validate: function validate(value) {
       if (value == null) {
         return null;
       }
@@ -1632,7 +1646,7 @@ const TYPE = module.exports.TYPE = {
     name: 'Variant',
     dataLengthLength: 4,
 
-    declaration: function(parameter) {
+    declaration: function declaration(parameter) {
       return 'sql_variant';
     }
   }
@@ -1647,16 +1661,16 @@ const TYPE = module.exports.TYPE = {
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)
  */
 
-for (const id in TYPE) {
-  const type = TYPE[id];
+for (var id in TYPE) {
+  var type = TYPE[id];
   type.id = parseInt(id, 10);
   typeByName[type.name] = type;
-  if ((type.aliases != null) && type.aliases instanceof Array) {
-    const ref = type.aliases;
-    const len = ref.length;
+  if (type.aliases != null && type.aliases instanceof Array) {
+    var ref = type.aliases;
+    var len = ref.length;
 
-    for (let i = 0; i < len; i++) {
-      const alias = ref[i];
+    for (var i = 0; i < len; i++) {
+      var alias = ref[i];
       if (!typeByName[alias]) {
         typeByName[alias] = type;
       }
