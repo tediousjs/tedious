@@ -1,7 +1,5 @@
 // This module contains tests cases for the Request.pause()/resume() methods.
 
-'use strict';
-
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const fs = require('fs');
