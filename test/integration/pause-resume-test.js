@@ -52,7 +52,7 @@ exports.tearDown = function(tearDownDone) {
 exports.testLargeQuery = function(test) {
   const debugMode = false;
   const totalRows = 200000;                                // total number of rows to read
-  const delayTime = 500;                                   // pause delay time in ms
+  const delayTime = 1000;                                  // pause delay time in ms
   const connection = this.connection;
   let request;
   let rowsReceived = 0;
@@ -121,7 +121,7 @@ exports.testLargeQuery = function(test) {
       test.ok(!socketRs.flowing,
         'Socket is not paused.');
     }
-    const minimalSocketFillTestLevel = 0x4000;             // (heuristic value)
+    const minimalSocketFillTestLevel = 0x2000;             // (heuristic value)
     const highWaterReserve = 512;                          // (heuristic value)
     test.ok(socketRs.length >= Math.min(socketRs.highWaterMark - highWaterReserve, minimalSocketFillTestLevel),
       'Socket does not feel backpressure.');
