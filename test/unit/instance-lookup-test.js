@@ -19,7 +19,8 @@ exports['instanceLookup invalid args'] = {
   },
 
   'invalid instanceName': function(test) {
-    const expectedErrorMessage = 'Invalid arguments: "instanceName" must be a string';
+    const expectedErrorMessage =
+      'Invalid arguments: "instanceName" must be a string';
     try {
       const notString = 4;
       this.instanceLookup({ server: 'serverName', instanceName: notString });
@@ -30,10 +31,15 @@ exports['instanceLookup invalid args'] = {
   },
 
   'invalid timeout': function(test) {
-    const expectedErrorMessage = 'Invalid arguments: "timeout" must be a number';
+    const expectedErrorMessage =
+      'Invalid arguments: "timeout" must be a number';
     try {
       const notNumber = 'some string';
-      this.instanceLookup({ server: 'server', instanceName: 'instance', timeout: notNumber });
+      this.instanceLookup({
+        server: 'server',
+        instanceName: 'instance',
+        timeout: notNumber
+      });
     } catch (err) {
       test.strictEqual(err.message, expectedErrorMessage);
       test.done();
@@ -41,10 +47,16 @@ exports['instanceLookup invalid args'] = {
   },
 
   'invalid retries': function(test) {
-    const expectedErrorMessage = 'Invalid arguments: "retries" must be a number';
+    const expectedErrorMessage =
+      'Invalid arguments: "retries" must be a number';
     try {
       const notNumber = 'some string';
-      this.instanceLookup({ server: 'server', instanceName: 'instance', timeout: 1000, retries: notNumber });
+      this.instanceLookup({
+        server: 'server',
+        instanceName: 'instance',
+        timeout: 1000,
+        retries: notNumber
+      });
     } catch (err) {
       test.strictEqual(err.message, expectedErrorMessage);
       test.done();
@@ -52,17 +64,25 @@ exports['instanceLookup invalid args'] = {
   },
 
   'invalid callback': function(test) {
-    const expectedErrorMessage = 'Invalid arguments: "callback" must be a function';
+    const expectedErrorMessage =
+      'Invalid arguments: "callback" must be a function';
     try {
       const notFunction = 4;
-      this.instanceLookup({ server: 'server', instanceName: 'instance', timeout: 1000, retries: 3 }, notFunction);
+      this.instanceLookup(
+        {
+          server: 'server',
+          instanceName: 'instance',
+          timeout: 1000,
+          retries: 3
+        },
+        notFunction
+      );
     } catch (err) {
       test.strictEqual(err.message, expectedErrorMessage);
       test.done();
     }
   }
 };
-
 
 exports['instanceLookup functional unit tests'] = {
   setUp: function(done) {
@@ -87,15 +107,24 @@ exports['instanceLookup functional unit tests'] = {
     // to override the execute method on Sender so we can test instance lookup code
     // without triggering network activity.
     this.testSender = this.instanceLookup.createSender(
-      this.options.server, this.anyPort, this.anyRequest);
-    this.createSenderStub = this.sinon.stub(this.instanceLookup, 'createSender');
+      this.options.server,
+      this.anyPort,
+      this.anyRequest
+    );
+    this.createSenderStub = this.sinon.stub(
+      this.instanceLookup,
+      'createSender'
+    );
     this.createSenderStub.returns(this.testSender);
     this.senderExecuteStub = this.sinon.stub(this.testSender, 'execute');
 
     // Stub parseBrowserResponse so we can mimic success and failure without creating
     // elaborate responses. parseBrowserResponse itself has unit tests to ensure that
     // it functions correctly.
-    this.parseStub = this.sinon.stub(this.instanceLookup, 'parseBrowserResponse');
+    this.parseStub = this.sinon.stub(
+      this.instanceLookup,
+      'parseBrowserResponse'
+    );
 
     done();
   },
@@ -105,9 +134,11 @@ exports['instanceLookup functional unit tests'] = {
     done();
   },
 
-  'success': function(test) {
+  success: function(test) {
     this.senderExecuteStub.callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub.withArgs(this.anyMessage, this.options.instanceName).returns(this.anySqlPort);
+    this.parseStub
+      .withArgs(this.anyMessage, this.options.instanceName)
+      .returns(this.anySqlPort);
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
       test.strictEqual(error, undefined);
@@ -142,7 +173,9 @@ exports['instanceLookup functional unit tests'] = {
 
   'parse fail': function(test) {
     this.senderExecuteStub.callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub.withArgs(this.anyMessage, this.options.instanceName).returns(null);
+    this.parseStub
+      .withArgs(this.anyMessage, this.options.instanceName)
+      .returns(null);
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
       test.ok(error.indexOf('not found') !== -1);
@@ -161,8 +194,12 @@ exports['instanceLookup functional unit tests'] = {
   'retry success': function(test) {
     // First invocation of execute will not invoke callback. This will cause a timeout
     // and trigger a retry. Setup to invoke callback on second invocation.
-    this.senderExecuteStub.onCall(1).callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub.withArgs(this.anyMessage, this.options.instanceName).returns(this.anySqlPort);
+    this.senderExecuteStub
+      .onCall(1)
+      .callsArgWithAsync(0, null, this.anyMessage);
+    this.parseStub
+      .withArgs(this.anyMessage, this.options.instanceName)
+      .returns(this.anySqlPort);
 
     const clock = this.sinon.useFakeTimers();
 
@@ -203,7 +240,11 @@ exports['instanceLookup functional unit tests'] = {
     };
 
     this.senderExecuteStub.restore();
-    this.senderExecuteStub = this.sinon.stub(this.testSender, 'execute', scheduleForwardClock);
+    this.senderExecuteStub = this.sinon.stub(
+      this.testSender,
+      'execute',
+      scheduleForwardClock
+    );
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
       test.ok(error.indexOf('Failed to get response') != -1);
@@ -232,14 +273,15 @@ exports['parseBrowserResponse'] = {
     done();
   },
 
-  'oneInstanceFound': function(test) {
-    const response = 'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
+  oneInstanceFound: function(test) {
+    const response =
+      'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
     test.strictEqual(this.parse(response, 'sqlexpress'), 1433);
     test.done();
   },
 
-  'twoInstancesFoundInFirst': function(test) {
+  twoInstancesFoundInFirst: function(test) {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
@@ -248,7 +290,7 @@ exports['parseBrowserResponse'] = {
     test.done();
   },
 
-  'twoInstancesFoundInSecond': function(test) {
+  twoInstancesFoundInSecond: function(test) {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
@@ -257,7 +299,7 @@ exports['parseBrowserResponse'] = {
     test.done();
   },
 
-  'twoInstancesNotFound': function(test) {
+  twoInstancesNotFound: function(test) {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
