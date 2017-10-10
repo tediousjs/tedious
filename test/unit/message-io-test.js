@@ -209,7 +209,7 @@ exports.startOutgoingMessage = (test) => {
 
   var debug = new Debug();
   var incomingMessageStream = new IncomingMessageStream(debug);
-  new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
 
   var payload = new Buffer([1, 2, 3]);
