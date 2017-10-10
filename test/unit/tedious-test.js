@@ -42,7 +42,10 @@ exports.connectionDoesNotModifyPassedConfig = function(test) {
 
   // Test that we did not do a deep copy of the cryptoCredentialsDetails,
   // as we never modify that value inside tedious.
-  test.strictEqual(connection.config.options.cryptoCredentialsDetails, config.options.cryptoCredentialsDetails);
+  test.strictEqual(
+    connection.config.options.cryptoCredentialsDetails,
+    config.options.cryptoCredentialsDetails
+  );
 
   test.done();
 };

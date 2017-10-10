@@ -183,7 +183,12 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
     if (this.loginData.domain) {
-      this.ntlmPacket = this.createNTLMRequest(this.loginData);
+      if (this.loginData.sspiBlob) {
+        this.ntlmPacket = this.loginData.sspiBlob;
+      } else {
+        this.ntlmPacket = this.createNTLMRequest(this.loginData);
+      }
+
       this.sspiLong = this.ntlmPacket.length;
       variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
       variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
@@ -192,11 +197,13 @@ module.exports = class Login7Payload {
     } else {
       this.addVariableDataString(variableData, this.sspi);
     }
+
     this.addVariableDataString(variableData, this.attachDbFile);
     if (this.loginData.tdsVersion > '7_1') {
       this.addVariableDataString(variableData, this.changePassword);
       variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
     }
+
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
   }
 
