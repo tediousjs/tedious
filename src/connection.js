@@ -905,10 +905,10 @@ class Connection extends EventEmitter {
         language: this.config.options.language
       });
 
-    this.routingData = undefined;
+      this.routingData = undefined;
 
-    const message = this.messageIo.startOutgoingMessage(TYPE.LOGIN7, false);
-    message.end(payload.data);
+      const message = this.messageIo.startOutgoingMessage(TYPE.LOGIN7, false);
+      message.end(payload.data);
 
       this.debug.payload(function() {
         return payload.toString('  ');
@@ -965,7 +965,7 @@ class Connection extends EventEmitter {
         if (clientResponse.length) {
           const message = this.messageIo.startOutgoingMessage(TYPE.NTLMAUTH_PKT, false);
           message.end(clientResponse);
-          
+
           this.debug.payload(function() {
             return '  SSPI Auth';
           });

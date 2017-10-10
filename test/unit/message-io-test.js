@@ -35,7 +35,7 @@ exports.receiveOnePacket = function(test) {
     );
   });
 
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
   var packet = new Packet(packetType);
   packet.last(true);
@@ -59,7 +59,7 @@ exports.receiveOnePacketInTwoChunks = function(test) {
     });
   });
 
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
   var packet = new Packet(packetType);
   packet.last(true);
@@ -99,7 +99,7 @@ exports.receiveTwoPackets = function(test) {
     });
   });
 
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
   var packet = new Packet(packetType);
   packet.addData(payload1);
@@ -142,7 +142,7 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
     });
   });
 
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
   var packet1 = new Packet(packetType);
   packet1.addData(payload.slice(0, 2));
@@ -178,7 +178,7 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(test)
     });
   });
 
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
   var packet1 = new Packet(packetType);
   packet1.addData(payload.slice(0, 2));
@@ -209,7 +209,7 @@ exports.startOutgoingMessage = (test) => {
 
   var debug = new Debug();
   var incomingMessageStream = new IncomingMessageStream(debug);
-  var io = new MessageIO(connection, incomingMessageStream, packetSize, debug);
+  new MessageIO(connection, incomingMessageStream, packetSize, debug);
 
 
   var payload = new Buffer([1, 2, 3]);
