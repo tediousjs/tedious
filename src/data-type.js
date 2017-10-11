@@ -295,7 +295,7 @@ const TYPE = module.exports.TYPE = {
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
         let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
-		var time = new Date(+parameter.value);
+        var time = new Date(+parameter.value);
         if (options.useUTC) {
           days = Math.floor((time.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
           seconds = time.getUTCHours() * 60 * 60;
