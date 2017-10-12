@@ -17,130 +17,109 @@ exports.setUp = function(done) {
 };
 
 exports.tearDown = function(done) {
-  this.connection.on('end', done);
-  this.connection.close();
+  if (this.connection.closed) {
+    done();
+  } else {
+    this.connection.on('end', done);
+    this.connection.close();
+  }
 };
 
-function dumpStreamStates(connection) {
-  dumpStreamState('Socket', connection.socket);
-  dumpStreamState('Packet transform', connection.messageIo.packetStream);
-  dumpStreamState('Token transform', connection.tokenStreamParser.parser);
-}
+exports.testPausedRequestDoesNotEmitRowsAfterConnectionClose = function(test) {
+  const sql = `
+    with cte1 as
+      (select 1 as i union all select i + 1 from cte1 where i < 20000)
+    select i from cte1 option (maxrecursion 0)
+  `;
 
-function dumpStreamState(name, stream) {
-  console.log();
-  console.log(name + ' state:');
-  const ws = stream._writableState;
-  console.log(' ws.length: ' + ws.length);
-  console.log(' ws.bufferedRequestCount: ' + ws.bufferedRequestCount);
-  console.log(' ws.highWaterMark: ' + ws.highWaterMark);
-  const rs = stream._readableState;
-  console.log(' rs.length: ' + rs.length);
-  console.log(' rs.buffer.length: ' + rs.buffer.length);
-  console.log(' rs.highWaterMark: ' + rs.highWaterMark);
-  console.log(' rs.flowing: ' + rs.flowing);
-}
+  const request = new Request(sql, (error) => {
+    test.ok(error);
+  });
 
-// This test reads a large number of rows from the database.
-// At 1/4 of the rows, Request.pause() is called.
-// After a delay, Request.resume() is called.
-// This test verifies that:
-//  - No 'row' events are received during the pause.
-//  - The socket and the two transforms are stopped during the pause.
-//  - No large amounts of data are accumulated within the transforms during the pause.
-//  - No data is lost.
-//  - The request timer does not cancel the query when it takes longer to
-//    receive all the rows.
-exports.testLargeQuery = function(test) {
-  const debugMode = false;
-  // total number of rows to read
-  const totalRows = 200000;
-  // pause delay time in ms
-  const delayTime = 1000;
-  const connection = this.connection;
+  request.on('row', (columns) => {
+    if (columns[0].value == 1000) {
+      request.pause();
+
+      setTimeout(() => {
+        this.connection.on('end', () => {
+          process.nextTick(() => {
+            test.done()
+          });
+        });
+        this.connection.close();
+      }, 100);
+    }
+  });
+
+  this.connection.execSql(request);
+};
+
+exports.testPausedRequestCanBeResumed = function(test) {
+  const sql = `
+    with cte1 as
+      (select 1 as i union all select i + 1 from cte1 where i < 20000)
+    select i from cte1 option (maxrecursion 0)
+  `;
+
   let rowsReceived = 0;
   let paused = false;
 
-  connection.on('error', function(err) {
-    test.ifError(err);
+  const request = new Request(sql, (error) => {
+    test.ifError(error);
+
+    test.strictEqual(rowsReceived, 20000);
+
+    test.done();
   });
 
-  // recursive CTE to generate rows
-  const sql = `
-    with cte1 as
-      (select 1 as i union all select i + 1 from cte1 where i < ${totalRows})
-    select i from cte1 option (maxrecursion 0)
-  `;
-  const request = new Request(sql, onRequestCompletion);
-  request.on('row', processRow);
-  connection.execSql(request);
+  request.on('row', (columns) => {
+    test.ok(!paused);
 
-  function onRequestCompletion(err) {
-    test.ifError(err);
-    test.equal(rowsReceived, totalRows, 'Invalid row count.');
-    test.done();
-  }
-
-  function processRow(columns) {
-    if (paused) {
-      test.ok(false, 'Row received in paused state.');
-    }
     rowsReceived++;
 
-    if (columns[0].value !== rowsReceived) {
-      test.ok(false, `Invalid row counter value, value=${columns[0].value}, expected=${rowsReceived}.`);
+    test.strictEqual(columns[0].value, rowsReceived);
+
+    if (columns[0].value == 1000) {
+      paused = true;
+      request.pause();
+
+      setTimeout(() => {
+        paused = false;
+        request.resume();
+      }, 100);
     }
+  });
 
-    if (rowsReceived === Math.round(totalRows / 4)) {
-      pause();
+  this.connection.execSql(request);
+};
+
+exports.testPausingRequestPausesTransforms = function(test) {
+  const sql = `
+    with cte1 as
+      (select 1 as i union all select i + 1 from cte1 where i < 20000)
+    select i from cte1 option (maxrecursion 0)
+  `;
+
+  const request = new Request(sql, (error) => {
+    test.ifError(error);
+
+    test.done();
+  });
+
+  request.on('row', (columns) => {
+    if (columns[0].value == 1000) {
+      request.pause();
+
+      setTimeout(() => {
+        test.ok(this.connection.messageIo.packetStream.isPaused());
+        test.ok(this.connection.tokenStreamParser.parser.isPaused());
+
+        request.resume();
+      }, 100);
     }
-  }
+  });
 
-  function pause() {
-    if (debugMode) {
-      dumpStreamStates(connection);
-      console.log('Start pause.');
-    }
-    paused = true;
-    request.pause();
-    setTimeout(resume, delayTime);
-  }
-
-  function resume() {
-    if (debugMode) {
-      console.log('End pause.');
-      dumpStreamStates(connection);
-    }
-    verifyStreamStatesAfterPause();
-    paused = false;
-    request.resume();
-  }
-
-  function verifyStreamStatesAfterPause() {
-    const packetSize = connection.messageIo.packetSize();
-    const socketRs = connection.socket._readableState;
-    test.ok(!socketRs.flowing, 'Socket is not paused.');
-
-    const minimalSocketFillTestLevel = 0x2000;             // (heuristic value)
-    const highWaterReserve = 512;                          // (heuristic value)
-    test.ok(socketRs.length >= Math.min(socketRs.highWaterMark - highWaterReserve, minimalSocketFillTestLevel),
-      'Socket does not feel backpressure.');
-    const packetTransformWs = connection.messageIo.packetStream._writableState;
-    const packetTransformRs = connection.messageIo.packetStream._readableState;
-    test.ok(!packetTransformRs.flowing,
-      'Packet transform is not paused.');
-    test.ok(packetTransformWs.length <= packetTransformWs.highWaterMark &&
-      packetTransformRs.length <= packetTransformRs.highWaterMark,
-      'Packet transform has large amount of data buffered.');
-    const tokenTransformWs = connection.tokenStreamParser.parser._writableState;
-    const tokenTransformRs = connection.tokenStreamParser.parser._readableState;
-    test.ok(!tokenTransformRs.flowing,
-      'Token transform is not paused.');
-    test.ok(tokenTransformWs.length <= tokenTransformWs.highWaterMark,
-      'Token transform input buffer overflow.');
-    test.ok(tokenTransformRs.length < packetSize / 3,
-      'Token transform output buffer has large amount of data buffered.');
-  }
+  this.connection.execSql(request);
 };
 
 exports.testPausedRequestCanBeCancelled = function(test) {
