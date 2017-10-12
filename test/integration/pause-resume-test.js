@@ -123,95 +123,79 @@ exports.testLargeQuery = function(test) {
   }
 };
 
-// This test reads only a few rows and makes a short pause after each row.
-// This test verifies that:
-//  - Pause/resume works correctly when applied after the last packet of a TDS
-//    message has already been dispatched by MessageIO.ReadablePacketStream.
-//    This is the case when EOM / packet.isLast() has already been detected
-//    at the time when Request.pause() is called.
-//    The 'message' event emitted by MessageIO has to be channeled through
-//    the token parser transform.
-//  - No more 'row' events are emitted after a paused request has been canceled.
-//  - The internal data flow is resumed after a paused request has been canceled.
-//  - A request can be paused before Connection.execSql() is called.
-exports.testTransitions = function(test) {
-  const totalRequests = 4;
-  const rowsPerRequest = 4;
-  // pause delay time in ms
-  const delayTime = 100;
-  // 1-based position of request to be canceled
-  const requestToCancel = 2;
-  // 1-based position of row at which connection.cancel() will be called
-  const rowToCancel = 2;
-  // 1-based position of request to start paused
-  const requestToStartPaused = 4;
-  const connection = this.connection;
-  let request;
-  let requestCount = 0;
-  let rowCount;
-  let paused = false;
-  let canceled = false;
-
-  connection.on('error', function(err) {
+exports.testPausedRequestCanBeCancelled = function(test) {
+  this.connection.on('error', (err) => {
     test.ifError(err);
   });
-  openRequest();
 
-  function openRequest() {
-    let sql = 'select 1';
-    for (let i = 2; i <= rowsPerRequest; i++) {
-      sql = `${sql} union all select ${i}`;
-    }
-    request = new Request(sql, onRequestCompletion);
-    request.on('row', processRow);
-    rowCount = 0;
-    paused = false;
-    canceled = false;
-    if (requestCount === requestToStartPaused - 1) {
-      pause();
-    }
-    connection.execSql(request);
-  }
+  const pauseAndCancelRequest = (next) => {
+    const sql = `
+      with cte1 as
+        (select 1 as i union all select i + 1 from cte1 where i < 20000)
+      select i from cte1 option (maxrecursion 0)
+    `;
 
-  function onRequestCompletion(err) {
-    requestCount++;
-    if (requestCount === requestToCancel) {
-      test.ok(err && err.code === 'ECANCEL');
-      test.equal(rowCount, rowToCancel);
-    } else {
-      test.ifError(err);
-      test.equal(rowCount, rowsPerRequest);
-    }
-    if (requestCount < totalRequests) {
-      openRequest();
-    } else {
+    const request = new Request(sql, (error) => {
+      test.ok(error);
+      test.strictEqual(error.code, 'ECANCEL');
+
+      next();
+    });
+
+    request.on('row', (columns) => {
+      if (columns[0].value == 1000) {
+        request.pause();
+
+        setTimeout(() => {
+          this.connection.cancel();
+        }, 100);
+      } else if (columns[0].value > 1000) {
+        test.ok(false, 'Received rows after pause');
+      }
+    });
+
+    this.connection.execSql(request);
+  };
+
+  pauseAndCancelRequest(() => {
+    const request = new Request('SELECT 1', (error) => {
+      test.ifError(error);
       test.done();
-    }
-  }
+    });
 
-  function processRow(columns) {
-    test.ok(!canceled, `Row received in canceled state, requestCount=${requestCount} rowCount=${rowCount}`);
-    test.ok(!paused, `Row received in paused state, requestCount=${requestCount} rowCount=${rowCount}`);
-    rowCount++;
-    test.equal(columns[0].value, rowCount);
-    pause();
-  }
+    request.on('row', (columns) => {
+      test.strictEqual(columns[0].value, 1);
+    });
 
-  function pause() {
-    paused = true;
-    request.pause();
-    setTimeout(afterDelay, delayTime);
-  }
+    this.connection.execSql(request);
+  });
+};
 
-  function afterDelay() {
-    if (requestCount === requestToCancel - 1 && rowCount === rowToCancel) {
-      canceled = true;
-      connection.cancel();
-    } else {
-      paused = false;
-      request.resume();
-    }
-  }
+exports.testImmediatelyPausedRequestDoesNotEmitRowsUntilResumed = function(test) {
+  this.connection.on('error', (err) => {
+    test.ifError(err);
+  });
+
+  const request = new Request('SELECT 1', (error) => {
+    test.ifError(error);
+    test.done();
+  });
+
+  let paused = true;
+  request.pause();
+
+  request.on('row', (columns) => {
+    test.ok(!paused);
+
+    test.strictEqual(columns[0].value, 1);
+  });
+
+  this.connection.execSql(request);
+
+  setTimeout(() => {
+    paused = false;
+    request.resume();
+  }, 100);
 };
 
 function dumpStreamStates(connection) {
