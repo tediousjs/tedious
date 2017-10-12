@@ -43,7 +43,7 @@ exports.testPausedRequestDoesNotEmitRowsAfterConnectionClose = function(test) {
       setTimeout(() => {
         this.connection.on('end', () => {
           process.nextTick(() => {
-            test.done()
+            test.done();
           });
         });
         this.connection.close();
