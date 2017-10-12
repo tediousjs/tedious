@@ -1,9 +1,7 @@
-// This module contains tests cases for the Request.pause()/resume() methods.
+const fs = require('fs');
 
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
-const fs = require('fs');
-const semver = require('semver');
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
@@ -117,10 +115,8 @@ exports.testLargeQuery = function(test) {
   function verifyStreamStatesAfterPause() {
     const packetSize = connection.messageIo.packetSize();
     const socketRs = connection.socket._readableState;
-    if (semver.gte(process.version, '0.12.18')) {
-      test.ok(!socketRs.flowing,
-        'Socket is not paused.');
-    }
+    test.ok(!socketRs.flowing, 'Socket is not paused.');
+
     const minimalSocketFillTestLevel = 0x2000;             // (heuristic value)
     const highWaterReserve = 512;                          // (heuristic value)
     test.ok(socketRs.length >= Math.min(socketRs.highWaterMark - highWaterReserve, minimalSocketFillTestLevel),
