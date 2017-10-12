@@ -6,35 +6,19 @@ const Request = require('../../src/request');
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-  config.options.requestTimeout = 250;                     // 250 ms timeout until the first response package is received
+  // 250 ms timeout until the first response package is received
+  config.options.requestTimeout = 250;
   return config;
 }
 
-exports.setUp = function(setUpDone) {
-  const connection = new Connection(getConfig());
-  connection.on('connect', (err) => {
-    if (err) {
-      setUpDone(err);
-      return;
-    }
-    this.connection = connection;
-    setUpDone();
-  });
-  connection.on('end', () => {
-    this.connection = undefined;
-  });
+exports.setUp = function(done) {
+  this.connection = new Connection(getConfig());
+  this.connection.on('connect', done);
 };
 
-exports.tearDown = function(tearDownDone) {
-  const connection = this.connection;
-  if (!connection) {
-    tearDownDone();
-    return;
-  }
-  connection.on('end', function() {
-    tearDownDone();
-  });
-  connection.close();
+exports.tearDown = function(done) {
+  this.connection.on('end', done);
+  this.connection.close();
 };
 
 // This test reads a large number of rows from the database.
