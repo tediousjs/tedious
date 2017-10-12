@@ -20,6 +20,8 @@ title: API - Request
   <li><a href="#event_returnValue">Event: 'returnValue'</a></li>
   <li><a href="#function_addParameter">request.addParameter(name, type, value, [options])</a></li>
   <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type, [value], [options])</a></li>
+  <li><a href="#function_pause">request.pause()</a></li>
+  <li><a href="#function_resume">request.resume()</a></li>
 </ul>
 
 <h2 id="function_newRequest">new Request(sql, callback)</h2>
@@ -488,3 +490,26 @@ request.addOutputParameter('id', TYPES.Int);
     </p>
   </div>
 </div>
+
+<h2 id="function_pause">request.pause()</h2>
+<p>
+  Temporarily suspends the flow of data from the database.
+  No more <code>'row'</code> events will be emitted until <a href="#function_resume"><code>request.resume()</code></a> is called.
+</p>
+{% highlight javascript %}
+request.pause();
+{% endhighlight %}
+<p>
+  If this request is already in a paused state, calling <code>pause()</code> has no effect.
+</p>
+
+<h2 id="function_resume">request.resume()</h2>
+<p>
+  Resumes the flow of data from the database.
+</p>
+{% highlight javascript %}
+request.resume();
+{% endhighlight %}
+<p>
+  If this request is not in a paused state, calling <code>resume()</code> has no effect.
+</p>
