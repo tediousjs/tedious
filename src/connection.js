@@ -577,7 +577,9 @@ class Connection extends EventEmitter {
         if (this.config.options.rowCollectionOnDone) {
           this.request.rst.push(token.columns);
         }
-        return this.request.emit('row', token.columns);
+        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
+          this.request.emit('row', token.columns);
+        }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
         return this.close();
@@ -641,6 +643,12 @@ class Connection extends EventEmitter {
       }
     });
 
+    this.tokenStreamParser.on('endOfMessage', () => {      // EOM pseudo token received
+      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
+        this.dispatchEvent('endOfMessageMarkerReceived');
+      }
+    });
+
     this.tokenStreamParser.on('resetConnection', () => {
       return this.emit('resetConnection');
     });
@@ -648,6 +656,12 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('tokenStreamError', (error) => {
       this.emit('error', error);
       return this.close();
+    });
+
+    this.tokenStreamParser.on('drain', () => {
+      // Bridge the release of backpressure from the token stream parser
+      // transform to the packet stream transform.
+      this.messageIo.resume();
     });
   }
 
@@ -766,7 +780,7 @@ class Connection extends EventEmitter {
     }
 
     if (this.state && this.state.exit) {
-      this.state.exit.apply(this);
+      this.state.exit.call(this, newState);
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
@@ -973,8 +987,31 @@ class Connection extends EventEmitter {
     }
   }
 
+  // Returns false to apply backpressure.
   sendDataToTokenStreamParser(data) {
     return this.tokenStreamParser.addBuffer(data);
+  }
+
+  // This is an internal method that is called from Request.pause().
+  // It has to check whether the passed Request object represents the currently
+  // active request, because the application might have called Request.pause()
+  // on an old inactive Request object.
+  pauseRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.pause();
+    }
+  }
+
+  // This is an internal method that is called from Request.resume().
+  resumeRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.resume();
+    }
+  }
+
+  // Returns true if the passed request is the currently active request of the connection.
+  isRequestActive(request) {
+    return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
   }
 
   sendInitialSql() {
@@ -1266,6 +1303,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.request.connection = this;
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
@@ -1275,7 +1313,10 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
-      return this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      if (request.paused) {                                // Request.pause() has been called before the request was started
+        this.pauseRequest(request);
+      }
     }
   }
 
@@ -1561,8 +1602,12 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function() {
+    exit: function(nextState) {
       this.clearRequestTimer();
+
+      if (nextState !== this.STATE.FINAL) {
+        this.tokenStreamParser.resume();
+      }
     },
     events: {
       socketError: function(err) {
@@ -1573,9 +1618,20 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         this.clearRequestTimer();                          // request timer is stopped on first data package
-        return this.sendDataToTokenStreamParser(data);
+        const ret = this.sendDataToTokenStreamParser(data);
+        if (ret === false) {
+          // Bridge backpressure from the token stream parser transform to the
+          // packet stream transform.
+          this.messageIo.pause();
+        }
       },
       message: function() {
+        // We have to channel the 'message' (EOM) event through the token stream
+        // parser transform, to keep it in line with the flow of the tokens, when
+        // the incoming data flow is paused and resumed.
+        return this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
         this.request = undefined;
