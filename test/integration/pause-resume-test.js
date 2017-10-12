@@ -47,7 +47,7 @@ exports.testPausedRequestDoesNotEmitRowsAfterConnectionClose = function(test) {
           });
         });
         this.connection.close();
-      }, 100);
+      }, 200);
     }
   });
 
@@ -86,7 +86,7 @@ exports.testPausedRequestCanBeResumed = function(test) {
       setTimeout(() => {
         paused = false;
         request.resume();
-      }, 100);
+      }, 200);
     }
   });
 
@@ -115,7 +115,7 @@ exports.testPausingRequestPausesTransforms = function(test) {
         test.ok(this.connection.tokenStreamParser.parser.isPaused());
 
         request.resume();
-      }, 100);
+      }, 200);
     }
   });
 
@@ -147,7 +147,7 @@ exports.testPausedRequestCanBeCancelled = function(test) {
 
         setTimeout(() => {
           this.connection.cancel();
-        }, 100);
+        }, 200);
       } else if (columns[0].value > 1000) {
         test.ok(false, 'Received rows after pause');
       }
@@ -194,5 +194,5 @@ exports.testImmediatelyPausedRequestDoesNotEmitRowsUntilResumed = function(test)
   setTimeout(() => {
     paused = false;
     request.resume();
-  }, 100);
+  }, 200);
 };
