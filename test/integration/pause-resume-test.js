@@ -33,28 +33,27 @@ exports.tearDown = function(done) {
 //    receive all the rows.
 exports.testLargeQuery = function(test) {
   const debugMode = false;
-  const totalRows = 200000;                                // total number of rows to read
-  const delayTime = 1000;                                  // pause delay time in ms
+  // total number of rows to read
+  const totalRows = 200000;
+  // pause delay time in ms
+  const delayTime = 1000;
   const connection = this.connection;
-  let request;
   let rowsReceived = 0;
-  let failed = false;                                      // used to suppress further error messages
   let paused = false;
 
   connection.on('error', function(err) {
     test.ifError(err);
   });
-  openRequest();
 
-  function openRequest() {
-    const sql =                                            // recursive CTE to generate rows
-      'with cte1 as ' +
-        '(select 1 as i union all select i + 1 from cte1 where i < ' + totalRows + ') ' +
-      'select i from cte1 option (maxrecursion 0)';
-    request = new Request(sql, onRequestCompletion);
-    request.on('row', processRow);
-    connection.execSql(request);
-  }
+  // recursive CTE to generate rows
+  const sql = `
+    with cte1 as
+      (select 1 as i union all select i + 1 from cte1 where i < ${totalRows})
+    select i from cte1 option (maxrecursion 0)
+  `;
+  const request = new Request(sql, onRequestCompletion);
+  request.on('row', processRow);
+  connection.execSql(request);
 
   function onRequestCompletion(err) {
     test.ifError(err);
@@ -64,13 +63,14 @@ exports.testLargeQuery = function(test) {
 
   function processRow(columns) {
     if (paused) {
-      fail('Row received in paused state.');
+      test.ok(false, 'Row received in paused state.');
     }
     rowsReceived++;
+
     if (columns[0].value !== rowsReceived) {
-      fail('Invalid row counter value, value=' + columns[0].value + ', expected=' + rowsReceived + '.');
-      return;
+      test.ok(false, `Invalid row counter value, value=${columns[0].value}, expected=${rowsReceived}.`);
     }
+
     if (rowsReceived === Math.round(totalRows / 4)) {
       pause();
     }
@@ -121,15 +121,6 @@ exports.testLargeQuery = function(test) {
     test.ok(tokenTransformRs.length < packetSize / 3,
       'Token transform output buffer has large amount of data buffered.');
   }
-
-  function fail(msg) {
-    if (failed) {
-      return;
-    }
-    failed = true;
-    test.ok(false, msg);
-    connection.close();
-  }
 };
 
 // This test reads only a few rows and makes a short pause after each row.
@@ -146,10 +137,14 @@ exports.testLargeQuery = function(test) {
 exports.testTransitions = function(test) {
   const totalRequests = 4;
   const rowsPerRequest = 4;
-  const delayTime = 100;                                   // pause delay time in ms
-  const requestToCancel = 2;                               // 1-based position of request to be canceled
-  const rowToCancel = 2;                                   // 1-based position of row at which connection.cancel() will be called
-  const requestToStartPaused = 4;                          // 1-based position of request to start paused
+  // pause delay time in ms
+  const delayTime = 100;
+  // 1-based position of request to be canceled
+  const requestToCancel = 2;
+  // 1-based position of row at which connection.cancel() will be called
+  const rowToCancel = 2;
+  // 1-based position of request to start paused
+  const requestToStartPaused = 4;
   const connection = this.connection;
   let request;
   let requestCount = 0;
@@ -165,7 +160,7 @@ exports.testTransitions = function(test) {
   function openRequest() {
     let sql = 'select 1';
     for (let i = 2; i <= rowsPerRequest; i++) {
-      sql = sql + ' union all select ' + i;
+      sql = `${sql} union all select ${i}`;
     }
     request = new Request(sql, onRequestCompletion);
     request.on('row', processRow);
@@ -195,8 +190,8 @@ exports.testTransitions = function(test) {
   }
 
   function processRow(columns) {
-    test.ok(!canceled, 'Row received in canceled state, requestCount=' + requestCount + ' rowCount=' + rowCount);
-    test.ok(!paused, 'Row received in paused state, requestCount=' + requestCount + ' rowCount=' + rowCount);
+    test.ok(!canceled, `Row received in canceled state, requestCount=${requestCount} rowCount=${rowCount}`);
+    test.ok(!paused, `Row received in paused state, requestCount=${requestCount} rowCount=${rowCount}`);
     rowCount++;
     test.equal(columns[0].value, rowCount);
     pause();
