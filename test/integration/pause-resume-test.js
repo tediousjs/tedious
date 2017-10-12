@@ -21,6 +21,26 @@ exports.tearDown = function(done) {
   this.connection.close();
 };
 
+function dumpStreamStates(connection) {
+  dumpStreamState('Socket', connection.socket);
+  dumpStreamState('Packet transform', connection.messageIo.packetStream);
+  dumpStreamState('Token transform', connection.tokenStreamParser.parser);
+}
+
+function dumpStreamState(name, stream) {
+  console.log();
+  console.log(name + ' state:');
+  const ws = stream._writableState;
+  console.log(' ws.length: ' + ws.length);
+  console.log(' ws.bufferedRequestCount: ' + ws.bufferedRequestCount);
+  console.log(' ws.highWaterMark: ' + ws.highWaterMark);
+  const rs = stream._readableState;
+  console.log(' rs.length: ' + rs.length);
+  console.log(' rs.buffer.length: ' + rs.buffer.length);
+  console.log(' rs.highWaterMark: ' + rs.highWaterMark);
+  console.log(' rs.flowing: ' + rs.flowing);
+}
+
 // This test reads a large number of rows from the database.
 // At 1/4 of the rows, Request.pause() is called.
 // After a delay, Request.resume() is called.
@@ -197,23 +217,3 @@ exports.testImmediatelyPausedRequestDoesNotEmitRowsUntilResumed = function(test)
     request.resume();
   }, 100);
 };
-
-function dumpStreamStates(connection) {
-  dumpStreamState('Socket', connection.socket);
-  dumpStreamState('Packet transform', connection.messageIo.packetStream);
-  dumpStreamState('Token transform', connection.tokenStreamParser.parser);
-}
-
-function dumpStreamState(name, stream) {
-  console.log();
-  console.log(name + ' state:');
-  const ws = stream._writableState;
-  console.log(' ws.length: ' + ws.length);
-  console.log(' ws.bufferedRequestCount: ' + ws.bufferedRequestCount);
-  console.log(' ws.highWaterMark: ' + ws.highWaterMark);
-  const rs = stream._readableState;
-  console.log(' rs.length: ' + rs.length);
-  console.log(' rs.buffer.length: ' + rs.buffer.length);
-  console.log(' rs.highWaterMark: ' + rs.highWaterMark);
-  console.log(' rs.flowing: ' + rs.flowing);
-}
