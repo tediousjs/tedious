@@ -780,7 +780,7 @@ class Connection extends EventEmitter {
     }
 
     if (this.state && this.state.exit) {
-      this.state.exit.apply(this);
+      this.state.exit.call(this, newState);
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
@@ -1602,9 +1602,12 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function() {
+    exit: function(nextState) {
       this.clearRequestTimer();
-      this.tokenStreamParser.resume();
+
+      if (nextState !== this.STATE.FINAL) {
+        this.tokenStreamParser.resume();
+      }
     },
     events: {
       socketError: function(err) {
