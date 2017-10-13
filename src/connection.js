@@ -6,7 +6,6 @@ const TransientErrorLookup = require('./transient-error-lookup.js').TransientErr
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
 const Login7Payload = require('./login7-payload');
-const NTLMResponsePayload = require('./ntlm-payload');
 const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
@@ -19,9 +18,8 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 const SspiModuleSupported = require('sspi-client').ModuleSupported;
-const SspiClientApi = require('sspi-client').SspiClientApi;
-const Fqdn = require('sspi-client').Fqdn;
-const MakeSpn = require('sspi-client').MakeSpn;
+
+const DefaultAuthProvider = require('./auth/default');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -359,6 +357,8 @@ class Connection extends EventEmitter {
       }
     }
 
+    this.authProvider = this.config.authProvider ? this.config.authProvider(this) : new DefaultAuthProvider();
+
     if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
@@ -396,6 +396,8 @@ class Connection extends EventEmitter {
       REDIRECT: 1,
       RETRY: 2
     };
+
+    this.authProvider = new DefaultAuthProvider(this);
   }
 
   close() {
@@ -867,8 +869,13 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendLogin7Packet(cb) {
-    const sendPayload = function(clientResponse) {
+  sendLogin7Packet(callback) {
+    this.authProvider.handshake(null, (error, data) => {
+      if (error) {
+        this.emit('error', error);
+        return this.close();
+      }
+
       const payload = new Login7Payload({
         domain: this.config.domain,
         userName: this.config.userName,
@@ -880,7 +887,7 @@ class Connection extends EventEmitter {
         tdsVersion: this.config.options.tdsVersion,
         initDbFatal: !this.config.options.fallbackToDefaultDb,
         readOnlyIntent: this.config.options.readOnlyIntent,
-        sspiBlob: clientResponse,
+        sspiBlob: data,
         language: this.config.options.language
       });
 
@@ -890,87 +897,26 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
-    };
 
-    if (this.config.options.useWindowsIntegratedAuth) {
-      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
-        if (err) {
-          this.emit('error', new Error('Error getting Fqdn. Error details: ' + err.message));
-          return this.close();
-        }
-
-        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
-
-        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
-
-        this.sspiClientResponsePending = true;
-        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
-          if (errorCode) {
-            this.emit('error', new Error(errorString));
-            return this.close();
-          }
-
-          if (isDone) {
-            this.emit('error', new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.'));
-            return this.close();
-          }
-
-          this.sspiClientResponsePending = false;
-          sendPayload.call(this, clientResponse);
-          cb();
-        });
-      });
-    } else {
-      sendPayload.call(this);
-      process.nextTick(cb);
-    }
+      process.nextTick(callback);
+    });
   }
 
   sendNTLMResponsePacket() {
-    if (this.sspiClient) {
-      this.sspiClientResponsePending = true;
+    this.authProvider.processChallenge(this.ntlmpacketBuffer, (error, responseBuffer) => {
+      if (error) {
+        this.emit('error', error);
+        return this.close();
+      }
 
-      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
-
-        if (errorCode) {
-          this.emit('error', new Error(errorString));
-          return this.close();
-        }
-
-        this.sspiClientResponsePending = false;
-
-        if (clientResponse.length) {
-          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
-          this.debug.payload(function() {
-            return '  SSPI Auth';
-          });
-        }
-
-        if (isDone) {
+      if (responseBuffer) {
+        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
+      } else {
+        process.nextTick(() => {
           this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-        }
-      });
-    } else {
-      const payload = new NTLMResponsePayload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        database: this.config.options.database,
-        appName: this.config.options.appName,
-        packetSize: this.config.options.packetSize,
-        tdsVersion: this.config.options.tdsVersion,
-        ntlmpacket: this.ntlmpacket,
-        additional: this.additional
-      });
-
-      this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
-
-      const boundTransitionTo = this.transitionTo.bind(this);
-      process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
-    }
+        });
+      }
+    });
   }
 
   sendDataToTokenStreamParser(data) {
@@ -997,7 +943,7 @@ class Connection extends EventEmitter {
 
     return `set ansi_nulls ${enableAnsiNull}\n
       set ansi_null_dflt_on ${enableAnsiNullDefault}\n
-      set ansi_padding ${enableAnsiPadding}\n 
+      set ansi_padding ${enableAnsiPadding}\n
       set ansi_warnings ${enableAnsiWarnings}\n
       set arithabort ${enableArithAbort}\n
       set concat_null_yields_null ${enableConcatNullYieldsNull}\n

@@ -9,7 +9,8 @@ exports.create = function(test) {
     language: 'lang',
     database: 'db',
     packetSize: 1024,
-    tdsVersion: '7_2'
+    tdsVersion: '7_2',
+    sspiBlob: new Buffer(0)
   };
 
   //start = new Date().getTime()
@@ -52,7 +53,7 @@ exports.create = function(test) {
     payload.clientId.length +
     2 +
     2 +
-    2 * payload.sspi.length +
+    2 * 0 +
     2 +
     2 +
     2 * payload.attachDbFile.length +
@@ -81,12 +82,11 @@ exports.createNTLM = function(test) {
     password: 'pw',
     appName: 'app',
     serverName: 'server',
-    domain: 'domain',
-    workstation: 'workstation',
     language: 'lang',
     database: 'db',
     packetSize: 1024,
-    tdsVersion: '7_2'
+    tdsVersion: '7_2',
+    sspiBlob: new Buffer(0)
   };
 
   var payload = new Login7Payload(loginData);
@@ -135,20 +135,6 @@ exports.createNTLM = function(test) {
 
   test.strictEqual(payload.data.length, expectedLength);
 
-  var protocolHeader = payload.ntlmPacket.slice(0, 8).toString('utf8');
-  test.strictEqual(protocolHeader, 'NTLMSSP\u0000');
-
-  var workstationName = payload.ntlmPacket
-    .slice(payload.ntlmPacket.length - 17)
-    .toString('ascii')
-    .substr(0, 11);
-  test.strictEqual(workstationName, 'WORKSTATION');
-
-  var domainName = payload.ntlmPacket
-    .slice(payload.ntlmPacket.length - 6)
-    .toString('ascii');
-  test.strictEqual(domainName, 'DOMAIN');
-
   var passwordStart = payload.data.readUInt16LE(4 + 32 + 2 * 4);
   var passwordEnd = passwordStart + 2 * loginData.password.length;
   var passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5]);
@@ -165,8 +151,6 @@ exports.createSSPI = function(test) {
     password: '',
     appName: 'app',
     serverName: 'server',
-    domain: 'domain',
-    workstation: 'workstation',
     language: 'lang',
     database: 'db',
     packetSize: 1024,

@@ -54,42 +54,6 @@ const FLAGS_3 = {
   UNKNOWN_COLLATION_HANDLING: 0x08
 };
 
-const NTLMFlags = {
-  NTLM_NegotiateUnicode: 0x00000001,
-  NTLM_NegotiateOEM: 0x00000002,
-  NTLM_RequestTarget: 0x00000004,
-  NTLM_Unknown9: 0x00000008,
-  NTLM_NegotiateSign: 0x00000010,
-  NTLM_NegotiateSeal: 0x00000020,
-  NTLM_NegotiateDatagram: 0x00000040,
-  NTLM_NegotiateLanManagerKey: 0x00000080,
-  NTLM_Unknown8: 0x00000100,
-  NTLM_NegotiateNTLM: 0x00000200,
-  NTLM_NegotiateNTOnly: 0x00000400,
-  NTLM_Anonymous: 0x00000800,
-  NTLM_NegotiateOemDomainSupplied: 0x00001000,
-  NTLM_NegotiateOemWorkstationSupplied: 0x00002000,
-  NTLM_Unknown6: 0x00004000,
-  NTLM_NegotiateAlwaysSign: 0x00008000,
-  NTLM_TargetTypeDomain: 0x00010000,
-  NTLM_TargetTypeServer: 0x00020000,
-  NTLM_TargetTypeShare: 0x00040000,
-  NTLM_NegotiateExtendedSecurity: 0x00080000,
-  NTLM_NegotiateIdentify: 0x00100000,
-  NTLM_Unknown5: 0x00200000,
-  NTLM_RequestNonNTSessionKey: 0x00400000,
-  NTLM_NegotiateTargetInfo: 0x00800000,
-  NTLM_Unknown4: 0x01000000,
-  NTLM_NegotiateVersion: 0x02000000,
-  NTLM_Unknown3: 0x04000000,
-  NTLM_Unknown2: 0x08000000,
-  NTLM_Unknown1: 0x10000000,
-  NTLM_Negotiate128: 0x20000000,
-  NTLM_NegotiateKeyExchange: 0x40000000,
-  NTLM_Negotiate56: 0x80000000
-};
-
-
 /*
   s2.2.6.3
  */
@@ -166,10 +130,6 @@ module.exports = class Login7Payload {
     this.loginData.appName = this.loginData.appName || 'Tedious';
     this.libraryName = libraryName;
     this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
-    if (!this.loginData.domain) {
-      this.sspi = '';
-      this.sspiLong = 0;
-    }
     this.attachDbFile = '';
     this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
@@ -182,21 +142,13 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
-    if (this.loginData.domain) {
-      if (this.loginData.sspiBlob) {
-        this.ntlmPacket = this.loginData.sspiBlob;
-      } else {
-        this.ntlmPacket = this.createNTLMRequest(this.loginData);
-      }
 
-      this.sspiLong = this.ntlmPacket.length;
-      variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-      variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
-      variableData.data.writeBuffer(this.ntlmPacket);
-      variableData.offset += this.ntlmPacket.length;
-    } else {
-      this.addVariableDataString(variableData, this.sspi);
-    }
+    this.ntlmPacket = this.loginData.sspiBlob;
+    this.sspiLong = this.ntlmPacket.length;
+    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
+    variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
+    variableData.data.writeBuffer(this.ntlmPacket);
+    variableData.offset += this.ntlmPacket.length;
 
     this.addVariableDataString(variableData, this.attachDbFile);
     if (this.loginData.tdsVersion > '7_1') {
@@ -222,40 +174,6 @@ module.exports = class Login7Payload {
     return variableData.offset += value.length * 2;
   }
 
-  createNTLMRequest(options) {
-    const domain = escape(options.domain.toUpperCase());
-    const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
-    const protocol = 'NTLMSSP\u0000';
-    const BODY_LENGTH = 40;
-    const bufferLength = BODY_LENGTH + domain.length;
-    const buffer = new WritableTrackingBuffer(bufferLength);
-
-    let type1flags = this.getNTLMFlags();
-    if (workstation === '') {
-      type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
-    }
-
-    buffer.writeString(protocol, 'utf8');
-    buffer.writeUInt32LE(1);
-    buffer.writeUInt32LE(type1flags);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt32LE(BODY_LENGTH + workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt32LE(BODY_LENGTH);
-    buffer.writeUInt8(5);
-    buffer.writeUInt8(0);
-    buffer.writeUInt16LE(2195);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(15);
-    buffer.writeString(workstation, 'ascii');
-    buffer.writeString(domain, 'ascii');
-    return buffer.data;
-  }
-
   createPasswordBuffer() {
     let password = this.loginData.password || '';
     password = new Buffer(password, 'ucs2');
@@ -268,10 +186,6 @@ module.exports = class Login7Payload {
       password[b] = byte;
     }
     return password;
-  }
-
-  getNTLMFlags() {
-    return NTLMFlags.NTLM_NegotiateUnicode + NTLMFlags.NTLM_NegotiateOEM + NTLMFlags.NTLM_RequestTarget + NTLMFlags.NTLM_NegotiateNTLM + NTLMFlags.NTLM_NegotiateOemDomainSupplied + NTLMFlags.NTLM_NegotiateOemWorkstationSupplied + NTLMFlags.NTLM_NegotiateAlwaysSign + NTLMFlags.NTLM_NegotiateVersion + NTLMFlags.NTLM_NegotiateExtendedSecurity + NTLMFlags.NTLM_Negotiate128 + NTLMFlags.NTLM_Negotiate56;
   }
 
   toString(indent) {
