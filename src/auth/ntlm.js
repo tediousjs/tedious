@@ -1,4 +1,4 @@
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
+const WritableTrackingBuffer = require('../tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
 const BigInteger = require('big-number').n;
 
@@ -241,7 +241,7 @@ function createNTLMRequest(options) {
   return buffer.data;
 }
 
-class NTLMAuthProvider {
+module.exports = class NTLMAuthProvider {
   constructor(connection, options) {
     this.connection = connection;
     this.options = options;
@@ -262,10 +262,4 @@ class NTLMAuthProvider {
       callback(null, payload.data);
     }
   }
-}
-
-module.exports = function(options) {
-  return function(connection) {
-    new NTLMAuthProvider(connection, options);
-  };
 };

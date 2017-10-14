@@ -17,9 +17,9 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
-const SspiModuleSupported = require('sspi-client').ModuleSupported;
 
 const DefaultAuthProvider = require('./auth/default');
+const NTLMAuthProvider = require('./auth/ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -49,12 +49,22 @@ class Connection extends EventEmitter {
       throw new TypeError('Invalid server: ' + config.server);
     }
 
+    let authProvider;
+    if (config.authProvider) {
+      authProvider = config.authProvider;
+    } else if (config.domain) {
+      authProvider = new NTLMAuthProvider(this, { domain: config.domain });
+    } else {
+      authProvider = new DefaultAuthProvider(this);
+    }
+
     this.config = {
       server: config.server,
       userName: config.userName,
       password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
-      securityPackage: config.securityPackage,
+
+      authProvider: authProvider,
+
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -355,12 +365,6 @@ class Connection extends EventEmitter {
       if (config.options.useUTC != undefined) {
         this.config.options.useUTC = config.options.useUTC;
       }
-    }
-
-    this.authProvider = this.config.authProvider ? this.config.authProvider(this) : new DefaultAuthProvider();
-
-    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
-      this.config.options.useWindowsIntegratedAuth = true;
     }
 
     this.reset = this.reset.bind(this);
