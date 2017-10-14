@@ -965,16 +965,7 @@ class Connection extends EventEmitter {
   }
 
   processLogin7Response() {
-    if (this.loggedIn) {
-      return this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      return this.dispatchEvent('loginFailed');
-    }
+
   }
 
   processLogin7NTLMResponse() {
@@ -1311,11 +1302,7 @@ Connection.prototype.STATE = {
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
-          if (this.config.domain) {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          } else {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          }
+          return this.transitionTo(this.STATE.SENT_LOGIN7);
         });
       },
       tls: function() {
@@ -1376,18 +1363,14 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
+            return this.transitionTo(this.STATE.SENT_LOGIN7);
           });
         }
       }
     }
   },
-  SENT_LOGIN7_WITH_STANDARD_LOGIN: {
-    name: 'SentLogin7WithStandardLogin',
+  SENT_LOGIN7: {
+    name: 'SentLogin7',
     events: {
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
@@ -1408,74 +1391,29 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        return this.processLogin7Response();
-      }
-    }
-  },
-  SENT_LOGIN7_WITH_NTLM: {
-    name: 'SentLogin7WithNTLMLogin',
-    events: {
-      socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
-          // call to complete on the client. We cannot process server data
-          // until this call completes as the state can change on completion of
-          // the call. Queue it for later.
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'data', data);
-        } else {
-          return this.sendDataToTokenStreamParser(data);
+        // Use SSPI blob if received
+        if (this.ntlmpacket) {
+          return this.authProvider.processChallenge(this.ntlmpacketBuffer, (error, responseBuffer) => {
+            if (error) {
+              this.emit('error', error);
+              return this.close();
+            }
+
+            this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
+          });
         }
-      },
-      receivedChallenge: function() {
-        return this.sendNTLMResponsePacket();
-      },
-      loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      message: function() {
-        if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
-          // call to complete on the client. We cannot process server data
-          // until this call completes as the state can change on completion of
-          // the call. Queue it for later.
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'message');
-        } else {
-          return this.processLogin7NTLMResponse();
+
+        if (this.loggedIn) {
+          return this.dispatchEvent('loggedIn');
         }
-      }
-    }
-  },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
-    events: {
-      socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
-      loggedIn: function() {
-        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      routingChange: function() {
-        return this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        return this.processLogin7NTLMAck();
+
+        if (this.loginError) {
+          this.emit('connect', this.loginError);
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+        }
+
+        return this.dispatchEvent('loginFailed');
       }
     }
   },
