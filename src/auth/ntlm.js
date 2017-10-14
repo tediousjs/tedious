@@ -207,6 +207,27 @@ function getNTLMFlags() {
   return NTLMFlags.NTLM_NegotiateUnicode + NTLMFlags.NTLM_NegotiateOEM + NTLMFlags.NTLM_RequestTarget + NTLMFlags.NTLM_NegotiateNTLM + NTLMFlags.NTLM_NegotiateOemDomainSupplied + NTLMFlags.NTLM_NegotiateOemWorkstationSupplied + NTLMFlags.NTLM_NegotiateAlwaysSign + NTLMFlags.NTLM_NegotiateVersion + NTLMFlags.NTLM_NegotiateExtendedSecurity + NTLMFlags.NTLM_Negotiate128 + NTLMFlags.NTLM_Negotiate56;
 }
 
+function parseChallenge(buffer) {
+  const challenge = {};
+
+  challenge.magic = buffer.slice(0, 8).toString('utf8');
+  challenge.type = buffer.readInt32LE(8);
+  challenge.domainLen = buffer.readInt16LE(12);
+  challenge.domainMax = buffer.readInt16LE(14);
+  challenge.domainOffset = buffer.readInt32LE(16);
+  challenge.flags = buffer.readInt32LE(20);
+  challenge.nonce = buffer.slice(24, 32);
+  challenge.zeroes = buffer.slice(32, 40);
+  challenge.targetLen = buffer.readInt16LE(40);
+  challenge.targetMax = buffer.readInt16LE(42);
+  challenge.targetOffset = buffer.readInt32LE(44);
+  challenge.oddData = buffer.slice(48, 56);
+  challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2');
+  challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen);
+
+  return challenge;
+}
+
 function createNTLMRequest(options) {
   const domain = escape(options.domain.toUpperCase());
   const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
@@ -248,18 +269,18 @@ module.exports = class NTLMAuthProvider {
   }
 
   handshake(data, callback) {
-    if (data) {
-      callback(null, createNTLMRequest());
-    } else {
-      const payload = new NTLMResponsePayload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        ntlmpacket: data,
-        additional: this.additional
-      });
-
-      callback(null, payload.data);
+    if (!data) {
+      return callback(null, createNTLMRequest());
     }
+
+    const payload = new NTLMResponsePayload({
+      domain: this.config.domain,
+      userName: this.config.userName,
+      password: this.config.password,
+      ntlmpacket: parseChallenge(data),
+      additional: this.additional
+    });
+
+    callback(null, payload.data);
   }
 };

@@ -380,7 +380,6 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
-    this.sspiClientResponsePending = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -450,10 +449,7 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
+      this.ntlmpacketBuffer = token.buffer;
       return this.emit('sspichallenge', token);
     });
 
@@ -906,23 +902,6 @@ class Connection extends EventEmitter {
     });
   }
 
-  sendNTLMResponsePacket() {
-    this.authProvider.processChallenge(this.ntlmpacketBuffer, (error, responseBuffer) => {
-      if (error) {
-        this.emit('error', error);
-        return this.close();
-      }
-
-      if (responseBuffer) {
-        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
-      } else {
-        process.nextTick(() => {
-          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-        });
-      }
-    });
-  }
-
   sendDataToTokenStreamParser(data) {
     return this.tokenStreamParser.addBuffer(data);
   }
@@ -966,36 +945,6 @@ class Connection extends EventEmitter {
   processedInitialSql() {
     this.clearConnectTimer();
     return this.emit('connect');
-  }
-
-  processLogin7Response() {
-
-  }
-
-  processLogin7NTLMResponse() {
-    if (this.ntlmpacket) {
-      return this.dispatchEvent('receivedChallenge');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      return this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMAck() {
-    if (this.loggedIn) {
-      return this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      return this.dispatchEvent('loginFailed');
-    }
   }
 
   execSqlBatch(request) {
@@ -1396,7 +1345,7 @@ Connection.prototype.STATE = {
       },
       message: function() {
         // Use SSPI blob if received
-        if (this.ntlmpacket) {
+        if (this.ntlmpacketBuffer) {
           return this.authProvider.processChallenge(this.ntlmpacketBuffer, (error, responseBuffer) => {
             if (error) {
               this.emit('error', error);
