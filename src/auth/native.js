@@ -2,7 +2,7 @@ const SspiClientApi = require('sspi-client').SspiClientApi;
 const Fqdn = require('sspi-client').Fqdn;
 const MakeSpn = require('sspi-client').MakeSpn;
 
-class SSPIAuthProvider {
+class NativeAuthProvider {
   constructor(connection, options) {
     this.connection = connection;
     this.client = undefined;
@@ -45,6 +45,6 @@ class SSPIAuthProvider {
 
 module.exports = function(options) {
   return function(connection) {
-    return new SSPIAuthProvider(connection, options);
+    return new NativeAuthProvider(connection, options);
   };
 };
