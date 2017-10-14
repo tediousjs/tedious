@@ -54,7 +54,7 @@ class NTLMResponsePayload {
     const lmv2len = 24;
     const ntlmv2len = 16;
     const domain = challenge.domain;
-    const username = challenge.userName;
+    const username = challenge.username;
     const password = challenge.password;
     let ntlmData = challenge.ntlmpacket;
     const server_data = ntlmData.target;
@@ -203,10 +203,6 @@ class NTLMResponsePayload {
   }
 }
 
-function getNTLMFlags() {
-  return NTLMFlags.NTLM_NegotiateUnicode + NTLMFlags.NTLM_NegotiateOEM + NTLMFlags.NTLM_RequestTarget + NTLMFlags.NTLM_NegotiateNTLM + NTLMFlags.NTLM_NegotiateOemDomainSupplied + NTLMFlags.NTLM_NegotiateOemWorkstationSupplied + NTLMFlags.NTLM_NegotiateAlwaysSign + NTLMFlags.NTLM_NegotiateVersion + NTLMFlags.NTLM_NegotiateExtendedSecurity + NTLMFlags.NTLM_Negotiate128 + NTLMFlags.NTLM_Negotiate56;
-}
-
 function parseChallenge(buffer) {
   const challenge = {};
 
@@ -228,39 +224,16 @@ function parseChallenge(buffer) {
   return challenge;
 }
 
-function createNTLMRequest(options) {
-  const domain = escape(options.domain.toUpperCase());
-  const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
-  const protocol = 'NTLMSSP\u0000';
-  const BODY_LENGTH = 40;
-  const bufferLength = BODY_LENGTH + domain.length;
-  const buffer = new WritableTrackingBuffer(bufferLength);
-
-  let type1flags = getNTLMFlags();
-  if (workstation === '') {
-    type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
-  }
-
-  buffer.writeString(protocol, 'utf8');
-  buffer.writeUInt32LE(1);
-  buffer.writeUInt32LE(type1flags);
-  buffer.writeUInt16LE(domain.length);
-  buffer.writeUInt16LE(domain.length);
-  buffer.writeUInt32LE(BODY_LENGTH + workstation.length);
-  buffer.writeUInt16LE(workstation.length);
-  buffer.writeUInt16LE(workstation.length);
-  buffer.writeUInt32LE(BODY_LENGTH);
-  buffer.writeUInt8(5);
-  buffer.writeUInt8(0);
-  buffer.writeUInt16LE(2195);
-  buffer.writeUInt8(0);
-  buffer.writeUInt8(0);
-  buffer.writeUInt8(0);
-  buffer.writeUInt8(15);
-  buffer.writeString(workstation, 'ascii');
-  buffer.writeString(domain, 'ascii');
-  return buffer.data;
-}
+const DEFAULT_NEGOTIATE_FLAGS =
+  NTLMFlags.NTLM_NegotiateUnicode +
+  NTLMFlags.NTLM_NegotiateOEM +
+  NTLMFlags.NTLM_RequestTarget +
+  NTLMFlags.NTLM_NegotiateNTLM +
+  NTLMFlags.NTLM_NegotiateAlwaysSign +
+  NTLMFlags.NTLM_NegotiateVersion +
+  NTLMFlags.NTLM_NegotiateExtendedSecurity +
+  NTLMFlags.NTLM_Negotiate128 +
+  NTLMFlags.NTLM_Negotiate56;
 
 module.exports = class NTLMAuthProvider {
   constructor(connection, options) {
@@ -270,17 +243,58 @@ module.exports = class NTLMAuthProvider {
 
   handshake(data, callback) {
     if (!data) {
-      return callback(null, createNTLMRequest());
+      return callback(null, this.buildNegotiateMessage());
     }
 
     const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
+      domain: this.options.domain,
+      username: this.options.username,
+      password: this.options.password,
       ntlmpacket: parseChallenge(data),
       additional: this.additional
     });
 
     callback(null, payload.data);
+  }
+
+  buildNegotiateMessage() {
+    const protocol = 'NTLMSSP\u0000';
+    const BODY_LENGTH = 40;
+
+    const domainBuffer = Buffer.from(this.options.domain || '', 'ascii');
+    const workstationBuffer = Buffer.from(this.options.workstation || '', 'ascii');
+
+    const buffer = new WritableTrackingBuffer(BODY_LENGTH + domainBuffer.length + workstationBuffer.length);
+
+    let negotiateFlags = DEFAULT_NEGOTIATE_FLAGS;
+
+    if (domainBuffer.length) {
+      negotiateFlags += NTLMFlags.NTLM_NegotiateOemDomainSupplied;
+    }
+
+    if (workstationBuffer.length) {
+      negotiateFlags += NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
+    }
+
+    buffer.writeString(protocol, 'utf8');
+    buffer.writeUInt32LE(1);
+    buffer.writeUInt32LE(negotiateFlags);
+    buffer.writeUInt16LE(domainBuffer.length);
+    buffer.writeUInt16LE(domainBuffer.length);
+    buffer.writeUInt32LE(BODY_LENGTH + workstationBuffer.length);
+    buffer.writeUInt16LE(workstationBuffer.length);
+    buffer.writeUInt16LE(workstationBuffer.length);
+    buffer.writeUInt32LE(BODY_LENGTH);
+    buffer.writeUInt8(5);
+    buffer.writeUInt8(0);
+    buffer.writeUInt16LE(2195);
+    buffer.writeUInt8(0);
+    buffer.writeUInt8(0);
+    buffer.writeUInt8(0);
+    buffer.writeUInt8(15);
+    buffer.writeBuffer(workstationBuffer);
+    buffer.writeBuffer(domainBuffer);
+
+    return buffer.data;
   }
 };
