@@ -229,7 +229,7 @@ module.exports = class NTLMAuthProvider {
       domain: this.options.domain,
       username: this.options.username,
       password: this.options.password,
-      ntlmpacket: this.parseChallenge(data)
+      ntlmpacket: this.parseChallengeMessage(data)
     });
 
     callback(null, payload.data);

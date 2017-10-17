@@ -53,7 +53,11 @@ class Connection extends EventEmitter {
     if (config.authProvider) {
       authProvider = config.authProvider;
     } else if (config.domain) {
-      authProvider = new NTLMAuthProvider(this, { domain: config.domain });
+      authProvider = new NTLMAuthProvider(this, {
+        domain: config.domain,
+        username: config.userName,
+        password: config.password
+      });
     } else {
       authProvider = new DefaultAuthProvider(this);
     }
@@ -62,7 +66,7 @@ class Connection extends EventEmitter {
       server: config.server,
       userName: config.userName,
       password: config.password,
-
+      domain: config.domain,
       authProvider: authProvider,
 
       options: {
@@ -400,7 +404,7 @@ class Connection extends EventEmitter {
       RETRY: 2
     };
 
-    this.authProvider = new DefaultAuthProvider(this);
+    this.authProvider = authProvider;
   }
 
   close() {
@@ -1346,13 +1350,15 @@ Connection.prototype.STATE = {
       message: function() {
         // Use SSPI blob if received
         if (this.ntlmpacketBuffer) {
-          return this.authProvider.processChallenge(this.ntlmpacketBuffer, (error, responseBuffer) => {
+          return this.authProvider.handshake(this.ntlmpacketBuffer, (error, responseBuffer) => {
             if (error) {
               this.emit('error', error);
               return this.close();
             }
-
             this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
+
+            // clear the ntlmpacketBuffer after processing
+            this.ntlmpacketBuffer = undefined;
           });
         }
 
