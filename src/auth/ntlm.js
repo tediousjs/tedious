@@ -215,9 +215,8 @@ const DEFAULT_NEGOTIATE_FLAGS =
   NTLMFlags.NTLM_Negotiate56;
 
 module.exports = class NTLMAuthProvider {
-  constructor(connection, options) {
+  constructor(connection) {
     this.connection = connection;
-    this.options = options;
   }
 
   handshake(data, callback) {
@@ -226,9 +225,9 @@ module.exports = class NTLMAuthProvider {
     }
 
     const payload = new NTLMResponsePayload({
-      domain: this.options.domain,
-      username: this.options.username,
-      password: this.options.password,
+      domain: this.connection.config.domain,
+      username: this.connection.config.userName,
+      password: this.connection.config.password,
       ntlmpacket: this.parseChallengeMessage(data)
     });
 
@@ -239,8 +238,8 @@ module.exports = class NTLMAuthProvider {
     const protocol = 'NTLMSSP\u0000';
     const BODY_LENGTH = 40;
 
-    const domainBuffer = Buffer.from(this.options.domain || '', 'ascii');
-    const workstationBuffer = Buffer.from(this.options.workstation || '', 'ascii');
+    const domainBuffer = Buffer.from(this.connection.config.domain || '', 'ascii');
+    const workstationBuffer = Buffer.from(this.connection.config.workstation || '', 'ascii');
 
     const buffer = new WritableTrackingBuffer(BODY_LENGTH + domainBuffer.length + workstationBuffer.length);
 

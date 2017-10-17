@@ -20,6 +20,7 @@ const Connector = require('./connector').Connector;
 
 const DefaultAuthProvider = require('./auth/default');
 const NTLMAuthProvider = require('./auth/ntlm');
+const NativeAuthProvider = require('./auth/native');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -51,13 +52,12 @@ class Connection extends EventEmitter {
 
     let authProvider;
     if (config.authProvider) {
-      authProvider = config.authProvider;
+      if (config.authProvider.SspiModuleSupported) {
+        authProvider = new NativeAuthProvider(this);
+      }
+      //TODO: throw error if there is no authprovider to handle
     } else if (config.domain) {
-      authProvider = new NTLMAuthProvider(this, {
-        domain: config.domain,
-        username: config.userName,
-        password: config.password
-      });
+      authProvider = new NTLMAuthProvider(this);
     } else {
       authProvider = new DefaultAuthProvider(this);
     }
