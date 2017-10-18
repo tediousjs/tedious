@@ -52,7 +52,7 @@ class Connection extends EventEmitter {
 
     let authProvider;
     if (config.authProvider) {
-      if (config.authProvider.SspiModuleSupported) {
+      if (config.authProvider.ModuleSupported) {
         authProvider = new NativeAuthProvider(this);
       }
       //TODO: throw error if there is no authprovider to handle
@@ -68,7 +68,7 @@ class Connection extends EventEmitter {
       password: config.password,
       domain: config.domain,
       authProvider: authProvider,
-
+      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,

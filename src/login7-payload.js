@@ -87,6 +87,8 @@ module.exports = class Login7Payload {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
+    // TODO: make integrated auth indpendent of domain name
+    // domain name is needed for NTLM auth, but not for Windows native and Kerberos integrated auth
     if (this.loginData.domain) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
