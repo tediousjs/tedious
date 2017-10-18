@@ -4,7 +4,7 @@ module.exports = {
   'NTLMAuthProvider.handshake': {
     'without input data': {
       'generates a NTLM NEGOTIATE_MESSAGE message': function(test) {
-        const authProvider = new NTLMAuthProvider(null, {});
+        const authProvider = new NTLMAuthProvider({config: {}});
 
         const expectedBuffer = new Buffer([
           // Signature
@@ -38,9 +38,7 @@ module.exports = {
       },
 
       'generates a NTLM NEGOTIATE_MESSAGE with a workstation name': function(test) {
-        const authProvider = new NTLMAuthProvider(null, {
-          workstation: 'WORKSTATION'
-        });
+        const authProvider = new NTLMAuthProvider({config: {workstation: 'WORKSTATION'}});
 
         const expectedBuffer = new Buffer([
           // Signature
@@ -79,9 +77,7 @@ module.exports = {
       },
 
       'generates a NTLM NEGOTIATE_MESSAGE with a domain name': function(test) {
-        const authProvider = new NTLMAuthProvider(null, {
-          domain: 'DOMAIN'
-        });
+        const authProvider = new NTLMAuthProvider({config: {domain: 'DOMAIN'}});
 
         const expectedBuffer = new Buffer([
           // Signature
@@ -120,9 +116,11 @@ module.exports = {
       },
 
       'generates a NTLM NEGOTIATE_MESSAGE with a workstation and a domain name': function(test) {
-        const authProvider = new NTLMAuthProvider(null, {
-          workstation: 'WORKSTATION',
-          domain: 'DOMAIN'
+        const authProvider = new NTLMAuthProvider({
+          config: {
+            domain: 'DOMAIN',
+            workstation: 'WORKSTATION'
+          }
         });
 
         const expectedBuffer = new Buffer([
@@ -166,9 +164,11 @@ module.exports = {
     },
 
     'calls the given callback with an initial NTLM packet when no input data is given': function(test) {
-      const authProvider = new NTLMAuthProvider(null, {
-        domain: 'DOMAIN',
-        workstation: 'WORKSTATION'
+      const authProvider = new NTLMAuthProvider({
+        config: {
+          domain: 'DOMAIN',
+          workstation: 'WORKSTATION'
+        }
       });
 
       // 4e544c4d53535000 01000000 07320000 0600060033000000 0b000b0028000000 050093080000000f 574f524b53544154494f4e 444f4d41494e
@@ -214,10 +214,12 @@ module.exports = {
     },
 
     'calls the given callback with a response NTLM packet when valid input data is given': function(test) {
-      const authProvider = new NTLMAuthProvider(null, {
-        domain: 'domain',
-        username: 'username',
-        password: 'password'
+      const authProvider = new NTLMAuthProvider({
+        config: {
+          domain: 'domain',
+          username: 'username',
+          password: 'password'
+        }
       });
 
       authProvider.handshake(null, function(error, data) {
