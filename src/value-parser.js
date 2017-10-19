@@ -492,13 +492,9 @@ function readSmallDateTime(parser, useUTC, callback) {
     parser.readUInt16LE((minutes) => {
       let value;
       if (useUTC) {
-        value = new Date(Date.UTC(1900, 0, 1));
-        value.setUTCDate(value.getUTCDate() + days);
-        value.setUTCMinutes(value.getUTCMinutes() + minutes);
+        value = new Date(Date.UTC(1900, 0, 1 + days, 0, minutes));
       } else {
-        value = new Date(1900, 0, 1);
-        value.setDate(value.getDate() + days);
-        value.setMinutes(value.getMinutes() + minutes);
+        value = new Date(1900, 0, 1 + days, 0, minutes);
       }
       callback(value);
     });
@@ -512,13 +508,9 @@ function readDateTime(parser, useUTC, callback) {
 
       let value;
       if (useUTC) {
-        value = new Date(Date.UTC(1900, 0, 1));
-        value.setUTCDate(value.getUTCDate() + days);
-        value.setUTCMilliseconds(value.getUTCMilliseconds() + milliseconds);
+        value = new Date(Date.UTC(1900, 0, 1 + days, 0, 0, 0, milliseconds));
       } else {
-        value = new Date(1900, 0, 1);
-        value.setDate(value.getDate() + days);
-        value.setMilliseconds(value.getMilliseconds() + milliseconds);
+        value = new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
       }
 
       callback(value);
