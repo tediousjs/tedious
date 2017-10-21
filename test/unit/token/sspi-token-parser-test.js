@@ -1,5 +1,6 @@
 var Parser = require('../../../src/token/stream-parser');
 var WriteBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+const NTLMAuthProvider = require('../../../src/auth/ntlm');
 
 exports.parseChallenge = function(test) {
   var source = new WriteBuffer(68);
@@ -25,7 +26,6 @@ exports.parseChallenge = function(test) {
   data.writeUInt16LE(data.length - 3, 1);
   parser.write(data);
   var challenge = parser.read();
-
   var expected = {
     magic: 'NTLMSSP\0',
     type: 2,
@@ -43,10 +43,12 @@ exports.parseChallenge = function(test) {
     target: new Buffer([0x00, 0xab, 0xcd, 0xef])
   };
 
-  test.deepEqual(challenge.ntlmpacket, expected);
+  const authProvider = new NTLMAuthProvider();
+  const parsed_challenge = authProvider.parseChallengeMessage(challenge.buffer);
+  test.deepEqual(parsed_challenge, expected);
 
   // Skip token (first byte) and length of VarByte (2 bytes).
-  test.ok(challenge.ntlmpacketBuffer.equals(data.slice(3)));
+  test.ok(challenge.buffer.equals(data.slice(3)));
 
   test.done();
 };
@@ -58,16 +60,11 @@ exports.parseChallengeSSPI = function(test) {
   source.writeUInt8(0xED);
   source.writeUInt16LE(anyData.length);
   source.copyFrom(anyData);
-
-  var parser = new Parser({ token() {} }, {}, { useWindowsIntegratedAuth: true });
+  var parser = new Parser({ token() {} }, {}, {});
   parser.write(source.data);
   var challenge = parser.read();
 
-  var expected = {};
-
-  test.deepEqual(challenge.ntlmpacket, expected);
-
-  test.ok(challenge.ntlmpacketBuffer.equals(anyData));
+  test.deepEqual(challenge.buffer, anyData);
 
   test.done();
 };

@@ -66,7 +66,7 @@ class Connection extends EventEmitter {
       server: config.server,
       userName: config.userName,
       password: config.password,
-      domain: config.domain,
+      domain: config.domain && config.domain.toUpperCase(),
       authProvider: authProvider,
       securityPackage: config.securityPackage,
       options: {
