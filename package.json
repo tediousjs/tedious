@@ -65,9 +65,9 @@
   },
   "scripts": {
     "pretest": "eslint src test",
-    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/auth test/unit/tracking-buffer",
     "pretest-all": "eslint src test",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/auth test/unit/tracking-buffer test/integration/",
     "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
     "build": "rimraf lib && babel src --out-dir lib",
