@@ -1,4 +1,3 @@
-const WritableTrackingBuffer = require('../tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
 const BigInteger = require('big-number').n;
 
@@ -39,98 +38,165 @@ const NTLMFlags = {
   NTLM_Negotiate56: 0x80000000
 };
 
-class NTLMResponsePayload {
-  constructor(loginData) {
-    this.data = this.createResponse(loginData);
+const DEFAULT_NEGOTIATE_FLAGS = (
+  NTLMFlags.NTLM_NegotiateUnicode |
+  NTLMFlags.NTLM_NegotiateOEM |
+  NTLMFlags.NTLM_RequestTarget |
+  NTLMFlags.NTLM_NegotiateNTLM |
+  NTLMFlags.NTLM_NegotiateAlwaysSign |
+  NTLMFlags.NTLM_NegotiateExtendedSecurity |
+  NTLMFlags.NTLM_Negotiate128 |
+  NTLMFlags.NTLM_Negotiate56
+) >>> 0;
+
+class NTLMAuthProvider {
+  constructor(connection, options) {
+    this.connection = connection;
+    this.options = options;
   }
 
-  toString(indent) {
-    indent || (indent = '');
-    return indent + 'NTLM Auth';
-  }
-
-  createResponse(challenge) {
-    const client_nonce = this.createClientNonce();
-    const lmv2len = 24;
-    const ntlmv2len = 16;
-    const domain = challenge.domain;
-    const username = challenge.username;
-    const password = challenge.password;
-    let ntlmData = challenge.ntlmpacket;
-    const server_data = ntlmData.target;
-    const server_nonce = ntlmData.nonce;
-    const bufferLength = 64 + (domain.length * 2) + (username.length * 2) + lmv2len + ntlmv2len + 8 + 8 + 8 + 4 + server_data.length + 4;
-    const data = new WritableTrackingBuffer(bufferLength);
-    data.position = 0;
-    data.writeString('NTLMSSP\u0000', 'utf8');
-    data.writeUInt32LE(0x03);
-    const baseIdx = 64;
-    const dnIdx = baseIdx;
-    const unIdx = dnIdx + domain.length * 2;
-    const l2Idx = unIdx + username.length * 2;
-    const ntIdx = l2Idx + lmv2len;
-    data.writeUInt16LE(lmv2len);
-    data.writeUInt16LE(lmv2len);
-    data.writeUInt32LE(l2Idx);
-    data.writeUInt16LE(ntlmv2len);
-    data.writeUInt16LE(ntlmv2len);
-    data.writeUInt32LE(ntIdx);
-    data.writeUInt16LE(domain.length * 2);
-    data.writeUInt16LE(domain.length * 2);
-    data.writeUInt32LE(dnIdx);
-    data.writeUInt16LE(username.length * 2);
-    data.writeUInt16LE(username.length * 2);
-    data.writeUInt32LE(unIdx);
-    data.writeUInt16LE(0);
-    data.writeUInt16LE(0);
-    data.writeUInt32LE(baseIdx);
-    data.writeUInt16LE(0);
-    data.writeUInt16LE(0);
-    data.writeUInt32LE(baseIdx);
-    data.writeUInt16LE(0x8201);
-    data.writeUInt16LE(0x08);
-    data.writeString(domain, 'ucs2');
-    data.writeString(username, 'ucs2');
-    const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
-    data.copyFrom(lmv2Data);
-    const genTime = new Date().getTime();
-    ntlmData = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
-    data.copyFrom(ntlmData);
-    data.writeUInt32LE(0x0101);
-    data.writeUInt32LE(0x0000);
-    const timestamp = this.createTimestamp(genTime);
-    data.copyFrom(timestamp);
-    data.copyFrom(client_nonce);
-    data.writeUInt32LE(0x0000);
-    data.copyFrom(server_data);
-    data.writeUInt32LE(0x0000);
-    return data.data;
-  }
-
-  createClientNonce() {
-    const client_nonce = new Buffer(8);
-    let nidx = 0;
-    while (nidx < 8) {
-      client_nonce.writeUInt8(Math.ceil(Math.random() * 255), nidx);
-      nidx++;
+  handshake(data, callback) {
+    if (!data) {
+      process.nextTick(callback, null, this.buildNegotiateMessage());
+    } else {
+      process.nextTick(callback, null, this.buildAuthenticateMessage(this.parseChallengeMessage(data)));
     }
-    return client_nonce;
   }
 
-  ntlmv2Response(domain, user, password, serverNonce, targetInfo, clientNonce, mytime) {
-    const timestamp = this.createTimestamp(mytime);
-    const hash = this.ntv2Hash(domain, user, password);
-    const dataLength = 40 + targetInfo.length;
-    const data = new Buffer(dataLength);
-    serverNonce.copy(data, 0, 0, 8);
-    data.writeUInt32LE(0x101, 8);
-    data.writeUInt32LE(0x0, 12);
-    timestamp.copy(data, 16, 0, 8);
-    clientNonce.copy(data, 24, 0, 8);
-    data.writeUInt32LE(0x0, 32);
-    targetInfo.copy(data, 36, 0, targetInfo.length);
-    data.writeUInt32LE(0x0, 36 + targetInfo.length);
-    return this.hmacMD5(data, hash);
+  buildNegotiateMessage() {
+    const messageBuffer = Buffer.alloc(40);
+    const domainBuffer = Buffer.from(this.options.domain || '', 'ascii');
+    const workstationBuffer = Buffer.from(this.options.workstation || '', 'ascii');
+
+    let negotiateFlags = DEFAULT_NEGOTIATE_FLAGS;
+
+    if (domainBuffer.length) {
+      negotiateFlags = (negotiateFlags | NTLMFlags.NTLM_NegotiateOemDomainSupplied) >>> 0;
+    }
+
+    if (workstationBuffer.length) {
+      negotiateFlags = (negotiateFlags | NTLMFlags.NTLM_NegotiateOemWorkstationSupplied) >>> 0;
+    }
+
+    messageBuffer.write('NTLMSSP');
+    messageBuffer.writeUInt32LE(1, 8);
+    messageBuffer.writeUInt32LE(negotiateFlags, 12);
+
+    messageBuffer.writeUInt16LE(domainBuffer.length, 16);
+    messageBuffer.writeUInt16LE(domainBuffer.length, 18);
+    messageBuffer.writeUInt32LE(messageBuffer.length + workstationBuffer.length, 20);
+
+    messageBuffer.writeUInt16LE(workstationBuffer.length, 24);
+    messageBuffer.writeUInt16LE(workstationBuffer.length, 26);
+    messageBuffer.writeUInt32LE(messageBuffer.length, 28);
+
+    // ProductMajorVersion
+    messageBuffer.writeUInt8(0, 32);
+
+    // ProductMinorVersion
+    messageBuffer.writeUInt8(0, 33);
+
+    // ProductBuild
+    messageBuffer.writeUInt16LE(0, 34);
+
+    // Reserved
+    messageBuffer.writeUInt8(0, 36);
+    messageBuffer.writeUInt8(0, 37);
+    messageBuffer.writeUInt8(0, 38);
+
+    // NTLMRevisionCurrent
+    messageBuffer.writeUInt8(15, 39);
+
+    return Buffer.concat([messageBuffer, workstationBuffer, domainBuffer]);
+  }
+
+  parseChallengeMessage(buffer) {
+    const challenge = {};
+
+    challenge.magic = buffer.slice(0, 8).toString('utf8');
+    challenge.type = buffer.readInt32LE(8);
+    challenge.domainLen = buffer.readInt16LE(12);
+    challenge.domainMax = buffer.readInt16LE(14);
+    challenge.domainOffset = buffer.readInt32LE(16);
+    challenge.flags = buffer.readUInt32LE(20);
+    challenge.nonce = buffer.slice(24, 32);
+    challenge.zeroes = buffer.slice(32, 40);
+    challenge.targetLen = buffer.readInt16LE(40);
+    challenge.targetMax = buffer.readInt16LE(42);
+    challenge.targetOffset = buffer.readInt32LE(44);
+    challenge.oddData = buffer.slice(48, 56);
+    challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2');
+    challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen);
+
+    return challenge;
+  }
+
+  buildAuthenticateMessage(challenge) {
+    const clientNonceBuffer = crypto.randomBytes(8);
+    const domainBuffer = Buffer.from(this.options.domain || '', 'ucs2');
+    const usernameBuffer = Buffer.from(this.options.username || '', 'ucs2');
+    const workstationBuffer = Buffer.from(this.options.workstation || '', 'ucs2');
+
+    const targetName = challenge.target;
+    const serverNonceBuffer = challenge.nonce;
+
+    let lmChallengeResponseBuffer, ntChallengeResponseBuffer;
+    if (this.options.username && this.options.password) {
+      const responseKey = this.generateResponseKey(this.options.domain, this.options.username, this.options.password);
+      lmChallengeResponseBuffer = this.buildLMv2Response(responseKey, serverNonceBuffer, clientNonceBuffer);
+
+      const timestampBuffer = this.createTimestamp(new Date().getTime());
+      ntChallengeResponseBuffer = this.buildNTLMv2Response(responseKey, targetName, timestampBuffer, serverNonceBuffer, clientNonceBuffer);
+    } else {
+      lmChallengeResponseBuffer = Buffer.alloc(0);
+      ntChallengeResponseBuffer = Buffer.alloc(0);
+    }
+
+    const messageBuffer = Buffer.alloc(64);
+
+    let payloadOffset = messageBuffer.length;
+
+    messageBuffer.write('NTLMSSP');
+    messageBuffer.writeUInt32LE(0x03, 8);
+
+    messageBuffer.writeUInt16LE(lmChallengeResponseBuffer.length, 12);
+    messageBuffer.writeUInt16LE(lmChallengeResponseBuffer.length, 14);
+    messageBuffer.writeUInt32LE(payloadOffset, 16);
+
+    payloadOffset += lmChallengeResponseBuffer.length;
+
+    messageBuffer.writeUInt16LE(ntChallengeResponseBuffer.length, 20);
+    messageBuffer.writeUInt16LE(ntChallengeResponseBuffer.length, 22);
+    messageBuffer.writeUInt32LE(payloadOffset, 24);
+
+    payloadOffset += ntChallengeResponseBuffer.length;
+
+    messageBuffer.writeUInt16LE(domainBuffer.length, 28);
+    messageBuffer.writeUInt16LE(domainBuffer.length, 30);
+    messageBuffer.writeUInt32LE(payloadOffset, 32);
+
+    payloadOffset += domainBuffer.length;
+
+    messageBuffer.writeUInt16LE(usernameBuffer.length, 36);
+    messageBuffer.writeUInt16LE(usernameBuffer.length, 38);
+    messageBuffer.writeUInt32LE(payloadOffset, 40);
+
+    payloadOffset += usernameBuffer.length;
+
+    messageBuffer.writeUInt16LE(workstationBuffer.length, 44);
+    messageBuffer.writeUInt16LE(workstationBuffer.length, 46);
+    messageBuffer.writeUInt32LE(payloadOffset, 48);
+
+    messageBuffer.writeUInt32LE(challenge.flags, 60);
+
+    return Buffer.concat([
+      messageBuffer,
+      lmChallengeResponseBuffer,
+      ntChallengeResponseBuffer,
+      domainBuffer,
+      usernameBuffer,
+      workstationBuffer
+    ]);
   }
 
   createTimestamp(time) {
@@ -154,147 +220,44 @@ class NTLMResponsePayload {
     return new Buffer(hexArray.join(''), 'hex');
   }
 
-  lmv2Response(domain, user, password, serverNonce, clientNonce) {
-    const hash = this.ntv2Hash(domain, user, password);
-    const data = new Buffer(serverNonce.length + clientNonce.length);
+  buildLMv2Response(responseKey, serverNonceBuffer, clientNonceBuffer) {
+    const hmacMd5 = crypto.createHmac('MD5', responseKey);
 
-    serverNonce.copy(data);
-    clientNonce.copy(data, serverNonce.length, 0, clientNonce.length);
-
-    const newhash = this.hmacMD5(data, hash);
-    const response = new Buffer(newhash.length + clientNonce.length);
-
-    newhash.copy(response);
-    clientNonce.copy(response, newhash.length, 0, clientNonce.length);
-
-    return response;
+    return Buffer.concat([
+      hmacMd5.update(serverNonceBuffer).update(clientNonceBuffer).digest(),
+      clientNonceBuffer
+    ]);
   }
 
-  ntv2Hash(domain, user, password) {
-    const hash = this.ntHash(password);
-    const identity = new Buffer(user.toUpperCase() + domain.toUpperCase(), 'ucs2');
-    return this.hmacMD5(identity, hash);
+  buildNTLMv2Response(responseKey, targetInfo, timestampBuffer, serverNonceBuffer, clientNonceBuffer) {
+    const blob = Buffer.concat([
+      Buffer.from('01', 'hex'),
+      Buffer.from('01', 'hex'),
+      Buffer.alloc(6),
+      timestampBuffer,
+      clientNonceBuffer,
+      Buffer.alloc(4),
+      targetInfo,
+      Buffer.alloc(4)
+    ]);
+
+    const hmacMd5 = crypto.createHmac('MD5', responseKey);
+
+    return Buffer.concat([
+      hmacMd5.update(serverNonceBuffer).update(blob).digest(),
+      blob
+    ]);
   }
 
-  ntHash(text) {
-    const hash = new Buffer(21);
-    hash.fill(0);
+  generateResponseKey(domain, username, password) {
+    const hashedPassword = crypto.createHash('md4').update(Buffer.from(password, 'ucs2')).digest();
 
-    const unicodeString = new Buffer(text, 'ucs2');
-    const md4 = crypto.createHash('md4').update(unicodeString).digest();
-    if (md4.copy) {
-      md4.copy(hash);
-    } else {
-      new Buffer(md4, 'ascii').copy(hash);
+    const hmacMd5 = crypto.createHmac('MD5', hashedPassword);
+    hmacMd5.update(Buffer.from(username.toUpperCase(), 'ucs2'));
+    if (domain) {
+      hmacMd5.update(Buffer.from(domain, 'ucs2'));
     }
-    return hash;
-  }
-
-  hmacMD5(data, key) {
-    const hmac = crypto.createHmac('MD5', key);
-    hmac.update(data);
-
-    const result = hmac.digest();
-    if (result.copy) {
-      return result;
-    } else {
-      return new Buffer(result, 'ascii').slice(0, 16);
-    }
-  }
-}
-
-const DEFAULT_NEGOTIATE_FLAGS =
-  NTLMFlags.NTLM_NegotiateUnicode +
-  NTLMFlags.NTLM_NegotiateOEM +
-  NTLMFlags.NTLM_RequestTarget +
-  NTLMFlags.NTLM_NegotiateNTLM +
-  NTLMFlags.NTLM_NegotiateAlwaysSign +
-  NTLMFlags.NTLM_NegotiateVersion +
-  NTLMFlags.NTLM_NegotiateExtendedSecurity +
-  NTLMFlags.NTLM_Negotiate128 +
-  NTLMFlags.NTLM_Negotiate56;
-
-class NTLMAuthProvider {
-  constructor(connection, options) {
-    this.connection = connection;
-    this.options = options;
-  }
-
-  handshake(data, callback) {
-    if (!data) {
-      return callback(null, this.buildNegotiateMessage());
-    }
-
-    const payload = new NTLMResponsePayload({
-      domain: this.options.domain,
-      username: this.options.username,
-      password: this.options.password,
-      ntlmpacket: this.parseChallengeMessage(data)
-    });
-
-    callback(null, payload.data);
-  }
-
-  buildNegotiateMessage() {
-    const protocol = 'NTLMSSP\u0000';
-    const BODY_LENGTH = 40;
-
-    const domainBuffer = Buffer.from(this.options.domain || '', 'ascii');
-    const workstationBuffer = Buffer.from(this.connection.config.workstation || '', 'ascii');
-
-    const buffer = new WritableTrackingBuffer(BODY_LENGTH + domainBuffer.length + workstationBuffer.length);
-
-    let negotiateFlags = DEFAULT_NEGOTIATE_FLAGS;
-
-    if (domainBuffer.length) {
-      negotiateFlags += NTLMFlags.NTLM_NegotiateOemDomainSupplied;
-    }
-
-    if (workstationBuffer.length) {
-      negotiateFlags += NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
-    }
-
-    buffer.writeString(protocol, 'utf8');
-    buffer.writeUInt32LE(1);
-    buffer.writeUInt32LE(negotiateFlags);
-    buffer.writeUInt16LE(domainBuffer.length);
-    buffer.writeUInt16LE(domainBuffer.length);
-    buffer.writeUInt32LE(BODY_LENGTH + workstationBuffer.length);
-    buffer.writeUInt16LE(workstationBuffer.length);
-    buffer.writeUInt16LE(workstationBuffer.length);
-    buffer.writeUInt32LE(BODY_LENGTH);
-    buffer.writeUInt8(5);
-    buffer.writeUInt8(0);
-    buffer.writeUInt16LE(2195);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(15);
-    buffer.writeBuffer(workstationBuffer);
-    buffer.writeBuffer(domainBuffer);
-
-    return buffer.data;
-  }
-
-  parseChallengeMessage(buffer) {
-    const challenge = {};
-
-    challenge.magic = buffer.slice(0, 8).toString('utf8');
-    challenge.type = buffer.readInt32LE(8);
-    challenge.domainLen = buffer.readInt16LE(12);
-    challenge.domainMax = buffer.readInt16LE(14);
-    challenge.domainOffset = buffer.readInt32LE(16);
-    challenge.flags = buffer.readInt32LE(20);
-    challenge.nonce = buffer.slice(24, 32);
-    challenge.zeroes = buffer.slice(32, 40);
-    challenge.targetLen = buffer.readInt16LE(40);
-    challenge.targetMax = buffer.readInt16LE(42);
-    challenge.targetOffset = buffer.readInt32LE(44);
-    challenge.oddData = buffer.slice(48, 56);
-    challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2');
-    challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen);
-
-    return challenge;
+    return hmacMd5.digest();
   }
 }
 
