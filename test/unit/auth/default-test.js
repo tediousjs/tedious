@@ -1,4 +1,4 @@
-const DefaultAuthProvider = require('../../../src/auth/default');
+const DefaultAuthProvider = require('../../../src/auth/default').DefaultAuthProvider;
 
 module.exports = {
   'DefaultAuthProvider.handshake': {
