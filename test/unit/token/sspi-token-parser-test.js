@@ -1,6 +1,6 @@
 var Parser = require('../../../src/token/stream-parser');
 var WriteBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const NTLMAuthProvider = require('../../../src/auth/ntlm');
+const NTLMAuthProvider = require('../../../src/auth/ntlm').NTLMAuthProvider;
 
 exports.parseChallenge = function(test) {
   var source = new WriteBuffer(68);

@@ -1,7 +1,8 @@
-module.exports = class NativeAuthProvider {
-
-  constructor(connection) {
+class NativeAuthProvider {
+  constructor(connection, options) {
     this.connection = connection;
+    this.options = options;
+
     this.client = undefined;
     this.SspiClientApi = require('sspi-client').SspiClientApi;
     this.Fqdn = require('sspi-client').Fqdn;
@@ -52,4 +53,12 @@ module.exports = class NativeAuthProvider {
       });
     }
   }
+}
+
+module.exports = function(options) {
+  return function(connection) {
+    return new NativeAuthProvider(connection, options);
+  };
 };
+
+module.exports.NativeAuthProvider = NativeAuthProvider;

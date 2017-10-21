@@ -18,9 +18,8 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
-const DefaultAuthProvider = require('./auth/default');
-const NTLMAuthProvider = require('./auth/ntlm');
-const NativeAuthProvider = require('./auth/native');
+const defaultAuthProvider = require('./auth/default');
+const ntlmAuthProvider = require('./auth/ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -50,25 +49,11 @@ class Connection extends EventEmitter {
       throw new TypeError('Invalid server: ' + config.server);
     }
 
-    let authProvider;
-    if (config.authProvider) {
-      if (config.authProvider.ModuleSupported) {
-        authProvider = new NativeAuthProvider(this);
-      }
-      //TODO: throw error if there is no authprovider to handle
-    } else if (config.domain) {
-      authProvider = new NTLMAuthProvider(this);
-    } else {
-      authProvider = new DefaultAuthProvider(this);
-    }
-
     this.config = {
       server: config.server,
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
-      authProvider: authProvider,
-      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -404,7 +389,19 @@ class Connection extends EventEmitter {
       RETRY: 2
     };
 
-    this.authProvider = authProvider;
+    if (config.authProvider) {
+      this.authProvider = config.authProvider.call(null, this);
+    } else if (config.domain) {
+      // We need to support the top-level `domain` option until the nextTick
+      // major version of tedious for backwards compatibility reasons.
+      this.authProvider = ntlmAuthProvider({
+        domain: config.domain,
+        username: config.userName,
+        password: config.password
+      })(this);
+    } else {
+      this.authProvider = defaultAuthProvider({})(this);
+    }
   }
 
   close() {
