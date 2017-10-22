@@ -450,7 +450,7 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('sspichallenge', (token) => {
-      this.ntlmpacketBuffer = token.buffer;
+      this.sspiBuffer = token.buffer;
       return this.emit('sspichallenge', token);
     });
 
@@ -1346,16 +1346,16 @@ Connection.prototype.STATE = {
       },
       message: function() {
         // Use SSPI blob if received
-        if (this.ntlmpacketBuffer) {
-          return this.authProvider.handshake(this.ntlmpacketBuffer, (error, responseBuffer) => {
+        if (this.sspiBuffer) {
+          return this.authProvider.handshake(this.sspiBuffer, (error, responseBuffer) => {
             if (error) {
               this.emit('error', error);
               return this.close();
             }
             this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
 
-            // clear the ntlmpacketBuffer after processing
-            this.ntlmpacketBuffer = undefined;
+            // clear the sspiBuffer after processing
+            this.sspiBuffer = undefined;
           });
         }
 
