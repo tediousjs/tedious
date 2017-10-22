@@ -14,7 +14,7 @@ module.exports = {
           '01000000',
 
           // NegotiateFlags
-          '078208a2',
+          '078208a0',
 
           // DomainNameFields
           '0000000028000000',
@@ -23,7 +23,10 @@ module.exports = {
           '0000000028000000',
 
           // Version
-          '050093080000000f'
+          '00000000',
+
+          // Other
+          '0000000f'
         ].join(''), 'hex');
 
         authProvider.handshake(null, function(error, data) {
@@ -50,7 +53,7 @@ module.exports = {
           '01000000',
 
           // NegotiateFlags
-          '07a208a2',
+          '07a208a0',
 
           // DomainNameFields
           '0000000033000000',
@@ -59,7 +62,10 @@ module.exports = {
           '0b000b0028000000',
 
           // Version
-          '050093080000000f',
+          '00000000',
+
+          // Other
+          '0000000f',
 
           // -- Payload
 
@@ -91,7 +97,7 @@ module.exports = {
           '01000000',
 
           // NegotiateFlags
-          '079208a2',
+          '079208a0',
 
           // DomainNameFields
           '0600060028000000',
@@ -100,7 +106,10 @@ module.exports = {
           '0000000028000000',
 
           // Version
-          '050093080000000f',
+          '00000000',
+
+          // Other
+          '0000000f',
 
           // -- Payload
 
@@ -133,7 +142,7 @@ module.exports = {
           '01000000',
 
           // NegotiateFlags
-          '07b208a2',
+          '07b208a0',
 
           // DomainNameFields
           '0600060033000000',
@@ -142,7 +151,10 @@ module.exports = {
           '0b000b0028000000',
 
           // Version
-          '050093080000000f',
+          '00000000',
+
+          // Other
+          '0000000f',
 
           // -- Payload
 
