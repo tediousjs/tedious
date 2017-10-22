@@ -45,7 +45,8 @@
     "bl": "^1.2.0",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.2.6",
-    "sprintf": "0.1.5"
+    "sprintf": "0.1.5",
+    "sspi-client": "^0.1.0"
   },
   "devDependencies": {
     "async": "^1.4.0",
