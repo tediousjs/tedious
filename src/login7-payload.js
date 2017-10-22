@@ -87,7 +87,7 @@ module.exports = class Login7Payload {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.loginData.sspiBlob) {
+    if (this.loginData.sspiBlob && this.loginData.sspiBlob.length) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
