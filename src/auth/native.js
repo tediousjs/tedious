@@ -1,12 +1,11 @@
+const { SspiClientApi, Fqdn, MakeSpn } = require('sspi-client');
+
 class NativeAuthProvider {
   constructor(connection, options) {
     this.connection = connection;
     this.options = options;
 
     this.client = undefined;
-    this.SspiClientApi = require('sspi-client').SspiClientApi;
-    this.Fqdn = require('sspi-client').Fqdn;
-    this.MakeSpn = require('sspi-client').MakeSpn;
   }
 
   handshake(data, callback) {
@@ -31,13 +30,13 @@ class NativeAuthProvider {
     }
     else {
       const server = this.connection.routingData ? this.connection.routingData.server : this.connection.config.server;
-      this.Fqdn.getFqdn(server, (err, fqdn) => {
+      Fqdn.getFqdn(server, (err, fqdn) => {
         if (err) {
           return callback(new Error('Error getting Fqdn. Error details: ' + err.message));
         }
 
-        const spn = this.MakeSpn.makeSpn('MSSQLSvc', fqdn, this.connection.config.options.port);
-        this.client = new this.SspiClientApi.SspiClient(spn, this.connection.config.securityPackage);
+        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.connection.config.options.port);
+        this.client = new SspiClientApi.SspiClient(spn, this.connection.config.securityPackage);
         this.sspiClientResponsePending = true;
         this.client.getNextBlob(null, 0, 0, (responseBuffer, isDone, errorCode, errorString) => {
           if (errorCode) {
