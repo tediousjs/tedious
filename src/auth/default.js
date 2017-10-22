@@ -1,5 +1,8 @@
 const EMPTY_BUFFER = new Buffer(0);
 
+/**
+  Authenticate to SQL Server via built-in authentication.
+*/
 class DefaultAuthProvider {
   constructor(connection, options) {
     this.connection = connection;

@@ -49,6 +49,12 @@ const DEFAULT_NEGOTIATE_FLAGS = (
   NTLMFlags.NTLM_Negotiate56
 ) >>> 0;
 
+/**
+  Authenticate to SQL Server via NTLM.
+
+  This class allows authentication to SQL Server via NTLM, using
+  target system or domain credentials.
+*/
 class NTLMAuthProvider {
   constructor(connection, options) {
     this.connection = connection;

@@ -1,5 +1,12 @@
 const { SspiClientApi, Fqdn, MakeSpn } = require('sspi-client');
 
+/**
+  Authenticate to SQL Server via Windows Native SSPI.
+
+  This class allows authentication to SQL Server via native APIs provided
+  by Windows. This allows client authentication without providing a
+  username/password.
+*/
 class NativeAuthProvider {
   constructor(connection, options) {
     this.connection = connection;
