@@ -394,7 +394,7 @@ class Connection extends EventEmitter {
       // We need to support the top-level `domain` option until the nextTick
       // major version of tedious for backwards compatibility reasons.
       this.authProvider = ntlmAuthProvider({
-        domain: config.domain,
+        domain: config.domain.toUpperCase(),
         username: config.userName,
         password: config.password
       })(this);
