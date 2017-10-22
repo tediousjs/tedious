@@ -51,9 +51,8 @@ class Connection extends EventEmitter {
 
     this.config = {
       server: config.server,
-      userName: config.userName,
-      password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
+      userName: config.domain ? undefined : config.userName,
+      password: config.domain ? undefined : config.password,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
