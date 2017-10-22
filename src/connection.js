@@ -878,7 +878,6 @@ class Connection extends EventEmitter {
       }
 
       const payload = new Login7Payload({
-        domain: this.config.domain,
         userName: this.config.userName,
         password: this.config.password,
         database: this.config.options.database,
