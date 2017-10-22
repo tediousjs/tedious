@@ -26,7 +26,7 @@ class NativeAuthProvider {
         }
 
         const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.connection.config.options.port);
-        this.client = new SspiClientApi.SspiClient(spn, this.connection.config.securityPackage);
+        this.client = new SspiClientApi.SspiClient(spn, this.options.securityPackage);
         this.client.getNextBlob(null, 0, 0, (responseBuffer, isDone, errorCode, errorString) => {
           if (errorCode) {
             return callback(new Error(errorString));
