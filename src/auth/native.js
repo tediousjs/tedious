@@ -6,6 +6,18 @@ const { SspiClientApi, Fqdn, MakeSpn } = require('sspi-client');
   This class allows authentication to SQL Server via native APIs provided
   by Windows. This allows client authentication without providing a
   username/password.
+
+  Optionally, the `securityPackage` to be used can be specified. SQL Server
+  understands `'kerberos'`, `'ntlm'` or `'negotiate'` (default).
+
+  `'negotiate'` will automatically decide whether to use Kerberos or NTLM based
+  authentication, preferring Kerberos if that is supported by the target server
+  as it's more secure than NTLM.
+
+  @param {Connection} connection
+  @param {Object} options
+  @param {?String} options.securityPackage
+    Can be one of `'ntlm'`, `'kerberos'` or `'negotiate'`.
 */
 class NativeAuthProvider {
   constructor(connection, options) {
