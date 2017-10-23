@@ -20,6 +20,7 @@ const Connector = require('./connector').Connector;
 
 const defaultAuthProvider = require('./auth/default');
 const ntlmAuthProvider = require('./auth/ntlm');
+const nativeAuthProvider = require('./auth/native');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -398,6 +399,8 @@ class Connection extends EventEmitter {
         username: config.userName,
         password: config.password
       })(this);
+    } else if (config.userName == undefined && config.password == undefined && nativeAuthProvider.isSupported) {
+      this.authProvider = nativeAuthProvider({})(this);
     } else {
       this.authProvider = defaultAuthProvider({})(this);
     }

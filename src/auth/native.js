@@ -1,4 +1,4 @@
-const { SspiClientApi, Fqdn, MakeSpn } = require('sspi-client');
+const { SspiClientApi, Fqdn, MakeSpn, ModuleSupported: isSupported } = require('sspi-client');
 
 /**
   Authenticate to SQL Server via Windows Native SSPI.
@@ -56,4 +56,5 @@ module.exports = function(options) {
   };
 };
 
+module.exports.isSupported = isSupported;
 module.exports.NativeAuthProvider = NativeAuthProvider;
