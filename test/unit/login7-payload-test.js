@@ -99,10 +99,10 @@ exports.createNTLM = function(test) {
     2 * payload.hostname.length +
     2 +
     2 +
-    2 * loginData.userName.length +
+    2 * 0 +
     2 +
     2 +
-    2 * loginData.password.length +
+    2 * 0 +
     2 +
     2 +
     2 * loginData.appName.length +
@@ -148,13 +148,6 @@ exports.createNTLM = function(test) {
     .slice(payload.ntlmPacket.length - 6)
     .toString('ascii');
   test.strictEqual(domainName, 'DOMAIN');
-
-  var passwordStart = payload.data.readUInt16LE(4 + 32 + 2 * 4);
-  var passwordEnd = passwordStart + 2 * loginData.password.length;
-  var passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5]);
-  test.ok(
-    payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected)
-  );
 
   test.done();
 };
