@@ -10,7 +10,7 @@ class DefaultAuthProvider {
   }
 
   handshake(data, callback) {
-    callback(null, EMPTY_BUFFER);
+    process.nextTick(callback, null, EMPTY_BUFFER);
   }
 }
 
