@@ -392,7 +392,7 @@ class Connection extends EventEmitter {
     if (config.authProvider) {
       this.authProvider = config.authProvider.call(null, this);
     } else if (config.domain) {
-      // We need to support the top-level `domain` option until the nextTick
+      // We need to support the top-level `domain` option until the next
       // major version of tedious for backwards compatibility reasons.
       this.authProvider = ntlmAuthProvider({
         domain: config.domain.toUpperCase(),
