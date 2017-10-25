@@ -38,7 +38,7 @@ module.exports = class Request extends EventEmitter {
   error: ?Error;
   connection: ?any; // TODO: This should be `Connection`, not `any`.
 
-  callback: () => void;
+  callback: (?Error) => void;
 
   constructor(sqlTextOrProcedure: ?string, callback: CompletionCallback) {
     super();
@@ -54,10 +54,14 @@ module.exports = class Request extends EventEmitter {
     this.error = undefined;
     this.connection = undefined;
     this.userCallback = callback;
-    this.callback = function() {
+    this.callback = function(err: ?Error) {
       if (this.preparing) {
-        this.emit('prepared');
         this.preparing = false;
+        if (err) {
+          this.emit('error', err);
+        } else {
+          this.emit('prepared');
+        }
       } else {
         this.userCallback.apply(this, arguments);
         this.emit('requestCompleted');
