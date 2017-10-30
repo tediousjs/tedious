@@ -50,24 +50,34 @@ exports.parseChallenge = function(test) {
 
   test.done();
 };
+exports.parseChallengeSSPI_windowsAuth = testChallengeSSPI(true);
+exports.parseChallengeSSPI_kerberosAuth = testChallengeSSPI();
 
+function testChallengeSSPI(isWindowsAuth = false) {
+  return (test) => {
+    var anyData = new Buffer([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+    var source = new WriteBuffer(68);
+    source.writeUInt8(0xED);
+    source.writeUInt16LE(anyData.length);
+    source.copyFrom(anyData);
 
-exports.parseChallengeSSPI = function(test) {
-  var anyData = new Buffer([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
-  var source = new WriteBuffer(68);
-  source.writeUInt8(0xED);
-  source.writeUInt16LE(anyData.length);
-  source.copyFrom(anyData);
+    var parser = new Parser({ token() { } }, {},
+      (() => {
+        if (isWindowsAuth)
+          return { useWindowsIntegratedAuth: true };
+        else
+          return { useKerberosIntegratedAuth: true };
+      })()
+    );
+    parser.write(source.data);
+    var challenge = parser.read();
 
-  var parser = new Parser({ token() {} }, {}, { useWindowsIntegratedAuth: true });
-  parser.write(source.data);
-  var challenge = parser.read();
+    var expected = {};
 
-  var expected = {};
+    test.deepEqual(challenge.ntlmpacket, expected);
 
-  test.deepEqual(challenge.ntlmpacket, expected);
+    test.ok(challenge.ntlmpacketBuffer.equals(anyData));
 
-  test.ok(challenge.ntlmpacketBuffer.equals(anyData));
-
-  test.done();
-};
+    test.done();
+  };
+}

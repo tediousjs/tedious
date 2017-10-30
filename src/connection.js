@@ -22,6 +22,7 @@ const SspiModuleSupported = require('sspi-client').ModuleSupported;
 const SspiClientApi = require('sspi-client').SspiClientApi;
 const Fqdn = require('sspi-client').Fqdn;
 const MakeSpn = require('sspi-client').MakeSpn;
+const Kerberos = require('node-kerberos').Kerberos;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -363,6 +364,10 @@ class Connection extends EventEmitter {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
+    if (this.config.domain && !this.config.userName && !this.config.password && !SspiModuleSupported) {
+      this.config.options.useKerberosIntegratedAuth = true;
+    }
+
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
@@ -409,23 +414,34 @@ class Connection extends EventEmitter {
 
   cleanupConnection(cleanupTypeEnum) {
     if (!this.closed) {
-      this.clearConnectTimer();
-      this.clearRequestTimer();
-      this.clearRetryTimer();
-      this.closeConnection();
-      if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
-        this.emit('rerouting');
-      } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-        this.emit('end');
+      const cleanConnection = () => {
+        this.clearConnectTimer();
+        this.clearRequestTimer();
+        this.clearRetryTimer();
+        this.closeConnection();
+
+        if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
+          this.emit('rerouting');
+        } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
+          this.emit('end');
+        }
+        if (this.request) {
+          const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+          this.request.callback(err);
+          this.request = undefined;
+        }
+        this.closed = true;
+        this.loggedIn = false;
+        return this.loginError = null;
+      };
+
+      // clean kerberos security context if exists
+      if (this.kerberos && this.context) {
+        this.kerberos.authGSSClientClean(this.context, () => { cleanConnection(); });
       }
-      if (this.request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
-        this.request = undefined;
+      else {
+        cleanConnection();
       }
-      this.closed = true;
-      this.loggedIn = false;
-      return this.loginError = null;
     }
   }
 
@@ -934,7 +950,35 @@ class Connection extends EventEmitter {
           cb();
         });
       });
-    } else {
+    } else if (this.config.options.useKerberosIntegratedAuth) {
+      this.kerberos = new Kerberos();
+      const spn = 'MSSQLSvc/' + this.config.server;
+      this.sspiClientResponsePending = true;
+      this.kerberos.authGSSClientInitDefault(spn, Kerberos.GSS_C_MUTUAL_FLAG | Kerberos.GSS_C_INTEG_FLAG, (err, context) => {
+        if (err) {
+          this.emit('error', new Error(err.toString()));
+          return this.close();
+        }
+
+        this.kerberos.authGSSClientStep(context, '', (err, result) => {
+          if (err) {
+            this.emit('error', new Error(err.toString()));
+            return this.close();
+          }
+          this.context = context;
+          //verify GSS_S_CONTINUE_NEEDED is returned after init_sec_context()
+          if (!((null != result) && ('number' === typeof (result)) && (0 === result /* GSS_S_CONTINUE_NEEDED */))) {
+            this.emit('error', new Error('Expected GSS_S_CONTINUE_NEEDED flag not received, kerberos authentication failed'));
+            return this.close();
+          }
+
+          this.sspiClientResponsePending = false;
+          sendPayload.call(this, Buffer.from(this.context.response, 'base64'));
+          cb();
+        });
+      });
+    }
+    else {
       sendPayload.call(this);
       process.nextTick(cb);
     }
@@ -1084,6 +1128,41 @@ class Connection extends EventEmitter {
   processLogin7NTLMAck() {
     if (this.loggedIn) {
       return this.dispatchEvent('loggedIn');
+    } else {
+      if (this.loginError) {
+        this.emit('connect', this.loginError);
+      } else {
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+      }
+      return this.dispatchEvent('loginFailed');
+    }
+  }
+
+  processLogin7KerberosResponse() {
+    if (this.loggedIn) {
+      return this.dispatchEvent('loggedIn');
+    }
+    else if (this.ntlmpacket && this.kerberos) {
+      this.sspiClientResponsePending = true;
+      this.kerberos.authGSSClientStep(this.context,
+        this.ntlmpacketBuffer.toString('base64', 0, this.ntlmpacketBuffer.length), (err, result) => {
+          if (err) {
+            this.emit('error', new Error(err.toString()));
+            return this.close();
+          }
+
+          //verify if kerberos auth was successful, ie, GSS_C_COMPLETE flag returned
+          if (!((null != result) && ('number' === typeof (result)) && (1 === result /* GSS_C_COMPLETE */))) {
+            this.emit('error', new Error('Expected GSS_C_COMPLETE flag not received, kerberos authentication failed'));
+            return this.close();
+          }
+
+          this.sspiClientResponsePending = false;
+
+          // clear the ntlmpacket
+          delete this.ntlmpacketBuffer;
+          delete this.ntlmpacket;
+        });
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
@@ -1406,7 +1485,9 @@ Connection.prototype.STATE = {
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
-          if (this.config.domain) {
+          if (this.config.domain && this.config.options.useKerberosIntegratedAuth) {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_KERBEROS);
+          } else if (this.config.domain) {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1425,7 +1506,7 @@ Connection.prototype.STATE = {
       return this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
@@ -1444,7 +1525,7 @@ Connection.prototype.STATE = {
       return this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         return this.transitionTo(this.STATE.FINAL);
       },
@@ -1471,7 +1552,9 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
+            if (this.config.domain && this.config.options.useKerberosIntegratedAuth) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_KERBEROS);
+            } else if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1518,7 +1601,7 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
+          // We got data from the server while we're waiting for getNextBlob() or GSS-API
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
           // the call. Queue it for later.
@@ -1536,7 +1619,7 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
+          // We got data from the server while we're waiting for getNextBlob() or GSS-API
           // call to complete on the client. We cannot process server data
           // until this call completes as the state can change on completion of
           // the call. Queue it for later.
@@ -1571,6 +1654,39 @@ Connection.prototype.STATE = {
       },
       message: function() {
         return this.processLogin7NTLMAck();
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_KERBEROS: {
+    name: 'SentLogin7WithKerberosLogin',
+    events: {
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        if (this.sspiClientResponsePending) {
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {
+          return this.sendDataToTokenStreamParser(data);
+        }
+      },
+      loggedIn: function() {
+        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      },
+      loginFailed: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      message: function() {
+        if (this.sspiClientResponsePending) {
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {
+          return this.processLogin7KerberosResponse();
+        }
       }
     }
   },

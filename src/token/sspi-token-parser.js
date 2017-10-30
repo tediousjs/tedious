@@ -24,7 +24,7 @@ module.exports = function(parser, colMetadata, options, callback) {
     callback({
       name: 'SSPICHALLENGE',
       event: 'sspichallenge',
-      ntlmpacket: options.useWindowsIntegratedAuth ? {} : parseChallenge(buffer),
+      ntlmpacket: (options.useWindowsIntegratedAuth || options.useKerberosIntegratedAuth) ? {} : parseChallenge(buffer),
       ntlmpacketBuffer: buffer
     });
   });
