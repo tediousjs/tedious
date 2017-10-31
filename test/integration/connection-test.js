@@ -219,7 +219,7 @@ var DomainCaseEnum = {
   Upper: 2,
 };
 
-var runNtlmTest = function(test, domainCase, isIntegratedAuth, securityPackage) {
+var runNtlmTest = function(test, domainCase) {
   if (!getNtlmConfig()) {
     console.log('Skipping ntlm test');
     test.done();
@@ -231,15 +231,8 @@ var runNtlmTest = function(test, domainCase, isIntegratedAuth, securityPackage) 
   var config = getConfig();
   var ntlmConfig = getNtlmConfig();
 
-  if (isIntegratedAuth) {
-    config.userName = '';
-    config.password = '';
-    config.securityPackage = securityPackage;
-  }
-  else {
-    config.userName = ntlmConfig.userName;
-    config.password = ntlmConfig.password;
-  }
+  config.userName = ntlmConfig.userName;
+  config.password = ntlmConfig.password;
 
   switch (domainCase) {
     case DomainCaseEnum.AsIs:
@@ -277,63 +270,15 @@ var runNtlmTest = function(test, domainCase, isIntegratedAuth, securityPackage) 
 };
 
 exports.ntlm = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs, false);
+  runNtlmTest(test, DomainCaseEnum.AsIs);
 };
 
 exports.ntlmLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower, false);
+  runNtlmTest(test, DomainCaseEnum.Lower);
 };
 
 exports.ntlmUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper, false);
-};
-
-exports.integratedAuthDefault = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs, true);
-};
-
-exports.integratedAuthDefaultLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower, true);
-};
-
-exports.integratedAuthDefaultUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper, true);
-};
-
-exports.integratedAuthNegotiate = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs, true, 'negotiate');
-};
-
-exports.integratedAuthNegotiateLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower, true, 'negotiate');
-};
-
-exports.integratedAuthNegotiateUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper, true, 'negotiate');
-};
-
-exports.integratedAuthKerberos = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs, true, 'kerberos');
-};
-
-exports.integratedAuthKerberosLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower, true, 'kerberos');
-};
-
-exports.integratedAuthKerberosUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper, true, 'kerberos');
-};
-
-exports.integratedAuthNtlm = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs, true, 'ntlm');
-};
-
-exports.integratedAuthNtlmLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower, true, 'ntlm');
-};
-
-exports.integratedAuthNtlmUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper, true, 'ntlm');
+  runNtlmTest(test, DomainCaseEnum.Upper);
 };
 
 exports.encrypt = function(test) {
