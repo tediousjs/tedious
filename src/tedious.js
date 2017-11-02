@@ -9,3 +9,4 @@ module.exports.RequestError = require('./errors').RequestError;
 module.exports.TYPES = require('./data-type').typeByName;
 module.exports.ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
 module.exports.TDS_VERSION = require('./tds-versions').versions;
+module.exports.BULK_LOAD_OPTIONS = require('./bulk-load-options').BULK_LOAD_OPTIONS;

@@ -1,6 +1,7 @@
 const EventEmitter = require('events').EventEmitter;
 const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
 const TOKEN_TYPE = require('./token/token').TYPE;
+const BULK_LOAD_OPTIONS = require('./bulk-load-options').BULK_LOAD_OPTIONS;
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -40,6 +41,7 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.firstRowWritten = false;
+    this.bulkOptions = [];
   }
 
   addColumn(name, type, options) {
@@ -115,6 +117,16 @@ module.exports = class BulkLoad extends EventEmitter {
     }
   }
 
+
+  /**
+   * @param {BULK_LOAD_OPTIONS} bulkOption - options to use during BulkLoad
+   */
+  addOptions(bulkOption) {
+    if (undefined !== BULK_LOAD_OPTIONS[bulkOption]) {
+      this.bulkOptions.push(bulkOption);
+    }
+  }
+
   getBulkInsertSql() {
     let sql = 'insert bulk ' + this.table + '(';
     for (let i = 0, len = this.columns.length; i < len; i++) {
@@ -125,6 +137,18 @@ module.exports = class BulkLoad extends EventEmitter {
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
     }
     sql += ')';
+
+    if (0 !== this.bulkOptions.length) {
+      sql += ' with (';
+      for (let option = 0, len = this.bulkOptions.length; option < len; option++) {
+        if (option !== 0) {
+          sql += ', ';
+        }
+        sql += this.bulkOptions[option];
+      }
+      sql += ')';
+    }
+
     return sql;
   }
 
