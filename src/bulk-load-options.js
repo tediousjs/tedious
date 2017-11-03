@@ -4,11 +4,11 @@
  * @readonly
  */
 module.exports.BULK_LOAD_OPTIONS = {
-  /** Hounours constraints during bulk load, it is disabled by deault */
+  /** Honors constraints during bulk load, it is disabled by default */
   CHECK_CONSTRAINTS: 'CHECK_CONSTRAINTS',
-  /** Hounours insert triggers during bulk load, it is disabled by deault */
+  /** Honors insert triggers during bulk load, it is disabled by default */
   FIRE_TRIGGERS: 'FIRE_TRIGGERS',
-  /** Hounours null value passed, ignores the default values set on table */
+  /** Honors null value passed, ignores the default values set on table */
   KEEP_NULLS: 'KEEP_NULLS',
   /** Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default. */
   TABLE_LOCK: 'TABLOCK',

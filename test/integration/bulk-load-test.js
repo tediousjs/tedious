@@ -164,7 +164,7 @@ exports.bulkLoad_Constraint = function(test) {
   connection.execSqlBatch(request);
 };
 
-// Test if bulk load honours trigger dependentant on destination table
+// Test if bulk load honours trigger dependent on destination table
 exports.bulkLoad_Triggers = function(test) {
   test.expect(4);
   const connection = this.connection;
