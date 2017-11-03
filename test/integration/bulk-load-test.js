@@ -2,6 +2,7 @@ const fs = require('fs');
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const TYPES = require('../../src/data-type').typeByName;
+const BULK_LOAD_OPTIONS = require('../../src/tedious').BULK_LOAD_OPTIONS;
 
 const debugMode = false;
 
@@ -130,5 +131,126 @@ exports.bulkLoadError = function(test) {
       connection.execBulkLoad(bulkLoad);
     }
   );
+  connection.execSqlBatch(request);
+};
+
+// Test if bulk load honours constraints in the destination table
+exports.bulkLoad_Constraint = function(test) {
+  const connection = this.connection;
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable3', function(
+    err,
+    rowCount
+  ) {
+    test.ok(
+      err,
+      'An error should have been thrown to indicate the conflict with the CHECK constraint.'
+    );
+    test.done();
+  });
+  bulkLoad.addColumn('id', TYPES.Int, {
+    nullable: true
+  });
+  bulkLoad.addOptions(BULK_LOAD_OPTIONS.CHECK_CONSTRAINTS);
+  const request = new Request(
+    'CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))',
+    function(err) {
+      test.ifError(err);
+      bulkLoad.addRow({
+        id: 555
+      });
+      connection.execBulkLoad(bulkLoad);
+    }
+  );
+  connection.execSqlBatch(request);
+};
+
+// Test if bulk load honours trigger dependentant on destination table
+exports.bulkLoad_Triggers = function(test) {
+  test.expect(4);
+  const connection = this.connection;
+  const bulkLoad = connection.newBulkLoad('testTable4', function(
+    err,
+    rowCount
+  ) {
+    test.ifError(err);
+    connection.execSql(request_verify);
+  });
+  bulkLoad.addColumn('id', TYPES.Int, {
+    nullable: true
+  });
+  bulkLoad.addOptions(BULK_LOAD_OPTIONS.FIRE_TRIGGERS);
+
+  const createTable = 'CREATE TABLE testTable4 ([id] int);';
+  const createTrigger =
+    `CREATE TRIGGER bulkLoadTest on testTable4
+    AFTER INSERT
+    AS
+    INSERT INTO testTable4 SELECT * FROM testTable4;`;
+  const verifyTrigger = 'SELECT COUNT(*) FROM testTable4';
+  const dropTable = 'DROP TABLE testTable4';
+
+  const request_table = new Request(createTable,
+    function(err) {
+      test.ifError(err);
+      connection.execSql(request_trigger);
+    }
+  );
+
+  const request_trigger = new Request(createTrigger,
+    function(err) {
+      test.ifError(err);
+      bulkLoad.addRow({
+        id: 555
+      });
+      connection.execBulkLoad(bulkLoad);
+    }
+  );
+
+  const request_verify = new Request(verifyTrigger, function(err) {
+    connection.execSql(request_dropTable);
+  });
+
+  const request_dropTable = new Request(dropTable, function() {
+    test.done();
+  });
+
+  request_verify.on('row', function(columns) {
+    test.deepEqual(columns[0].value, 2);
+  });
+
+  connection.execSql(request_table);
+};
+
+// test if null value is honoured and retained during BulkLoad
+exports.bulkLoad_KeepNull = function(test) {
+  const connection = this.connection;
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', function(
+    err,
+    rowCount
+  ) {
+    test.ifError(err);
+    connection.execSqlBatch(request_verifyBulkLoad);
+  });
+  bulkLoad.addColumn('id', TYPES.Int, {
+    nullable: true
+  });
+  bulkLoad.addOptions(BULK_LOAD_OPTIONS.KEEP_NULLS);
+  const request = new Request(
+    'CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)',
+    function(err) {
+      test.ifError(err);
+      bulkLoad.addRow({
+        id: null
+      });
+      connection.execBulkLoad(bulkLoad);
+    }
+  );
+  const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err) {
+    test.ifError(err);
+    test.done();
+  });
+  request_verifyBulkLoad.on('row', function(columns) {
+    test.deepEqual(columns[0].value, null);
+  });
   connection.execSqlBatch(request);
 };
