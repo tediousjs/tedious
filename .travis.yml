@@ -6,9 +6,10 @@ node_js:
   - "7"
   - "8"
 
-branches:
-  except:
-    - /^v\d+\.\d+\.\d+$/
+stages:
+  - test
+  - name: release
+    if: branch = master
 
 services:
   - docker
