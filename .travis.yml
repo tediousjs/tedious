@@ -47,6 +47,7 @@ script:
   - TEDIOUS_TDS_VERSION=7_3_A npm run test-integration
   - TEDIOUS_TDS_VERSION=7_2   npm run test-integration
   - TEDIOUS_TDS_VERSION=7_1   npm run test-integration
+  - npm run lint
 
 after_success:
   - npm run semantic-release
