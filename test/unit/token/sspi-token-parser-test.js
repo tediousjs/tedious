@@ -45,5 +45,8 @@ exports.parseChallenge = function(test) {
 
   test.deepEqual(challenge.ntlmpacket, expected);
 
+  // Skip token (first byte) and length of VarByte (2 bytes).
+  test.ok(challenge.ntlmpacketBuffer.equals(data.slice(3)));
+
   test.done();
 };

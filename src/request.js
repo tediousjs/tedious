@@ -7,10 +7,11 @@ module.exports = class Request extends EventEmitter {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
-    this.callback = callback;
     this.parameters = [];
     this.parametersByName = {};
-    this.userCallback = this.callback;
+    this.canceled = false;
+    this.paused = false;
+    this.userCallback = callback;
     this.callback = function() {
       if (this.preparing) {
         this.emit('prepared');
@@ -133,5 +134,28 @@ module.exports = class Request extends EventEmitter {
       parameter.value = value;
     }
     return null;
+  }
+
+  // Temporarily suspends the flow of data from the database.
+  // No more 'row' events will be emitted until resume() is called.
+  pause() {
+    if (this.paused) {
+      return;
+    }
+    this.paused = true;
+    if (this.connection) {
+      this.connection.pauseRequest(this);
+    }
+  }
+
+  // Resumes the flow of data from the database.
+  resume() {
+    if (!this.paused) {
+      return;
+    }
+    this.paused = false;
+    if (this.connection) {
+      this.connection.resumeRequest(this);
+    }
   }
 };

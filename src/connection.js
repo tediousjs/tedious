@@ -32,6 +32,8 @@ const DEFAULT_TEXTSIZE = '2147483647';
 const DEFAULT_DATEFIRST = 7;
 const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
+const DEFAULT_LANGUAGE = 'us_english';
+const DEFAULT_DATEFORMAT = 'mdy';
 
 class Connection extends EventEmitter {
   constructor(config) {
@@ -50,37 +52,48 @@ class Connection extends EventEmitter {
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
+      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
         columnNameReplacer: undefined,
+        connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
         datefirst: DEFAULT_DATEFIRST,
+        dateFormat: DEFAULT_DATEFORMAT,
         debug: {
           data: false,
           packet: false,
           payload: false,
           token: false
         },
-        enableArithAbort: false,
+        enableAnsiNull: true,
         enableAnsiNullDefault: true,
+        enableAnsiPadding: true,
+        enableAnsiWarnings: true,
+        enableArithAbort: false,
+        enableConcatNullYieldsNull: true,
+        enableCursorCloseOnCommit: false,
+        enableImplicitTransactions: false,
+        enableNumericRoundabort: false,
+        enableQuotedIdentifier: true,
         encrypt: false,
         fallbackToDefaultDb: false,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
+        language: DEFAULT_LANGUAGE,
         localAddress: undefined,
+        maxRetriesOnTransientErrors: 3,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
         port: DEFAULT_PORT,
         readOnlyIntent: false,
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
-        maxRetriesOnTransientErrors: 3,
-        connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
         tdsVersion: DEFAULT_TDS_VERSION,
@@ -97,6 +110,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.abortTransactionOnError != undefined) {
+        if (typeof config.options.abortTransactionOnError !== 'boolean') {
+          throw new TypeError('options.abortTransactionOnError must be a boolean (true or false).');
+        }
+
         this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
       }
 
@@ -144,6 +161,10 @@ class Connection extends EventEmitter {
         this.config.options.datefirst = config.options.datefirst;
       }
 
+      if (config.options.dateFormat != undefined) {
+        this.config.options.dateFormat = config.options.dateFormat;
+      }
+
       if (config.options.debug) {
         if (config.options.debug.data != undefined) {
           this.config.options.debug.data = config.options.debug.data;
@@ -159,8 +180,36 @@ class Connection extends EventEmitter {
         }
       }
 
+      if (config.options.enableAnsiNull != undefined) {
+        if (typeof config.options.enableAnsiNull !== 'boolean') {
+          throw new TypeError('options.enableAnsiNull must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiNull = config.options.enableAnsiNull;
+      }
+
       if (config.options.enableAnsiNullDefault != undefined) {
+        if (typeof config.options.enableAnsiNullDefault !== 'boolean') {
+          throw new TypeError('options.enableAnsiNullDefault must be a boolean (true or false).');
+        }
+
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
+      }
+
+      if (config.options.enableAnsiPadding != undefined) {
+        if (typeof config.options.enableAnsiPadding !== 'boolean') {
+          throw new TypeError('options.enableAnsiPadding must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiPadding = config.options.enableAnsiPadding;
+      }
+
+      if (config.options.enableAnsiWarnings != undefined) {
+        if (typeof config.options.enableAnsiWarnings !== 'boolean') {
+          throw new TypeError('options.enableAnsiWarnings must be a boolean (true or false).');
+        }
+
+        this.config.options.enableAnsiWarnings = config.options.enableAnsiWarnings;
       }
 
       if (config.options.enableArithAbort !== undefined) {
@@ -169,6 +218,46 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
+      }
+
+      if (config.options.enableConcatNullYieldsNull != undefined) {
+        if (typeof config.options.enableConcatNullYieldsNull !== 'boolean') {
+          throw new TypeError('options.enableConcatNullYieldsNull must be a boolean (true or false).');
+        }
+
+        this.config.options.enableConcatNullYieldsNull = config.options.enableConcatNullYieldsNull;
+      }
+
+      if (config.options.enableCursorCloseOnCommit != undefined) {
+        if (typeof config.options.enableCursorCloseOnCommit !== 'boolean') {
+          throw new TypeError('options.enableCursorCloseOnCommit must be a boolean (true or false).');
+        }
+
+        this.config.options.enableCursorCloseOnCommit = config.options.enableCursorCloseOnCommit;
+      }
+
+      if (config.options.enableImplicitTransactions != undefined) {
+        if (typeof config.options.enableImplicitTransactions !== 'boolean') {
+          throw new TypeError('options.enableImplicitTransactions must be a boolean (true or false).');
+        }
+
+        this.config.options.enableImplicitTransactions = config.options.enableImplicitTransactions;
+      }
+
+      if (config.options.enableNumericRoundabort != undefined) {
+        if (typeof config.options.enableNumericRoundabort !== 'boolean') {
+          throw new TypeError('options.enableNumericRoundabort must be a boolean (true or false).');
+        }
+
+        this.config.options.enableNumericRoundabort = config.options.enableNumericRoundabort;
+      }
+
+      if (config.options.enableQuotedIdentifier !== undefined) {
+        if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
+          throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
+        }
+
+        this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
 
       if (config.options.encrypt != undefined) {
@@ -186,6 +275,10 @@ class Connection extends EventEmitter {
 
       if (config.options.isolationLevel) {
         this.config.options.isolationLevel = config.options.isolationLevel;
+      }
+
+      if (config.options.language != undefined) {
+        this.config.options.language = config.options.language;
       }
 
       if (config.options.localAddress != undefined) {
@@ -344,6 +437,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('sspichallenge', (token) => {
       if (token.ntlmpacket) {
         this.ntlmpacket = token.ntlmpacket;
+        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
       }
       return this.emit('sspichallenge', token);
     });
@@ -474,7 +568,9 @@ class Connection extends EventEmitter {
         if (this.config.options.rowCollectionOnDone) {
           this.request.rst.push(token.columns);
         }
-        return this.request.emit('row', token.columns);
+        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
+          this.request.emit('row', token.columns);
+        }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
         return this.close();
@@ -538,6 +634,12 @@ class Connection extends EventEmitter {
       }
     });
 
+    this.tokenStreamParser.on('endOfMessage', () => {      // EOM pseudo token received
+      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
+        this.dispatchEvent('endOfMessageMarkerReceived');
+      }
+    });
+
     this.tokenStreamParser.on('resetConnection', () => {
       return this.emit('resetConnection');
     });
@@ -545,6 +647,12 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('tokenStreamError', (error) => {
       this.emit('error', error);
       return this.close();
+    });
+
+    this.tokenStreamParser.on('drain', () => {
+      // Bridge the release of backpressure from the token stream parser
+      // transform to the packet stream transform.
+      this.messageIo.resume();
     });
   }
 
@@ -663,7 +771,7 @@ class Connection extends EventEmitter {
     }
 
     if (this.state && this.state.exit) {
-      this.state.exit.apply(this);
+      this.state.exit.call(this, newState);
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
@@ -764,26 +872,33 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendLogin7Packet() {
-    const payload = new Login7Payload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      serverName: this.routingData ? this.routingData.server : this.config.server,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      initDbFatal: !this.config.options.fallbackToDefaultDb,
-      readOnlyIntent: this.config.options.readOnlyIntent
-    });
+  sendLogin7Packet(cb) {
+    const sendPayload = function(clientResponse) {
+      const payload = new Login7Payload({
+        domain: this.config.domain,
+        userName: this.config.userName,
+        password: this.config.password,
+        database: this.config.options.database,
+        serverName: this.routingData ? this.routingData.server : this.config.server,
+        appName: this.config.options.appName,
+        packetSize: this.config.options.packetSize,
+        tdsVersion: this.config.options.tdsVersion,
+        initDbFatal: !this.config.options.fallbackToDefaultDb,
+        readOnlyIntent: this.config.options.readOnlyIntent,
+        sspiBlob: clientResponse,
+        language: this.config.options.language
+      });
 
-    this.routingData = undefined;
-    this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+      this.routingData = undefined;
+      this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
 
-    return this.debug.payload(function() {
-      return payload.toString('  ');
-    });
+      this.debug.payload(function() {
+        return payload.toString('  ');
+      });
+    };
+
+    sendPayload.call(this);
+    process.nextTick(cb);
   }
 
   sendNTLMResponsePacket() {
@@ -798,14 +913,41 @@ class Connection extends EventEmitter {
       ntlmpacket: this.ntlmpacket,
       additional: this.additional
     });
+
     this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    return this.debug.payload(function() {
+    this.debug.payload(function() {
       return payload.toString('  ');
     });
+
+    const boundTransitionTo = this.transitionTo.bind(this);
+    process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
   }
 
+  // Returns false to apply backpressure.
   sendDataToTokenStreamParser(data) {
     return this.tokenStreamParser.addBuffer(data);
+  }
+
+  // This is an internal method that is called from Request.pause().
+  // It has to check whether the passed Request object represents the currently
+  // active request, because the application might have called Request.pause()
+  // on an old inactive Request object.
+  pauseRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.pause();
+    }
+  }
+
+  // This is an internal method that is called from Request.resume().
+  resumeRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.resume();
+    }
+  }
+
+  // Returns true if the passed request is the currently active request of the connection.
+  isRequestActive(request) {
+    return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
   }
 
   sendInitialSql() {
@@ -814,10 +956,34 @@ class Connection extends EventEmitter {
   }
 
   getInitialSql() {
-    const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
+    const enableAnsiNull = this.config.options.enableAnsiNull ? 'on' : 'off';
     const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
+    const enableAnsiPadding = this.config.options.enableAnsiPadding ? 'on' : 'off';
+    const enableAnsiWarnings = this.config.options.enableAnsiWarnings ? 'on' : 'off';
     const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
-    return 'set textsize ' + this.config.options.textsize + '\nset quoted_identifier on\nset arithabort ' + enableArithAbort + '\nset numeric_roundabort off\nset ansi_warnings on\nset ansi_padding on\nset ansi_nulls on\nset ansi_null_dflt_on ' + enableAnsiNullDefault + '\nset concat_null_yields_null on\nset cursor_close_on_commit off\nset implicit_transactions off\nset language us_english\nset dateformat mdy\nset datefirst ' + this.config.options.datefirst + '\nset transaction isolation level ' + (this.getIsolationLevelText(this.config.options.connectionIsolationLevel)) + '\nset xact_abort ' + xact_abort;
+    const enableConcatNullYieldsNull = this.config.options.enableConcatNullYieldsNull ? 'on' : 'off';
+    const enableCursorCloseOnCommit = this.config.options.enableCursorCloseOnCommit ? 'on' : 'off';
+    const enableImplicitTransactions = this.config.options.enableImplicitTransactions ? 'on' : 'off';
+    const enableNumericRoundabort = this.config.options.enableNumericRoundabort ? 'on' : 'off';
+    const enableQuotedIdentifier = this.config.options.enableQuotedIdentifier ? 'on' : 'off';
+    const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
+
+    return `set ansi_nulls ${enableAnsiNull}\n
+      set ansi_null_dflt_on ${enableAnsiNullDefault}\n
+      set ansi_padding ${enableAnsiPadding}\n
+      set ansi_warnings ${enableAnsiWarnings}\n
+      set arithabort ${enableArithAbort}\n
+      set concat_null_yields_null ${enableConcatNullYieldsNull}\n
+      set cursor_close_on_commit ${enableCursorCloseOnCommit}\n
+      set datefirst ${this.config.options.datefirst}\n
+      set dateformat ${this.config.options.dateFormat}\n
+      set implicit_transactions ${enableImplicitTransactions}\n
+      set language ${this.config.options.language}\n
+      set numeric_roundabort ${enableNumericRoundabort}\n
+      set quoted_identifier ${enableQuotedIdentifier}\n
+      set textsize ${this.config.options.textsize}\n
+      set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}\n
+      set xact_abort ${xact_abort}`;
   }
 
   processedInitialSql() {
@@ -1073,6 +1239,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.request.connection = this;
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
@@ -1082,7 +1249,10 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
-      return this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      if (request.paused) {                                // Request.pause() has been called before the request was started
+        this.pauseRequest(request);
+      }
     }
   }
 
@@ -1171,12 +1341,13 @@ Connection.prototype.STATE = {
         return this.processPreLoginResponse();
       },
       noTls: function() {
-        this.sendLogin7Packet();
-        if (this.config.domain) {
-          return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        } else {
-          return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        }
+        this.sendLogin7Packet(() => {
+          if (this.config.domain) {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
+        });
       },
       tls: function() {
         this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
@@ -1235,12 +1406,13 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet();
-          if (this.config.domain) {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          } else {
-            return this.transitionTo (this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          }
+          this.sendLogin7Packet(() => {
+            if (this.config.domain) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            } else {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            }
+          });
         }
       }
     }
@@ -1284,8 +1456,7 @@ Connection.prototype.STATE = {
         return this.sendDataToTokenStreamParser(data);
       },
       receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-        return this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        return this.sendNTLMResponsePacket();
       },
       loginFailed: function() {
         return this.transitionTo(this.STATE.FINAL);
@@ -1349,8 +1520,12 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function() {
+    exit: function(nextState) {
       this.clearRequestTimer();
+
+      if (nextState !== this.STATE.FINAL) {
+        this.tokenStreamParser.resume();
+      }
     },
     events: {
       socketError: function(err) {
@@ -1361,9 +1536,20 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         this.clearRequestTimer();                          // request timer is stopped on first data package
-        return this.sendDataToTokenStreamParser(data);
+        const ret = this.sendDataToTokenStreamParser(data);
+        if (ret === false) {
+          // Bridge backpressure from the token stream parser transform to the
+          // packet stream transform.
+          this.messageIo.pause();
+        }
       },
       message: function() {
+        // We have to channel the 'message' (EOM) event through the token stream
+        // parser transform, to keep it in line with the flow of the tokens, when
+        // the incoming data flow is paused and resumed.
+        return this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
         this.request = undefined;
