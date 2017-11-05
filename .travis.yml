@@ -6,11 +6,6 @@ node_js:
   - "7"
   - "8"
 
-stages:
-  - test
-  - name: release
-    if: branch = master
-
 services:
   - docker
 
@@ -51,7 +46,8 @@ script:
 
 jobs:
   include:
-    - stage: release
+    - if: branch = master
+      stage: release
       node_js: 4
       before_install: skip
       before_script: skip
