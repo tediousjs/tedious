@@ -6,9 +6,10 @@ node_js:
   - "7"
   - "8"
 
-branches:
-  except:
-    - /^v\d+\.\d+\.\d+$/
+stages:
+  - test
+  - name: release
+    if: (branch = master) AND (type = push)
 
 services:
   - docker
@@ -49,5 +50,10 @@ script:
   - TEDIOUS_TDS_VERSION=7_1   npm run test-integration
   - npm run lint
 
-after_success:
-  - npm run semantic-release
+jobs:
+  include:
+    - stage: release
+      node_js: 4
+      before_install: skip
+      before_script: skip
+      script: npm run semantic-release
