@@ -179,4 +179,14 @@ module.exports = class MessageIO extends EventEmitter {
     this.debug.packet(direction, packet);
     return this.debug.data(packet);
   }
+
+  // Temporarily suspends the flow of incoming packets.
+  pause() {
+    this.packetStream.pause();
+  }
+
+  // Resumes the flow of incoming packets.
+  resume() {
+    this.packetStream.resume();
+  }
 };
