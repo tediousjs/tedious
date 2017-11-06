@@ -179,49 +179,159 @@ module.exports = {
 
     'with input data': {
       'generates a NTLM AUTHENTICATE_MESSAGE without username or password': function(test) {
-        test.done();
+        const authProvider = new NTLMAuthProvider(null, {
+          domain: 'DOMAIN'
+        });
 
-        // const authProvider = new NTLMAuthProvider(null, {});
-        //
-        // const challengeMessage = new Buffer([
-        //   '4e544c4d53535000',
-        //
-        //   '02000000',
-        //
-        //   '0c000c0030000000',
-        //
-        //   '01028100',
-        //
-        //   '0123456789abcdef',
-        //
-        //   '0000000000000000',
-        //
-        //   '620062003c000000',
-        //
-        //   '44004f004d00410049004e00',
-        //
-        //   '02000c0044004f004d00410049004e00',
-        //   '01000c00530045005200560045005200',
-        //   '0400140064006f006d00610069006e002e0063006f006d00',
-        //   '030022007300650072007600650072002e0064006f006d00610069006e002e0063006f006d00',
-        //   '00000000'
-        // ].join(''), 'hex');
-        //
-        // authProvider.handshake(challengeMessage, function(error, data) {
-        //   test.ifError(error);
-        //
-        //   test.ok(Buffer.isBuffer(data));
-        //
-        //   test.done();
-        // });
+        const challengeMessage = new Buffer([
+          '4e544c4d53535000',
+
+          '02000000',
+
+          '0c000c0030000000',
+
+          '01028100',
+
+          '0123456789abcdef',
+
+          '0000000000000000',
+
+          '620062003c000000',
+
+          '44004f004d00410049004e00',
+
+          '02000c0044004f004d00410049004e00',
+          '01000c00530045005200560045005200',
+          '0400140064006f006d00610069006e002e0063006f006d00',
+          '030022007300650072007600650072002e0064006f006d00610069006e002e0063006f006d00',
+          '00000000'
+        ].join(''), 'hex');
+
+        authProvider.handshake(challengeMessage, function(error, data) {
+          test.ifError(error);
+
+          test.ok(Buffer.isBuffer(data));
+          test.strictEqual(data.length, 76);
+
+          test.strictEqual(data.slice(0, 8).toString('hex'), '4e544c4d53535000');
+          test.strictEqual(data.slice(8, 12).toString('hex'), '03000000');
+          test.strictEqual(data.slice(12, 20).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(20, 28).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(28, 36).toString('hex'), '0c000c0040000000');
+          test.strictEqual(data.slice(36, 44).toString('hex'), '000000004c000000');
+          test.strictEqual(data.slice(44, 52).toString('hex'), '000000004c000000');
+          test.strictEqual(data.slice(52, 60).toString('hex'), '0000000000000000');
+          test.strictEqual(data.slice(60, 64).toString('hex'), '01028100');
+
+          test.strictEqual(data.slice(64, 76).toString('ucs2'), 'DOMAIN');
+
+          test.done();
+        });
       },
 
       'generates a NTLM AUTHENTICATE_MESSAGE with password only': function(test) {
-        test.done();
+        const authProvider = new NTLMAuthProvider(null, {
+          password: 'SecREt01',
+          domain: 'DOMAIN'
+        });
+
+        const challengeMessage = new Buffer([
+          '4e544c4d53535000',
+
+          '02000000',
+
+          '0c000c0030000000',
+
+          '01028100',
+
+          '0123456789abcdef',
+
+          '0000000000000000',
+
+          '620062003c000000',
+
+          '44004f004d00410049004e00',
+
+          '02000c0044004f004d00410049004e00',
+          '01000c00530045005200560045005200',
+          '0400140064006f006d00610069006e002e0063006f006d00',
+          '030022007300650072007600650072002e0064006f006d00610069006e002e0063006f006d00',
+          '00000000'
+        ].join(''), 'hex');
+
+        authProvider.handshake(challengeMessage, function(error, data) {
+          test.ifError(error);
+
+          test.ok(Buffer.isBuffer(data));
+          test.strictEqual(data.length, 76);
+
+          test.strictEqual(data.slice(0, 8).toString('hex'), '4e544c4d53535000');
+          test.strictEqual(data.slice(8, 12).toString('hex'), '03000000');
+          test.strictEqual(data.slice(12, 20).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(20, 28).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(28, 36).toString('hex'), '0c000c0040000000');
+          test.strictEqual(data.slice(36, 44).toString('hex'), '000000004c000000');
+          test.strictEqual(data.slice(44, 52).toString('hex'), '000000004c000000');
+          test.strictEqual(data.slice(52, 60).toString('hex'), '0000000000000000');
+          test.strictEqual(data.slice(60, 64).toString('hex'), '01028100');
+
+          test.strictEqual(data.slice(64, 76).toString('ucs2'), 'DOMAIN');
+
+          test.done();
+        });
       },
 
       'generates a NTLM AUTHENTICATE_MESSAGE with username only': function(test) {
-        test.done();
+        const authProvider = new NTLMAuthProvider(null, {
+          username: 'user',
+          domain: 'DOMAIN'
+        });
+
+        const challengeMessage = new Buffer([
+          '4e544c4d53535000',
+
+          '02000000',
+
+          '0c000c0030000000',
+
+          '01028100',
+
+          '0123456789abcdef',
+
+          '0000000000000000',
+
+          '620062003c000000',
+
+          '44004f004d00410049004e00',
+
+          '02000c0044004f004d00410049004e00',
+          '01000c00530045005200560045005200',
+          '0400140064006f006d00610069006e002e0063006f006d00',
+          '030022007300650072007600650072002e0064006f006d00610069006e002e0063006f006d00',
+          '00000000'
+        ].join(''), 'hex');
+
+        authProvider.handshake(challengeMessage, function(error, data) {
+          test.ifError(error);
+
+          test.ok(Buffer.isBuffer(data));
+          test.strictEqual(data.length, 84);
+
+          test.strictEqual(data.slice(0, 8).toString('hex'), '4e544c4d53535000');
+          test.strictEqual(data.slice(8, 12).toString('hex'), '03000000');
+          test.strictEqual(data.slice(12, 20).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(20, 28).toString('hex'), '0000000040000000');
+          test.strictEqual(data.slice(28, 36).toString('hex'), '0c000c0040000000');
+          test.strictEqual(data.slice(36, 44).toString('hex'), '080008004c000000');
+          test.strictEqual(data.slice(44, 52).toString('hex'), '0000000054000000');
+          test.strictEqual(data.slice(52, 60).toString('hex'), '0000000000000000');
+          test.strictEqual(data.slice(60, 64).toString('hex'), '01028100');
+
+          test.strictEqual(data.slice(64, 76).toString('ucs2'), 'DOMAIN');
+          test.strictEqual(data.slice(76, 84).toString('ucs2'), 'user');
+
+          test.done();
+        });
       },
 
       'generates a NTLM AUTHENTICATE_MESSAGE with username and password': function(test) {
