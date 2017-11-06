@@ -18,10 +18,6 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
-const SspiModuleSupported = require('sspi-client').ModuleSupported;
-const SspiClientApi = require('sspi-client').SspiClientApi;
-const Fqdn = require('sspi-client').Fqdn;
-const MakeSpn = require('sspi-client').MakeSpn;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -359,10 +355,6 @@ class Connection extends EventEmitter {
       }
     }
 
-    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
-      this.config.options.useWindowsIntegratedAuth = true;
-    }
-
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
@@ -376,7 +368,6 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
-    this.sspiClientResponsePending = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -577,7 +568,9 @@ class Connection extends EventEmitter {
         if (this.config.options.rowCollectionOnDone) {
           this.request.rst.push(token.columns);
         }
-        return this.request.emit('row', token.columns);
+        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
+          this.request.emit('row', token.columns);
+        }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
         return this.close();
@@ -641,6 +634,12 @@ class Connection extends EventEmitter {
       }
     });
 
+    this.tokenStreamParser.on('endOfMessage', () => {      // EOM pseudo token received
+      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
+        this.dispatchEvent('endOfMessageMarkerReceived');
+      }
+    });
+
     this.tokenStreamParser.on('resetConnection', () => {
       return this.emit('resetConnection');
     });
@@ -648,6 +647,12 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('tokenStreamError', (error) => {
       this.emit('error', error);
       return this.close();
+    });
+
+    this.tokenStreamParser.on('drain', () => {
+      // Bridge the release of backpressure from the token stream parser
+      // transform to the packet stream transform.
+      this.messageIo.resume();
     });
   }
 
@@ -766,7 +771,7 @@ class Connection extends EventEmitter {
     }
 
     if (this.state && this.state.exit) {
-      this.state.exit.apply(this);
+      this.state.exit.call(this, newState);
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
@@ -892,89 +897,57 @@ class Connection extends EventEmitter {
       });
     };
 
-    if (this.config.options.useWindowsIntegratedAuth) {
-      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
-        if (err) {
-          this.emit('error', new Error('Error getting Fqdn. Error details: ' + err.message));
-          return this.close();
-        }
-
-        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
-
-        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
-
-        this.sspiClientResponsePending = true;
-        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
-          if (errorCode) {
-            this.emit('error', new Error(errorString));
-            return this.close();
-          }
-
-          if (isDone) {
-            this.emit('error', new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.'));
-            return this.close();
-          }
-
-          this.sspiClientResponsePending = false;
-          sendPayload.call(this, clientResponse);
-          cb();
-        });
-      });
-    } else {
-      sendPayload.call(this);
-      process.nextTick(cb);
-    }
+    sendPayload.call(this);
+    process.nextTick(cb);
   }
 
   sendNTLMResponsePacket() {
-    if (this.sspiClient) {
-      this.sspiClientResponsePending = true;
+    const payload = new NTLMResponsePayload({
+      domain: this.config.domain,
+      userName: this.config.userName,
+      password: this.config.password,
+      database: this.config.options.database,
+      appName: this.config.options.appName,
+      packetSize: this.config.options.packetSize,
+      tdsVersion: this.config.options.tdsVersion,
+      ntlmpacket: this.ntlmpacket,
+      additional: this.additional
+    });
 
-      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+    this.debug.payload(function() {
+      return payload.toString('  ');
+    });
 
-        if (errorCode) {
-          this.emit('error', new Error(errorString));
-          return this.close();
-        }
+    const boundTransitionTo = this.transitionTo.bind(this);
+    process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+  }
 
-        this.sspiClientResponsePending = false;
+  // Returns false to apply backpressure.
+  sendDataToTokenStreamParser(data) {
+    return this.tokenStreamParser.addBuffer(data);
+  }
 
-        if (clientResponse.length) {
-          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
-          this.debug.payload(function() {
-            return '  SSPI Auth';
-          });
-        }
-
-        if (isDone) {
-          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-        }
-      });
-    } else {
-      const payload = new NTLMResponsePayload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        database: this.config.options.database,
-        appName: this.config.options.appName,
-        packetSize: this.config.options.packetSize,
-        tdsVersion: this.config.options.tdsVersion,
-        ntlmpacket: this.ntlmpacket,
-        additional: this.additional
-      });
-
-      this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
-
-      const boundTransitionTo = this.transitionTo.bind(this);
-      process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+  // This is an internal method that is called from Request.pause().
+  // It has to check whether the passed Request object represents the currently
+  // active request, because the application might have called Request.pause()
+  // on an old inactive Request object.
+  pauseRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.pause();
     }
   }
 
-  sendDataToTokenStreamParser(data) {
-    return this.tokenStreamParser.addBuffer(data);
+  // This is an internal method that is called from Request.resume().
+  resumeRequest(request) {
+    if (this.isRequestActive(request)) {
+      this.tokenStreamParser.resume();
+    }
+  }
+
+  // Returns true if the passed request is the currently active request of the connection.
+  isRequestActive(request) {
+    return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
   }
 
   sendInitialSql() {
@@ -997,7 +970,7 @@ class Connection extends EventEmitter {
 
     return `set ansi_nulls ${enableAnsiNull}\n
       set ansi_null_dflt_on ${enableAnsiNullDefault}\n
-      set ansi_padding ${enableAnsiPadding}\n 
+      set ansi_padding ${enableAnsiPadding}\n
       set ansi_warnings ${enableAnsiWarnings}\n
       set arithabort ${enableArithAbort}\n
       set concat_null_yields_null ${enableConcatNullYieldsNull}\n
@@ -1266,6 +1239,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.request.connection = this;
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
@@ -1275,7 +1249,10 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
-      return this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+      if (request.paused) {                                // Request.pause() has been called before the request was started
+        this.pauseRequest(request);
+      }
     }
   }
 
@@ -1476,16 +1453,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
-          // call to complete on the client. We cannot process server data
-          // until this call completes as the state can change on completion of
-          // the call. Queue it for later.
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'data', data);
-        } else {
-          return this.sendDataToTokenStreamParser(data);
-        }
+        return this.sendDataToTokenStreamParser(data);
       },
       receivedChallenge: function() {
         return this.sendNTLMResponsePacket();
@@ -1494,16 +1462,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        if (this.sspiClientResponsePending) {
-          // We got data from the server while we're waiting for getNextBlob()
-          // call to complete on the client. We cannot process server data
-          // until this call completes as the state can change on completion of
-          // the call. Queue it for later.
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'message');
-        } else {
-          return this.processLogin7NTLMResponse();
-        }
+        return this.processLogin7NTLMResponse();
       }
     }
   },
@@ -1561,8 +1520,12 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function() {
+    exit: function(nextState) {
       this.clearRequestTimer();
+
+      if (nextState !== this.STATE.FINAL) {
+        this.tokenStreamParser.resume();
+      }
     },
     events: {
       socketError: function(err) {
@@ -1573,9 +1536,20 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         this.clearRequestTimer();                          // request timer is stopped on first data package
-        return this.sendDataToTokenStreamParser(data);
+        const ret = this.sendDataToTokenStreamParser(data);
+        if (ret === false) {
+          // Bridge backpressure from the token stream parser transform to the
+          // packet stream transform.
+          this.messageIo.pause();
+        }
       },
       message: function() {
+        // We have to channel the 'message' (EOM) event through the token stream
+        // parser transform, to keep it in line with the flow of the tokens, when
+        // the incoming data flow is paused and resumed.
+        return this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request;
         this.request = undefined;
