@@ -46,8 +46,13 @@ module.exports = class Request extends EventEmitter {
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
+    this.originalParameters = [];
+    this.preparing = false;
+    this.handle = undefined;
     this.canceled = false;
     this.paused = false;
+    this.error = undefined;
+    this.connection = undefined;
     this.userCallback = callback;
     this.callback = function() {
       if (this.preparing) {
