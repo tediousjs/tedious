@@ -1,7 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
 const TOKEN_TYPE = require('./token/token').TYPE;
-const BULK_LOAD_OPTIONS = require('./bulk-load-options').BULK_LOAD_OPTIONS;
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -27,6 +26,12 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
+const bulkOptionMapping = new Map();
+bulkOptionMapping.set('checkConstraints', 'CHECK_CONSTRAINTS');
+bulkOptionMapping.set('fireTriggers', 'FIRE_TRIGGERS');
+bulkOptionMapping.set('keepNulls', 'KEEP_NULLS');
+bulkOptionMapping.set('lockTable', 'TABLOCK');
+
 module.exports = class BulkLoad extends EventEmitter {
   constructor(table, options1, callback) {
     super();
@@ -41,7 +46,12 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.firstRowWritten = false;
-    this.bulkOptions = [];
+    this.bulkOptions = {
+      checkConstraints: false,
+      fireTriggers: false,
+      keepNulls: false,
+      lockTable: false
+    };
   }
 
   addColumn(name, type, options) {
@@ -117,13 +127,27 @@ module.exports = class BulkLoad extends EventEmitter {
     }
   }
 
-
   /**
-   * @param {BULK_LOAD_OPTIONS} bulkOption - options to use during BulkLoad
+   * @param {{checkConstraints : boolean , fireTriggers : boolean , keepNulls : boolean, tableLock: boolean}} bulkLoadOptions
+   * @descriptions
+   *  checkConstraints - Honors constraints during bulk load, it is disabled by default.
+   *  fireTriggers -  Honors insert triggers during bulk load, it is disabled by default.
+   *  keepNulls - Honors null value passed, ignores the default values set on table.
+   *  tableLock - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
    */
-  addOptions(bulkOption) {
-    if (undefined !== BULK_LOAD_OPTIONS[bulkOption]) {
-      this.bulkOptions.push(bulkOption);
+  setOptions(bulkLoadOptions) {
+    if (bulkLoadOptions) {
+      for (const option in bulkLoadOptions) {
+        if (typeof bulkLoadOptions[option] === 'boolean' && this.bulkOptions[option] != undefined) {
+          this.bulkOptions[option] = bulkLoadOptions[option];
+        }
+        else {
+          throw new TypeError('Unknown bulk load option ' + option);
+        }
+      }
+    }
+    else {
+      throw new TypeError('No option set for BulkLoad');
     }
   }
 
@@ -138,17 +162,17 @@ module.exports = class BulkLoad extends EventEmitter {
     }
     sql += ')';
 
-    if (0 !== this.bulkOptions.length) {
-      sql += ' with (';
-      for (let option = 0, len = this.bulkOptions.length; option < len; option++) {
-        if (option !== 0) {
-          sql += ', ';
-        }
-        sql += this.bulkOptions[option];
-      }
-      sql += ')';
-    }
+    const addOptions = Object.keys(this.bulkOptions)
+      .filter((key) => {
+        // checks if bulkOptions is true
+        return this.bulkOptions[key] === true;
+      }).map((key) => {
+        // gets the keyword corresponding to bulkOption
+        return bulkOptionMapping.get(key);
+      });
 
+    if (addOptions.length !== 0)
+      sql += 'WITH (' + addOptions.join(',') + ')';
     return sql;
   }
 
