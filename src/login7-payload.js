@@ -173,8 +173,8 @@ module.exports = class Login7Payload {
     this.attachDbFile = '';
     this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
-    this.addVariableDataString(variableData, this.loginData.userName);
-    this.addVariableDataBuffer(variableData, this.createPasswordBuffer());
+    this.addVariableDataString(variableData, this.loginData.domain ? '' : this.loginData.userName);
+    this.addVariableDataBuffer(variableData, this.loginData.domain ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
     this.addVariableDataString(variableData, '');

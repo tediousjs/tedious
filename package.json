@@ -47,7 +47,6 @@
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.2.6",
     "sprintf": "0.1.5",
-    "sspi-client": "^0.1.0",
     "adal-angular":" ^1.0.11"
   },
   "devDependencies": {
@@ -67,12 +66,10 @@
     "source-map-support": "^0.4.14"
   },
   "scripts": {
-    "pretest": "eslint src test",
+    "lint": "eslint src test",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer",
-    "pretest-all": "eslint src test",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "pretest-integration": "eslint src test",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/",
+    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build": "rimraf lib && babel src --out-dir lib",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post"
@@ -91,5 +88,8 @@
     "plugins": [
       "transform-runtime"
     ]
+  },
+  "release": {
+    "verifyConditions": "semantic-release/src/lib/plugin-noop"
   }
 }
