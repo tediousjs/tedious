@@ -82,7 +82,8 @@
             "node": 4
           }
         }
-      ]
+      ],
+      "flow"
     ],
     "plugins": [
       "transform-runtime"
