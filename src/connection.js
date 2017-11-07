@@ -103,6 +103,7 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
+        authentication: undefined,
         useColumnNames: false,
         useUTC: true
       }
@@ -357,8 +358,19 @@ class Connection extends EventEmitter {
       if (config.options.useUTC != undefined) {
         this.config.options.useUTC = config.options.useUTC;
       }
+      // Whenever authentication property is used to specify an authentication method,
+      // the client will request encryption (the default value of the Encrypt property will be true)
+      // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
+      if (config.options.authentication != undefined) {
+        // TODO: check for valid options
+        this.config.options.authentication = config.options.authentication;
+        this.config.options.encrypt = true;
+        if (config.options.trustServerCertificate != 'true') {
+          this.config.options.trustServerCertificate = false;
+        }
+      }
     }
-
+    // TODO: if authentication is set to true, along with any other authentication methods throw error
     if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
@@ -377,6 +389,7 @@ class Connection extends EventEmitter {
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
     this.sspiClientResponsePending = false;
+    this.fedAuthRequiredPreLoginResponse = false;
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -868,7 +881,13 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-
+    if (0 != preloginPayload.fedAuth && 1 != preloginPayload.fedAuth) {
+      this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuth, 'EFEDAUTH'));
+      return this.close();
+    }
+    if (this.config.options.authentication != undefined) {
+      this.fedAuthRequiredPreLoginResponse = (preloginPayload.fedAuth == 1);
+    }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
         this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));

@@ -13,6 +13,7 @@ const TOKEN = {
   INSTOPT: 0x02,
   THREADID: 0x03,
   MARS: 0x04,
+  FEDAUTHREQUIRED: 0x06,
   TERMINATOR: 0xFF
 };
 
@@ -63,7 +64,8 @@ module.exports = class PreloginPayload {
       this.createEncryptionOption(),
       this.createInstanceOption(),
       this.createThreadIdOption(),
-      this.createMarsOption()
+      this.createMarsOption(),
+      this.createFedAuthOption()
     ];
 
     let length = 0;
@@ -139,6 +141,15 @@ module.exports = class PreloginPayload {
     };
   }
 
+  createFedAuthOption() {
+    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    buffer.writeUInt8(0x01);
+    return {
+      token: TOKEN.FEDAUTHREQUIRED,
+      data: buffer.data
+    };
+  }
+
   extractOptions() {
     let offset = 0;
     while (this.data[offset] !== TOKEN.TERMINATOR) {
@@ -161,6 +172,9 @@ module.exports = class PreloginPayload {
           break;
         case TOKEN.MARS:
           this.extractMars(dataOffset);
+          break;
+        case TOKEN.FEDAUTHREQUIRED:
+          this.extractFedAuth(dataOffset);
       }
       offset += 5;
       dataOffset += dataLength;
@@ -193,6 +207,10 @@ module.exports = class PreloginPayload {
   extractMars(offset) {
     this.mars = this.data.readUInt8(offset);
     return this.marsString = marsByValue[this.mars];
+  }
+
+  extractFedAuth(offset) {
+    this.fedAuth = this.data.readUInt8(offset);
   }
 
   toString(indent) {
