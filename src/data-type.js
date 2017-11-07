@@ -1280,28 +1280,34 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const time = new Date(+parameter.value);
+
+        let timestamp;
         if (options.useUTC) {
-          time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
-          time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+
+        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        timestamp = Math.round(timestamp);
+
         switch (parameter.scale) {
           case 0:
           case 1:
           case 2:
             buffer.writeUInt8(3);
-            return buffer.writeUInt24LE(time);
+            return buffer.writeUInt24LE(timestamp);
           case 3:
           case 4:
             buffer.writeUInt8(4);
-            return buffer.writeUInt32LE(time);
+            return buffer.writeUInt32LE(timestamp);
           case 5:
           case 6:
           case 7:
             buffer.writeUInt8(5);
-            return buffer.writeUInt40LE(time);
+            return buffer.writeUInt40LE(timestamp);
         }
       } else {
         return buffer.writeUInt8(0);
@@ -1410,30 +1416,36 @@ const TYPE = module.exports.TYPE = {
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const time = new Date(+parameter.value);
+
+        let timestamp;
         if (options.useUTC) {
-          time = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
         } else {
-          time = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
         }
-        time = (time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+
+        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        timestamp = Math.round(timestamp);
+
         switch (parameter.scale) {
           case 0:
           case 1:
           case 2:
             buffer.writeUInt8(6);
-            buffer.writeUInt24LE(time);
+            buffer.writeUInt24LE(timestamp);
             break;
           case 3:
           case 4:
             buffer.writeUInt8(7);
-            buffer.writeUInt32LE(time);
+            buffer.writeUInt32LE(timestamp);
             break;
           case 5:
           case 6:
           case 7:
             buffer.writeUInt8(8);
-            buffer.writeUInt40LE(time);
+            buffer.writeUInt40LE(timestamp);
         }
         if (options.useUTC) {
           return buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
@@ -1499,29 +1511,33 @@ const TYPE = module.exports.TYPE = {
     },
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
-        let ref, time = new Date(+parameter.value);
+        const time = new Date(+parameter.value);
         time.setUTCFullYear(1970);
         time.setUTCMonth(0);
         time.setUTCDate(1);
-        time = (+time / 1000 + ((ref = parameter.value.nanosecondDelta) != null ? ref : 0)) * Math.pow(10, parameter.scale);
+
+        let timestamp = time * Math.pow(10, parameter.scale - 3);
+        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+        timestamp = Math.round(timestamp);
+
         const offset = -parameter.value.getTimezoneOffset();
         switch (parameter.scale) {
           case 0:
           case 1:
           case 2:
             buffer.writeUInt8(8);
-            buffer.writeUInt24LE(time);
+            buffer.writeUInt24LE(timestamp);
             break;
           case 3:
           case 4:
             buffer.writeUInt8(9);
-            buffer.writeUInt32LE(time);
+            buffer.writeUInt32LE(timestamp);
             break;
           case 5:
           case 6:
           case 7:
             buffer.writeUInt8(10);
-            buffer.writeUInt40LE(time);
+            buffer.writeUInt40LE(timestamp);
         }
         buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
         return buffer.writeInt16LE(offset);
