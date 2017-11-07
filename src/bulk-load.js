@@ -130,10 +130,13 @@ module.exports = class BulkLoad extends EventEmitter {
   /**
    * @param {{checkConstraints : boolean , fireTriggers : boolean , keepNulls : boolean, tableLock: boolean}} bulkLoadOptions
    * @descriptions
-   *  checkConstraints - Honors constraints during bulk load, it is disabled by default.
-   *  fireTriggers -  Honors insert triggers during bulk load, it is disabled by default.
-   *  keepNulls - Honors null value passed, ignores the default values set on table.
-   *  tableLock - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
+   *  checkConstraints - honors constraints during bulk load, it is disabled by default.
+   *
+   *  fireTriggers -  honors insert triggers during bulk load, it is disabled by default.
+   *
+   *  keepNulls - honors null value passed, ignores the default values set on table.
+   *
+   *  tableLock - places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
    */
   setOptions(bulkLoadOptions) {
     if (bulkLoadOptions) {
