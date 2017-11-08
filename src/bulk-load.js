@@ -26,12 +26,6 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-const bulkOptionMapping = new Map();
-bulkOptionMapping.set('checkConstraints', 'CHECK_CONSTRAINTS');
-bulkOptionMapping.set('fireTriggers', 'FIRE_TRIGGERS');
-bulkOptionMapping.set('keepNulls', 'KEEP_NULLS');
-bulkOptionMapping.set('lockTable', 'TABLOCK');
-
 module.exports = class BulkLoad extends EventEmitter {
   constructor(table, options1, callback) {
     super();
@@ -52,6 +46,12 @@ module.exports = class BulkLoad extends EventEmitter {
       keepNulls: false,
       lockTable: false
     };
+
+    this.bulkOptionMapping = new Map();
+    this.bulkOptionMapping.set('checkConstraints', 'CHECK_CONSTRAINTS');
+    this.bulkOptionMapping.set('fireTriggers', 'FIRE_TRIGGERS');
+    this.bulkOptionMapping.set('keepNulls', 'KEEP_NULLS');
+    this.bulkOptionMapping.set('lockTable', 'TABLOCK');
   }
 
   addColumn(name, type, options) {
@@ -170,7 +170,7 @@ module.exports = class BulkLoad extends EventEmitter {
       .filter((key) => {
         return this.bulkOptions[key] === true;
       }).map((key) => {
-        return bulkOptionMapping.get(key);
+        return this.bulkOptionMapping.get(key);
       });
 
     if (addOptions.length !== 0)
