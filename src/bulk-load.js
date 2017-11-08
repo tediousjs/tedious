@@ -165,12 +165,11 @@ module.exports = class BulkLoad extends EventEmitter {
     }
     sql += ')';
 
+    // filter bulkOptions that are true and get their corresponding T-SQL keyword
     const addOptions = Object.keys(this.bulkOptions)
       .filter((key) => {
-        // checks if bulkOptions is true
         return this.bulkOptions[key] === true;
       }).map((key) => {
-        // gets the keyword corresponding to bulkOption
         return bulkOptionMapping.get(key);
       });
 
