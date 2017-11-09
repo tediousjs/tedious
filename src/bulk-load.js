@@ -121,9 +121,13 @@ module.exports = class BulkLoad extends EventEmitter {
     @param {boolean} bulkLoadOptions.checkConstraints - honors constraints during bulk load, it is disabled by default.
     @param {boolean} bulkLoadOptions.fireTriggers - honors insert triggers during bulk load, it is disabled by default.
     @param {boolean} bulkLoadOptions.keepNulls - honors null value passed, ignores the default values set on table.
-    @param {boolean} bulkLoadOptions.tableLock- places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
+    @param {boolean} bulkLoadOptions.tableLock- places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
   */
   setOptions(bulkLoadOptions) {
+    if (typeof bulkLoadOptions !== 'object') {
+      throw new TypeError('"bulkLoadOptions" argument must be an object');
+    }
+
     const bOptions = {};
     bOptions.checkConstraints = getBooleanOption('checkConstraints', false);
     bOptions.fireTriggers = getBooleanOption('fireTriggers', false);
