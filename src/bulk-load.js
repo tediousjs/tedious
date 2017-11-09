@@ -40,18 +40,7 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.firstRowWritten = false;
-    this.bulkOptions = {
-      checkConstraints: false,
-      fireTriggers: false,
-      keepNulls: false,
-      lockTable: false
-    };
-
-    this.bulkOptionMapping = new Map();
-    this.bulkOptionMapping.set('checkConstraints', 'CHECK_CONSTRAINTS');
-    this.bulkOptionMapping.set('fireTriggers', 'FIRE_TRIGGERS');
-    this.bulkOptionMapping.set('keepNulls', 'KEEP_NULLS');
-    this.bulkOptionMapping.set('lockTable', 'TABLOCK');
+    this.bulkOptions = {};
   }
 
   addColumn(name, type, options) {
@@ -128,29 +117,56 @@ module.exports = class BulkLoad extends EventEmitter {
   }
 
   /**
-   * @param {{checkConstraints : boolean , fireTriggers : boolean , keepNulls : boolean, tableLock: boolean}} bulkLoadOptions
-   * @descriptions
-   *  checkConstraints - honors constraints during bulk load, it is disabled by default.
-   *
-   *  fireTriggers -  honors insert triggers during bulk load, it is disabled by default.
-   *
-   *  keepNulls - honors null value passed, ignores the default values set on table.
-   *
-   *  tableLock - places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
-   */
+    @param {Object} bulkLoadOptions
+    @param {boolean} bulkLoadOptions.checkConstraints - honors constraints during bulk load, it is disabled by default.
+    @param {boolean} bulkLoadOptions.fireTriggers - honors insert triggers during bulk load, it is disabled by default.
+    @param {boolean} bulkLoadOptions.keepNulls - honors null value passed, ignores the default values set on table.
+    @param {boolean} bulkLoadOptions.tableLock- places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default
+  */
   setOptions(bulkLoadOptions) {
-    if (bulkLoadOptions) {
-      for (const option in bulkLoadOptions) {
-        if (typeof bulkLoadOptions[option] === 'boolean' && this.bulkOptions[option] != undefined) {
-          this.bulkOptions[option] = bulkLoadOptions[option];
-        }
-        else {
-          throw new TypeError('Unknown bulk load option ' + option);
-        }
+    const bOptions = {};
+    bOptions.checkConstraints = getBooleanOption('checkConstraints', false);
+    bOptions.fireTriggers = getBooleanOption('fireTriggers', false);
+    bOptions.keepNulls = getBooleanOption('keepNulls', false);
+    bOptions.lockTable = getBooleanOption('lockTable', false);
+    this.bulkOptions = bOptions;
+
+    function getBooleanOption(optionName, defaultValue) {
+      const optionValue = bulkLoadOptions[optionName];
+      if (optionValue == undefined) {
+        return defaultValue;
       }
+      if (typeof optionValue !== 'boolean') {
+        throw new TypeError(`Option "${optionName}" must be a boolean.`);
+      }
+      return optionValue;
+    }
+  }
+
+  getOptionsSql() {
+    const addOptions = [];
+
+    if (this.bulkOptions.checkConstraints) {
+      addOptions.push('CHECK_CONSTRAINTS');
+    }
+
+    if (this.bulkOptions.fireTriggers) {
+      addOptions.push('FIRE_TRIGGERS');
+    }
+
+    if (this.bulkOptions.keepNulls) {
+      addOptions.push('KEEP_NULLS');
+    }
+
+    if (this.bulkOptions.lockTable) {
+      addOptions.push('TABLOCK');
+    }
+
+    if (addOptions.length > 0) {
+      return `WITH (${addOptions.join(',')})`;
     }
     else {
-      throw new TypeError('No option set for BulkLoad');
+      return '';
     }
   }
 
@@ -165,16 +181,7 @@ module.exports = class BulkLoad extends EventEmitter {
     }
     sql += ')';
 
-    // filter bulkOptions that are true and get their corresponding T-SQL keyword
-    const addOptions = Object.keys(this.bulkOptions)
-      .filter((key) => {
-        return this.bulkOptions[key] === true;
-      }).map((key) => {
-        return this.bulkOptionMapping.get(key);
-      });
-
-    if (addOptions.length !== 0)
-      sql += 'WITH (' + addOptions.join(',') + ')';
+    sql += this.getOptionsSql();
     return sql;
   }
 
