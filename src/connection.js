@@ -962,7 +962,6 @@ class Connection extends EventEmitter {
     const enableAnsiWarnings = this.config.options.enableAnsiWarnings ? 'on' : 'off';
     const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
     const enableConcatNullYieldsNull = this.config.options.enableConcatNullYieldsNull ? 'on' : 'off';
-    const enableCursorCloseOnCommit = this.config.options.enableCursorCloseOnCommit ? 'on' : 'off';
     const enableImplicitTransactions = this.config.options.enableImplicitTransactions ? 'on' : 'off';
     const enableNumericRoundabort = this.config.options.enableNumericRoundabort ? 'on' : 'off';
     const enableQuotedIdentifier = this.config.options.enableQuotedIdentifier ? 'on' : 'off';
@@ -974,7 +973,7 @@ class Connection extends EventEmitter {
       set ansi_warnings ${enableAnsiWarnings}\n
       set arithabort ${enableArithAbort}\n
       set concat_null_yields_null ${enableConcatNullYieldsNull}\n
-      set cursor_close_on_commit ${enableCursorCloseOnCommit}\n
+      ${this.config.options.enableCursorCloseOnCommit ? 'set cursor_close_on_commit on' : ''}
       set datefirst ${this.config.options.datefirst}\n
       set dateformat ${this.config.options.dateFormat}\n
       set implicit_transactions ${enableImplicitTransactions}\n
