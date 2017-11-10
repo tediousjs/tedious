@@ -167,9 +167,8 @@ module.exports = class BulkLoad extends EventEmitter {
     }
 
     if (addOptions.length > 0) {
-      return `WITH (${addOptions.join(',')})`;
-    }
-    else {
+      return ` WITH (${addOptions.join(',')})`;
+    } else {
       return '';
     }
   }
