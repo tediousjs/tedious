@@ -54,6 +54,4 @@ test_script:
       SET TEDIOUS_TDS_VERSION=7_1
       npm run-script test-integration || SET EXITVAL=1
 
-      npm run-script lint
-
       EXIT /B %EXITVAL%
