@@ -23,6 +23,8 @@ cache:
 build: off
 
 before_test:
+  - npm prune
+
   - sc config sqlbrowser start= auto
   - net start sqlbrowser
 
