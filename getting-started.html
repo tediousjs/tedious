@@ -41,51 +41,9 @@ title: Getting started
   </a>
   constructor are
   <em>host</em>, <em>username</em>, <em>password</em>,
-  an <em>options object</em> (empty in this example).
+  an <em>options object</em> (empty in this example),
+  and a <em>callback function</em>.
 </p>
-
-<p>
-    Arguments to <a href="api-connection.html">
-        <code>Connection</code>
-    </a>constructor varies based on the type of authentication needed.
-</p>
-<table>
-    <tr>
-        <th rowspan="2">Authentication Type</th>
-        <th colspan="4">
-            Configuration options needed
-        </th>
-    </tr>
-    <tr>
-        <th class="code">username</th>
-        <th class="code">password</th>
-        <th class="code">domain</th>
-        <th class="code">server</th>
-    </tr>
-
-    <tr>
-        <td class="code">SQL Server Authentication</td>
-        <td class="supported">&#10003;</td>
-        <td class="supported">&#10003;</td>
-        <td class="supported">-</td>
-        <td class="supported">&#10003;</td>
-    </tr>
-    <tr>
-        <td class="code">NTLM Authentication</td>
-        <td class="supported">&#10003;</td>
-        <td class="supported">&#10003;</td>
-        <td class="supported">&#10003;</td>
-        <td class="supported">&#10003;</td>
-    </tr>
-    <tr>
-        <td class="code">Integrated Authentication</td>
-        <td class="supported">-</td>
-        <td class="supported">-</td>
-        <td class="supported">-</td>
-        <td class="supported">&#10003;<span class="footnote">1</span></td>
-    </tr>
-
-</table>
 
 <p>
   The connect event is emitted when either the connection has been established
