@@ -8,6 +8,7 @@ node_js:
 
 stages:
   - test
+  - lint
   - name: release
     if: (branch = master) AND (type = push)
 
@@ -46,10 +47,14 @@ script:
   - TEDIOUS_TDS_VERSION=7_3_A npm run test-integration
   - TEDIOUS_TDS_VERSION=7_2   npm run test-integration
   - TEDIOUS_TDS_VERSION=7_1   npm run test-integration
-  - npm run lint
 
 jobs:
   include:
+    - stage: lint
+      node_js: 4
+      before_install: skip
+      before_script: skip
+      script: npm run lint
     - stage: release
       node_js: 4
       before_install: skip
