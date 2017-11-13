@@ -436,7 +436,7 @@ function readMax(parser, callback) {
 }
 
 function readMaxKnownLength(parser, totalLength, callback) {
-  const data = new Buffer(totalLength);
+  const data = new Buffer(totalLength).fill(0);
 
   let offset = 0;
   function next(done) {

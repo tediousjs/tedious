@@ -51,7 +51,7 @@ class Packet {
       this.buffer = typeOrBuffer;
     } else {
       const type = typeOrBuffer;
-      this.buffer = new Buffer(HEADER_LENGTH);
+      this.buffer = new Buffer(HEADER_LENGTH).fill(0);
       this.buffer.writeUInt8(type, OFFSET.Type);
       this.buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status);
       this.buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID);
