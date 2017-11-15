@@ -3,6 +3,7 @@ const os = require('os');
 const sprintf = require('sprintf').sprintf;
 const libraryName = require('./library').name;
 const versions = require('./tds-versions').versions;
+const assert = require('assert');
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -89,6 +90,18 @@ const NTLMFlags = {
   NTLM_Negotiate56: 0x80000000
 };
 
+const FEDAUTH_OPTIONS = {
+  FEATURE_ID: 0x02, //int
+  LIBRARY_SECURITYTOKEN: 0x01,
+  LIBRARY_ADAL: 0x02, //int
+  FEDAUTH_YES_ECHO: 0x01, // TODO: assign FEDAUTHREQUIRED value
+  FEDAUTH_NO_ECHO: 0x00,
+  ADAL_WORKFLOW_USER_PASS: 0x01,
+  ADAL_WORKFLOW_INTEGRATED: 0x02,
+  FEDAUTH_INFO_ID_STSURL: 0x01, //byte
+  FEDAUTH_INFO_ID_SPN: 0x02, //byte
+};
+// TODO: add Secuirty token authentication
 
 /*
   s2.2.6.3
@@ -182,6 +195,14 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
+
+    if ((this.loginData.fedAuthInfo.method.toUpperCase() === this.loginData.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) &&
+         this.loginData.fedAuthInfo.fedAuthRequiredPreLoginResponse) {
+      this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
+      this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
+      this.fedAuthFeatureExt = this.CreateFedAuthExtData(this.loginData.fedAuthInfo);
+    }
+    this.addVariableDataString(variableData, this.fedAuthFeatureExt);
     if (this.loginData.domain) {
       if (this.loginData.sspiBlob) {
         this.ntlmPacket = this.loginData.sspiBlob;
@@ -253,6 +274,45 @@ module.exports = class Login7Payload {
     buffer.writeUInt8(15);
     buffer.writeString(workstation, 'ascii');
     buffer.writeString(domain, 'ascii');
+    return buffer.data;
+  }
+
+  CreateFedAuthExtData(fedAuthInfo) {
+    var dataLen = 0;
+    switch (fedAuthInfo.fedAuthLibrary) {
+      case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+        // length of feature data = 1 byte for library and echo + 1 byte for workflow
+        dataLen = 2;
+        break;
+        // TODO: Security Token authentication datalen
+      default:
+        assert.fail();
+    }
+
+    var totalLen = dataLen + 5; // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
+    const buffer = new WritableTrackingBuffer(totalLen);
+    buffer.writeInt8(FEDAUTH_OPTIONS.FEATURE_ID); //FeatureId
+    buffer.writeInt8(dataLen); //FeatureDataLen
+    let optionsByte = 0x00;
+    switch (fedAuthInfo.fedAuthLibrary) {
+      case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+        optionsByte |= FEDAUTH_OPTIONS.LIBRARY_ADAL << 1;
+        break;
+      default:
+        assert.fail();
+    }
+    optionsByte |= (fedAuthInfo.fedAuthRequiredPreLoginResponse ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO);
+    buffer.writeInt8(optionsByte);
+
+    let workflow = 0x00;
+    switch (fedAuthInfo.fedAuthLibrary) {
+      case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+        workflow |= FEDAUTH_OPTIONS.LIBRARY_ADAL << 1;
+        break;
+      default:
+        assert.fail();
+    }
+    buffer.writeInt8(workflow);
     return buffer.data;
   }
 

@@ -47,6 +47,18 @@ class Connection extends EventEmitter {
       throw new TypeError('Invalid server: ' + config.server);
     }
 
+    this.fedAuthInfo = {
+      ValidFedAuthEnum: {
+        SqlPassword: 'SQLPASSWORD',
+        ActiveDirectoryPassword: 'ACTIVEDIRECTORYPASSWORD',
+        // TODO: ActiveDirectoryIntegrated
+      },
+      method: undefined,
+      fedAuthLibrary: undefined,
+      fedAuthRequiredPreLoginResponse: false,
+      fedAuthInfoRequested: false
+    };
+
     this.config = {
       server: config.server,
       userName: config.userName,
@@ -354,20 +366,25 @@ class Connection extends EventEmitter {
       if (config.options.useUTC != undefined) {
         this.config.options.useUTC = config.options.useUTC;
       }
+
       // Whenever authentication property is used to specify an authentication method,
       // the client will request encryption (the default value of the Encrypt property will be true)
       // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
       if (config.options.authentication != undefined) {
-        // TODO: check for valid options
-        this.config.options.authentication = config.options.authentication;
+        // check for valid options
+        if (!(config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
+        config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
+          throw new Error('An invalid authentication method is specified');
+        }
         this.config.options.encrypt = true;
+        this.fedAuthInfo.method = config.options.authentication;
         if (config.options.trustServerCertificate != 'true') {
           this.config.options.trustServerCertificate = false;
         }
       }
     }
     // TODO: if authentication is set to true, along with any other authentication methods throw error
-    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
+    if (this.config.domain && !this.config.userName && !this.config.password) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
 
@@ -384,7 +401,7 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
-    this.fedAuthRequiredPreLoginResponse = false;
+
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -880,7 +897,7 @@ class Connection extends EventEmitter {
       this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuth, 'EFEDAUTH'));
       return this.close();
     }
-    if (this.config.options.authentication != undefined) {
+    if (this.fedAuthInfo.method != undefined) {
       this.fedAuthRequiredPreLoginResponse = (preloginPayload.fedAuth == 1);
     }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
@@ -909,7 +926,8 @@ class Connection extends EventEmitter {
         initDbFatal: !this.config.options.fallbackToDefaultDb,
         readOnlyIntent: this.config.options.readOnlyIntent,
         sspiBlob: clientResponse,
-        language: this.config.options.language
+        language: this.config.options.language,
+        fedAuthInfo: this.fedAuthInfo
       });
 
       this.routingData = undefined;
