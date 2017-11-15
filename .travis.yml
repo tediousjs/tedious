@@ -3,11 +3,12 @@ sudo: false
 node_js:
   - "4"
   - "6"
-  - "7"
   - "8"
+  - "9"
 
 stages:
   - test
+  - lint
   - name: release
     if: (branch = master) AND (type = push)
 
@@ -19,8 +20,6 @@ cache:
     - node_modules
 
 before_install:
-  - npm install -g npm
-
   - docker pull microsoft/mssql-server-linux
   - docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=yourStrong(!)Password' -p 1433:1433 -d microsoft/mssql-server-linux
 
@@ -48,10 +47,14 @@ script:
   - TEDIOUS_TDS_VERSION=7_3_A npm run test-integration
   - TEDIOUS_TDS_VERSION=7_2   npm run test-integration
   - TEDIOUS_TDS_VERSION=7_1   npm run test-integration
-  - npm run lint
 
 jobs:
   include:
+    - stage: lint
+      node_js: 4
+      before_install: skip
+      before_script: skip
+      script: npm run lint
     - stage: release
       node_js: 4
       before_install: skip
