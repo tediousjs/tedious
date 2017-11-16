@@ -90,19 +90,21 @@ const NTLMFlags = {
   NTLM_Negotiate56: 0x80000000
 };
 
+
 const FEDAUTH_OPTIONS = {
-  FEATURE_ID: 0x02, //int
+  FEATURE_ID: 0x02,
   LIBRARY_SECURITYTOKEN: 0x01,
-  LIBRARY_ADAL: 0x02, //int
-  FEDAUTH_YES_ECHO: 0x01, // TODO: assign FEDAUTHREQUIRED value
+  LIBRARY_ADAL: 0x02,
+  FEDAUTH_YES_ECHO: 0x01,
   FEDAUTH_NO_ECHO: 0x00,
   ADAL_WORKFLOW_USER_PASS: 0x01,
   ADAL_WORKFLOW_INTEGRATED: 0x02,
-  FEDAUTH_INFO_ID_STSURL: 0x01, //byte
-  FEDAUTH_INFO_ID_SPN: 0x02, //byte
+  FEDAUTH_INFO_ID_STSURL: 0x01,
+  FEDAUTH_INFO_ID_SPN: 0x02,
 };
 // TODO: add Secuirty token authentication
 
+const FEATURE_EXT_TERMINATOR = 0xFF;
 /*
   s2.2.6.3
  */
@@ -111,13 +113,15 @@ module.exports = class Login7Payload {
     this.loginData = loginData;
 
     const lengthLength = 4;
+    const featureExt = this.createFeatureExt();
     const fixed = this.createFixedData();
     const variable = this.createVariableData(lengthLength + fixed.length);
-    const length = lengthLength + fixed.length + variable.length;
+    const length = lengthLength + fixed.length + variable.length + featureExt.length;
     const data = new WritableTrackingBuffer(300);
     data.writeUInt32LE(length);
     data.writeBuffer(fixed);
     data.writeBuffer(variable);
+    data.writeBuffer(featureExt);
     this.data = data.data;
   }
 
@@ -186,8 +190,8 @@ module.exports = class Login7Payload {
     this.attachDbFile = '';
     this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
-    this.addVariableDataString(variableData, this.loginData.domain ? '' : this.loginData.userName);
-    this.addVariableDataBuffer(variableData, this.loginData.domain ? Buffer.alloc(0) : this.createPasswordBuffer());
+    this.addVariableDataString(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? '' : this.loginData.userName);
+    this.addVariableDataBuffer(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
     this.addVariableDataString(variableData, '');
@@ -196,13 +200,6 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    if ((this.loginData.fedAuthInfo.method.toUpperCase() === this.loginData.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) &&
-         this.loginData.fedAuthInfo.fedAuthRequiredPreLoginResponse) {
-      this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
-      this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
-      this.fedAuthFeatureExt = this.CreateFedAuthExtData(this.loginData.fedAuthInfo);
-    }
-    this.addVariableDataString(variableData, this.fedAuthFeatureExt);
     if (this.loginData.domain) {
       if (this.loginData.sspiBlob) {
         this.ntlmPacket = this.loginData.sspiBlob;
@@ -226,6 +223,18 @@ module.exports = class Login7Payload {
     }
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
+  }
+
+  createFeatureExt() {
+    const buffer = new WritableTrackingBuffer(100);
+    if ((this.loginData.fedAuthInfo.method.toUpperCase() === this.loginData.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) &&
+    this.loginData.fedAuthInfo.fedAuthRequiredPreLoginResponse) {
+      this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
+      this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
+      this.CreateFedAuthExtData(buffer, this.loginData.fedAuthInfo);
+    }
+    buffer.writeUInt8(FEATURE_EXT_TERMINATOR);
+    return buffer.data;
   }
 
   addVariableDataBuffer(variableData, buffer) {
@@ -277,7 +286,7 @@ module.exports = class Login7Payload {
     return buffer.data;
   }
 
-  CreateFedAuthExtData(fedAuthInfo) {
+  CreateFedAuthExtData(buffer, fedAuthInfo) {
     var dataLen = 0;
     switch (fedAuthInfo.fedAuthLibrary) {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
@@ -289,8 +298,8 @@ module.exports = class Login7Payload {
         assert.fail();
     }
 
-    var totalLen = dataLen + 5; // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
-    const buffer = new WritableTrackingBuffer(totalLen);
+    //var totalLen = dataLen + 5; // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
+    //const buffer = new WritableTrackingBuffer(totalLen);
     buffer.writeInt8(FEDAUTH_OPTIONS.FEATURE_ID); //FeatureId
     buffer.writeInt8(dataLen); //FeatureDataLen
     let optionsByte = 0x00;
@@ -298,6 +307,7 @@ module.exports = class Login7Payload {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
         optionsByte |= FEDAUTH_OPTIONS.LIBRARY_ADAL << 1;
         break;
+        // TODO: Security Token authentication
       default:
         assert.fail();
     }
@@ -309,6 +319,7 @@ module.exports = class Login7Payload {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
         workflow |= FEDAUTH_OPTIONS.LIBRARY_ADAL << 1;
         break;
+        // TODO: ActiveDirectoryIntegrated
       default:
         assert.fail();
     }

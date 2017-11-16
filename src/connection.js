@@ -898,7 +898,7 @@ class Connection extends EventEmitter {
       return this.close();
     }
     if (this.fedAuthInfo.method != undefined) {
-      this.fedAuthRequiredPreLoginResponse = (preloginPayload.fedAuth == 1);
+      this.fedAuthInfo.fedAuthRequiredPreLoginResponse = (preloginPayload.fedAuth == 1);
     }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
