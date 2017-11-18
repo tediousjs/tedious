@@ -1,6 +1,5 @@
 var Parser = require('../../../src/token/stream-parser');
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
 module.exports.database = function(test) {
   var oldDb = 'old';

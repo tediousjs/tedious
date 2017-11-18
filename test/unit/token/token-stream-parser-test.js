@@ -1,8 +1,7 @@
 var Debug = require('../../../src/debug');
 var Parser = require('../../../src/token/token-stream-parser').Parser;
 var TYPE = require('../../../src/token/token').TYPE;
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
 var debug = new Debug({ token: true });
 
