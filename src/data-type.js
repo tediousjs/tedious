@@ -25,15 +25,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
-      return buffer.writeUInt8(1);
+      buffer.writeUInt8(1);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(1);
-        return buffer.writeUInt8(parseInt(parameter.value));
+        buffer.writeUInt8(parseInt(parameter.value));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -62,15 +62,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.BitN.id);
-      return buffer.writeUInt8(1);
+      buffer.writeUInt8(1);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (typeof parameter.value === 'undefined' || parameter.value === null) {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       } else {
         buffer.writeUInt8(1);
-        return buffer.writeUInt8(parameter.value ? 1 : 0);
+        buffer.writeUInt8(parameter.value ? 1 : 0);
       }
     },
 
@@ -96,15 +96,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
-      return buffer.writeUInt8(2);
+      buffer.writeUInt8(2);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(2);
-        return buffer.writeInt16LE(parseInt(parameter.value));
+        buffer.writeInt16LE(parseInt(parameter.value));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -133,15 +133,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
-      return buffer.writeUInt8(4);
+      buffer.writeUInt8(4);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
-        return buffer.writeInt32LE(parseInt(parameter.value));
+        buffer.writeInt32LE(parseInt(parameter.value));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -170,7 +170,7 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.DateTimeN.id);
-      return buffer.writeUInt8(4);
+      buffer.writeUInt8(4);
     },
 
     writeParameterData: function(buffer, parameter, options) {
@@ -188,9 +188,9 @@ const TYPE = module.exports.TYPE = {
         buffer.writeUInt8(4);
         buffer.writeUInt16LE(days);
 
-        return buffer.writeUInt16LE(minutes);
+        buffer.writeUInt16LE(minutes);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -221,15 +221,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.FloatN.id);
-      return buffer.writeUInt8(4);
+      buffer.writeUInt8(4);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
-        return buffer.writeFloatLE(parseFloat(parameter.value));
+        buffer.writeFloatLE(parseFloat(parameter.value));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -255,15 +255,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.MoneyN.id);
-      return buffer.writeUInt8(8);
+      buffer.writeUInt8(8);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(8);
-        return buffer.writeMoney(parameter.value * 10000);
+        buffer.writeMoney(parameter.value * 10000);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -289,7 +289,7 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.DateTimeN.id);
-      return buffer.writeUInt8(8);
+      buffer.writeUInt8(8);
     },
 
     writeParameterData: function(buffer, parameter, options) {
@@ -316,9 +316,9 @@ const TYPE = module.exports.TYPE = {
         buffer.writeUInt8(8);
         buffer.writeInt32LE(days);
 
-        return buffer.writeUInt32LE(threeHundredthsOfSecond);
+        buffer.writeUInt32LE(threeHundredthsOfSecond);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -346,15 +346,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.FloatN.id);
-      return buffer.writeUInt8(8);
+      buffer.writeUInt8(8);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(8);
-        return buffer.writeDoubleLE(parseFloat(parameter.value));
+        buffer.writeDoubleLE(parseFloat(parameter.value));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -410,7 +410,7 @@ const TYPE = module.exports.TYPE = {
         buffer.writeUInt8(17);
       }
       buffer.writeUInt8(parameter.precision);
-      return buffer.writeUInt8(parameter.scale);
+      buffer.writeUInt8(parameter.scale);
     },
 
     writeParameterData: function(buffer, parameter) {
@@ -420,25 +420,25 @@ const TYPE = module.exports.TYPE = {
         if (parameter.precision <= 9) {
           buffer.writeUInt8(5);
           buffer.writeUInt8(sign);
-          return buffer.writeUInt32LE(value);
+          buffer.writeUInt32LE(value);
         } else if (parameter.precision <= 19) {
           buffer.writeUInt8(9);
           buffer.writeUInt8(sign);
-          return buffer.writeUInt64LE(value);
+          buffer.writeUInt64LE(value);
         } else if (parameter.precision <= 28) {
           buffer.writeUInt8(13);
           buffer.writeUInt8(sign);
           buffer.writeUInt64LE(value);
-          return buffer.writeUInt32LE(0x00000000);
+          buffer.writeUInt32LE(0x00000000);
         } else {
           buffer.writeUInt8(17);
           buffer.writeUInt8(sign);
           buffer.writeUInt64LE(value);
           buffer.writeUInt32LE(0x00000000);
-          return buffer.writeUInt32LE(0x00000000);
+          buffer.writeUInt32LE(0x00000000);
         }
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -494,7 +494,7 @@ const TYPE = module.exports.TYPE = {
         buffer.writeUInt8(17);
       }
       buffer.writeUInt8(parameter.precision);
-      return buffer.writeUInt8(parameter.scale);
+      buffer.writeUInt8(parameter.scale);
     },
 
     writeParameterData: function(buffer, parameter) {
@@ -504,25 +504,25 @@ const TYPE = module.exports.TYPE = {
         if (parameter.precision <= 9) {
           buffer.writeUInt8(5);
           buffer.writeUInt8(sign);
-          return buffer.writeUInt32LE(value);
+          buffer.writeUInt32LE(value);
         } else if (parameter.precision <= 19) {
           buffer.writeUInt8(9);
           buffer.writeUInt8(sign);
-          return buffer.writeUInt64LE(value);
+          buffer.writeUInt64LE(value);
         } else if (parameter.precision <= 28) {
           buffer.writeUInt8(13);
           buffer.writeUInt8(sign);
           buffer.writeUInt64LE(value);
-          return buffer.writeUInt32LE(0x00000000);
+          buffer.writeUInt32LE(0x00000000);
         } else {
           buffer.writeUInt8(17);
           buffer.writeUInt8(sign);
           buffer.writeUInt64LE(value);
           buffer.writeUInt32LE(0x00000000);
-          return buffer.writeUInt32LE(0x00000000);
+          buffer.writeUInt32LE(0x00000000);
         }
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -548,15 +548,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.MoneyN.id);
-      return buffer.writeUInt8(4);
+      buffer.writeUInt8(4);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(4);
-        return buffer.writeInt32LE(parameter.value * 10000);
+        buffer.writeInt32LE(parameter.value * 10000);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -585,16 +585,16 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.IntN.id);
-      return buffer.writeUInt8(8);
+      buffer.writeUInt8(8);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
         buffer.writeUInt8(8);
-        return buffer.writeInt64LE(val);
+        buffer.writeInt64LE(val);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -639,15 +639,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
-      return buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(parameter.length);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeInt32LE(parameter.length);
-        return buffer.writeBuffer(parameter.value);
+        buffer.writeBuffer(parameter.value);
       } else {
-        return buffer.writeInt32LE(parameter.length);
+        buffer.writeInt32LE(parameter.length);
       }
     },
 
@@ -684,16 +684,16 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(typeByName.Text.id);
-      return buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(parameter.length);
     },
 
     writeParameterData: function(buffer, parameter) {
       buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
       if (parameter.value != null) {
         buffer.writeInt32LE(parameter.length);
-        return buffer.writeString(parameter.value.toString(), 'ascii');
+        buffer.writeString(parameter.value.toString(), 'ascii');
       } else {
-        return buffer.writeInt32LE(parameter.length);
+        buffer.writeInt32LE(parameter.length);
       }
     },
 
@@ -727,15 +727,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer) {
       buffer.writeUInt8(typeByName.UniqueIdentifierN.id);
-      return buffer.writeUInt8(0x10);
+      buffer.writeUInt8(0x10);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt8(0x10);
-        return buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
+        buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -845,25 +845,25 @@ const TYPE = module.exports.TYPE = {
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
       if (parameter.length <= this.maximumLength) {
-        return buffer.writeUInt16LE(this.maximumLength);
+        buffer.writeUInt16LE(this.maximumLength);
       } else {
-        return buffer.writeUInt16LE(MAX);
+        buffer.writeUInt16LE(MAX);
       }
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUsVarbyte(parameter.value);
+          buffer.writeUsVarbyte(parameter.value);
         } else {
-          return buffer.writePLPBody(parameter.value);
+          buffer.writePLPBody(parameter.value);
         }
       } else {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUInt16LE(NULL);
+          buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
-          return buffer.writeUInt32LE(0xFFFFFFFF);
+          buffer.writeUInt32LE(0xFFFFFFFF);
         }
       }
     },
@@ -926,22 +926,22 @@ const TYPE = module.exports.TYPE = {
       } else {
         buffer.writeUInt16LE(MAX);
       }
-      return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUsVarbyte(parameter.value, 'ascii');
+          buffer.writeUsVarbyte(parameter.value, 'ascii');
         } else {
-          return buffer.writePLPBody(parameter.value, 'ascii');
+          buffer.writePLPBody(parameter.value, 'ascii');
         }
       } else {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUInt16LE(NULL);
+          buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
-          return buffer.writeUInt32LE(0xFFFFFFFF);
+          buffer.writeUInt32LE(0xFFFFFFFF);
         }
       }
     },
@@ -990,15 +990,15 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
-      return buffer.writeUInt16LE(parameter.length);
+      buffer.writeUInt16LE(parameter.length);
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         buffer.writeUInt16LE(parameter.length);
-        return buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
+        buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
       } else {
-        return buffer.writeUInt16LE(NULL);
+        buffer.writeUInt16LE(NULL);
       }
     },
 
@@ -1056,14 +1056,14 @@ const TYPE = module.exports.TYPE = {
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
       buffer.writeUInt16LE(parameter.length);
-      return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
-        return buffer.writeUsVarbyte(parameter.value, 'ascii');
+        buffer.writeUsVarbyte(parameter.value, 'ascii');
       } else {
-        return buffer.writeUInt16LE(NULL);
+        buffer.writeUInt16LE(NULL);
       }
     },
 
@@ -1128,22 +1128,22 @@ const TYPE = module.exports.TYPE = {
       } else {
         buffer.writeUInt16LE(MAX);
       }
-      return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUsVarbyte(parameter.value, 'ucs2');
+          buffer.writeUsVarbyte(parameter.value, 'ucs2');
         } else {
-          return buffer.writePLPBody(parameter.value, 'ucs2');
+          buffer.writePLPBody(parameter.value, 'ucs2');
         }
       } else {
         if (parameter.length <= this.maximumLength) {
-          return buffer.writeUInt16LE(NULL);
+          buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
-          return buffer.writeUInt32LE(0xFFFFFFFF);
+          buffer.writeUInt32LE(0xFFFFFFFF);
         }
       }
     },
@@ -1205,14 +1205,14 @@ const TYPE = module.exports.TYPE = {
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
       buffer.writeUInt16LE(parameter.length * 2);
-      return buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     },
 
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
-        return buffer.writeUsVarbyte(parameter.value, 'ucs2');
+        buffer.writeUsVarbyte(parameter.value, 'ucs2');
       } else {
-        return buffer.writeUInt16LE(NULL);
+        buffer.writeUInt16LE(NULL);
       }
     },
 
@@ -1275,7 +1275,7 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
-      return buffer.writeUInt8(parameter.scale);
+      buffer.writeUInt8(parameter.scale);
     },
 
     writeParameterData: function(buffer, parameter, options) {
@@ -1298,19 +1298,19 @@ const TYPE = module.exports.TYPE = {
           case 1:
           case 2:
             buffer.writeUInt8(3);
-            return buffer.writeUInt24LE(timestamp);
+            buffer.writeUInt24LE(timestamp);
           case 3:
           case 4:
             buffer.writeUInt8(4);
-            return buffer.writeUInt32LE(timestamp);
+            buffer.writeUInt32LE(timestamp);
           case 5:
           case 6:
           case 7:
             buffer.writeUInt8(5);
-            return buffer.writeUInt40LE(timestamp);
+            buffer.writeUInt40LE(timestamp);
         }
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -1341,20 +1341,20 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeTypeInfo: function(buffer) {
-      return buffer.writeUInt8(this.id);
+      buffer.writeUInt8(this.id);
     },
 
     writeParameterData: function(buffer, parameter, options) {
       if (parameter.value != null) {
         buffer.writeUInt8(3);
         if (options.useUTC) {
-          return buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
         } else {
           const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          return buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
         }
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -1411,7 +1411,7 @@ const TYPE = module.exports.TYPE = {
 
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
-      return buffer.writeUInt8(parameter.scale);
+      buffer.writeUInt8(parameter.scale);
     },
 
     writeParameterData: function(buffer, parameter, options) {
@@ -1448,13 +1448,13 @@ const TYPE = module.exports.TYPE = {
             buffer.writeUInt40LE(timestamp);
         }
         if (options.useUTC) {
-          return buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
         } else {
           const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          return buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
         }
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
 
@@ -1507,7 +1507,7 @@ const TYPE = module.exports.TYPE = {
     },
     writeTypeInfo: function(buffer, parameter) {
       buffer.writeUInt8(this.id);
-      return buffer.writeUInt8(parameter.scale);
+      buffer.writeUInt8(parameter.scale);
     },
     writeParameterData: function(buffer, parameter) {
       if (parameter.value != null) {
@@ -1540,9 +1540,9 @@ const TYPE = module.exports.TYPE = {
             buffer.writeUInt40LE(timestamp);
         }
         buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        return buffer.writeInt16LE(offset);
+        buffer.writeInt16LE(offset);
       } else {
-        return buffer.writeUInt8(0);
+        buffer.writeUInt8(0);
       }
     },
     validate: function(value) {
