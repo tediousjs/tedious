@@ -218,7 +218,7 @@ function valueParse(parser, metaData, options, callback) {
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readBinary(parser, dataLength, callback);
+            return parser.readBuffer(dataLength, callback);
           }
 
         case 'Xml':
