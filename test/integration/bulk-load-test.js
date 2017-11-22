@@ -135,7 +135,7 @@ exports.bulkLoadError = function(test) {
 
 exports['bulkLoad - verify constraints'] = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable3', function(
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable3', {checkConstraints: true}, function(
     err,
     rowCount
   ) {
@@ -148,7 +148,6 @@ exports['bulkLoad - verify constraints'] = function(test) {
   bulkLoad.addColumn('id', TYPES.Int, {
     nullable: true
   });
-  bulkLoad.setOptions({checkConstraints: true});
   const request = new Request(
     'CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))',
     function(err) {
@@ -165,7 +164,7 @@ exports['bulkLoad - verify constraints'] = function(test) {
 exports['bulkLoad - verify trigger'] = function(test) {
   test.expect(6);
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('testTable4', function(
+  const bulkLoad = connection.newBulkLoad('testTable4', {fireTriggers: true}, function(
     err,
     rowCount
   ) {
@@ -175,7 +174,6 @@ exports['bulkLoad - verify trigger'] = function(test) {
   bulkLoad.addColumn('id', TYPES.Int, {
     nullable: true
   });
-  bulkLoad.setOptions({fireTriggers: true});
   const createTable = 'CREATE TABLE testTable4 ([id] int);';
   const createTrigger =
     `CREATE TRIGGER bulkLoadTest on testTable4
@@ -221,7 +219,7 @@ exports['bulkLoad - verify trigger'] = function(test) {
 
 exports['bulkLoad - verify null value'] = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', function(
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', {keepNulls: true}, function(
     err,
     rowCount
   ) {
@@ -231,7 +229,6 @@ exports['bulkLoad - verify null value'] = function(test) {
   bulkLoad.addColumn('id', TYPES.Int, {
     nullable: true
   });
-  bulkLoad.setOptions({keepNulls: true});
   const request = new Request(
     'CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)',
     function(err) {

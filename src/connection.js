@@ -1045,8 +1045,15 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  newBulkLoad(table, callback) {
-    return new BulkLoad(table, this.config.options, callback);
+  newBulkLoad(table, options, callback) {
+    if (callback === undefined) {
+      callback = options;
+      options = {};
+    }
+    if (typeof options !== 'object') {
+      throw new TypeError('"options" argument must be an object');
+    }
+    return new BulkLoad(table, this.config.options, options, callback);
   }
 
   execBulkLoad(bulkLoad) {

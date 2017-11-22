@@ -27,20 +27,42 @@ const DONE_STATUS = {
 };
 
 module.exports = class BulkLoad extends EventEmitter {
-  constructor(table, options1, callback) {
+  constructor(table, connectionOptions, {
+    checkConstraints = false,
+    fireTriggers = false,
+    keepNulls = false,
+    lockTable = false,
+  }, callback) {
     super();
 
     this.error = undefined;
     this.canceled = false;
 
     this.table = table;
-    this.options = options1;
+    this.options = connectionOptions;
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.firstRowWritten = false;
-    this.bulkOptions = {};
+
+    if (typeof checkConstraints !== 'boolean') {
+      throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
+    }
+
+    if (typeof fireTriggers !== 'boolean') {
+      throw new TypeError('The "options.fireTriggers" property must be of type boolean.');
+    }
+
+    if (typeof keepNulls !== 'boolean') {
+      throw new TypeError('The "options.keepNulls" property must be of type boolean.');
+    }
+
+    if (typeof lockTable !== 'boolean') {
+      throw new TypeError('The "options.lockTable" property must be of type boolean.');
+    }
+
+    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
   addColumn(name, type, options) {
@@ -113,37 +135,6 @@ module.exports = class BulkLoad extends EventEmitter {
         precision: c.precision,
         value: row[arr ? i : c.objName]
       }, this.options);
-    }
-  }
-
-  /**
-    @param {Object} bulkLoadOptions
-    @param {boolean} bulkLoadOptions.checkConstraints - honors constraints during bulk load, it is disabled by default.
-    @param {boolean} bulkLoadOptions.fireTriggers - honors insert triggers during bulk load, it is disabled by default.
-    @param {boolean} bulkLoadOptions.keepNulls - honors null value passed, ignores the default values set on table.
-    @param {boolean} bulkLoadOptions.tableLock- places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
-  */
-  setOptions(bulkLoadOptions) {
-    if (typeof bulkLoadOptions !== 'object') {
-      throw new TypeError('"bulkLoadOptions" argument must be an object');
-    }
-
-    const bOptions = {};
-    bOptions.checkConstraints = getBooleanOption('checkConstraints', false);
-    bOptions.fireTriggers = getBooleanOption('fireTriggers', false);
-    bOptions.keepNulls = getBooleanOption('keepNulls', false);
-    bOptions.lockTable = getBooleanOption('lockTable', false);
-    this.bulkOptions = bOptions;
-
-    function getBooleanOption(optionName, defaultValue) {
-      const optionValue = bulkLoadOptions[optionName];
-      if (optionValue == undefined) {
-        return defaultValue;
-      }
-      if (typeof optionValue !== 'boolean') {
-        throw new TypeError(`Option "${optionName}" must be a boolean.`);
-      }
-      return optionValue;
     }
   }
 
