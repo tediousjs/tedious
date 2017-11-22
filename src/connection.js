@@ -1045,6 +1045,16 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
+  /**
+   @function newBulkLoad
+   @param {string} table - Table's name.
+   @param {Object} [options] - BulkLoad options.
+   @param {boolean} [options.checkConstraints=false] - Honors constraints during bulk load, it is disabled by default.
+   @param {boolean} [options.fireTriggers=false] - Honors insert triggers during bulk load, it is disabled by default.
+   @param {boolean} [options.keepNulls=false] - Honors null value passed, ignores the default values set on table.
+   @param {boolean} [options.tableLock=false] - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
+   @param {callback} callback - Function to call after BulkLoad executes.
+  */
   newBulkLoad(table, options, callback) {
     if (callback === undefined) {
       callback = options;
