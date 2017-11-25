@@ -78,7 +78,7 @@ class Connection extends EventEmitter {
         enableAnsiWarnings: true,
         enableArithAbort: false,
         enableConcatNullYieldsNull: true,
-        enableCursorCloseOnCommit: false,
+        enableCursorCloseOnCommit: undefined,
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
@@ -994,8 +994,12 @@ class Connection extends EventEmitter {
       options.push('set concat_null_yields_null off');
     }
 
-    if (this.config.options.enableCursorCloseOnCommit) {
-      options.push('set cursor_close_on_commit on');
+    if (this.config.options.enableCursorCloseOnCommit !== undefined) {
+      if (this.config.options.enableCursorCloseOnCommit) {
+        options.push('set cursor_close_on_commit on');
+      } else {
+        options.push('set cursor_close_on_commit off');
+      }
     }
 
     options.push(`set datefirst ${this.config.options.datefirst}`);
