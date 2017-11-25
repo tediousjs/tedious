@@ -956,33 +956,81 @@ class Connection extends EventEmitter {
   }
 
   getInitialSql() {
-    const enableAnsiNull = this.config.options.enableAnsiNull ? 'on' : 'off';
-    const enableAnsiNullDefault = this.config.options.enableAnsiNullDefault ? 'on' : 'off';
-    const enableAnsiPadding = this.config.options.enableAnsiPadding ? 'on' : 'off';
-    const enableAnsiWarnings = this.config.options.enableAnsiWarnings ? 'on' : 'off';
-    const enableArithAbort = this.config.options.enableArithAbort ? 'on' : 'off';
-    const enableConcatNullYieldsNull = this.config.options.enableConcatNullYieldsNull ? 'on' : 'off';
-    const enableImplicitTransactions = this.config.options.enableImplicitTransactions ? 'on' : 'off';
-    const enableNumericRoundabort = this.config.options.enableNumericRoundabort ? 'on' : 'off';
-    const enableQuotedIdentifier = this.config.options.enableQuotedIdentifier ? 'on' : 'off';
-    const xact_abort = this.config.options.abortTransactionOnError ? 'on' : 'off';
+    const options = [];
 
-    return `set ansi_nulls ${enableAnsiNull}\n
-      set ansi_null_dflt_on ${enableAnsiNullDefault}\n
-      set ansi_padding ${enableAnsiPadding}\n
-      set ansi_warnings ${enableAnsiWarnings}\n
-      set arithabort ${enableArithAbort}\n
-      set concat_null_yields_null ${enableConcatNullYieldsNull}\n
-      ${this.config.options.enableCursorCloseOnCommit ? 'set cursor_close_on_commit on' : ''}
-      set datefirst ${this.config.options.datefirst}\n
-      set dateformat ${this.config.options.dateFormat}\n
-      set implicit_transactions ${enableImplicitTransactions}\n
-      set language ${this.config.options.language}\n
-      set numeric_roundabort ${enableNumericRoundabort}\n
-      set quoted_identifier ${enableQuotedIdentifier}\n
-      set textsize ${this.config.options.textsize}\n
-      set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}\n
-      set xact_abort ${xact_abort}`;
+    if (this.config.options.enableAnsiNull) {
+      options.push('set ansi_nulls on');
+    } else {
+      options.push('set ansi_nulls off');
+    }
+
+    if (this.config.options.enableAnsiNullDefault) {
+      options.push('set ansi_null_dflt_on on');
+    } else {
+      options.push('set ansi_null_dflt_on off');
+    }
+
+    if (this.config.options.enableAnsiPadding) {
+      options.push('set ansi_padding on');
+    } else {
+      options.push('set ansi_padding off');
+    }
+
+    if (this.config.options.enableAnsiWarnings) {
+      options.push('set ansi_warnings on');
+    } else {
+      options.push('set ansi_warnings off');
+    }
+
+    if (this.config.options.enableArithAbort) {
+      options.push('set arithabort on');
+    } else {
+      options.push('set arithabort off');
+    }
+
+    if (this.config.options.enableConcatNullYieldsNull) {
+      options.push('set concat_null_yields_null on');
+    } else {
+      options.push('set concat_null_yields_null off');
+    }
+
+    if (this.config.options.enableCursorCloseOnCommit) {
+      options.push('set cursor_close_on_commit on');
+    }
+
+    options.push(`set datefirst ${this.config.options.datefirst}`);
+    options.push(`set dateformat ${this.config.options.dateFormat}`);
+
+    if (this.config.options.enableImplicitTransactions) {
+      options.push('set implicit_transactions on');
+    } else {
+      options.push('set implicit_transactions off');
+    }
+
+    options.push(`set language ${this.config.options.language}`);
+
+    if (this.config.options.enableNumericRoundabort) {
+      options.push('set numeric_roundabort on');
+    } else {
+      options.push('set numeric_roundabort off');
+    }
+
+    if (this.config.options.enableQuotedIdentifier) {
+      options.push('set quoted_identifier on');
+    } else {
+      options.push('set quoted_identifier off');
+    }
+
+    options.push(`set textsize ${this.config.options.textsize}`);
+    options.push(`set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}`);
+
+    if (this.config.options.abortTransactionOnError) {
+      options.push('set xact_abort on');
+    } else {
+      options.push('set xact_abort off');
+    }
+
+    return options.join('\n');
   }
 
   processedInitialSql() {
