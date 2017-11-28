@@ -1,5 +1,5 @@
 const EventEmitter = require('events').EventEmitter;
-const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
 
 const FLAGS = {

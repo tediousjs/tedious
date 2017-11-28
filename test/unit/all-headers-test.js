@@ -1,5 +1,4 @@
-var WritableTrackingBuffer = require('../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 var writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer;
 
 exports.headers = function(test) {

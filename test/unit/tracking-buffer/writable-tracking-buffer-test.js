@@ -1,5 +1,4 @@
-var TrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var TrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
 exports.create = function(test) {
   var buffer = new TrackingBuffer(2);
