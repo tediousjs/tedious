@@ -52,7 +52,8 @@ const FLAGS_3 = {
   CHANGE_PASSWORD_YES: 0x01,
   BINARY_XML: 0x02,
   SPAWN_USER_INSTANCE: 0x04,
-  UNKNOWN_COLLATION_HANDLING: 0x08
+  UNKNOWN_COLLATION_HANDLING: 0x08,
+  EXTENSION_USED: 0x10
 };
 
 const NTLMFlags = {
@@ -126,6 +127,7 @@ module.exports = class Login7Payload {
   }
 
   createFixedData() {
+    const extUsed = (this.loginData.fedAuthInfo.method != undefined);
     this.tdsVersion = versions[this.loginData.tdsVersion];
     this.packetSize = this.loginData.packetSize;
     this.clientProgVer = 0;
@@ -140,12 +142,17 @@ module.exports = class Login7Payload {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
+    // TODO: assert fedauth and integrated can't be used at the same time
     if (this.loginData.domain) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
     }
     this.flags3 = FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+    if (this.loginData.tdsVersion == '7_4') {
+      if (extUsed)
+        this.flags3 |= FLAGS_3.EXTENSION_USED;
+    }
     this.typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
     if (this.loginData.readOnlyIntent) {
       this.typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
@@ -183,6 +190,7 @@ module.exports = class Login7Payload {
     this.loginData.appName = this.loginData.appName || 'Tedious';
     this.libraryName = libraryName;
     this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    //TODO: assert fedauth and integrated can't be used at the same time
     if (!this.loginData.domain) {
       this.sspi = '';
       this.sspiLong = 0;
@@ -195,6 +203,10 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
     this.addVariableDataString(variableData, '');
+    //this.variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
+    //this.variableData.offsetsAndLengths.writeUInt16LE(4);// :(
+    //this.variableData.data.writeUInt32LE(value);
+    //this.variableData.offset += value.length * 2;
     this.addVariableDataString(variableData, this.libraryName);
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
@@ -212,7 +224,7 @@ module.exports = class Login7Payload {
       variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
       variableData.data.writeBuffer(this.ntlmPacket);
       variableData.offset += this.ntlmPacket.length;
-    } else {
+    } else { //TODO: if fed auth , no sspi
       this.addVariableDataString(variableData, this.sspi);
     }
 
@@ -299,9 +311,8 @@ module.exports = class Login7Payload {
     }
 
     //var totalLen = dataLen + 5; // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
-    //const buffer = new WritableTrackingBuffer(totalLen);
-    buffer.writeInt8(FEDAUTH_OPTIONS.FEATURE_ID); //FeatureId
-    buffer.writeInt8(dataLen); //FeatureDataLen
+    buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID); //FeatureId
+    buffer.writeUInt32LE(dataLen); //FeatureDataLen
     let optionsByte = 0x00;
     switch (fedAuthInfo.fedAuthLibrary) {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
@@ -312,19 +323,26 @@ module.exports = class Login7Payload {
         assert.fail();
     }
     optionsByte |= (fedAuthInfo.fedAuthRequiredPreLoginResponse ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO);
-    buffer.writeInt8(optionsByte);
+    buffer.writeUInt8(optionsByte);
 
     let workflow = 0x00;
     switch (fedAuthInfo.fedAuthLibrary) {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
-        workflow |= FEDAUTH_OPTIONS.LIBRARY_ADAL << 1;
+        switch (fedAuthInfo.method.toUpperCase()) {
+          case fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword:
+            workflow = FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS;
+            break;
+          // TODO: ActiveDirectoryIntegrated
+          default:
+            assert.fail();
+        }
         break;
-        // TODO: ActiveDirectoryIntegrated
+        // TODO: security token
       default:
         assert.fail();
+
     }
-    buffer.writeInt8(workflow);
-    return buffer.data;
+    buffer.writeUInt8(workflow);
   }
 
   createPasswordBuffer() {
