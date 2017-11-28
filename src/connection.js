@@ -511,6 +511,10 @@ class Connection extends EventEmitter {
       return this.emit('charsetChange', token.newValue);
     });
 
+    this.tokenStreamParser.on('fedAuthInfo', (token) => {
+      console.log(token);
+    });
+
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
