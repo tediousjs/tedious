@@ -204,14 +204,14 @@ function valueParse(parser, metaData, options, callback) {
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readChars(parser, dataLength, metaData.collation.codepage, callback);
+            return readText(parser, dataLength, metaData.collation.codepage, callback);
           }
 
         case 'NText':
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readNChars(parser, dataLength, callback);
+            return readNText(parser, dataLength, callback);
           }
 
         case 'Image':
@@ -387,6 +387,30 @@ function readChars(parser, dataLength, codepage, callback) {
 
 function readNChars(parser, dataLength, callback) {
   if (dataLength === NULL) {
+    return callback(null);
+  } else {
+    return parser.readBuffer(dataLength, (data) => {
+      callback(data.toString('ucs2'));
+    });
+  }
+}
+
+function readText(parser, dataLength, codepage, callback) {
+  if (codepage == null) {
+    codepage = DEFAULT_ENCODING;
+  }
+
+  if (dataLength === PLP_NULL) {
+    return callback(null);
+  } else {
+    return parser.readBuffer(dataLength, (data) => {
+      callback(iconv.decode(data, codepage));
+    });
+  }
+}
+
+function readNText(parser, dataLength, callback) {
+  if (dataLength === PLP_NULL) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, (data) => {
