@@ -218,7 +218,7 @@ function valueParse(parser, metaData, options, callback) {
           if (textPointerNull) {
             return callback(null);
           } else {
-            return parser.readBuffer(dataLength, callback);
+            return readImage(parser, dataLength, callback);
           }
 
         case 'Xml':
@@ -357,6 +357,14 @@ function valueParse(parser, metaData, options, callback) {
 
 function readBinary(parser, dataLength, callback) {
   if (dataLength === NULL) {
+    return callback(null);
+  } else {
+    return parser.readBuffer(dataLength, callback);
+  }
+}
+
+function readImage(parser, dataLength, callback) {
+  if (dataLength === PLP_NULL) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, callback);
