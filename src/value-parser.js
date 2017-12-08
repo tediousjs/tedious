@@ -181,7 +181,7 @@ function valueParse(parser, metaData, options, callback) {
           if (metaData.dataLength === MAX) {
             return readMaxChars(parser, codepage, callback);
           } else {
-            return readChars(parser, dataLength, codepage, callback);
+            return readChars(parser, dataLength, codepage, NULL, callback);
           }
 
         case 'NVarChar':
@@ -189,7 +189,7 @@ function valueParse(parser, metaData, options, callback) {
           if (metaData.dataLength === MAX) {
             return readMaxNChars(parser, callback);
           } else {
-            return readNChars(parser, dataLength, callback);
+            return readNChars(parser, dataLength, NULL, callback);
           }
 
         case 'VarBinary':
@@ -197,28 +197,28 @@ function valueParse(parser, metaData, options, callback) {
           if (metaData.dataLength === MAX) {
             return readMaxBinary(parser, callback);
           } else {
-            return readBinary(parser, dataLength, callback);
+            return readBinary(parser, dataLength, NULL, callback);
           }
 
         case 'Text':
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readText(parser, dataLength, metaData.collation.codepage, callback);
+            return readChars(parser, dataLength, metaData.collation.codepage, PLP_NULL, callback);
           }
 
         case 'NText':
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readNText(parser, dataLength, callback);
+            return readNChars(parser, dataLength, PLP_NULL, callback);
           }
 
         case 'Image':
           if (textPointerNull) {
             return callback(null);
           } else {
-            return readImage(parser, dataLength, callback);
+            return readBinary(parser, dataLength, PLP_NULL, callback);
           }
 
         case 'Xml':
@@ -355,28 +355,20 @@ function valueParse(parser, metaData, options, callback) {
   });
 }
 
-function readBinary(parser, dataLength, callback) {
-  if (dataLength === NULL) {
+function readBinary(parser, dataLength, nullValue, callback) {
+  if (dataLength === nullValue) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, callback);
   }
 }
 
-function readImage(parser, dataLength, callback) {
-  if (dataLength === PLP_NULL) {
-    return callback(null);
-  } else {
-    return parser.readBuffer(dataLength, callback);
-  }
-}
-
-function readChars(parser, dataLength, codepage, callback) {
+function readChars(parser, dataLength, codepage, nullValue, callback) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
 
-  if (dataLength === NULL) {
+  if (dataLength === nullValue) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, (data) => {
@@ -385,32 +377,8 @@ function readChars(parser, dataLength, codepage, callback) {
   }
 }
 
-function readNChars(parser, dataLength, callback) {
-  if (dataLength === NULL) {
-    return callback(null);
-  } else {
-    return parser.readBuffer(dataLength, (data) => {
-      callback(data.toString('ucs2'));
-    });
-  }
-}
-
-function readText(parser, dataLength, codepage, callback) {
-  if (codepage == null) {
-    codepage = DEFAULT_ENCODING;
-  }
-
-  if (dataLength === PLP_NULL) {
-    return callback(null);
-  } else {
-    return parser.readBuffer(dataLength, (data) => {
-      callback(iconv.decode(data, codepage));
-    });
-  }
-}
-
-function readNText(parser, dataLength, callback) {
-  if (dataLength === PLP_NULL) {
+function readNChars(parser, dataLength, nullValue, callback) {
+  if (dataLength === nullValue) {
     return callback(null);
   } else {
     return parser.readBuffer(dataLength, (data) => {
