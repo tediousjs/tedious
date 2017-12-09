@@ -1,6 +1,5 @@
 var TYPES = require('../../src/data-type');
 var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
-var ReadableTrackingBuffer = require('../../src/tracking-buffer/readable-tracking-buffer');
 
 exports.noTypeOverridesByAliases = function(test) {
   var type;
@@ -79,39 +78,31 @@ exports.dateTimeDaylightSaving = function(test) {
 
 exports.dateTime2DaylightSaving = function(test) {
   var type = TYPES.typeByName['DateTime2'];
-  for (var testSet of [
-    [new Date(2015, 5, 18, 23, 59, 59), 735766],
-    [new Date(2015, 5, 19, 0, 0, 0), 735767],
-    [new Date(2015, 5, 19, 23, 59, 59), 735767],
-    [new Date(2015, 5, 20, 0, 0, 0), 735768]
+  for (const [value, expectedBuffer] of [
+    [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('067f5101163a0b', 'hex')],
+    [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('06000000173a0b', 'hex')],
+    [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('067f5101173a0b', 'hex')],
+    [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('06000000183a0b', 'hex')]
   ]) {
     var buffer = new WritableTrackingBuffer(16);
-    var parameter = { value: testSet[0], scale: 0 };
-    var expectedNoOfDays = testSet[1];
-    type.writeParameterData(buffer, parameter, { useUTC: false });
-    var rBuffer = new ReadableTrackingBuffer(buffer.buffer);
-    rBuffer.readUInt8();
-    rBuffer.readUInt24LE();
-    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
+    type.writeParameterData(buffer, { value: value, scale: 0 }, { useUTC: false });
+    test.deepEqual(buffer.data, expectedBuffer);
   }
   test.done();
 };
 
 exports.dateDaylightSaving = function(test) {
   var type = TYPES.typeByName['Date'];
-  for (var testSet of [
-    [new Date(2015, 5, 18, 23, 59, 59), 735766],
-    [new Date(2015, 5, 19, 0, 0, 0), 735767],
-    [new Date(2015, 5, 19, 23, 59, 59), 735767],
-    [new Date(2015, 5, 20, 0, 0, 0), 735768]
+  for (const [value, expectedBuffer] of [
+    [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('03163a0b', 'hex')],
+    [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('03173a0b', 'hex')],
+    [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('03173a0b', 'hex')],
+    [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('03183a0b', 'hex')]
   ]) {
     var buffer = new WritableTrackingBuffer(16);
-    var parameter = { value: testSet[0] };
-    var expectedNoOfDays = testSet[1];
-    type.writeParameterData(buffer, parameter, { useUTC: false });
-    var rBuffer = new ReadableTrackingBuffer(buffer.buffer);
-    rBuffer.readUInt8();
-    test.strictEqual(rBuffer.readUInt24LE(), expectedNoOfDays);
+    type.writeParameterData(buffer, { value: value }, { useUTC: false });
+
+    test.deepEqual(buffer.data, expectedBuffer);
   }
   test.done();
 };
@@ -119,19 +110,18 @@ exports.dateDaylightSaving = function(test) {
 // Test rounding of nanosecondDelta
 exports.nanoSecondRounding = function(test) {
   const type = TYPES.typeByName['TimeN'];
-  for (const testSet of [
-    [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, 624035036264],
-    [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, 54640124612],
-    [new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118, 7, 463483737118]
+  for (const [value, nanosecondDelta, scale, expectedBuffer] of [
+    [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, Buffer.from('0568fc624b91', 'hex')],
+    [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, Buffer.from('05c422ceb80c', 'hex')],
+    [new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118, 7, Buffer.from('051e94c8e96b', 'hex')]
   ]) {
+    const parameter = { value: value, scale: scale };
+    parameter.value.nanosecondDelta = nanosecondDelta;
+
     const buffer = new WritableTrackingBuffer(16);
-    const parameter = { value: testSet[0], scale: testSet[2] };
-    parameter.value.nanosecondDelta = testSet[1];
-    const expectedTime = testSet[3];
     type.writeParameterData(buffer, parameter, { useUTC: false });
-    const rBuffer = new ReadableTrackingBuffer(buffer.buffer);
-    rBuffer.readUInt8();
-    test.strictEqual(rBuffer.readUInt40LE(), expectedTime);
+
+    test.deepEqual(buffer.data, expectedBuffer);
   }
   test.done();
 };
