@@ -123,7 +123,7 @@ var connection = new Connection(config);
         <code>options.fallbackToDefaultDb</code>
       </dt>
       <dd>
-        By default, if the database requestion by <code>options.database</code> cannot be accessed,
+        By default, if the database requested by <code>options.database</code> cannot be accessed,
         the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
         set to <code>true</code>, then the user's default database will be used instead
         (Default: <code>false</code>).
@@ -191,7 +191,7 @@ var connection = new Connection(config);
         <code>options.localAddress</code>
       </dt>
       <dd>
-        A string indicating which network interface (ip addres) to use when connecting to SQL Server.
+        A string indicating which network interface (ip address) to use when connecting to SQL Server.
       </dd>
 
       <dt>
@@ -356,6 +356,84 @@ var connection = new Connection(config);
         </ul>
         (default: <code>7_4</code>).
       </dd>
+
+      <dt>
+          <code>options.connectionRetryInterval</code>
+      </dt>
+      <dd>
+          Number of milliseconds before retrying to establish connection, in case of transient failure. (default: <code>500</code>)
+      </dd>
+
+      <dt>
+          <code>options.dateFormat</code>
+      </dt>
+      <dd>
+          A string representing position of month, day and year in temporal datatypes. (default: <code>mdy</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiNull</code>
+      </dt>
+      <dd>
+          A boolean, controls the way null values should be used during comparison operation. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiPadding</code>
+      </dt>
+      <dd>
+          A boolean, controls if padding should be applied for values shorter than the size of defined column. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableAnsiWarnings</code>
+      </dt>
+      <dd>
+          If true, SQL Server will follow ISO standard behavior during various error conditions. For details, see <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-ansi-warnings-transact-sql">documentation</a>. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableConcatNullYieldsNull</code>
+      </dt>
+      <dd>
+          A boolean, determines if concatenation with NULL should result in NULL or empty string value, more details in <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql">documentation</a>. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableCursorCloseOnCommit</code>
+      </dt>
+      <dd>
+          A boolean, controls whether cursor should be closed, if the transaction opening it gets committed or rolled back. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableImplicitTransactions</code>
+      </dt>
+      <dd>
+          A boolean, sets the connection to either implicit or autocommit transaction mode. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableNumericRoundabort</code>
+      </dt>
+      <dd>
+          If false, error is not generated during loss of precession. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+          <code>options.enableQuotedIdentifier </code>
+      </dt>
+      <dd>
+          If true, characters enclosed in single quotes are treated as literals and those enclosed double quotes are treated as identifiers. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+          <code>options.appName </code>
+      </dt>
+      <dd>
+          Application name used for identifying a specific application in profiling, logging or tracing tools of SQL Server. (default: <code>Tedious</code>)
+      </dd>
+
     </dl>
   </div>
 </div>
@@ -467,7 +545,7 @@ var connection = new Connection(config);
 <span class="function">function (databaseName) { }</span>
 <p>
   The server has reported that the active database has changed.
-  This may be as a result of a sucessful login, or a <code>use</code> statement.
+  This may be as a result of a successful login, or a <code>use</code> statement.
 </p>
 <div class="argument">
   <div class="name">databaseName</div>
@@ -538,7 +616,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to start the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -548,7 +626,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -610,7 +688,7 @@ var connection = new Connection(config);
   Closes the connection to the database.
 </p>
 <p>
-  The <a href="#event_end"><code>end</code></a> will be emmited once the connection has been closed.
+  The <a href="#event_end"><code>end</code></a> will be emitted once the connection has been closed.
 </p>
 
 <h2 id="function_execSql">connection.execSql(request)</h2>
@@ -657,7 +735,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to commit the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -667,7 +745,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -753,7 +831,7 @@ var connection = new Connection(config);
         <p>
             The callback is called when the connection reset has completed,
             either successfully or with an error.
-            If an error occured then <code>err</code> will describe the error.
+            If an error occurred then <code>err</code> will describe the error.
         </p>
         <p>
             As only one request at a time may be executed on a connection, another request should not
@@ -763,7 +841,7 @@ var connection = new Connection(config);
             <div class="name">err</div>
             <div class="description">
                 <p>
-                    If an error occured, a string with details of the error.
+                    If an error occurred, a string with details of the error.
                 </p>
             </div>
         </div>
@@ -785,7 +863,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to rollback the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -795,7 +873,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -817,7 +895,7 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to set a savepoint within the transaction has completed,
       either successfully or with an error.
-      If an error occured then <code>err</code> will describe the error.
+      If an error occurred then <code>err</code> will describe the error.
     </p>
     <p>
       As only one request at a time may be executed on a connection, another request should not
@@ -827,7 +905,7 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
     </div>
@@ -852,8 +930,8 @@ var connection = new Connection(config);
     <p>
       The callback is called when the request to start a transaction (or create a savepoint, in
       the case of a nested transaction) has completed, either successfully or with an error.
-      If an error occured, then <code>err</code> will describe the error.
-      If no error occured, the callback should perform its work and eventually call
+      If an error occurred, then <code>err</code> will describe the error.
+      If no error occurred, the callback should perform its work and eventually call
       <code>done</code> with an error or null (to trigger a transaction rollback or a
       transaction commit) and an additional completion callback that will be called when the request
       to rollback or commit the current transaction has completed, either successfully or with an error.
@@ -867,14 +945,14 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, a string with details of the error.
+          If an error occurred, a string with details of the error.
         </p>
       </div>
 
       <div class="name">done</div>
       <div class="description">
         <p>
-          If no error occured, a function to be called to commit or rollback
+          If no error occurred, a function to be called to commit or rollback
           the transaction.
         </p>
       </div>
