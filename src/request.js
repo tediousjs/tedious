@@ -1,34 +1,77 @@
+// @flow
+
 const EventEmitter = require('events').EventEmitter;
 const TYPES = require('./data-type').typeByName;
 const RequestError = require('./errors').RequestError;
 
+// TODO: Figure out how to type the `rows` parameter here.
+type CompletionCallback = (error: ?Error, rowCount: ?number, rows: any) => void;
+
+type Parameter = {
+  // TODO: `type` must be a valid TDS value type
+  type: any,
+  name: string,
+  value: mixed,
+  output: boolean,
+  length: ?number,
+  precision: ?number,
+  scale: ?number
+};
+
+type ParameterOptions = {
+  output?: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number
+}
+
 module.exports = class Request extends EventEmitter {
-  constructor(sqlTextOrProcedure, callback) {
+  sqlTextOrProcedure: ?string;
+  parameters: Parameter[];
+  parametersByName: { [string]: Parameter };
+  originalParameters: Parameter[];
+  preparing: boolean;
+  canceled: boolean;
+  paused: boolean;
+  userCallback: CompletionCallback;
+  handle: ?any; // TODO: Figure out the type here.
+  error: ?Error;
+  connection: ?any; // TODO: This should be `Connection`, not `any`.
+
+  callback: () => void;
+
+  constructor(sqlTextOrProcedure: ?string, callback: CompletionCallback) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
+    this.originalParameters = [];
+    this.preparing = false;
+    this.handle = undefined;
     this.canceled = false;
     this.paused = false;
+    this.error = undefined;
+    this.connection = undefined;
     this.userCallback = callback;
     this.callback = function() {
       if (this.preparing) {
         this.emit('prepared');
-        return this.preparing = false;
+        this.preparing = false;
       } else {
         this.userCallback.apply(this, arguments);
-        return this.emit('requestCompleted');
+        this.emit('requestCompleted');
       }
     };
   }
 
-  addParameter(name, type, value, options) {
+  // TODO: `type` must be a valid TDS value type
+  addParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
     if (options == null) {
       options = {};
     }
 
-    const parameter = {
+    const parameter: Parameter = {
       type: type,
       name: name,
       value: value,
@@ -41,7 +84,8 @@ module.exports = class Request extends EventEmitter {
     return this.parametersByName[name] = parameter;
   }
 
-  addOutputParameter(name, type, value, options) {
+  // TODO: `type` must be a valid TDS value type
+  addOutputParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
     if (options == null) {
       options = {};
     }
@@ -49,7 +93,7 @@ module.exports = class Request extends EventEmitter {
     return this.addParameter(name, type, value, options);
   }
 
-  makeParamsParameter(parameters) {
+  makeParamsParameter(parameters: Parameter[]) {
     let paramsParameter = '';
     for (let i = 0, len = parameters.length; i < len; i++) {
       const parameter = parameters[i];
@@ -107,7 +151,7 @@ module.exports = class Request extends EventEmitter {
     return this.sqlTextOrProcedure = 'sp_unprepare';
   }
 
-  transformIntoExecuteRpc(parameters) {
+  transformIntoExecuteRpc(parameters: { [string]: mixed }) {
     this.parameters = [];
     this.addParameter('handle', TYPES.Int, this.handle);
 
