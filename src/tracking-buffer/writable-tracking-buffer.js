@@ -25,10 +25,10 @@ module.exports = class WritableTrackingBuffer {
 
   position: number;
 
-  constructor(initialSize: number, encoding: ?Encoding, doubleSizeGrowth: ?boolean) {
+  constructor(initialSize: number, encoding: Encoding = 'ucs2', doubleSizeGrowth: boolean = false) {
     this.initialSize = initialSize;
-    this.encoding = encoding || 'ucs2';
-    this.doubleSizeGrowth = doubleSizeGrowth || false;
+    this.encoding = encoding;
+    this.doubleSizeGrowth = doubleSizeGrowth;
     this.buffer = new Buffer(this.initialSize).fill(0);
     this.compositeBuffer = new Buffer(0);
     this.position = 0;
@@ -181,11 +181,7 @@ module.exports = class WritableTrackingBuffer {
     return this.position += length;
   }
 
-  writeString(value: string, encoding: ?Encoding) {
-    if (encoding == undefined) {
-      encoding = this.encoding;
-    }
-
+  writeString(value: string, encoding: Encoding = this.encoding) {
     const length = Buffer.byteLength(value, encoding);
     this.makeRoomFor(length);
 
@@ -196,22 +192,18 @@ module.exports = class WritableTrackingBuffer {
     return bytesWritten;
   }
 
-  writeBVarchar(value: string, encoding: ?Encoding) {
+  writeBVarchar(value: string, encoding: Encoding = this.encoding) {
     this.writeUInt8(value.length);
     return this.writeString(value, encoding);
   }
 
-  writeUsVarchar(value: string, encoding: ?Encoding) {
+  writeUsVarchar(value: string, encoding: Encoding = this.encoding) {
     this.writeUInt16LE(value.length);
     return this.writeString(value, encoding);
   }
 
   // TODO: Figure out what types are passed in other than `Buffer`
-  writeUsVarbyte(value: any, encoding: ?Encoding) {
-    if (encoding == undefined) {
-      encoding = this.encoding;
-    }
-
+  writeUsVarbyte(value: any, encoding: Encoding = this.encoding) {
     let length;
     if (value instanceof Buffer) {
       length = value.length;
@@ -231,11 +223,7 @@ module.exports = class WritableTrackingBuffer {
     }
   }
 
-  writePLPBody(value: any, encoding: ?Encoding) {
-    if (encoding == null) {
-      encoding = this.encoding;
-    }
-
+  writePLPBody(value: any, encoding: Encoding = this.encoding) {
     let length;
     if (value instanceof Buffer) {
       length = value.length;
