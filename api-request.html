@@ -13,6 +13,7 @@ title: API - Request
   <li><a href="#function_newRequest">new Request(sql, callback)</a></li>
   <li><a href="#event_columnMetadata">Event: 'columnMetadata'</a></li>
   <li><a href="#event_prepared">Event: 'prepared'</a></li>
+  <li><a href="#event_error">Event: 'error'</a></li>
   <li><a href="#event_requestCompleted">Event: 'requestCompleted'</a></li>
   <li><a href="#event_row">Event: 'row'</a></li>
   <li><a href="#event_done">Event: 'done'</a></li>
@@ -159,6 +160,15 @@ request.on('prepared', function () { });
   and can be used in subsequent calls to
   <a href="api-connection.html#function_execute">execute</a> and
   <a href="api-connection.html#function_unprepare">unprepare</a>.
+</p>
+
+<h2 id="event_error">Event: error</h2>
+{% highlight javascript %}
+request.on('error', function (err) { });
+{% endhighlight %}
+
+<p>
+  The request encountered an error and has not been <a href="api-connection.html#function_prepare">prepared</a>.
 </p>
 
 <h2 id="event_requestCompleted">Event: requestCompleted</h2>
