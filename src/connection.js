@@ -1718,9 +1718,6 @@ Connection.prototype.STATE = {
       data: function(data) {
         return this.sendDataToTokenStreamParser(data);
       },
-      featureExtAck: function() {
-        console.log('-----feature ext ack-----');
-      },
       loggedIn: function() {
         return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
@@ -1731,7 +1728,7 @@ Connection.prototype.STATE = {
         return this.transitionTo(this.STATE.REROUTING);
       },
       message: function() {
-        return this.processLogin7FeatureExtAck();
+        return this.processLogin7Response();
       }
     }
   },

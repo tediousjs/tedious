@@ -57,7 +57,7 @@ function fedAuthInfoParser(parser, colMetadata, options, callback) {
   });
 }
 
-function FeatureAckOpt(parser,featureId ,callback){
+function FeatureAckOpt(parser, featureId, callback) {
   parser.readUInt8((featureId) => {
     parser.readUInt32LE((featureAckDataLen) => {
       parser.readBuffer(featureAckDataLen, (featureData) => {
@@ -76,18 +76,15 @@ function FeatureAckOpt(parser,featureId ,callback){
 
 module.exports.featureExtAckParser = featureExtAckParser;
 
-function featureExtAckParser(parser, colMetadata, options, callback) {  
-  loop(parser, featureId, callback) {
-    if(featureId != TERMINATOR){
-      loop(parser, featureId, callback);
-    }
-  }
-  /*
-  // while featureId != TDS.FEATURE_EXT_TERMINATOR
+function featureExtAckParser(parser, colMetadata, options, callback) {
+
+
+  //
   // there might be other features
   parser.readUInt8((featureId) => {
     parser.readUInt32LE((featureAckDataLen) => {
       parser.readBuffer(featureAckDataLen, (featureData) => {
+        parser.readUInt8((id) => {console.log(id == TERMINATOR);});
         callback({
           'name': 'FEATUREEXTACK',
           'event': 'featureExtAck',
@@ -99,5 +96,5 @@ function featureExtAckParser(parser, colMetadata, options, callback) {
       });
     });
     // If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection,
-  });*/
+  });
 }
