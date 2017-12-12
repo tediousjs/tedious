@@ -1,3 +1,5 @@
+
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
@@ -18,6 +20,7 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+const AuthenticationContext = require('adal-node').AuthenticationContext;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -56,7 +59,9 @@ class Connection extends EventEmitter {
       method: undefined,
       fedAuthLibrary: undefined,
       fedAuthRequiredPreLoginResponse: false,
-      fedAuthInfoRequested: false
+      fedAuthInfoRequested: false,
+      responsePending: false,
+      token: undefined
     };
 
     this.config = {
@@ -512,7 +517,26 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('fedAuthInfo', (token) => {
-      console.log(token);
+      const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+      if (token.fedAuthInfoData.stsurl && token.fedAuthInfoData.spn) {
+        this.fedAuthInfo.responsePending = true;
+        var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
+        context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
+          console.log('in auth context call back');
+          if (err) {
+            this.fedAuthInfo.responsePending = false;
+            console.log('well that didn\'t work: ' + err.stack);
+          } else {
+            console.log(typeof tokenResponse.accessToken);
+            console.log(tokenResponse.accessToken);
+            // console.log(tokenResponse.accessToken.length);
+            // console.log(Buffer.from(tokenResponse.accessToken, 'base64'));
+            // console.log(Buffer.from(tokenResponse.accessToken, 'base64').toString());
+            this.fedAuthInfo.responsePending = false;
+            this.fedAuthInfo.token = tokenResponse;
+          }
+        });
+      }
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -968,6 +992,23 @@ class Connection extends EventEmitter {
     process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
   }
 
+  sendFedAuthResponsePacket() {
+    console.log('------in sendFedAuthResponsePacket-------');
+    // console.log(Buffer.from(this.fedAuthInfo.token.accessToken));
+
+    const accessTokenLen = Buffer.byteLength(this.fedAuthInfo.token.accessToken, 'utf16le');
+    // const accessTokenLen = this.fedAuthInfo.token.accessToken.length;
+    console.log(accessTokenLen);
+    const data = new WritableTrackingBuffer(4 + accessTokenLen);
+    data.writeUInt32LE(accessTokenLen + 4);
+    data.writeUInt32LE(accessTokenLen);
+    data.writeString(this.fedAuthInfo.token.accessToken, 'utf16le');
+    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data.data);
+
+    const boundTransitionTo = this.transitionTo.bind(this);
+    process.nextTick(boundTransitionTo, this.STATE.SENT_FEDAUTH_TOKEN);
+  }
+
   // Returns false to apply backpressure.
   sendDataToTokenStreamParser(data) {
     return this.tokenStreamParser.addBuffer(data);
@@ -1064,6 +1105,19 @@ class Connection extends EventEmitter {
   processLogin7NTLMAck() {
     if (this.loggedIn) {
       return this.dispatchEvent('loggedIn');
+    } else {
+      if (this.loginError) {
+        this.emit('connect', this.loginError);
+      } else {
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+      }
+      return this.dispatchEvent('loginFailed');
+    }
+  }
+
+  processLogin7FedAuthResponse() {
+    if (this.fedAuthInfo.fedAuthInfoRequested) {
+      return this.dispatchEvent('receivedFedAuthInfo');
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
@@ -1451,9 +1505,15 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
+            if (this.config.domain && this.fedAuthInfo.method) {
+              // error out
+            }
             if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
+            } else if (this.fedAuthInfo.method) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            }
+            else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           });
@@ -1533,6 +1593,76 @@ Connection.prototype.STATE = {
       },
       message: function() {
         return this.processLogin7NTLMAck();
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
+    events: {
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        if (this.fedAuthInfo.responsePending) {
+          // We got data from the server while we're waiting for adal authentication context
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {
+          return this.sendDataToTokenStreamParser(data);
+        }
+      },
+      receivedFedAuthInfo: function() {
+        return this.sendFedAuthResponsePacket();
+      },
+      loginFailed: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      message: function() {
+        if (this.fedAuthInfo.responsePending) {
+          // We got data from the server while we're waiting for adal authentication context
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {
+          return this.processLogin7FedAuthResponse();
+        }
+      }
+    }
+  },
+  SENT_FEDAUTH_TOKEN: {
+    name: 'SentFedAuthToken',
+    events: {
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        return this.sendDataToTokenStreamParser(data);
+      },
+      featureExtAck: function() {
+        console.log('-----feature ext ack-----');
+      },
+      loggedIn: function() {
+        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      },
+      loginFailed: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      routingChange: function() {
+        return this.transitionTo(this.STATE.REROUTING);
+      },
+      message: function() {
+        return this.processLogin7FeatureExtAck();
       }
     }
   },

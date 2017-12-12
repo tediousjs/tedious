@@ -8,7 +8,8 @@ tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
 tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser');
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser;
-tokenParsers[TYPE.FEDAUTHINFO] = require('./fedauth-token-parser');
+tokenParsers[TYPE.FEDAUTHINFO] = require('./feature-ext-parser').fedAuthInfoParser;
+tokenParsers[TYPE.FEATUREEXTACK] = require('./feature-ext-parser').featureExtAckParser;
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser;
 tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser');
 tokenParsers[TYPE.ORDER] = require('./order-token-parser');
@@ -77,7 +78,7 @@ module.exports = class Parser extends Transform {
         this.push(token);
       }
     };
-
+    console.log(this.buffer.data);
     while (!this.suspended && this.position + 1 <= this.buffer.length) {
       const type = this.buffer.readUInt8(this.position, true);
 

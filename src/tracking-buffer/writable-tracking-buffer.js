@@ -19,6 +19,7 @@ module.exports = class WritableTrackingBuffer {
     this.doubleSizeGrowth || (this.doubleSizeGrowth = false);
     this.encoding || (this.encoding = 'ucs2');
     this.buffer = new Buffer(this.initialSize);
+    console.log('this.buffer :' + this.buffer.length);
     this.position = 0;
   }
 
@@ -73,6 +74,18 @@ module.exports = class WritableTrackingBuffer {
     return this.position += length;
   }
 
+  writeUInt32LE_(value, pos) {
+    this.buffer.writeUInt32LE(value, pos);
+  }
+
+  getPos() {
+    return this.position;
+  }
+
+  getLen() {
+    return this.buffer.length;
+  }
+
   writeUShort(value) {
     return this.writeUInt16LE(value);
   }
@@ -97,6 +110,7 @@ module.exports = class WritableTrackingBuffer {
     const length = 4;
     this.makeRoomFor(length);
     this.buffer.writeUInt32LE(value, this.position);
+    console.log(this.buffer);
     return this.position += length;
   }
 
@@ -208,6 +222,27 @@ module.exports = class WritableTrackingBuffer {
     }
     this.writeUInt16LE(length);
 
+    if (Buffer.isBuffer(value)) {
+      return this.writeBuffer(value);
+    } else {
+      this.makeRoomFor(length);
+      this.buffer.write(value, this.position, encoding);
+      return this.position += length;
+    }
+  }
+
+  writeLVarbyte(value, encoding) {
+    if (encoding == null) {
+      encoding = this.encoding;
+    }
+    let length;
+    if (Buffer.isBuffer(value)) {
+      length = value.length;
+    } else {
+      value = value.toString();
+      length = Buffer.byteLength(value, encoding);
+    }
+    this.writeInt32LE(length);
     if (Buffer.isBuffer(value)) {
       return this.writeBuffer(value);
     } else {
