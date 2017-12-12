@@ -114,15 +114,21 @@ module.exports = class Login7Payload {
     this.loginData = loginData;
 
     const lengthLength = 4;
-    const featureExt = this.createFeatureExt();
+    this.featureExt = '';
+    if (this.loginData.fedAuthInfo.method != undefined) {
+      this.featureExt = this.createFeatureExt();
+    }
     const fixed = this.createFixedData();
     const variable = this.createVariableData(lengthLength + fixed.length);
-    const length = lengthLength + fixed.length + variable.length + featureExt.length;
+    const length = lengthLength + fixed.length + variable.length;
+
+    // variableData.data.writeUInt16LE_(variableData.offset, this.tempHolder);
+
     const data = new WritableTrackingBuffer(300);
     data.writeUInt32LE(length);
     data.writeBuffer(fixed);
     data.writeBuffer(variable);
-    data.writeBuffer(featureExt);
+
     this.data = data.data;
   }
 
@@ -149,9 +155,8 @@ module.exports = class Login7Payload {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
     }
     this.flags3 = FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
-    if (this.loginData.tdsVersion == '7_4') {
-      if (extUsed)
-        this.flags3 |= FLAGS_3.EXTENSION_USED;
+    if (this.loginData.tdsVersion === '7_4' && extUsed) {
+      this.flags3 |= FLAGS_3.EXTENSION_USED;
     }
     this.typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
     if (this.loginData.readOnlyIntent) {
@@ -176,6 +181,7 @@ module.exports = class Login7Payload {
   }
 
   createVariableData(offset) {
+    console.log('nned ' + offset);
     this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
     if (this.loginData.tdsVersion === '7_1') {
       this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
@@ -202,11 +208,12 @@ module.exports = class Login7Payload {
     this.addVariableDataBuffer(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
-    this.addVariableDataString(variableData, '');
-    //this.variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    //this.variableData.offsetsAndLengths.writeUInt16LE(4);// :(
-    //this.variableData.data.writeUInt32LE(value);
-    //this.variableData.offset += value.length * 2;
+    if (this.loginData.fedAuthInfo.method != undefined) {
+      this.addVariableDataInt(variableData, '');
+    } else {
+      this.addVariableDataString(variableData, '');
+    }
+
     this.addVariableDataString(variableData, this.libraryName);
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
@@ -232,6 +239,11 @@ module.exports = class Login7Payload {
     if (this.loginData.tdsVersion > '7_1') {
       this.addVariableDataString(variableData, this.changePassword);
       variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
+    }
+
+    if (this.loginData.fedAuthInfo.method != undefined) {
+      variableData.data.writeUInt32LE_(variableData.offset, this.tempHolder);
+      return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data, this.featureExt ]);
     }
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
@@ -264,6 +276,16 @@ module.exports = class Login7Payload {
     return variableData.offset += value.length * 2;
   }
 
+  addVariableDataInt(variableData, value) {
+    value || (value = '');
+    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
+    variableData.offsetsAndLengths.writeUInt16LE(4);
+    //placeHolder
+    this.tempHolder = variableData.data.getPos();
+    // variableData.offset + 4;
+    variableData.data.writeUInt32LE(0);
+    return variableData.offset += 4;
+  }
   createNTLMRequest(options) {
     const domain = escape(options.domain.toUpperCase());
     const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
