@@ -73,7 +73,7 @@ module.exports = class NTLMResponsePayload {
   }
 
   createClientNonce() {
-    const client_nonce = new Buffer(8);
+    const client_nonce = new Buffer(8).fill(0);
     let nidx = 0;
     while (nidx < 8) {
       client_nonce.writeUInt8(Math.ceil(Math.random() * 255), nidx);
@@ -86,7 +86,7 @@ module.exports = class NTLMResponsePayload {
     const timestamp = this.createTimestamp(mytime);
     const hash = this.ntv2Hash(domain, user, password);
     const dataLength = 40 + targetInfo.length;
-    const data = new Buffer(dataLength);
+    const data = new Buffer(dataLength).fill(0);
     serverNonce.copy(data, 0, 0, 8);
     data.writeUInt32LE(0x101, 8);
     data.writeUInt32LE(0x0, 12);
@@ -121,13 +121,13 @@ module.exports = class NTLMResponsePayload {
 
   lmv2Response(domain, user, password, serverNonce, clientNonce) {
     const hash = this.ntv2Hash(domain, user, password);
-    const data = new Buffer(serverNonce.length + clientNonce.length);
+    const data = new Buffer(serverNonce.length + clientNonce.length).fill(0);
 
     serverNonce.copy(data);
     clientNonce.copy(data, serverNonce.length, 0, clientNonce.length);
 
     const newhash = this.hmacMD5(data, hash);
-    const response = new Buffer(newhash.length + clientNonce.length);
+    const response = new Buffer(newhash.length + clientNonce.length).fill(0);
 
     newhash.copy(response);
     clientNonce.copy(response, newhash.length, 0, clientNonce.length);
@@ -142,7 +142,7 @@ module.exports = class NTLMResponsePayload {
   }
 
   ntHash(text) {
-    const hash = new Buffer(21);
+    const hash = new Buffer(21).fill(0);
     hash.fill(0);
 
     const unicodeString = new Buffer(text, 'ucs2');

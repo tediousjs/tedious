@@ -1,7 +1,6 @@
 var Parser = require('../../../src/token/stream-parser');
 var dataTypeByName = require('../../../src/data-type').typeByName;
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 var options = {
   useUTC: false,
   tdsVersion: '7_2'

@@ -1,5 +1,5 @@
 const sprintf = require('sprintf').sprintf;
-const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 
 const optionBufferSize = 20;
 
@@ -74,7 +74,7 @@ module.exports = class PreloginPayload {
       length += 5 + option.data.length;
     }
     length++; // terminator
-    this.data = new Buffer(length);
+    this.data = new Buffer(length).fill(0);
     let optionOffset = 0;
     let optionDataOffset = 5 * options.length + 1;
 
