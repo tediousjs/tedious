@@ -72,7 +72,7 @@ module.exports = class PreloginPayload {
       length += 5 + option.data.length;
     }
     length++; // terminator
-    this.data = new Buffer(length);
+    this.data = new Buffer(length).fill(0);
     let optionOffset = 0;
     let optionDataOffset = 5 * options.length + 1;
 

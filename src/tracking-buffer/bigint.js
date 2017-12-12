@@ -68,7 +68,7 @@ function numberToInt64LE(num) {
   let hi = Math.abs(num);
   let lo = hi % 0x100000000;
   hi = (hi / 0x100000000) | 0;
-  const buf = new Buffer(8);
+  const buf = new Buffer(8).fill(0);
   for (let i = 0; i <= 7; i++) {
     buf[i] = lo & 0xff;
     lo = i === 3 ? hi : lo >>> 8;
