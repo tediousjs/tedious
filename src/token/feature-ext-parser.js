@@ -46,6 +46,7 @@ var readFedAuthInfoOpt = (parser, callback) => {
     });
   });
 };
+
 module.exports.fedAuthInfoParser = fedAuthInfoParser;
 function fedAuthInfoParser(parser, colMetadata, options, callback) {
   parser.readUInt32LE((tokenLength) => {
@@ -57,44 +58,32 @@ function fedAuthInfoParser(parser, colMetadata, options, callback) {
   });
 }
 
-function FeatureAckOpt(parser, featureId, callback) {
-  parser.readUInt8((featureId) => {
-    parser.readUInt32LE((featureAckDataLen) => {
-      parser.readBuffer(featureAckDataLen, (featureData) => {
-        callback({
-          'name': 'FEATUREEXTACK',
-          'event': 'featureExtAck',
-          'feature': {
-            id: featureId,
-            data: featureData
-          }
-        });
-      });
-    });
-  });
-}
-
 module.exports.featureExtAckParser = featureExtAckParser;
-
 function featureExtAckParser(parser, colMetadata, options, callback) {
-
-
-  //
   // there might be other features
   parser.readUInt8((featureId) => {
-    parser.readUInt32LE((featureAckDataLen) => {
-      parser.readBuffer(featureAckDataLen, (featureData) => {
-        parser.readUInt8((id) => {console.log(id == TERMINATOR);});
-        callback({
-          'name': 'FEATUREEXTACK',
-          'event': 'featureExtAck',
-          'feature': {
-            id: featureId,
-            data: featureData
-          }
+    //TODO: If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection
+    let featureData = undefined;
+    function next(done) {
+      if (featureId === TERMINATOR) {
+        return done();
+      }
+      parser.readUInt32LE((featureAckDataLen) => {
+        parser.readBuffer(featureAckDataLen, (fd) => {
+          featureData = fd;
+          next(done);
         });
       });
+    }
+    next(() => {
+      callback({
+        'name': 'FEATUREEXTACK',
+        'event': 'featureExtAck',
+        'feature': {
+          id: featureId,
+          data: featureData
+        }
+      });
     });
-    // If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection,
   });
 }
