@@ -389,6 +389,9 @@ class Connection extends EventEmitter {
       }
     }
     // TODO: if authentication is set to true, along with any other authentication methods throw error
+    if (this.config.domain && this.fedAuthInfo.method) {
+      throw new Error('Integrated authentication and Azure active authentication cannot be used together');
+    }
     if (this.config.domain && !this.config.userName && !this.config.password) {
       this.config.options.useWindowsIntegratedAuth = true;
     }

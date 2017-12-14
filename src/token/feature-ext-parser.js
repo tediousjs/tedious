@@ -7,7 +7,7 @@ const FedAuthInfoID = {
 
 const TERMINATOR = 0xFF;
 
-var infoData = {
+const infoData = {
   spnLen: undefined,
   stsurlLen: undefined
 };
@@ -61,29 +61,23 @@ function fedAuthInfoParser(parser, colMetadata, options, callback) {
 module.exports.featureExtAckParser = featureExtAckParser;
 function featureExtAckParser(parser, colMetadata, options, callback) {
   // there might be other features
-  parser.readUInt8((featureId) => {
-    //TODO: If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection
-    let featureData = undefined;
-    function next(done) {
+
+    // TODO: If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection
+    // switch case on featureIds and fedauth types
+  function next(done) {
+    parser.readUInt8((featureId) => {
       if (featureId === TERMINATOR) {
         return done();
       }
       parser.readUInt32LE((featureAckDataLen) => {
         parser.readBuffer(featureAckDataLen, (fd) => {
-          featureData = fd;
+          //len must be zero
           next(done);
         });
       });
-    }
-    next(() => {
-      callback({
-        'name': 'FEATUREEXTACK',
-        'event': 'featureExtAck',
-        'feature': {
-          id: featureId,
-          data: featureData
-        }
-      });
     });
+  }
+  next(() => {
+    callback(undefined);
   });
 }
