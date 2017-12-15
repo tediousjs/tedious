@@ -82,7 +82,7 @@ module.exports = class WritableTrackingBuffer {
     return this.position += length;
   }
 
-  writeUInt32LE_(value, pos) {
+  writeUInt32LEposition(value, pos) {
     this.buffer.writeUInt32LE(value, pos);
   }
 

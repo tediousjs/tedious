@@ -58,7 +58,7 @@ class Connection extends EventEmitter {
       },
       method: undefined,
       fedAuthLibrary: undefined,
-      fedAuthRequiredPreLoginResponse: false,
+      requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
       responsePending: false,
       token: undefined
@@ -388,9 +388,9 @@ class Connection extends EventEmitter {
         }
       }
     }
-    // TODO: if authentication is set to true, along with any other authentication methods throw error
+
     if (this.config.domain && this.fedAuthInfo.method) {
-      throw new Error('Integrated authentication and Azure active authentication cannot be used together');
+      //throw new Error('Integrated authentication and Azure active authentication cannot be used together');
     }
     if (this.config.domain && !this.config.userName && !this.config.password) {
       this.config.options.useWindowsIntegratedAuth = true;
@@ -528,13 +528,8 @@ class Connection extends EventEmitter {
           console.log('in auth context call back');
           if (err) {
             this.fedAuthInfo.responsePending = false;
-            console.log('well that didn\'t work: ' + err.stack);
+            // TODO: add error
           } else {
-            console.log(typeof tokenResponse.accessToken);
-            console.log(tokenResponse.accessToken);
-            // console.log(tokenResponse.accessToken.length);
-            // console.log(Buffer.from(tokenResponse.accessToken, 'base64'));
-            // console.log(Buffer.from(tokenResponse.accessToken, 'base64').toString());
             this.fedAuthInfo.responsePending = false;
             this.fedAuthInfo.token = tokenResponse;
           }
@@ -924,12 +919,17 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-    if (0 != preloginPayload.fedAuth && 1 != preloginPayload.fedAuth) {
-      this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuth, 'EFEDAUTH'));
+    if (0 != preloginPayload.fedAuthRequired && 1 != preloginPayload.fedAuthRequired) {
+      this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuthRequired, 'EFEDAUTH'));
+      return this.close();
+    }
+    // fedAuthRequired is used for capability negotiation when choosing between SSPI and federated authentication
+    if (preloginPayload.fedAuthRequired === 1 && this.config.domain) {
+      this.emit('connect', ConnectionError('Server sent federated authentication required response, value domain should not be set', 'EFEDAUTH'));
       return this.close();
     }
     if (this.fedAuthInfo.method != undefined) {
-      this.fedAuthInfo.fedAuthRequiredPreLoginResponse = (preloginPayload.fedAuth == 1);
+      this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
     }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
@@ -996,16 +996,11 @@ class Connection extends EventEmitter {
   }
 
   sendFedAuthResponsePacket() {
-    console.log('------in sendFedAuthResponsePacket-------');
-    // console.log(Buffer.from(this.fedAuthInfo.token.accessToken));
-
-    const accessTokenLen = Buffer.byteLength(this.fedAuthInfo.token.accessToken, 'utf16le');
-    // const accessTokenLen = this.fedAuthInfo.token.accessToken.length;
-    console.log(accessTokenLen);
+    const accessTokenLen = Buffer.byteLength(this.fedAuthInfo.token.accessToken, 'ucs2');
     const data = new WritableTrackingBuffer(4 + accessTokenLen);
     data.writeUInt32LE(accessTokenLen + 4);
     data.writeUInt32LE(accessTokenLen);
-    data.writeString(this.fedAuthInfo.token.accessToken, 'utf16le');
+    data.writeString(this.fedAuthInfo.token.accessToken, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data.data);
 
     const boundTransitionTo = this.transitionTo.bind(this);
@@ -1577,12 +1572,9 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain && this.fedAuthInfo.method) {
-              // error out
-            }
             if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else if (this.fedAuthInfo.method) {
+            } else if (this.fedAuthInfo.requiredPreLoginResponse) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             }
             else {

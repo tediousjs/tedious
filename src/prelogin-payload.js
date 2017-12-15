@@ -210,7 +210,7 @@ module.exports = class PreloginPayload {
   }
 
   extractFedAuth(offset) {
-    this.fedAuth = this.data.readUInt8(offset);
+    this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
   toString(indent) {

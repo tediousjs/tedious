@@ -100,8 +100,6 @@ const FEDAUTH_OPTIONS = {
   FEDAUTH_NO_ECHO: 0x00,
   ADAL_WORKFLOW_USER_PASS: 0x01,
   ADAL_WORKFLOW_INTEGRATED: 0x02,
-  FEDAUTH_INFO_ID_STSURL: 0x01,
-  FEDAUTH_INFO_ID_SPN: 0x02,
 };
 // TODO: add Secuirty token authentication
 
@@ -112,17 +110,15 @@ const FEATURE_EXT_TERMINATOR = 0xFF;
 module.exports = class Login7Payload {
   constructor(loginData) {
     this.loginData = loginData;
-
     const lengthLength = 4;
-    this.featureExt = '';
-    if (this.loginData.fedAuthInfo.method != undefined) {
+
+    this.featureExt = undefined;
+    if (this.loginData.fedAuthInfo.requiredPreLoginResponse) {
       this.featureExt = this.createFeatureExt();
     }
     const fixed = this.createFixedData();
     const variable = this.createVariableData(lengthLength + fixed.length);
     const length = lengthLength + fixed.length + variable.length;
-
-    // variableData.data.writeUInt16LE_(variableData.offset, this.tempHolder);
 
     const data = new WritableTrackingBuffer(300);
     data.writeUInt32LE(length);
@@ -133,7 +129,7 @@ module.exports = class Login7Payload {
   }
 
   createFixedData() {
-    const extUsed = (this.loginData.fedAuthInfo.method != undefined);
+    const extUsed = (this.loginData.fedAuthInfo.requiredPreLoginResponse);
     this.tdsVersion = versions[this.loginData.tdsVersion];
     this.packetSize = this.loginData.packetSize;
     this.clientProgVer = 0;
@@ -148,8 +144,7 @@ module.exports = class Login7Payload {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    // TODO: assert fedauth and integrated can't be used at the same time
-    if (this.loginData.domain) {
+    if (this.loginData.domain && !this.loginData.fedAuthInfo.requiredPreLoginResponse) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
@@ -181,7 +176,6 @@ module.exports = class Login7Payload {
   }
 
   createVariableData(offset) {
-    console.log('nned ' + offset);
     this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
     if (this.loginData.tdsVersion === '7_1') {
       this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
@@ -196,7 +190,7 @@ module.exports = class Login7Payload {
     this.loginData.appName = this.loginData.appName || 'Tedious';
     this.libraryName = libraryName;
     this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
-    //TODO: assert fedauth and integrated can't be used at the same time
+
     if (!this.loginData.domain) {
       this.sspi = '';
       this.sspiLong = 0;
@@ -208,7 +202,7 @@ module.exports = class Login7Payload {
     this.addVariableDataBuffer(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
-    if (this.loginData.fedAuthInfo.method != undefined) {
+    if (this.loginData.fedAuthInfo.fedAuthInfoRequested) {
       this.addVariableDataInt(variableData, '');
     } else {
       this.addVariableDataString(variableData, '');
@@ -219,7 +213,7 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    if (this.loginData.domain) {
+    if (this.loginData.domain && !this.loginData.fedAuthInfo.requiredPreLoginResponse) {
       if (this.loginData.sspiBlob) {
         this.ntlmPacket = this.loginData.sspiBlob;
       } else {
@@ -231,7 +225,7 @@ module.exports = class Login7Payload {
       variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
       variableData.data.writeBuffer(this.ntlmPacket);
       variableData.offset += this.ntlmPacket.length;
-    } else { //TODO: if fed auth , no sspi
+    } else {
       this.addVariableDataString(variableData, this.sspi);
     }
 
@@ -242,7 +236,7 @@ module.exports = class Login7Payload {
     }
 
     if (this.loginData.fedAuthInfo.method != undefined) {
-      variableData.data.writeUInt32LE_(variableData.offset, this.tempHolder);
+      variableData.data.writeUInt32LEposition(variableData.offset, this.tempHolder);
       return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data, this.featureExt ]);
     }
 
@@ -252,7 +246,7 @@ module.exports = class Login7Payload {
   createFeatureExt() {
     const buffer = new WritableTrackingBuffer(100);
     if ((this.loginData.fedAuthInfo.method.toUpperCase() === this.loginData.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) &&
-    this.loginData.fedAuthInfo.fedAuthRequiredPreLoginResponse) {
+    this.loginData.fedAuthInfo.requiredPreLoginResponse) {
       this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
       this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
       this.CreateFedAuthExtData(buffer, this.loginData.fedAuthInfo);
@@ -344,7 +338,7 @@ module.exports = class Login7Payload {
       default:
         assert.fail();
     }
-    optionsByte |= (fedAuthInfo.fedAuthRequiredPreLoginResponse ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO);
+    optionsByte |= (fedAuthInfo.requiredPreLoginResponse ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO);
     buffer.writeUInt8(optionsByte);
 
     let workflow = 0x00;
