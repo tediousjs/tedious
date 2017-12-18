@@ -60,17 +60,13 @@ function fedAuthInfoParser(parser, colMetadata, options, callback) {
 
 module.exports.featureExtAckParser = featureExtAckParser;
 function featureExtAckParser(parser, colMetadata, options, callback) {
-  // there might be other features
-
-    // TODO: If the FEDAUTH FeatureId is not present, the TDS client MUST close the underlying transport connection
-    // switch case on featureIds and fedauth types
   function next(done) {
     parser.readUInt8((featureId) => {
       if (featureId === TERMINATOR) {
         return done();
       }
       parser.readUInt32LE((featureAckDataLen) => {
-        parser.readBuffer(featureAckDataLen, (fd) => {
+        parser.readBuffer(featureAckDataLen, (featureData) => {
           //len must be zero
           next(done);
         });

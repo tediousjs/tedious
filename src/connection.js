@@ -382,7 +382,7 @@ class Connection extends EventEmitter {
           throw new Error('An invalid authentication method is specified');
         }
         if (this.config.options.tdsVersion < '7_4') {
-          throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${config.options.tdsVersion}`);
+          throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
         }
         this.config.options.encrypt = true;
         this.fedAuthInfo.method = config.options.authentication;

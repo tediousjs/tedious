@@ -326,7 +326,7 @@ module.exports = class Login7Payload {
         assert.fail();
     }
 
-    //var totalLen = dataLen + 5; // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
+    // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
     buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID); //FeatureId
     buffer.writeUInt32LE(dataLen); //FeatureDataLen
     let optionsByte = 0x00;
