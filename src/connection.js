@@ -381,6 +381,9 @@ class Connection extends EventEmitter {
         config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
           throw new Error('An invalid authentication method is specified');
         }
+        if (this.config.options.tdsVersion < '7_4') {
+          throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${config.options.tdsVersion}`);
+        }
         this.config.options.encrypt = true;
         this.fedAuthInfo.method = config.options.authentication;
         if (config.options.trustServerCertificate != 'true') {
@@ -389,9 +392,6 @@ class Connection extends EventEmitter {
       }
     }
 
-    if (this.config.domain && this.fedAuthInfo.method) {
-      //throw new Error('Integrated authentication and Azure active authentication cannot be used together');
-    }
     if (this.config.domain && !this.config.userName && !this.config.password) {
       this.config.options.useWindowsIntegratedAuth = true;
     }
