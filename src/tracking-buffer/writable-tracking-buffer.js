@@ -118,7 +118,6 @@ module.exports = class WritableTrackingBuffer {
     const length = 4;
     this.makeRoomFor(length);
     this.buffer.writeUInt32LE(value, this.position);
-    console.log(this.buffer);
     return this.position += length;
   }
 

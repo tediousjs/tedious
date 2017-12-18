@@ -525,7 +525,6 @@ class Connection extends EventEmitter {
         this.fedAuthInfo.responsePending = true;
         var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
         context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
-          console.log('in auth context call back');
           if (err) {
             this.fedAuthInfo.responsePending = false;
             // TODO: add error

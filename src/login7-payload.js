@@ -112,8 +112,10 @@ module.exports = class Login7Payload {
     this.loginData = loginData;
     const lengthLength = 4;
 
+
+    this.fedAuthPreloginRequired = (this.loginData.fedAuthInfo && this.loginData.fedAuthInfo.requiredPreLoginResponse);
     this.featureExt = undefined;
-    if (this.loginData.fedAuthInfo.requiredPreLoginResponse) {
+    if (this.fedAuthPreloginRequired) {
       this.featureExt = this.createFeatureExt();
     }
     const fixed = this.createFixedData();
@@ -129,7 +131,7 @@ module.exports = class Login7Payload {
   }
 
   createFixedData() {
-    const extUsed = (this.loginData.fedAuthInfo.requiredPreLoginResponse);
+    const extUsed = this.fedAuthPreloginRequired;
     this.tdsVersion = versions[this.loginData.tdsVersion];
     this.packetSize = this.loginData.packetSize;
     this.clientProgVer = 0;
@@ -144,7 +146,7 @@ module.exports = class Login7Payload {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.loginData.domain && !this.loginData.fedAuthInfo.requiredPreLoginResponse) {
+    if (this.loginData.domain && !this.fedAuthPreloginRequired) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
@@ -198,11 +200,11 @@ module.exports = class Login7Payload {
     this.attachDbFile = '';
     this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
-    this.addVariableDataString(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? '' : this.loginData.userName);
-    this.addVariableDataBuffer(variableData, (this.loginData.domain || this.loginData.fedAuthInfo.fedAuthInfoRequested) ? Buffer.alloc(0) : this.createPasswordBuffer());
+    this.addVariableDataString(variableData, (this.loginData.domain || this.fedAuthPreloginRequired) ? '' : this.loginData.userName);
+    this.addVariableDataBuffer(variableData, (this.loginData.domain || this.fedAuthPreloginRequired) ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
-    if (this.loginData.fedAuthInfo.fedAuthInfoRequested) {
+    if (this.fedAuthPreloginRequired) {
       this.addVariableDataInt(variableData, '');
     } else {
       this.addVariableDataString(variableData, '');
@@ -213,7 +215,7 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    if (this.loginData.domain && !this.loginData.fedAuthInfo.requiredPreLoginResponse) {
+    if (this.loginData.domain && !this.fedAuthPreloginRequired) {
       if (this.loginData.sspiBlob) {
         this.ntlmPacket = this.loginData.sspiBlob;
       } else {
@@ -235,7 +237,7 @@ module.exports = class Login7Payload {
       variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
     }
 
-    if (this.loginData.fedAuthInfo.method != undefined) {
+    if (this.fedAuthPreloginRequired) {
       variableData.data.writeUInt32LEposition(variableData.offset, this.tempHolder);
       return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data, this.featureExt ]);
     }
@@ -246,7 +248,7 @@ module.exports = class Login7Payload {
   createFeatureExt() {
     const buffer = new WritableTrackingBuffer(100);
     if ((this.loginData.fedAuthInfo.method.toUpperCase() === this.loginData.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) &&
-    this.loginData.fedAuthInfo.requiredPreLoginResponse) {
+    this.fedAuthPreloginRequired) {
       this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
       this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
       this.CreateFedAuthExtData(buffer, this.loginData.fedAuthInfo);
