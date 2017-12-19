@@ -1003,7 +1003,8 @@ class Connection extends EventEmitter {
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data.data);
 
     const boundTransitionTo = this.transitionTo.bind(this);
-    process.nextTick(boundTransitionTo, this.STATE.SENT_FEDAUTH_TOKEN);
+    // sent the fedAuth token message, the rest is similar to standard login 7
+    process.nextTick(boundTransitionTo, this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
@@ -1697,32 +1698,6 @@ Connection.prototype.STATE = {
         } else {
           return this.processLogin7FedAuthResponse();
         }
-      }
-    }
-  },
-  SENT_FEDAUTH_TOKEN: {
-    name: 'SentFedAuthToken',
-    events: {
-      socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
-      },
-      loggedIn: function() {
-        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
-      },
-      routingChange: function() {
-        return this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        return this.processLogin7Response();
       }
     }
   },
