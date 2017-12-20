@@ -108,3 +108,32 @@ title: Getting started
     <code>examples/minimal.js</code>
   </a>.
 </p>
+
+<br/>
+
+<h3>Azure Data Warehouse Connection</h3>
+<p>
+  Connection to Data Warehouse requiers additional
+  <a href="api-connection.html#function_newConnection">
+    <code>config</code> 
+  </a> options,
+</p>
+{% highlight javascript %}
+var ISOLATION_LEVEL = require('tedious').ISOLATION_LEVEL;
+var Connection = require('tedious').Connection;
+
+  var config = {
+    userName: 'test',
+    password: 'test',
+    server: '192.168.1.210',
+    
+    // If you're on Azure Data Warehouse, you will need this:
+    options: {
+      encrypt: true,
+      enableArithAbort: true,
+      connectionIsolationLevel: ISOLATION_LEVEL.READ_UNCOMMITTED
+    }
+  };
+
+  var connection = new Connection(config);
+{% endhighlight %}
