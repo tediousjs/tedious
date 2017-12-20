@@ -51,7 +51,7 @@ connection.execBulkLoad(bulkLoad);
       </dt>
       <dd>
         <p>
-          Honors constraints during bulk load. (default: <code>false</code>)
+          Honors constraints during bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx">CHECK_CONSTRAINTS</a>. (default: <code>false</code>)
         </p>
       </dd>
 
@@ -59,21 +59,21 @@ connection.execBulkLoad(bulkLoad);
         <code>fireTriggers</code>
       </dt>
       <dd>
-        Honors insert triggers during bulk load. (default: <code>false</code>)
+        Honors insert triggers during bulk load, using the T-SQL <a href="https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx">FIRE_TRIGGERS</a>. (default: <code>false</code>)
       </dd>
 
       <dt>
         <code>keepNulls</code>
       </dt>
       <dd>
-        Honors null value passed, ignores the default values set on table. (default: <code>false</code>)
+        Honors null value passed, ignores the default values set on table, using T-SQL <a href="https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx">KEEP_NULLS</a>. (default: <code>false</code>)
       </dd>
 
       <dt>
         <code>tableLock</code>
       </dt>
       <dd>
-        Places a bulk update(BU) lock on table while performing bulk load. (default: <code>false</code>)
+        Places a bulk update(BU) lock on table while performing bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx">TABLOCK</a>. (default: <code>false</code>)
       </dd>
       </dl>
   </div>
