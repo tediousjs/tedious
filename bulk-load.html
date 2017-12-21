@@ -21,8 +21,12 @@ title: API - BulkLoad
 
 <h2 id="usage">Usage</h2>
 {% highlight javascript %}
-// instantiate - provide the table where you'll be inserting to, and a callback
-var bulkLoad = connection.newBulkLoad('MyTable', function (error, rowCount) {
+
+// optional BulkLoad options
+var options = { keepNulls: true };
+
+// instantiate - provide the table where you'll be inserting to, options and a callback
+var bulkLoad = connection.newBulkLoad('MyTable', options, function (error, rowCount) {
   console.log('inserted %d rows', rowCount);
 });
 
@@ -37,6 +41,43 @@ bulkLoad.addRow({ myInt: 23, myString: 'world' });
 // execute
 connection.execBulkLoad(bulkLoad);
 {% endhighlight %}
+
+<div class="argument">
+  <div class="name">options</div>
+  <div class="description">
+    <dl>
+      <dt>
+        <code>checkConstraints</code>
+      </dt>
+      <dd>
+        <p>
+          Honors constraints during bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx">CHECK_CONSTRAINTS</a>. (default: <code>false</code>)
+        </p>
+      </dd>
+
+      <dt>
+        <code>fireTriggers</code>
+      </dt>
+      <dd>
+        Honors insert triggers during bulk load, using the T-SQL <a href="https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx">FIRE_TRIGGERS</a>. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>keepNulls</code>
+      </dt>
+      <dd>
+        Honors null value passed, ignores the default values set on table, using T-SQL <a href="https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx">KEEP_NULLS</a>. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>tableLock</code>
+      </dt>
+      <dd>
+        Places a bulk update(BU) lock on table while performing bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx">TABLOCK</a>. (default: <code>false</code>)
+      </dd>
+      </dl>
+  </div>
+</div>
 
 <h2 id="function_addColumn">bulkLoad.addColumn(name, type, options)</h2>
 <p>
