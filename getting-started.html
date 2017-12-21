@@ -113,11 +113,12 @@ title: Getting started
 
 <h3>Azure Data Warehouse Connection</h3>
 <p>
-  Connection to Data Warehouse requiers additional
+  Connecting to Azure Data Warehouse requires specifying additional
   <a href="api-connection.html#function_newConnection">
     <code>config</code> 
-  </a> options,
+  </a> options:
 </p>
+
 {% highlight javascript %}
 var ISOLATION_LEVEL = require('tedious').ISOLATION_LEVEL;
 var Connection = require('tedious').Connection;
