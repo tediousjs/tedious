@@ -23,7 +23,7 @@ const TinyInt = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.IntN.id);
+    buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(1);
   },
 
@@ -60,7 +60,7 @@ const Bit = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.BitN.id);
+    buffer.writeUInt8(BitN.id);
     buffer.writeUInt8(1);
   },
 
@@ -94,7 +94,7 @@ const SmallInt = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.IntN.id);
+    buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(2);
   },
 
@@ -131,7 +131,7 @@ const Int = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.IntN.id);
+    buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(4);
   },
 
@@ -168,7 +168,7 @@ const SmallDateTime = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.DateTimeN.id);
+    buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(4);
   },
 
@@ -219,7 +219,7 @@ const Real = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.FloatN.id);
+    buffer.writeUInt8(FloatN.id);
     buffer.writeUInt8(4);
   },
 
@@ -253,7 +253,7 @@ const Money = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.MoneyN.id);
+    buffer.writeUInt8(MoneyN.id);
     buffer.writeUInt8(8);
   },
 
@@ -287,7 +287,7 @@ const DateTime = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.DateTimeN.id);
+    buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(8);
   },
 
@@ -344,7 +344,7 @@ const Float = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.FloatN.id);
+    buffer.writeUInt8(FloatN.id);
     buffer.writeUInt8(8);
   },
 
@@ -398,7 +398,7 @@ const Decimal = {
   },
 
   writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(typeByName.DecimalN.id);
+    buffer.writeUInt8(DecimalN.id);
     if (parameter.precision <= 9) {
       buffer.writeUInt8(5);
     } else if (parameter.precision <= 19) {
@@ -482,7 +482,7 @@ const Numeric = {
   },
 
   writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(typeByName.NumericN.id);
+    buffer.writeUInt8(NumericN.id);
     if (parameter.precision <= 9) {
       buffer.writeUInt8(5);
     } else if (parameter.precision <= 19) {
@@ -546,7 +546,7 @@ const SmallMoney = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.MoneyN.id);
+    buffer.writeUInt8(MoneyN.id);
     buffer.writeUInt8(4);
   },
 
@@ -583,7 +583,7 @@ const BigInt = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.IntN.id);
+    buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(8);
   },
 
@@ -682,7 +682,7 @@ const Text = {
   },
 
   writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(typeByName.Text.id);
+    buffer.writeUInt8(Text.id);
     buffer.writeInt32LE(parameter.length);
   },
 
@@ -725,7 +725,7 @@ const UniqueIdentifierN = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(typeByName.UniqueIdentifierN.id);
+    buffer.writeUInt8(UniqueIdentifierN.id);
     buffer.writeUInt8(0x10);
   },
 
