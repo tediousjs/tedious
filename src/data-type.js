@@ -10,11 +10,13 @@ const MAX = (1 << 16) - 1;
 const typeByName = module.exports.typeByName = {};
 
 const Null = {
+  id: 0x1F,
   type: 'NULL',
   name: 'Null'
 };
 
 const TinyInt = {
+  id: 0x30,
   type: 'INT1',
   name: 'TinyInt',
 
@@ -52,6 +54,7 @@ const TinyInt = {
 };
 
 const Bit = {
+  id: 0x32,
   type: 'BIT',
   name: 'Bit',
 
@@ -86,6 +89,7 @@ const Bit = {
 };
 
 const SmallInt = {
+  id: 0x34,
   type: 'INT2',
   name: 'SmallInt',
 
@@ -123,6 +127,7 @@ const SmallInt = {
 };
 
 const Int = {
+  id: 0x38,
   type: 'INT4',
   name: 'Int',
 
@@ -160,6 +165,7 @@ const Int = {
 };
 
 const SmallDateTime = {
+  id: 0x3A,
   type: 'DATETIM4',
   name: 'SmallDateTime',
 
@@ -211,6 +217,7 @@ const SmallDateTime = {
 };
 
 const Real = {
+  id: 0x3B,
   type: 'FLT4',
   name: 'Real',
 
@@ -245,6 +252,7 @@ const Real = {
 };
 
 const Money = {
+  id: 0x3C,
   type: 'MONEY',
   name: 'Money',
 
@@ -279,6 +287,7 @@ const Money = {
 };
 
 const DateTime = {
+  id: 0x3D,
   type: 'DATETIME',
   name: 'DateTime',
 
@@ -336,6 +345,7 @@ const DateTime = {
 };
 
 const Float = {
+  id: 0x3E,
   type: 'FLT8',
   name: 'Float',
 
@@ -370,6 +380,7 @@ const Float = {
 };
 
 const Decimal = {
+  id: 0x37,
   type: 'DECIMAL',
   name: 'Decimal',
   hasPrecision: true,
@@ -454,6 +465,7 @@ const Decimal = {
 };
 
 const Numeric = {
+  id: 0x3F,
   type: 'NUMERIC',
   name: 'Numeric',
   hasPrecision: true,
@@ -538,6 +550,7 @@ const Numeric = {
 };
 
 const SmallMoney = {
+  id: 0x7A,
   type: 'MONEY4',
   name: 'SmallMoney',
 
@@ -575,6 +588,7 @@ const SmallMoney = {
 };
 
 const BigInt = {
+  id: 0x7F,
   type: 'INT8',
   name: 'BigInt',
 
@@ -618,6 +632,7 @@ const BigInt = {
 };
 
 const Image = {
+  id: 0x22,
   type: 'IMAGE',
   name: 'Image',
   hasTableName: true,
@@ -662,6 +677,7 @@ const Image = {
 };
 
 const Text = {
+  id: 0x23,
   type: 'TEXT',
   name: 'Text',
   hasCollation: true,
@@ -711,6 +727,7 @@ const Text = {
 };
 
 const UniqueIdentifierN = {
+  id: 0x24,
   type: 'GUIDN',
   name: 'UniqueIdentifierN',
   aliases: ['UniqueIdentifier'],
@@ -753,12 +770,14 @@ const UniqueIdentifierN = {
 };
 
 const IntN = {
+  id: 0x26,
   type: 'INTN',
   name: 'IntN',
   dataLengthLength: 1
 };
 
 const NText = {
+  id: 0x63,
   type: 'NTEXT',
   name: 'NText',
   hasCollation: true,
@@ -768,12 +787,14 @@ const NText = {
 };
 
 const BitN = {
+  id: 0x68,
   type: 'BITN',
   name: 'BitN',
   dataLengthLength: 1
 };
 
 const DecimalN = {
+  id: 0x6A,
   type: 'DECIMALN',
   name: 'DecimalN',
   dataLengthLength: 1,
@@ -782,6 +803,7 @@ const DecimalN = {
 };
 
 const NumericN = {
+  id: 0x6C,
   type: 'NUMERICN',
   name: 'NumericN',
   dataLengthLength: 1,
@@ -790,24 +812,28 @@ const NumericN = {
 };
 
 const FloatN = {
+  id: 0x6D,
   type: 'FLTN',
   name: 'FloatN',
   dataLengthLength: 1
 };
 
 const MoneyN = {
+  id: 0x6E,
   type: 'MONEYN',
   name: 'MoneyN',
   dataLengthLength: 1
 };
 
 const DateTimeN = {
+  id: 0x6F,
   type: 'DATETIMN',
   name: 'DateTimeN',
   dataLengthLength: 1
 };
 
 const VarBinary = {
+  id: 0xA5,
   type: 'BIGVARBIN',
   name: 'VarBinary',
   dataLengthLength: 2,
@@ -880,6 +906,7 @@ const VarBinary = {
 };
 
 const VarChar = {
+  id: 0xA7,
   type: 'BIGVARCHR',
   name: 'VarChar',
   hasCollation: true,
@@ -961,6 +988,7 @@ const VarChar = {
 };
 
 const Binary = {
+  id: 0xAD,
   type: 'BIGBinary',
   name: 'Binary',
   dataLengthLength: 2,
@@ -1014,6 +1042,7 @@ const Binary = {
 };
 
 const Char = {
+  id: 0xAF,
   type: 'BIGCHAR',
   name: 'Char',
   hasCollation: true,
@@ -1082,6 +1111,7 @@ const Char = {
 };
 
 const NVarChar = {
+  id: 0xE7,
   type: 'NVARCHAR',
   name: 'NVarChar',
   hasCollation: true,
@@ -1163,6 +1193,7 @@ const NVarChar = {
 };
 
 const NChar = {
+  id: 0xEF,
   type: 'NCHAR',
   name: 'NChar',
   hasCollation: true,
@@ -1231,12 +1262,14 @@ const NChar = {
 };
 
 const Xml = {
+  id: 0xF1,
   type: 'XML',
   name: 'Xml',
   hasSchemaPresent: true
 };
 
 const TimeN = {
+  id: 0x29,
   type: 'TIMEN',
   name: 'TimeN',
   aliases: ['Time'],
@@ -1330,6 +1363,7 @@ const TimeN = {
 };
 
 const DateN = {
+  id: 0x28,
   type: 'DATEN',
   name: 'DateN',
   aliases: ['Date'],
@@ -1373,6 +1407,7 @@ const DateN = {
 };
 
 const DateTime2N = {
+  id: 0x2A,
   type: 'DATETIME2N',
   name: 'DateTime2N',
   aliases: ['DateTime2'],
@@ -1473,6 +1508,7 @@ const DateTime2N = {
 };
 
 const DateTimeOffsetN = {
+  id: 0x2B,
   type: 'DATETIMEOFFSETN',
   name: 'DateTimeOffsetN',
   aliases: ['DateTimeOffset'],
@@ -1560,12 +1596,14 @@ const DateTimeOffsetN = {
 };
 
 const UDT = {
+  id: 0xF0,
   type: 'UDTTYPE',
   name: 'UDT',
   hasUDTInfo: true
 };
 
 const TVP = {
+  id: 0xF3,
   type: 'TVPTYPE',
   name: 'TVP',
 
@@ -1644,6 +1682,7 @@ const TVP = {
 };
 
 const Variant = {
+  id: 0x62,
   type: 'SSVARIANTTYPE',
   name: 'Variant',
   dataLengthLength: 4,
@@ -1654,45 +1693,45 @@ const Variant = {
 };
 
 const TYPE = module.exports.TYPE = {
-  [0x1F]: Null,
-  [0x30]: TinyInt,
-  [0x32]: Bit,
-  [0x34]: SmallInt,
-  [0x38]: Int,
-  [0x3A]: SmallDateTime,
-  [0x3B]: Real,
-  [0x3C]: Money,
-  [0x3D]: DateTime,
-  [0x3E]: Float,
-  [0x37]: Decimal,
-  [0x3F]: Numeric,
-  [0x7A]: SmallMoney,
-  [0x7F]: BigInt,
-  [0x22]: Image,
-  [0x23]: Text,
-  [0x24]: UniqueIdentifierN,
-  [0x26]: IntN,
-  [0x63]: NText,
-  [0x68]: BitN,
-  [0x6A]: DecimalN,
-  [0x6C]: NumericN,
-  [0x6D]: FloatN,
-  [0x6E]: MoneyN,
-  [0x6F]: DateTimeN,
-  [0xA5]: VarBinary,
-  [0xA7]: VarChar,
-  [0xAD]: Binary,
-  [0xAF]: Char,
-  [0xE7]: NVarChar,
-  [0xEF]: NChar,
-  [0xF1]: Xml,
-  [0x29]: TimeN,
-  [0x28]: DateN,
-  [0x2A]: DateTime2N,
-  [0x2B]: DateTimeOffsetN,
-  [0xF0]: UDT,
-  [0xF3]: TVP,
-  [0x62]: Variant
+  [Null.id]: Null,
+  [TinyInt.id]: TinyInt,
+  [Bit.id]: Bit,
+  [SmallInt.id]: SmallInt,
+  [Int.id]: Int,
+  [SmallDateTime.id]: SmallDateTime,
+  [Real.id]: Real,
+  [Money.id]: Money,
+  [DateTime.id]: DateTime,
+  [Float.id]: Float,
+  [Decimal.id]: Decimal,
+  [Numeric.id]: Numeric,
+  [SmallMoney.id]: SmallMoney,
+  [BigInt.id]: BigInt,
+  [Image.id]: Image,
+  [Text.id]: Text,
+  [UniqueIdentifierN.id]: UniqueIdentifierN,
+  [IntN.id]: IntN,
+  [NText.id]: NText,
+  [BitN.id]: BitN,
+  [DecimalN.id]: DecimalN,
+  [NumericN.id]: NumericN,
+  [FloatN.id]: FloatN,
+  [MoneyN.id]: MoneyN,
+  [DateTimeN.id]: DateTimeN,
+  [VarBinary.id]: VarBinary,
+  [VarChar.id]: VarChar,
+  [Binary.id]: Binary,
+  [Char.id]: Char,
+  [NVarChar.id]: NVarChar,
+  [NChar.id]: NChar,
+  [Xml.id]: Xml,
+  [TimeN.id]: TimeN,
+  [DateN.id]: DateN,
+  [DateTime2N.id]: DateTime2N,
+  [DateTimeOffsetN.id]: DateTimeOffsetN,
+  [UDT.id]: UDT,
+  [TVP.id]: TVP,
+  [Variant.id]: Variant
 };
 
 /*
@@ -1706,7 +1745,6 @@ const TYPE = module.exports.TYPE = {
 
 for (const id in TYPE) {
   const type = TYPE[id];
-  type.id = parseInt(id, 10);
   typeByName[type.name] = type;
   if ((type.aliases != null) && type.aliases instanceof Array) {
     const ref = type.aliases;
