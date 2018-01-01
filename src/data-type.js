@@ -10,12 +10,12 @@ const MAX = (1 << 16) - 1;
 const typeByName = module.exports.typeByName = {};
 
 const TYPE = module.exports.TYPE = {
-  0x1F: {
+  [0x1F]: {
     type: 'NULL',
     name: 'Null'
   },
 
-  0x30: {
+  [0x30]: {
     type: 'INT1',
     name: 'TinyInt',
 
@@ -52,7 +52,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x32: {
+  [0x32]: {
     type: 'BIT',
     name: 'Bit',
 
@@ -86,7 +86,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x34: {
+  [0x34]: {
     type: 'INT2',
     name: 'SmallInt',
 
@@ -123,7 +123,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x38: {
+  [0x38]: {
     type: 'INT4',
     name: 'Int',
 
@@ -160,7 +160,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3A: {
+  [0x3A]: {
     type: 'DATETIM4',
     name: 'SmallDateTime',
 
@@ -211,7 +211,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3B: {
+  [0x3B]: {
     type: 'FLT4',
     name: 'Real',
 
@@ -245,7 +245,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3C: {
+  [0x3C]: {
     type: 'MONEY',
     name: 'Money',
 
@@ -279,7 +279,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3D: {
+  [0x3D]: {
     type: 'DATETIME',
     name: 'DateTime',
 
@@ -336,7 +336,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3E: {
+  [0x3E]: {
     type: 'FLT8',
     name: 'Float',
 
@@ -370,7 +370,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x37: {
+  [0x37]: {
     type: 'DECIMAL',
     name: 'Decimal',
     hasPrecision: true,
@@ -454,7 +454,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x3F: {
+  [0x3F]: {
     type: 'NUMERIC',
     name: 'Numeric',
     hasPrecision: true,
@@ -538,7 +538,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x7A: {
+  [0x7A]: {
     type: 'MONEY4',
     name: 'SmallMoney',
 
@@ -575,7 +575,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x7F: {
+  [0x7F]: {
     type: 'INT8',
     name: 'BigInt',
 
@@ -618,7 +618,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x22: {
+  [0x22]: {
     type: 'IMAGE',
     name: 'Image',
     hasTableName: true,
@@ -662,7 +662,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x23: {
+  [0x23]: {
     type: 'TEXT',
     name: 'Text',
     hasCollation: true,
@@ -711,7 +711,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x24: {
+  [0x24]: {
     type: 'GUIDN',
     name: 'UniqueIdentifierN',
     aliases: ['UniqueIdentifier'],
@@ -753,13 +753,13 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x26: {
+  [0x26]: {
     type: 'INTN',
     name: 'IntN',
     dataLengthLength: 1
   },
 
-  0x63: {
+  [0x63]: {
     type: 'NTEXT',
     name: 'NText',
     hasCollation: true,
@@ -768,12 +768,12 @@ const TYPE = module.exports.TYPE = {
     dataLengthLength: 4
   },
 
-  0x68: {
+  [0x68]: {
     type: 'BITN',
     name: 'BitN',
     dataLengthLength: 1
   },
-  0x6A: {
+  [0x6A]: {
     type: 'DECIMALN',
     name: 'DecimalN',
     dataLengthLength: 1,
@@ -781,7 +781,7 @@ const TYPE = module.exports.TYPE = {
     hasScale: true
   },
 
-  0x6C: {
+  [0x6C]: {
     type: 'NUMERICN',
     name: 'NumericN',
     dataLengthLength: 1,
@@ -789,25 +789,25 @@ const TYPE = module.exports.TYPE = {
     hasScale: true
   },
 
-  0x6D: {
+  [0x6D]: {
     type: 'FLTN',
     name: 'FloatN',
     dataLengthLength: 1
   },
 
-  0x6E: {
+  [0x6E]: {
     type: 'MONEYN',
     name: 'MoneyN',
     dataLengthLength: 1
   },
 
-  0x6F: {
+  [0x6F]: {
     type: 'DATETIMN',
     name: 'DateTimeN',
     dataLengthLength: 1
   },
 
-  0xA5: {
+  [0xA5]: {
     type: 'BIGVARBIN',
     name: 'VarBinary',
     dataLengthLength: 2,
@@ -879,7 +879,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xA7: {
+  [0xA7]: {
     type: 'BIGVARCHR',
     name: 'VarChar',
     hasCollation: true,
@@ -960,7 +960,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xAD: {
+  [0xAD]: {
     type: 'BIGBinary',
     name: 'Binary',
     dataLengthLength: 2,
@@ -1013,7 +1013,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xAF: {
+  [0xAF]: {
     type: 'BIGCHAR',
     name: 'Char',
     hasCollation: true,
@@ -1081,7 +1081,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xE7: {
+  [0xE7]: {
     type: 'NVARCHAR',
     name: 'NVarChar',
     hasCollation: true,
@@ -1162,7 +1162,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xEF: {
+  [0xEF]: {
     type: 'NCHAR',
     name: 'NChar',
     hasCollation: true,
@@ -1230,13 +1230,13 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xF1: {
+  [0xF1]: {
     type: 'XML',
     name: 'Xml',
     hasSchemaPresent: true
   },
 
-  0x29: {
+  [0x29]: {
     type: 'TIMEN',
     name: 'TimeN',
     aliases: ['Time'],
@@ -1329,7 +1329,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x28: {
+  [0x28]: {
     type: 'DATEN',
     name: 'DateN',
     aliases: ['Date'],
@@ -1372,7 +1372,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x2A: {
+  [0x2A]: {
     type: 'DATETIME2N',
     name: 'DateTime2N',
     aliases: ['DateTime2'],
@@ -1472,7 +1472,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x2B: {
+  [0x2B]: {
     type: 'DATETIMEOFFSETN',
     name: 'DateTimeOffsetN',
     aliases: ['DateTimeOffset'],
@@ -1559,13 +1559,13 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0xF0: {
+  [0xF0]: {
     type: 'UDTTYPE',
     name: 'UDT',
     hasUDTInfo: true
   },
 
-  0xF3: {
+  [0xF3]: {
     type: 'TVPTYPE',
     name: 'TVP',
 
@@ -1643,7 +1643,7 @@ const TYPE = module.exports.TYPE = {
     }
   },
 
-  0x62: {
+  [0x62]: {
     type: 'SSVARIANTTYPE',
     name: 'Variant',
     dataLengthLength: 4,
