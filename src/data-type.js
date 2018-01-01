@@ -15,6 +15,8 @@ const Null = {
   name: 'Null'
 };
 
+typeByName.Null = Null;
+
 const TinyInt = {
   id: 0x30,
   type: 'INT1',
@@ -53,6 +55,8 @@ const TinyInt = {
   }
 };
 
+typeByName.TinyInt = TinyInt;
+
 const Bit = {
   id: 0x32,
   type: 'BIT',
@@ -87,6 +91,8 @@ const Bit = {
     }
   }
 };
+
+typeByName.Bit = Bit;
 
 const SmallInt = {
   id: 0x34,
@@ -126,6 +132,8 @@ const SmallInt = {
   }
 };
 
+typeByName.SmallInt = SmallInt;
+
 const Int = {
   id: 0x38,
   type: 'INT4',
@@ -163,6 +171,8 @@ const Int = {
     return value;
   }
 };
+
+typeByName.Int = Int;
 
 const SmallDateTime = {
   id: 0x3A,
@@ -216,6 +226,8 @@ const SmallDateTime = {
   }
 };
 
+typeByName.SmallDateTime = SmallDateTime;
+
 const Real = {
   id: 0x3B,
   type: 'FLT4',
@@ -251,6 +263,8 @@ const Real = {
   }
 };
 
+typeByName.Real = Real;
+
 const Money = {
   id: 0x3C,
   type: 'MONEY',
@@ -285,6 +299,8 @@ const Money = {
     return value;
   }
 };
+
+typeByName.Money = Money;
 
 const DateTime = {
   id: 0x3D,
@@ -344,6 +360,8 @@ const DateTime = {
   }
 };
 
+typeByName.DateTime = DateTime;
+
 const Float = {
   id: 0x3E,
   type: 'FLT8',
@@ -378,6 +396,8 @@ const Float = {
     return value;
   }
 };
+
+typeByName.Float = Float;
 
 const Decimal = {
   id: 0x37,
@@ -464,6 +484,8 @@ const Decimal = {
   }
 };
 
+typeByName.Decimal = Decimal;
+
 const Numeric = {
   id: 0x3F,
   type: 'NUMERIC',
@@ -549,6 +571,8 @@ const Numeric = {
   }
 };
 
+typeByName.Numeric = Numeric;
+
 const SmallMoney = {
   id: 0x7A,
   type: 'MONEY4',
@@ -586,6 +610,8 @@ const SmallMoney = {
     return value;
   }
 };
+
+typeByName.SmallMoney = SmallMoney;
 
 const BigInt = {
   id: 0x7F,
@@ -631,6 +657,8 @@ const BigInt = {
   }
 };
 
+typeByName.BigInt = BigInt;
+
 const Image = {
   id: 0x22,
   type: 'IMAGE',
@@ -675,6 +703,8 @@ const Image = {
     return value;
   }
 };
+
+typeByName.Image = Image;
 
 const Text = {
   id: 0x23,
@@ -726,6 +756,8 @@ const Text = {
   }
 };
 
+typeByName.Text = Text;
+
 const UniqueIdentifierN = {
   id: 0x24,
   type: 'GUIDN',
@@ -769,12 +801,16 @@ const UniqueIdentifierN = {
   }
 };
 
+typeByName.UniqueIdentifierN = typeByName.UniqueIdentifier = UniqueIdentifierN;
+
 const IntN = {
   id: 0x26,
   type: 'INTN',
   name: 'IntN',
   dataLengthLength: 1
 };
+
+typeByName.IntN = IntN;
 
 const NText = {
   id: 0x63,
@@ -786,12 +822,16 @@ const NText = {
   dataLengthLength: 4
 };
 
+typeByName.NText = NText;
+
 const BitN = {
   id: 0x68,
   type: 'BITN',
   name: 'BitN',
   dataLengthLength: 1
 };
+
+typeByName.BitN = BitN;
 
 const DecimalN = {
   id: 0x6A,
@@ -802,6 +842,8 @@ const DecimalN = {
   hasScale: true
 };
 
+typeByName.DecimalN = DecimalN;
+
 const NumericN = {
   id: 0x6C,
   type: 'NUMERICN',
@@ -811,12 +853,16 @@ const NumericN = {
   hasScale: true
 };
 
+typeByName.NumericN = NumericN;
+
 const FloatN = {
   id: 0x6D,
   type: 'FLTN',
   name: 'FloatN',
   dataLengthLength: 1
 };
+
+typeByName.FloatN = FloatN;
 
 const MoneyN = {
   id: 0x6E,
@@ -825,12 +871,16 @@ const MoneyN = {
   dataLengthLength: 1
 };
 
+typeByName.MoneyN = MoneyN;
+
 const DateTimeN = {
   id: 0x6F,
   type: 'DATETIMN',
   name: 'DateTimeN',
   dataLengthLength: 1
 };
+
+typeByName.DateTimeN = DateTimeN;
 
 const VarBinary = {
   id: 0xA5,
@@ -904,6 +954,8 @@ const VarBinary = {
     return value;
   }
 };
+
+typeByName.VarBinary = VarBinary;
 
 const VarChar = {
   id: 0xA7,
@@ -987,6 +1039,8 @@ const VarChar = {
   }
 };
 
+typeByName.VarChar = VarChar;
+
 const Binary = {
   id: 0xAD,
   type: 'BIGBinary',
@@ -1040,6 +1094,8 @@ const Binary = {
     return value;
   }
 };
+
+typeByName.Binary = Binary;
 
 const Char = {
   id: 0xAF,
@@ -1109,6 +1165,8 @@ const Char = {
     return value;
   }
 };
+
+typeByName.Char = Char;
 
 const NVarChar = {
   id: 0xE7,
@@ -1192,6 +1250,8 @@ const NVarChar = {
   }
 };
 
+typeByName.NVarChar = NVarChar;
+
 const NChar = {
   id: 0xEF,
   type: 'NCHAR',
@@ -1261,12 +1321,16 @@ const NChar = {
   }
 };
 
+typeByName.NChar = NChar;
+
 const Xml = {
   id: 0xF1,
   type: 'XML',
   name: 'Xml',
   hasSchemaPresent: true
 };
+
+typeByName.Xml = Xml;
 
 const TimeN = {
   id: 0x29,
@@ -1362,6 +1426,8 @@ const TimeN = {
   }
 };
 
+typeByName.TimeN = typeByName.Time = TimeN;
+
 const DateN = {
   id: 0x28,
   type: 'DATEN',
@@ -1405,6 +1471,8 @@ const DateN = {
     return value;
   }
 };
+
+typeByName.DateN = typeByName.Date = DateN;
 
 const DateTime2N = {
   id: 0x2A,
@@ -1507,6 +1575,8 @@ const DateTime2N = {
   }
 };
 
+typeByName.DateTime2N = typeByName.DateTime2 = DateTime2N;
+
 const DateTimeOffsetN = {
   id: 0x2B,
   type: 'DATETIMEOFFSETN',
@@ -1595,12 +1665,16 @@ const DateTimeOffsetN = {
   }
 };
 
+typeByName.DateTimeOffsetN = typeByName.DateTimeOffset = DateTimeOffsetN;
+
 const UDT = {
   id: 0xF0,
   type: 'UDTTYPE',
   name: 'UDT',
   hasUDTInfo: true
 };
+
+typeByName.UDT = UDT;
 
 const TVP = {
   id: 0xF3,
@@ -1681,6 +1755,8 @@ const TVP = {
   }
 };
 
+typeByName.TVP = TVP;
+
 const Variant = {
   id: 0x62,
   type: 'SSVARIANTTYPE',
@@ -1692,7 +1768,9 @@ const Variant = {
   }
 };
 
-const TYPE = module.exports.TYPE = {
+typeByName.Variant = Variant;
+
+module.exports.TYPE = {
   [Null.id]: Null,
   [TinyInt.id]: TinyInt,
   [Bit.id]: Bit,
@@ -1742,19 +1820,3 @@ const TYPE = module.exports.TYPE = {
 
   SSVARIANTTYPE:        0x62  # Sql_Variant (introduced in TDS 7.2)
  */
-
-for (const id in TYPE) {
-  const type = TYPE[id];
-  typeByName[type.name] = type;
-  if ((type.aliases != null) && type.aliases instanceof Array) {
-    const ref = type.aliases;
-    const len = ref.length;
-
-    for (let i = 0; i < len; i++) {
-      const alias = ref[i];
-      if (!typeByName[alias]) {
-        typeByName[alias] = type;
-      }
-    }
-  }
-}
