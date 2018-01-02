@@ -129,6 +129,11 @@ module.exports = class BulkLoad extends EventEmitter {
     const arr = row instanceof Array;
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
+
+      if (c.type.writeParameterData === undefined) {
+        throw new TypeError(`The ${c.type.name} type cannot be used as a bulk load column type.`);
+      }
+
       c.type.writeParameterData(this.rowsData, {
         length: c.length,
         scale: c.scale,
@@ -171,6 +176,10 @@ module.exports = class BulkLoad extends EventEmitter {
       if (i !== 0) {
         sql += ', ';
       }
+
+      if (c.type.declaration === undefined) {
+        throw new TypeError(`The ${c.type.name} type cannot be used as a bulk load column type.`);
+      }
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
     }
     sql += ')';
@@ -186,7 +195,12 @@ module.exports = class BulkLoad extends EventEmitter {
       if (i !== 0) {
         sql += ',\n';
       }
+
+      if (c.type.declaration === undefined) {
+        throw new TypeError(`The ${c.type.name} type cannot be used as a bulk load column type.`);
+      }
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
+
       if (c.nullable !== undefined) {
         sql += ' ' + (c.nullable ? 'NULL' : 'NOT NULL');
       }
@@ -253,6 +267,9 @@ module.exports = class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
+      if (c.type.writeTypeInfo === undefined) {
+        throw new TypeError(`The ${c.type.name} type cannot be used as a bulk load column type.`);
+      }
       c.type.writeTypeInfo(tBuf, c, this.options);
 
       // ColName
