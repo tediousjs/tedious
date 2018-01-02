@@ -1,3 +1,7 @@
+// @flow
+
+import type WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+
 const guidParser = require('./guid-parser');
 
 const NULL = (1 << 16) - 1;
@@ -22,16 +26,16 @@ const TinyInt = {
   type: 'INT1',
   name: 'TinyInt',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'tinyint';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(1);
       buffer.writeUInt8(parseInt(parameter.value));
@@ -40,7 +44,7 @@ const TinyInt = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -62,16 +66,16 @@ const Bit = {
   type: 'BIT',
   name: 'Bit',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'bit';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(BitN.id);
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
       buffer.writeUInt8(0);
     } else {
@@ -80,7 +84,7 @@ const Bit = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -99,16 +103,16 @@ const SmallInt = {
   type: 'INT2',
   name: 'SmallInt',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'smallint';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(2);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(2);
       buffer.writeInt16LE(parseInt(parameter.value));
@@ -117,7 +121,7 @@ const SmallInt = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -139,16 +143,16 @@ const Int = {
   type: 'INT4',
   name: 'Int',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'int';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(4);
       buffer.writeInt32LE(parseInt(parameter.value));
@@ -157,7 +161,7 @@ const Int = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -179,16 +183,16 @@ const SmallDateTime = {
   type: 'DATETIM4',
   name: 'SmallDateTime',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'smalldatetime';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       let days, dstDiff, minutes;
       if (options.useUTC) {
@@ -209,7 +213,7 @@ const SmallDateTime = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -233,16 +237,16 @@ const Real = {
   type: 'FLT4',
   name: 'Real',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'real';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(FloatN.id);
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(4);
       buffer.writeFloatLE(parseFloat(parameter.value));
@@ -251,7 +255,7 @@ const Real = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -270,16 +274,16 @@ const Money = {
   type: 'MONEY',
   name: 'Money',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'money';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(MoneyN.id);
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(8);
       buffer.writeMoney(parameter.value * 10000);
@@ -288,7 +292,7 @@ const Money = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -307,16 +311,16 @@ const DateTime = {
   type: 'DATETIME',
   name: 'DateTime',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'datetime';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
       if (options.useUTC) {
@@ -346,7 +350,7 @@ const DateTime = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -367,16 +371,16 @@ const Float = {
   type: 'FLT8',
   name: 'Float',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'float';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(FloatN.id);
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(8);
       buffer.writeDoubleLE(parseFloat(parameter.value));
@@ -385,7 +389,7 @@ const Float = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -406,11 +410,11 @@ const Decimal = {
   hasPrecision: true,
   hasScale: true,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolvePrecision: function(parameter) {
+  resolvePrecision: function(parameter: any) {
     if (parameter.precision != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
@@ -420,7 +424,7 @@ const Decimal = {
     }
   },
 
-  resolveScale: function(parameter) {
+  resolveScale: function(parameter: any) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else {
@@ -428,7 +432,7 @@ const Decimal = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(DecimalN.id);
     if (parameter.precision <= 9) {
       buffer.writeUInt8(5);
@@ -443,7 +447,7 @@ const Decimal = {
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
@@ -472,7 +476,7 @@ const Decimal = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -493,11 +497,11 @@ const Numeric = {
   hasPrecision: true,
   hasScale: true,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolvePrecision: function(parameter) {
+  resolvePrecision: function(parameter: any) {
     if (parameter.precision != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
@@ -507,7 +511,7 @@ const Numeric = {
     }
   },
 
-  resolveScale: function(parameter) {
+  resolveScale: function(parameter: any) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else {
@@ -515,7 +519,7 @@ const Numeric = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(NumericN.id);
     if (parameter.precision <= 9) {
       buffer.writeUInt8(5);
@@ -530,7 +534,7 @@ const Numeric = {
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
@@ -559,7 +563,7 @@ const Numeric = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -578,16 +582,16 @@ const SmallMoney = {
   type: 'MONEY4',
   name: 'SmallMoney',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'smallmoney';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(MoneyN.id);
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(4);
       buffer.writeInt32LE(parameter.value * 10000);
@@ -596,7 +600,7 @@ const SmallMoney = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -618,16 +622,16 @@ const BigInt = {
   type: 'INT8',
   name: 'BigInt',
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'bigint';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(IntN.id);
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
       buffer.writeUInt8(8);
@@ -637,7 +641,7 @@ const BigInt = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -667,11 +671,11 @@ const Image = {
   hasTextPointerAndTimestamp: true,
   dataLengthLength: 4,
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'image';
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.value != null) {
       return parameter.value.length;
     } else {
@@ -679,12 +683,12 @@ const Image = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeInt32LE(parameter.length);
       buffer.writeBuffer(parameter.value);
@@ -693,7 +697,7 @@ const Image = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -715,11 +719,11 @@ const Text = {
   hasTextPointerAndTimestamp: true,
   dataLengthLength: 4,
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'text';
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.value != null) {
       return parameter.value.length;
     } else {
@@ -727,12 +731,12 @@ const Text = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(Text.id);
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     if (parameter.value != null) {
       buffer.writeInt32LE(parameter.length);
@@ -742,7 +746,7 @@ const Text = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -765,7 +769,7 @@ const UniqueIdentifierN = {
   aliases: ['UniqueIdentifier'],
   dataLengthLength: 1,
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'uniqueidentifier';
   },
 
@@ -773,12 +777,12 @@ const UniqueIdentifierN = {
     return 16;
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(UniqueIdentifierN.id);
     buffer.writeUInt8(0x10);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(0x10);
       buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
@@ -787,7 +791,7 @@ const UniqueIdentifierN = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -889,7 +893,7 @@ const VarBinary = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -908,7 +912,7 @@ const VarBinary = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -918,7 +922,7 @@ const VarBinary = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     if (parameter.length <= this.maximumLength) {
       buffer.writeUInt16LE(this.maximumLength);
@@ -927,7 +931,7 @@ const VarBinary = {
     }
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       if (parameter.length <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value);
@@ -944,7 +948,7 @@ const VarBinary = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -965,7 +969,7 @@ const VarChar = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -984,7 +988,7 @@ const VarChar = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -998,7 +1002,7 @@ const VarChar = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     if (parameter.length <= this.maximumLength) {
       buffer.writeUInt16LE(this.maximumLength);
@@ -1008,7 +1012,7 @@ const VarChar = {
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       if (parameter.length <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value, 'ascii');
@@ -1025,7 +1029,7 @@ const VarChar = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1048,7 +1052,7 @@ const Binary = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     var length;
     if (parameter.length) {
       length = parameter.length;
@@ -1062,7 +1066,7 @@ const Binary = {
     return 'binary(' + length + ')';
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.value != null) {
       return parameter.value.length;
     } else {
@@ -1070,12 +1074,12 @@ const Binary = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt16LE(parameter.length);
       buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
@@ -1084,7 +1088,7 @@ const Binary = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1105,7 +1109,7 @@ const Char = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -1124,7 +1128,7 @@ const Char = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -1138,13 +1142,13 @@ const Char = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length);
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUsVarbyte(parameter.value, 'ascii');
     } else {
@@ -1152,7 +1156,7 @@ const Char = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1176,7 +1180,7 @@ const NVarChar = {
   dataLengthLength: 2,
   maximumLength: 4000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -1195,7 +1199,7 @@ const NVarChar = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -1209,7 +1213,7 @@ const NVarChar = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     if (parameter.length <= this.maximumLength) {
       buffer.writeUInt16LE(parameter.length * 2);
@@ -1219,7 +1223,7 @@ const NVarChar = {
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       if (parameter.length <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value, 'ucs2');
@@ -1236,7 +1240,7 @@ const NVarChar = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1260,7 +1264,7 @@ const NChar = {
   dataLengthLength: 2,
   maximumLength: 4000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -1279,7 +1283,7 @@ const NChar = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function(parameter: any) {
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -1293,13 +1297,13 @@ const NChar = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length * 2);
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUsVarbyte(parameter.value, 'ucs2');
     } else {
@@ -1307,7 +1311,7 @@ const NChar = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1340,7 +1344,7 @@ const TimeN = {
   hasScale: true,
   dataLengthLength: 1,
 
-  dataLengthFromScale: function(scale) {
+  dataLengthFromScale: function(scale: number) {
     switch (scale) {
       case 0:
       case 1:
@@ -1356,11 +1360,11 @@ const TimeN = {
     }
   },
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'time(' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolveScale: function(parameter) {
+  resolveScale: function(parameter: any) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else if (parameter.value === null) {
@@ -1370,12 +1374,12 @@ const TimeN = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
 
@@ -1411,7 +1415,7 @@ const TimeN = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1436,15 +1440,15 @@ const DateN = {
   dataLengthLength: 1,
   fixedDataLength: 3,
 
-  declaration: function() {
+  declaration: function(parameter: any) {
     return 'date';
   },
 
-  writeTypeInfo: function(buffer) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       buffer.writeUInt8(3);
       if (options.useUTC) {
@@ -1458,7 +1462,7 @@ const DateN = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1482,7 +1486,7 @@ const DateTime2N = {
   hasScale: true,
   dataLengthLength: 1,
 
-  dataLengthFromScale: function(scale) {
+  dataLengthFromScale: function(scale: number) {
     switch (scale) {
       case 0:
       case 1:
@@ -1498,11 +1502,11 @@ const DateTime2N = {
     }
   },
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'datetime2(' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolveScale: function(parameter) {
+  resolveScale: function(parameter: any) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else if (parameter.value === null) {
@@ -1512,12 +1516,12 @@ const DateTime2N = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
 
@@ -1561,7 +1565,7 @@ const DateTime2N = {
     }
   },
 
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1584,7 +1588,7 @@ const DateTimeOffsetN = {
   aliases: ['DateTimeOffset'],
   hasScale: true,
   dataLengthLength: 1,
-  dataLengthFromScale: function(scale) {
+  dataLengthFromScale: function(scale: number) {
     switch (scale) {
       case 0:
       case 1:
@@ -1599,10 +1603,10 @@ const DateTimeOffsetN = {
         return 5;
     }
   },
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'datetimeoffset(' + (this.resolveScale(parameter)) + ')';
   },
-  resolveScale: function(parameter) {
+  resolveScale: function(parameter: any) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else if (parameter.value === null) {
@@ -1611,11 +1615,11 @@ const DateTimeOffsetN = {
       return 7;
     }
   },
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
       time.setUTCFullYear(1970);
@@ -1651,7 +1655,7 @@ const DateTimeOffsetN = {
       buffer.writeUInt8(0);
     }
   },
-  validate: function(value) {
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1681,19 +1685,18 @@ const TVP = {
   type: 'TVPTYPE',
   name: 'TVP',
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return parameter.value.name + ' readonly';
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    let ref, ref1, ref2, ref3;
+  writeTypeInfo: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     buffer.writeUInt8(this.id);
     buffer.writeBVarchar('');
-    buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : undefined) != null ? ref : '');
-    buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
+    buffer.writeBVarchar(parameter.value != null && parameter.value.schema != null ? parameter.value.schema : '');
+    buffer.writeBVarchar(parameter.value != null && parameter.value.name != null ? parameter.value.name : '');
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
     if (parameter.value == null) {
       buffer.writeUInt16LE(0xFFFF);
       buffer.writeUInt8(0x00);
@@ -1734,7 +1737,8 @@ const TVP = {
 
     buffer.writeUInt8(0x00);
   },
-  validate: function(value) {
+
+  validate: function(value: any) {
     if (value == null) {
       return null;
     }
@@ -1763,7 +1767,7 @@ const Variant = {
   name: 'Variant',
   dataLengthLength: 4,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: any) {
     return 'sql_variant';
   }
 };
@@ -1811,6 +1815,17 @@ module.exports.TYPE = {
   [TVP.id]: TVP,
   [Variant.id]: Variant
 };
+
+export type DataType =
+  typeof Null | typeof TinyInt | typeof Bit | typeof SmallInt | typeof Int |
+  typeof SmallDateTime | typeof Real | typeof Money | typeof DateTime |
+  typeof Float | typeof Decimal | typeof Numeric | typeof SmallMoney |
+  typeof BigInt | typeof Image | typeof Text | typeof UniqueIdentifierN |
+  typeof IntN | typeof NText | typeof BitN | typeof DecimalN | typeof NumericN |
+  typeof FloatN | typeof MoneyN | typeof DateTimeN | typeof VarBinary |
+  typeof VarChar | typeof Binary | typeof Char | typeof NVarChar |
+  typeof NChar | typeof Xml | typeof TimeN | typeof DateN | typeof DateTime2N |
+  typeof DateTimeOffsetN | typeof UDT | typeof TVP | typeof Variant;
 
 /*
   CHARTYPE:             0x2F  # Char (legacy support)

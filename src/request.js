@@ -6,10 +6,11 @@ const RequestError = require('./errors').RequestError;
 
 // TODO: Figure out how to type the `rows` parameter here.
 type CompletionCallback = (error: ?Error, rowCount: ?number, rows: any) => void;
+import type { DataType } from './data-type';
 
 type Parameter = {
   // TODO: `type` must be a valid TDS value type
-  type: any,
+  type: DataType,
   name: string,
   value: mixed,
   output: boolean,
@@ -70,7 +71,7 @@ module.exports = class Request extends EventEmitter {
   }
 
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
+  addParameter(name: string, type: DataType, value: mixed, options: ?ParameterOptions) {
     if (options == null) {
       options = {};
     }
