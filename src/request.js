@@ -105,6 +105,11 @@ module.exports = class Request extends EventEmitter {
         paramsParameter += ', ';
       }
       paramsParameter += '@' + parameter.name + ' ';
+
+      if (parameter.type.declaration == undefined) {
+        throw new TypeError(`The ${parameter.type.name} type cannot be used as a request parameter type.`);
+      }
+
       paramsParameter += parameter.type.declaration(parameter);
       if (parameter.output) {
         paramsParameter += ' OUTPUT';
@@ -175,6 +180,11 @@ module.exports = class Request extends EventEmitter {
   validateParameters() {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
+
+      if (parameter.type.validate == undefined) {
+        throw new TypeError(`The ${parameter.type.name} type cannot be used as a request parameter type.`);
+      }
+
       const value = parameter.type.validate(parameter.value);
       if (value instanceof TypeError) {
         return this.error = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + value.message, 'EPARAM');
