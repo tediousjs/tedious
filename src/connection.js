@@ -523,7 +523,7 @@ class Connection extends EventEmitter {
         context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
           if (err) {
             this.fedAuthInfo.responsePending = false;
-            this.loginError = ConnectionError(`Security token could not be authenticated or authorized.`, 'EFEDAUTH');
+            this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
           } else {
             this.fedAuthInfo.responsePending = false;
             this.fedAuthInfo.token = tokenResponse;
