@@ -392,10 +392,6 @@ class Connection extends EventEmitter {
       }
     }
 
-    if (this.config.domain && !this.config.userName && !this.config.password) {
-      this.config.options.useWindowsIntegratedAuth = true;
-    }
-
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
     this.socketEnd = this.socketEnd.bind(this);
@@ -527,7 +523,7 @@ class Connection extends EventEmitter {
         context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
           if (err) {
             this.fedAuthInfo.responsePending = false;
-            // TODO: add error
+            this.loginError = ConnectionError(`Security token could not be authenticated or authorized.`, 'EFEDAUTH');
           } else {
             this.fedAuthInfo.responsePending = false;
             this.fedAuthInfo.token = tokenResponse;
@@ -918,16 +914,16 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-    if (0 != preloginPayload.fedAuthRequired && 1 != preloginPayload.fedAuthRequired) {
-      this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuthRequired, 'EFEDAUTH'));
-      return this.close();
-    }
-    // fedAuthRequired is used for capability negotiation when choosing between SSPI and federated authentication
-    if (preloginPayload.fedAuthRequired === 1 && this.config.domain) {
-      this.emit('connect', ConnectionError('Server sent federated authentication required response, value domain should not be set', 'EFEDAUTH'));
-      return this.close();
-    }
     if (this.fedAuthInfo.method != undefined) {
+      if (0 != preloginPayload.fedAuthRequired && 1 != preloginPayload.fedAuthRequired) {
+        this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuthRequired, 'EFEDAUTH'));
+        return this.close();
+      }
+      // fedAuthRequired is used for capability negotiation when choosing between SSPI and federated authentication
+      if (preloginPayload.fedAuthRequired === 1 && this.config.domain) {
+        this.emit('connect', ConnectionError('Server sent federated authentication required response, value domain should not be set', 'EFEDAUTH'));
+        return this.close();
+      }
       this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
     }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
@@ -1166,7 +1162,7 @@ class Connection extends EventEmitter {
   }
 
   processLogin7FedAuthResponse() {
-    if (this.fedAuthInfo.fedAuthInfoRequested) {
+    if (this.fedAuthInfo.fedAuthInfoRequested && !this.loginError) {
       return this.dispatchEvent('receivedFedAuthInfo');
     } else {
       if (this.loginError) {
