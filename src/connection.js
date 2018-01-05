@@ -893,7 +893,8 @@ class Connection extends EventEmitter {
 
   sendPreLogin() {
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt
+      encrypt: this.config.options.encrypt,
+      fedAuthRequested: (this.fedAuthInfo.method != undefined)
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     return this.debug.payload(function() {

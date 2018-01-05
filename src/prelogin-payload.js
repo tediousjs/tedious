@@ -65,7 +65,7 @@ module.exports = class PreloginPayload {
       this.createInstanceOption(),
       this.createThreadIdOption(),
       this.createMarsOption(),
-      this.createFedAuthOption()
+      ...(this.options.fedAuthRequested ? [this.createFedAuthOption()] : [])
     ];
 
     let length = 0;
@@ -175,6 +175,7 @@ module.exports = class PreloginPayload {
           break;
         case TOKEN.FEDAUTHREQUIRED:
           this.extractFedAuth(dataOffset);
+          break;
       }
       offset += 5;
       dataOffset += dataLength;
@@ -210,7 +211,7 @@ module.exports = class PreloginPayload {
   }
 
   extractFedAuth(offset) {
-    this.fedAuthRequired = this.data.readUInt8(offset);
+    return this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
   toString(indent) {
