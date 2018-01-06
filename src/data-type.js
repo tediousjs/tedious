@@ -125,9 +125,15 @@ const SmallInt = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+    if (value != null) {
       buffer.writeUInt8(2);
-      buffer.writeInt16LE(parseInt(parameter.value));
+
+      if (typeof value === 'number') {
+        buffer.writeInt16LE(value);
+      } else {
+        buffer.writeInt16LE(parseInt(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
@@ -165,9 +171,15 @@ const Int = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+    if (value != null) {
       buffer.writeUInt8(4);
-      buffer.writeInt32LE(parseInt(parameter.value));
+
+      if (typeof value === 'number') {
+        buffer.writeInt32LE(value);
+      } else {
+        buffer.writeInt32LE(parseInt(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
@@ -205,15 +217,21 @@ const SmallDateTime = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       let days, dstDiff, minutes;
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-        minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-        minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (value.getHours() * 60) + value.getMinutes();
       }
 
       buffer.writeUInt8(4);
@@ -259,9 +277,16 @@ const Real = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null) {
       buffer.writeUInt8(4);
-      buffer.writeFloatLE(parseFloat(parameter.value));
+
+      if (typeof value === 'number') {
+        buffer.writeFloatLE(value);
+      } else {
+        buffer.writeFloatLE(parseFloat(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
@@ -296,9 +321,15 @@ const Money = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && !(typeof value === 'number')) {
+      throw new TypeError(`The "parameter.value" property must be one of type number, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeUInt8(8);
-      buffer.writeMoney(parameter.value * 10000);
+      buffer.writeMoney(value * 10000);
     } else {
       buffer.writeUInt8(0);
     }
@@ -333,21 +364,27 @@ const DateTime = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getUTCHours() * 60 * 60;
-        seconds += parameter.value.getUTCMinutes() * 60;
-        seconds += parameter.value.getUTCSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getHours() * 60 * 60;
-        seconds += parameter.value.getMinutes() * 60;
-        seconds += parameter.value.getSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
       }
 
       threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
@@ -393,9 +430,16 @@ const Float = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
+    const value = parameter.value;
+
     if (parameter.value != null) {
       buffer.writeUInt8(8);
-      buffer.writeDoubleLE(parseFloat(parameter.value));
+
+      if (typeof value === 'number') {
+        buffer.writeDoubleLE(value);
+      } else {
+        buffer.writeDoubleLE(parseFloat(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
@@ -460,26 +504,32 @@ const Decimal = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const sign = parameter.value < 0 ? 0 : 1;
-      const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'number') {
+      throw new TypeError(`The "parameter.value" property must be one of type number, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      const sign = value < 0 ? 0 : 1;
+      const decimalValue = Math.round(Math.abs(value * Math.pow(10, parameter.scale)));
       if (parameter.precision <= 9) {
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);
-        buffer.writeUInt32LE(value);
+        buffer.writeUInt32LE(decimalValue);
       } else if (parameter.precision <= 19) {
         buffer.writeUInt8(9);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(decimalValue);
       } else if (parameter.precision <= 28) {
         buffer.writeUInt8(13);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(decimalValue);
         buffer.writeUInt32LE(0x00000000);
       } else {
         buffer.writeUInt8(17);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(decimalValue);
         buffer.writeUInt32LE(0x00000000);
         buffer.writeUInt32LE(0x00000000);
       }
@@ -547,26 +597,32 @@ const Numeric = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const sign = parameter.value < 0 ? 0 : 1;
-      const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'number') {
+      throw new TypeError(`The "parameter.value" property must be one of type number, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      const sign = value < 0 ? 0 : 1;
+      const numericValue = Math.round(Math.abs(value * Math.pow(10, parameter.scale)));
       if (parameter.precision <= 9) {
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);
-        buffer.writeUInt32LE(value);
+        buffer.writeUInt32LE(numericValue);
       } else if (parameter.precision <= 19) {
         buffer.writeUInt8(9);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(numericValue);
       } else if (parameter.precision <= 28) {
         buffer.writeUInt8(13);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(numericValue);
         buffer.writeUInt32LE(0x00000000);
       } else {
         buffer.writeUInt8(17);
         buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
+        buffer.writeUInt64LE(numericValue);
         buffer.writeUInt32LE(0x00000000);
         buffer.writeUInt32LE(0x00000000);
       }
@@ -604,9 +660,15 @@ const SmallMoney = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'number') {
+      throw new TypeError(`The "parameter.value" property must be one of type number, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeUInt8(4);
-      buffer.writeInt32LE(parameter.value * 10000);
+      buffer.writeInt32LE(value * 10000);
     } else {
       buffer.writeUInt8(0);
     }
@@ -644,10 +706,15 @@ const BigInt = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
+    const value = parameter.value;
+
+    if (value != null) {
       buffer.writeUInt8(8);
-      buffer.writeInt64LE(val);
+      if (typeof value === 'number') {
+        buffer.writeInt64LE(value);
+      } else {
+        buffer.writeInt64LE(parseInt(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
@@ -701,9 +768,15 @@ const Image = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeInt32LE(parameter.length);
-      buffer.writeBuffer(parameter.value);
+      buffer.writeBuffer(value);
     } else {
       buffer.writeInt32LE(parameter.length);
     }
@@ -749,10 +822,17 @@ const Text = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
+    const value = parameter.value;
+
+    if (value != null && !(value instanceof Buffer) && typeof value !== 'string') {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, undefined or null. Received type ${typeof value}`);
+    }
+
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
-    if (parameter.value != null) {
+
+    if (value != null) {
       buffer.writeInt32LE(parameter.length);
-      buffer.writeString(parameter.value.toString(), 'ascii');
+      buffer.writeString(value.toString(), 'ascii');
     } else {
       buffer.writeInt32LE(parameter.length);
     }
@@ -795,9 +875,15 @@ const UniqueIdentifierN = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string') {
+      throw new TypeError(`The "parameter.value" property must be one of type string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeUInt8(0x10);
-      buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
+      buffer.writeBuffer(new Buffer(guidParser.guidToArray(value)));
     } else {
       buffer.writeUInt8(0);
     }
@@ -944,11 +1030,17 @@ const VarBinary = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       if (parameter.length <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value);
+        buffer.writeUsVarbyte(value);
       } else {
-        buffer.writePLPBody(parameter.value);
+        buffer.writePLPBody(value);
       }
     } else {
       if (parameter.length <= this.maximumLength) {
@@ -1025,11 +1117,17 @@ const VarChar = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       if (parameter.length <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value, 'ascii');
+        buffer.writeUsVarbyte(value, 'ascii');
       } else {
-        buffer.writePLPBody(parameter.value, 'ascii');
+        buffer.writePLPBody(value, 'ascii');
       }
     } else {
       if (parameter.length <= this.maximumLength) {
@@ -1092,9 +1190,15 @@ const Binary = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeUInt16LE(parameter.length);
-      buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
+      buffer.writeBuffer(value.slice(0, Math.min(parameter.length, this.maximumLength)));
     } else {
       buffer.writeUInt16LE(NULL);
     }
@@ -1161,8 +1265,14 @@ const Char = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      buffer.writeUsVarbyte(parameter.value, 'ascii');
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      buffer.writeUsVarbyte(value, 'ascii');
     } else {
       buffer.writeUInt16LE(NULL);
     }
@@ -1236,11 +1346,17 @@ const NVarChar = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       if (parameter.length <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value, 'ucs2');
+        buffer.writeUsVarbyte(value, 'ucs2');
       } else {
-        buffer.writePLPBody(parameter.value, 'ucs2');
+        buffer.writePLPBody(value, 'ucs2');
       }
     } else {
       if (parameter.length <= this.maximumLength) {
@@ -1316,8 +1432,14 @@ const NChar = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      buffer.writeUsVarbyte(parameter.value, 'ucs2');
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && !(value instanceof Buffer)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Buffer, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      buffer.writeUsVarbyte(value, 'ucs2');
     } else {
       buffer.writeUInt16LE(NULL);
     }
@@ -1392,8 +1514,14 @@ const TimeN = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, number, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      const time = value instanceof Date ? value : new Date(+value);
 
       let timestamp;
       if (options.useUTC) {
@@ -1403,7 +1531,7 @@ const TimeN = {
       }
 
       timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
       switch (parameter.scale) {
@@ -1461,13 +1589,19 @@ const DateN = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    if (value != null && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
       buffer.writeUInt8(3);
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+value - YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
@@ -1534,8 +1668,14 @@ const DateTime2N = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, number, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      const time = value instanceof Date ? value : new Date(+value);
 
       let timestamp;
       if (options.useUTC) {
@@ -1545,7 +1685,7 @@ const DateTime2N = {
       }
 
       timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
       switch (parameter.scale) {
@@ -1567,10 +1707,10 @@ const DateTime2N = {
           buffer.writeUInt40LE(timestamp);
       }
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+value - YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
@@ -1632,17 +1772,24 @@ const DateTimeOffsetN = {
     buffer.writeUInt8(parameter.scale);
   },
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+    const value = parameter.value;
+
+    if (value != null && typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+      throw new TypeError(`The "parameter.value" property must be one of type Date, number, string, undefined or null. Received type ${typeof value}`);
+    }
+
+    if (value != null) {
+      const time = value instanceof Date ? value : new Date(+value);
+
       time.setUTCFullYear(1970);
       time.setUTCMonth(0);
       time.setUTCDate(1);
 
       let timestamp = time * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
-      const offset = -parameter.value.getTimezoneOffset();
+      const offset = -value.getTimezoneOffset();
       switch (parameter.scale) {
         case 0:
         case 1:
@@ -1661,7 +1808,7 @@ const DateTimeOffsetN = {
           buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
       buffer.writeInt16LE(offset);
     } else {
       buffer.writeUInt8(0);
@@ -1709,16 +1856,18 @@ const TVP = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value == null) {
+    const value = parameter.value;
+
+    if (value == null) {
       buffer.writeUInt16LE(0xFFFF);
       buffer.writeUInt8(0x00);
       buffer.writeUInt8(0x00);
       return;
     }
 
-    buffer.writeUInt16LE(parameter.value.columns.length);
+    buffer.writeUInt16LE(value.columns.length);
 
-    const ref = parameter.value.columns;
+    const ref = value.columns;
     for (let i = 0, len = ref.length; i < len; i++) {
       const column = ref[i];
       buffer.writeUInt32LE(0x00000000);
@@ -1729,21 +1878,23 @@ const TVP = {
 
     buffer.writeUInt8(0x00);
 
-    const ref1 = parameter.value.rows;
+    const ref1 = value.rows;
     for (let j = 0, len1 = ref1.length; j < len1; j++) {
       const row = ref1[j];
 
       buffer.writeUInt8(0x01);
 
       for (let k = 0, len2 = row.length; k < len2; k++) {
-        const value = row[k];
+        const rowValue = row[k];
+        const column = value.columns[k];
+
         const param = {
-          value: value,
-          length: parameter.value.columns[k].length,
-          scale: parameter.value.columns[k].scale,
-          precision: parameter.value.columns[k].precision
+          value: rowValue,
+          length: column.length,
+          scale: column.scale,
+          precision: column.precision
         };
-        parameter.value.columns[k].type.writeParameterData(buffer, param, options);
+        column.type.writeParameterData(buffer, param, options);
       }
     }
 
