@@ -36,9 +36,18 @@ const TinyInt = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (parameter.value != null) {
+    const value = parameter.value;
+
+    // TODO: `undefined` is currently treated like `null` here, but `undefined`
+    //       and `null` have different semantics. `undefined` should not be a
+    //       valid argument type.
+    if (value != null) {
       buffer.writeUInt8(1);
-      buffer.writeUInt8(parseInt(parameter.value));
+      if (typeof value === 'number') {
+        buffer.writeUInt8(value);
+      } else {
+        buffer.writeUInt8(parseInt(value));
+      }
     } else {
       buffer.writeUInt8(0);
     }
