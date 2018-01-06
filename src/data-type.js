@@ -85,7 +85,10 @@ const Bit = {
   },
 
   writeParameterData: function(buffer: WritableTrackingBuffer, parameter: any, options: any) {
-    if (typeof parameter.value === 'undefined' || parameter.value === null) {
+    // TODO: `undefined` is currently treated like `null` here, but `undefined`
+    //       and `null` have different semantics. `undefined` should not be a
+    //       valid argument type.
+    if (parameter.value === undefined || parameter.value === null) {
       buffer.writeUInt8(0);
     } else {
       buffer.writeUInt8(1);
