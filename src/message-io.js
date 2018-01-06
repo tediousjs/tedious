@@ -177,7 +177,7 @@ module.exports = class MessageIO extends EventEmitter {
 
   logPacket(direction, packet) {
     this.debug.packet(direction, packet);
-    return this.debug.data(packet);
+    this.debug.data(packet);
   }
 
   // Temporarily suspends the flow of incoming packets.

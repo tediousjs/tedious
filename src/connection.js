@@ -390,12 +390,12 @@ class Connection extends EventEmitter {
   }
 
   close() {
-    return this.transitionTo(this.STATE.FINAL);
+    this.transitionTo(this.STATE.FINAL);
   }
 
   initialiseConnection() {
     this.connect();
-    return this.createConnectTimer();
+    this.createConnectTimer();
   }
 
   cleanupConnection(cleanupTypeEnum) {
@@ -416,14 +416,14 @@ class Connection extends EventEmitter {
       }
       this.closed = true;
       this.loggedIn = false;
-      return this.loginError = null;
+      this.loginError = null;
     }
   }
 
   createDebug() {
     this.debug = new Debug(this.config.options.debug);
-    return this.debug.on('debug', (message) => {
-      return this.emit('debug', message);
+    this.debug.on('debug', (message) => {
+      this.emit('debug', message);
     });
   }
 
@@ -431,7 +431,7 @@ class Connection extends EventEmitter {
     this.tokenStreamParser = new TokenStreamParser(this.debug, undefined, this.config.options);
 
     this.tokenStreamParser.on('infoMessage', (token) => {
-      return this.emit('infoMessage', token);
+      this.emit('infoMessage', token);
     });
 
     this.tokenStreamParser.on('sspichallenge', (token) => {
@@ -439,7 +439,8 @@ class Connection extends EventEmitter {
         this.ntlmpacket = token.ntlmpacket;
         this.ntlmpacketBuffer = token.ntlmpacketBuffer;
       }
-      return this.emit('sspichallenge', token);
+
+      this.emit('sspichallenge', token);
     });
 
     this.tokenStreamParser.on('errorMessage', (token) => {
@@ -466,15 +467,15 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('databaseChange', (token) => {
-      return this.emit('databaseChange', token.newValue);
+      this.emit('databaseChange', token.newValue);
     });
 
     this.tokenStreamParser.on('languageChange', (token) => {
-      return this.emit('languageChange', token.newValue);
+      this.emit('languageChange', token.newValue);
     });
 
     this.tokenStreamParser.on('charsetChange', (token) => {
-      return this.emit('charsetChange', token.newValue);
+      this.emit('charsetChange', token.newValue);
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -494,30 +495,30 @@ class Connection extends EventEmitter {
 
       // use negotiated version
       this.config.options.tdsVersion = token.tdsVersion;
-      return this.loggedIn = true;
+      this.loggedIn = true;
     });
 
     this.tokenStreamParser.on('routingChange', (token) => {
       this.routingData = token.newValue;
-      return this.dispatchEvent('routingChange');
+      this.dispatchEvent('routingChange');
     });
 
     this.tokenStreamParser.on('packetSizeChange', (token) => {
-      return this.messageIo.packetSize(token.newValue);
+      this.messageIo.packetSize(token.newValue);
     });
 
     // A new top-level transaction was started. This is not fired
     // for nested transactions.
     this.tokenStreamParser.on('beginTransaction', (token) => {
       this.transactionDescriptors.push(token.newValue);
-      return this.inTransaction = true;
+      this.inTransaction = true;
     });
 
     // A top-level transaction was committed. This is not fired
     // for nested transactions.
     this.tokenStreamParser.on('commitTransaction', () => {
       this.transactionDescriptors.length = 1;
-      return this.inTransaction = false;
+      this.inTransaction = false;
     });
 
     // A top-level transaction was rolled back. This is not fired
@@ -527,7 +528,7 @@ class Connection extends EventEmitter {
       this.transactionDescriptors.length = 1;
       // An outermost transaction was rolled back. Reset the transaction counter
       this.inTransaction = false;
-      return this.emit('rollbackTransaction');
+      this.emit('rollbackTransaction');
     });
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
@@ -544,19 +545,19 @@ class Connection extends EventEmitter {
         } else {
           columns = token.columns;
         }
-        return this.request.emit('columnMetadata', columns);
+        this.request.emit('columnMetadata', columns);
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
-        return this.close();
+        this.close();
       }
     });
 
     this.tokenStreamParser.on('order', (token) => {
       if (this.request) {
-        return this.request.emit('order', token.orderColumns);
+        this.request.emit('order', token.orderColumns);
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
-        return this.close();
+        this.close();
       }
     });
 
@@ -573,20 +574,20 @@ class Connection extends EventEmitter {
         }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
-        return this.close();
+        this.close();
       }
     });
 
     this.tokenStreamParser.on('returnStatus', (token) => {
       if (this.request) {
         // Keep value for passing in 'doneProc' event.
-        return this.procReturnStatusValue = token.value;
+        this.procReturnStatusValue = token.value;
       }
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
       if (this.request) {
-        return this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        this.request.emit('returnValue', token.paramName, token.value, token.metadata);
       }
     });
 
@@ -598,7 +599,7 @@ class Connection extends EventEmitter {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
-          return this.request.rst = [];
+          this.request.rst = [];
         }
       }
     });
@@ -610,7 +611,7 @@ class Connection extends EventEmitter {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
-          return this.request.rst = [];
+          this.request.rst = [];
         }
       }
     });
@@ -629,7 +630,7 @@ class Connection extends EventEmitter {
           this.request.rowCount += token.rowCount;
         }
         if (this.config.options.rowCollectionOnDone) {
-          return this.request.rst = [];
+          this.request.rst = [];
         }
       }
     });
@@ -641,12 +642,12 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('resetConnection', () => {
-      return this.emit('resetConnection');
+      this.emit('resetConnection');
     });
 
     this.tokenStreamParser.on('tokenStreamError', (error) => {
       this.emit('error', error);
-      return this.close();
+      this.close();
     });
 
     this.tokenStreamParser.on('drain', () => {
@@ -669,9 +670,9 @@ class Connection extends EventEmitter {
           return;
         }
         if (message) {
-          return this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
         } else {
-          return this.connectOnPort(port, this.config.options.multiSubnetFailover);
+          this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
       });
     }
@@ -709,13 +710,13 @@ class Connection extends EventEmitter {
   }
 
   createConnectTimer() {
-    return this.connectTimer = setTimeout(this.connectTimeout, this.config.options.connectTimeout);
+    this.connectTimer = setTimeout(this.connectTimeout, this.config.options.connectTimeout);
   }
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
     if (this.config.options.requestTimeout) {
-      return this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
+      this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
     }
   }
 
@@ -729,13 +730,13 @@ class Connection extends EventEmitter {
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
-    return this.dispatchEvent('connectTimeout');
+    this.dispatchEvent('connectTimeout');
   }
 
   requestTimeout() {
     this.requestTimer = undefined;
     this.messageIo.sendMessage(TYPE.ATTENTION);
-    return this.transitionTo(this.STATE.SENT_ATTENTION);
+    this.transitionTo(this.STATE.SENT_ATTENTION);
   }
 
   retryTimeout() {
@@ -746,7 +747,7 @@ class Connection extends EventEmitter {
 
   clearConnectTimer() {
     if (this.connectTimer) {
-      return clearTimeout(this.connectTimer);
+      clearTimeout(this.connectTimer);
     }
   }
 
@@ -778,7 +779,7 @@ class Connection extends EventEmitter {
     this.state = newState;
 
     if (this.state.enter) {
-      return this.state.enter.apply(this);
+      this.state.enter.apply(this);
     }
   }
 
@@ -788,10 +789,10 @@ class Connection extends EventEmitter {
       for (let i = 0; i < args.length;) {
         args[i++] = arguments[i];
       }
-      return this.state.events[eventName].apply(this, args);
+      this.state.events[eventName].apply(this, args);
     } else {
       this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
-      return this.close();
+      this.close();
     }
   }
 
@@ -805,34 +806,34 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       this.emit('error', ConnectionError(message, 'ESOCKET'));
     }
-    return this.dispatchEvent('socketError', error);
+    this.dispatchEvent('socketError', error);
   }
 
   socketConnect() {
     this.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
     this.closed = false;
     this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-    return this.dispatchEvent('socketConnect');
+    this.dispatchEvent('socketConnect');
   }
 
   socketEnd() {
     this.debug.log('socket ended');
-    return this.transitionTo(this.STATE.FINAL);
+    this.transitionTo(this.STATE.FINAL);
   }
 
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
-      return this.dispatchEvent('reconnect');
+      this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
       this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-      return this.dispatchEvent('retry');
+      this.dispatchEvent('retry');
     } else {
-      return this.transitionTo(this.STATE.FINAL);
+      this.transitionTo(this.STATE.FINAL);
     }
   }
 
@@ -841,17 +842,17 @@ class Connection extends EventEmitter {
       encrypt: this.config.options.encrypt
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
-    return this.debug.payload(function() {
+    this.debug.payload(function() {
       return payload.toString('  ');
     });
   }
 
   emptyMessageBuffer() {
-    return this.messageBuffer = new Buffer(0);
+    this.messageBuffer = new Buffer(0);
   }
 
   addToMessageBuffer(data) {
-    return this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
+    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
   processPreLoginResponse() {
@@ -866,9 +867,9 @@ class Connection extends EventEmitter {
         return this.close();
       }
 
-      return this.dispatchEvent('tls');
+      this.dispatchEvent('tls');
     } else {
-      return this.dispatchEvent('noTls');
+      this.dispatchEvent('noTls');
     }
   }
 
@@ -1039,61 +1040,64 @@ class Connection extends EventEmitter {
 
   processedInitialSql() {
     this.clearConnectTimer();
-    return this.emit('connect');
+    this.emit('connect');
   }
 
   processLogin7Response() {
     if (this.loggedIn) {
-      return this.dispatchEvent('loggedIn');
+      this.dispatchEvent('loggedIn');
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
       } else {
         this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
       }
-      return this.dispatchEvent('loginFailed');
+      this.dispatchEvent('loginFailed');
     }
   }
 
   processLogin7NTLMResponse() {
     if (this.ntlmpacket) {
-      return this.dispatchEvent('receivedChallenge');
+      this.dispatchEvent('receivedChallenge');
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
       } else {
         this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
       }
-      return this.dispatchEvent('loginFailed');
+      this.dispatchEvent('loginFailed');
     }
   }
 
   processLogin7NTLMAck() {
     if (this.loggedIn) {
-      return this.dispatchEvent('loggedIn');
+      this.dispatchEvent('loggedIn');
     } else {
       if (this.loginError) {
         this.emit('connect', this.loginError);
       } else {
         this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
       }
-      return this.dispatchEvent('loginFailed');
+      this.dispatchEvent('loginFailed');
     }
   }
 
   execSqlBatch(request) {
-    return this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, this.currentTransactionDescriptor(), this.config.options));
   }
 
   execSql(request) {
     request.transformIntoExecuteSqlRpc();
+
     if (request.error != null) {
-      return process.nextTick(() => {
+      process.nextTick(() => {
         this.debug.log(request.error.message);
-        return request.callback(request.error);
+        request.callback(request.error);
       });
+      return;
     }
-    return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -1124,44 +1128,52 @@ class Connection extends EventEmitter {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
         bulkLoad.error = error;
-        return bulkLoad.callback(error);
+        bulkLoad.callback(error);
       } else {
-        return this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
+        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
       }
     });
-    return this.execSqlBatch(request);
+
+    this.execSqlBatch(request);
   }
 
   prepare(request) {
     request.transformIntoPrepareRpc();
-    return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   unprepare(request) {
     request.transformIntoUnprepareRpc();
-    return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   execute(request, parameters) {
     request.transformIntoExecuteRpc(parameters);
+
     if (request.error != null) {
-      return process.nextTick(() => {
+      process.nextTick(() => {
         this.debug.log(request.error.message);
-        return request.callback(request.error);
+        request.callback(request.error);
       });
+
+      return;
     }
-    return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   callProcedure(request) {
     request.validateParameters();
+
     if (request.error != null) {
-      return process.nextTick(() => {
+      process.nextTick(() => {
         this.debug.log(request.error.message);
-        return request.callback(request.error);
+        request.callback(request.error);
       });
+      return;
     }
-    return this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   beginTransaction(callback, name, isolationLevel) {
@@ -1298,7 +1310,7 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      return request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else {
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
@@ -1375,69 +1387,69 @@ Connection.prototype.STATE = {
   CONNECTING: {
     name: 'Connecting',
     enter: function() {
-      return this.initialiseConnection();
+      this.initialiseConnection();
     },
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       socketConnect: function() {
         this.sendPreLogin();
-        return this.transitionTo(this.STATE.SENT_PRELOGIN);
+        this.transitionTo(this.STATE.SENT_PRELOGIN);
       }
     }
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      return this.emptyMessageBuffer();
+      this.emptyMessageBuffer();
     },
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.addToMessageBuffer(data);
+        this.addToMessageBuffer(data);
       },
       message: function() {
-        return this.processPreLoginResponse();
+        this.processPreLoginResponse();
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
           if (this.config.domain) {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
-            return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
         });
       },
       tls: function() {
         this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
-        return this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
       }
     }
   },
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
-      return this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
+      this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
       message: function() {},
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       reconnect: function() {
-        return this.transitionTo(this.STATE.CONNECTING);
+        this.transitionTo(this.STATE.CONNECTING);
       }
     }
   },
@@ -1445,15 +1457,15 @@ Connection.prototype.STATE = {
     name: 'TRANSIENT_FAILURE_RETRY',
     enter: function() {
       this.curTransientRetryCount++;
-      return this.cleanupConnection(this.cleanupTypeEnum.RETRY);
+      this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
       message: function() {},
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       retry: function() {
         this.createRetryTimer();
@@ -1464,21 +1476,21 @@ Connection.prototype.STATE = {
     name: 'SentTLSSSLNegotiation',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.messageIo.tlsHandshakeData(data);
+        this.messageIo.tlsHandshakeData(data);
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
             if (this.config.domain) {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           });
         }
@@ -1489,25 +1501,25 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithStandardLogin',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
-        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
       routingChange: function() {
-        return this.transitionTo(this.STATE.REROUTING);
+        this.transitionTo(this.STATE.REROUTING);
       },
       loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        return this.processLogin7Response();
+        this.processLogin7Response();
       }
     }
   },
@@ -1515,22 +1527,22 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithNTLMLogin',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        this.sendDataToTokenStreamParser(data);
       },
       receivedChallenge: function() {
-        return this.sendNTLMResponsePacket();
+        this.sendNTLMResponsePacket();
       },
       loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        return this.processLogin7NTLMResponse();
+        this.processLogin7NTLMResponse();
       }
     }
   },
@@ -1538,43 +1550,43 @@ Connection.prototype.STATE = {
     name: 'SentNTLMResponse',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
-        return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
       loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       routingChange: function() {
-        return this.transitionTo(this.STATE.REROUTING);
+        this.transitionTo(this.STATE.REROUTING);
       },
       message: function() {
-        return this.processLogin7NTLMAck();
+        this.processLogin7NTLMAck();
       }
     }
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      return this.sendInitialSql();
+      this.sendInitialSql();
     },
     events: {
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        this.sendDataToTokenStreamParser(data);
       },
       message: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
-        return this.processedInitialSql();
+        this.processedInitialSql();
       }
     }
   },
@@ -1582,7 +1594,7 @@ Connection.prototype.STATE = {
     name: 'LoggedIn',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -1600,7 +1612,7 @@ Connection.prototype.STATE = {
         const sqlRequest = this.request;
         this.request = undefined;
         sqlRequest.callback(err);
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
         this.clearRequestTimer();                          // request timer is stopped on first data package
@@ -1615,7 +1627,7 @@ Connection.prototype.STATE = {
         // We have to channel the 'message' (EOM) event through the token stream
         // parser transform, to keep it in line with the flow of the tokens, when
         // the incoming data flow is paused and resumed.
-        return this.tokenStreamParser.addEndOfMessageMarker();
+        this.tokenStreamParser.addEndOfMessageMarker();
       },
       endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
@@ -1624,24 +1636,24 @@ Connection.prototype.STATE = {
         if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
           this.inTransaction = false;
         }
-        return sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+        sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
       }
     }
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
     enter: function() {
-      return this.attentionReceived = false;
+      this.attentionReceived = false;
     },
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        return this.sendDataToTokenStreamParser(data);
+        this.sendDataToTokenStreamParser(data);
       },
       attention: function() {
-        return this.attentionReceived = true;
+        this.attentionReceived = true;
       },
       message: function() {
         // 3.2.5.7 Sent Attention State
@@ -1651,10 +1663,10 @@ Connection.prototype.STATE = {
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
           if (sqlRequest.canceled) {
-            return sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           } else {
             const message = 'Timeout: Request failed to complete in ' + this.config.options.requestTimeout + 'ms';
-            return sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
           }
         }
       }
@@ -1663,7 +1675,7 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     enter: function() {
-      return this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
+      this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
     },
     events: {
       loginFailed: function() {
