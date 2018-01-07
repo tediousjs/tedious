@@ -73,12 +73,15 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (typeof parameter.value === 'undefined' || parameter.value === null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
-      } else {
-        buffer.writeUInt8(1);
-        buffer.writeUInt8(parameter.value ? 1 : 0);
+        return;
       }
+
+      buffer.writeUInt8(1);
+      buffer.writeUInt8(value ? 1 : 0);
     },
 
     validate: function(value) {
