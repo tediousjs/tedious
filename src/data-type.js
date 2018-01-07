@@ -1684,40 +1684,47 @@ const TYPE = module.exports.TYPE = {
       buffer.writeUInt8(parameter.scale);
     },
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
-        time.setUTCFullYear(1970);
-        time.setUTCMonth(0);
-        time.setUTCDate(1);
+      const value = parameter.value;
 
-        let timestamp = time * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        const offset = -parameter.value.getTimezoneOffset();
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(8);
-            buffer.writeUInt24LE(timestamp);
-            break;
-          case 3:
-          case 4:
-            buffer.writeUInt8(9);
-            buffer.writeUInt32LE(timestamp);
-            break;
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(10);
-            buffer.writeUInt40LE(timestamp);
-        }
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        buffer.writeInt16LE(offset);
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+      time.setUTCFullYear(1970);
+      time.setUTCMonth(0);
+      time.setUTCDate(1);
+
+      let timestamp = time * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      const offset = -value.getTimezoneOffset();
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(8);
+          buffer.writeUInt24LE(timestamp);
+          break;
+        case 3:
+        case 4:
+          buffer.writeUInt8(9);
+          buffer.writeUInt32LE(timestamp);
+          break;
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(10);
+          buffer.writeUInt40LE(timestamp);
+      }
+      buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeInt16LE(offset);
     },
     validate: function(value) {
       if (value == null) {
