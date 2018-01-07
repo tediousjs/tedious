@@ -728,12 +728,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeInt32LE(parameter.length);
-        buffer.writeBuffer(parameter.value);
-      } else {
-        buffer.writeInt32LE(parameter.length);
+        return;
       }
+
+      if (!(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeInt32LE(parameter.length);
+      buffer.writeBuffer(value);
     },
 
     validate: function(value) {
