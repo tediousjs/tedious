@@ -296,12 +296,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(8);
-        buffer.writeMoney(parameter.value * 10000);
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(8);
+      buffer.writeMoney(value * 10000);
     },
 
     validate: function(value) {
