@@ -1117,12 +1117,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt16LE(parameter.length);
-        buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt16LE(NULL);
+        return;
       }
+
+      if (!(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt16LE(parameter.length);
+      buffer.writeBuffer(value.slice(0, Math.min(parameter.length, this.maximumLength)));
     },
 
     validate: function(value) {
