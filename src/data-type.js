@@ -29,11 +29,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(1);
-        buffer.writeUInt8(parseInt(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(1);
+      if (typeof value === 'number') {
+        buffer.writeUInt8(value);
+      } else {
+        buffer.writeUInt8(parseInt(value));
       }
     },
 
