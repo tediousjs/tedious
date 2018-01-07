@@ -831,12 +831,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(0x10);
-        buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (value != null && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(0x10);
+      buffer.writeBuffer(new Buffer(guidParser.guidToArray(value)));
     },
 
     validate: function(value) {
