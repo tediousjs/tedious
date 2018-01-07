@@ -1045,19 +1045,27 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        if (parameter.length <= this.maximumLength) {
-          buffer.writeUsVarbyte(parameter.value, 'ascii');
-        } else {
-          buffer.writePLPBody(parameter.value, 'ascii');
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         if (parameter.length <= this.maximumLength) {
           buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
           buffer.writeUInt32LE(0xFFFFFFFF);
         }
+
+        return;
+      }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      if (parameter.length <= this.maximumLength) {
+        buffer.writeUsVarbyte(value, 'ascii');
+      } else {
+        buffer.writePLPBody(value, 'ascii');
       }
     },
 
