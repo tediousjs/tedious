@@ -337,33 +337,40 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
-        if (options.useUTC) {
-          days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getUTCHours() * 60 * 60;
-          seconds += parameter.value.getUTCMinutes() * 60;
-          seconds += parameter.value.getUTCSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
-        } else {
-          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-          days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getHours() * 60 * 60;
-          seconds += parameter.value.getMinutes() * 60;
-          seconds += parameter.value.getSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
-        }
+      const value = parameter.value;
 
-        threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-        threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
-
-        buffer.writeUInt8(8);
-        buffer.writeInt32LE(days);
-
-        buffer.writeUInt32LE(threeHundredthsOfSecond);
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
+      } else {
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
+      }
+
+      threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
+      threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+
+      buffer.writeUInt8(8);
+      buffer.writeInt32LE(days);
+
+      buffer.writeUInt32LE(threeHundredthsOfSecond);
     },
 
     validate: function(value) {
