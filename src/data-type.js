@@ -472,31 +472,38 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const sign = parameter.value < 0 ? 0 : 1;
-        const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
-        if (parameter.precision <= 9) {
-          buffer.writeUInt8(5);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt32LE(value);
-        } else if (parameter.precision <= 19) {
-          buffer.writeUInt8(9);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-        } else if (parameter.precision <= 28) {
-          buffer.writeUInt8(13);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-        } else {
-          buffer.writeUInt8(17);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-          buffer.writeUInt32LE(0x00000000);
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      const sign = parameter.value < 0 ? 0 : 1;
+      const decimalValue = Math.round(Math.abs(value * Math.pow(10, parameter.scale)));
+      if (parameter.precision <= 9) {
+        buffer.writeUInt8(5);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt32LE(decimalValue);
+      } else if (parameter.precision <= 19) {
+        buffer.writeUInt8(9);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+      } else if (parameter.precision <= 28) {
+        buffer.writeUInt8(13);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+        buffer.writeUInt32LE(0x00000000);
+      } else {
+        buffer.writeUInt8(17);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+        buffer.writeUInt32LE(0x00000000);
+        buffer.writeUInt32LE(0x00000000);
       }
     },
 
