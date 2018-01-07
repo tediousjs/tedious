@@ -1581,46 +1581,54 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
+      const value = parameter.value;
 
-        let timestamp;
-        if (options.useUTC) {
-          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-        } else {
-          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-        }
-
-        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(6);
-            buffer.writeUInt24LE(timestamp);
-            break;
-          case 3:
-          case 4:
-            buffer.writeUInt8(7);
-            buffer.writeUInt32LE(timestamp);
-            break;
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(8);
-            buffer.writeUInt40LE(timestamp);
-        }
-        if (options.useUTC) {
-          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
-        }
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(6);
+          buffer.writeUInt24LE(timestamp);
+          break;
+        case 3:
+        case 4:
+          buffer.writeUInt8(7);
+          buffer.writeUInt32LE(timestamp);
+          break;
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(8);
+          buffer.writeUInt40LE(timestamp);
+      }
+
+      if (options.useUTC) {
+        buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+value - YEAR_ONE + dstDiff) / 86400000));
       }
     },
 
