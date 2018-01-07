@@ -1504,16 +1504,23 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(3);
-        if (options.useUTC) {
-          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(3);
+      if (options.useUTC) {
+        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      } else {
+        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
       }
     },
 
