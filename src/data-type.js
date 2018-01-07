@@ -1763,7 +1763,7 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value == null) {
+      if (parameter.value === undefined || parameter.value === null) {
         buffer.writeUInt16LE(0xFFFF);
         buffer.writeUInt8(0x00);
         buffer.writeUInt8(0x00);
