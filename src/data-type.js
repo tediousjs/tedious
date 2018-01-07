@@ -1431,38 +1431,45 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
+      const value = parameter.value;
 
-        let timestamp;
-        if (options.useUTC) {
-          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-        } else {
-          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-        }
-
-        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(3);
-            buffer.writeUInt24LE(timestamp);
-          case 3:
-          case 4:
-            buffer.writeUInt8(4);
-            buffer.writeUInt32LE(timestamp);
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(5);
-            buffer.writeUInt40LE(timestamp);
-        }
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(3);
+          buffer.writeUInt24LE(timestamp);
+        case 3:
+        case 4:
+          buffer.writeUInt8(4);
+          buffer.writeUInt32LE(timestamp);
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(5);
+          buffer.writeUInt40LE(timestamp);
       }
     },
 
