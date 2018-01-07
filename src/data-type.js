@@ -29,11 +29,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(1);
-        buffer.writeUInt8(parseInt(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(1);
+      if (typeof value === 'number') {
+        buffer.writeUInt8(value);
+      } else {
+        buffer.writeUInt8(parseInt(value));
       }
     },
 
@@ -66,12 +73,15 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (typeof parameter.value === 'undefined' || parameter.value === null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
-      } else {
-        buffer.writeUInt8(1);
-        buffer.writeUInt8(parameter.value ? 1 : 0);
+        return;
       }
+
+      buffer.writeUInt8(1);
+      buffer.writeUInt8(value ? 1 : 0);
     },
 
     validate: function(value) {
@@ -100,11 +110,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(2);
-        buffer.writeInt16LE(parseInt(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(2);
+      if (typeof value === 'number') {
+        buffer.writeInt16LE(value);
+      } else {
+        buffer.writeInt16LE(parseInt(value));
       }
     },
 
@@ -137,11 +154,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(4);
-        buffer.writeInt32LE(parseInt(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(4);
+      if (typeof value === 'number') {
+        buffer.writeInt32LE(value);
+      } else {
+        buffer.writeInt32LE(parseInt(value));
       }
     },
 
@@ -174,24 +198,30 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        let days, dstDiff, minutes;
-        if (options.useUTC) {
-          days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
-        } else {
-          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-          days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
-        }
+      const value = parameter.value;
 
-        buffer.writeUInt8(4);
-        buffer.writeUInt16LE(days);
-
-        buffer.writeUInt16LE(minutes);
-      } else {
+      if (value === null || value === undefined) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      let days, minutes;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (value.getHours() * 60) + value.getMinutes();
+      }
+
+      buffer.writeUInt8(4);
+      buffer.writeUInt16LE(days);
+      buffer.writeUInt16LE(minutes);
     },
 
     validate: function(value) {
@@ -225,11 +255,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(4);
-        buffer.writeFloatLE(parseFloat(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(4);
+      if (typeof value === 'number') {
+        buffer.writeFloatLE(value);
+      } else {
+        buffer.writeFloatLE(parseFloat(value));
       }
     },
 
@@ -259,12 +296,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(8);
-        buffer.writeMoney(parameter.value * 10000);
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(8);
+      buffer.writeMoney(value * 10000);
     },
 
     validate: function(value) {
@@ -293,33 +337,40 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
-        if (options.useUTC) {
-          days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getUTCHours() * 60 * 60;
-          seconds += parameter.value.getUTCMinutes() * 60;
-          seconds += parameter.value.getUTCSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
-        } else {
-          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-          days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          seconds = parameter.value.getHours() * 60 * 60;
-          seconds += parameter.value.getMinutes() * 60;
-          seconds += parameter.value.getSeconds();
-          milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
-        }
+      const value = parameter.value;
 
-        threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-        threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
-
-        buffer.writeUInt8(8);
-        buffer.writeInt32LE(days);
-
-        buffer.writeUInt32LE(threeHundredthsOfSecond);
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
+      } else {
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
+      }
+
+      threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
+      threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+
+      buffer.writeUInt8(8);
+      buffer.writeInt32LE(days);
+
+      buffer.writeUInt32LE(threeHundredthsOfSecond);
     },
 
     validate: function(value) {
@@ -350,11 +401,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(8);
-        buffer.writeDoubleLE(parseFloat(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(8);
+      if (typeof value === 'number') {
+        buffer.writeDoubleLE(value);
+      } else {
+        buffer.writeDoubleLE(parseFloat(value));
       }
     },
 
@@ -414,31 +472,38 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const sign = parameter.value < 0 ? 0 : 1;
-        const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
-        if (parameter.precision <= 9) {
-          buffer.writeUInt8(5);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt32LE(value);
-        } else if (parameter.precision <= 19) {
-          buffer.writeUInt8(9);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-        } else if (parameter.precision <= 28) {
-          buffer.writeUInt8(13);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-        } else {
-          buffer.writeUInt8(17);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-          buffer.writeUInt32LE(0x00000000);
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      const sign = parameter.value < 0 ? 0 : 1;
+      const decimalValue = Math.round(Math.abs(value * Math.pow(10, parameter.scale)));
+      if (parameter.precision <= 9) {
+        buffer.writeUInt8(5);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt32LE(decimalValue);
+      } else if (parameter.precision <= 19) {
+        buffer.writeUInt8(9);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+      } else if (parameter.precision <= 28) {
+        buffer.writeUInt8(13);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+        buffer.writeUInt32LE(0x00000000);
+      } else {
+        buffer.writeUInt8(17);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(decimalValue);
+        buffer.writeUInt32LE(0x00000000);
+        buffer.writeUInt32LE(0x00000000);
       }
     },
 
@@ -498,31 +563,38 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const sign = parameter.value < 0 ? 0 : 1;
-        const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
-        if (parameter.precision <= 9) {
-          buffer.writeUInt8(5);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt32LE(value);
-        } else if (parameter.precision <= 19) {
-          buffer.writeUInt8(9);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-        } else if (parameter.precision <= 28) {
-          buffer.writeUInt8(13);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-        } else {
-          buffer.writeUInt8(17);
-          buffer.writeUInt8(sign);
-          buffer.writeUInt64LE(value);
-          buffer.writeUInt32LE(0x00000000);
-          buffer.writeUInt32LE(0x00000000);
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      const sign = value < 0 ? 0 : 1;
+      const numericValue = Math.round(Math.abs(value * Math.pow(10, parameter.scale)));
+      if (parameter.precision <= 9) {
+        buffer.writeUInt8(5);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt32LE(numericValue);
+      } else if (parameter.precision <= 19) {
+        buffer.writeUInt8(9);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(numericValue);
+      } else if (parameter.precision <= 28) {
+        buffer.writeUInt8(13);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(numericValue);
+        buffer.writeUInt32LE(0x00000000);
+      } else {
+        buffer.writeUInt8(17);
+        buffer.writeUInt8(sign);
+        buffer.writeUInt64LE(numericValue);
+        buffer.writeUInt32LE(0x00000000);
+        buffer.writeUInt32LE(0x00000000);
       }
     },
 
@@ -552,12 +624,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(4);
-        buffer.writeInt32LE(parameter.value * 10000);
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (typeof value !== 'number' && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(4);
+      buffer.writeInt32LE(value * 10000);
     },
 
     validate: function(value) {
@@ -589,12 +668,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
-        buffer.writeUInt8(8);
-        buffer.writeInt64LE(val);
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(8);
+      if (typeof value === 'number') {
+        buffer.writeInt64LE(value);
+      } else {
+        buffer.writeInt64LE(parseInt(value));
       }
     },
 
@@ -643,12 +728,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeInt32LE(parameter.length);
-        buffer.writeBuffer(parameter.value);
-      } else {
-        buffer.writeInt32LE(parameter.length);
+        return;
       }
+
+      if (!(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeInt32LE(parameter.length);
+      buffer.writeBuffer(value);
     },
 
     validate: function(value) {
@@ -688,13 +780,21 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
-      if (parameter.value != null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
+        buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
         buffer.writeInt32LE(parameter.length);
-        buffer.writeString(parameter.value.toString(), 'ascii');
-      } else {
-        buffer.writeInt32LE(parameter.length);
+        return;
       }
+
+      if (typeof value !== 'string' && typeof value.toString !== 'function') {
+        throw new TypeError(`parameter.value must have a 'toString' method, or be a string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeInt32LE(parameter.length);
+      buffer.writeString(parameter.value.toString(), 'ascii');
     },
 
     validate: function(value) {
@@ -731,12 +831,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(0x10);
-        buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (value != null && typeof value !== 'string') {
+        throw new TypeError(`parameter.value must be a string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(0x10);
+      buffer.writeBuffer(new Buffer(guidParser.guidToArray(value)));
     },
 
     validate: function(value) {
@@ -852,19 +959,27 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        if (parameter.length <= this.maximumLength) {
-          buffer.writeUsVarbyte(parameter.value);
-        } else {
-          buffer.writePLPBody(parameter.value);
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         if (parameter.length <= this.maximumLength) {
           buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
           buffer.writeUInt32LE(0xFFFFFFFF);
         }
+
+        return;
+      }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      if (parameter.length <= this.maximumLength) {
+        buffer.writeUsVarbyte(parameter.value);
+      } else {
+        buffer.writePLPBody(parameter.value);
       }
     },
 
@@ -930,19 +1045,27 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        if (parameter.length <= this.maximumLength) {
-          buffer.writeUsVarbyte(parameter.value, 'ascii');
-        } else {
-          buffer.writePLPBody(parameter.value, 'ascii');
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         if (parameter.length <= this.maximumLength) {
           buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
           buffer.writeUInt32LE(0xFFFFFFFF);
         }
+
+        return;
+      }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      if (parameter.length <= this.maximumLength) {
+        buffer.writeUsVarbyte(value, 'ascii');
+      } else {
+        buffer.writePLPBody(value, 'ascii');
       }
     },
 
@@ -994,12 +1117,19 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt16LE(parameter.length);
-        buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt16LE(NULL);
+        return;
       }
+
+      if (!(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt16LE(parameter.length);
+      buffer.writeBuffer(value.slice(0, Math.min(parameter.length, this.maximumLength)));
     },
 
     validate: function(value) {
@@ -1060,11 +1190,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUsVarbyte(parameter.value, 'ascii');
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt16LE(NULL);
+        return;
       }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUsVarbyte(value, 'ascii');
     },
 
     validate: function(value) {
@@ -1132,19 +1269,27 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        if (parameter.length <= this.maximumLength) {
-          buffer.writeUsVarbyte(parameter.value, 'ucs2');
-        } else {
-          buffer.writePLPBody(parameter.value, 'ucs2');
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         if (parameter.length <= this.maximumLength) {
           buffer.writeUInt16LE(NULL);
         } else {
           buffer.writeUInt32LE(0xFFFFFFFF);
           buffer.writeUInt32LE(0xFFFFFFFF);
         }
+
+        return;
+      }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      if (parameter.length <= this.maximumLength) {
+        buffer.writeUsVarbyte(value, 'ucs2');
+      } else {
+        buffer.writePLPBody(value, 'ucs2');
       }
     },
 
@@ -1209,11 +1354,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUsVarbyte(parameter.value, 'ucs2');
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt16LE(NULL);
+        return;
       }
+
+      if (typeof value !== 'string' && !(value instanceof Buffer)) {
+        throw new TypeError(`parameter.value must be a Buffer, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUsVarbyte(value, 'ucs2');
     },
 
     validate: function(value) {
@@ -1279,38 +1431,45 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
+      const value = parameter.value;
 
-        let timestamp;
-        if (options.useUTC) {
-          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-        } else {
-          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-        }
-
-        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(3);
-            buffer.writeUInt24LE(timestamp);
-          case 3:
-          case 4:
-            buffer.writeUInt8(4);
-            buffer.writeUInt32LE(timestamp);
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(5);
-            buffer.writeUInt40LE(timestamp);
-        }
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, number, string, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(3);
+          buffer.writeUInt24LE(timestamp);
+        case 3:
+        case 4:
+          buffer.writeUInt8(4);
+          buffer.writeUInt32LE(timestamp);
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(5);
+          buffer.writeUInt40LE(timestamp);
       }
     },
 
@@ -1345,16 +1504,23 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(3);
-        if (options.useUTC) {
-          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
-        }
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeUInt8(3);
+      if (options.useUTC) {
+        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      } else {
+        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
       }
     },
 
@@ -1415,46 +1581,54 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
+      const value = parameter.value;
 
-        let timestamp;
-        if (options.useUTC) {
-          timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-        } else {
-          timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-        }
-
-        timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(6);
-            buffer.writeUInt24LE(timestamp);
-            break;
-          case 3:
-          case 4:
-            buffer.writeUInt8(7);
-            buffer.writeUInt32LE(timestamp);
-            break;
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(8);
-            buffer.writeUInt40LE(timestamp);
-        }
-        if (options.useUTC) {
-          buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        } else {
-          const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-          buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
-        }
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(6);
+          buffer.writeUInt24LE(timestamp);
+          break;
+        case 3:
+        case 4:
+          buffer.writeUInt8(7);
+          buffer.writeUInt32LE(timestamp);
+          break;
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(8);
+          buffer.writeUInt40LE(timestamp);
+      }
+
+      if (options.useUTC) {
+        buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+value - YEAR_ONE + dstDiff) / 86400000));
       }
     },
 
@@ -1510,40 +1684,47 @@ const TYPE = module.exports.TYPE = {
       buffer.writeUInt8(parameter.scale);
     },
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        const time = new Date(+parameter.value);
-        time.setUTCFullYear(1970);
-        time.setUTCMonth(0);
-        time.setUTCDate(1);
+      const value = parameter.value;
 
-        let timestamp = time * Math.pow(10, parameter.scale - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
-        timestamp = Math.round(timestamp);
-
-        const offset = -parameter.value.getTimezoneOffset();
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(8);
-            buffer.writeUInt24LE(timestamp);
-            break;
-          case 3:
-          case 4:
-            buffer.writeUInt8(9);
-            buffer.writeUInt32LE(timestamp);
-            break;
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(10);
-            buffer.writeUInt40LE(timestamp);
-        }
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-        buffer.writeInt16LE(offset);
-      } else {
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      const time = new Date(+value);
+      time.setUTCFullYear(1970);
+      time.setUTCMonth(0);
+      time.setUTCDate(1);
+
+      let timestamp = time * Math.pow(10, parameter.scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = Math.round(timestamp);
+
+      const offset = -value.getTimezoneOffset();
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(8);
+          buffer.writeUInt24LE(timestamp);
+          break;
+        case 3:
+        case 4:
+          buffer.writeUInt8(9);
+          buffer.writeUInt32LE(timestamp);
+          break;
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(10);
+          buffer.writeUInt40LE(timestamp);
+      }
+      buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeInt16LE(offset);
     },
     validate: function(value) {
       if (value == null) {
@@ -1582,7 +1763,7 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value == null) {
+      if (parameter.value === undefined || parameter.value === null) {
         buffer.writeUInt16LE(0xFFFF);
         buffer.writeUInt8(0x00);
         buffer.writeUInt8(0x00);
