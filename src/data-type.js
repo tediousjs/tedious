@@ -780,13 +780,21 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
-      if (parameter.value != null) {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
+        buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
         buffer.writeInt32LE(parameter.length);
-        buffer.writeString(parameter.value.toString(), 'ascii');
-      } else {
-        buffer.writeInt32LE(parameter.length);
+        return;
       }
+
+      if (typeof value !== 'string' && typeof value.toString !== 'function') {
+        throw new TypeError(`parameter.value must have a 'toString' method, or be a string, undefined or null. Received type ${typeof value}`);
+      }
+
+      buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+      buffer.writeInt32LE(parameter.length);
+      buffer.writeString(parameter.value.toString(), 'ascii');
     },
 
     validate: function(value) {
