@@ -154,11 +154,18 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter) {
-      if (parameter.value != null) {
-        buffer.writeUInt8(4);
-        buffer.writeInt32LE(parseInt(parameter.value));
-      } else {
+      const value = parameter.value;
+
+      if (value === undefined || value === null) {
         buffer.writeUInt8(0);
+        return;
+      }
+
+      buffer.writeUInt8(4);
+      if (typeof value === 'number') {
+        buffer.writeInt32LE(value);
+      } else {
+        buffer.writeInt32LE(parseInt(value));
       }
     },
 
