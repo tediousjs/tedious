@@ -198,24 +198,30 @@ const TYPE = module.exports.TYPE = {
     },
 
     writeParameterData: function(buffer, parameter, options) {
-      if (parameter.value != null) {
-        let days, dstDiff, minutes;
-        if (options.useUTC) {
-          days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
-        } else {
-          dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-          days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-          minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
-        }
+      const value = parameter.value;
 
-        buffer.writeUInt8(4);
-        buffer.writeUInt16LE(days);
-
-        buffer.writeUInt16LE(minutes);
-      } else {
+      if (value === null || value === undefined) {
         buffer.writeUInt8(0);
+        return;
       }
+
+      if (!(value instanceof Date)) {
+        throw new TypeError(`parameter.value must be a Date, undefined or null. Received type ${typeof value}`);
+      }
+
+      let days, minutes;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (value.getHours() * 60) + value.getMinutes();
+      }
+
+      buffer.writeUInt8(4);
+      buffer.writeUInt16LE(days);
+      buffer.writeUInt16LE(minutes);
     },
 
     validate: function(value) {
