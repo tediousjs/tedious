@@ -26,7 +26,7 @@ exports.createFromBuffer = function(test) {
 };
 
 exports.noFedAuth = function(test) {
-  var payload = new PreloginPayload({ encrypt: true , fedAuthRequested: false });
+  var payload = new PreloginPayload({ encrypt: true, fedAuthRequested: false });
 
   assertFedauthPayload(test, payload, undefined);
 
@@ -34,7 +34,7 @@ exports.noFedAuth = function(test) {
 };
 
 exports.fedAuth = function(test) {
-  var payload = new PreloginPayload({ encrypt: true , fedAuthRequested: true });
+  var payload = new PreloginPayload({ encrypt: true, fedAuthRequested: true });
 
   assertFedauthPayload(test, payload, 1);
 
@@ -65,5 +65,5 @@ var assertFedauthPayload = function(test, payload, fedauth) {
   test.strictEqual(payload.instance, 0);
   test.strictEqual(payload.threadId, 0);
   test.strictEqual(payload.marsString, 'OFF');
-  test.strictEqual(payload.fedAuthRequired, fedauth)
+  test.strictEqual(payload.fedAuthRequired, fedauth);
 };
