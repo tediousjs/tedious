@@ -106,7 +106,7 @@ module.exports = class BulkLoad extends EventEmitter {
 
     this.columns.push(column);
 
-    return this.columnsByName[name] = column;
+    this.columnsByName[name] = column;
   }
 
   addRow(row) {

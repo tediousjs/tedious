@@ -63,7 +63,7 @@ class Packet {
   }
 
   setLength() {
-    return this.buffer.writeUInt16BE(this.buffer.length, OFFSET.Length);
+    this.buffer.writeUInt16BE(this.buffer.length, OFFSET.Length);
   }
 
   length() {
@@ -77,7 +77,7 @@ class Packet {
     } else {
       status &= 0xFF - STATUS.RESETCONNECTION;
     }
-    return this.buffer.writeUInt8(status, OFFSET.Status);
+    this.buffer.writeUInt8(status, OFFSET.Status);
   }
 
   last(last) {

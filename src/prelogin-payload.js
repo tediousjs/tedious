@@ -88,7 +88,7 @@ module.exports = class PreloginPayload {
       optionDataOffset += option.data.length;
     }
 
-    return this.data.writeUInt8(TOKEN.TERMINATOR, optionOffset);
+    this.data.writeUInt8(TOKEN.TERMINATOR, optionOffset);
   }
 
   createVersionOption() {
@@ -183,7 +183,7 @@ module.exports = class PreloginPayload {
   }
 
   extractVersion(offset) {
-    return this.version = {
+    this.version = {
       major: this.data.readUInt8(offset + 0),
       minor: this.data.readUInt8(offset + 1),
       patch: this.data.readUInt8(offset + 2),
@@ -194,20 +194,20 @@ module.exports = class PreloginPayload {
 
   extractEncryption(offset) {
     this.encryption = this.data.readUInt8(offset);
-    return this.encryptionString = encryptByValue[this.encryption];
+    this.encryptionString = encryptByValue[this.encryption];
   }
 
   extractInstance(offset) {
-    return this.instance = this.data.readUInt8(offset);
+    this.instance = this.data.readUInt8(offset);
   }
 
   extractThreadId(offset) {
-    return this.threadId = this.data.readUInt32BE(offset);
+    this.threadId = this.data.readUInt32BE(offset);
   }
 
   extractMars(offset) {
     this.mars = this.data.readUInt8(offset);
-    return this.marsString = marsByValue[this.mars];
+    this.marsString = marsByValue[this.mars];
   }
 
   extractFedAuth(offset) {
