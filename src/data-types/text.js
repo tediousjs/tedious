@@ -1,3 +1,6 @@
+const MAX = 2147483647;
+const NULL = -1;
+
 module.exports = {
   id: 0x23,
   type: 'TEXT',
@@ -11,39 +14,39 @@ module.exports = {
     return 'text';
   },
 
-  resolveLength: function(parameter) {
-    if (parameter.value != null) {
-      return parameter.value.length;
-    } else {
-      return -1;
-    }
-  },
-
   writeTypeInfo: function(buffer, parameter) {
+    const value = parameter.value;
+
     buffer.writeUInt8(this.id);
-    buffer.writeInt32LE(parameter.length);
+    if (value === null) {
+      buffer.writeInt32LE(NULL);
+    } else {
+      buffer.writeInt32LE(value.length);
+    }
   },
 
   writeParameterData: function(buffer, parameter) {
+    const value = parameter.value;
+
     buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
     if (parameter.value != null) {
-      buffer.writeInt32LE(parameter.length);
-      buffer.writeString(parameter.value.toString(), 'ascii');
+      buffer.writeInt32LE(value.length);
+      buffer.writeString(value, 'ascii');
     } else {
-      buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(NULL);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
-      }
-      value = value.toString();
+
+    const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+    if (typeof stringValue !== 'string' || stringValue.length > MAX) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return stringValue;
   }
 };

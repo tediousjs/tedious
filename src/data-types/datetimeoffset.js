@@ -38,17 +38,18 @@ module.exports = {
     buffer.writeUInt8(parameter.scale);
   },
   writeParameterData: function(buffer, parameter) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+    const value = parameter.value;
+    if (value != null) {
+      const time = new Date(+value);
       time.setUTCFullYear(1970);
       time.setUTCMonth(0);
       time.setUTCDate(1);
 
       let timestamp = time * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
-      const offset = -parameter.value.getTimezoneOffset();
+      const offset = -value.getTimezoneOffset();
       switch (parameter.scale) {
         case 0:
         case 1:
@@ -67,22 +68,29 @@ module.exports = {
           buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
       buffer.writeInt16LE(offset);
     } else {
       buffer.writeUInt8(0);
     }
   },
-  validate: function(value) {
-    if (value == null) {
+
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!(value instanceof Date)) {
-      value = Date.parse(value);
+
+    let dateValue;
+    if (value instanceof Date) {
+      dateValue = value;
+    } else {
+      dateValue = new Date(Date.parse(value));
     }
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+
+    if (isNaN(dateValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return dateValue;
   }
 };

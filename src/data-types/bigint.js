@@ -15,31 +15,25 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter) {
-    if (parameter.value != null) {
-      const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
-      buffer.writeUInt8(8);
-      buffer.writeInt64LE(val);
-    } else {
+    const value = parameter.value;
+    if (value === null) {
       buffer.writeUInt8(0);
+    } else {
+      buffer.writeUInt8(8);
+      buffer.writeInt64LE(value);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === null || value === undefined) {
       return null;
     }
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    if (value < -9007199254740991 || value > 9007199254740991) {
-      // Number.MIN_SAFE_INTEGER = -9007199254740991
-      // Number.MAX_SAFE_INTEGER = 9007199254740991
-      // 9007199254740991 = (2**53) - 1
-      // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
-      // as these constants are not available in node 0.10.
-      return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
-        ' For bigger numbers, use VarChar type.');
-    }
-    return value;
+
+    return numberValue;
   }
 };

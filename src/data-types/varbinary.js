@@ -63,13 +63,15 @@ module.exports = {
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value, length) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+
+    if (!Buffer.isBuffer(value) || (length <= this.maximumLength && value.length > length)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
+
     return value;
   }
 };

@@ -17,20 +17,28 @@ module.exports = {
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
       buffer.writeUInt8(4);
-      buffer.writeFloatLE(parseFloat(parameter.value));
+      buffer.writeFloatLE(parameter.value);
     } else {
       buffer.writeUInt8(0);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    value = parseFloat(value);
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+
+    let numberValue;
+    if (typeof value === 'number') {
+      numberValue = value;
+    } else {
+      numberValue = parseFloat(value);
     }
-    return value;
+
+    if (!Number.isFinite(numberValue) || (typeof value === 'string' && value !== numberValue.toString()) || numberValue !== Math.fround(numberValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
+    }
+
+    return numberValue;
   }
 };

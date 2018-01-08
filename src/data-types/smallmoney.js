@@ -23,17 +23,22 @@ module.exports = {
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    value = parseFloat(value);
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+
+    let numberValue;
+    if (typeof value === 'number') {
+      numberValue = value;
+    } else {
+      numberValue = parseFloat(value);
     }
-    if (value < -214748.3648 || value > 214748.3647) {
-      return new TypeError('Value must be between -214748.3648 and 214748.3647.');
+
+    if (!Number.isFinite(numberValue) || numberValue < -214748.3648 || numberValue > 214748.3647 || (typeof value === 'string' && value !== numberValue.toString()) || numberValue.toString() !== numberValue.toFixed(4)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return numberValue;
   }
 };

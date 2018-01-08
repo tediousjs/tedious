@@ -129,12 +129,15 @@ module.exports = class BulkLoad extends EventEmitter {
     const arr = row instanceof Array;
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
-      c.type.writeParameterData(this.rowsData, {
+
+      const parameter = {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
-        value: row[arr ? i : c.objName]
-      }, this.options);
+        value: c.type.validate(row[arr ? i : c.objName], c.length, c.precision, c.scale)
+      };
+
+      c.type.writeParameterData(this.rowsData, parameter, this.options);
     }
   }
 

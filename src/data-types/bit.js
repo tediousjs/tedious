@@ -15,7 +15,7 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter) {
-    if (typeof parameter.value === 'undefined' || parameter.value === null) {
+    if (parameter.value === null) {
       buffer.writeUInt8(0);
     } else {
       buffer.writeUInt8(1);
@@ -23,14 +23,11 @@ module.exports = {
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (value) {
-      return true;
-    } else {
-      return false;
-    }
+
+    return !!value;
   }
 };

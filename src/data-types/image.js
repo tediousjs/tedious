@@ -1,3 +1,6 @@
+const MAX = 2147483647;
+const NULL = -1;
+
 module.exports = {
   id: 0x22,
   type: 'IMAGE',
@@ -10,35 +13,37 @@ module.exports = {
     return 'image';
   },
 
-  resolveLength: function(parameter) {
-    if (parameter.value != null) {
-      return parameter.value.length;
-    } else {
-      return -1;
-    }
-  },
-
   writeTypeInfo: function(buffer, parameter) {
+    const value = parameter.value;
+
     buffer.writeUInt8(this.id);
-    buffer.writeInt32LE(parameter.length);
+    if (value === null) {
+      buffer.writeInt32LE(NULL);
+    } else {
+      buffer.writeInt32LE(value.length);
+    }
   },
 
   writeParameterData: function(buffer, parameter) {
-    if (parameter.value != null) {
-      buffer.writeInt32LE(parameter.length);
-      buffer.writeBuffer(parameter.value);
+    const value = parameter.value;
+
+    if (value === null) {
+      buffer.writeInt32LE(NULL);
     } else {
-      buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(value.length);
+      buffer.writeBuffer(value);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+
+    if (!Buffer.isBuffer(value) || value.length > MAX) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
+
     return value;
   }
 };

@@ -175,11 +175,17 @@ exports.Real = function(test) {
   var value = TYPE.Real.validate(null);
   test.strictEqual(value, null);
 
+  value = TYPE.Real.validate(4.875);
+  test.strictEqual(value, 4.875);
+
+  value = TYPE.Real.validate('4.875');
+  test.strictEqual(value, 4.875);
+
   value = TYPE.Real.validate(1516.61556);
-  test.strictEqual(value, 1516.61556);
+  test.ok(value instanceof TypeError);
 
   value = TYPE.Real.validate('1516.61556');
-  test.strictEqual(value, 1516.61556);
+  test.ok(value instanceof TypeError);
 
   value = TYPE.Real.validate('xxx');
   test.ok(value instanceof TypeError);
@@ -239,11 +245,17 @@ exports.Money = function(test) {
   var value = TYPE.Money.validate(null);
   test.strictEqual(value, null);
 
+  value = TYPE.Money.validate(214748.3647);
+  test.strictEqual(value, 214748.3647);
+
+  value = TYPE.Money.validate(214748.3648);
+  test.strictEqual(value, 214748.3648);
+
   value = TYPE.Money.validate(1516.61556);
-  test.strictEqual(value, 1516.61556);
+  test.ok(value instanceof TypeError);
 
   value = TYPE.Money.validate('1516.61556');
-  test.strictEqual(value, 1516.61556);
+  test.ok(value instanceof TypeError);
 
   value = TYPE.Money.validate('xxx');
   test.ok(value instanceof TypeError);
@@ -259,6 +271,12 @@ exports.SmallMoney = function(test) {
   test.strictEqual(value, 214748.3647);
 
   value = TYPE.SmallMoney.validate(214748.3648);
+  test.ok(value instanceof TypeError);
+
+  value = TYPE.SmallMoney.validate(1516.61556);
+  test.ok(value instanceof TypeError);
+
+  value = TYPE.SmallMoney.validate('1516.61556');
   test.ok(value instanceof TypeError);
 
   test.done();
@@ -392,7 +410,7 @@ exports.TVP = function(test) {
 
   var table = { columns: [], rows: [] };
   value = TYPE.TVP.validate(table);
-  test.strictEqual(value, table);
+  test.deepEqual(value, table);
 
   value = TYPE.TVP.validate({});
   test.ok(value instanceof TypeError);

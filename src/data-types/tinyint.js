@@ -17,23 +17,22 @@ module.exports = {
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
       buffer.writeUInt8(1);
-      buffer.writeUInt8(parseInt(parameter.value));
+      buffer.writeUInt8(parameter.value);
     } else {
       buffer.writeUInt8(0);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === null || value === undefined) {
       return null;
     }
-    value = parseInt(value);
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue) || value < 0 || value > 255) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    if (value < 0 || value > 255) {
-      return new TypeError('Value must be between 0 and 255.');
-    }
-    return value;
+
+    return numberValue;
   }
 };

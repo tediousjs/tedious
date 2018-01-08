@@ -35,21 +35,25 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter) {
-    if (parameter.value != null) {
-      buffer.writeUInt16LE(parameter.length);
-      buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
+    const value = parameter.value;
+
+    if (value != null) {
+      buffer.writeUInt16LE(value.length);
+      buffer.writeBuffer(value);
     } else {
       buffer.writeUInt16LE(NULL);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value, length) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+
+    if (!Buffer.isBuffer(value) || value.length > length) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
+
     return value;
   }
 };

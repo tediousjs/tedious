@@ -69,16 +69,16 @@ module.exports = {
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value, length) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
-      }
-      value = value.toString();
+
+    const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+    if (typeof stringValue !== 'string' || (length <= this.maximumLength && stringValue.length > length)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return stringValue;
   }
 };

@@ -35,7 +35,7 @@ exports.callProcedureWithTVP = function(test) {
     return;
   }
 
-  test.expect(13);
+  test.expect(14);
 
   var request = new Request(TEST_SETUP_1, function(err, rowCount) {
     connection.execSqlBatch(request2);
@@ -50,6 +50,7 @@ exports.callProcedureWithTVP = function(test) {
   });
 
   var request4 = new Request('__tediousTvpTest', function(err, rowCount) {
+    test.ifError(err);
     connection.close();
   });
 

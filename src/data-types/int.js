@@ -15,25 +15,25 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter) {
-    if (parameter.value != null) {
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(parseInt(parameter.value));
-    } else {
+    const value = parameter.value;
+    if (value === null) {
       buffer.writeUInt8(0);
+    } else {
+      buffer.writeUInt8(4);
+      buffer.writeInt32LE(value);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === null || value === undefined) {
       return null;
     }
-    value = parseInt(value);
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue) || value < -2147483648 || value > 2147483647) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    if (value < -2147483648 || value > 2147483647) {
-      return new TypeError('Value must be between -2147483648 and 2147483647.');
-    }
-    return value;
+
+    return numberValue;
   }
 };

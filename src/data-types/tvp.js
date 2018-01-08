@@ -43,36 +43,48 @@ module.exports = {
       buffer.writeUInt8(0x01);
 
       for (let k = 0, len2 = row.length; k < len2; k++) {
-        const value = row[k];
-        const param = {
-          value: value,
-          length: parameter.value.columns[k].length,
-          scale: parameter.value.columns[k].scale,
-          precision: parameter.value.columns[k].precision
-        };
-        parameter.value.columns[k].type.writeParameterData(buffer, param, options);
+        const column = parameter.value.columns[k];
+        const param = row[k];
+        column.type.writeParameterData(buffer, param, options);
       }
     }
 
     buffer.writeUInt8(0x00);
   },
-  validate: function(value) {
-    if (value == null) {
+
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
 
-    if (typeof value !== 'object') {
-      return new TypeError('Invalid table.');
+    if (typeof value !== 'object' || !Array.isArray(value.columns) || !Array.isArray(value.rows)) {
+      return new TypeError();
     }
 
-    if (!Array.isArray(value.columns)) {
-      return new TypeError('Invalid table.');
-    }
+    const result = {
+      columns: value.columns,
+      rows: value.rows.map(function(row) {
+        if (!Array.isArray(row)) {
+          return new TypeError();
+        }
 
-    if (!Array.isArray(value.rows)) {
-      return new TypeError('Invalid table.');
-    }
+        return row.map(function(columnValue, index) {
+          const column = value.columns[index];
 
-    return value;
+          if (column === undefined || column.type === undefined) {
+            return new TypeError();
+          }
+
+          return {
+            value: column.type.validate(columnValue, column.length, column.scale, column.precision),
+            length: column.length,
+            scale: column.scale,
+            precision: column.precision
+          };
+        });
+      })
+    };
+
+    return result;
   }
 };

@@ -44,18 +44,17 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter, options) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
-
+    const value = parameter.value;
+    if (value != null) {
       let timestamp;
       if (options.useUTC) {
-        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+        timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
       } else {
-        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+        timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
       }
 
       timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
       switch (parameter.scale) {
@@ -77,26 +76,32 @@ module.exports = {
           buffer.writeUInt40LE(timestamp);
       }
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+value - UTC_YEAR_ONE) / 86400000));
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+value - YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
     }
   },
 
-  validate: function(value) {
-    if (value == null) {
+  validate(value) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!(value instanceof Date)) {
-      value = Date.parse(value);
+
+    let dateValue;
+    if (value instanceof Date) {
+      dateValue = value;
+    } else {
+      dateValue = new Date(Date.parse(value));
     }
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+
+    if (isNaN(dateValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return dateValue;
   }
 };
