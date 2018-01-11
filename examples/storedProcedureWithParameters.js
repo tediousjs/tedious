@@ -25,17 +25,15 @@ connection.on('connect', function(err) {
       if (err) {
         console.log(err);
       }
+
+      connection.close();
     });
 
   request.addParameter('inputVal', TYPES.VarChar, 'hello world');
   request.addOutputParameter('outputCount', TYPES.Int);
 
-  request.on('returnValue', function(pramName, value, metadata) {
-    console.log(pramName + ' : ' + value);
-  });
-
-  request.on('requestCompleted', function() {
-    connection.close();
+  request.on('returnValue', function(paramName, value, metadata) {
+    console.log(paramName + ' : ' + value);
   });
 
   connection.callProcedure(request);
