@@ -1,2 +1,15 @@
 destination: site
 highlighter: rouge
+theme : jekyll-theme-slate
+title : 'Tedious'
+description : 'Node.js implementation of TDS'
+show_downloads: true
+
+github :
+  repository_url : https://github.com/tediousjs/tedious
+  is_project_page : true
+  repository_name : 'tediousjs/tedious'
+  owner_url : https://github.com/pekim
+  owner_name : 'Mike D Pilsbury'
+  zip_url : https://github.com/tediousjs/tedious/zipball/master
+  tar_url : https://github.com/tediousjs/tedious/tarball/master
