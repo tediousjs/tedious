@@ -689,17 +689,22 @@ class Connection extends EventEmitter {
       if (err) {
         return this.socketError(err);
       }
+      if(this.state === this.STATE.FINAL) {
+        if(socket) {
+          socket.destroy();
+        }
+      } else {
+        this.socket = socket;
+        this.socket.on('error', this.socketError);
+        this.socket.on('close', this.socketClose);
+        this.socket.on('end', this.socketEnd);
+        this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
+        this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
+        this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+        this.messageIo.on('secure', this.emit.bind(this, 'secure'));
 
-      this.socket = socket;
-      this.socket.on('error', this.socketError);
-      this.socket.on('close', this.socketClose);
-      this.socket.on('end', this.socketEnd);
-      this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
-      this.messageIo.on('secure', this.emit.bind(this, 'secure'));
-
-      this.socketConnect();
+        this.socketConnect();
+      }
     });
   }
 
