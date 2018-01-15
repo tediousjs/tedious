@@ -1,5 +1,6 @@
 const tls = require('tls');
 const crypto = require('crypto');
+const DuplexPair = require('native-duplexpair');
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 
@@ -83,10 +84,10 @@ module.exports = class MessageIO extends EventEmitter {
   startTls(credentialsDetails, hostname, trustServerCertificate) {
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
-    this.securePair = tls.createSecurePair(credentials);
+    this.securePair = this.createSecurePair(credentials);
     this.tlsNegotiationComplete = false;
 
-    this.securePair.on('secure', () => {
+    this.securePair.cleartext.on('secure', () => {
       const cipher = this.securePair.cleartext.getCipher();
 
       if (!trustServerCertificate) {
@@ -187,5 +188,16 @@ module.exports = class MessageIO extends EventEmitter {
   // Resumes the flow of incoming packets.
   resume() {
     this.packetStream.resume();
+  }
+
+  createSecurePair(credentials) {
+    const duplexpair = new DuplexPair();
+    return {
+      cleartext: new tls.TLSSocket(duplexpair.socket1, {
+        secureContext: credentials,
+        rejectUnauthorized: false
+      }),
+      encrypted: duplexpair.socket2
+    };
   }
 };
