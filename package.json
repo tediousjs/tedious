@@ -34,7 +34,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">= 4"
+    "node": ">= 6"
   },
   "publishConfig": {
     "tag": "next"
@@ -84,7 +84,7 @@
         "env",
         {
           "targets": {
-            "node": 4
+            "node": 6
           }
         }
       ],
