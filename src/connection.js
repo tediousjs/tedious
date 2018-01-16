@@ -691,8 +691,8 @@ class Connection extends EventEmitter {
       }
 
       if (this.state === this.STATE.FINAL) {
-          socket.destroy();
-          return;
+        socket.destroy();
+        return;
       } else {
         this.socket = socket;
         this.socket.on('error', this.socketError);
