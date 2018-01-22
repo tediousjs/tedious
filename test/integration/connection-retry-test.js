@@ -74,6 +74,8 @@ exports['connection retry tests'] = {
     const config = getConfig();
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
+    const clock = this.sinon.useFakeTimers('setTimeout');
+
     test.expect(1);
 
     this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
@@ -86,11 +88,17 @@ exports['connection retry tests'] = {
       test.ok(false);
     });
 
+    connection.on('errorMessage', () => {
+      // Forward clock past connectTimeout which is less than retry interval.
+      clock.tick(config.options.connectTimeout + 1);
+    });
+
     connection.on('connect', (err) => {
       test.ok(err);
     });
 
     connection.on('end', (info) => {
+      clock.restore();
       test.done();
     });
   },
