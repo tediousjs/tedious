@@ -8,6 +8,8 @@ const Packet = require('./packet').Packet;
 const TYPE = require('./packet').TYPE;
 const packetHeaderLength = require('./packet').HEADER_LENGTH;
 
+const USE_LEGACY_SECUREPAIR = Number(process.versions.node[0]) <= 7;
+
 class ReadablePacketStream extends Transform {
   constructor() {
     super({ objectMode: true });
@@ -85,25 +87,14 @@ module.exports = class MessageIO extends EventEmitter {
   startTls(credentialsDetails, hostname, trustServerCertificate) {
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
-    const duplexpair = new DuplexPair();
-    this.securePair = {
-      cleartext: new tls.TLSSocket(duplexpair.socket1, {
-        secureContext: credentials,
-        rejectUnauthorized: false
-      }),
-      encrypted: duplexpair.socket2
-    };
+    this.securePair = this.createSecurePair(credentials);
     this.tlsNegotiationComplete = false;
 
-    this.securePair.cleartext.on('secure', () => {
+    this.getSecurePairSecureTarget().on('secure', () => {
       const cipher = this.securePair.cleartext.getCipher();
 
-      if (!trustServerCertificate) {
-        if (!this.tlsHandler.cleartext.authorized) {
-          this.securePair.cleartext.destroy()
-          this.socket.destroy(this.tlsHandler.cleartext.authorizationError);
-          return;
-        }
+      if (!trustServerCertificate && !this.checkAuthorizationError(hostname)) {
+        return;
       }
 
       this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
@@ -189,5 +180,49 @@ module.exports = class MessageIO extends EventEmitter {
   // Resumes the flow of incoming packets.
   resume() {
     this.packetStream.resume();
+  }
+
+  createSecurePair(credentials) {
+    if (USE_LEGACY_SECUREPAIR) {
+      return tls.createSecurePair(credentials);
+    } else {
+      const duplexpair = new DuplexPair();
+      return {
+        cleartext: new tls.TLSSocket(duplexpair.socket1, {
+          secureContext: credentials,
+          rejectUnauthorized: false
+        }),
+        encrypted: duplexpair.socket2
+      };
+    }
+  }
+
+  checkAuthorizationError(hostname) {
+    let verifyError = null;
+    if (USE_LEGACY_SECUREPAIR) {
+      verifyError = this.securePair.ssl.verifyError();
+      // Verify that server's identity matches it's certificate's names
+      if (!verifyError) {
+        verifyError = tls.checkServerIdentity(hostname, this.securePair.cleartext.getPeerCertificate());
+      }
+      if (verifyError) {
+        this.securePair.destroy();
+      }
+    } else if (!this.securePair.cleartext.authorized) {
+      verifyError = this.securePair.cleartext.authorizationError;
+    }
+    if (verifyError) {
+      this.socket.destroy(verifyError);
+      return false;
+    }
+    return true;
+  }
+
+  getSecurePairSecureTarget() {
+    if (USE_LEGACY_SECUREPAIR) {
+      return this.securePair;
+    } else {
+      return this.securePair.cleartext;
+    }
   }
 };
