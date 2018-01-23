@@ -240,28 +240,28 @@ function valueParse(parser, metaData, options, callback) {
               return readDateTime(parser, options.useUTC, callback);
           }
 
-        case 'TimeN':
+        case 'Time':
           if (dataLength === 0) {
             return callback(null);
           } else {
             return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
           }
 
-        case 'DateN':
+        case 'Date':
           if (dataLength === 0) {
             return callback(null);
           } else {
             return readDate(parser, options.useUTC, callback);
           }
 
-        case 'DateTime2N':
+        case 'DateTime2':
           if (dataLength === 0) {
             return callback(null);
           } else {
             return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
           }
 
-        case 'DateTimeOffsetN':
+        case 'DateTimeOffset':
           if (dataLength === 0) {
             return callback(null);
           } else {
@@ -300,7 +300,7 @@ function valueParse(parser, metaData, options, callback) {
             });
           }
 
-        case 'UniqueIdentifierN':
+        case 'UniqueIdentifier':
           switch (dataLength) {
             case 0:
               return callback(null);

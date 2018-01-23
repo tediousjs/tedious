@@ -1,3 +1,5 @@
+const deprecate = require('depd')('tedious');
+
 const Null = require('./data-types/null');
 const TinyInt = require('./data-types/tinyint');
 const Bit = require('./data-types/bit');
@@ -14,7 +16,7 @@ const SmallMoney = require('./data-types/smallmoney');
 const BigInt = require('./data-types/bigint');
 const Image = require('./data-types/image');
 const Text = require('./data-types/text');
-const UniqueIdentifierN = require('./data-types/uniqueidentifiern');
+const UniqueIdentifier = require('./data-types/uniqueidentifier');
 const IntN = require('./data-types/intn');
 const NText = require('./data-types/ntext');
 const BitN = require('./data-types/bitn');
@@ -30,15 +32,15 @@ const Char = require('./data-types/char');
 const NVarChar = require('./data-types/nvarchar');
 const NChar = require('./data-types/nchar');
 const Xml = require('./data-types/xml');
-const TimeN = require('./data-types/timen');
-const DateN = require('./data-types/daten');
-const DateTime2N = require('./data-types/datetime2n');
-const DateTimeOffsetN = require('./data-types/datetimeoffsetn');
+const Time = require('./data-types/time');
+const Date = require('./data-types/date');
+const DateTime2 = require('./data-types/datetime2');
+const DateTimeOffset = require('./data-types/datetimeoffset');
 const UDT = require('./data-types/udt');
 const TVP = require('./data-types/tvp');
 const Variant = require('./data-types/sql-variant');
 
-const TYPE = module.exports.TYPE = {
+module.exports.TYPE = {
   [Null.id]: Null,
   [TinyInt.id]: TinyInt,
   [Bit.id]: Bit,
@@ -55,7 +57,7 @@ const TYPE = module.exports.TYPE = {
   [BigInt.id]: BigInt,
   [Image.id]: Image,
   [Text.id]: Text,
-  [UniqueIdentifierN.id]: UniqueIdentifierN,
+  [UniqueIdentifier.id]: UniqueIdentifier,
   [IntN.id]: IntN,
   [NText.id]: NText,
   [BitN.id]: BitN,
@@ -71,29 +73,76 @@ const TYPE = module.exports.TYPE = {
   [NVarChar.id]: NVarChar,
   [NChar.id]: NChar,
   [Xml.id]: Xml,
-  [TimeN.id]: TimeN,
-  [DateN.id]: DateN,
-  [DateTime2N.id]: DateTime2N,
-  [DateTimeOffsetN.id]: DateTimeOffsetN,
+  [Time.id]: Time,
+  [Date.id]: Date,
+  [DateTime2.id]: DateTime2,
+  [DateTimeOffset.id]: DateTimeOffset,
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
 };
 
-const typeByName = module.exports.typeByName = {};
+const typeByName = module.exports.typeByName = {
+  Null,
+  TinyInt,
+  Bit,
+  SmallInt,
+  Int,
+  SmallDateTime,
+  Real,
+  Money,
+  DateTime,
+  Float,
+  Decimal,
+  Numeric,
+  SmallMoney,
+  BigInt,
+  Image,
+  Text,
+  UniqueIdentifier,
+  NText,
+  VarBinary,
+  VarChar,
+  Binary,
+  Char,
+  NVarChar,
+  NChar,
+  Xml,
+  Time,
+  Date,
+  DateTime2,
+  DateTimeOffset,
+  UDT,
+  TVP,
+  Variant,
 
-for (const id in TYPE) {
-  const type = TYPE[id];
-  typeByName[type.name] = type;
-  if ((type.aliases != null) && type.aliases instanceof Array) {
-    const ref = type.aliases;
-    const len = ref.length;
+  // These are all internal and should not be used directly.
+  IntN,
+  BitN,
+  FloatN,
+  MoneyN,
+  DateTimeN,
+  DecimalN,
+  NumericN,
 
-    for (let i = 0; i < len; i++) {
-      const alias = ref[i];
-      if (!typeByName[alias]) {
-        typeByName[alias] = type;
-      }
-    }
-  }
-}
+  // These are all deprecated aliases.
+  DateN: Date,
+  DateTimeOffsetN: DateTimeOffset,
+  DateTime2N: DateTime2,
+  TimeN: Time,
+  UniqueIdentifierN: UniqueIdentifier,
+};
+
+[
+  ['DateN', 'Date'],
+  ['DateTimeOffsetN', 'DateTimeOffset'],
+  ['DateTime2N', 'DateTime2'],
+  ['TimeN', 'Time'],
+  ['UniqueIdentifierN', 'UniqueIdentifier']
+].forEach(function([alias, name]) {
+  deprecate.property(typeByName, alias, 'The `' + alias + '` data type alias is deprecated, please use `' + name + '` instead.');
+});
+
+['IntN', 'BitN', 'FloatN', 'MoneyN', 'DateTimeN', 'DecimalN', 'NumericN'].forEach(function(name) {
+  deprecate.property(typeByName, name, 'The `' + name + '` data type is internal and will be removed.');
+});
