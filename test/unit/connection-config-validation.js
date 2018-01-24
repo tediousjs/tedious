@@ -66,5 +66,41 @@ exports['Connection configuration validation'] = {
     });
 
     test.done();
+  },
+
+  'bad boolean types': function(test) {
+    const booleanOptions = [
+      'abortTransactionOnError',
+      'camelCaseColumns',
+      'enableAnsiNull',
+      'enableAnsiNullDefault',
+      'enableAnsiPadding',
+      'enableAnsiWarnings',
+      'enableArithAbort',
+      'enableConcatNullYieldsNull',
+      'enableCursorCloseOnCommit',
+      'enableImplicitTransactions',
+      'enableNumericRoundabort',
+      'enableQuotedIdentifier',
+      'encrypt',
+      'fallbackToDefaultDb',
+      'multiSubnetFailover',
+      'readOnlyIntent',
+      'rowCollectionOnDone',
+      'rowCollectionOnRequestCompletion',
+      'trustServerCertificate',
+      'useColumnNames',
+      'useUTC'
+    ];
+
+    for (const item of booleanOptions) {
+      this.config.options[item] = 'string';
+      console.log(item);
+      test.throws(() => {
+        new Connection(this.config);
+      });
+    }
+
+    test.done();
   }
 };
