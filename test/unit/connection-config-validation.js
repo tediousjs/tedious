@@ -95,7 +95,6 @@ exports['Connection configuration validation'] = {
 
     for (const item of booleanOptions) {
       this.config.options[item] = 'string';
-      console.log(item);
       test.throws(() => {
         new Connection(this.config);
       });
