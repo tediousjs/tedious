@@ -110,10 +110,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.abortTransactionOnError != undefined) {
-        if (typeof config.options.abortTransactionOnError !== 'boolean') {
-          throw new TypeError('options.abortTransactionOnError must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.abortTransactionOnError, 'options.abortTransactionOnError');
         this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
       }
 
@@ -122,10 +119,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.camelCaseColumns != undefined) {
-        if (typeof config.options.camelCaseColumns !== 'boolean') {
-          throw new TypeError('options.camelCaseColumns must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.camelCaseColumns, 'options.camelCaseColumns');
         this.config.options.camelCaseColumns = config.options.camelCaseColumns;
       }
 
@@ -185,97 +179,62 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.enableAnsiNull != undefined) {
-        if (typeof config.options.enableAnsiNull !== 'boolean') {
-          throw new TypeError('options.enableAnsiNull must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableAnsiNull, 'options.enableAnsiNull');
         this.config.options.enableAnsiNull = config.options.enableAnsiNull;
       }
 
       if (config.options.enableAnsiNullDefault != undefined) {
-        if (typeof config.options.enableAnsiNullDefault !== 'boolean') {
-          throw new TypeError('options.enableAnsiNullDefault must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableAnsiNullDefault, 'options.enableAnsiNullDefault');
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
       }
 
       if (config.options.enableAnsiPadding != undefined) {
-        if (typeof config.options.enableAnsiPadding !== 'boolean') {
-          throw new TypeError('options.enableAnsiPadding must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableAnsiPadding, 'options.enableAnsiPadding');
         this.config.options.enableAnsiPadding = config.options.enableAnsiPadding;
       }
 
       if (config.options.enableAnsiWarnings != undefined) {
-        if (typeof config.options.enableAnsiWarnings !== 'boolean') {
-          throw new TypeError('options.enableAnsiWarnings must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableAnsiWarnings, 'options.enableAnsiWarnings');
         this.config.options.enableAnsiWarnings = config.options.enableAnsiWarnings;
       }
 
       if (config.options.enableArithAbort !== undefined) {
-        if (typeof config.options.enableArithAbort !== 'boolean') {
-          throw new TypeError('options.enableArithAbort must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableArithAbort, 'options.enableArithAbort');
         this.config.options.enableArithAbort = config.options.enableArithAbort;
       }
 
       if (config.options.enableConcatNullYieldsNull != undefined) {
-        if (typeof config.options.enableConcatNullYieldsNull !== 'boolean') {
-          throw new TypeError('options.enableConcatNullYieldsNull must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableConcatNullYieldsNull, 'options.enableConcatNullYieldsNull');
         this.config.options.enableConcatNullYieldsNull = config.options.enableConcatNullYieldsNull;
       }
 
       if (config.options.enableCursorCloseOnCommit != undefined) {
-        if (typeof config.options.enableCursorCloseOnCommit !== 'boolean') {
-          throw new TypeError('options.enableCursorCloseOnCommit must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableCursorCloseOnCommit, 'options.enableCursorCloseOnCommit');
         this.config.options.enableCursorCloseOnCommit = config.options.enableCursorCloseOnCommit;
       }
 
       if (config.options.enableImplicitTransactions != undefined) {
-        if (typeof config.options.enableImplicitTransactions !== 'boolean') {
-          throw new TypeError('options.enableImplicitTransactions must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableImplicitTransactions, 'options.enableImplicitTransactions');
         this.config.options.enableImplicitTransactions = config.options.enableImplicitTransactions;
       }
 
       if (config.options.enableNumericRoundabort != undefined) {
-        if (typeof config.options.enableNumericRoundabort !== 'boolean') {
-          throw new TypeError('options.enableNumericRoundabort must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableNumericRoundabort, 'options.enableNumericRoundabort');
         this.config.options.enableNumericRoundabort = config.options.enableNumericRoundabort;
       }
 
       if (config.options.enableQuotedIdentifier !== undefined) {
-        if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
-          throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.enableQuotedIdentifier, 'options.enableQuotedIdentifier');
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
 
       if (config.options.encrypt != undefined) {
-        if (typeof config.options.encrypt !== 'boolean') {
-          throw new TypeError('options.encrypt must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.encrypt, 'options.encrypt');
         this.config.options.encrypt = config.options.encrypt;
       }
 
       if (config.options.fallbackToDefaultDb != undefined) {
-        if (typeof config.options.fallbackToDefaultDb !== 'boolean') {
-          throw new TypeError('options.fallbackToDefaultDb must be a boolean (true or false).');
-        }
+        this.validateBooleanOptions(config.options.fallbackToDefaultDb, 'options.fallbackToDefaultDb');
         this.config.options.fallbackToDefaultDb = config.options.fallbackToDefaultDb;
       }
 
@@ -297,10 +256,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.multiSubnetFailover != undefined) {
-        if (typeof config.options.multiSubnetFailover !== 'boolean') {
-          throw new TypeError('options.multiSubnetFailover must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.multiSubnetFailover, 'options.multiSubnetFailover');
         this.config.options.multiSubnetFailover = !!config.options.multiSubnetFailover;
       }
 
@@ -318,10 +274,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.readOnlyIntent != undefined) {
-        if (typeof config.options.readOnlyIntent !== 'boolean') {
-          throw new TypeError('options.readOnlyIntent must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.readOnlyIntent, 'options.readOnlyIntent');
         this.config.options.readOnlyIntent = config.options.readOnlyIntent;
       }
 
@@ -346,17 +299,12 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.rowCollectionOnDone != undefined) {
-        if (typeof config.options.rowCollectionOnDone !== 'boolean') {
-          throw new TypeError('options.rowCollectionOnDone must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.rowCollectionOnDone, 'options.rowCollectionOnDone');
         this.config.options.rowCollectionOnDone = config.options.rowCollectionOnDone;
       }
 
       if (config.options.rowCollectionOnRequestCompletion != undefined) {
-        if (typeof config.options.rowCollectionOnRequestCompletion !== 'boolean') {
-          throw new TypeError('options.rowCollectionOnRequestCompletion must be a boolean (true or false).');
-        }
+        this.validateBooleanOptions(config.options.rowCollectionOnRequestCompletion, 'options.rowCollectionOnRequestCompletion');
 
         this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
       }
@@ -370,29 +318,21 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.trustServerCertificate != undefined) {
-        if (typeof config.options.trustServerCertificate !== 'boolean') {
-          throw new TypeError('options.trustServerCertificate must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.trustServerCertificate, 'options.trustServerCertificate');
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
       }
 
       if (config.options.useColumnNames != undefined) {
-        if (typeof config.options.useColumnNames !== 'boolean') {
-          throw new TypeError('options.useColumnNames must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.useColumnNames, 'options.useColumnNames');
         this.config.options.useColumnNames = config.options.useColumnNames;
       }
 
       if (config.options.useUTC != undefined) {
-        if (typeof config.options.useUTC !== 'boolean') {
-          throw new TypeError('options.useUTC must be a boolean (true or false).');
-        }
-
+        this.validateBooleanOptions(config.options.useUTC, 'options.useUTC');
         this.config.options.useUTC = config.options.useUTC;
       }
     }
+
 
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
@@ -426,6 +366,12 @@ class Connection extends EventEmitter {
       REDIRECT: 1,
       RETRY: 2
     };
+  }
+
+  validateBooleanOptions(option, optionName) {
+    if (typeof option !== 'boolean') {
+      throw new TypeError(`${optionName} must be a boolean (true or false).`);
+    }
   }
 
   close() {
