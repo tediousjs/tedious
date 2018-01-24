@@ -78,7 +78,7 @@ class Connection extends EventEmitter {
         enableAnsiWarnings: true,
         enableArithAbort: false,
         enableConcatNullYieldsNull: true,
-        enableCursorCloseOnCommit: undefined,
+        enableCursorCloseOnCommit: false,
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
