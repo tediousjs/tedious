@@ -305,7 +305,6 @@ class Connection extends EventEmitter {
 
       if (config.options.rowCollectionOnRequestCompletion != undefined) {
         this.validateBooleanOptions(config.options.rowCollectionOnRequestCompletion, 'options.rowCollectionOnRequestCompletion');
-
         this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
       }
 
@@ -332,7 +331,6 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
     }
-
 
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
