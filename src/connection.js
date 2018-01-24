@@ -122,6 +122,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.camelCaseColumns != undefined) {
+        if (typeof config.options.camelCaseColumns !== 'boolean') {
+          throw new TypeError('options.camelCaseColumns must be a boolean (true or false).');
+        }
+
         this.config.options.camelCaseColumns = config.options.camelCaseColumns;
       }
 
@@ -261,10 +265,17 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.encrypt != undefined) {
+        if (typeof config.options.encrypt !== 'boolean') {
+          throw new TypeError('options.encrypt must be a boolean (true or false).');
+        }
+
         this.config.options.encrypt = config.options.encrypt;
       }
 
       if (config.options.fallbackToDefaultDb != undefined) {
+        if (typeof config.options.fallbackToDefaultDb !== 'boolean') {
+          throw new TypeError('options.fallbackToDefaultDb must be a boolean (true or false).');
+        }
         this.config.options.fallbackToDefaultDb = config.options.fallbackToDefaultDb;
       }
 
@@ -286,6 +297,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.multiSubnetFailover != undefined) {
+        if (typeof config.options.multiSubnetFailover !== 'boolean') {
+          throw new TypeError('options.multiSubnetFailover must be a boolean (true or false).');
+        }
+
         this.config.options.multiSubnetFailover = !!config.options.multiSubnetFailover;
       }
 
@@ -303,6 +318,10 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.readOnlyIntent != undefined) {
+        if (typeof config.options.readOnlyIntent !== 'boolean') {
+          throw new TypeError('options.readOnlyIntent must be a boolean (true or false).');
+        }
+
         this.config.options.readOnlyIntent = config.options.readOnlyIntent;
       }
 
@@ -327,10 +346,18 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.rowCollectionOnDone != undefined) {
+        if (typeof config.options.rowCollectionOnDone !== 'boolean') {
+          throw new TypeError('options.rowCollectionOnDone must be a boolean (true or false).');
+        }
+
         this.config.options.rowCollectionOnDone = config.options.rowCollectionOnDone;
       }
 
       if (config.options.rowCollectionOnRequestCompletion != undefined) {
+        if (typeof config.options.rowCollectionOnRequestCompletion !== 'boolean') {
+          throw new TypeError('options.rowCollectionOnRequestCompletion must be a boolean (true or false).');
+        }
+
         this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
       }
 
@@ -343,14 +370,26 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.trustServerCertificate != undefined) {
+        if (typeof config.options.trustServerCertificate !== 'boolean') {
+          throw new TypeError('options.trustServerCertificate must be a boolean (true or false).');
+        }
+
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
       }
 
       if (config.options.useColumnNames != undefined) {
+        if (typeof config.options.useColumnNames !== 'boolean') {
+          throw new TypeError('options.useColumnNames must be a boolean (true or false).');
+        }
+
         this.config.options.useColumnNames = config.options.useColumnNames;
       }
 
       if (config.options.useUTC != undefined) {
+        if (typeof config.options.useUTC !== 'boolean') {
+          throw new TypeError('options.useUTC must be a boolean (true or false).');
+        }
+
         this.config.options.useUTC = config.options.useUTC;
       }
     }
