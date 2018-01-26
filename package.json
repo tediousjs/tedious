@@ -51,6 +51,7 @@
   "devDependencies": {
     "@commitlint/cli": "^6.0.2",
     "@commitlint/config-conventional": "^6.0.2",
+    "@commitlint/travis-cli": "^6.0.2",
     "async": "^1.4.0",
     "babel-cli": "^6.26.0",
     "babel-eslint": "^7.2.3",
