@@ -1,3 +1,11 @@
+const MoneyN = require('../../../src/data-types/moneyn');
+const Money = require('../../../src/data-types/money');
+const SmallMoney = require('../../../src/data-types/smallmoney');
+const IntN = require('../../../src/data-types/intn');
+const FloatN = require('../../../src/data-types/floatn');
+const DateTimeN = require('../../../src/data-types/datetimen');
+const NumericN = require('../../../src/data-types/numericn');
+
 var Parser = require('../../../src/token/stream-parser');
 var dataTypeByName = require('../../../src/data-type').typeByName;
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
@@ -110,12 +118,12 @@ module.exports.float = function(test) {
 
 module.exports.money = function(test) {
   var colMetaData = [
-    { type: dataTypeByName.SmallMoney },
-    { type: dataTypeByName.Money },
-    { type: dataTypeByName.MoneyN },
-    { type: dataTypeByName.MoneyN },
-    { type: dataTypeByName.MoneyN },
-    { type: dataTypeByName.MoneyN }
+    { type: SmallMoney },
+    { type: Money },
+    { type: MoneyN },
+    { type: MoneyN },
+    { type: MoneyN },
+    { type: MoneyN }
   ];
   var value = 123.456;
   var valueLarge = 123456789012345.11;
@@ -498,18 +506,18 @@ module.exports.varBinaryMaxUnknownLength = function(test) {
 
 module.exports.intN = function(test) {
   var colMetaData = [
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN },
-    { type: dataTypeByName.IntN }
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN },
+    { type: IntN }
   ];
 
   var buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -644,8 +652,8 @@ module.exports.intN = function(test) {
 
 module.exports.guidN = function(test) {
   var colMetaData = [
-    { type: dataTypeByName.UniqueIdentifierN },
-    { type: dataTypeByName.UniqueIdentifierN }
+    { type: dataTypeByName.UniqueIdentifier },
+    { type: dataTypeByName.UniqueIdentifier }
   ];
 
   var buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -691,9 +699,9 @@ module.exports.guidN = function(test) {
 
 module.exports.floatN = function(test) {
   var colMetaData = [
-    { type: dataTypeByName.FloatN },
-    { type: dataTypeByName.FloatN },
-    { type: dataTypeByName.FloatN }
+    { type: FloatN },
+    { type: FloatN },
+    { type: FloatN }
   ];
 
   var buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -771,7 +779,7 @@ module.exports.datetime = function(test) {
 };
 
 module.exports.datetimeN = function(test) {
-  var colMetaData = [{ type: dataTypeByName.DateTimeN }];
+  var colMetaData = [{ type: DateTimeN }];
 
   var buffer = new WritableTrackingBuffer(0, 'ucs2');
   buffer.writeUInt8(0xd1);
@@ -793,7 +801,7 @@ module.exports.datetimeN = function(test) {
 module.exports.numeric4Bytes = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 3,
       scale: 1
     }
@@ -823,7 +831,7 @@ module.exports.numeric4Bytes = function(test) {
 module.exports.numeric4BytesNegative = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 3,
       scale: 1
     }
@@ -853,7 +861,7 @@ module.exports.numeric4BytesNegative = function(test) {
 module.exports.numeric8Bytes = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 13,
       scale: 1
     }
@@ -884,7 +892,7 @@ module.exports.numeric8Bytes = function(test) {
 module.exports.numeric12Bytes = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 23,
       scale: 1
     }
@@ -916,7 +924,7 @@ module.exports.numeric12Bytes = function(test) {
 module.exports.numeric16Bytes = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 33,
       scale: 1
     }
@@ -954,7 +962,7 @@ module.exports.numeric16Bytes = function(test) {
 module.exports.numericNull = function(test) {
   var colMetaData = [
     {
-      type: dataTypeByName.NumericN,
+      type: NumericN,
       precision: 3,
       scale: 1
     }

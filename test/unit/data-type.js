@@ -1,44 +1,36 @@
 var TYPES = require('../../src/data-type');
 var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 
-exports.noTypeOverridesByAliases = function(test) {
-  var type;
-  var typesByName = {};
-  for (var id in TYPES.TYPE) {
-    type = TYPES.TYPE[id];
-    typesByName[type.name] = type;
-  }
+function deprecationHandler() { }
 
-  for (id in TYPES.TYPE) {
-    type = TYPES.TYPE[id];
-    for (var alias of type.aliases || []) {
-      test.ok(
-        !typesByName[alias],
-        `Type ${alias} already exist. ${type.name} should not declare it as its alias.`
+exports['Data Types with alias'] = {
+  setUp(done) {
+    process.on('deprecation', deprecationHandler);
+    done();
+  },
+
+  'should be available under both names': function(test) {
+    for (var alias of [
+      'UniqueIdentifier',
+      'Date',
+      'Time',
+      'DateTime2',
+      'DateTimeOffset'
+    ]) {
+      test.strictEqual(
+        TYPES.typeByName[alias],
+        TYPES.typeByName[`${alias}N`],
+        `Alias ${alias} is not pointing to ${alias}N type.`
       );
     }
+
+    test.done();
+  },
+
+  tearDown(done) {
+    process.removeListener('deprecation', deprecationHandler);
+    done();
   }
-
-  test.done();
-};
-
-// Test some aliases
-exports.knownAliases = function(test) {
-  for (var alias of [
-    'UniqueIdentifier',
-    'Date',
-    'Time',
-    'DateTime2',
-    'DateTimeOffset'
-  ]) {
-    test.strictEqual(
-      TYPES.typeByName[alias],
-      TYPES.typeByName[`${alias}N`],
-      `Alias ${alias} is not pointing to ${alias}N type.`
-    );
-  }
-
-  test.done();
 };
 
 // Test date calculation for non utc date during daylight savings period
@@ -109,7 +101,7 @@ exports.dateDaylightSaving = function(test) {
 
 // Test rounding of nanosecondDelta
 exports.nanoSecondRounding = function(test) {
-  const type = TYPES.typeByName['TimeN'];
+  const type = TYPES.typeByName['Time'];
   for (const [value, nanosecondDelta, scale, expectedBuffer] of [
     [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, Buffer.from('0568fc624b91', 'hex')],
     [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, Buffer.from('05c422ceb80c', 'hex')],
