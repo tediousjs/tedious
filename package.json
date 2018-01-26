@@ -92,6 +92,11 @@
       "transform-runtime"
     ]
   },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
   "release": {
     "verifyConditions": "semantic-release/src/lib/plugin-noop"
   }
