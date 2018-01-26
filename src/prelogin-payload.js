@@ -64,9 +64,12 @@ module.exports = class PreloginPayload {
       this.createEncryptionOption(),
       this.createInstanceOption(),
       this.createThreadIdOption(),
-      this.createMarsOption(),
-      ...(this.options.fedAuthRequested ? [this.createFedAuthOption()] : [])
+      this.createMarsOption()
     ];
+
+    if (this.options.fedAuthRequested) {
+      options.push(this.createFedAuthOption());
+    }
 
     let length = 0;
     for (let i = 0, len = options.length; i < len; i++) {
@@ -216,6 +219,6 @@ module.exports = class PreloginPayload {
 
   toString(indent) {
     indent || (indent = '');
-    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0);
+    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s),fedAuthRequired:0x%02X', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0, this.fedAuthRequired ? this.fedAuthRequired : 0);
   }
 };

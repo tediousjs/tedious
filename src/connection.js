@@ -386,7 +386,7 @@ class Connection extends EventEmitter {
         }
         this.config.options.encrypt = true;
         this.fedAuthInfo.method = config.options.authentication;
-        if (config.options.trustServerCertificate != 'true') {
+        if (!config.options.trustServerCertificate) {
           this.config.options.trustServerCertificate = false;
         }
       }
@@ -923,7 +923,7 @@ class Connection extends EventEmitter {
     });
     if (this.fedAuthInfo.method != undefined) {
       if (0 != preloginPayload.fedAuthRequired && 1 != preloginPayload.fedAuthRequired) {
-        this.emit('connect', ConnectionError('Server sent an unexpected value for FedAuthRequired PreLogin Option. Value was' + preloginPayload.fedAuthRequired, 'EFEDAUTH'));
+        this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was  ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
         return this.close();
       }
       // fedAuthRequired is used for capability negotiation when choosing between SSPI and federated authentication

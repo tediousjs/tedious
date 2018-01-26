@@ -251,7 +251,7 @@ module.exports = class Login7Payload {
     this.fedAuthPreloginRequired) {
       this.loginData.fedAuthInfo.fedAuthInfoRequested = true;
       this.loginData.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
-      this.CreateFedAuthExtData(buffer, this.loginData.fedAuthInfo);
+      this.createFedAuthExtData(buffer, this.loginData.fedAuthInfo);
     }
     buffer.writeUInt8(FEATURE_EXT_TERMINATOR);
     return buffer.data;
@@ -316,7 +316,7 @@ module.exports = class Login7Payload {
     return buffer.data;
   }
 
-  CreateFedAuthExtData(buffer, fedAuthInfo) {
+  createFedAuthExtData(buffer, fedAuthInfo) {
     var dataLen = 0;
     switch (fedAuthInfo.fedAuthLibrary) {
       case FEDAUTH_OPTIONS.LIBRARY_ADAL:
