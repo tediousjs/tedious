@@ -20,7 +20,7 @@ var readFedAuthInfoOpt = (data, infoData, callback) => {
       infoData.stsurlLen = fedAuthInfoDataLen;
       infoData.stsurlOffset = fedAuthInfoDataOffset;
       break;
-              // ignoring unknown fedauthinfo options
+    // ignoring unknown fedauthinfo options
     default:
       break;
   }
