@@ -3,8 +3,7 @@ const guidParser = require('../guid-parser');
 module.exports = {
   id: 0x24,
   type: 'GUIDN',
-  name: 'UniqueIdentifierN',
-  aliases: ['UniqueIdentifier'],
+  name: 'UniqueIdentifier',
   dataLengthLength: 1,
 
   declaration: function() {
