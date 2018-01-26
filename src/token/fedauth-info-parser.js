@@ -42,6 +42,7 @@ var readFedAuthInfoOpt = (data, infoData, callback) => {
 module.exports = function fedAuthInfoParser(parser, colMetadata, options, callback) {
   parser.readUInt32LE((tokenLength) => {
     parser.readBuffer(tokenLength, (data) => {
+
       const infoData = {
         offset: 0,
         spnLen: undefined,
@@ -49,8 +50,8 @@ module.exports = function fedAuthInfoParser(parser, colMetadata, options, callba
         stsurlLen: undefined,
         stsurloffset: undefined
       };
-      const countOfInfoIDs = data.readUInt32LE(infoData.offset);
 
+      const countOfInfoIDs = data.readUInt32LE(infoData.offset);
       infoData.offset += 4;
       async.times(countOfInfoIDs, () => {
         readFedAuthInfoOpt(data, infoData, callback);
