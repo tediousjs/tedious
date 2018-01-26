@@ -54,7 +54,9 @@ jobs:
       node_js: 4
       before_install: skip
       before_script: skip
-      script: npm run lint
+      script:
+        - npm run lint
+        - commitlint-travis
     - stage: release
       node_js: 4
       before_install: skip
