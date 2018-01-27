@@ -56,7 +56,7 @@ jobs:
       before_script: skip
       script: npm run lint
     - stage: release
-      node_js: 4
+      node_js: 8
       before_install: skip
       before_script: skip
-      script: npm run semantic-release || true
+      script: npm run semantic-release
