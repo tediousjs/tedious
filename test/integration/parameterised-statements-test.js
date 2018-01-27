@@ -133,10 +133,10 @@ exports.money = function(test) {
   execSql(test, TYPES.Money, 956455842.4566);
 };
 
-exports.uniqueIdentifierN = function(test) {
+exports.uniqueIdentifier = function(test) {
   execSql(
     test,
-    TYPES.UniqueIdentifierN,
+    TYPES.UniqueIdentifier,
     '01234567-89AB-CDEF-0123-456789ABCDEF'
   );
 };
@@ -508,10 +508,10 @@ exports.outputFloat = function(test) {
   execSqlOutput(test, TYPES.Float, 9654.2546456567565767644);
 };
 
-exports.outputUniqueIdentifierN = function(test) {
+exports.outputUniqueIdentifier = function(test) {
   execSqlOutput(
     test,
-    TYPES.UniqueIdentifierN,
+    TYPES.UniqueIdentifier,
     '01234567-89AB-CDEF-0123-456789ABCDEF'
   );
 };
@@ -840,7 +840,7 @@ var execSql = function(test, type, value, tdsVersion, options, expectedValue) {
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       test.strictEqual(columns[0].value, expectedValue.toString());
-    } else if (type === TYPES.UniqueIdentifierN) {
+    } else if (type === TYPES.UniqueIdentifier) {
       test.deepEqual(columns[0].value, expectedValue);
     } else {
       test.strictEqual(columns[0].value, expectedValue);
@@ -897,7 +897,7 @@ var execSqlOutput = function(test, type, value, expectedValue) {
       test.strictEqual(returnValue.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       test.strictEqual(returnValue, expectedValue.toString());
-    } else if (type === TYPES.UniqueIdentifierN) {
+    } else if (type === TYPES.UniqueIdentifier) {
       test.deepEqual(returnValue, expectedValue);
     } else {
       test.strictEqual(returnValue, expectedValue);
