@@ -28,6 +28,7 @@ exports.connectionDoesNotModifyPassedConfig = function(test) {
     userName: 'sa',
     password: 'sapwd',
     options: {
+      encrypt: false,
       port: 1234,
       cryptoCredentialsDetails: {
         ciphers: 'RC4-MD5'
