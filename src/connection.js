@@ -52,7 +52,6 @@ class Connection extends EventEmitter {
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
-      securityPackage: config.securityPackage,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
