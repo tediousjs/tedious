@@ -89,8 +89,5 @@
     "plugins": [
       "transform-runtime"
     ]
-  },
-  "release": {
-    "verifyConditions": "semantic-release/src/lib/plugin-noop"
   }
 }
