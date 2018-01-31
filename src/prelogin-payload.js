@@ -1,4 +1,4 @@
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 
 const optionBufferSize = 20;

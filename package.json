@@ -46,7 +46,7 @@
     "depd": "^1.1.2",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.2.6",
-    "sprintf": "0.1.5"
+    "sprintf-js": "^1.1.1"
   },
   "devDependencies": {
     "async": "^1.4.0",
