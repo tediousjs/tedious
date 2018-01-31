@@ -294,7 +294,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.port) {
-        if (config.options.port < 0 || config.options.port > 65536) {
+        if (config.options.port <= 0 || config.options.port >= 65536) {
           throw new RangeError('Port must be > 0 and < 65536');
         }
 
