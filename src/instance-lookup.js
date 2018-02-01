@@ -65,7 +65,7 @@ class InstanceLookup {
             if (port) {
               callback(undefined, port);
             } else {
-              callback('Port for ' + instanceName + ' not found in ' + message);
+              callback('Port for ' + instanceName + ' not found in ' + options.server);
             }
           }
         });
