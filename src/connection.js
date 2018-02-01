@@ -100,7 +100,8 @@ class Connection extends EventEmitter {
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
         useColumnNames: false,
-        useUTC: true
+        useUTC: true,
+        serverNameAsACE: false
       }
     };
 
@@ -352,6 +353,14 @@ class Connection extends EventEmitter {
 
       if (config.options.useUTC != undefined) {
         this.config.options.useUTC = config.options.useUTC;
+      }
+
+      if (config.options.serverNameAsACE != undefined) {
+        if (typeof config.options.serverNameAsACE !== 'boolean') {
+          throw new TypeError('options.serverNameAsACE must be a boolean (true or false).');
+        }
+
+        this.config.options.serverNameAsACE = config.options.serverNameAsACE;
       }
     }
 
@@ -664,7 +673,8 @@ class Connection extends EventEmitter {
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName,
-        timeout: this.config.options.connectTimeout
+        timeout: this.config.options.connectTimeout,
+        serverNameAsACE: this.config.options.serverNameAsACE
       }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
@@ -682,7 +692,8 @@ class Connection extends EventEmitter {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
-      localAddress: this.config.options.localAddress
+      localAddress: this.config.options.localAddress,
+      serverNameAsACE: this.config.options.serverNameAsACE
     };
 
     new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
