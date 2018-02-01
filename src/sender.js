@@ -27,7 +27,7 @@ class Sender {
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
   invokeLookupAll(host, cb) {
-    const serverName = this.serverNameAsACE ? (punycode.toASCII(host)).trim() : this.options.host;
+    const serverName = this.serverNameAsACE ? (punycode.toASCII(host)).trim() : host;
     dns.lookup(serverName, { all: true }, cb);
   }
 
