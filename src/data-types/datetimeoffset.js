@@ -1,11 +1,11 @@
+const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+
 module.exports = {
-  id: 0x29,
-  type: 'TIMEN',
-  name: 'TimeN',
-  aliases: ['Time'],
+  id: 0x2B,
+  type: 'DATETIMEOFFSETN',
+  name: 'DateTimeOffset',
   hasScale: true,
   dataLengthLength: 1,
-
   dataLengthFromScale: function(scale) {
     switch (scale) {
       case 0:
@@ -21,11 +21,9 @@ module.exports = {
         return 5;
     }
   },
-
   declaration: function(parameter) {
-    return 'time(' + (this.resolveScale(parameter)) + ')';
+    return 'datetimeoffset(' + (this.resolveScale(parameter)) + ')';
   },
-
   resolveScale: function(parameter) {
     if (parameter.scale != null) {
       return parameter.scale;
@@ -35,58 +33,55 @@ module.exports = {
       return 7;
     }
   },
-
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
-
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
+      time.setUTCFullYear(1970);
+      time.setUTCMonth(0);
+      time.setUTCDate(1);
 
-      let timestamp;
-      if (options.useUTC) {
-        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-      } else {
-        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-      }
-
-      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
+      let timestamp = time * Math.pow(10, parameter.scale - 3);
       timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
+      const offset = -parameter.value.getTimezoneOffset();
       switch (parameter.scale) {
         case 0:
         case 1:
         case 2:
-          buffer.writeUInt8(3);
+          buffer.writeUInt8(8);
           buffer.writeUInt24LE(timestamp);
+          break;
         case 3:
         case 4:
-          buffer.writeUInt8(4);
+          buffer.writeUInt8(9);
           buffer.writeUInt32LE(timestamp);
+          break;
         case 5:
         case 6:
         case 7:
-          buffer.writeUInt8(5);
+          buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
+      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeInt16LE(offset);
     } else {
       buffer.writeUInt8(0);
     }
   },
-
   validate: function(value) {
     if (value == null) {
       return null;
     }
-    if (value instanceof Date) {
-      return value;
+    if (!(value instanceof Date)) {
+      value = Date.parse(value);
     }
-    value = Date.parse(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid time.');
+      return new TypeError('Invalid date.');
     }
     return value;
   }

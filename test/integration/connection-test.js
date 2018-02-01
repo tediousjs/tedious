@@ -322,6 +322,17 @@ exports.encrypt = function(test) {
   });
 };
 
+exports['does not emit error after connect timeout'] = function(test) {
+  const config = getConfig();
+  config.options.connectTimeout = 1;
+
+  const connection = new Connection(config);
+  connection.on('error', (error) => { test.ifError(error); });
+  connection.on('connect', (err) => {});
+
+  setTimeout(() => { test.done(); }, 500);
+};
+
 exports.execSql = function(test) {
   test.expect(7);
 

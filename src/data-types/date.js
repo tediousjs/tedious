@@ -4,8 +4,7 @@ const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 module.exports = {
   id: 0x28,
   type: 'DATEN',
-  name: 'DateN',
-  aliases: ['Date'],
+  name: 'Date',
   dataLengthLength: 1,
   fixedDataLength: 3,
 
