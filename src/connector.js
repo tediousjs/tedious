@@ -1,5 +1,6 @@
 const net = require('net');
 const dns = require('dns');
+const punycode = require('punycode');
 
 class Connector {
   constructor(options, multiSubnetFailover) {
@@ -39,7 +40,7 @@ class Connector {
   }
 
   executeForHostname(cb) {
-    dns.lookup(this.options.host, { all: true }, (err, addresses) => {
+    dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
       if (err) {
         return cb(err);
       }

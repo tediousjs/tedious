@@ -46,7 +46,8 @@
     "depd": "^1.1.2",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.2.6",
-    "sprintf-js": "^1.1.1"
+    "sprintf-js": "^1.1.1",
+    "punycode": "^2.1.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^6.0.2",

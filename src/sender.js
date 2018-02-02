@@ -1,6 +1,7 @@
 const dgram = require('dgram');
 const dns = require('dns');
 const net = require('net');
+const punycode = require('punycode');
 
 class Sender {
   constructor(host, port, request) {
@@ -25,7 +26,7 @@ class Sender {
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
   invokeLookupAll(host, cb) {
-    dns.lookup(host, { all: true }, cb);
+    dns.lookup(punycode.toASCII(host), { all: true }, cb);
   }
 
   executeForHostname(cb) {
