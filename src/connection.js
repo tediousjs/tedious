@@ -146,8 +146,7 @@ class Connection extends EventEmitter {
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
         useColumnNames: false,
-        useUTC: true,
-        serverNameAsACE: false
+        useUTC: true
       }
     };
 
@@ -792,8 +791,7 @@ class Connection extends EventEmitter {
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName,
-        timeout: this.config.options.connectTimeout,
-        serverNameAsACE: this.config.options.serverNameAsACE
+        timeout: this.config.options.connectTimeout
       }, (message, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
@@ -811,8 +809,7 @@ class Connection extends EventEmitter {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
-      localAddress: this.config.options.localAddress,
-      serverNameAsACE: this.config.options.serverNameAsACE
+      localAddress: this.config.options.localAddress
     };
 
     new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {

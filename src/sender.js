@@ -4,11 +4,10 @@ const net = require('net');
 const punycode = require('punycode');
 
 class Sender {
-  constructor(host, port, request, serverNameAsACE) {
+  constructor(host, port, request) {
     this.host = host;
     this.port = port;
     this.request = request;
-    this.serverNameAsACE = serverNameAsACE;
 
     this.parallelSendStrategy = null;
   }
@@ -27,8 +26,7 @@ class Sender {
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
   invokeLookupAll(host, cb) {
-    const serverName = this.serverNameAsACE ? (punycode.toASCII(host)).trim() : host;
-    dns.lookup(serverName, { all: true }, cb);
+    dns.lookup(punycode.toASCII(host), { all: true }, cb);
   }
 
   executeForHostname(cb) {

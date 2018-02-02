@@ -40,8 +40,7 @@ class Connector {
   }
 
   executeForHostname(cb) {
-    const serverName = this.options.serverNameAsACE ? (punycode.toASCII(this.options.host)).trim() : this.options.host;
-    dns.lookup(serverName, { all: true }, (err, addresses) => {
+    dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
       if (err) {
         return cb(err);
       }

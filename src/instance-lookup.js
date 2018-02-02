@@ -11,8 +11,8 @@ class InstanceLookup {
   constructor() { }
 
   // Wrapper allows for stubbing Sender when unit testing instance-lookup.
-  createSender(host, port, request, serverNameAsACE) {
-    return new Sender(host, port, request, serverNameAsACE);
+  createSender(host, port, request) {
+    return new Sender(host, port, request);
   }
 
   instanceLookup(options, callback) {
@@ -52,7 +52,7 @@ class InstanceLookup {
         retriesLeft--;
 
         const request = new Buffer([0x02]);
-        sender = this.createSender(options.server, SQL_SERVER_BROWSER_PORT, request, options.serverNameAsACE);
+        sender = this.createSender(options.server, SQL_SERVER_BROWSER_PORT, request);
         sender.execute((err, message) => {
           clearTimeout(timer);
           if (err) {
