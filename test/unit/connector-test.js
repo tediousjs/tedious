@@ -456,7 +456,7 @@ exports['ParallelConnectionStrategy'] = {
 };
 
 exports['Test unicode SQL Server name'] = {
-  setUp: function (done) {
+  setUp: function(done) {
     this.sinon = sinon.sandbox.create();
 
     // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
@@ -465,13 +465,13 @@ exports['Test unicode SQL Server name'] = {
     done();
   },
 
-  tearDown: function (done) {
+  tearDown: function(done) {
     this.sinon.restore();
 
     done();
   },
 
-  'test IDN Server name': function (test) {
+  'test IDN Server name': function(test) {
     test.expect(2);
     const server = '本地主机.ad';
     const connector = new Connector({ host: server, port: 12345 }, true);
@@ -482,7 +482,7 @@ exports['Test unicode SQL Server name'] = {
     test.done();
   },
 
-  'test ASCII Server name': function (test) {
+  'test ASCII Server name': function(test) {
     test.expect(2);
     const server = 'localhost';
     const connector = new Connector({ host: server, port: 12345 }, true);
