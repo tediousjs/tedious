@@ -1,6 +1,6 @@
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const os = require('os');
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 const libraryName = require('./library').name;
 const versions = require('./tds-versions').versions;
 const assert = require('assert');

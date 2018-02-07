@@ -1,10 +1,6 @@
 const async = require('async');
 
-var readFedAuthInfoOpt = (data, infoData, callback) => {
-  const FEDAUTHINFOID = {
-    STSURL: 0x01,
-    SPN: 0x02
-  };
+function readFedAuthInfoOpt(data, infoData, FEDAUTHINFOID, callback) {
   const fedauthInfoID = data.readUInt8(infoData.offset);
   infoData.offset += 1;
   const fedAuthInfoDataLen = data.readUInt32LE(infoData.offset);
@@ -26,18 +22,16 @@ var readFedAuthInfoOpt = (data, infoData, callback) => {
   }
 
   if (infoData.spnLen && infoData.stsurlLen) {
-    const spn = data.slice(infoData.spnOffset, infoData.spnOffset + infoData.spnLen);
-    const stsurl = data.slice(infoData.stsurlOffset, infoData.stsurlOffset + infoData.stsurlLen);
     callback({
       'name': 'FEDAUTHINFO',
       'event': 'fedAuthInfo',
       'fedAuthInfoData': {
-        stsurl: stsurl.toString().replace(/\0/g, ''),
-        spn: spn.toString().replace(/\0/g, '')
+        stsurl: data.slice(infoData.stsurlOffset, infoData.stsurlOffset + infoData.stsurlLen).toString('ucs2'),
+        spn: data.slice(infoData.spnOffset, infoData.spnOffset + infoData.spnLen).toString('ucs2')
       }
     });
   }
-};
+}
 
 module.exports = function fedAuthInfoParser(parser, colMetadata, options, callback) {
   parser.readUInt32LE((tokenLength) => {
@@ -46,15 +40,20 @@ module.exports = function fedAuthInfoParser(parser, colMetadata, options, callba
       const infoData = {
         offset: 0,
         spnLen: undefined,
-        spnoffset: undefined,
+        spnOffset: undefined,
         stsurlLen: undefined,
         stsurloffset: undefined
+      };
+
+      const FEDAUTHINFOID = {
+        STSURL: 0x01,
+        SPN: 0x02
       };
 
       const countOfInfoIDs = data.readUInt32LE(infoData.offset);
       infoData.offset += 4;
       async.times(countOfInfoIDs, () => {
-        readFedAuthInfoOpt(data, infoData, callback);
+        readFedAuthInfoOpt(data, infoData, FEDAUTHINFOID, callback);
       });
     });
   });

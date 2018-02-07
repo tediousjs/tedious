@@ -1,7 +1,7 @@
 const codepageBySortId = require('./collation').codepageBySortId;
 const codepageByLcid = require('./collation').codepageByLcid;
 const TYPE = require('./data-type').TYPE;
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 
 module.exports = metadataParse;
 module.exports.readPrecision = readPrecision;

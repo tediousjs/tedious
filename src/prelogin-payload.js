@@ -1,4 +1,4 @@
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 
 const optionBufferSize = 20;
@@ -214,7 +214,7 @@ module.exports = class PreloginPayload {
   }
 
   extractFedAuth(offset) {
-    return this.fedAuthRequired = this.data.readUInt8(offset);
+    this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
   toString(indent) {

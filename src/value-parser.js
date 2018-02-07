@@ -1,5 +1,5 @@
 const iconv = require('iconv-lite');
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 const TYPE = require('./data-type').TYPE;
 const guidParser = require('./guid-parser');
 

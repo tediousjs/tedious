@@ -1,4 +1,4 @@
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 
 const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
 
