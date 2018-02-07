@@ -26,8 +26,8 @@ function readFedAuthInfoOpt(data, infoData, FEDAUTHINFOID, callback) {
       'name': 'FEDAUTHINFO',
       'event': 'fedAuthInfo',
       'fedAuthInfoData': {
-        stsurl: data.slice(infoData.stsurlOffset, infoData.stsurlOffset + infoData.stsurlLen).toString('ucs2'),
-        spn: data.slice(infoData.spnOffset, infoData.spnOffset + infoData.spnLen).toString('ucs2')
+        stsurl: data.toString('ucs2', infoData.stsurlOffset, infoData.stsurlOffset + infoData.stsurlLen),
+        spn: data.toString('ucs2', infoData.spnOffset, infoData.spnOffset + infoData.spnLen)
       }
     });
   }

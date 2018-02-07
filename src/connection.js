@@ -1124,15 +1124,18 @@ class Connection extends EventEmitter {
 
   sendFedAuthResponsePacket() {
     const accessTokenLen = Buffer.byteLength(this.fedAuthInfo.token.accessToken, 'ucs2');
-    const data = new WritableTrackingBuffer(4 + accessTokenLen);
-    data.writeUInt32LE(accessTokenLen + 4);
-    data.writeUInt32LE(accessTokenLen);
-    data.writeString(this.fedAuthInfo.token.accessToken, 'ucs2');
-    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data.data);
-
-    const boundTransitionTo = this.transitionTo.bind(this);
+    const data = new Buffer(8 + accessTokenLen);
+    let offset = 0;
+    data.writeUInt32LE(accessTokenLen + 4, offset);
+    offset += 4;
+    data.writeUInt32LE(accessTokenLen, offset);
+    offset += 4;
+    data.write(this.fedAuthInfo.token.accessToken, offset, 'ucs2');
+    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
-    process.nextTick(boundTransitionTo, this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    process.nextTick(() => {
+      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    });
   }
 
   // Returns false to apply backpressure.
