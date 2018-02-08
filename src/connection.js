@@ -1,5 +1,3 @@
-
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const deprecate = require('depd')('tedious');
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -1047,13 +1045,8 @@ class Connection extends EventEmitter {
       return preloginPayload.toString('  ');
     });
     if (this.fedAuthInfo.method != undefined) {
-      if (0 != preloginPayload.fedAuthRequired && 1 != preloginPayload.fedAuthRequired) {
+      if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
         this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was  ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
-        return this.close();
-      }
-      // fedAuthRequired is used for capability negotiation when choosing between SSPI and federated authentication
-      if (preloginPayload.fedAuthRequired === 1 && this.config.domain) {
-        this.emit('connect', ConnectionError('Server sent federated authentication required response, value domain should not be set', 'EFEDAUTH'));
         return this.close();
       }
       this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
@@ -1714,10 +1707,10 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else if (this.fedAuthInfo.requiredPreLoginResponse) {
+            if (this.fedAuthInfo.requiredPreLoginResponse) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            } else if (this.config.domain) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             }
             else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
