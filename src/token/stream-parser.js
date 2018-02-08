@@ -78,7 +78,7 @@ module.exports = class Parser extends Transform {
         this.push(token);
       }
     };
-    
+
     while (!this.suspended && this.position + 1 <= this.buffer.length) {
       const type = this.buffer.readUInt8(this.position, true);
 
