@@ -204,8 +204,10 @@ module.exports = class Login7Payload {
     this.addVariableDataBuffer(variableData, (this.loginData.domain || this.fedAuthPreloginRequired) ? Buffer.alloc(0) : this.createPasswordBuffer());
     this.addVariableDataString(variableData, this.loginData.appName);
     this.addVariableDataString(variableData, this.loginData.serverName);
+    let extensionPos = undefined;
     if (this.fedAuthPreloginRequired) {
-      this.addVariableDataInt(variableData, '');
+      // hold the positon at which the FeaturExt offset is going to be written. We write 0 in the placeholder till the offset is available.
+      extensionPos = this.addVariableDataInt32LE(variableData, 0);
     } else {
       this.addVariableDataString(variableData, '');
     }
@@ -238,7 +240,7 @@ module.exports = class Login7Payload {
     }
 
     if (this.fedAuthPreloginRequired) {
-      variableData.data.writeUInt32LEposition(variableData.offset, this.tempHolder);
+      variableData.data.writeUInt32LEatPos(variableData.offset, extensionPos);
       return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data, this.featureExt ]);
     }
 
@@ -272,15 +274,14 @@ module.exports = class Login7Payload {
     return variableData.offset += value.length * 2;
   }
 
-  addVariableDataInt(variableData, value) {
-    value || (value = '');
+  addVariableDataInt32LE(variableData, value) {
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
     variableData.offsetsAndLengths.writeUInt16LE(4);
-    //placeHolder
-    this.tempHolder = variableData.data.getPos();
-    // variableData.offset + 4;
-    variableData.data.writeUInt32LE(0);
-    return variableData.offset += 4;
+    // position at which the int value is written
+    const position = variableData.data.getPos();
+    variableData.data.writeUInt32LE(value);
+    variableData.offset += 4;
+    return position;
   }
   createNTLMRequest(options) {
     const domain = escape(options.domain.toUpperCase());
