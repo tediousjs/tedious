@@ -40,11 +40,14 @@
     "tag": "next"
   },
   "dependencies": {
+    "adal-node": "^0.1.22",
     "babel-runtime": "^6.26.0",
     "big-number": "0.3.1",
     "bl": "^1.2.0",
+    "commitlint": "^6.1.0",
     "depd": "^1.1.2",
     "iconv-lite": "^0.4.11",
+    "punycode": "^2.1.0",
     "readable-stream": "^2.2.6",
     "sprintf-js": "^1.1.1",
     "punycode": "^2.1.0"

@@ -82,6 +82,18 @@ module.exports = class WritableTrackingBuffer {
     this.position += length;
   }
 
+  writeUInt32LEatPos(value: number, pos: number) {
+    this.buffer.writeUInt32LE(value, pos);
+  }
+
+  getPos() {
+    return this.position;
+  }
+
+  getLen() {
+    return this.buffer.length;
+  }
+
   writeUShort(value: number) {
     this.writeUInt16LE(value);
   }
