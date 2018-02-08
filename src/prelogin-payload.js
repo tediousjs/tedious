@@ -13,6 +13,7 @@ const TOKEN = {
   INSTOPT: 0x02,
   THREADID: 0x03,
   MARS: 0x04,
+  FEDAUTHREQUIRED: 0x06,
   TERMINATOR: 0xFF
 };
 
@@ -65,6 +66,10 @@ module.exports = class PreloginPayload {
       this.createThreadIdOption(),
       this.createMarsOption()
     ];
+
+    if (this.options.fedAuthRequested) {
+      options.push(this.createFedAuthOption());
+    }
 
     let length = 0;
     for (let i = 0, len = options.length; i < len; i++) {
@@ -139,6 +144,15 @@ module.exports = class PreloginPayload {
     };
   }
 
+  createFedAuthOption() {
+    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    buffer.writeUInt8(0x01);
+    return {
+      token: TOKEN.FEDAUTHREQUIRED,
+      data: buffer.data
+    };
+  }
+
   extractOptions() {
     let offset = 0;
     while (this.data[offset] !== TOKEN.TERMINATOR) {
@@ -161,6 +175,10 @@ module.exports = class PreloginPayload {
           break;
         case TOKEN.MARS:
           this.extractMars(dataOffset);
+          break;
+        case TOKEN.FEDAUTHREQUIRED:
+          this.extractFedAuth(dataOffset);
+          break;
       }
       offset += 5;
       dataOffset += dataLength;
@@ -195,8 +213,12 @@ module.exports = class PreloginPayload {
     this.marsString = marsByValue[this.mars];
   }
 
+  extractFedAuth(offset) {
+    this.fedAuthRequired = this.data.readUInt8(offset);
+  }
+
   toString(indent) {
     indent || (indent = '');
-    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0);
+    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s),fedAuthRequired:0x%02X', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0, this.fedAuthRequired ? this.fedAuthRequired : 0);
   }
 };

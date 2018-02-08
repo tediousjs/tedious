@@ -1,5 +1,4 @@
 const deprecate = require('depd')('tedious');
-
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
@@ -20,6 +19,7 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+const AuthenticationContext = require('adal-node').AuthenticationContext;
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -79,6 +79,19 @@ class Connection extends EventEmitter {
       throw new TypeError('Invalid server: ' + config.server);
     }
 
+    this.fedAuthInfo = {
+      ValidFedAuthEnum: {
+        SqlPassword: 'SQLPASSWORD',
+        ActiveDirectoryPassword: 'ACTIVEDIRECTORYPASSWORD',
+        // TODO: ActiveDirectoryIntegrated
+      },
+      method: undefined,
+      fedAuthLibrary: undefined,
+      requiredPreLoginResponse: false,
+      fedAuthInfoRequested: false,
+      responsePending: false,
+      token: undefined
+    };
     if (config.domain != undefined) {
       deprecateNonStringConfigValue('domain', config.domain);
     }
@@ -145,6 +158,7 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
+        authentication: undefined,
         useColumnNames: false,
         useUTC: true
       }
@@ -479,6 +493,25 @@ class Connection extends EventEmitter {
         deprecateNonBooleanConfigValue('options.useUTC', config.options.useUTC);
         this.config.options.useUTC = config.options.useUTC;
       }
+
+      // Whenever authentication property is used to specify an authentication method,
+      // the client will request encryption (the default value of the Encrypt property will be true)
+      // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
+      if (config.options.authentication != undefined) {
+        // check for valid options
+        if (!(config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
+        config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
+          throw new Error('An invalid authentication method is specified');
+        }
+        if (this.config.options.tdsVersion < '7_4') {
+          throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
+        }
+        this.config.options.encrypt = true;
+        this.fedAuthInfo.method = config.options.authentication;
+        if (!config.options.trustServerCertificate) {
+          this.config.options.trustServerCertificate = false;
+        }
+      }
       deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
 
@@ -495,6 +528,7 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
+
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -603,6 +637,23 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('charsetChange', (token) => {
       this.emit('charsetChange', token.newValue);
+    });
+
+    this.tokenStreamParser.on('fedAuthInfo', (token) => {
+      const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+      if (token.fedAuthInfoData.stsurl && token.fedAuthInfoData.spn) {
+        this.fedAuthInfo.responsePending = true;
+        var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
+        context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
+          if (err) {
+            this.fedAuthInfo.responsePending = false;
+            this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+          } else {
+            this.fedAuthInfo.responsePending = false;
+            this.fedAuthInfo.token = tokenResponse;
+          }
+        });
+      }
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -971,7 +1022,8 @@ class Connection extends EventEmitter {
 
   sendPreLogin() {
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt
+      encrypt: this.config.options.encrypt,
+      fedAuthRequested: (this.fedAuthInfo.method != undefined)
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
@@ -992,7 +1044,13 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-
+    if (this.fedAuthInfo.method != undefined) {
+      if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
+        this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
+        return this.close();
+      }
+      this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
+    }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
         this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
@@ -1019,7 +1077,8 @@ class Connection extends EventEmitter {
         initDbFatal: !this.config.options.fallbackToDefaultDb,
         readOnlyIntent: this.config.options.readOnlyIntent,
         sspiBlob: clientResponse,
-        language: this.config.options.language
+        language: this.config.options.language,
+        fedAuthInfo: this.fedAuthInfo
       });
 
       this.routingData = undefined;
@@ -1054,6 +1113,22 @@ class Connection extends EventEmitter {
 
     const boundTransitionTo = this.transitionTo.bind(this);
     process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+  }
+
+  sendFedAuthResponsePacket() {
+    const accessTokenLen = Buffer.byteLength(this.fedAuthInfo.token.accessToken, 'ucs2');
+    const data = new Buffer(8 + accessTokenLen);
+    let offset = 0;
+    data.writeUInt32LE(accessTokenLen + 4, offset);
+    offset += 4;
+    data.writeUInt32LE(accessTokenLen, offset);
+    offset += 4;
+    data.write(this.fedAuthInfo.token.accessToken, offset, 'ucs2');
+    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
+    // sent the fedAuth token message, the rest is similar to standard login 7
+    process.nextTick(() => {
+      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    });
   }
 
   // Returns false to apply backpressure.
@@ -1211,6 +1286,19 @@ class Connection extends EventEmitter {
         this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
       }
       this.dispatchEvent('loginFailed');
+    }
+  }
+
+  processLogin7FedAuthResponse() {
+    if (this.fedAuthInfo.fedAuthInfoRequested && !this.loginError) {
+      return this.dispatchEvent('receivedFedAuthInfo');
+    } else {
+      if (this.loginError) {
+        this.emit('connect', this.loginError);
+      } else {
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+      }
+      return this.dispatchEvent('loginFailed');
     }
   }
 
@@ -1619,10 +1707,13 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            if (this.fedAuthInfo.requiredPreLoginResponse) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            } else if (this.config.domain) {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            }
+            else {
+              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           });
         }
@@ -1701,6 +1792,47 @@ Connection.prototype.STATE = {
       },
       message: function() {
         this.processLogin7NTLMAck();
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
+    events: {
+      socketError: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        if (this.fedAuthInfo.responsePending) {
+          // We got data from the server while we're waiting for adal authentication context
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {
+          return this.sendDataToTokenStreamParser(data);
+        }
+      },
+      receivedFedAuthInfo: function() {
+        return this.sendFedAuthResponsePacket();
+      },
+      loginFailed: function() {
+        return this.transitionTo(this.STATE.FINAL);
+      },
+      message: function() {
+        if (this.fedAuthInfo.responsePending) {
+          // We got data from the server while we're waiting for adal authentication context
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {
+          return this.processLogin7FedAuthResponse();
+        }
       }
     }
   },
