@@ -1046,7 +1046,7 @@ class Connection extends EventEmitter {
     });
     if (this.fedAuthInfo.method != undefined) {
       if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
-        this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was  ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
+        this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
         return this.close();
       }
       this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
