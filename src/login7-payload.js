@@ -3,7 +3,6 @@ const os = require('os');
 const sprintf = require('sprintf-js').sprintf;
 const libraryName = require('./library').name;
 const versions = require('./tds-versions').versions;
-const assert = require('assert');
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -326,7 +325,7 @@ module.exports = class Login7Payload {
         break;
         // TODO: Security Token authentication datalen
       default:
-        assert.fail();
+        throw new Error('Unexpected library for Azure Active Directory authentication is set.');
     }
 
     // length of feature id (1 byte), data length field (4 bytes), and feature data (dataLen)
@@ -339,7 +338,7 @@ module.exports = class Login7Payload {
         break;
         // TODO: Security Token authentication
       default:
-        assert.fail();
+        throw new Error('Unexpected library for Azure Active Directory authentication is set.');
     }
     optionsByte |= (fedAuthInfo.requiredPreLoginResponse ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO);
     buffer.writeUInt8(optionsByte);
@@ -353,12 +352,12 @@ module.exports = class Login7Payload {
             break;
           // TODO: ActiveDirectoryIntegrated
           default:
-            assert.fail();
+            throw new Error('Specified method for Active Directory authentication is invalid.');
         }
         break;
         // TODO: security token
       default:
-        assert.fail();
+        throw new Error('Unexpected library for Azure Active Directory authentication is set.');
 
     }
     buffer.writeUInt8(workflow);
