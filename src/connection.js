@@ -1711,8 +1711,7 @@ Connection.prototype.STATE = {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            }
-            else {
+            } else {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           });
