@@ -266,6 +266,25 @@ exports['instanceLookup functional unit tests'] = {
       clock.restore();
       test.done();
     });
+  },
+
+  'incorrect instanceName': function(test) {
+    const message = 'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
+      'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
+    this.senderExecuteStub.callsArgWithAsync(0, null, message);
+    this.parseStub
+      .withArgs(message, this.options.instanceName);
+
+    this.instanceLookup.instanceLookup(this.options, (error, port) => {
+      test.ok(error.indexOf('XXXXXXXXXX') == -1);
+      test.ok(error.indexOf('YYYYYYYYYY') == -1);
+      test.strictEqual(port, undefined);
+
+      test.ok(this.createSenderStub.calledOnce);
+      test.ok(this.senderExecuteStub.calledOnce);
+      test.ok(this.parseStub.calledOnce);
+      test.done();
+    });
   }
 };
 
