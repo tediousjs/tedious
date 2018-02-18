@@ -482,14 +482,6 @@ class Connection extends EventEmitter {
       deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
 
-    this.reset = this.reset.bind(this);
-    this.socketClose = this.socketClose.bind(this);
-    this.socketEnd = this.socketEnd.bind(this);
-    this.socketConnect = this.socketConnect.bind(this);
-    this.socketError = this.socketError.bind(this);
-    this.requestTimeout = this.requestTimeout.bind(this);
-    this.connectTimeout = this.connectTimeout.bind(this);
-    this.retryTimeout = this.retryTimeout.bind(this);
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
@@ -823,13 +815,19 @@ class Connection extends EventEmitter {
       }
 
       this.socket = socket;
-      this.socket.on('error', this.socketError);
-      this.socket.on('close', this.socketClose);
-      this.socket.on('end', this.socketEnd);
+      this.socket.on('error', (error) => {
+        this.socketError(error);
+      });
+      this.socket.on('close', () => {
+        this.socketClose();
+      });
+      this.socket.on('end', () => {
+        this.socketEnd();
+      });
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
-      this.messageIo.on('secure', this.emit.bind(this, 'secure'));
+      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
       this.socketConnect();
     });
@@ -842,19 +840,25 @@ class Connection extends EventEmitter {
   }
 
   createConnectTimer() {
-    this.connectTimer = setTimeout(this.connectTimeout, this.config.options.connectTimeout);
+    this.connectTimer = setTimeout(() => {
+      this.connectTimeout();
+    }, this.config.options.connectTimeout);
   }
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
     if (this.config.options.requestTimeout) {
-      this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
+      this.requestTimer = setTimeout(() => {
+        this.requestTimeout();
+      }, this.config.options.requestTimeout);
     }
   }
 
   createRetryTimer() {
     this.clearRetryTimer();
-    this.retryTimer = setTimeout(this.retryTimeout, this.config.options.connectionRetryInterval);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimeout();
+    }, this.config.options.connectionRetryInterval);
   }
 
   connectTimeout() {
@@ -1052,8 +1056,9 @@ class Connection extends EventEmitter {
       return payload.toString('  ');
     });
 
-    const boundTransitionTo = this.transitionTo.bind(this);
-    process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+    process.nextTick(() => {
+      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+    });
   }
 
   // Returns false to apply backpressure.
