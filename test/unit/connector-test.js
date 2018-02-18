@@ -1,5 +1,7 @@
 const Mitm = require('mitm');
 const sinon = require('sinon');
+const dns = require('dns');
+const punycode = require('punycode');
 
 const ParallelConnectionStrategy = require('../../src/connector')
   .ParallelConnectionStrategy;
@@ -450,5 +452,44 @@ exports['ParallelConnectionStrategy'] = {
 
       test.done();
     });
+  }
+};
+
+exports['Test unicode SQL Server name'] = {
+  setUp: function(done) {
+    this.sinon = sinon.sandbox.create();
+
+    // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
+    this.spy = this.sinon.spy(dns, 'lookup');
+
+    done();
+  },
+
+  tearDown: function(done) {
+    this.sinon.restore();
+
+    done();
+  },
+
+  'test IDN Server name': function(test) {
+    test.expect(2);
+    const server = '本地主机.ad';
+    const connector = new Connector({ host: server, port: 12345 }, true);
+
+    connector.execute(() => { });
+    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
+    test.ok(this.spy.calledWithMatch(punycode.toASCII(server)), 'Unexpcted hostname passed to dns.lookup');
+    test.done();
+  },
+
+  'test ASCII Server name': function(test) {
+    test.expect(2);
+    const server = 'localhost';
+    const connector = new Connector({ host: server, port: 12345 }, true);
+
+    connector.execute(() => { });
+    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
+    test.ok(this.spy.calledWithMatch(server), 'Unexpcted hostname passed to dns.lookup');
+    test.done();
   }
 };
