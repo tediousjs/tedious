@@ -61,10 +61,12 @@ module.exports = {
         case 2:
           buffer.writeUInt8(3);
           buffer.writeUInt24LE(timestamp);
+          break;
         case 3:
         case 4:
           buffer.writeUInt8(4);
           buffer.writeUInt32LE(timestamp);
+          break;
         case 5:
         case 6:
         case 7:
