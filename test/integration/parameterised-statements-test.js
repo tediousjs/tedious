@@ -282,35 +282,35 @@ exports.textLarge = function(test) {
 var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), {nanosecondDelta: 0.1111111});
 
 exports.time = function(test) {
-  execSql(test, TYPES.Time, testTime, null, null, '00:00:00.1111111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
 };
 
 exports.time1 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 1}, '00:00:00.1', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 1}, '00:00:00.1', true);
 };
 
 exports.time2 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 2}, '00:00:00.11', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 2}, '00:00:00.11', true);
 };
 
 exports.time3 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 3}, '00:00:00.111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 3}, '00:00:00.111', true);
 };
 
 exports.time4 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 4}, '00:00:00.1111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 4}, '00:00:00.1111', true);
 };
 
 exports.time5 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 5}, '00:00:00.11111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 5}, '00:00:00.11111', true);
 };
 
 exports.time6 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 6}, '00:00:00.111111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 6}, '00:00:00.111111', true);
 };
 
 exports.time7 = function(test) {
-  execSql(test, TYPES.Time, testTime, null, {scale: 7}, '00:00:00.1111111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 7}, '00:00:00.1111111', true);
 };
 
 exports.smallDateTime = function(test) {
