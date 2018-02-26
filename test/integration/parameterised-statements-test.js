@@ -279,6 +279,40 @@ exports.textLarge = function(test) {
   execSql(test, TYPES.Text, dBuf.toString());
 };
 
+var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), {nanosecondDelta: 0.1111111});
+
+exports.time = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+};
+
+exports.time1 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 1}, '00:00:00.1', true);
+};
+
+exports.time2 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 2}, '00:00:00.11', true);
+};
+
+exports.time3 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 3}, '00:00:00.111', true);
+};
+
+exports.time4 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 4}, '00:00:00.1111', true);
+};
+
+exports.time5 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 5}, '00:00:00.11111', true);
+};
+
+exports.time6 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 6}, '00:00:00.111111', true);
+};
+
+exports.time7 = function(test) {
+  execSql(test, TYPES.Time, testTime, '7_3', {scale: 7}, '00:00:00.1111111', true);
+};
+
 exports.smallDateTime = function(test) {
   execSql(
     test,
@@ -805,7 +839,7 @@ end')\
   });
 };
 
-var execSql = function(test, type, value, tdsVersion, options, expectedValue) {
+var execSql = function(test, type, value, tdsVersion, options, expectedValue, cast) {
   var config = getConfig();
   //config.options.packetSize = 32768
 
@@ -816,7 +850,7 @@ var execSql = function(test, type, value, tdsVersion, options, expectedValue) {
 
   test.expect(6);
 
-  var request = new Request('select @param', function(err) {
+  var request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
     test.ifError(err);
 
     connection.close();
@@ -836,7 +870,9 @@ var execSql = function(test, type, value, tdsVersion, options, expectedValue) {
       expectedValue = value;
     }
 
-    if (value instanceof Date) {
+    if (cast) {
+      test.strictEqual(columns[0].value, expectedValue);
+    } else if (value instanceof Date) {
       test.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       test.strictEqual(columns[0].value, expectedValue.toString());
