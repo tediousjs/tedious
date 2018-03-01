@@ -362,6 +362,8 @@ class Connection extends EventEmitter {
       if (config.options.encrypt != undefined) {
         deprecateNonBooleanConfigValue('options.encrypt', config.options.encrypt);
         this.config.options.encrypt = config.options.encrypt;
+      } else {
+        deprecate('The default value for `options.encrypt` will change from `false` to `true`. Please pass `false` explicitly if you want to retain current behaviour.');
       }
       deprecateNullConfigValue('options.encrypt', config.options.encrypt);
 
