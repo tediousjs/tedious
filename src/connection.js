@@ -20,6 +20,12 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+//SSPI integration edit - start
+const SspiModuleSupported = require('sspi-client').ModuleSupported;
+const SspiClientApi = require('sspi-client').SspiClientApi;
+const Fqdn = require('sspi-client').Fqdn;
+const MakeSpn = require('sspi-client').MakeSpn;
+//SSPI integration edit - end
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -99,6 +105,9 @@ class Connection extends EventEmitter {
       userName: config.userName,
       password: config.password,
       domain: config.domain && config.domain.toUpperCase(),
+	  //SSPI integration edit - start
+	  securityPackage: config.securityPackage,
+	  //SSPI integration edit - end	  
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -483,6 +492,12 @@ class Connection extends EventEmitter {
       }
       deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
+	
+	//SSPI integration edit - start
+    if (this.config.domain && !this.config.userName && !this.config.password && SspiModuleSupported) {
+      this.config.options.useWindowsIntegratedAuth = true;
+    }
+	//SSPI integration edit - end	
 
     this.reset = this.reset.bind(this);
     this.socketClose = this.socketClose.bind(this);
@@ -497,6 +512,9 @@ class Connection extends EventEmitter {
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
+	//SSPI integration edit - start
+    this.sspiClientResponsePending = false;	
+	//SSPI integration edit - end	
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -1032,11 +1050,70 @@ class Connection extends EventEmitter {
       });
     };
 
+	//SSPI integration edit - start
+    if (this.config.options.useWindowsIntegratedAuth) {
+      Fqdn.getFqdn(this.routingData ? this.routingData.server : this.config.server, (err, fqdn) => {
+        if (err) {
+          this.emit('error', new Error('Error getting Fqdn. Error details: ' + err.message));
+          return this.close();
+        }
+
+        const spn = MakeSpn.makeSpn('MSSQLSvc', fqdn, this.config.options.port);
+
+        this.sspiClient = new SspiClientApi.SspiClient(spn, this.config.securityPackage);
+
+        this.sspiClientResponsePending = true;
+        this.sspiClient.getNextBlob(null, 0, 0, (clientResponse, isDone, errorCode, errorString) => {
+          if (errorCode) {
+            this.emit('error', new Error(errorString));
+            return this.close();
+          }
+
+          if (isDone) {
+            this.emit('error', new Error('Unexpected isDone=true on getNextBlob in sendLogin7Packet.'));
+            return this.close();
+          }
+
+          this.sspiClientResponsePending = false;
+          sendPayload.call(this, clientResponse);
+          cb();
+        });
+      });
+    } else {	
+	//SSPI integration edit - end	
     sendPayload.call(this);
     process.nextTick(cb);
+	}
+	//SSPI integration edit - end	
   }
 
   sendNTLMResponsePacket() {
+	//SSPI integration edit - start
+	    if (this.sspiClient) {
+      this.sspiClientResponsePending = true;
+
+      this.sspiClient.getNextBlob(this.ntlmpacketBuffer, 0, this.ntlmpacketBuffer.length, (clientResponse, isDone, errorCode, errorString) => {
+
+        if (errorCode) {
+          this.emit('error', new Error(errorString));
+          return this.close();
+        }
+
+        this.sspiClientResponsePending = false;
+
+        if (clientResponse.length) {
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, clientResponse);
+          this.debug.payload(function() {
+            return '  SSPI Auth';
+          });
+        }
+
+        if (isDone) {
+          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+        }
+      });
+    } else {
+	//SSPI integration edit - end	  
     const payload = new NTLMResponsePayload({
       domain: this.config.domain,
       userName: this.config.userName,
@@ -1056,6 +1133,7 @@ class Connection extends EventEmitter {
 
     const boundTransitionTo = this.transitionTo.bind(this);
     process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+	}
   }
 
   // Returns false to apply backpressure.
@@ -1667,7 +1745,18 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
+	//SSPI integration edit -- start
+        if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'data', data);
+        } else {	
+	//SSPI integration edit -- end				
         this.sendDataToTokenStreamParser(data);
+		}
       },
       receivedChallenge: function() {
         this.sendNTLMResponsePacket();
@@ -1676,7 +1765,18 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
+	//SSPI integration edit -- start
+	  if (this.sspiClientResponsePending) {
+          // We got data from the server while we're waiting for getNextBlob()
+          // call to complete on the client. We cannot process server data
+          // until this call completes as the state can change on completion of
+          // the call. Queue it for later.
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        } else {		  
+	//SSPI integration edit -- end						
         this.processLogin7NTLMResponse();
+		}
       }
     }
   },

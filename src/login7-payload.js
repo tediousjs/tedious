@@ -290,4 +290,5 @@ module.exports = class Login7Payload {
         this.loginData.language, this.loginData.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
+  
 };
