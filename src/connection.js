@@ -92,6 +92,7 @@ class Connection extends EventEmitter {
       responsePending: false,
       token: undefined
     };
+
     if (config.domain != undefined) {
       deprecateNonStringConfigValue('domain', config.domain);
     }
@@ -158,7 +159,6 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
-        authentication: undefined,
         useColumnNames: false,
         useUTC: true
       }
@@ -514,7 +514,6 @@ class Connection extends EventEmitter {
           this.config.options.trustServerCertificate = false;
         }
       }
-      deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
 
     this.reset = this.reset.bind(this);
@@ -1025,7 +1024,7 @@ class Connection extends EventEmitter {
   sendPreLogin() {
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt,
-      fedAuthRequested: (this.fedAuthInfo.method != undefined)
+      fedAuthRequested: (this.fedAuthInfo.method !== undefined)
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
