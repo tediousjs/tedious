@@ -33,7 +33,7 @@ module.exports = class Parser extends Transform {
     this.next = undefined;
   }
 
-  _transform(input, encoding, done) {
+  async _transform(input, encoding, done) {
     if (input === this.endOfMessageMarker) {
       done(null, {                                         // generate endOfMessage pseudo token
         name: 'EOM',
@@ -55,17 +55,16 @@ module.exports = class Parser extends Transform {
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
       this.suspended = false;
-      this.next.call(null);
+      await this.next.call(null);
     }
-
-    // If we're no longer suspended, parse new tokens
-    if (!this.suspended) {
+    // If we're no longer suspended, parse new tokens*/
+    else if (!this.suspended) {
       // Start the parser
-      this.parseTokens();
+      await this.parseTokens();
     }
   }
 
-  parseTokens() {
+  async parseTokens() {
     const doneParsing = (token) => {
       if (token) {
         switch (token.name) {
@@ -81,8 +80,10 @@ module.exports = class Parser extends Transform {
       const type = this.buffer.readUInt8(this.position, true);
 
       this.position += 1;
-
-      if (tokenParsers[type]) {
+      if (type == TYPE.ROW) {
+        await tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
+      }
+      else if (tokenParsers[type]) {
         tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
       } else {
         this.emit('error', new Error('Unknown type: ' + type));
@@ -91,6 +92,7 @@ module.exports = class Parser extends Transform {
 
     if (!this.suspended && this.position === this.buffer.length) {
       // If we reached the end of the buffer, we can stop parsing now.
+      this.emit('checkIfLastPacket');
       return this.await.call(null);
     }
   }
@@ -352,6 +354,68 @@ module.exports = class Parser extends Transform {
   readUsVarByte(callback) {
     this.readUInt16LE((length) => {
       this.readBuffer(length, callback);
+    });
+  }
+
+  //------------------------------------------------------------//
+
+  async _readInt32LE(callback) {
+    await this._awaitData(4);
+    const data = this.buffer.readUInt32LE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async _readUInt32LE() {
+    await this._awaitData(4);
+    const data = this.buffer.readUInt32LE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async _readUInt16LE() {
+    await this._awaitData(2);
+    const data = this.buffer.readUInt16LE(this.position);
+    this.position += 2;
+    return data;
+  }
+
+  async _readUInt8() {
+    await this._awaitData(1);
+    const data = this.buffer.readUInt8(this.position);
+    this.position += 1;
+    return data;
+  }
+
+  // Read a Unicode String (BVARCHAR)
+  async _readBVarChar(callback) {
+    const length = await this._readUInt8();
+    const data = await this._readBuffer(length * 2);
+    return data.toString('ucs2');
+  }
+
+  // Read binary data (BVARBYTE)
+  async _readBVarByte(callback) {
+    const length = await this._readUInt8();
+    return await this._readBuffer(length);
+  }
+
+  async _readBuffer(length) {
+    await this._awaitData(length);
+    const data = this.buffer.slice(this.position, this.position + length);
+    this.position += length;
+    return data;
+  }
+
+  _awaitData(length) {
+    return new Promise((resolve, reject) => {
+      if (this.position + length <= this.buffer.length) {
+        resolve();
+      } else {
+        this.suspend(() => {
+          resolve(this._awaitData(length));
+        });
+      }
     });
   }
 };

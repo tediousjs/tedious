@@ -2,44 +2,37 @@
 
 const valueParse = require('../value-parser');
 
-module.exports = function(parser, colMetadata, options, callback) {
+module.exports = async function(parser, colMetadata, options, callback) {
   const columns = options.useColumnNames ? {} : [];
 
   const len = colMetadata.length;
-  let i = 0;
 
-  function next(done) {
-    if (i === len) {
-      return done();
-    }
-
-
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
-      const column = {
-        value: value,
-        metadata: columnMetaData
-      };
-
-      if (options.useColumnNames) {
-        if (columns[columnMetaData.colName] == null) {
-          columns[columnMetaData.colName] = column;
-        }
-      } else {
-        columns.push(column);
-      }
-
-      i++;
-
-      next(done);
-    });
-  }
-
-  next(() => {
+  const done = () => {
     callback({
       name: 'ROW',
       event: 'row',
       columns: columns
     });
-  });
+  };
+
+  for (let i = 0; i < len; i++) {
+    const columnMetaData = colMetadata[i];
+    const value = await valueParse(parser, columnMetaData, options);
+
+    const column = {
+      value: value,
+      metadata: columnMetaData
+    };
+
+    if (options.useColumnNames) {
+      if (columns[columnMetaData.colName] == null) {
+        columns[columnMetaData.colName] = column;
+      }
+    } else {
+      columns.push(column);
+    }
+    if (i == len - 1) {
+      return done();
+    }
+  }
 };

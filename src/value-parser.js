@@ -16,343 +16,120 @@ const PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
-function readTextPointerNull(parser, type, callback) {
+async function _readTextPointerNull(parser, type) {
   if (type.hasTextPointerAndTimestamp) {
-    parser.readUInt8((textPointerLength) => {
-      if (textPointerLength !== 0) {
-        // Appear to be dummy values, so consume and discard them.
-        parser.readBuffer(textPointerLength, () => {
-          parser.readBuffer(8, () => {
-            callback(undefined);
-          });
-        });
-      } else {
-        callback(true);
-      }
-    });
+    const textPointerLength = await parser._readUInt8();
+    if (textPointerLength !== 0) {
+      // Appear to be dummy values, so consume and discard them.
+      await parser._readBuffer(textPointerLength);
+      await parser._readBuffer(8);
+      return undefined;
+    }
+    else {
+      return true;
+    }
   } else {
-    callback(undefined);
+    return undefined;
   }
 }
 
-function readDataLength(parser, type, metaData, textPointerNull, callback) {
+async function _readDataLength(parser, type, metaData, textPointerNull) {
   if (textPointerNull) {
-    return callback(0);
+    return 0;
   }
 
   if (metaData.isVariantValue) {
-    return callback(metaData.dataLength);
+    return metaData.dataLength;
   }
 
   // s2.2.4.2.1
   switch (type.id & 0x30) {
     case 0x10: // xx01xxxx - s2.2.4.2.1.1
-      return callback(0);
+      return 0;
 
     case 0x20: // xx10xxxx - s2.2.4.2.1.3
       // Variable length
       if (metaData.dataLength !== MAX) {
         switch (type.dataLengthLength) {
           case 0:
-            return callback(undefined);
+            return undefined;
 
           case 1:
-            return parser.readUInt8(callback);
+            return await parser._readUInt8();
 
           case 2:
-            return parser.readUInt16LE(callback);
+            return await parser._readUInt16LE();
 
           case 4:
-            return parser.readUInt32LE(callback);
+            return await parser._readUInt32LE();
 
           default:
             return parser.emit('error', new Error('Unsupported dataLengthLength ' + type.dataLengthLength + ' for data type ' + type.name));
         }
       } else {
-        return callback(undefined);
+        return undefined;
       }
 
     case 0x30:
-      return callback(1 << ((type.id & 0x0C) >> 2));
+      return (1 << ((type.id & 0x0C) >> 2));
   }
 }
 
-module.exports = valueParse;
-function valueParse(parser, metaData, options, callback) {
+module.exports = _valueParse;
+// prototyping for just int and varchar types
+async function _valueParse(parser, metaData, options) {
   const type = metaData.type;
+  const textPointerNull = await _readTextPointerNull(parser, type);
+  const dataLength = await _readDataLength(parser, type, metaData, textPointerNull);
+  switch (type.name) {
+    case 'Null':
+      return null;
 
-  readTextPointerNull(parser, type, (textPointerNull) => {
-    readDataLength(parser, type, metaData, textPointerNull, (dataLength) => {
-      switch (type.name) {
-        case 'Null':
-          return callback(null);
+    case 'TinyInt':
+      return await parser._readUInt8();
 
-        case 'TinyInt':
-          return parser.readUInt8(callback);
+    case 'Int':
+      return await parser._readInt32LE();
 
-        case 'Int':
-          return parser.readInt32LE(callback);
+    case 'SmallInt':
+      return await parser._readInt16LE();
 
-        case 'SmallInt':
-          return parser.readInt16LE(callback);
+    case 'BigInt':
+      const buffer = await parser._readBuffer(8);
+      return await convertLEBytesToString(buffer);
 
-        case 'BigInt':
-          return parser.readBuffer(8, (buffer) => {
-            callback(convertLEBytesToString(buffer));
-          });
-
-        case 'IntN':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 1:
-              return parser.readUInt8(callback);
-            case 2:
-              return parser.readInt16LE(callback);
-            case 4:
-              return parser.readInt32LE(callback);
-            case 8:
-              return parser.readBuffer(8, (buffer) => {
-                callback(convertLEBytesToString(buffer));
-              });
-
-            default:
-              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
-          }
-
-        case 'Real':
-          return parser.readFloatLE(callback);
-
-        case 'Float':
-          return parser.readDoubleLE(callback);
-
-        case 'FloatN':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 4:
-              return parser.readFloatLE(callback);
-            case 8:
-              return parser.readDoubleLE(callback);
-
-            default:
-              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
-          }
-
-        case 'Money':
-        case 'SmallMoney':
-        case 'MoneyN':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 4:
-              return parser.readInt32LE((value) => {
-                callback(value / MONEY_DIVISOR);
-              });
-            case 8:
-              return parser.readInt32LE((high) => {
-                parser.readUInt32LE((low) => {
-                  callback((low + (0x100000000 * high)) / MONEY_DIVISOR);
-                });
-              });
-
-            default:
-              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
-          }
-
-        case 'Bit':
-          return parser.readUInt8((value) => {
-            callback(!!value);
-          });
-
-        case 'BitN':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 1:
-              return parser.readUInt8((value) => {
-                callback(!!value);
-              });
-          }
-
-        case 'VarChar':
-        case 'Char':
-          const codepage = metaData.collation.codepage;
-          if (metaData.dataLength === MAX) {
-            return readMaxChars(parser, codepage, callback);
-          } else {
-            return readChars(parser, dataLength, codepage, NULL, callback);
-          }
-
-        case 'NVarChar':
-        case 'NChar':
-          if (metaData.dataLength === MAX) {
-            return readMaxNChars(parser, callback);
-          } else {
-            return readNChars(parser, dataLength, NULL, callback);
-          }
-
-        case 'VarBinary':
-        case 'Binary':
-          if (metaData.dataLength === MAX) {
-            return readMaxBinary(parser, callback);
-          } else {
-            return readBinary(parser, dataLength, NULL, callback);
-          }
-
-        case 'Text':
-          if (textPointerNull) {
-            return callback(null);
-          } else {
-            return readChars(parser, dataLength, metaData.collation.codepage, PLP_NULL, callback);
-          }
-
-        case 'NText':
-          if (textPointerNull) {
-            return callback(null);
-          } else {
-            return readNChars(parser, dataLength, PLP_NULL, callback);
-          }
-
-        case 'Image':
-          if (textPointerNull) {
-            return callback(null);
-          } else {
-            return readBinary(parser, dataLength, PLP_NULL, callback);
-          }
-
-        case 'Xml':
-          return readMaxNChars(parser, callback);
-
-        case 'SmallDateTime':
-          return readSmallDateTime(parser, options.useUTC, callback);
-
-        case 'DateTime':
-          return readDateTime(parser, options.useUTC, callback);
-
-        case 'DateTimeN':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 4:
-              return readSmallDateTime(parser, options.useUTC, callback);
-            case 8:
-              return readDateTime(parser, options.useUTC, callback);
-          }
-
-        case 'Time':
-          if (dataLength === 0) {
-            return callback(null);
-          } else {
-            return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
-          }
-
-        case 'Date':
-          if (dataLength === 0) {
-            return callback(null);
-          } else {
-            return readDate(parser, options.useUTC, callback);
-          }
-
-        case 'DateTime2':
-          if (dataLength === 0) {
-            return callback(null);
-          } else {
-            return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
-          }
-
-        case 'DateTimeOffset':
-          if (dataLength === 0) {
-            return callback(null);
-          } else {
-            return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
-          }
-
-        case 'NumericN':
-        case 'DecimalN':
-          if (dataLength === 0) {
-            return callback(null);
-          } else {
-            return parser.readUInt8((sign) => {
-              sign = sign === 1 ? 1 : -1;
-
-              let readValue;
-              switch (dataLength - 1) {
-                case 4:
-                  readValue = parser.readUInt32LE;
-                  break;
-                case 8:
-                  readValue = parser.readUNumeric64LE;
-                  break;
-                case 12:
-                  readValue = parser.readUNumeric96LE;
-                  break;
-                case 16:
-                  readValue = parser.readUNumeric128LE;
-                  break;
-                default:
-                  return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength - 1)));
-              }
-
-              readValue.call(parser, (value) => {
-                callback((value * sign) / Math.pow(10, metaData.scale));
-              });
-            });
-          }
-
-        case 'UniqueIdentifier':
-          switch (dataLength) {
-            case 0:
-              return callback(null);
-            case 0x10:
-              return parser.readBuffer(0x10, (data) => {
-                callback(guidParser.arrayToGuid(data));
-              });
-
-            default:
-              return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
-          }
-
-        case 'UDT':
-          return readMaxBinary(parser, callback);
-
-        case 'Variant':
-          if (dataLength === 0) {
-            return callback(null);
-          }
-
-          const valueMetaData = metaData.valueMetaData = {};
-          Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});
-          return parser.readUInt8((baseType) => {
-            return parser.readUInt8((propBytes) => {
-              valueMetaData.dataLength = dataLength - propBytes - 2;
-              valueMetaData.type = TYPE[baseType];
-              return readPrecision(parser, valueMetaData.type, (precision) => {
-                valueMetaData.precision = precision;
-                return readScale(parser, valueMetaData.type, (scale) => {
-                  valueMetaData.scale = scale;
-                  return readCollation(parser, valueMetaData.type, (collation) => {
-                    valueMetaData.collation = collation;
-                    if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
-                      return readDataLength(parser, valueMetaData.type, {}, null, (maxDataLength) => {
-                        // skip the 2-byte max length sent for BIGVARCHRTYPE, BIGCHARTYPE, NVARCHARTYPE, NCHARTYPE, BIGVARBINTYPE and BIGBINARYTYPE types
-                        // and parse based on the length of actual data
-                        return valueParse(parser, valueMetaData, options, callback);
-                      });
-                    } else {
-                      return valueParse(parser, valueMetaData, options, callback);
-                    }
-                  });
-                });
-              });
-            });
-          });
+    case 'IntN':
+      switch (dataLength) {
+        case 0:
+          return null;
+        case 1:
+          return await parser._readUInt8();
+        case 2:
+          return await parser._readInt16LE();
+        case 4:
+          return await parser._readInt32LE();
+        case 8:
+          const buffer = await parser._readBuffer(8);
+          // should convert convertLEBytesToString to async too - doesn't work on bigint yet
+          return await convertLEBytesToString(buffer);
 
         default:
-          return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
       }
-    });
-  });
+
+    case 'VarChar':
+    case 'Char':
+      const codepage = metaData.collation.codepage;
+      if (metaData.dataLength === MAX) {
+        return readMaxChars(parser, codepage, callback);
+      } else {
+        return await _readChars(parser, dataLength, codepage, NULL);
+      }
+
+    //TODO: add all the other datatypes
+    default:
+      return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+  }
 }
 
 function readBinary(parser, dataLength, nullValue, callback) {
@@ -363,17 +140,16 @@ function readBinary(parser, dataLength, nullValue, callback) {
   }
 }
 
-function readChars(parser, dataLength, codepage, nullValue, callback) {
+async function _readChars(parser, dataLength, codepage, nullValue) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
 
   if (dataLength === nullValue) {
-    return callback(null);
+    return null;
   } else {
-    return parser.readBuffer(dataLength, (data) => {
-      callback(iconv.decode(data, codepage));
-    });
+    const data = await parser._readBuffer(dataLength);
+    return iconv.decode(data, codepage);
   }
 }
 

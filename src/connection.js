@@ -1734,6 +1734,13 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
+    enter: function() {
+      // TODO: remove 'enter' function after all response from SQL Server are parsed using async/await
+      this.messageIo.setAsyncAwaitFlow(true);
+      this.tokenStreamParser.on('checkIfLastPacket', () => {
+        this.messageIo.isLastPacket(this.state.events.packet);
+      });
+    },
     exit: function(nextState) {
       this.clearRequestTimer();
 
@@ -1748,9 +1755,11 @@ Connection.prototype.STATE = {
         sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
+      data: function(packet) {
         this.clearRequestTimer();                          // request timer is stopped on first data package
-        const ret = this.sendDataToTokenStreamParser(data);
+        const ret = this.sendDataToTokenStreamParser(packet.data());
+        // after parsing the data, this stored `packet` is used to check if it is the last packet.
+        this.state.events.packet = packet;
         if (ret === false) {
           // Bridge backpressure from the token stream parser transform to the
           // packet stream transform.
@@ -1758,6 +1767,9 @@ Connection.prototype.STATE = {
         }
       },
       message: function() {
+        this.tokenStreamParser.removeAllListeners('checkIfLastPacket');
+        this.messageIo.setAsyncAwaitFlow(false);
+
         // We have to channel the 'message' (EOM) event through the token stream
         // parser transform, to keep it in line with the flow of the tokens, when
         // the incoming data flow is paused and resumed.
