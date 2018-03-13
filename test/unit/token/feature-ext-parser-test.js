@@ -1,5 +1,3 @@
-// @flow
-require('babel-register');
 
 var Parser = require('../../../src/token/stream-parser');
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
