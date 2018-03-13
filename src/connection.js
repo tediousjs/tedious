@@ -6,7 +6,8 @@ const InstanceLookup = require('./instance-lookup').InstanceLookup;
 const TransientErrorLookup = require('./transient-error-lookup.js').TransientErrorLookup;
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
-const Login7Payload = require('./login7-payload');
+const Login7Payload = require('./login7-payload').Login7Payload;
+const FEDAUTH_OPTIONS = require('./login7-payload').FEDAUTH_OPTIONS;
 const NTLMResponsePayload = require('./ntlm-payload');
 const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
@@ -654,6 +655,27 @@ class Connection extends EventEmitter {
             this.fedAuthInfo.token = tokenResponse;
           }
         });
+      }
+    });
+
+    this.tokenStreamParser.on('featureExtAck', (token) => {
+      switch (token.featureId) {
+        case FEDAUTH_OPTIONS.FEATURE_ID:
+          if (!this.fedAuthInfo.fedAuthInfoRequested) {
+            throw new Error('Did not request federated authentication, but received federeated authentication acknowledgment');
+          }
+          switch (this.fedAuthInfo.fedAuthLibrary) {
+            case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+              if (0 !== token.featureAckDataLen) {
+                throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
+              }
+              break;
+            default:
+              throw new Error('attempting to use unknown federated authentication library');
+          }
+          break;
+        default:
+          throw new Error('Received acknowledgement for unknown feature');
       }
     });
 
