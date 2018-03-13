@@ -1,4 +1,4 @@
-var Login7Payload = require('../../src/login7-payload');
+var Login7Payload = require('../../src/login7-payload').Login7Payload;
 
 exports.create = function(test) {
   var loginData = {
@@ -192,3 +192,46 @@ exports.createSSPI = function(test) {
 
   test.done();
 };
+
+exports.createFedAuth = function(test) {
+
+  var loginData = {
+    userName: 'user',
+    password: 'pw',
+    serverName: 'server',
+    language: 'lang',
+    database: 'db',
+    tdsVersion: '7_4',
+    fedauthInfo: {
+      method: 'activedirectorypassword',
+      requiredPreLoginResponse: true,
+      responsePending: false
+    }
+  };
+
+  var payload = new Login7Payload(loginData);
+
+  var expectedLength =
+  4 +  // Length
+  32 + // Fixed data
+  // Variable
+  2 + 2 + 2 * payload.hostname.length +
+  2 + 2 + 2 * 0 + // Username
+  2 + 2 + 2 * 0 + // Password
+  2 + 2 + 2 * loginData.appName.length +
+  2 + 2 + 2 * loginData.serverName.length +
+  2 + 2 + 4 +
+  2 + 2 + 2 * payload.libraryName.length +
+  2 + 2 + 2 * loginData.language.length +
+  2 + 2 + 2 * loginData.database.length +
+  payload.clientId.length +
+  2 + 2 + 2 * payload.attachDbFile.length +
+  2 + 2 + 2 * payload.changePassword.length +
+  4 +  // cbSSPILong
+  4 + // Extension offset
+  1 + 1 + 4 + 1 + 1; // Feature ext
+
+  test.strictEqual(payload.data.length, expectedLength);
+  test.done();
+};
+

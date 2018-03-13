@@ -98,15 +98,15 @@ const FEDAUTH_OPTIONS = {
   FEDAUTH_YES_ECHO: 0x01,
   FEDAUTH_NO_ECHO: 0x00,
   ADAL_WORKFLOW_USER_PASS: 0x01,
-  ADAL_WORKFLOW_INTEGRATED: 0x02,
+  ADAL_WORKFLOW_INTEGRATED: 0x02
 };
-// TODO: add Secuirty token authentication
+module.exports.FEDAUTH_OPTIONS = FEDAUTH_OPTIONS;
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
 /*
   s2.2.6.3
  */
-module.exports = class Login7Payload {
+module.exports.Login7Payload = class Login7Payload {
   constructor(loginData) {
     this.loginData = loginData;
     const lengthLength = 4;
@@ -398,3 +398,4 @@ module.exports = class Login7Payload {
       );
   }
 };
+
