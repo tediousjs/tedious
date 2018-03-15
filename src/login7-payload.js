@@ -239,7 +239,7 @@ module.exports.Login7Payload = class Login7Payload {
     }
 
     if (this.fedAuthPreloginRequired) {
-      variableData.data.writeUInt32LEatPos(variableData.offset, extensionPos);
+      variableData.data.writeUInt32LEatOffset(variableData.offset, extensionPos);
       return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data, this.featureExt ]);
     }
 
