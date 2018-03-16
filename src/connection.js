@@ -662,7 +662,7 @@ class Connection extends EventEmitter {
       switch (token.featureId) {
         case FEDAUTH_OPTIONS.FEATURE_ID:
           if (!this.fedAuthInfo.fedAuthInfoRequested) {
-            throw new Error('Did not request federated authentication, but received federeated authentication acknowledgment');
+            throw new Error('Did not request federated authentication, but received the acknowledgment');
           }
           switch (this.fedAuthInfo.fedAuthLibrary) {
             case FEDAUTH_OPTIONS.LIBRARY_ADAL:
@@ -671,7 +671,7 @@ class Connection extends EventEmitter {
               }
               break;
             default:
-              throw new Error('attempting to use unknown federated authentication library');
+              throw new Error('Attempting to use unknown federated authentication library');
           }
           break;
         default:
