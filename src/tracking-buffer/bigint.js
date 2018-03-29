@@ -39,26 +39,29 @@ function invert(array) {
   }
 }
 
-module.exports.convertLEBytesToString = convertLEBytesToString;
-function convertLEBytesToString(buffer) {
-  const array = Array.prototype.slice.call(buffer, 0, buffer.length);
-  if (isZero(array)) {
-    return '0';
-  } else {
-    let sign;
-    if (array[array.length - 1] & 0x80) {
-      sign = '-';
-      invert(array);
+module.exports.convertLEBytesToString = _convertLEBytesToString;
+function _convertLEBytesToString(buffer) {
+  return new Promise((resolve, reject) => {
+    const array = Array.prototype.slice.call(buffer, 0, buffer.length);
+    if (isZero(array)) {
+      resolve ('0');
     } else {
-      sign = '';
+      let sign;
+      if (array[array.length - 1] & 0x80) {
+        sign = '-';
+        invert(array);
+      } else {
+        sign = '';
+      }
+      let result = '';
+      while (!isZero(array)) {
+        const t = getNextRemainder(array);
+        result = t + result;
+      }
+      resolve(sign + result);
     }
-    let result = '';
-    while (!isZero(array)) {
-      const t = getNextRemainder(array);
-      result = t + result;
-    }
-    return sign + result;
-  }
+  });
+
 }
 
 module.exports.numberToInt64LE = numberToInt64LE;
