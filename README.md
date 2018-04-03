@@ -17,7 +17,7 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
 
 ### Supported TDS versions
 
-- TDS 7.4 (SQL Server 2012/2014)
+- TDS 7.4 (SQL Server 2012/2014/2016/2017)
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
