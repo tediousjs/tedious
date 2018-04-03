@@ -484,14 +484,6 @@ class Connection extends EventEmitter {
       deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
 
-    this.reset = this.reset.bind(this);
-    this.socketClose = this.socketClose.bind(this);
-    this.socketEnd = this.socketEnd.bind(this);
-    this.socketConnect = this.socketConnect.bind(this);
-    this.socketError = this.socketError.bind(this);
-    this.requestTimeout = this.requestTimeout.bind(this);
-    this.connectTimeout = this.connectTimeout.bind(this);
-    this.retryTimeout = this.retryTimeout.bind(this);
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
@@ -825,13 +817,19 @@ class Connection extends EventEmitter {
       }
 
       this.socket = socket;
-      this.socket.on('error', this.socketError);
-      this.socket.on('close', this.socketClose);
-      this.socket.on('end', this.socketEnd);
+      this.socket.on('error', (error) => {
+        this.socketError(error);
+      });
+      this.socket.on('close', () => {
+        this.socketClose();
+      });
+      this.socket.on('end', () => {
+        this.socketEnd();
+      });
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
-      this.messageIo.on('secure', this.emit.bind(this, 'secure'));
+      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
       this.socketConnect();
     });
@@ -844,19 +842,25 @@ class Connection extends EventEmitter {
   }
 
   createConnectTimer() {
-    this.connectTimer = setTimeout(this.connectTimeout, this.config.options.connectTimeout);
+    this.connectTimer = setTimeout(() => {
+      this.connectTimeout();
+    }, this.config.options.connectTimeout);
   }
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
     if (this.config.options.requestTimeout) {
-      this.requestTimer = setTimeout(this.requestTimeout, this.config.options.requestTimeout);
+      this.requestTimer = setTimeout(() => {
+        this.requestTimeout();
+      }, this.config.options.requestTimeout);
     }
   }
 
   createRetryTimer() {
     this.clearRetryTimer();
-    this.retryTimer = setTimeout(this.retryTimeout, this.config.options.connectionRetryInterval);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimeout();
+    }, this.config.options.connectionRetryInterval);
   }
 
   connectTimeout() {
@@ -917,12 +921,8 @@ class Connection extends EventEmitter {
     }
   }
 
-  dispatchEvent(eventName) {
+  dispatchEvent(eventName, ...args) {
     if (this.state.events[eventName]) {
-      const args = new Array(arguments.length - 1);
-      for (let i = 0; i < args.length;) {
-        args[i++] = arguments[i];
-      }
       this.state.events[eventName].apply(this, args);
     } else {
       this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
@@ -1054,8 +1054,9 @@ class Connection extends EventEmitter {
       return payload.toString('  ');
     });
 
-    const boundTransitionTo = this.transitionTo.bind(this);
-    process.nextTick(boundTransitionTo, this.STATE.SENT_NTLM_RESPONSE);
+    process.nextTick(() => {
+      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+    });
   }
 
   // Returns false to apply backpressure.
@@ -1314,13 +1315,12 @@ class Connection extends EventEmitter {
     isolationLevel || (isolationLevel = this.config.options.isolationLevel);
     const transaction = new Transaction(name || '', isolationLevel);
     if (this.config.options.tdsVersion < '7_2') {
-      const self = this;
-      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, function() {
-        self.transactionDepth++;
-        if (self.transactionDepth === 1) {
-          self.inTransaction = true;
+      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (...args) => {
+        this.transactionDepth++;
+        if (this.transactionDepth === 1) {
+          this.inTransaction = true;
         }
-        return callback.apply(null, arguments);
+        callback(...args);
       }));
     }
 
@@ -1333,13 +1333,12 @@ class Connection extends EventEmitter {
   commitTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      const self = this;
-      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, function() {
-        self.transactionDepth--;
-        if (self.transactionDepth === 0) {
-          self.inTransaction = false;
+      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (...args) => {
+        this.transactionDepth--;
+        if (this.transactionDepth === 0) {
+          this.inTransaction = false;
         }
-        return callback.apply(null, arguments);
+        callback(...args);
       }));
     }
     const request = new Request(undefined, callback);
@@ -1349,13 +1348,12 @@ class Connection extends EventEmitter {
   rollbackTransaction(callback, name) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
-      const self = this;
-      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, function() {
-        self.transactionDepth--;
-        if (self.transactionDepth === 0) {
-          self.inTransaction = false;
+      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (...args) => {
+        this.transactionDepth--;
+        if (this.transactionDepth === 0) {
+          this.inTransaction = false;
         }
-        return callback.apply(null, arguments);
+        callback(...args);
       }));
     }
     const request = new Request(undefined, callback);
@@ -1365,10 +1363,9 @@ class Connection extends EventEmitter {
   saveTransaction(callback, name) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
-      const self = this;
-      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, function() {
-        self.transactionDepth++;
-        return callback.apply(null, arguments);
+      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (...args) => {
+        this.transactionDepth++;
+        callback(...args);
       }));
     }
     const request = new Request(undefined, callback);
@@ -1379,51 +1376,44 @@ class Connection extends EventEmitter {
     if (typeof cb !== 'function') {
       throw new TypeError('`cb` must be a function');
     }
+
     const useSavepoint = this.inTransaction;
     const name = '_tedious_' + (crypto.randomBytes(10).toString('hex'));
-    const self = this;
-    const txDone = function(err, done) {
-      const args = new Array(arguments.length - 2);
-      for (let i = 0; i < args.length;) {
-        args[i++] = arguments[i + 1];
-      }
-
+    const txDone = (err, done, ...args) => {
       if (err) {
-        if (self.inTransaction && self.state === self.STATE.LOGGED_IN) {
-          return self.rollbackTransaction(function(txErr) {
-            args.unshift(txErr || err);
-            return done.apply(null, args);
+        if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
+          return this.rollbackTransaction((txErr) => {
+            done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(function() {
-            args.unshift(err);
-            return done.apply(null, args);
+          return process.nextTick(() => {
+            done(err, ...args);
           });
         }
       } else {
         if (useSavepoint) {
-          return process.nextTick(function() {
-            if (self.config.options.tdsVersion < '7_2') {
-              self.transactionDepth--;
+          return process.nextTick(() => {
+            if (this.config.options.tdsVersion < '7_2') {
+              this.transactionDepth--;
             }
-            args.unshift(null);
-            return done.apply(null, args);
+            done(null, ...args);
           });
         } else {
-          return self.commitTransaction(function(txErr) {
-            args.unshift(txErr);
-            return done.apply(null, args);
+          return this.commitTransaction((txErr) => {
+            done(txErr, ...args);
           }, name);
         }
       }
     };
+
     if (useSavepoint) {
       return this.saveTransaction((err) => {
         if (err) {
           return cb(err);
         }
+
         if (isolationLevel) {
-          return this.execSqlBatch(new Request('SET transaction isolation level ' + this.getIsolationLevelText(isolationLevel), function(err) {
+          return this.execSqlBatch(new Request('SET transaction isolation level ' + this.getIsolationLevelText(isolationLevel), (err) => {
             return cb(err, txDone);
           }));
         } else {
@@ -1435,6 +1425,7 @@ class Connection extends EventEmitter {
         if (err) {
           return cb(err);
         }
+
         return cb(null, txDone);
       }, name, isolationLevel);
     }
@@ -1484,12 +1475,11 @@ class Connection extends EventEmitter {
   }
 
   reset(callback) {
-    const self = this;
-    const request = new Request(this.getInitialSql(), function(err) {
-      if (self.config.options.tdsVersion < '7_2') {
-        self.inTransaction = false;
+    const request = new Request(this.getInitialSql(), (err) => {
+      if (this.config.options.tdsVersion < '7_2') {
+        this.inTransaction = false;
       }
-      return callback(err);
+      callback(err);
     });
     this.resetConnectionOnNextRequest = true;
     return this.execSqlBatch(request);
