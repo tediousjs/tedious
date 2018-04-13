@@ -20,6 +20,7 @@ title: API - Request
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
   <li><a href="#event_doneProc">Event: 'doneProc'</a></li>
   <li><a href="#event_returnValue">Event: 'returnValue'</a></li>
+  <li><a href="#event_order">Event: 'order'</a></li>
   <li><a href="#function_addParameter">request.addParameter(name, type, value, [options])</a></li>
   <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type, [value], [options])</a></li>
   <li><a href="#function_pause">request.pause()</a></li>
@@ -404,6 +405,24 @@ request.on('returnValue', function (parameterName, value, metadata) { });
   <div class="description">
     <p>
       The same data that is exposed in the <code>columnMetadata</code> event.
+    </p>
+  </div>
+</div>
+
+<h2 id="event_order">Event: order</h2>
+{% highlight javascript %}
+request.on('order', function (orderColumns) { });
+{% endhighlight %}
+
+<p>
+  This event gives the columns by which data is ordered, if <code>ORDER BY</code> clause is executed in SQL Server.
+</p>
+
+<div class="argument">
+  <div class="name">orderColumns</div>
+  <div class="description">
+    <p>
+      An array of column numbers in the result set by which data is ordered.
     </p>
   </div>
 </div>
