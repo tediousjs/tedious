@@ -139,6 +139,45 @@ exports.connectByPort = function(test) {
   });
 };
 
+exports.connectByPortOpeningConnectionManually = function(test) {
+  var config = getConfig();
+
+  if ((config.options != null ? config.options.port : undefined) == null) {
+    // Config says don't do this test (probably because ports are dynamic).
+    console.log('Skipping connectByPort test');
+    test.done();
+    return;
+  }
+
+  test.expect(2);
+
+  const connection = new Connection(config, false);
+  connection.open();
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+
+    connection.close();
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+
+  connection.on('databaseChange', function(database) {
+    test.strictEqual(database, config.options.database);
+  });
+
+  connection.on('infoMessage', function(info) {
+    //console.log("#{info.number} : #{info.message}")
+  });
+
+  return connection.on('debug', function(text) {
+    //console.log(text)
+  });
+};
+
+
 exports.connectByInstanceName = function(test) {
   if (!getInstanceName()) {
     // Config says don't do this test (probably because SQL Server Browser is not available).
@@ -178,6 +217,46 @@ exports.connectByInstanceName = function(test) {
   });
 };
 
+exports.connectByInstanceNameOpeningConnectionManually = function(test) {
+  if (!getInstanceName()) {
+    // Config says don't do this test (probably because SQL Server Browser is not available).
+    console.log('Skipping connectByInstanceName test');
+    test.done();
+    return;
+  }
+
+  test.expect(2);
+
+  var config = getConfig();
+  delete config.options.port;
+  config.options.instanceName = getInstanceName();
+
+  const connection = new Connection(config, false);
+  connection.open();
+
+  connection.on('connect', function(err) {
+    test.ifError(err);
+
+    connection.close();
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+
+  connection.on('databaseChange', function(database) {
+    test.strictEqual(database, config.options.database);
+  });
+
+  connection.on('infoMessage', function(info) {
+    //console.log("#{info.number} : #{info.message}")
+  });
+
+  return connection.on('debug', function(text) {
+    //console.log(text)
+  });
+};
+
 exports.connectByInvalidInstanceName = function(test) {
   if (!getInstanceName()) {
     // Config says don't do this test (probably because SQL Server Browser is not available).
@@ -193,6 +272,42 @@ exports.connectByInvalidInstanceName = function(test) {
   config.options.instanceName = `${getInstanceName()}X`;
 
   var connection = new Connection(config);
+
+  connection.on('connect', function(err) {
+    test.ok(err);
+
+    connection.close();
+  });
+
+  connection.on('end', function(info) {
+    test.done();
+  });
+
+  connection.on('infoMessage', function(info) {
+    //console.log("#{info.number} : #{info.message}")
+  });
+
+  return connection.on('debug', function(text) {
+    //console.log(text)
+  });
+};
+
+exports.connectByInvalidInstanceNameOpeningConnectionManually = function(test) {
+  if (!getInstanceName()) {
+    // Config says don't do this test (probably because SQL Server Browser is not available).
+    console.log('Skipping connectByInvalidInstanceName test');
+    test.done();
+    return;
+  }
+
+  test.expect(1);
+
+  var config = getConfig();
+  delete config.options.port;
+  config.options.instanceName = `${getInstanceName()}X`;
+
+  const connection = new Connection(config, false);
+  connection.open();
 
   connection.on('connect', function(err) {
     test.ok(err);

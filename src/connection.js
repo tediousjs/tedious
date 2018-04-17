@@ -68,7 +68,7 @@ function deprecateNonNumberConfigValue(optionName, value) {
 }
 
 class Connection extends EventEmitter {
-  constructor(config) {
+  constructor(config, openConnection = true) {
     super();
 
     if (!config) {
@@ -488,7 +488,9 @@ class Connection extends EventEmitter {
     this.createTokenStreamParser();
     this.inTransaction = false;
     this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
-    this.transitionTo(this.STATE.CONNECTING);
+    if (openConnection) {
+      this.open();
+    }
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -508,6 +510,10 @@ class Connection extends EventEmitter {
       REDIRECT: 1,
       RETRY: 2
     };
+  }
+
+  open() {
+    this.transitionTo(this.STATE.CONNECTING);
   }
 
   close() {
