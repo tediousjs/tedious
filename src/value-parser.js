@@ -276,27 +276,40 @@ function valueParse(parser, metaData, options, callback) {
             return parser.readUInt8((sign) => {
               sign = sign === 1 ? 1 : -1;
 
-              let readValue;
-              switch (dataLength - 1) {
-                case 4:
-                  readValue = parser.readUInt32LE;
-                  break;
-                case 8:
-                  readValue = parser.readUNumeric64LE;
-                  break;
-                case 12:
-                  readValue = parser.readUNumeric96LE;
-                  break;
-                case 16:
-                  readValue = parser.readUNumeric128LE;
-                  break;
-                default:
-                  return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength - 1)));
-              }
+              if (options.returnDecimalAndNumericAsString) {
+                return parser.readBuffer(dataLength - 1, (buffer) => {
+                  let value = convertLEBytesToString(buffer);
+                  if (metaData.scale > 0) {
+                    value = value.padStart(metaData.scale + 1, '0');
+                    const idx = value.length - metaData.scale;
+                    value = value.slice(0, idx) + '.' + value.slice(idx);
+                    if (sign == -1) value = '-' + value;
+                  }
+                  callback(value);
+                });
+              } else {
+                let readValue;
+                switch (dataLength - 1) {
+                  case 4:
+                    readValue = parser.readUInt32LE;
+                    break;
+                  case 8:
+                    readValue = parser.readUNumeric64LE;
+                    break;
+                  case 12:
+                    readValue = parser.readUNumeric96LE;
+                    break;
+                  case 16:
+                    readValue = parser.readUNumeric128LE;
+                    break;
+                  default:
+                    return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength - 1)));
+                }
 
-              readValue.call(parser, (value) => {
-                callback((value * sign) / Math.pow(10, metaData.scale));
-              });
+                readValue.call(parser, (value) => {
+                  callback((value * sign) / Math.pow(10, metaData.scale));
+                });
+              }
             });
           }
 
