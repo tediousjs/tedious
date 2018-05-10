@@ -44,6 +44,7 @@
     "big-number": "0.3.1",
     "bl": "^1.2.0",
     "depd": "^1.1.2",
+    "native-duplexpair": "^1.0.0",
     "iconv-lite": "^0.4.11",
     "readable-stream": "^2.2.6",
     "sprintf-js": "^1.1.1",
