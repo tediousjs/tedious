@@ -50,7 +50,7 @@
     "sprintf-js": "^1.1.1"
   },
   "devDependencies": {
-    "@commitlint/cli": "^6.0.2",
+    "@commitlint/cli": "^6.2.0",
     "@commitlint/config-conventional": "^6.0.2",
     "@commitlint/travis-cli": "^6.0.2",
     "async": "^1.4.0",
