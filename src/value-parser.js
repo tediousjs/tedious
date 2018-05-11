@@ -283,8 +283,8 @@ function valueParse(parser, metaData, options, callback) {
                     value = value.padStart(metaData.scale + 1, '0');
                     const idx = value.length - metaData.scale;
                     value = value.slice(0, idx) + '.' + value.slice(idx);
-                    if (sign == -1) value = '-' + value;
                   }
+                  if (sign == -1) value = '-' + value;
                   callback(value);
                 });
               } else {
