@@ -165,7 +165,7 @@ module.exports = class Login7Payload {
     this.loginData = this.loginData || {};
     this.loginData.appName = this.loginData.appName || 'Tedious';
     this.libraryName = libraryName;
-    this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    this.clientId = Buffer.from([1, 2, 3, 4, 5, 6]);
     if (!this.loginData.domain) {
       this.sspi = '';
       this.sspiLong = 0;
@@ -258,7 +258,7 @@ module.exports = class Login7Payload {
 
   createPasswordBuffer() {
     let password = this.loginData.password || '';
-    password = new Buffer(password, 'ucs2');
+    password = Buffer.from(password, 'ucs2');
     for (let b = 0, len = password.length; b < len; b++) {
       let byte = password[b];
       const lowNibble = byte & 0x0f;

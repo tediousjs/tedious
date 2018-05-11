@@ -49,7 +49,7 @@ module.exports = {
     } else {
       buffer.writeUInt16LE(MAX);
     }
-    buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
   writeParameterData: function(buffer, parameter) {

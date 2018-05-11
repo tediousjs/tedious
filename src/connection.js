@@ -487,7 +487,7 @@ class Connection extends EventEmitter {
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
-    this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
+    this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
@@ -982,7 +982,7 @@ class Connection extends EventEmitter {
   }
 
   emptyMessageBuffer() {
-    this.messageBuffer = new Buffer(0);
+    this.messageBuffer = Buffer.alloc(0);
   }
 
   addToMessageBuffer(data) {
