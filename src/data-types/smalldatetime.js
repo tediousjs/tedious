@@ -1,7 +1,6 @@
 const DateTimeN = require('./datetimen');
-
-const EPOCH_DATE = new Date(1900, 0, 1);
-const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+const EPOCH_DATE = DateTimeN.EPOCH_DATE;
+const UTC_EPOCH_DATE = DateTimeN.UTC_EPOCH_DATE;
 
 module.exports = {
   id: 0x3A,
@@ -20,13 +19,14 @@ module.exports = {
   writeParameterData: function(buffer, parameter, options) {
     if (parameter.value != null) {
       let days, dstDiff, minutes;
+      const _date = new Date(parameter.value);
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-        minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
+        days = Math.floor((_date.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (_date.getUTCHours() * 60) + _date.getUTCMinutes();
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-        minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
+        dstDiff = -(_date.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((_date.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (_date.getHours() * 60) + _date.getMinutes();
       }
 
       buffer.writeUInt8(4);
@@ -37,20 +37,5 @@ module.exports = {
       buffer.writeUInt8(0);
     }
   },
-
-  validate: function(value) {
-    if (value == null) {
-      return null;
-    }
-
-    if (!(value instanceof Date)) {
-      value = Date.parse(value);
-    }
-
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
-    }
-
-    return value;
-  }
+  validate: DateTimeN.validate
 };

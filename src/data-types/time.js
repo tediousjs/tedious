@@ -1,3 +1,5 @@
+const DateTimeN = require('./datetimen');
+
 module.exports = {
   id: 0x29,
   type: 'TIMEN',
@@ -77,18 +79,5 @@ module.exports = {
       buffer.writeUInt8(0);
     }
   },
-
-  validate: function(value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Date) {
-      return value;
-    }
-    value = Date.parse(value);
-    if (isNaN(value)) {
-      return new TypeError('Invalid time.');
-    }
-    return value;
-  }
+  validate: DateTimeN.validate
 };
