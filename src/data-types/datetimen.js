@@ -13,7 +13,7 @@ module.exports = {
       return null;
     }
     // do Date.parse internally and duplicate existing date instances
-    let _date = new Date(value);
+    const _date = new Date(value);
     if (isNaN(_date)) {
       return new TypeError('Invalid date.');
     }
