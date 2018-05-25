@@ -1,4 +1,5 @@
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+const DateTimeN = require('./datetimen');
+const UTC_YEAR_ONE = DateTimeN.UTC_YEAR_ONE;
 
 module.exports = {
   id: 0x2B,
@@ -39,7 +40,8 @@ module.exports = {
   },
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+      const _date = new Date(+parameter.value);
+      const time = new Date(_date);
       time.setUTCFullYear(1970);
       time.setUTCMonth(0);
       time.setUTCDate(1);
@@ -48,7 +50,7 @@ module.exports = {
       timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
       timestamp = Math.round(timestamp);
 
-      const offset = -parameter.value.getTimezoneOffset();
+      const offset = -_date.getTimezoneOffset();
       switch (parameter.scale) {
         case 0:
         case 1:
@@ -67,22 +69,11 @@ module.exports = {
           buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      buffer.writeUInt24LE(Math.floor((_date - UTC_YEAR_ONE) / 86400000));
       buffer.writeInt16LE(offset);
     } else {
       buffer.writeUInt8(0);
     }
   },
-  validate: function(value) {
-    if (value == null) {
-      return null;
-    }
-    if (!(value instanceof Date)) {
-      value = Date.parse(value);
-    }
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
-    }
-    return value;
-  }
+  validate: DateTimeN.validate
 };

@@ -1,5 +1,6 @@
-const YEAR_ONE = new Date(2000, 0, -730118);
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+const DateTimeN = require('./datetimen');
+const YEAR_ONE = DateTimeN.YEAR_ONE;
+const UTC_YEAR_ONE = DateTimeN.UTC_YEAR_ONE;
 
 module.exports = {
   id: 0x28,
@@ -18,28 +19,17 @@ module.exports = {
 
   writeParameterData: function(buffer, parameter, options) {
     if (parameter.value != null) {
+      const _date = new Date(parameter.value);
       buffer.writeUInt8(3);
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+_date - UTC_YEAR_ONE) / 86400000));
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        const dstDiff = -(_date.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+_date - YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
     }
   },
-
-  validate: function(value) {
-    if (value == null) {
-      return null;
-    }
-    if (!(value instanceof Date)) {
-      value = Date.parse(value);
-    }
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
-    }
-    return value;
-  }
+  validate: DateTimeN.validate
 };
