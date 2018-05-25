@@ -17,13 +17,15 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
 
 ### Supported TDS versions
 
-- TDS 7.4 (SQL Server 2012/2014)
+- TDS 7.4 (SQL Server 2012/2014/2016/2017)
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
 - TDS 7.1 (SQL Server 2000)
 
 ## Installation
+
+Node.js is a prerequisite for installing tedious. Once you have installed [Node.js](https://nodejs.org/), installing tedious is simple: 
 
     npm install tedious
 
@@ -36,7 +38,7 @@ See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for versi
 
 <a name="documentation"></a>
 ## Documentation
-More documentation is available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
+More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
 <a name="discussion"></a>
 ## Discussion
@@ -51,6 +53,10 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 We'd like to learn more about how you use tedious:
 
 <a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://meetsstorenew.blob.core.windows.net/contianerhd/survey.png?st=2017-02-17T22%3A03%3A00Z&se=2100-02-18T22%3A03%3A00Z&sp=rl&sv=2015-12-11&sr=b&sig=DJSFoihBptSvO%2BjvWzwpHecf8o5yfAbJoD2qW5oB8tc%3D"></a>
+
+<a name="contributing"></a>
+## Contributing
+We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
 
 <a name="license"></a>
 ## Licence

@@ -80,7 +80,7 @@ module.exports = class Parser extends Transform {
     };
 
     while (!this.suspended && this.position + 1 <= this.buffer.length) {
-      const type = this.buffer.readUInt8(this.position, true);
+      const type = this.buffer.readUInt8(this.position);
 
       this.position += 1;
 
