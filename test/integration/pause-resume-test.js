@@ -86,7 +86,7 @@ exports.testPausedRequestCanBeResumed = function(test) {
       setTimeout(() => {
         paused = false;
         request.resume();
-      }, 200);
+      }, 1000);
     }
   });
 
@@ -115,7 +115,7 @@ exports.testPausingRequestPausesTransforms = function(test) {
         test.ok(this.connection.tokenStreamParser.parser.isPaused());
 
         request.resume();
-      }, 200);
+      }, 1000);
     }
   });
 
