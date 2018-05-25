@@ -9,6 +9,8 @@ node_js:
 stages:
   - test
   - lint
+  - azureSQLPwd
+  - azureADPwd
   - name: release
     if: (branch = master) AND (type = push)
 
@@ -57,6 +59,47 @@ jobs:
       script:
         - npm run lint
         - commitlint-travis
+
+    - stage: azureSQLPwd
+      node_js: 8
+      before_install:
+      - mkdir ~/.tedious
+      - >
+      echo '{
+        "config": {
+          "server": "'${AZ_SERVER}'",
+          "userName": "'${AZ_USER}'",
+          "password": "'${AZ_PASS}'",
+          "options": {
+          "database": "test",
+          "encrypt": "true",
+          'authentication': 'SqlPassword'
+          }
+        }
+      }' > ~/.tedious/test-connection.json
+      before_script: skip
+      script: npm run test-integration
+      
+      - stage: azureSQLPwd
+      node_js: 8
+      before_install:
+      - mkdir ~/.tedious
+      - >
+      echo '{
+        "config": {
+          "server": "'${AZ_SERVER}'",
+          "userName": "'${AZURE_AD_USER}'",
+          "password": "'${AZURE_AD_PASS}'",
+          "options": {
+          "database": "test",
+          "encrypt": "true",
+          'authentication': 'ActiveDirectoryPassword'
+          }
+        }
+      }' > ~/.tedious/test-connection.json
+      before_script: skip
+      script: npm run test-integration
+
     - stage: release
       node_js: 8
       before_install: skip
