@@ -65,38 +65,38 @@ jobs:
       before_install:
       - mkdir ~/.tedious
       - >
-      echo '{
-        "config": {
-          "server": "${AZ_SERVER}",
-          "userName": "${AZ_USER}",
-          "password": "${AZ_PASS}",
-          "options": {
-            "database": "test",
-            "encrypt": true,
-            "authentication": "SqlPassword"
+        echo '{
+          "config": {
+            "server": "${AZ_SERVER}",
+            "userName": "${AZ_USER}",
+            "password": "${AZ_PASS}",
+            "options": {
+              "database": "test",
+              "encrypt": true,
+              "authentication": "SqlPassword"
+            }
           }
-        }
-      }' > ~/.tedious/test-connection.json
+        }' > ~/.tedious/test-connection.json
       before_script: skip
       script: npm run test-integration
-      
+
     - stage: azure
       node_js: 8
       before_install:
       - mkdir ~/.tedious
       - >
-      echo '{
-        "config": {
-          "server": "${AZ_SERVER}",
-          "userName": "${AZURE_AD_USER}",
-          "password": "${AZURE_AD_PASS}",
-          "options": {
-            "database": "test",
-            "encrypt": true,
-            "authentication": "ActiveDirectoryPassword"
+        echo '{
+          "config": {
+            "server": "${AZ_SERVER}",
+            "userName": "${AZURE_AD_USER}",
+            "password": "${AZURE_AD_PASS}",
+            "options": {
+              "database": "test",
+              "encrypt": true,
+              "authentication": "ActiveDirectoryPassword"
+            }
           }
-        }
-      }' > ~/.tedious/test-connection.json
+        }' > ~/.tedious/test-connection.json
       before_script: skip
       script: npm run test-integration
 
