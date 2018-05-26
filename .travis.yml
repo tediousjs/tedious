@@ -8,8 +8,9 @@ node_js:
 
 stages:
   - test
-  - lint
   - name: azure
+    if: type = push
+  - lint
   - name: release
     if: (branch = master) AND (type = push)
 
