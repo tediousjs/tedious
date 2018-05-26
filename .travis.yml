@@ -10,7 +10,6 @@ stages:
   - test
   - lint
   - name: azure
-    if: (branch != master)
   - name: release
     if: (branch = master) AND (type = push)
 
