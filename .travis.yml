@@ -66,9 +66,9 @@ jobs:
       - >
         echo '{
           "config": {
-            "server": "${AZ_SERVER}",
-            "userName": "${AZ_USER}",
-            "password": "${AZ_PASS}",
+            "server": "'${AZ_SERVER}'",
+            "userName": "'${AZ_USER}'",
+            "password": "'${AZ_PASS}'",
             "options": {
               "database": "test",
               "encrypt": true,
@@ -86,9 +86,9 @@ jobs:
       - >
         echo '{
           "config": {
-            "server": "${AZ_SERVER}",
-            "userName": "${AZURE_AD_USER}",
-            "password": "${AZURE_AD_PASS}",
+            "server": "'${AZ_SERVER}'",
+            "userName": "'${AZURE_AD_USER}'",
+            "password": "'${AZURE_AD_PASS}'",
             "options": {
               "database": "test",
               "encrypt": true,
