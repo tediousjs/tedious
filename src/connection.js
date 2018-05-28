@@ -864,7 +864,7 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
-    const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
+    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
