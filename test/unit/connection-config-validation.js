@@ -3,7 +3,7 @@ const Connection = require('../../src/tedious').Connection;
 exports['Connection configuration validation'] = {
   setUp: function(done) {
     this.config = {};
-    this.config.options = {};
+    this.config.options = { encrypt: false };
     this.config.server = 'localhost';
     done();
   },

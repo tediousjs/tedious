@@ -1,34 +1,81 @@
+// @flow
+
 const EventEmitter = require('events').EventEmitter;
 const TYPES = require('./data-type').typeByName;
 const RequestError = require('./errors').RequestError;
 
+// TODO: Figure out how to type the `rows` parameter here.
+type CompletionCallback = (error: ?Error, rowCount: ?number, rows: any) => void;
+
+type Parameter = {
+  // TODO: `type` must be a valid TDS value type
+  type: any,
+  name: string,
+  value: mixed,
+  output: boolean,
+  length: ?number,
+  precision: ?number,
+  scale: ?number
+};
+
+type ParameterOptions = {
+  output?: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number
+}
+
 module.exports = class Request extends EventEmitter {
-  constructor(sqlTextOrProcedure, callback) {
+  sqlTextOrProcedure: ?string;
+  parameters: Parameter[];
+  parametersByName: { [string]: Parameter };
+  originalParameters: Parameter[];
+  preparing: boolean;
+  canceled: boolean;
+  paused: boolean;
+  userCallback: CompletionCallback;
+  handle: ?any; // TODO: Figure out the type here.
+  error: ?Error;
+  connection: ?any; // TODO: This should be `Connection`, not `any`.
+
+  callback: (?Error) => void;
+
+  constructor(sqlTextOrProcedure: ?string, callback: CompletionCallback) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
+    this.originalParameters = [];
+    this.preparing = false;
+    this.handle = undefined;
     this.canceled = false;
     this.paused = false;
+    this.error = undefined;
+    this.connection = undefined;
     this.userCallback = callback;
-    this.callback = function() {
+    this.callback = function(err: ?Error) {
       if (this.preparing) {
-        this.emit('prepared');
-        return this.preparing = false;
+        this.preparing = false;
+        if (err) {
+          this.emit('error', err);
+        } else {
+          this.emit('prepared');
+        }
       } else {
         this.userCallback.apply(this, arguments);
-        return this.emit('requestCompleted');
+        this.emit('requestCompleted');
       }
     };
   }
 
-  addParameter(name, type, value, options) {
+  // TODO: `type` must be a valid TDS value type
+  addParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
     if (options == null) {
       options = {};
     }
 
-    const parameter = {
+    const parameter: Parameter = {
       type: type,
       name: name,
       value: value,
@@ -38,18 +85,19 @@ module.exports = class Request extends EventEmitter {
       scale: options.scale
     };
     this.parameters.push(parameter);
-    return this.parametersByName[name] = parameter;
+    this.parametersByName[name] = parameter;
   }
 
-  addOutputParameter(name, type, value, options) {
+  // TODO: `type` must be a valid TDS value type
+  addOutputParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
     if (options == null) {
       options = {};
     }
     options.output = true;
-    return this.addParameter(name, type, value, options);
+    this.addParameter(name, type, value, options);
   }
 
-  makeParamsParameter(parameters) {
+  makeParamsParameter(parameters: Parameter[]) {
     let paramsParameter = '';
     for (let i = 0, len = parameters.length; i < len; i++) {
       const parameter = parameters[i];
@@ -81,7 +129,7 @@ module.exports = class Request extends EventEmitter {
       const parameter = this.originalParameters[i];
       this.parameters.push(parameter);
     }
-    return this.sqlTextOrProcedure = 'sp_executesql';
+    this.sqlTextOrProcedure = 'sp_executesql';
   }
 
   transformIntoPrepareRpc() {
@@ -92,11 +140,11 @@ module.exports = class Request extends EventEmitter {
     this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
     this.sqlTextOrProcedure = 'sp_prepare';
     this.preparing = true;
-    return this.on('returnValue', (name, value) => {
+    this.on('returnValue', (name, value) => {
       if (name === 'handle') {
-        return this.handle = value;
+        this.handle = value;
       } else {
-        return this.error = RequestError('Tedious > Unexpected output parameter ' + name + ' from sp_prepare');
+        this.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
       }
     });
   }
@@ -104,10 +152,10 @@ module.exports = class Request extends EventEmitter {
   transformIntoUnprepareRpc() {
     this.parameters = [];
     this.addParameter('handle', TYPES.Int, this.handle);
-    return this.sqlTextOrProcedure = 'sp_unprepare';
+    this.sqlTextOrProcedure = 'sp_unprepare';
   }
 
-  transformIntoExecuteRpc(parameters) {
+  transformIntoExecuteRpc(parameters: { [string]: mixed }) {
     this.parameters = [];
     this.addParameter('handle', TYPES.Int, this.handle);
 
@@ -121,7 +169,7 @@ module.exports = class Request extends EventEmitter {
       return;
     }
 
-    return this.sqlTextOrProcedure = 'sp_execute';
+    this.sqlTextOrProcedure = 'sp_execute';
   }
 
   validateParameters() {

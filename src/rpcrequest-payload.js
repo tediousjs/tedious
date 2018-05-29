@@ -1,4 +1,4 @@
-const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
 
 // const OPTION = {

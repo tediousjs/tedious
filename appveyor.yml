@@ -4,8 +4,8 @@ environment:
   matrix:
     - nodejs_version: "4"
     - nodejs_version: "6"
-    - nodejs_version: "7"
     - nodejs_version: "8"
+    - nodejs_version: "9"
 
 branches:
   only:
@@ -23,6 +23,8 @@ cache:
 build: off
 
 before_test:
+  - npm prune
+
   - sc config sqlbrowser start= auto
   - net start sqlbrowser
 
@@ -53,7 +55,5 @@ test_script:
 
       SET TEDIOUS_TDS_VERSION=7_1
       npm run-script test-integration || SET EXITVAL=1
-
-      npm run-script lint
 
       EXIT /B %EXITVAL%

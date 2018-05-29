@@ -1,4 +1,4 @@
-const sprintf = require('sprintf').sprintf;
+const sprintf = require('sprintf-js').sprintf;
 
 const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
 
@@ -51,7 +51,7 @@ class Packet {
       this.buffer = typeOrBuffer;
     } else {
       const type = typeOrBuffer;
-      this.buffer = new Buffer(HEADER_LENGTH);
+      this.buffer = new Buffer(HEADER_LENGTH).fill(0);
       this.buffer.writeUInt8(type, OFFSET.Type);
       this.buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status);
       this.buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID);
@@ -62,7 +62,7 @@ class Packet {
   }
 
   setLength() {
-    return this.buffer.writeUInt16BE(this.buffer.length, OFFSET.Length);
+    this.buffer.writeUInt16BE(this.buffer.length, OFFSET.Length);
   }
 
   length() {
@@ -76,7 +76,7 @@ class Packet {
     } else {
       status &= 0xFF - STATUS.RESETCONNECTION;
     }
-    return this.buffer.writeUInt8(status, OFFSET.Status);
+    this.buffer.writeUInt8(status, OFFSET.Status);
   }
 
   last(last) {

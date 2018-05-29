@@ -1,6 +1,5 @@
 var dataTypeByName = require('../../../src/data-type').typeByName;
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/tracking-buffer')
-  .WritableTrackingBuffer;
+var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
 var TokenStreamParser = require('../../../src/token/stream-parser');
 

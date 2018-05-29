@@ -44,7 +44,7 @@ class InstanceLookup {
 
     const onTimeout = () => {
       sender.cancel();
-      return makeAttempt();
+      makeAttempt();
     };
 
     const makeAttempt = () => {
@@ -56,26 +56,27 @@ class InstanceLookup {
         sender.execute((err, message) => {
           clearTimeout(timer);
           if (err) {
-            return callback('Failed to lookup instance on ' + server + ' - ' + err.message);
+            callback('Failed to lookup instance on ' + server + ' - ' + err.message);
+            return;
           } else {
             message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
             const port = this.parseBrowserResponse(message, instanceName);
 
             if (port) {
-              return callback(undefined, port);
+              callback(undefined, port);
             } else {
-              return callback('Port for ' + instanceName + ' not found in ' + message);
+              callback('Port for ' + instanceName + ' not found in ' + options.server);
             }
           }
         });
 
-        return timer = setTimeout(onTimeout, timeout);
+        timer = setTimeout(onTimeout, timeout);
       } else {
-        return callback('Failed to get response from SQL Server Browser on ' + server);
+        callback('Failed to get response from SQL Server Browser on ' + server);
       }
     };
 
-    return makeAttempt();
+    makeAttempt();
   }
 
   parseBrowserResponse(response, instanceName) {

@@ -1,5 +1,7 @@
 const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const Sinon = require('sinon');
+const dns = require('dns');
+const punycode = require('punycode');
 
 exports['instanceLookup invalid args'] = {
   setUp: function(done) {
@@ -264,6 +266,25 @@ exports['instanceLookup functional unit tests'] = {
       clock.restore();
       test.done();
     });
+  },
+
+  'incorrect instanceName': function(test) {
+    const message = 'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
+      'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
+    this.senderExecuteStub.callsArgWithAsync(0, null, message);
+    this.parseStub
+      .withArgs(message, this.options.instanceName);
+
+    this.instanceLookup.instanceLookup(this.options, (error, port) => {
+      test.ok(error.indexOf('XXXXXXXXXX') == -1);
+      test.ok(error.indexOf('YYYYYYYYYY') == -1);
+      test.strictEqual(port, undefined);
+
+      test.ok(this.createSenderStub.calledOnce);
+      test.ok(this.senderExecuteStub.calledOnce);
+      test.ok(this.parseStub.calledOnce);
+      test.done();
+    });
   }
 };
 
@@ -305,6 +326,47 @@ exports['parseBrowserResponse'] = {
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
     test.strictEqual(this.parse(response, 'sqlexpress'), undefined);
+    test.done();
+  }
+};
+
+exports['Test unicode SQL Server name'] = {
+  setUp: function(done) {
+    this.sinon = Sinon.sandbox.create();
+
+    // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
+    this.spy = this.sinon.spy(dns, 'lookup');
+
+    done();
+  },
+
+  tearDown: function(done) {
+    this.sinon.restore();
+
+    done();
+  },
+
+  'test IDN Server name': function(test) {
+    test.expect(2);
+    const options = {
+      server: '本地主机.ad',
+      instanceName: 'instance',
+    };
+    new InstanceLookup().instanceLookup(options, () => { });
+    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
+    test.ok(this.spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpcted hostname passed to dns.lookup');
+    test.done();
+  },
+
+  'test ASCII Server name': function(test) {
+    test.expect(2);
+    const options = {
+      server: 'localhost',
+      instanceName: 'instance',
+    };
+    new InstanceLookup().instanceLookup(options, () => { });
+    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
+    test.ok(this.spy.calledWithMatch(options.server), 'Unexpcted hostname passed to dns.lookup');
     test.done();
   }
 };

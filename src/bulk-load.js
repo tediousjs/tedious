@@ -1,5 +1,5 @@
 const EventEmitter = require('events').EventEmitter;
-const WritableTrackingBuffer = require('./tracking-buffer/tracking-buffer').WritableTrackingBuffer;
+const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
 
 const FLAGS = {
@@ -27,19 +27,42 @@ const DONE_STATUS = {
 };
 
 module.exports = class BulkLoad extends EventEmitter {
-  constructor(table, options1, callback) {
+  constructor(table, connectionOptions, {
+    checkConstraints = false,
+    fireTriggers = false,
+    keepNulls = false,
+    lockTable = false,
+  }, callback) {
     super();
 
     this.error = undefined;
     this.canceled = false;
 
     this.table = table;
-    this.options = options1;
+    this.options = connectionOptions;
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.firstRowWritten = false;
+
+    if (typeof checkConstraints !== 'boolean') {
+      throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
+    }
+
+    if (typeof fireTriggers !== 'boolean') {
+      throw new TypeError('The "options.fireTriggers" property must be of type boolean.');
+    }
+
+    if (typeof keepNulls !== 'boolean') {
+      throw new TypeError('The "options.keepNulls" property must be of type boolean.');
+    }
+
+    if (typeof lockTable !== 'boolean') {
+      throw new TypeError('The "options.lockTable" property must be of type boolean.');
+    }
+
+    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
   addColumn(name, type, options) {
@@ -83,7 +106,7 @@ module.exports = class BulkLoad extends EventEmitter {
 
     this.columns.push(column);
 
-    return this.columnsByName[name] = column;
+    this.columnsByName[name] = column;
   }
 
   addRow(row) {
@@ -115,6 +138,32 @@ module.exports = class BulkLoad extends EventEmitter {
     }
   }
 
+  getOptionsSql() {
+    const addOptions = [];
+
+    if (this.bulkOptions.checkConstraints) {
+      addOptions.push('CHECK_CONSTRAINTS');
+    }
+
+    if (this.bulkOptions.fireTriggers) {
+      addOptions.push('FIRE_TRIGGERS');
+    }
+
+    if (this.bulkOptions.keepNulls) {
+      addOptions.push('KEEP_NULLS');
+    }
+
+    if (this.bulkOptions.lockTable) {
+      addOptions.push('TABLOCK');
+    }
+
+    if (addOptions.length > 0) {
+      return ` WITH (${addOptions.join(',')})`;
+    } else {
+      return '';
+    }
+  }
+
   getBulkInsertSql() {
     let sql = 'insert bulk ' + this.table + '(';
     for (let i = 0, len = this.columns.length; i < len; i++) {
@@ -125,6 +174,8 @@ module.exports = class BulkLoad extends EventEmitter {
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
     }
     sql += ')';
+
+    sql += this.getOptionsSql();
     return sql;
   }
 

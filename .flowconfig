@@ -1,0 +1,4 @@
+[ignore]
+<PROJECT_ROOT>/lib/.*
+.*/config-chain/test/broken.json
+.*/npmconf/test/fixtures/package.json
