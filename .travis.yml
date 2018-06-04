@@ -1,6 +1,64 @@
 language: node_js
+sudo: false
 node_js:
-  - "0.6"
-  - "0.8"
-  - "0.10"
-  - "0.11"
+  - "4"
+  - "6"
+  - "8"
+  - "9"
+
+stages:
+  - test
+  - lint
+  - name: release
+    if: (branch = master) AND (type = push)
+
+services:
+  - docker
+
+cache:
+  directories:
+    - node_modules
+
+before_install:
+  - docker pull microsoft/mssql-server-linux
+  - docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=yourStrong(!)Password' -p 1433:1433 -d microsoft/mssql-server-linux
+
+  - mkdir ~/.tedious
+  - >
+    echo '{
+      "config": {
+        "server": "localhost",
+        "userName": "sa",
+        "password": "yourStrong(!)Password",
+        "options": {
+          "port": 1433,
+          "database": "master"
+        }
+      }
+    }' > ~/.tedious/test-connection.json
+
+before_script:
+  - npm prune
+
+script:
+  - npm run test
+  - TEDIOUS_TDS_VERSION=7_4   npm run test-integration
+  - TEDIOUS_TDS_VERSION=7_3_B npm run test-integration
+  - TEDIOUS_TDS_VERSION=7_3_A npm run test-integration
+  - TEDIOUS_TDS_VERSION=7_2   npm run test-integration
+  - TEDIOUS_TDS_VERSION=7_1   npm run test-integration
+
+jobs:
+  include:
+    - stage: lint
+      node_js: 4
+      before_install: skip
+      before_script: skip
+      script:
+        - npm run lint
+        - commitlint-travis
+    - stage: release
+      node_js: 8
+      before_install: skip
+      before_script: skip
+      script: npm run semantic-release

@@ -1,59 +1,64 @@
 # Tedious (node implementation of TDS)
-[![Dependency Status](https://david-dm.org/pekim/tedious.png)](https://david-dm.org/pekim/tedious) [![NPM version](https://badge.fury.io/js/tedious.png)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/pekim/tedious.png)](http://travis-ci.org/pekim/tedious)
+[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Join the chat at https://gitter.im/gitterHQ/gitterHQ.github.io](https://badges.gitter.im/tediousjs/Lobby.svg)](https://gitter.im/tediousjs/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Tedious is an implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
+
+
+Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
+
+**NOTE: New columns are nullable by default as of version 1.11.0**
+
+Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/tediousjs/tedious/pull/230).
+
+**NOTE: Default login behavior has changed slightly as of version 1.2**
+
+See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for version history.
+
 
 ### Supported TDS versions
 
-- TDS 7.4 (SQL Server 2012/2014)
-- TDS 7.3.A (SQL Server 2008 R2)
-- TDS 7.3.B (SQL Server 2008)
+- TDS 7.4 (SQL Server 2012/2014/2016/2017)
+- TDS 7.3.B (SQL Server 2008 R2)
+- TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
 - TDS 7.1 (SQL Server 2000)
 
-<a name="status" />
-## Status
-Current version: 0.1.5
+## Installation
 
-### Coming soon in 0.2.0
+Node.js is a prerequisite for installing tedious. Once you have installed [Node.js](https://nodejs.org/), installing tedious is simple: 
 
-- Added support for TDS 7.4
-- Added request cancelation
-- Added support for UDT, TVP, Time, Date, DateTime2, DateTimeOffset, Numeric, Decimal, SmallMoney and Money data types
-- Added option to choose whether to pass/receive times in UTC or local time (`useUTC`)
-- Binary, VarBinary and Image are now supported as input parameters
-- Binary, VarBinary and Image types are now returned as Buffer (was Array)
-- Connection errors are now correctly propagated to `connect` event
-- Better support for numeric column names and columns with same name
-- Errors are now instanceof Error / ConnectionError / RequestError (was plain text)
-- Transaction isolationLevel default is now `READ_COMMITED` (was `READ_UNCOMMITED`)
-- Fixed issue when zero value was casted as null when using BigInt as input parameter
-- Fixed issue when dates before 1900/01/01 in input parameters resulted in "Out of bounds" error
-- Fixed compatibility with TDS 7.1 (SQL Server 2000)
-- Minor fixes
+    npm install tedious
 
-### Upgrade from 0.1.5 to 0.2.0
+## Getting Started
+- [Node.js + macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
+- [Node.js + Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
+- [Node.js + SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
+- [Node.js + Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
+- [Node.js + Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
 
-- Time values are now passed/received in UTC instead of local time. You can disable this by `options.useUTC = false`.
-- There was a change in default transaction isolationLevel from `READ_UNCOMMITED` to `READ_COMMITED`. You can disable this by `options.isolationLevel = require('tedious').ISOLATION_LEVEL.READ_UNCOMMITTED`.
-- Binary values are now returned in Buffers.
-- All error values are no longer strings, but instances of Error.
-- Results (rows and column metadata) are now simple arrays. You can change this to key-value collections by `options.useColumnNames = true`.
-
-<a name="documentation" />
+<a name="documentation"></a>
 ## Documentation
-More documentation is available at [pekim.github.io/tedious/](http://pekim.github.io/tedious/)
+More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
-<a name="discussion" />
+<a name="discussion"></a>
 ## Discussion
 Google Group - http://groups.google.com/group/node-tedious
 
-<a name="name" />
+<a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
 
-<a name="license" />
+## Developer Survey
+
+We'd like to learn more about how you use tedious:
+
+<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://meetsstorenew.blob.core.windows.net/contianerhd/survey.png?st=2017-02-17T22%3A03%3A00Z&se=2100-02-18T22%3A03%3A00Z&sp=rl&sv=2015-12-11&sr=b&sig=DJSFoihBptSvO%2BjvWzwpHecf8o5yfAbJoD2qW5oB8tc%3D"></a>
+
+<a name="contributing"></a>
+## Contributing
+We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
+
+<a name="license"></a>
 ## Licence
 
 Copyright (c) 2010-2014 Mike D Pilsbury

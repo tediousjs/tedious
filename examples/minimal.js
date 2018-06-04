@@ -13,7 +13,9 @@ var config = {
       payload: true,
       token: false,
       log: true
-    }
+    },
+    database: 'DBName',
+    encrypt: true // for Azure users
   }
   */
 };

@@ -1,0 +1,59 @@
+version: "{build}"
+
+environment:
+  matrix:
+    - nodejs_version: "4"
+    - nodejs_version: "6"
+    - nodejs_version: "8"
+    - nodejs_version: "9"
+
+branches:
+  only:
+    - master
+    - /^maint\/.+/
+    - /v\d+\.\d+\.\d+/
+
+install:
+  - ps: Install-Product node $env:nodejs_version
+  - npm install
+
+cache:
+  - node_modules
+
+build: off
+
+before_test:
+  - npm prune
+
+  - sc config sqlbrowser start= auto
+  - net start sqlbrowser
+
+  - mkdir C:\Users\appveyor\.tedious
+
+test_script:
+  - node --version
+  - npm --version
+
+  - cmd: |
+      SET EXITVAL=0
+
+      npm run-script test || SET EXITVAL=1
+
+      powershell %cd%\scripts\appveyor\config.ps1 SQL2016
+
+      SET TEDIOUS_TDS_VERSION=7_4
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_3_B
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_3_A
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_2
+      npm run-script test-integration || SET EXITVAL=1
+
+      SET TEDIOUS_TDS_VERSION=7_1
+      npm run-script test-integration || SET EXITVAL=1
+
+      EXIT /B %EXITVAL%

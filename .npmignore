@@ -4,3 +4,4 @@ examples/
 scripts/
 todo
 .*
+/scratch
