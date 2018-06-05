@@ -651,23 +651,25 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
-      switch (token.featureId) {
-        case FEDAUTH_OPTIONS.FEATURE_ID:
-          if (!this.fedAuthInfo.fedAuthInfoRequested) {
-            throw new Error('Did not request federated authentication, but received the acknowledgment');
-          }
-          switch (this.fedAuthInfo.fedAuthLibrary) {
-            case FEDAUTH_OPTIONS.LIBRARY_ADAL:
-              if (0 !== token.featureAckDataLen) {
-                throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
-              }
-              break;
-            default:
-              throw new Error('Attempting to use unknown federated authentication library');
-          }
-          break;
-        default:
-          throw new Error('Received acknowledgement for unknown feature');
+      for (var featureId in token.featureAckOpts) {
+        switch (featureId) {
+          case FEDAUTH_OPTIONS.FEATURE_ID.toString():
+            if (!this.fedAuthInfo.fedAuthInfoRequested) {
+              throw new Error('Did not request federated authentication, but received the acknowledgment');
+            }
+            switch (this.fedAuthInfo.fedAuthLibrary) {
+              case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+                if (0 !== token.featureAckOpts[featureId].length) {
+                  throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
+                }
+                break;
+              default:
+                throw new Error('Attempting to use unknown federated authentication library');
+            }
+            break;
+          default:
+            throw new Error('Received acknowledgement for unknown feature');
+        }
       }
     });
 

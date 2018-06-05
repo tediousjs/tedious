@@ -1,16 +1,15 @@
 
 module.exports = function featureExtAckParser(parser, colMetadata, options, callback) {
-  var id = undefined;
-  var len = undefined;
+
+  const featureAckOpts = [];
   function next(done) {
     parser.readUInt8((featureId) => {
       if (featureId === 0xFF) {
         return done();
       }
-      id = featureId;
       parser.readUInt32LE((featureAckDataLen) => {
-        len = featureAckDataLen;
         parser.readBuffer(featureAckDataLen, (featureData) => {
+          featureAckOpts[featureId] = featureData;
           next(done);
         });
       });
@@ -20,8 +19,7 @@ module.exports = function featureExtAckParser(parser, colMetadata, options, call
     callback({
       'name': 'FEATUREEXTACK',
       'event': 'featureExtAck',
-      featureId: id,
-      featureAckDataLen: len
+      featureAckOpts: featureAckOpts
     });
   });
 };
