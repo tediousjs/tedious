@@ -641,6 +641,7 @@ class Connection extends EventEmitter {
         context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
           if (err) {
             this.fedAuthInfo.responsePending = false;
+            //console.log('error');
             this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
           } else {
             this.fedAuthInfo.responsePending = false;
@@ -651,25 +652,23 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
-      for (var featureId in token.featureAckOpts) {
-        switch (featureId) {
-          case FEDAUTH_OPTIONS.FEATURE_ID.toString():
-            if (!this.fedAuthInfo.fedAuthInfoRequested) {
-              throw new Error('Did not request federated authentication, but received the acknowledgment');
-            }
-            switch (this.fedAuthInfo.fedAuthLibrary) {
-              case FEDAUTH_OPTIONS.LIBRARY_ADAL:
-                if (0 !== token.featureAckOpts[featureId].length) {
-                  throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
-                }
-                break;
-              default:
-                throw new Error('Attempting to use unknown federated authentication library');
+      let value = undefined;
+      if ((value = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) !== undefined) {
+        if (!this.fedAuthInfo.fedAuthInfoRequested) {
+          throw new Error('Did not request federated authentication, but received the acknowledgment');
+        }
+        switch (this.fedAuthInfo.fedAuthLibrary) {
+          case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+            if (0 !== value.length) {
+              throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
             }
             break;
           default:
-            throw new Error('Received acknowledgement for unknown feature');
+            throw new Error('Attempting to use unknown federated authentication library');
         }
+      }
+      else {
+        throw new Error('Received acknowledgement for unknown feature');
       }
     });
 

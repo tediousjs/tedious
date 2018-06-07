@@ -26,9 +26,9 @@ module.exports.fedauth = function(test) {
 
   var token = parser.read();
 
-  test.ok(token.featureAckOpts[0x01].equals(Buffer.from('a')));
-  test.ok(token.featureAckOpts[0x02].equals(Buffer.from('bc')));
-  test.ok(token.featureAckOpts[0x03].equals(Buffer.from('')));
+  test.ok(token.featureAckOpts.get(0x01).equals(Buffer.from('a')));
+  test.ok(token.featureAckOpts.get(0x02).equals(Buffer.from('bc')));
+  test.ok(token.featureAckOpts.get(0x03).equals(Buffer.from('')));
 
   test.done();
 };
