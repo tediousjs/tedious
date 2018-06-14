@@ -91,6 +91,7 @@ class Connection extends EventEmitter {
       requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
       responsePending: false,
+      featureExtAckPending: false,
       token: undefined
     };
 
@@ -641,7 +642,6 @@ class Connection extends EventEmitter {
         context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
           if (err) {
             this.fedAuthInfo.responsePending = false;
-            //console.log('error');
             this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
           } else {
             this.fedAuthInfo.responsePending = false;
@@ -652,14 +652,18 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
-      let value = undefined;
-      if ((value = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) !== undefined) {
+      let fedAuthAck = undefined;
+      this.fedAuthInfo.featureExtAckPending = true;
+      if ( this.fedAuthInfo.fedAuthInfoRequested && (fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) === undefined) {
+        throw new Error('Did not receive federated authentication acknowledgement');
+      }
+      if (fedAuthAck !== undefined) {
         if (!this.fedAuthInfo.fedAuthInfoRequested) {
           throw new Error('Did not request federated authentication, but received the acknowledgment');
         }
         switch (this.fedAuthInfo.fedAuthLibrary) {
           case FEDAUTH_OPTIONS.LIBRARY_ADAL:
-            if (0 !== value.length) {
+            if (0 !== fedAuthAck.length) {
               throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
             }
             break;
@@ -670,6 +674,7 @@ class Connection extends EventEmitter {
       else {
         throw new Error('Received acknowledgement for unknown feature');
       }
+      this.fedAuthInfo.featureExtAckPending = false;
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -1812,28 +1817,27 @@ Connection.prototype.STATE = {
     name: 'SentLogin7Withfedauth',
     events: {
       socketError: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        if (this.fedAuthInfo.responsePending) {
-          // We got data from the server while we're waiting for adal authentication context
-          // call to complete on the client. We cannot process server data
-          // until this call completes as the state can change on completion of
-          // the call. Queue it for later.
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'data', data);
-        } else {
-          return this.sendDataToTokenStreamParser(data);
-        }
+        this.sendDataToTokenStreamParser(data);
       },
       receivedFedAuthInfo: function() {
-        return this.sendFedAuthResponsePacket();
+        if(this.fedAuthInfo.featureExtAckPending){
+          // FEDAUTH FeatureId should be acknowledged before we transition to standard login 7
+          // TODO: Checking FedAuthId should be checked in a separate state 3.2.3.5
+          const boundDispatchEvent = this.dispatchEvent.bind(this);
+          return setImmediate(boundDispatchEvent, 'message');
+        }
+        else {
+          this.sendFedAuthResponsePacket();
+        }
       },
       loginFailed: function() {
-        return this.transitionTo(this.STATE.FINAL);
+        this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
         if (this.fedAuthInfo.responsePending) {
@@ -1844,7 +1848,7 @@ Connection.prototype.STATE = {
           const boundDispatchEvent = this.dispatchEvent.bind(this);
           return setImmediate(boundDispatchEvent, 'message');
         } else {
-          return this.processLogin7FedAuthResponse();
+          this.processLogin7FedAuthResponse();
         }
       }
     }

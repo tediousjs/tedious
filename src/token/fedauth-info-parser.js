@@ -52,7 +52,7 @@ module.exports = function fedAuthInfoParser(parser, colMetadata, options, callba
 
       const countOfInfoIDs = data.readUInt32LE(infoData.offset);
       infoData.offset += 4;
-      for (let i = 0; i <= countOfInfoIDs; ++i) {
+      for (let i = 0; i < countOfInfoIDs; ++i) {
         readFedAuthInfoOpt(data, infoData, callback);
       }
     });
