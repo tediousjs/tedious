@@ -653,27 +653,32 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
       let fedAuthAck = undefined;
-      this.fedAuthInfo.featureExtAckPending = true;
       if ( this.fedAuthInfo.fedAuthInfoRequested && (fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) === undefined) {
-        throw new Error('Did not receive federated authentication acknowledgement');
+        this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+        this.loggedIn = false;
       }
       if (fedAuthAck !== undefined) {
         if (!this.fedAuthInfo.fedAuthInfoRequested) {
-          throw new Error('Did not request federated authentication, but received the acknowledgment');
+          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+          this.loggedIn = false;
         }
         switch (this.fedAuthInfo.fedAuthLibrary) {
           case FEDAUTH_OPTIONS.LIBRARY_ADAL:
             if (0 !== fedAuthAck.length) {
-              throw new Error(`Federated authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
+              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
+              this.loggedIn = false;
             }
             break;
           default:
-            throw new Error('Attempting to use unknown federated authentication library');
+          this.loginError = ConnectionError('Attempting to use unknown Active Directory authentication library');
+          this.loggedIn = false;
         }
       }
       else {
-        throw new Error('Received acknowledgement for unknown feature');
+        this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+        this.loggedIn = false;
       }
+
       this.fedAuthInfo.featureExtAckPending = false;
     });
 
@@ -1075,7 +1080,7 @@ class Connection extends EventEmitter {
     });
     if (this.fedAuthInfo.method != undefined) {
       if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
-        this.emit('connect', ConnectionError(`Server sent an unexpected response for federated authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
+        this.emit('connect', ConnectionError(`Server sent an unexpected response for Active Directory authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
         return this.close();
       }
       this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
@@ -1281,7 +1286,12 @@ class Connection extends EventEmitter {
   }
 
   processLogin7Response() {
-    if (this.loggedIn) {
+    // FEDAUTH FeatureId should be acknowledged in featureExtAck before proceeding
+    // TODO: Checking FedAuthId should be checked in a separate state as in 3.2.3.5
+    if(this.fedAuthInfo.featureExtAckPending){
+      return setImmediate(this.processLogin7Response());
+    }
+    else if (this.loggedIn) {
       this.dispatchEvent('loggedIn');
     } else {
       if (this.loginError) {
@@ -1321,6 +1331,7 @@ class Connection extends EventEmitter {
 
   processLogin7FedAuthResponse() {
     if (this.fedAuthInfo.fedAuthInfoRequested && !this.loginError) {
+      this.fedAuthInfo.featureExtAckPending = true;
       return this.dispatchEvent('receivedFedAuthInfo');
     } else {
       if (this.loginError) {
@@ -1826,15 +1837,7 @@ Connection.prototype.STATE = {
         this.sendDataToTokenStreamParser(data);
       },
       receivedFedAuthInfo: function() {
-        if(this.fedAuthInfo.featureExtAckPending){
-          // FEDAUTH FeatureId should be acknowledged before we transition to standard login 7
-          // TODO: Checking FedAuthId should be checked in a separate state 3.2.3.5
-          const boundDispatchEvent = this.dispatchEvent.bind(this);
-          return setImmediate(boundDispatchEvent, 'message');
-        }
-        else {
-          this.sendFedAuthResponsePacket();
-        }
+        this.sendFedAuthResponsePacket();
       },
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
