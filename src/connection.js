@@ -653,7 +653,7 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
       let fedAuthAck = undefined;
-      if ( this.fedAuthInfo.fedAuthInfoRequested && (fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) === undefined) {
+      if (this.fedAuthInfo.fedAuthInfoRequested && (fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) === undefined) {
         this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
         this.loggedIn = false;
       }
@@ -670,8 +670,8 @@ class Connection extends EventEmitter {
             }
             break;
           default:
-          this.loginError = ConnectionError('Attempting to use unknown Active Directory authentication library');
-          this.loggedIn = false;
+            this.loginError = ConnectionError('Attempting to use unknown Active Directory authentication library');
+            this.loggedIn = false;
         }
       }
       else {
@@ -1288,7 +1288,7 @@ class Connection extends EventEmitter {
   processLogin7Response() {
     // FEDAUTH FeatureId should be acknowledged in featureExtAck before proceeding
     // TODO: Checking FedAuthId should be checked in a separate state as in 3.2.3.5
-    if(this.fedAuthInfo.featureExtAckPending){
+    if (this.fedAuthInfo.featureExtAckPending) {
       return setImmediate(this.processLogin7Response());
     }
     else if (this.loggedIn) {
