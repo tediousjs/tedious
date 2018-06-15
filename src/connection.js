@@ -501,19 +501,28 @@ class Connection extends EventEmitter {
       // Whenever authentication property is used to specify an authentication method,
       // the client will request encryption (the default value of the Encrypt property will be true)
       // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
-      if (config.options.authentication != undefined) {
+      let authMethod = undefined;
+      if ((authMethod = config.options.authentication) != undefined) {
         // check for valid options
-        if (!(config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
-        config.options.authentication.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
+        if (!(authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
+          authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
           throw new Error('An invalid authentication method is specified');
         }
+        if (!(authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
+          authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
+          throw new Error('An invalid authentication method is specified');
+        }
+
         if (this.config.options.tdsVersion < '7_4') {
           throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
         }
         this.config.options.encrypt = true;
-        this.fedAuthInfo.method = config.options.authentication;
         if (!config.options.trustServerCertificate) {
           this.config.options.trustServerCertificate = false;
+        }
+        // sqlpassword directly authenticates and does not use fedAuth
+        if (authMethod.toUpperCase() !== this.fedAuthInfo.ValidFedAuthEnum.SqlPassword) {
+          this.fedAuthInfo.method = authMethod;
         }
       }
     }
