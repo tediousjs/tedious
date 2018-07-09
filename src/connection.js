@@ -20,8 +20,7 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
-const defaultAuthProvider = require('./auth/default');
-const ntlmAuthProvider = require('./auth/ntlm');
+const ntlmAuthProvider = require('./auth/integrated/ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -150,6 +149,12 @@ class Connection extends EventEmitter {
         useUTC: true
       }
     };
+
+    if (config.integratedAuthProvider !== undefined) {
+      if (typeof config.integratedAuthProvider !== 'function') {
+        throw new TypeError('integratedAuthProvider must be a function.');
+      }
+    }
 
     if (config.options) {
       if (config.options.port && config.options.instanceName) {
@@ -510,18 +515,18 @@ class Connection extends EventEmitter {
       RETRY: 2
     };
 
-    if (config.authProvider) {
-      this.authProvider = config.authProvider.call(null, this);
+    if (config.integratedAuthProvider) {
+      this.integratedAuthProvider = config.integratedAuthProvider.call(null, this);
     } else if (config.domain) {
       // We need to support the top-level `domain` option until the next
       // major version of tedious for backwards compatibility reasons.
-      this.authProvider = ntlmAuthProvider({
+      this.integratedAuthProvider = ntlmAuthProvider({
         domain: config.domain.toUpperCase(),
         username: config.userName,
         password: config.password
       })(this);
     } else {
-      this.authProvider = defaultAuthProvider({})(this);
+      this.integratedAuthProvider = undefined;
     }
   }
 
@@ -1588,7 +1593,7 @@ Connection.prototype.STATE = {
       message: function() {
         // Use SSPI blob if received
         if (this.sspiBuffer) {
-          return this.authProvider.handshake(this.sspiBuffer, (error, responseBuffer) => {
+          return this.integratedAuthProvider.handshake(this.sspiBuffer, (error, responseBuffer) => {
             if (error) {
               this.emit('error', error);
               return this.close();
