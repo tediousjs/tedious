@@ -952,11 +952,13 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
+    this.checkForAConnectState();
     this.transitionTo(this.STATE.FINAL);
   }
 
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+    this.checkForAConnectState();
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
       this.dispatchEvent('reconnect');
@@ -968,6 +970,12 @@ class Connection extends EventEmitter {
       this.dispatchEvent('retry');
     } else {
       this.transitionTo(this.STATE.FINAL);
+    }
+  }
+
+  checkForAConnectState() {
+    if (this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
+      this.emit('connect', ConnectionError('failed to successfully negotiate tls', 'ESOCKET'));
     }
   }
 
