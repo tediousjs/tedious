@@ -8,7 +8,6 @@ const TransientErrorLookup = require('./transient-error-lookup.js').TransientErr
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
 const Login7Payload = require('./login7-payload');
-const NTLMResponsePayload = require('./ntlm-payload');
 const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
 const SqlBatchPayload = require('./sqlbatch-payload');
@@ -20,6 +19,8 @@ const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+
+const ntlmAuthProvider = require('./auth/integrated/ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -96,9 +97,8 @@ class Connection extends EventEmitter {
 
     this.config = {
       server: config.server,
-      userName: config.userName,
-      password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
+      userName: config.domain ? undefined : config.userName,
+      password: config.domain ? undefined : config.password,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -149,6 +149,12 @@ class Connection extends EventEmitter {
         useUTC: true
       }
     };
+
+    if (config.integratedAuthProvider !== undefined) {
+      if (typeof config.integratedAuthProvider !== 'function') {
+        throw new TypeError('integratedAuthProvider must be a function.');
+      }
+    }
 
     if (config.options) {
       if (config.options.port && config.options.instanceName) {
@@ -508,6 +514,20 @@ class Connection extends EventEmitter {
       REDIRECT: 1,
       RETRY: 2
     };
+
+    if (config.integratedAuthProvider) {
+      this.integratedAuthProvider = config.integratedAuthProvider.call(null, this);
+    } else if (config.domain) {
+      // We need to support the top-level `domain` option until the next
+      // major version of tedious for backwards compatibility reasons.
+      this.integratedAuthProvider = ntlmAuthProvider({
+        domain: config.domain.toUpperCase(),
+        username: config.userName,
+        password: config.password
+      })(this);
+    } else {
+      this.integratedAuthProvider = undefined;
+    }
   }
 
   close() {
@@ -556,11 +576,7 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
-
+      this.sspiBuffer = token.buffer;
       this.emit('sspichallenge', token);
     });
 
@@ -1007,10 +1023,14 @@ class Connection extends EventEmitter {
     }
   }
 
-  sendLogin7Packet(cb) {
-    const sendPayload = function(clientResponse) {
+  sendLogin7Packet(callback) {
+    this.authProvider.handshake(null, (error, data) => {
+      if (error) {
+        this.emit('error', error);
+        return this.close();
+      }
+
       const payload = new Login7Payload({
-        domain: this.config.domain,
         userName: this.config.userName,
         password: this.config.password,
         database: this.config.options.database,
@@ -1020,7 +1040,7 @@ class Connection extends EventEmitter {
         tdsVersion: this.config.options.tdsVersion,
         initDbFatal: !this.config.options.fallbackToDefaultDb,
         readOnlyIntent: this.config.options.readOnlyIntent,
-        sspiBlob: clientResponse,
+        sspiBlob: data,
         language: this.config.options.language
       });
 
@@ -1030,36 +1050,11 @@ class Connection extends EventEmitter {
       this.debug.payload(function() {
         return payload.toString('  ');
       });
-    };
 
-    sendPayload.call(this);
-    process.nextTick(cb);
-  }
-
-  sendNTLMResponsePacket() {
-    const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    this.debug.payload(function() {
-      return payload.toString('  ');
-    });
-
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+      process.nextTick(callback);
     });
   }
 
-  // Returns false to apply backpressure.
   sendDataToTokenStreamParser(data) {
     return this.tokenStreamParser.addBuffer(data);
   }
@@ -1176,45 +1171,6 @@ class Connection extends EventEmitter {
   processedInitialSql() {
     this.clearConnectTimer();
     this.emit('connect');
-  }
-
-  processLogin7Response() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMResponse() {
-    if (this.ntlmpacket) {
-      this.dispatchEvent('receivedChallenge');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMAck() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
   }
 
   execSqlBatch(request) {
@@ -1546,11 +1502,7 @@ Connection.prototype.STATE = {
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
-          if (this.config.domain) {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          } else {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          }
+          this.transitionTo(this.STATE.SENT_LOGIN7);
         });
       },
       tls: function() {
@@ -1611,18 +1563,14 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.config.domain) {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
+            this.transitionTo(this.STATE.SENT_LOGIN7);
           });
         }
       }
     }
   },
-  SENT_LOGIN7_WITH_STANDARD_LOGIN: {
-    name: 'SentLogin7WithStandardLogin',
+  SENT_LOGIN7: {
+    name: 'SentLogin7',
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1643,56 +1591,31 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function() {
-        this.processLogin7Response();
-      }
-    }
-  },
-  SENT_LOGIN7_WITH_NTLM: {
-    name: 'SentLogin7WithNTLMLogin',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function() {
-        this.processLogin7NTLMResponse();
-      }
-    }
-  },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        this.processLogin7NTLMAck();
+        // Use SSPI blob if received
+        if (this.sspiBuffer) {
+          return this.integratedAuthProvider.handshake(this.sspiBuffer, (error, responseBuffer) => {
+            if (error) {
+              this.emit('error', error);
+              return this.close();
+            }
+            this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, responseBuffer);
+
+            // clear the sspiBuffer after processing
+            this.sspiBuffer = undefined;
+          });
+        }
+
+        if (this.loggedIn) {
+          return this.dispatchEvent('loggedIn');
+        }
+
+        if (this.loginError) {
+          this.emit('connect', this.loginError);
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+        }
+
+        this.dispatchEvent('loginFailed');
       }
     }
   },
