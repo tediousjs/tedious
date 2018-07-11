@@ -322,6 +322,26 @@ exports.encrypt = function(test) {
   });
 };
 
+exports['fails if no cipher can be negotiated'] = function(test) {
+  var config = getConfig();
+  config.options.encrypt = true;
+
+  // Do not allow any cipher to be used
+  config.options.cryptoCredentialsDetails = {
+    ciphers: '!ALL'
+  };
+
+  var connection = new Connection(config);
+  connection.on('connect', function(err) {
+    test.ok(err);
+    test.strictEqual(err.code, 'ESOCKET');
+  });
+
+  connection.on('end', function() {
+    test.done();
+  });
+};
+
 exports['does not emit error after connect timeout'] = function(test) {
   const config = getConfig();
   config.options.connectTimeout = 1;
