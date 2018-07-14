@@ -655,6 +655,9 @@ exports.closeConnectionRequestPending = function(test) {
     test.done();
   });
 
+  connection.on('error', function(err) {
+  });
+
   connection.on('infoMessage', function(info) {
     //console.log("#{info.number} : #{info.message}")
   });
