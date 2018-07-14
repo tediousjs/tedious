@@ -113,6 +113,12 @@ module.exports = class MessageIO extends EventEmitter {
       this.sendMessage(TYPE.PRELOGIN, data);
     });
 
+    // If an error happens in the TLS layer, there is nothing we can do about it.
+    // Forward the error to the socket so the connection gets properly cleaned up.
+    this.securePair.cleartext.on('error', (err) => {
+      this.socket.destroy(err);
+    });
+
     // On Node >= 0.12, the encrypted stream automatically starts spewing out
     // data once we attach a `data` listener. But on Node <= 0.10.x, this is not
     // the case. We need to kick the cleartext stream once to get the
