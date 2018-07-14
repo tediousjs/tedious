@@ -115,7 +115,7 @@ exports.testPausingRequestPausesTransforms = function(test) {
         test.ok(this.connection.tokenStreamParser.parser.isPaused());
 
         request.resume();
-      }, 1000);
+      }, 3000);
     }
   });
 
