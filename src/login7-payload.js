@@ -139,9 +139,11 @@ module.exports = class Login7Payload {
   language: string | typeof undefined;
   database: string | typeof undefined;
   clientId: Buffer;
-  sspi: Buffer;
+  sspi: Buffer | typeof undefined;
   attachDbFile: string;
   changePassword: string;
+  readOnlyIntent: boolean | typeof undefined;
+  initDbFatal: boolean | typeof undefined;
 
   constructor(loginData: LoginData) {
     this.tdsVersion = versions[loginData.tdsVersion];
@@ -151,28 +153,6 @@ module.exports = class Login7Payload {
     this.connectionId = 0;
     this.clientTimeZone = new Date().getTimezoneOffset();
     this.clientLcid = 0x00000409;
-    this.flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCP_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
-    if (loginData.initDbFatal) {
-      this.flags1 |= FLAGS_1.INIT_DB_FATAL;
-    } else {
-      this.flags1 |= FLAGS_1.INIT_DB_WARN;
-    }
-
-    this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (loginData.domain || loginData.sspiBlob) {
-      this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
-    } else {
-      this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
-    }
-
-    this.flags3 = FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
-
-    this.typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
-    if (loginData.readOnlyIntent) {
-      this.typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
-    } else {
-      this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
-    }
 
     this.hostname = os.hostname();
     this.userName = loginData.userName;
@@ -190,6 +170,9 @@ module.exports = class Login7Payload {
     this.domain = loginData.domain;
     this.workstation = loginData.workstation;
 
+    this.readOnlyIntent = loginData.readOnlyIntent;
+    this.initDbFatal = loginData.initDbFatal;
+
     if (loginData.sspiBlob) {
       this.sspi = loginData.sspiBlob;
     } else if (this.domain) {
@@ -198,7 +181,7 @@ module.exports = class Login7Payload {
         workstation: this.workstation
       });
     } else {
-      this.sspi = new Buffer(0);
+      this.sspi = undefined;
     }
   }
 
@@ -227,16 +210,16 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt32LE(this.connectionId, offset);
 
     // OptionFlags1: 1-byte
-    offset = fixedData.writeUInt8(this.flags1, offset);
+    offset = fixedData.writeUInt8(this.buildOptionFlags1(), offset);
 
     // OptionFlags2: 1-byte
-    offset = fixedData.writeUInt8(this.flags2, offset);
+    offset = fixedData.writeUInt8(this.buildOptionFlags2(), offset);
 
     // TypeFlags: 1-byte
-    offset = fixedData.writeUInt8(this.typeFlags, offset);
+    offset = fixedData.writeUInt8(this.buildTypeFlags(), offset);
 
     // OptionFlags3: 1-byte
-    offset = fixedData.writeUInt8(this.flags3, offset);
+    offset = fixedData.writeUInt8(this.buildOptionFlags3(), offset);
 
     // ClientTimZone: 4-byte
     offset = fixedData.writeInt32LE(this.clientTimeZone, offset);
@@ -431,6 +414,40 @@ module.exports = class Login7Payload {
     return data;
   }
 
+  buildOptionFlags1() {
+    let flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCP_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
+    if (this.initDbFatal) {
+      flags1 |= FLAGS_1.INIT_DB_FATAL;
+    } else {
+      flags1 |= FLAGS_1.INIT_DB_WARN;
+    }
+    return flags1;
+  }
+
+  buildOptionFlags2() {
+    let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
+    if (this.sspi) {
+      flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
+    } else {
+      flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
+    }
+    return flags2;
+  }
+
+  buildTypeFlags() {
+    let typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
+    if (this.readOnlyIntent) {
+      typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
+    } else {
+      typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
+    }
+    return typeFlags;
+  }
+
+  buildOptionFlags3() {
+    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+  }
+
   createNTLMRequest(options: { domain: string, workstation?: string }) {
     const domain = escape(options.domain.toUpperCase());
     const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
@@ -487,7 +504,7 @@ module.exports = class Login7Payload {
         this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
       ) + '\n' + indent + '         ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
-        this.flags1, this.flags2, this.typeFlags, this.flags3, this.clientTimeZone, this.clientLcid
+        this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
       ) + '\n' + indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
         this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
