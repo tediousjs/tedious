@@ -142,7 +142,6 @@ module.exports = class Login7Payload {
   libraryName: string;
   clientId: Buffer;
   sspi: Buffer;
-  sspiLong: number;
   attachDbFile: string;
   changePassword: string;
 
@@ -244,7 +243,7 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.attachDbFile);
     this.addVariableDataString(variableData, this.changePassword);
 
-    variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
+    variableData.offsetsAndLengths.writeUInt32LE(this.sspi.length);
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
   }
