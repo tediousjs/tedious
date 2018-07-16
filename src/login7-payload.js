@@ -141,12 +141,12 @@ module.exports = class Login7Payload {
   hostname: string;
   libraryName: string;
   clientId: Buffer;
-  sspi: string;
+  sspi: Buffer;
   sspiLong: number;
   attachDbFile: string;
   changePassword: string;
 
-  ntlmPacket: Buffer | typeof undefined;
+  ntlmPacket: Buffer;
 
   constructor(loginData: LoginData) {
     this.loginData = loginData;
@@ -229,31 +229,18 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    if (this.loginData.domain) {
-      const ntlmOptions = {
+    if (this.loginData.sspiBlob) {
+      this.ntlmPacket = this.sspi = this.loginData.sspiBlob;
+    } else if (this.loginData.domain) {
+      this.ntlmPacket = this.sspi = this.createNTLMRequest({
         domain: this.loginData.domain,
         workstation: this.loginData.workstation
-      };
-
-      let ntlmPacket;
-      if (this.loginData.sspiBlob) {
-        ntlmPacket = this.loginData.sspiBlob;
-      } else {
-        ntlmPacket = this.createNTLMRequest(ntlmOptions);
-      }
-
-      this.sspiLong = ntlmPacket.length;
-      variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-      variableData.offsetsAndLengths.writeUInt16LE(ntlmPacket.length);
-      variableData.data.writeBuffer(ntlmPacket);
-      variableData.offset += ntlmPacket.length;
-
-      this.ntlmPacket = ntlmPacket;
+      });
     } else {
-      this.sspi = '';
-      this.sspiLong = 0;
-      this.addVariableDataString(variableData, this.sspi);
+      this.ntlmPacket = this.sspi = new Buffer(0);
     }
+
+    this.addVariableDataBuffer(variableData, this.sspi);
 
     this.addVariableDataString(variableData, this.attachDbFile);
     this.addVariableDataString(variableData, this.changePassword);
