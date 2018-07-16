@@ -124,7 +124,7 @@ exports.createNTLM = function(test) {
     payload.clientId.length +
     2 +
     2 +
-    payload.ntlmPacket.length + // NTLM
+    payload.sspi.length + // NTLM
     2 +
     2 +
     2 * payload.attachDbFile.length +
@@ -135,17 +135,17 @@ exports.createNTLM = function(test) {
 
   test.strictEqual(payload.data.length, expectedLength);
 
-  var protocolHeader = payload.ntlmPacket.slice(0, 8).toString('utf8');
+  var protocolHeader = payload.sspi.slice(0, 8).toString('utf8');
   test.strictEqual(protocolHeader, 'NTLMSSP\u0000');
 
-  var workstationName = payload.ntlmPacket
-    .slice(payload.ntlmPacket.length - 17)
+  var workstationName = payload.sspi
+    .slice(payload.sspi.length - 17)
     .toString('ascii')
     .substr(0, 11);
   test.strictEqual(workstationName, 'WORKSTATION');
 
-  var domainName = payload.ntlmPacket
-    .slice(payload.ntlmPacket.length - 6)
+  var domainName = payload.sspi
+    .slice(payload.sspi.length - 6)
     .toString('ascii');
   test.strictEqual(domainName, 'DOMAIN');
 
@@ -182,13 +182,13 @@ exports.createSSPI = function(test) {
     2 + 2 + (2 * loginData.language.length) +
     2 + 2 + (2 * loginData.database.length) +
     payload.clientId.length +
-    2 + 2 + payload.ntlmPacket.length +             // NTLM
+    2 + 2 + payload.sspi.length +             // NTLM
     2 + 2 + (2 * payload.attachDbFile.length) +
     2 + 2 + (2 * payload.changePassword.length) +
     4;                                              // cbSSPILong
 
   test.strictEqual(payload.data.length, expectedLength);
-  test.strictEqual(payload.ntlmPacket, loginData.sspiBlob);
+  test.strictEqual(payload.sspi, loginData.sspiBlob);
 
   test.done();
 };

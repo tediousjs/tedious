@@ -146,8 +146,6 @@ module.exports = class Login7Payload {
   attachDbFile: string;
   changePassword: string;
 
-  ntlmPacket: Buffer;
-
   constructor(loginData: LoginData) {
     this.loginData = loginData;
 
@@ -230,14 +228,14 @@ module.exports = class Login7Payload {
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
     if (this.loginData.sspiBlob) {
-      this.ntlmPacket = this.sspi = this.loginData.sspiBlob;
+      this.sspi = this.loginData.sspiBlob;
     } else if (this.loginData.domain) {
-      this.ntlmPacket = this.sspi = this.createNTLMRequest({
+      this.sspi = this.createNTLMRequest({
         domain: this.loginData.domain,
         workstation: this.loginData.workstation
       });
     } else {
-      this.ntlmPacket = this.sspi = new Buffer(0);
+      this.sspi = new Buffer(0);
     }
 
     this.addVariableDataBuffer(variableData, this.sspi);
