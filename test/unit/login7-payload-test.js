@@ -61,14 +61,13 @@ exports.create = function(test) {
     2 * payload.changePassword.length +
     4; // cbSSPILong
 
-  test.strictEqual(payload.data.length, expectedLength);
+  const data = payload.toBuffer();
+  test.strictEqual(data.length, expectedLength);
 
-  var passwordStart = payload.data.readUInt16LE(4 + 32 + 2 * 4);
+  var passwordStart = data.readUInt16LE(4 + 32 + 2 * 4);
   var passwordEnd = passwordStart + 2 * loginData.password.length;
   var passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5]);
-  test.ok(
-    payload.data.slice(passwordStart, passwordEnd).equals(passwordExpected)
-  );
+  test.ok(data.slice(passwordStart, passwordEnd).equals(passwordExpected));
 
   //console.log(payload.toString(''))
 
@@ -133,7 +132,8 @@ exports.createNTLM = function(test) {
     2 * payload.changePassword.length +
     4; // cbSSPILong
 
-  test.strictEqual(payload.data.length, expectedLength);
+  const data = payload.toBuffer();
+  test.strictEqual(data.length, expectedLength);
 
   var protocolHeader = payload.sspi.slice(0, 8).toString('utf8');
   test.strictEqual(protocolHeader, 'NTLMSSP\u0000');
@@ -187,7 +187,8 @@ exports.createSSPI = function(test) {
     2 + 2 + (2 * payload.changePassword.length) +
     4;                                              // cbSSPILong
 
-  test.strictEqual(payload.data.length, expectedLength);
+  const data = payload.toBuffer();
+  test.strictEqual(data.length, expectedLength);
   test.strictEqual(payload.sspi, loginData.sspiBlob);
 
   test.done();

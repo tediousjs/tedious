@@ -136,8 +136,6 @@ module.exports = class Login7Payload {
   typeFlags: number;
   flags3: number;
 
-  data: Buffer;
-
   hostname: string;
   libraryName: string;
   clientId: Buffer;
@@ -194,12 +192,15 @@ module.exports = class Login7Payload {
     } else {
       this.sspi = new Buffer(0);
     }
+  }
 
+  toBuffer() {
     const fixed = this.createFixedData();
     const variable = this.createVariableData(fixed.length);
 
-    this.data = Buffer.concat([fixed, variable]);
-    this.data.writeUInt32LE(this.data.length, 0);
+    const data = Buffer.concat([fixed, variable]);
+    data.writeUInt32LE(data.length, 0);
+    return data;
   }
 
   createFixedData() {

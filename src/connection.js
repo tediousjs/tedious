@@ -1025,7 +1025,7 @@ class Connection extends EventEmitter {
       });
 
       this.routingData = undefined;
-      this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+      this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
 
       this.debug.payload(function() {
         return payload.toString('  ');
