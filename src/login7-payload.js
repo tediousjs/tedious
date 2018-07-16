@@ -240,13 +240,21 @@ module.exports = class Login7Payload {
 
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    this.addVariableDataBuffer(variableData, this.sspi);
+    this.addVariableDataSSPI(variableData, this.sspi);
     this.addVariableDataString(variableData, this.attachDbFile);
     this.addVariableDataString(variableData, this.changePassword);
 
     variableData.offsetsAndLengths.writeUInt32LE(this.sspi.length);
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
+  }
+
+  addVariableDataSSPI(variableData: VariableData, buffer: Buffer) {
+    const length = buffer.length > 65535 ? 65535 : buffer.length;
+    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
+    variableData.offsetsAndLengths.writeUInt16LE(length);
+    variableData.data.writeBuffer(buffer);
+    variableData.offset += length;
   }
 
   addVariableDataBuffer(variableData: VariableData, buffer: Buffer) {
