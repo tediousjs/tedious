@@ -192,19 +192,20 @@ module.exports = class Login7Payload {
       this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
     }
 
-    const buffer = new WritableTrackingBuffer(100);
-    buffer.writeUInt32LE(this.tdsVersion);
-    buffer.writeUInt32LE(this.packetSize);
-    buffer.writeUInt32LE(this.clientProgVer);
-    buffer.writeUInt32LE(this.clientPid);
-    buffer.writeUInt32LE(this.connectionId);
-    buffer.writeUInt8(this.flags1);
-    buffer.writeUInt8(this.flags2);
-    buffer.writeUInt8(this.typeFlags);
-    buffer.writeUInt8(this.flags3);
-    buffer.writeInt32LE(this.clientTimeZone);
-    buffer.writeUInt32LE(this.clientLcid);
-    return buffer.data;
+    const buffer = new Buffer(32);
+    let offset = 0;
+    offset = buffer.writeUInt32LE(this.tdsVersion, offset);
+    offset = buffer.writeUInt32LE(this.packetSize, offset);
+    offset = buffer.writeUInt32LE(this.clientProgVer, offset);
+    offset = buffer.writeUInt32LE(this.clientPid, offset);
+    offset = buffer.writeUInt32LE(this.connectionId, offset);
+    offset = buffer.writeUInt8(this.flags1, offset);
+    offset = buffer.writeUInt8(this.flags2, offset);
+    offset = buffer.writeUInt8(this.typeFlags, offset);
+    offset = buffer.writeUInt8(this.flags3, offset);
+    offset = buffer.writeInt32LE(this.clientTimeZone, offset);
+    buffer.writeUInt32LE(this.clientLcid, offset);
+    return buffer;
   }
 
   createVariableData(offset: number) {
