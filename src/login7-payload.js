@@ -153,18 +153,6 @@ module.exports = class Login7Payload {
   constructor(loginData: LoginData) {
     this.loginData = loginData;
 
-    const lengthLength = 4;
-    const fixed = this.createFixedData();
-    const variable = this.createVariableData(lengthLength + fixed.length);
-    const length = lengthLength + fixed.length + variable.length;
-    const data = new WritableTrackingBuffer(300);
-    data.writeUInt32LE(length);
-    data.writeBuffer(fixed);
-    data.writeBuffer(variable);
-    this.data = data.data;
-  }
-
-  createFixedData() {
     this.tdsVersion = versions[this.loginData.tdsVersion];
     this.packetSize = this.loginData.packetSize;
     this.clientProgVer = 0;
@@ -192,8 +180,17 @@ module.exports = class Login7Payload {
       this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
     }
 
-    const buffer = new Buffer(32);
+    const fixed = this.createFixedData();
+    const variable = this.createVariableData(fixed.length);
+
+    this.data = Buffer.concat([fixed, variable]);
+    this.data.writeUInt32LE(this.data.length, 0);
+  }
+
+  createFixedData() {
+    const buffer = new Buffer(36);
     let offset = 0;
+    offset = buffer.writeUInt32LE(0, offset);
     offset = buffer.writeUInt32LE(this.tdsVersion, offset);
     offset = buffer.writeUInt32LE(this.packetSize, offset);
     offset = buffer.writeUInt32LE(this.clientProgVer, offset);
