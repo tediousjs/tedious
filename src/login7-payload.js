@@ -1,6 +1,5 @@
 // @flow
 
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const os = require('os');
 const sprintf = require('sprintf-js').sprintf;
 const libraryName = require('./library').name;
@@ -451,35 +450,38 @@ module.exports = class Login7Payload {
   createNTLMRequest(options: { domain: string, workstation?: string }) {
     const domain = escape(options.domain.toUpperCase());
     const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
-    const protocol = 'NTLMSSP\u0000';
-    const BODY_LENGTH = 40;
-    const bufferLength = BODY_LENGTH + domain.length;
-    const buffer = new WritableTrackingBuffer(bufferLength);
 
     let type1flags = this.getNTLMFlags();
     if (workstation === '') {
       type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
     }
 
-    buffer.writeString(protocol, 'utf8');
-    buffer.writeUInt32LE(1);
-    buffer.writeUInt32LE(type1flags);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt32LE(BODY_LENGTH + workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt32LE(BODY_LENGTH);
-    buffer.writeUInt8(5);
-    buffer.writeUInt8(0);
-    buffer.writeUInt16LE(2195);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(15);
-    buffer.writeString(workstation, 'ascii');
-    buffer.writeString(domain, 'ascii');
-    return buffer.data;
+    const fixedData = new Buffer(40);
+    const buffers = [fixedData];
+    let offset = 0;
+
+    offset += fixedData.write('NTLMSSP', offset, 7, 'ascii');
+    offset = fixedData.writeUInt8(0, offset);
+    offset = fixedData.writeUInt32LE(1, offset);
+    offset = fixedData.writeUInt32LE(type1flags, offset);
+    offset = fixedData.writeUInt16LE(domain.length, offset);
+    offset = fixedData.writeUInt16LE(domain.length, offset);
+    offset = fixedData.writeUInt32LE(fixedData.length + workstation.length, offset);
+    offset = fixedData.writeUInt16LE(workstation.length, offset);
+    offset = fixedData.writeUInt16LE(workstation.length, offset);
+    offset = fixedData.writeUInt32LE(fixedData.length, offset);
+    offset = fixedData.writeUInt8(5, offset);
+    offset = fixedData.writeUInt8(0, offset);
+    offset = fixedData.writeUInt16LE(2195, offset);
+    offset = fixedData.writeUInt8(0, offset);
+    offset = fixedData.writeUInt8(0, offset);
+    offset = fixedData.writeUInt8(0, offset);
+    fixedData.writeUInt8(15, offset);
+
+    buffers.push(new Buffer(workstation, 'ascii'));
+    buffers.push(new Buffer(domain, 'ascii'));
+
+    return Buffer.concat(buffers);
   }
 
   scramblePassword(password: Buffer) {
