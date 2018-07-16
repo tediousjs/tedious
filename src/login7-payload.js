@@ -176,6 +176,26 @@ module.exports = class Login7Payload {
       this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
     }
 
+    this.hostname = os.hostname();
+    this.loginData = this.loginData || {};
+    this.loginData.appName = this.loginData.appName || 'Tedious';
+    this.libraryName = libraryName;
+    this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+
+    this.attachDbFile = '';
+    this.changePassword = '';
+
+    if (this.loginData.sspiBlob) {
+      this.sspi = this.loginData.sspiBlob;
+    } else if (this.loginData.domain) {
+      this.sspi = this.createNTLMRequest({
+        domain: this.loginData.domain,
+        workstation: this.loginData.workstation
+      });
+    } else {
+      this.sspi = new Buffer(0);
+    }
+
     const fixed = this.createFixedData();
     const variable = this.createVariableData(fixed.length);
 
@@ -208,14 +228,6 @@ module.exports = class Login7Payload {
       offset: 94
     };
 
-    this.hostname = os.hostname();
-    this.loginData = this.loginData || {};
-    this.loginData.appName = this.loginData.appName || 'Tedious';
-    this.libraryName = libraryName;
-    this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
-
-    this.attachDbFile = '';
-    this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
     this.addVariableDataString(variableData, this.loginData.domain ? '' : this.loginData.userName);
     this.addVariableDataBuffer(variableData, this.loginData.domain ? Buffer.alloc(0) : this.createPasswordBuffer());
@@ -225,23 +237,13 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.libraryName);
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
+
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
 
-    if (this.loginData.sspiBlob) {
-      this.sspi = this.loginData.sspiBlob;
-    } else if (this.loginData.domain) {
-      this.sspi = this.createNTLMRequest({
-        domain: this.loginData.domain,
-        workstation: this.loginData.workstation
-      });
-    } else {
-      this.sspi = new Buffer(0);
-    }
-
     this.addVariableDataBuffer(variableData, this.sspi);
-
     this.addVariableDataString(variableData, this.attachDbFile);
     this.addVariableDataString(variableData, this.changePassword);
+
     variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
