@@ -210,9 +210,7 @@ module.exports = class Login7Payload {
 
   createVariableData(offset: number) {
     this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
-    if (this.loginData.tdsVersion === '7_1') {
-      this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
-    }
+
     const variableData = {
       offsetsAndLengths: new WritableTrackingBuffer(200),
       data: new WritableTrackingBuffer(200, 'ucs2'),
@@ -265,10 +263,8 @@ module.exports = class Login7Payload {
     }
 
     this.addVariableDataString(variableData, this.attachDbFile);
-    if (this.loginData.tdsVersion > '7_1') {
-      this.addVariableDataString(variableData, this.changePassword);
-      variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
-    }
+    this.addVariableDataString(variableData, this.changePassword);
+    variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
 
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
   }
