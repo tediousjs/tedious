@@ -138,8 +138,6 @@ module.exports = class Login7Payload {
 
   data: Buffer;
 
-  variableLengthsLength: number;
-
   hostname: string;
   libraryName: string;
   clientId: Buffer;
@@ -206,13 +204,12 @@ module.exports = class Login7Payload {
   }
 
   createVariableData(offset: number) {
-    this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
-
     const variableData = {
       offsetsAndLengths: new WritableTrackingBuffer(200),
       data: new WritableTrackingBuffer(200, 'ucs2'),
-      offset: offset + this.variableLengthsLength
+      offset: 94
     };
+
     this.hostname = os.hostname();
     this.loginData = this.loginData || {};
     this.loginData.appName = this.loginData.appName || 'Tedious';
