@@ -215,10 +215,7 @@ module.exports = class Login7Payload {
     this.loginData.appName = this.loginData.appName || 'Tedious';
     this.libraryName = libraryName;
     this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
-    if (!this.loginData.domain) {
-      this.sspi = '';
-      this.sspiLong = 0;
-    }
+
     this.attachDbFile = '';
     this.changePassword = '';
     this.addVariableDataString(variableData, this.hostname);
@@ -253,6 +250,8 @@ module.exports = class Login7Payload {
 
       this.ntlmPacket = ntlmPacket;
     } else {
+      this.sspi = '';
+      this.sspiLong = 0;
       this.addVariableDataString(variableData, this.sspi);
     }
 
