@@ -21,6 +21,8 @@ const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 
+const { createNTLMRequest } = require('./ntlm');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -1008,31 +1010,27 @@ class Connection extends EventEmitter {
   }
 
   sendLogin7Packet(cb) {
-    const sendPayload = function(clientResponse) {
-      const payload = new Login7Payload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        database: this.config.options.database,
-        serverName: this.routingData ? this.routingData.server : this.config.server,
-        appName: this.config.options.appName,
-        packetSize: this.config.options.packetSize,
-        tdsVersion: this.config.options.tdsVersion,
-        initDbFatal: !this.config.options.fallbackToDefaultDb,
-        readOnlyIntent: this.config.options.readOnlyIntent,
-        sspiBlob: clientResponse,
-        language: this.config.options.language
-      });
+    const payload = new Login7Payload({
+      userName: this.config.domain ? undefined : this.config.userName,
+      password: this.config.domain ? undefined : this.config.password,
+      database: this.config.options.database,
+      serverName: this.routingData ? this.routingData.server : this.config.server,
+      appName: this.config.options.appName,
+      packetSize: this.config.options.packetSize,
+      tdsVersion: this.config.options.tdsVersion,
+      initDbFatal: !this.config.options.fallbackToDefaultDb,
+      readOnlyIntent: this.config.options.readOnlyIntent,
+      sspiBlob: this.config.domain ? createNTLMRequest({ domain: this.config.domain }) : undefined,
+      language: this.config.options.language,
+    });
 
-      this.routingData = undefined;
-      this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
+    this.routingData = undefined;
+    this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
 
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
-    };
+    this.debug.payload(function() {
+      return payload.toString('  ');
+    });
 
-    sendPayload.call(this);
     process.nextTick(cb);
   }
 
