@@ -91,13 +91,6 @@ const NTLMFlags = {
   NTLM_Negotiate56: 0x80000000
 };
 
-
-type VariableData = {
-  offsetsAndLengths: WritableTrackingBuffer,
-  data: WritableTrackingBuffer,
-  offset: number
-};
-
 type LoginData = {
   tdsVersion: string,
   packetSize: number,
@@ -195,80 +188,232 @@ module.exports = class Login7Payload {
   }
 
   toBuffer() {
-    const fixed = this.createFixedData();
-    const variable = this.createVariableData(fixed.length);
+    const fixedData = new Buffer(94);
+    const buffers = [fixedData];
 
-    const data = Buffer.concat([fixed, variable]);
+    let offset = 0, dataOffset = fixedData.length;
+
+    // Length: 4-byte
+    offset = fixedData.writeUInt32LE(0, offset);
+
+    // TDSVersion: 4-byte
+    offset = fixedData.writeUInt32LE(this.tdsVersion, offset);
+
+    // PacketSize: 4-byte
+    offset = fixedData.writeUInt32LE(this.packetSize, offset);
+
+    // ClientProgVer: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientProgVer, offset);
+
+    // ClientPID: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientPid, offset);
+
+    // ConnectionID: 4-byte
+    offset = fixedData.writeUInt32LE(this.connectionId, offset);
+
+    // OptionFlags1: 1-byte
+    offset = fixedData.writeUInt8(this.flags1, offset);
+
+    // OptionFlags2: 1-byte
+    offset = fixedData.writeUInt8(this.flags2, offset);
+
+    // TypeFlags: 1-byte
+    offset = fixedData.writeUInt8(this.typeFlags, offset);
+
+    // OptionFlags3: 1-byte
+    offset = fixedData.writeUInt8(this.flags3, offset);
+
+    // ClientTimZone: 4-byte
+    offset = fixedData.writeInt32LE(this.clientTimeZone, offset);
+
+    // ClientLCID: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientLcid, offset);
+
+    // ibHostName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchHostName: 2-byte
+    if (this.hostname) {
+      const buffer = new Buffer(this.hostname, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(dataOffset, offset);
+    }
+
+    // ibUserName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchUserName: 2-byte
+    if (!this.loginData.domain && this.loginData.userName) {
+      const buffer = new Buffer(this.loginData.userName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibPassword: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchPassword: 2-byte
+    if (!this.loginData.domain && this.loginData.password) {
+      const buffer = new Buffer(this.loginData.password, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(this.scramblePassword(buffer));
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibAppName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchAppName: 2-byte
+    if (this.loginData.appName) {
+      const buffer = new Buffer(this.loginData.appName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibServerName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchServerName: 2-byte
+    if (this.loginData.serverName) {
+      const buffer = new Buffer(this.loginData.serverName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // (ibUnused / ibExtension): 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // (cchUnused / cbExtension): 2-byte
+    offset = fixedData.writeUInt16LE(0, offset);
+
+    // ibCltIntName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchCltIntName: 2-byte
+    if (this.libraryName) {
+      const buffer = new Buffer(this.libraryName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibLanguage: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchLanguage: 2-byte
+    if (this.loginData.language) {
+      const buffer = new Buffer(this.loginData.language, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibDatabase: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchDatabase: 2-byte
+    if (this.loginData.database) {
+      const buffer = new Buffer(this.loginData.database, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ClientID: 6-byte
+    offset += this.clientId.copy(fixedData, offset);
+
+    // ibSSPI: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cbSSPI: 2-byte
+    if (this.sspi) {
+      if (this.sspi.length > 65535) {
+        offset = fixedData.writeUInt16LE(65535, offset);
+      } else {
+        offset = fixedData.writeUInt16LE(this.sspi.length, offset);
+      }
+
+      buffers.push(this.sspi);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibAtchDBFile: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchAtchDBFile: 2-byte
+    if (this.attachDbFile) {
+      const buffer = new Buffer(this.attachDbFile, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibChangePassword: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchChangePassword: 2-byte
+    if (this.changePassword) {
+      const buffer = new Buffer(this.changePassword, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // cbSSPILong: 4-byte
+    if (this.sspi && this.sspi.length > 65535) {
+      fixedData.writeUInt32LE(this.sspi.length, offset);
+    } else {
+      fixedData.writeUInt32LE(0, offset);
+    }
+
+    const data = Buffer.concat(buffers);
     data.writeUInt32LE(data.length, 0);
     return data;
-  }
-
-  createFixedData() {
-    const buffer = new Buffer(36);
-    let offset = 0;
-    offset = buffer.writeUInt32LE(0, offset);
-    offset = buffer.writeUInt32LE(this.tdsVersion, offset);
-    offset = buffer.writeUInt32LE(this.packetSize, offset);
-    offset = buffer.writeUInt32LE(this.clientProgVer, offset);
-    offset = buffer.writeUInt32LE(this.clientPid, offset);
-    offset = buffer.writeUInt32LE(this.connectionId, offset);
-    offset = buffer.writeUInt8(this.flags1, offset);
-    offset = buffer.writeUInt8(this.flags2, offset);
-    offset = buffer.writeUInt8(this.typeFlags, offset);
-    offset = buffer.writeUInt8(this.flags3, offset);
-    offset = buffer.writeInt32LE(this.clientTimeZone, offset);
-    buffer.writeUInt32LE(this.clientLcid, offset);
-    return buffer;
-  }
-
-  createVariableData(offset: number) {
-    const variableData = {
-      offsetsAndLengths: new WritableTrackingBuffer(200),
-      data: new WritableTrackingBuffer(200, 'ucs2'),
-      offset: 94
-    };
-
-    this.addVariableDataString(variableData, this.hostname);
-    this.addVariableDataString(variableData, this.loginData.domain ? '' : this.loginData.userName);
-    this.addVariableDataBuffer(variableData, this.loginData.domain ? Buffer.alloc(0) : this.createPasswordBuffer());
-    this.addVariableDataString(variableData, this.loginData.appName);
-    this.addVariableDataString(variableData, this.loginData.serverName);
-    this.addVariableDataString(variableData, '');
-    this.addVariableDataString(variableData, this.libraryName);
-    this.addVariableDataString(variableData, this.loginData.language);
-    this.addVariableDataString(variableData, this.loginData.database);
-
-    variableData.offsetsAndLengths.writeBuffer(this.clientId);
-
-    this.addVariableDataSSPI(variableData, this.sspi);
-    this.addVariableDataString(variableData, this.attachDbFile);
-    this.addVariableDataString(variableData, this.changePassword);
-
-    variableData.offsetsAndLengths.writeUInt32LE(this.sspi.length);
-
-    return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
-  }
-
-  addVariableDataSSPI(variableData: VariableData, buffer: Buffer) {
-    const length = buffer.length > 65535 ? 65535 : buffer.length;
-    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    variableData.offsetsAndLengths.writeUInt16LE(length);
-    variableData.data.writeBuffer(buffer);
-    variableData.offset += length;
-  }
-
-  addVariableDataBuffer(variableData: VariableData, buffer: Buffer) {
-    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    variableData.offsetsAndLengths.writeUInt16LE(buffer.length / 2);
-    variableData.data.writeBuffer(buffer);
-    variableData.offset += buffer.length;
-  }
-
-  addVariableDataString(variableData: VariableData, value?: string = '') {
-    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    variableData.offsetsAndLengths.writeUInt16LE(value.length);
-    variableData.data.writeString(value);
-    variableData.offset += value.length * 2;
   }
 
   createNTLMRequest(options: { domain: string, workstation?: string }) {
@@ -305,9 +450,7 @@ module.exports = class Login7Payload {
     return buffer.data;
   }
 
-  createPasswordBuffer() {
-    let password = this.loginData.password || '';
-    password = new Buffer(password, 'ucs2');
+  scramblePassword(password: Buffer) {
     for (let b = 0, len = password.length; b < len; b++) {
       let byte = password[b];
       const lowNibble = byte & 0x0f;
