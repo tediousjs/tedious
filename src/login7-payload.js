@@ -1,3 +1,5 @@
+// @flow
+
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const os = require('os');
 const sprintf = require('sprintf-js').sprintf;
@@ -90,11 +92,65 @@ const NTLMFlags = {
 };
 
 
+type VariableData = {
+  offsetsAndLengths: WritableTrackingBuffer,
+  data: WritableTrackingBuffer,
+  offset: number
+};
+
+type LoginData = {
+  tdsVersion: string,
+  packetSize: number,
+
+  initDbFatal?: boolean,
+  domain?: string,
+  workstation?: string,
+  readOnlyIntent?: boolean,
+
+  appName?: string,
+  userName?: string,
+  password?: string,
+  serverName?: string,
+  language?: string,
+  database?: string,
+
+  sspiBlob?: Buffer
+};
+
 /*
   s2.2.6.3
  */
 module.exports = class Login7Payload {
-  constructor(loginData) {
+  loginData: LoginData;
+
+  tdsVersion: number;
+  packetSize: number;
+  clientProgVer: number;
+  clientPid: number;
+  connectionId: number;
+  clientTimeZone: number;
+  clientLcid: number;
+
+  flags1: number;
+  flags2: number;
+  typeFlags: number;
+  flags3: number;
+
+  data: Buffer;
+
+  variableLengthsLength: number;
+
+  hostname: string;
+  libraryName: string;
+  clientId: Buffer;
+  sspi: string;
+  sspiLong: number;
+  attachDbFile: string;
+  changePassword: string;
+
+  ntlmPacket: Buffer | typeof undefined;
+
+  constructor(loginData: LoginData) {
     this.loginData = loginData;
 
     const lengthLength = 4;
@@ -116,7 +172,7 @@ module.exports = class Login7Payload {
     this.connectionId = 0;
     this.clientTimeZone = new Date().getTimezoneOffset();
     this.clientLcid = 0x00000409;
-    this.flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCD_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
+    this.flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCP_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
     if (this.loginData.initDbFatal) {
       this.flags1 |= FLAGS_1.INIT_DB_FATAL;
     } else {
@@ -151,7 +207,7 @@ module.exports = class Login7Payload {
     return buffer.data;
   }
 
-  createVariableData(offset) {
+  createVariableData(offset: number) {
     this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
     if (this.loginData.tdsVersion === '7_1') {
       this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
@@ -182,18 +238,27 @@ module.exports = class Login7Payload {
     this.addVariableDataString(variableData, this.loginData.language);
     this.addVariableDataString(variableData, this.loginData.database);
     variableData.offsetsAndLengths.writeBuffer(this.clientId);
+
     if (this.loginData.domain) {
+      const ntlmOptions = {
+        domain: this.loginData.domain,
+        workstation: this.loginData.workstation
+      };
+
+      let ntlmPacket;
       if (this.loginData.sspiBlob) {
-        this.ntlmPacket = this.loginData.sspiBlob;
+        ntlmPacket = this.loginData.sspiBlob;
       } else {
-        this.ntlmPacket = this.createNTLMRequest(this.loginData);
+        ntlmPacket = this.createNTLMRequest(ntlmOptions);
       }
 
-      this.sspiLong = this.ntlmPacket.length;
+      this.sspiLong = ntlmPacket.length;
       variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-      variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
-      variableData.data.writeBuffer(this.ntlmPacket);
-      variableData.offset += this.ntlmPacket.length;
+      variableData.offsetsAndLengths.writeUInt16LE(ntlmPacket.length);
+      variableData.data.writeBuffer(ntlmPacket);
+      variableData.offset += ntlmPacket.length;
+
+      this.ntlmPacket = ntlmPacket;
     } else {
       this.addVariableDataString(variableData, this.sspi);
     }
@@ -207,22 +272,21 @@ module.exports = class Login7Payload {
     return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
   }
 
-  addVariableDataBuffer(variableData, buffer) {
+  addVariableDataBuffer(variableData: VariableData, buffer: Buffer) {
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
     variableData.offsetsAndLengths.writeUInt16LE(buffer.length / 2);
     variableData.data.writeBuffer(buffer);
     return variableData.offset += buffer.length;
   }
 
-  addVariableDataString(variableData, value) {
-    value || (value = '');
+  addVariableDataString(variableData: VariableData, value?: string = '') {
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
     variableData.offsetsAndLengths.writeUInt16LE(value.length);
     variableData.data.writeString(value);
     return variableData.offset += value.length * 2;
   }
 
-  createNTLMRequest(options) {
+  createNTLMRequest(options: { domain: string, workstation?: string }) {
     const domain = escape(options.domain.toUpperCase());
     const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
     const protocol = 'NTLMSSP\u0000';
@@ -274,8 +338,7 @@ module.exports = class Login7Payload {
     return NTLMFlags.NTLM_NegotiateUnicode + NTLMFlags.NTLM_NegotiateOEM + NTLMFlags.NTLM_RequestTarget + NTLMFlags.NTLM_NegotiateNTLM + NTLMFlags.NTLM_NegotiateOemDomainSupplied + NTLMFlags.NTLM_NegotiateOemWorkstationSupplied + NTLMFlags.NTLM_NegotiateAlwaysSign + NTLMFlags.NTLM_NegotiateVersion + NTLMFlags.NTLM_NegotiateExtendedSecurity + NTLMFlags.NTLM_Negotiate128 + NTLMFlags.NTLM_Negotiate56;
   }
 
-  toString(indent) {
-    indent || (indent = '');
+  toString(indent?: string = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
         this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
