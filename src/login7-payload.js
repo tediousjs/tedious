@@ -114,8 +114,6 @@ type LoginData = {
   s2.2.6.3
  */
 module.exports = class Login7Payload {
-  loginData: LoginData;
-
   tdsVersion: number;
   packetSize: number;
   clientProgVer: number;
@@ -129,58 +127,75 @@ module.exports = class Login7Payload {
   typeFlags: number;
   flags3: number;
 
-  hostname: string;
-  libraryName: string;
+  domain: string | typeof undefined;
+  workstation: string | typeof undefined;
+
+  userName: string | typeof undefined;
+  password: string | typeof undefined;
+  serverName: string | typeof undefined;
+  appName: string | typeof undefined;
+  hostname: string | typeof undefined;
+  libraryName: string | typeof undefined;
+  language: string | typeof undefined;
+  database: string | typeof undefined;
   clientId: Buffer;
   sspi: Buffer;
   attachDbFile: string;
   changePassword: string;
 
   constructor(loginData: LoginData) {
-    this.loginData = loginData;
-
-    this.tdsVersion = versions[this.loginData.tdsVersion];
-    this.packetSize = this.loginData.packetSize;
+    this.tdsVersion = versions[loginData.tdsVersion];
+    this.packetSize = loginData.packetSize;
     this.clientProgVer = 0;
     this.clientPid = process.pid;
     this.connectionId = 0;
     this.clientTimeZone = new Date().getTimezoneOffset();
     this.clientLcid = 0x00000409;
     this.flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCP_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
-    if (this.loginData.initDbFatal) {
+    if (loginData.initDbFatal) {
       this.flags1 |= FLAGS_1.INIT_DB_FATAL;
     } else {
       this.flags1 |= FLAGS_1.INIT_DB_WARN;
     }
+
     this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.loginData.domain) {
+    if (loginData.domain || loginData.sspiBlob) {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
     }
+
     this.flags3 = FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+
     this.typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
-    if (this.loginData.readOnlyIntent) {
+    if (loginData.readOnlyIntent) {
       this.typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
     } else {
       this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
     }
 
     this.hostname = os.hostname();
-    this.loginData = this.loginData || {};
-    this.loginData.appName = this.loginData.appName || 'Tedious';
+    this.userName = loginData.userName;
+    this.password = loginData.password;
+    this.serverName = loginData.serverName;
+    this.appName = loginData.appName || 'Tedious';
     this.libraryName = libraryName;
+    this.language = loginData.language;
+    this.database = loginData.database;
     this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
 
     this.attachDbFile = '';
     this.changePassword = '';
 
-    if (this.loginData.sspiBlob) {
-      this.sspi = this.loginData.sspiBlob;
-    } else if (this.loginData.domain) {
+    this.domain = loginData.domain;
+    this.workstation = loginData.workstation;
+
+    if (loginData.sspiBlob) {
+      this.sspi = loginData.sspiBlob;
+    } else if (this.domain) {
       this.sspi = this.createNTLMRequest({
-        domain: this.loginData.domain,
-        workstation: this.loginData.workstation
+        domain: this.domain,
+        workstation: this.workstation
       });
     } else {
       this.sspi = new Buffer(0);
@@ -248,8 +263,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchUserName: 2-byte
-    if (!this.loginData.domain && this.loginData.userName) {
-      const buffer = new Buffer(this.loginData.userName, 'ucs2');
+    if (!this.domain && this.userName) {
+      const buffer = new Buffer(this.userName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -263,8 +278,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchPassword: 2-byte
-    if (!this.loginData.domain && this.loginData.password) {
-      const buffer = new Buffer(this.loginData.password, 'ucs2');
+    if (!this.domain && this.password) {
+      const buffer = new Buffer(this.password, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -278,8 +293,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchAppName: 2-byte
-    if (this.loginData.appName) {
-      const buffer = new Buffer(this.loginData.appName, 'ucs2');
+    if (this.appName) {
+      const buffer = new Buffer(this.appName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -293,8 +308,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchServerName: 2-byte
-    if (this.loginData.serverName) {
-      const buffer = new Buffer(this.loginData.serverName, 'ucs2');
+    if (this.serverName) {
+      const buffer = new Buffer(this.serverName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -329,8 +344,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchLanguage: 2-byte
-    if (this.loginData.language) {
-      const buffer = new Buffer(this.loginData.language, 'ucs2');
+    if (this.language) {
+      const buffer = new Buffer(this.language, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -344,8 +359,8 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // cchDatabase: 2-byte
-    if (this.loginData.database) {
-      const buffer = new Buffer(this.loginData.database, 'ucs2');
+    if (this.database) {
+      const buffer = new Buffer(this.database, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -475,10 +490,10 @@ module.exports = class Login7Payload {
         this.flags1, this.flags2, this.typeFlags, this.flags3, this.clientTimeZone, this.clientLcid
       ) + '\n' + indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
-        this.hostname, this.loginData.userName, this.loginData.password, this.loginData.appName, this.loginData.serverName, libraryName
+        this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
       ) + '\n' + indent + '         ' +
       sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
-        this.loginData.language, this.loginData.database, this.sspi, this.attachDbFile, this.changePassword
+        this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
 };
