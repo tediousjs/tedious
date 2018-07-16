@@ -139,7 +139,7 @@ module.exports = class Login7Payload {
   language: string | typeof undefined;
   database: string | typeof undefined;
   clientId: Buffer;
-  sspi: Buffer | typeof undefined;
+  sspi: Buffer;
   attachDbFile: string;
   changePassword: string;
   readOnlyIntent: boolean | typeof undefined;
@@ -181,7 +181,7 @@ module.exports = class Login7Payload {
         workstation: this.workstation
       });
     } else {
-      this.sspi = undefined;
+      this.sspi = new Buffer(0);
     }
   }
 
@@ -426,7 +426,7 @@ module.exports = class Login7Payload {
 
   buildOptionFlags2() {
     let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.sspi) {
+    if (this.sspi.length) {
       flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
