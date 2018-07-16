@@ -267,14 +267,14 @@ module.exports = class Login7Payload {
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
     variableData.offsetsAndLengths.writeUInt16LE(buffer.length / 2);
     variableData.data.writeBuffer(buffer);
-    return variableData.offset += buffer.length;
+    variableData.offset += buffer.length;
   }
 
   addVariableDataString(variableData: VariableData, value?: string = '') {
     variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
     variableData.offsetsAndLengths.writeUInt16LE(value.length);
     variableData.data.writeString(value);
-    return variableData.offset += value.length * 2;
+    variableData.offset += value.length * 2;
   }
 
   createNTLMRequest(options: { domain: string, workstation?: string }) {
