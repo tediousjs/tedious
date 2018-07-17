@@ -84,11 +84,6 @@ module.exports = class Login7Payload {
   clientTimeZone: number;
   clientLcid: number;
 
-  flags1: number;
-  flags2: number;
-  typeFlags: number;
-  flags3: number;
-
   userName: string | typeof undefined;
   password: string | typeof undefined;
   serverName: string | typeof undefined;
