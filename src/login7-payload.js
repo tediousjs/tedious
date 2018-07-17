@@ -296,7 +296,10 @@ module.exports = class Login7Payload {
     }
 
     // ClientID: 6-byte
-    offset += this.clientId.copy(fixedData, offset);
+    if (this.clientId) {
+      this.clientId.copy(fixedData, offset, 0, 6);
+    }
+    offset += 6;
 
     // ibSSPI: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
