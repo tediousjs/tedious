@@ -98,7 +98,7 @@ module.exports = class Login7Payload {
   language: string | typeof undefined;
   database: string | typeof undefined;
   clientId: Buffer;
-  sspi: Buffer;
+  sspi: Buffer | typeof undefined;
   attachDbFile: string;
   changePassword: string;
   readOnlyIntent: boolean | typeof undefined;
@@ -129,7 +129,7 @@ module.exports = class Login7Payload {
     this.readOnlyIntent = loginData.readOnlyIntent;
     this.initDbFatal = loginData.initDbFatal;
 
-    this.sspi = loginData.sspiBlob || new Buffer(0);
+    this.sspi = loginData.sspiBlob;
   }
 
   toBuffer() {
@@ -373,7 +373,7 @@ module.exports = class Login7Payload {
 
   buildOptionFlags2() {
     let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.sspi.length) {
+    if (this.sspi) {
       flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
     } else {
       flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
