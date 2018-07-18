@@ -1,9 +1,6 @@
 // @flow
 
-const os = require('os');
 const sprintf = require('sprintf-js').sprintf;
-const libraryName = require('./library').name;
-const versions = require('./tds-versions').versions;
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -55,21 +52,14 @@ const FLAGS_3 = {
   UNKNOWN_COLLATION_HANDLING: 0x08
 };
 
-type LoginData = {
-  tdsVersion: string,
+type Options = {
+  tdsVersion: number,
   packetSize: number,
-
-  initDbFatal?: boolean,
-  readOnlyIntent?: boolean,
-
-  appName?: string,
-  userName?: string,
-  password?: string,
-  serverName?: string,
-  language?: string,
-  database?: string,
-
-  sspiBlob?: Buffer
+  clientProgVer: number,
+  clientPid: number,
+  connectionId: number,
+  clientTimeZone: number,
+  clientLcid: number
 };
 
 /*
@@ -84,6 +74,9 @@ module.exports = class Login7Payload {
   clientTimeZone: number;
   clientLcid: number;
 
+  readOnlyIntent: boolean;
+  initDbFatal: boolean;
+
   userName: string | typeof undefined;
   password: string | typeof undefined;
   serverName: string | typeof undefined;
@@ -92,39 +85,35 @@ module.exports = class Login7Payload {
   libraryName: string | typeof undefined;
   language: string | typeof undefined;
   database: string | typeof undefined;
-  clientId: Buffer;
+  clientId: Buffer | typeof undefined;
   sspi: Buffer | typeof undefined;
-  attachDbFile: string;
-  changePassword: string;
-  readOnlyIntent: boolean | typeof undefined;
-  initDbFatal: boolean | typeof undefined;
+  attachDbFile: string | typeof undefined;
+  changePassword: string | typeof undefined;
 
-  constructor(loginData: LoginData) {
-    this.tdsVersion = versions[loginData.tdsVersion];
-    this.packetSize = loginData.packetSize;
-    this.clientProgVer = 0;
-    this.clientPid = process.pid;
-    this.connectionId = 0;
-    this.clientTimeZone = new Date().getTimezoneOffset();
-    this.clientLcid = 0x00000409;
+  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
+    this.tdsVersion = tdsVersion;
+    this.packetSize = packetSize;
+    this.clientProgVer = clientProgVer;
+    this.clientPid = clientPid;
+    this.connectionId = connectionId;
+    this.clientTimeZone = clientTimeZone;
+    this.clientLcid = clientLcid;
 
-    this.hostname = os.hostname();
-    this.userName = loginData.userName;
-    this.password = loginData.password;
-    this.serverName = loginData.serverName;
-    this.appName = loginData.appName || 'Tedious';
-    this.libraryName = libraryName;
-    this.language = loginData.language;
-    this.database = loginData.database;
-    this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    this.readOnlyIntent = false;
+    this.initDbFatal = false;
 
-    this.attachDbFile = '';
-    this.changePassword = '';
-
-    this.readOnlyIntent = loginData.readOnlyIntent;
-    this.initDbFatal = loginData.initDbFatal;
-
-    this.sspi = loginData.sspiBlob;
+    this.userName = undefined;
+    this.password = undefined;
+    this.serverName = undefined;
+    this.appName = undefined;
+    this.hostname = undefined;
+    this.libraryName = undefined;
+    this.language = undefined;
+    this.database = undefined;
+    this.clientId = undefined;
+    this.sspi = undefined;
+    this.attachDbFile = undefined;
+    this.changePassword = undefined;
   }
 
   toBuffer() {

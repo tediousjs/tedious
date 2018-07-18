@@ -1,23 +1,26 @@
 var Login7Payload = require('../../src/login7-payload');
 
 exports.create = function(test) {
-  var loginData = {
-    userName: 'user',
-    password: 'pw',
-    appName: 'app',
-    serverName: 'server',
-    language: 'lang',
-    database: 'db',
+  var payload = new Login7Payload({
+    tdsVersion: 0x72090002,
     packetSize: 1024,
-    tdsVersion: '7_2'
-  };
+    clientProgVer: 0,
+    clientPid: 12345,
+    connectionId: 0,
+    clientTimeZone: 120,
+    clientLcid: 0x00000409
+  });
 
-  //start = new Date().getTime()
-  //for c in [1..1000]
-  //  payload = new Login7Payload(loginData)
-  //end = new Date().getTime()
-  //console.log(end - start)
-  var payload = new Login7Payload(loginData);
+  payload.hostname = 'example.com';
+  payload.userName = 'user';
+  payload.password = 'pw';
+  payload.appName = 'app';
+  payload.serverName = 'server';
+  payload.language = 'lang';
+  payload.database = 'db';
+  payload.libraryName = 'Tedious';
+  payload.attachDbFile = 'c:\\mydbfile.mdf';
+  payload.changePassword = 'new_pw';
 
   var expectedLength =
     4 + // Length
@@ -27,16 +30,16 @@ exports.create = function(test) {
     2 * payload.hostname.length +
     2 +
     2 +
-    2 * loginData.userName.length +
+    2 * payload.userName.length +
     2 +
     2 +
-    2 * loginData.password.length +
+    2 * payload.password.length +
     2 +
     2 +
-    2 * loginData.appName.length +
+    2 * payload.appName.length +
     2 +
     2 +
-    2 * loginData.serverName.length +
+    2 * payload.serverName.length +
     2 +
     2 +
     2 * 0 + // Reserved
@@ -45,11 +48,11 @@ exports.create = function(test) {
     2 * payload.libraryName.length +
     2 +
     2 +
-    2 * loginData.language.length +
+    2 * payload.language.length +
     2 +
     2 +
-    2 * loginData.database.length +
-    payload.clientId.length +
+    2 * payload.database.length +
+    6 + // ClientID
     2 +
     2 +
     2 * 0 + // No SSPI given
@@ -65,45 +68,47 @@ exports.create = function(test) {
   test.strictEqual(data.length, expectedLength);
 
   var passwordStart = data.readUInt16LE(4 + 32 + 2 * 4);
-  var passwordEnd = passwordStart + 2 * loginData.password.length;
+  var passwordEnd = passwordStart + 2 * payload.password.length;
   var passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5]);
   test.ok(data.slice(passwordStart, passwordEnd).equals(passwordExpected));
-
-  //console.log(payload.toString(''))
 
   test.done();
 };
 
 exports.createSSPI = function(test) {
-  var loginData = {
-    userName: '',
-    password: '',
-    appName: 'app',
-    serverName: 'server',
-    domain: 'domain',
-    workstation: 'workstation',
-    language: 'lang',
-    database: 'db',
+  var payload = new Login7Payload({
+    tdsVersion: 0x72090002,
     packetSize: 1024,
-    tdsVersion: '7_2',
-    sspiBlob: new Buffer([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9])
-  };
+    clientProgVer: 0,
+    clientPid: 12345,
+    connectionId: 0,
+    clientTimeZone: 120,
+    clientLcid: 0x00000409
+  });
 
-  var payload = new Login7Payload(loginData);
+  payload.hostname = 'example.com';
+  payload.appName = 'app';
+  payload.serverName = 'server';
+  payload.language = 'lang';
+  payload.database = 'db';
+  payload.libraryName = 'Tedious';
+  payload.attachDbFile = 'c:\\mydbfile.mdf';
+  payload.changePassword = 'new_pw';
+  payload.sspi = new Buffer([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9]);
 
   var expectedLength =
     4 +                                             // Length
     32 +                                            // Variable
     2 + 2 + (2 * payload.hostname.length) +
-    2 + 2 + (2 * loginData.userName.length) +
-    2 + 2 + (2 * loginData.password.length) +
-    2 + 2 + (2 * loginData.appName.length) +
-    2 + 2 + (2 * loginData.serverName.length) +
+    2 + 2 + (2 * 0) +
+    2 + 2 + (2 * 0) +
+    2 + 2 + (2 * payload.appName.length) +
+    2 + 2 + (2 * payload.serverName.length) +
     2 + 2 + (2 * 0) +                               // Reserved
     2 + 2 + (2 * payload.libraryName.length) +
-    2 + 2 + (2 * loginData.language.length) +
-    2 + 2 + (2 * loginData.database.length) +
-    payload.clientId.length +
+    2 + 2 + (2 * payload.language.length) +
+    2 + 2 + (2 * payload.database.length) +
+    6 +
     2 + 2 + payload.sspi.length +             // NTLM
     2 + 2 + (2 * payload.attachDbFile.length) +
     2 + 2 + (2 * payload.changePassword.length) +
@@ -111,7 +116,6 @@ exports.createSSPI = function(test) {
 
   const data = payload.toBuffer();
   test.strictEqual(data.length, expectedLength);
-  test.strictEqual(payload.sspi, loginData.sspiBlob);
 
   test.done();
 };
