@@ -52,7 +52,7 @@ exports.create = function(test) {
     payload.clientId.length +
     2 +
     2 +
-    2 * payload.sspi.length +
+    2 * 0 + // No SSPI given
     2 +
     2 +
     2 * payload.attachDbFile.length +
