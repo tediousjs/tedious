@@ -40,10 +40,6 @@ Node.js is a prerequisite for installing tedious. Once you have installed [Node.
 ## Documentation
 More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
-<a name="discussion"></a>
-## Discussion
-Google Group - http://groups.google.com/group/node-tedious
-
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
@@ -61,7 +57,7 @@ We welcome contributions from the community. Feel free to checkout the code and 
 <a name="license"></a>
 ## Licence
 
-Copyright (c) 2010-2014 Mike D Pilsbury
+Copyright (c) 2010-2018 Mike D Pilsbury
 
 The MIT License
 
