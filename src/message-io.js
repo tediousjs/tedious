@@ -11,7 +11,7 @@ class ReadablePacketStream extends Transform {
   constructor() {
     super({ objectMode: true });
 
-    this.buffer = new Buffer(0);
+    this.buffer = Buffer.alloc(0);
     this.position = 0;
   }
 
@@ -147,7 +147,7 @@ module.exports = class MessageIO extends EventEmitter {
       numberOfPackets = (Math.floor((data.length - 1) / this.packetDataSize)) + 1;
     } else {
       numberOfPackets = 1;
-      data = new Buffer(0);
+      data = Buffer.alloc(0);
     }
 
     for (let packetNumber = 0; packetNumber < numberOfPackets; packetNumber++) {
