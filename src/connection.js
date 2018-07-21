@@ -952,7 +952,10 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+
+    if (this.state !== this.STATE.FINAL && this.state !== this.STATE.REROUTING && this.state !== this.STATE.TRANSIENT_FAILURE_RETRY) {
+      this.socketError(new Error('socket hang up'));
+    }
   }
 
   socketClose() {
