@@ -163,7 +163,7 @@ bulkLoad.addRow( col0, col1, ... colN )
 <h2 id="function_getRowStream">bulkLoad.getRowStream()</h2>
 <p>
   Switches the <code>BulkLoad</code> object into streaming mode and returns a
-  <a href="https://nodejs.org/dist/latest-v8.x/docs/api/stream.html#stream_writable_streams">writable stream</a>
+  <a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_streams">writable stream</a>
   that can be used to send a large amount of rows to the server.
 </p>
 {% highlight javascript %}
@@ -178,9 +178,9 @@ rowSource.pipe(rowStream);
 </p>
 <p>
   The stream implementation uses data flow control to prevent memory overload.
-  <code><a href="https://nodejs.org/dist/latest-v8.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback">stream.write()</a></code> 
+  <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback">stream.write()</a></code>
   returns <code>false</code> to indicate that data transfer should be paused.
-  After that, the stream emits a <code><a href="https://nodejs.org/dist/latest-v8.x/docs/api/stream.html#stream_event_drain">'drain' event</a></code> 
+  After that, the stream emits a <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain">'drain' event</a></code>
   when it is ready to resume data transfer.
 </p>
 
