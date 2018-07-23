@@ -1253,10 +1253,11 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.config.options, options, callback);
+    return new BulkLoad(table, this.config.options, options, this, callback);
   }
 
   execBulkLoad(bulkLoad) {
+    bulkLoad.executionStarted = true;
     const request = new Request(bulkLoad.getBulkInsertSql(), (error) => {
       if (error) {
         if (error.code === 'UNKNOWN') {
@@ -1264,6 +1265,13 @@ class Connection extends EventEmitter {
         }
         bulkLoad.error = error;
         bulkLoad.callback(error);
+        return;
+      }
+      if (bulkLoad.streamingMode) {
+        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, null, true);
+        if (this.request === bulkLoad && this.state === this.STATE.SENT_CLIENT_REQUEST) {
+          bulkLoad.startStreaming();
+        }
       } else {
         this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
       }
@@ -1431,7 +1439,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  makeRequest(request, packetType, payload) {
+  makeRequest(request, packetType, payload, streamingUploadMode) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -1448,12 +1456,14 @@ class Connection extends EventEmitter {
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
-      this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
-      this.resetConnectionOnNextRequest = false;
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
+      if (!streamingUploadMode) {
+        this.createRequestTimer();
+        this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload.toString('  ');
+        });
+      }
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
       if (request.paused) {                                // Request.pause() has been called before the request was started
         this.pauseRequest(request);
@@ -1465,6 +1475,9 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.SENT_CLIENT_REQUEST) {
       const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
+      return false;
+    } else if (this.request.isBulkLoad) {
+      this.debug.log('Canceling a bulk load has not yet been implemented.');
       return false;
     } else {
       this.request.canceled = true;
@@ -1726,9 +1739,11 @@ Connection.prototype.STATE = {
     name: 'SentClientRequest',
     exit: function(nextState) {
       this.clearRequestTimer();
-
       if (nextState !== this.STATE.FINAL) {
         this.tokenStreamParser.resume();
+      }
+      if (this.request && this.request.stopStreaming) {
+        this.request.stopStreaming();
       }
     },
     events: {

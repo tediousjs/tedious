@@ -1,15 +1,18 @@
 const fs = require('fs');
+const Readable = require('readable-stream').Readable;
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const TYPES = require('../../src/data-type').typeByName;
 
 const debugMode = false;
+var useEncryptedConnection = false;
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
   ).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  config.options.encrypt = useEncryptedConnection;
   if (debugMode) {
     config.options.debug = {
       packet: true,
@@ -247,4 +250,92 @@ exports['bulkLoad - verify null value'] = function(test) {
     test.deepEqual(columns[0].value, null);
   });
   connection.execSqlBatch(request);
+};
+
+exports.testStreamingBulkLoad = function(test) {
+  const totalRows = 500000;
+  const connection = this.connection;
+  const tableName = '#streamingBulkLoadTest';
+
+  connection.on('error', function(err) {
+    test.ifError(err);
+  });
+  startCreateTable();
+
+  function startCreateTable() {
+    const sql = 'create table ' + tableName + ' (i int not null primary key)';
+    const request = new Request(sql, completeCreateTable);
+    connection.execSqlBatch(request);
+  }
+
+  function completeCreateTable(err) {
+    test.ifError(err);
+    startBulkLoad();
+  }
+
+  function startBulkLoad() {
+    const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
+    bulkLoad.addColumn('i', TYPES.Int, {nullable: false});
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+    const rowSource = new RowSource(totalRows);
+    rowSource.pipe(rowStream);
+  }
+
+  function completeBulkLoad(err, rowCount) {
+    test.ifError(err);
+    test.equal(rowCount, totalRows);
+    startVerifyTableContent();
+  }
+
+  function startVerifyTableContent() {
+    const sql =
+      'select count(*) ' +
+        'from ' + tableName + ' a ' +
+          'inner join ' + tableName + ' b on a.i = b.i - 1';
+    const request = new Request(sql, completeVerifyTableContent);
+    request.on('data', (row) => {
+      test.equals(row[0].value, totalRows - 1);
+    });
+    connection.execSqlBatch(request);
+  }
+
+  function completeVerifyTableContent(err, rowCount) {
+    test.ifError(err);
+    test.equal(rowCount, 1);
+    test.done();
+  }
+
+  class RowSource extends Readable {
+    constructor(totalRows) {
+      super({
+        objectMode: true
+      });
+      this.totalRows = totalRows;
+      this.rowCount = 0;
+    }
+    _read() {
+      while (this.rowCount < this.totalRows) {
+        const i = this.rowCount++;
+        const row = [i];
+        if (!this.push(row)) {
+          return;
+        }
+      }
+      this.push(null);
+    }
+  }
+};
+
+exports.dummyToSwitchToEncryptedConnection = function(test) {
+  // (Please let me know if you find a better solution for this.)
+  useEncryptedConnection = true;
+  test.done();
+};
+
+// Executes testStreamingBulkLoad() a second time with an encrypted connection.
+// This is important to test data flow control through TLS.
+exports.testStreamingBulkLoadEncrypted = function(test) {
+  test.ok(useEncryptedConnection);
+  exports.testStreamingBulkLoad.call(this, test);
 };

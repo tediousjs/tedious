@@ -71,6 +71,9 @@ module.exports = class MessageIO extends EventEmitter {
     });
 
     this.socket.pipe(this.packetStream);
+    this.socket.on('drain', () => {
+      this.emit('drain');
+    });
     this.packetDataSize = this._packetSize - packetHeaderLength;
   }
 
@@ -121,10 +124,14 @@ module.exports = class MessageIO extends EventEmitter {
 
   encryptAllFutureTraffic() {
     this.socket.unpipe(this.packetStream);
+    this.socket.removeAllListeners('drain');
     this.securePair.encrypted.removeAllListeners('data');
     this.socket.pipe(this.securePair.encrypted);
     this.securePair.encrypted.pipe(this.socket);
     this.securePair.cleartext.pipe(this.packetStream);
+    this.securePair.cleartext.on('drain', () => {
+      this.emit('drain');
+    });
     this.tlsNegotiationComplete = true;
   }
 
@@ -164,12 +171,13 @@ module.exports = class MessageIO extends EventEmitter {
     }
   }
 
+  // Returns false to apply backpressure.
   sendPacket(packet) {
     this.logPacket('Sent', packet);
     if (this.securePair && this.tlsNegotiationComplete) {
-      this.securePair.cleartext.write(packet.buffer);
+      return this.securePair.cleartext.write(packet.buffer);
     } else {
-      this.socket.write(packet.buffer);
+      return this.socket.write(packet.buffer);
     }
   }
 
