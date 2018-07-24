@@ -1,5 +1,6 @@
 const tls = require('tls');
 const crypto = require('crypto');
+const DuplexPair = require('native-duplexpair');
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 
@@ -58,6 +59,8 @@ module.exports = class MessageIO extends EventEmitter {
     this._packetSize = _packetSize;
     this.debug = debug;
 
+    this.tlsNegotiationComplete = false;
+
     this.packetStream = new ReadablePacketStream();
     this.packetStream.on('data', (packet) => {
       this.logPacket('Received', packet);
@@ -83,47 +86,37 @@ module.exports = class MessageIO extends EventEmitter {
   startTls(credentialsDetails, hostname, trustServerCertificate) {
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
-    this.securePair = tls.createSecurePair(credentials);
-    this.tlsNegotiationComplete = false;
-
-    this.securePair.on('secure', () => {
-      const cipher = this.securePair.cleartext.getCipher();
-
-      if (!trustServerCertificate) {
-        let verifyError = this.securePair.ssl.verifyError();
-
-        // Verify that server's identity matches it's certificate's names
-        if (!verifyError) {
-          verifyError = tls.checkServerIdentity(hostname, this.securePair.cleartext.getPeerCertificate());
-        }
-
-        if (verifyError) {
-          this.securePair.destroy();
-          this.socket.destroy(verifyError);
-          return;
-        }
-      }
-
-      this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
-      this.emit('secure', this.securePair.cleartext);
-      this.encryptAllFutureTraffic();
-    });
-
-    this.securePair.encrypted.on('data', (data) => {
-      this.sendMessage(TYPE.PRELOGIN, data);
-    });
+    const duplexpair = new DuplexPair();
+    const securePair = this.securePair = {
+      cleartext: tls.connect({
+        socket: duplexpair.socket1,
+        servername: hostname,
+        secureContext: credentials,
+        rejectUnauthorized: !trustServerCertificate
+      }),
+      encrypted: duplexpair.socket2
+    };
 
     // If an error happens in the TLS layer, there is nothing we can do about it.
     // Forward the error to the socket so the connection gets properly cleaned up.
-    this.securePair.cleartext.on('error', (err) => {
+    securePair.cleartext.on('error', (err) => {
+      // Streams in node.js versions before 8.0.0 don't support `.destroy`
+      if (typeof securePair.encrypted.destroy === 'function') {
+        securePair.encrypted.destroy();
+      }
       this.socket.destroy(err);
     });
 
-    // On Node >= 0.12, the encrypted stream automatically starts spewing out
-    // data once we attach a `data` listener. But on Node <= 0.10.x, this is not
-    // the case. We need to kick the cleartext stream once to get the
-    // encrypted end of the secure pair to emit the TLS handshake data.
-    this.securePair.cleartext.write('');
+    securePair.cleartext.on('secureConnect', () => {
+      const cipher = securePair.cleartext.getCipher();
+      this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+      this.emit('secure', securePair.cleartext);
+      this.encryptAllFutureTraffic();
+    });
+
+    securePair.encrypted.on('data', (data) => {
+      this.sendMessage(TYPE.PRELOGIN, data);
+    });
   }
 
   encryptAllFutureTraffic() {

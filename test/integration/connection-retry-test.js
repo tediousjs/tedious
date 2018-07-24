@@ -74,7 +74,7 @@ exports['connection retry tests'] = {
     const config = getConfig();
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
-    const clock = this.sinon.useFakeTimers();
+    const clock = this.sinon.useFakeTimers('setTimeout');
 
     test.expect(1);
 
