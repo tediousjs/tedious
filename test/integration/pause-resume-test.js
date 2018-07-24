@@ -4,7 +4,7 @@ const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 
 function getConfig() {
-  const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+  const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
   // 250 ms timeout until the first response package is received
   config.options.requestTimeout = 250;

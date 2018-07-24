@@ -5,7 +5,7 @@ var async = require('async');
 
 var getConfig = function() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 };
 

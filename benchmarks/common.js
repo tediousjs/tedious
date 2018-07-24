@@ -6,7 +6,7 @@ var Benchmark = require("benchmark");
 var Connection = require("../lib/tedious").Connection;
 
 function createConnection(cb) {
-  var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+  var config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
 
   var connection = new Connection(config);
   connection.on("connect", function() {
