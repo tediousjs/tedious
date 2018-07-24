@@ -161,4 +161,3 @@ exports.createFedAuth = function(test) {
   test.strictEqual(payload.data.length, expectedLength);
   test.done();
 };
-
