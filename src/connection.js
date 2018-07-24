@@ -1124,7 +1124,7 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    if (this.fedAuthInfo) {
+    if (this.fedAuthInfo && this.fedAuthInfo.method !== undefined) {
       if (this.fedAuthInfo.requiredPreLoginResponse) {
         if (this.fedAuthInfo.method.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword) {
           this.fedAuthInfo.fedAuthInfoRequested = true;
