@@ -5,7 +5,12 @@ const TransientErrorLookup = require('../../src/transient-error-lookup').Transie
 
 const getConfig = function() {
   const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
-  config.password = 'InvalidPassword';
+  if (config.authentication) {
+    config.authentication.options.password = 'InvalidPassword';
+  } else {
+    config.password = 'InvalidPassword';
+  }
+
   config.options.maxRetriesOnTransientErrors = 5;
   config.options.connectionRetryInterval = 25;
 

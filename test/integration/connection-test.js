@@ -72,7 +72,11 @@ exports.badCredentials = function(test) {
   test.expect(2);
 
   var config = getConfig();
-  config.password = 'bad-password';
+  if (config.authentication) {
+    config.authentication.options.password = 'bad-password';
+  } else {
+    config.password = 'bad-password';
+  }
 
   var connection = new Connection(config);
 
