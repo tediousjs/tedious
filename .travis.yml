@@ -87,26 +87,6 @@ jobs:
         echo '{
           "config": {
             "server": "'${AZURE_SERVER}'",
-            "userName": "'${AZURE_USERNAME}'",
-            "password": "'${AZURE_PASS}'",
-            "options": {
-              "database": "test",
-              "encrypt": true,
-              "authentication": "SqlPassword"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
-      before_script: skip
-      script: npm run test-integration
-
-    - stage: azure
-      node_js: 8
-      before_install:
-      - mkdir ~/.tedious
-      - >
-        echo '{
-          "config": {
-            "server": "'${AZURE_SERVER}'",
             "userName": "'${AZURE_AD_USER}'",
             "password": "'${AZURE_AD_PASS}'",
             "options": {
