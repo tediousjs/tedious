@@ -14,23 +14,6 @@ var options = {
   tdsVersion: '7_2'
 };
 
-module.exports.dbnull = function(test) {
-  var colMetaData = [{ type: dataTypeByName.Null }];
-
-  var buffer = new WritableTrackingBuffer(0, 'ucs2');
-  buffer.writeUInt8(0xd1);
-
-  var parser = new Parser({ token() {} }, colMetaData, options);
-  parser.write(buffer.data);
-  var token = parser.read();
-
-  test.strictEqual(token.columns.length, 1);
-  test.strictEqual(token.columns[0].value, null);
-  test.strictEqual(token.columns[0].metadata, colMetaData[0]);
-
-  test.done();
-};
-
 module.exports.int = function(test) {
   var colMetaData = [{ type: dataTypeByName.Int }];
   var value = 3;
