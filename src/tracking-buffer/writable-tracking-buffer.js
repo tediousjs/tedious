@@ -40,38 +40,6 @@ module.exports = class WritableTrackingBuffer {
     return this.compositeBuffer;
   }
 
-  // This method together with getPosition()/setPosition() provides access to the
-  // internal buffer and allows using WritableTrackingBuffer for streaming.
-  // If both internal buffers are in use, they are combined into one and the
-  // compositeBuffer is released.
-  normalizeBuffer() {
-    if (this.compositeBuffer && this.compositeBuffer.length > 0) {
-      const newBufferSize = Math.max(this.initialSize, this.compositeBuffer.length + this.buffer.length);
-      const newBuffer = new Buffer(newBufferSize);
-      this.compositeBuffer.copy(newBuffer);
-      this.buffer.copy(newBuffer, this.compositeBuffer.length, 0, this.position);
-      this.buffer = newBuffer;
-      this.position = this.compositeBuffer.length + this.position;
-      this.compositeBuffer = ZERO_LENGTH_BUFFER;
-    }
-    return this.buffer;
-  }
-
-  // Returns the current buffer position.
-  getPosition() {
-    this.normalizeBuffer();
-    return this.position;
-  }
-
-  // Sets the current buffer position.
-  setPosition(newPosition: number) {
-    this.normalizeBuffer();
-    if (newPosition < 0 || newPosition > this.buffer.length) {
-      throw new Error('Invalid new position.');
-    }
-    this.position = newPosition;
-  }
-
   copyFrom(buffer) {
     const length = buffer.length;
     this.makeRoomFor(length);
