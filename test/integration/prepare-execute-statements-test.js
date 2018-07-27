@@ -7,7 +7,7 @@ var TYPES = require('../../src/data-type').typeByName;
 
 var getConfig = function() {
   var config = JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
   config.options.debug = {

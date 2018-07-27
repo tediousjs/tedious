@@ -2,8 +2,7 @@ const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
-const Packet = require('./packet').Packet;
-const packetHeaderLength = require('./packet').HEADER_LENGTH;
+const Message = require('./message');
 const PACKET_TYPE = require('./packet').TYPE;
 
 const FLAGS = {
@@ -50,7 +49,6 @@ module.exports = class BulkLoad extends EventEmitter {
     this.connection = connection;
     const userCallback = callback;
     this.callback = (err, rowCount) => {
-      this.stopStreaming();
       userCallback(err, rowCount);
     };
     this.columns = [];
@@ -295,7 +293,7 @@ module.exports = class BulkLoad extends EventEmitter {
       throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
     }
     if (!this.rowToPacketTransform) {
-      this.rowToPacketTransform = new RowToPacketTransform(this);
+      this.rowToPacketTransform = new RowTransform(this);
     }
     this.streamingMode = true;
     return this.rowToPacketTransform;
@@ -304,96 +302,46 @@ module.exports = class BulkLoad extends EventEmitter {
   // This internal method is called to start streaming once the bulk insert
   // command has completed.
   startStreaming() {
-    const messageIo = this.connection.messageIo;
-    this.rowToPacketTransform.on('data', (packet) => {
-      const ret = messageIo.sendPacket(packet);
-      if (ret === false) {
-        this.rowToPacketTransform.pause();
-        messageIo.once('drain', () => {
-          this.rowToPacketTransform.resume();
-        });
-      }
-    });
-  }
-
-  // This internal method is called to stop streaming when the TDS driver
-  // leaves the SENT_CLIENT_REQUEST state.
-  stopStreaming() {
-    if (!this.streamingMode) {
-      return; }
-    this.rowToPacketTransform.removeAllListeners('data');
+    const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
+    this.connection.messageIo.outgoingMessageStream.write(message);
+    this.rowToPacketTransform.pipe(message);
   }
 };
 
 // A transform that converts rows to packets.
-class RowToPacketTransform extends Transform {
-
+class RowTransform extends Transform {
   constructor(bulkLoad) {
-    const streamOptions = {objectMode: true };
-    super(streamOptions);
+    super({ writableObjectMode: true });
+
     this.bulkLoad = bulkLoad;
     this.mainOptions = bulkLoad.options;
     this.columns = bulkLoad.columns;
-    this.packetDataSize = bulkLoad.connection.messageIo.packetSize() - packetHeaderLength;
-    this.packetCount = 0;
-    this.buf = new WritableTrackingBuffer(2 * this.packetDataSize, 'ucs2', true);
-    this.buf.copyFrom(bulkLoad.getColMetaData());
+
+    this.push(bulkLoad.getColMetaData());
   }
 
   _transform(row, encoding, callback) {
-    this.appendRowToBuffer(row);
-    this.pushPackets(false);
-    callback();
-  }
+    const buf = new WritableTrackingBuffer(1024, 'ucs2', true);
+    buf.writeUInt8(TOKEN_TYPE.ROW);
 
-  _flush(callback) {
-    this.buf.copyFrom(this.bulkLoad.createDoneToken());
-    this.pushPackets(true);
-    callback();
-  }
-
-  appendRowToBuffer(row) {
-    this.buf.writeUInt8(TOKEN_TYPE.ROW);
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
-      c.type.writeParameterData(this.buf, {
+      c.type.writeParameterData(buf, {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
         value: row[i]
       }, this.mainOptions);
     }
+
+    this.push(buf.data);
+
+    callback();
   }
 
-  pushPackets(flush) {
-    const dataLen = this.buf.getPosition();
-    if (!flush && dataLen < this.packetDataSize || dataLen === 0) {
-      return; }
-    const n = flush ? Math.floor((dataLen + this.packetDataSize - 1) / this.packetDataSize) : Math.floor(dataLen / this.packetDataSize);
-       // n is the number of packets to send
-    const dataBuf = this.buf.normalizeBuffer();
-    for (let i = 0; i < n; i++) {
-      const packetData = dataBuf.slice(i * this.packetDataSize, Math.min((i + 1) * this.packetDataSize, dataLen));
-      const lastPacket = flush && i === n - 1;
-      this.pushPacket(packetData, lastPacket);
-    }
-    const endPos = n * this.packetDataSize;
-    if (endPos >= dataLen) {
-      // No remaining data in buffer.
-      this.buf.setPosition(0);
-    } else {
-      // Move remaining data to start of buffer.
-      dataBuf.copy(dataBuf, 0, endPos, dataLen);
-      this.buf.setPosition(dataLen - endPos);
-    }
-  }
+  _flush(callback) {
+    this.push(this.bulkLoad.createDoneToken());
 
-  pushPacket(packetData, lastPacket) {
-    const packet = new Packet(PACKET_TYPE.BULK_LOAD);
-    packet.last(lastPacket);
-    packet.packetId(this.packetCount + 1);
-    packet.addData(packetData);
-    this.push(packet);
-    this.packetCount++;
+    callback();
   }
 }

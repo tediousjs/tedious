@@ -1,8 +1,6 @@
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
-const os = require('os');
+// @flow
+
 const sprintf = require('sprintf-js').sprintf;
-const libraryName = require('./library').name;
-const versions = require('./tds-versions').versions;
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -54,211 +52,337 @@ const FLAGS_3 = {
   UNKNOWN_COLLATION_HANDLING: 0x08
 };
 
-const NTLMFlags = {
-  NTLM_NegotiateUnicode: 0x00000001,
-  NTLM_NegotiateOEM: 0x00000002,
-  NTLM_RequestTarget: 0x00000004,
-  NTLM_Unknown9: 0x00000008,
-  NTLM_NegotiateSign: 0x00000010,
-  NTLM_NegotiateSeal: 0x00000020,
-  NTLM_NegotiateDatagram: 0x00000040,
-  NTLM_NegotiateLanManagerKey: 0x00000080,
-  NTLM_Unknown8: 0x00000100,
-  NTLM_NegotiateNTLM: 0x00000200,
-  NTLM_NegotiateNTOnly: 0x00000400,
-  NTLM_Anonymous: 0x00000800,
-  NTLM_NegotiateOemDomainSupplied: 0x00001000,
-  NTLM_NegotiateOemWorkstationSupplied: 0x00002000,
-  NTLM_Unknown6: 0x00004000,
-  NTLM_NegotiateAlwaysSign: 0x00008000,
-  NTLM_TargetTypeDomain: 0x00010000,
-  NTLM_TargetTypeServer: 0x00020000,
-  NTLM_TargetTypeShare: 0x00040000,
-  NTLM_NegotiateExtendedSecurity: 0x00080000,
-  NTLM_NegotiateIdentify: 0x00100000,
-  NTLM_Unknown5: 0x00200000,
-  NTLM_RequestNonNTSessionKey: 0x00400000,
-  NTLM_NegotiateTargetInfo: 0x00800000,
-  NTLM_Unknown4: 0x01000000,
-  NTLM_NegotiateVersion: 0x02000000,
-  NTLM_Unknown3: 0x04000000,
-  NTLM_Unknown2: 0x08000000,
-  NTLM_Unknown1: 0x10000000,
-  NTLM_Negotiate128: 0x20000000,
-  NTLM_NegotiateKeyExchange: 0x40000000,
-  NTLM_Negotiate56: 0x80000000
+type Options = {
+  tdsVersion: number,
+  packetSize: number,
+  clientProgVer: number,
+  clientPid: number,
+  connectionId: number,
+  clientTimeZone: number,
+  clientLcid: number
 };
-
 
 /*
   s2.2.6.3
  */
 module.exports = class Login7Payload {
-  constructor(loginData) {
-    this.loginData = loginData;
+  tdsVersion: number;
+  packetSize: number;
+  clientProgVer: number;
+  clientPid: number;
+  connectionId: number;
+  clientTimeZone: number;
+  clientLcid: number;
 
-    const lengthLength = 4;
-    const fixed = this.createFixedData();
-    const variable = this.createVariableData(lengthLength + fixed.length);
-    const length = lengthLength + fixed.length + variable.length;
-    const data = new WritableTrackingBuffer(300);
-    data.writeUInt32LE(length);
-    data.writeBuffer(fixed);
-    data.writeBuffer(variable);
-    this.data = data.data;
+  readOnlyIntent: boolean;
+  initDbFatal: boolean;
+
+  userName: string | typeof undefined;
+  password: string | typeof undefined;
+  serverName: string | typeof undefined;
+  appName: string | typeof undefined;
+  hostname: string | typeof undefined;
+  libraryName: string | typeof undefined;
+  language: string | typeof undefined;
+  database: string | typeof undefined;
+  clientId: Buffer | typeof undefined;
+  sspi: Buffer | typeof undefined;
+  attachDbFile: string | typeof undefined;
+  changePassword: string | typeof undefined;
+
+  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
+    this.tdsVersion = tdsVersion;
+    this.packetSize = packetSize;
+    this.clientProgVer = clientProgVer;
+    this.clientPid = clientPid;
+    this.connectionId = connectionId;
+    this.clientTimeZone = clientTimeZone;
+    this.clientLcid = clientLcid;
+
+    this.readOnlyIntent = false;
+    this.initDbFatal = false;
+
+    this.userName = undefined;
+    this.password = undefined;
+    this.serverName = undefined;
+    this.appName = undefined;
+    this.hostname = undefined;
+    this.libraryName = undefined;
+    this.language = undefined;
+    this.database = undefined;
+    this.clientId = undefined;
+    this.sspi = undefined;
+    this.attachDbFile = undefined;
+    this.changePassword = undefined;
   }
 
-  createFixedData() {
-    this.tdsVersion = versions[this.loginData.tdsVersion];
-    this.packetSize = this.loginData.packetSize;
-    this.clientProgVer = 0;
-    this.clientPid = process.pid;
-    this.connectionId = 0;
-    this.clientTimeZone = new Date().getTimezoneOffset();
-    this.clientLcid = 0x00000409;
-    this.flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCD_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
-    if (this.loginData.initDbFatal) {
-      this.flags1 |= FLAGS_1.INIT_DB_FATAL;
+  toBuffer() {
+    const fixedData = new Buffer(94);
+    const buffers = [fixedData];
+
+    let offset = 0, dataOffset = fixedData.length;
+
+    // Length: 4-byte
+    offset = fixedData.writeUInt32LE(0, offset);
+
+    // TDSVersion: 4-byte
+    offset = fixedData.writeUInt32LE(this.tdsVersion, offset);
+
+    // PacketSize: 4-byte
+    offset = fixedData.writeUInt32LE(this.packetSize, offset);
+
+    // ClientProgVer: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientProgVer, offset);
+
+    // ClientPID: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientPid, offset);
+
+    // ConnectionID: 4-byte
+    offset = fixedData.writeUInt32LE(this.connectionId, offset);
+
+    // OptionFlags1: 1-byte
+    offset = fixedData.writeUInt8(this.buildOptionFlags1(), offset);
+
+    // OptionFlags2: 1-byte
+    offset = fixedData.writeUInt8(this.buildOptionFlags2(), offset);
+
+    // TypeFlags: 1-byte
+    offset = fixedData.writeUInt8(this.buildTypeFlags(), offset);
+
+    // OptionFlags3: 1-byte
+    offset = fixedData.writeUInt8(this.buildOptionFlags3(), offset);
+
+    // ClientTimZone: 4-byte
+    offset = fixedData.writeInt32LE(this.clientTimeZone, offset);
+
+    // ClientLCID: 4-byte
+    offset = fixedData.writeUInt32LE(this.clientLcid, offset);
+
+    // ibHostName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchHostName: 2-byte
+    if (this.hostname) {
+      const buffer = new Buffer(this.hostname, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
     } else {
-      this.flags1 |= FLAGS_1.INIT_DB_WARN;
-    }
-    this.flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
-    if (this.loginData.domain) {
-      this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
-    } else {
-      this.flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
-    }
-    this.flags3 = FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
-    this.typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
-    if (this.loginData.readOnlyIntent) {
-      this.typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
-    } else {
-      this.typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
+      offset = fixedData.writeUInt16LE(dataOffset, offset);
     }
 
-    const buffer = new WritableTrackingBuffer(100);
-    buffer.writeUInt32LE(this.tdsVersion);
-    buffer.writeUInt32LE(this.packetSize);
-    buffer.writeUInt32LE(this.clientProgVer);
-    buffer.writeUInt32LE(this.clientPid);
-    buffer.writeUInt32LE(this.connectionId);
-    buffer.writeUInt8(this.flags1);
-    buffer.writeUInt8(this.flags2);
-    buffer.writeUInt8(this.typeFlags);
-    buffer.writeUInt8(this.flags3);
-    buffer.writeInt32LE(this.clientTimeZone);
-    buffer.writeUInt32LE(this.clientLcid);
-    return buffer.data;
-  }
+    // ibUserName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
 
-  createVariableData(offset) {
-    this.variableLengthsLength = (9 * 4) + 6 + (3 * 4) + 4;
-    if (this.loginData.tdsVersion === '7_1') {
-      this.variableLengthsLength = (9 * 4) + 6 + (2 * 4);
+    // cchUserName: 2-byte
+    if (this.userName) {
+      const buffer = new Buffer(this.userName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
     }
-    const variableData = {
-      offsetsAndLengths: new WritableTrackingBuffer(200),
-      data: new WritableTrackingBuffer(200, 'ucs2'),
-      offset: offset + this.variableLengthsLength
-    };
-    this.hostname = os.hostname();
-    this.loginData = this.loginData || {};
-    this.loginData.appName = this.loginData.appName || 'Tedious';
-    this.libraryName = libraryName;
-    this.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
-    if (!this.loginData.domain) {
-      this.sspi = '';
-      this.sspiLong = 0;
+
+    // ibPassword: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchPassword: 2-byte
+    if (this.password) {
+      const buffer = new Buffer(this.password, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(this.scramblePassword(buffer));
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
     }
-    this.attachDbFile = '';
-    this.changePassword = '';
-    this.addVariableDataString(variableData, this.hostname);
-    this.addVariableDataString(variableData, this.loginData.domain ? '' : this.loginData.userName);
-    this.addVariableDataBuffer(variableData, this.loginData.domain ? Buffer.alloc(0) : this.createPasswordBuffer());
-    this.addVariableDataString(variableData, this.loginData.appName);
-    this.addVariableDataString(variableData, this.loginData.serverName);
-    this.addVariableDataString(variableData, '');
-    this.addVariableDataString(variableData, this.libraryName);
-    this.addVariableDataString(variableData, this.loginData.language);
-    this.addVariableDataString(variableData, this.loginData.database);
-    variableData.offsetsAndLengths.writeBuffer(this.clientId);
-    if (this.loginData.domain) {
-      if (this.loginData.sspiBlob) {
-        this.ntlmPacket = this.loginData.sspiBlob;
+
+    // ibAppName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchAppName: 2-byte
+    if (this.appName) {
+      const buffer = new Buffer(this.appName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibServerName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchServerName: 2-byte
+    if (this.serverName) {
+      const buffer = new Buffer(this.serverName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // (ibUnused / ibExtension): 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // (cchUnused / cbExtension): 2-byte
+    offset = fixedData.writeUInt16LE(0, offset);
+
+    // ibCltIntName: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchCltIntName: 2-byte
+    if (this.libraryName) {
+      const buffer = new Buffer(this.libraryName, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibLanguage: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchLanguage: 2-byte
+    if (this.language) {
+      const buffer = new Buffer(this.language, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ibDatabase: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchDatabase: 2-byte
+    if (this.database) {
+      const buffer = new Buffer(this.database, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
+
+    // ClientID: 6-byte
+    if (this.clientId) {
+      this.clientId.copy(fixedData, offset, 0, 6);
+    }
+    offset += 6;
+
+    // ibSSPI: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cbSSPI: 2-byte
+    if (this.sspi) {
+      if (this.sspi.length > 65535) {
+        offset = fixedData.writeUInt16LE(65535, offset);
       } else {
-        this.ntlmPacket = this.createNTLMRequest(this.loginData);
+        offset = fixedData.writeUInt16LE(this.sspi.length, offset);
       }
 
-      this.sspiLong = this.ntlmPacket.length;
-      variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-      variableData.offsetsAndLengths.writeUInt16LE(this.ntlmPacket.length);
-      variableData.data.writeBuffer(this.ntlmPacket);
-      variableData.offset += this.ntlmPacket.length;
+      buffers.push(this.sspi);
     } else {
-      this.addVariableDataString(variableData, this.sspi);
+      offset = fixedData.writeUInt16LE(0, offset);
     }
 
-    this.addVariableDataString(variableData, this.attachDbFile);
-    if (this.loginData.tdsVersion > '7_1') {
-      this.addVariableDataString(variableData, this.changePassword);
-      variableData.offsetsAndLengths.writeUInt32LE(this.sspiLong);
+    // ibAtchDBFile: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
+
+    // cchAtchDBFile: 2-byte
+    if (this.attachDbFile) {
+      const buffer = new Buffer(this.attachDbFile, 'ucs2');
+
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
+
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
     }
 
-    return Buffer.concat([variableData.offsetsAndLengths.data, variableData.data.data]);
-  }
+    // ibChangePassword: 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
 
-  addVariableDataBuffer(variableData, buffer) {
-    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    variableData.offsetsAndLengths.writeUInt16LE(buffer.length / 2);
-    variableData.data.writeBuffer(buffer);
-    return variableData.offset += buffer.length;
-  }
+    // cchChangePassword: 2-byte
+    if (this.changePassword) {
+      const buffer = new Buffer(this.changePassword, 'ucs2');
 
-  addVariableDataString(variableData, value) {
-    value || (value = '');
-    variableData.offsetsAndLengths.writeUInt16LE(variableData.offset);
-    variableData.offsetsAndLengths.writeUInt16LE(value.length);
-    variableData.data.writeString(value);
-    return variableData.offset += value.length * 2;
-  }
+      offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
+      dataOffset += buffer.length;
 
-  createNTLMRequest(options) {
-    const domain = escape(options.domain.toUpperCase());
-    const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
-    const protocol = 'NTLMSSP\u0000';
-    const BODY_LENGTH = 40;
-    const bufferLength = BODY_LENGTH + domain.length;
-    const buffer = new WritableTrackingBuffer(bufferLength);
-
-    let type1flags = this.getNTLMFlags();
-    if (workstation === '') {
-      type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
+      buffers.push(buffer);
+    } else {
+      offset = fixedData.writeUInt16LE(0, offset);
     }
 
-    buffer.writeString(protocol, 'utf8');
-    buffer.writeUInt32LE(1);
-    buffer.writeUInt32LE(type1flags);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt16LE(domain.length);
-    buffer.writeUInt32LE(BODY_LENGTH + workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt16LE(workstation.length);
-    buffer.writeUInt32LE(BODY_LENGTH);
-    buffer.writeUInt8(5);
-    buffer.writeUInt8(0);
-    buffer.writeUInt16LE(2195);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(0);
-    buffer.writeUInt8(15);
-    buffer.writeString(workstation, 'ascii');
-    buffer.writeString(domain, 'ascii');
-    return buffer.data;
+    // cbSSPILong: 4-byte
+    if (this.sspi && this.sspi.length > 65535) {
+      fixedData.writeUInt32LE(this.sspi.length, offset);
+    } else {
+      fixedData.writeUInt32LE(0, offset);
+    }
+
+    const data = Buffer.concat(buffers);
+    data.writeUInt32LE(data.length, 0);
+    return data;
   }
 
-  createPasswordBuffer() {
-    let password = this.loginData.password || '';
-    password = new Buffer(password, 'ucs2');
+  buildOptionFlags1() {
+    let flags1 = FLAGS_1.ENDIAN_LITTLE | FLAGS_1.CHARSET_ASCII | FLAGS_1.FLOAT_IEEE_754 | FLAGS_1.BCP_DUMPLOAD_OFF | FLAGS_1.USE_DB_OFF | FLAGS_1.SET_LANG_WARN_ON;
+    if (this.initDbFatal) {
+      flags1 |= FLAGS_1.INIT_DB_FATAL;
+    } else {
+      flags1 |= FLAGS_1.INIT_DB_WARN;
+    }
+    return flags1;
+  }
+
+  buildOptionFlags2() {
+    let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
+    if (this.sspi) {
+      flags2 |= FLAGS_2.INTEGRATED_SECURITY_ON;
+    } else {
+      flags2 |= FLAGS_2.INTEGRATED_SECURITY_OFF;
+    }
+    return flags2;
+  }
+
+  buildTypeFlags() {
+    let typeFlags = TYPE_FLAGS.SQL_DFLT | TYPE_FLAGS.OLEDB_OFF;
+    if (this.readOnlyIntent) {
+      typeFlags |= TYPE_FLAGS.READ_ONLY_INTENT;
+    } else {
+      typeFlags |= TYPE_FLAGS.READ_WRITE_INTENT;
+    }
+    return typeFlags;
+  }
+
+  buildOptionFlags3() {
+    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+  }
+
+  scramblePassword(password: Buffer) {
     for (let b = 0, len = password.length; b < len; b++) {
       let byte = password[b];
       const lowNibble = byte & 0x0f;
@@ -270,24 +394,19 @@ module.exports = class Login7Payload {
     return password;
   }
 
-  getNTLMFlags() {
-    return NTLMFlags.NTLM_NegotiateUnicode + NTLMFlags.NTLM_NegotiateOEM + NTLMFlags.NTLM_RequestTarget + NTLMFlags.NTLM_NegotiateNTLM + NTLMFlags.NTLM_NegotiateOemDomainSupplied + NTLMFlags.NTLM_NegotiateOemWorkstationSupplied + NTLMFlags.NTLM_NegotiateAlwaysSign + NTLMFlags.NTLM_NegotiateVersion + NTLMFlags.NTLM_NegotiateExtendedSecurity + NTLMFlags.NTLM_Negotiate128 + NTLMFlags.NTLM_Negotiate56;
-  }
-
-  toString(indent) {
-    indent || (indent = '');
+  toString(indent?: string = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
         this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
       ) + '\n' + indent + '         ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
-        this.flags1, this.flags2, this.typeFlags, this.flags3, this.clientTimeZone, this.clientLcid
+        this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
       ) + '\n' + indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
-        this.hostname, this.loginData.userName, this.loginData.password, this.loginData.appName, this.loginData.serverName, libraryName
+        this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
       ) + '\n' + indent + '         ' +
       sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
-        this.loginData.language, this.loginData.database, this.sspi, this.attachDbFile, this.changePassword
+        this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
 };
