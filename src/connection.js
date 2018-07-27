@@ -1758,9 +1758,6 @@ Connection.prototype.STATE = {
       if (nextState !== this.STATE.FINAL) {
         this.tokenStreamParser.resume();
       }
-      if (this.request && this.request.stopStreaming) {
-        this.request.stopStreaming();
-      }
     },
     events: {
       socketError: function(err) {
