@@ -93,10 +93,7 @@ class BulkLoad extends EventEmitter {
     this.table = table;
     this.options = connectionOptions;
     this.connection = connection;
-    const userCallback = callback;
-    this.callback = (err, rowCount) => {
-      userCallback(err, rowCount);
-    };
+    this.callback = callback;
     this.columns = [];
     this.columnsByName = {};
     this.firstRowWritten = false;
