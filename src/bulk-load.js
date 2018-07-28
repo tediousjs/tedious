@@ -83,6 +83,22 @@ class BulkLoad extends EventEmitter {
     keepNulls = false,
     lockTable = false,
   }: Options, connection: any, callback: (err: ?Error, rowCount: number) => void) {
+    if (typeof checkConstraints !== 'boolean') {
+      throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
+    }
+
+    if (typeof fireTriggers !== 'boolean') {
+      throw new TypeError('The "options.fireTriggers" property must be of type boolean.');
+    }
+
+    if (typeof keepNulls !== 'boolean') {
+      throw new TypeError('The "options.keepNulls" property must be of type boolean.');
+    }
+
+    if (typeof lockTable !== 'boolean') {
+      throw new TypeError('The "options.lockTable" property must be of type boolean.');
+    }
+
     super();
 
     this.isBulkLoad = true;
@@ -101,22 +117,6 @@ class BulkLoad extends EventEmitter {
 
     this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.rowToPacketTransform = new RowTransform(this);
-
-    if (typeof checkConstraints !== 'boolean') {
-      throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
-    }
-
-    if (typeof fireTriggers !== 'boolean') {
-      throw new TypeError('The "options.fireTriggers" property must be of type boolean.');
-    }
-
-    if (typeof keepNulls !== 'boolean') {
-      throw new TypeError('The "options.keepNulls" property must be of type boolean.');
-    }
-
-    if (typeof lockTable !== 'boolean') {
-      throw new TypeError('The "options.lockTable" property must be of type boolean.');
-    }
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
