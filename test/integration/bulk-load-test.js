@@ -5,14 +5,14 @@ const Request = require('../../src/request');
 const TYPES = require('../../src/data-type').typeByName;
 
 const debugMode = false;
-var useEncryptedConnection = false;
 
 function getConfig() {
-  const config = JSON.parse(
+  const { config } = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-  ).config;
+  );
+
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-  config.options.encrypt = useEncryptedConnection;
+
   if (debugMode) {
     config.options.debug = {
       packet: true,
@@ -21,6 +21,7 @@ function getConfig() {
       token: true
     };
   }
+
   return config;
 }
 
@@ -325,17 +326,4 @@ exports.testStreamingBulkLoad = function(test) {
       this.push(null);
     }
   }
-};
-
-exports.dummyToSwitchToEncryptedConnection = function(test) {
-  // (Please let me know if you find a better solution for this.)
-  useEncryptedConnection = true;
-  test.done();
-};
-
-// Executes testStreamingBulkLoad() a second time with an encrypted connection.
-// This is important to test data flow control through TLS.
-exports.testStreamingBulkLoadEncrypted = function(test) {
-  test.ok(useEncryptedConnection);
-  exports.testStreamingBulkLoad.call(this, test);
 };
