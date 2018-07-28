@@ -76,7 +76,6 @@ class BulkLoad extends EventEmitter {
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
   bulkOptions: Options;
-  rowsData: WritableTrackingBuffer;
   rowToPacketTransform: RowTransform;
 
   constructor(table: string, connectionOptions: Object, {
@@ -117,7 +116,6 @@ class BulkLoad extends EventEmitter {
     this.firstRowWritten = false;
     this.streamingMode = false;
 
-    this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
     this.rowToPacketTransform = new RowTransform(this);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
