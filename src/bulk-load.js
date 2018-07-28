@@ -71,7 +71,6 @@ class BulkLoad extends EventEmitter {
   streamingMode: boolean;
   table: string;
   options: Object;
-  connection: any;
   callback: (err: ?Error, rowCount: number) => void;
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
@@ -83,7 +82,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, connection: any, callback: (err: ?Error, rowCount: number) => void) {
+  }: Options, callback: (err: ?Error, rowCount: number) => void) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }
@@ -109,7 +108,6 @@ class BulkLoad extends EventEmitter {
 
     this.table = table;
     this.options = connectionOptions;
-    this.connection = connection;
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};

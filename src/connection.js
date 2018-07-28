@@ -1269,7 +1269,7 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.config.options, options, this, callback);
+    return new BulkLoad(table, this.config.options, options, callback);
   }
 
   execBulkLoad(bulkLoad) {
