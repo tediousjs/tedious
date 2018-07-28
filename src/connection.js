@@ -1283,14 +1283,8 @@ class Connection extends EventEmitter {
         bulkLoad.callback(error);
         return;
       }
-      if (bulkLoad.streamingMode) {
-        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, null, true);
-        if (this.request === bulkLoad && this.state === this.STATE.SENT_CLIENT_REQUEST) {
-          bulkLoad.startStreaming();
-        }
-      } else {
-        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
-      }
+
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, undefined);
     });
 
     this.execSqlBatch(request);
@@ -1455,7 +1449,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  makeRequest(request, packetType, payload, streamingUploadMode) {
+  makeRequest(request, packetType, payload) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -1472,7 +1466,20 @@ class Connection extends EventEmitter {
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
-      if (!streamingUploadMode) {
+
+      if (request instanceof BulkLoad) {
+        const message = request.getMessageStream();
+
+        // If the bulkload was not put into streaming mode by the user,
+        // we end the rowToPacketTransform here for them.
+        //
+        // If it was put into streaming mode, it's the user's responsibility
+        // to end the stream.
+        if (!request.streamingMode) {
+          request.rowToPacketTransform.end();
+        }
+        this.messageIo.outgoingMessageStream.write(message);
+      } else {
         this.createRequestTimer();
         this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
         this.resetConnectionOnNextRequest = false;
@@ -1480,7 +1487,9 @@ class Connection extends EventEmitter {
           return payload.toString('  ');
         });
       }
+
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
       if (request.paused) {                                // Request.pause() has been called before the request was started
         this.pauseRequest(request);
       }

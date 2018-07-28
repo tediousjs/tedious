@@ -1,5 +1,7 @@
 // @flow
 
+/* globals $PropertyType */
+
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
@@ -168,39 +170,22 @@ class BulkLoad extends EventEmitter {
     if (this.streamingMode) {
       throw new Error('BulkLoad.addRow() cannot be used in streaming mode.');
     }
+
     this.firstRowWritten = true;
 
-    let row: Array<any> | { [string]: any };
     if (input.length === 1 && typeof input[0] === 'object') {
-      row = input[0];
-    } else {
-      row = input;
-    }
-
-    // write row token
-    this.rowsData.writeUInt8(TOKEN_TYPE.ROW);
-
-    // write each column
-    if (row instanceof Array) {
-      for (let i = 0, len = this.columns.length; i < len; i++) {
-        const c = this.columns[i];
-        c.type.writeParameterData(this.rowsData, {
-          length: c.length,
-          scale: c.scale,
-          precision: c.precision,
-          value: row[i]
-        }, this.options);
+      if (Array.isArray(input[0])) {
+        const row: Array<any> = input[0];
+        this.rowToPacketTransform.write(row);
+      } else {
+        const row: { [string]: any } = input[0];
+        this.rowToPacketTransform.write(this.columns.map((column) => {
+          return row[column.objName];
+        }));
       }
     } else {
-      for (let i = 0, len = this.columns.length; i < len; i++) {
-        const c = this.columns[i];
-        c.type.writeParameterData(this.rowsData, {
-          length: c.length,
-          scale: c.scale,
-          precision: c.precision,
-          value: row[c.objName]
-        }, this.options);
-      }
+      const row: Array<any> = input;
+      this.rowToPacketTransform.write(row);
     }
   }
 
@@ -259,27 +244,6 @@ class BulkLoad extends EventEmitter {
     }
     sql += '\n)';
     return sql;
-  }
-
-  getPayload() {
-    // Create COLMETADATA token
-    const metaData = this.getColMetaData();
-    let length = metaData.length;
-
-    // row data
-    const rows = this.rowsData ? this.rowsData.data : new Buffer(0);
-    length += rows.length;
-
-    // Create DONE token
-    const done = this.createDoneToken();
-    length += done.length;
-
-    // composite payload
-    const payload = new WritableTrackingBuffer(length);
-    payload.copyFrom(metaData);
-    payload.copyFrom(rows);
-    payload.copyFrom(done);
-    return payload;
   }
 
   getColMetaData() {
@@ -343,12 +307,10 @@ class BulkLoad extends EventEmitter {
     return this.rowToPacketTransform;
   }
 
-  // This internal method is called to start streaming once the bulk insert
-  // command has completed.
-  startStreaming() {
+  getMessageStream() {
     const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
-    this.connection.messageIo.outgoingMessageStream.write(message);
     this.rowToPacketTransform.pipe(message);
+    return message;
   }
 }
 
@@ -368,13 +330,13 @@ class RowTransform extends Transform {
     this.columnMetadataWritten = false;
   }
 
-  _transform(row, encoding: void, callback: () => void) {
+  _transform(row, encoding, callback) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
     }
 
-    const buf = new WritableTrackingBuffer(1024, 'ucs2', true);
+    const buf = new WritableTrackingBuffer(10, 'ucs2', true);
     buf.writeUInt8(TOKEN_TYPE.ROW);
 
     for (let i = 0; i < this.columns.length; i++) {
