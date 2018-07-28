@@ -317,6 +317,9 @@ module.exports = BulkLoad;
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
   columnMetadataWritten: boolean;
+  bulkLoad: BulkLoad;
+  mainOptions: $PropertyType<BulkLoad, 'options'>;
+  columns: $PropertyType<BulkLoad, 'columns'>;
 
   constructor(bulkLoad: BulkLoad) {
     super({ writableObjectMode: true });
