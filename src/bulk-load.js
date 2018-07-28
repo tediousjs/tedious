@@ -1,3 +1,5 @@
+// @flow
+
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
@@ -29,14 +31,58 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
+type Options = {
+  checkConstraints: boolean,
+  fireTriggers: boolean,
+  keepNulls: boolean,
+  lockTable: boolean
+};
+
+type Column = {
+  type: Object,
+  name: string,
+  value: null,
+  output: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number,
+  objName: string,
+  nullable: boolean
+};
+
+type ColumnOptions = {
+  output?: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number,
+  objName?: string,
+  nullable?: boolean
+};
+
 // Note that the Connection module uses this class in the same way as the Request class.
-module.exports = class BulkLoad extends EventEmitter {
-  constructor(table, connectionOptions, {
+class BulkLoad extends EventEmitter {
+  isBulkLoad: boolean;
+  error: Error | typeof undefined;
+  canceled: boolean;
+  executionStarted: boolean;
+  firstRowWritten: boolean;
+  streamingMode: boolean;
+  table: string;
+  options: Object;
+  connection: any;
+  callback: (err: ?Error, rowCount: number) => void;
+  columns: Array<Column>;
+  columnsByName: { [name: string]: Column };
+  bulkOptions: Options;
+  rowsData: WritableTrackingBuffer;
+  rowToPacketTransform: RowTransform;
+
+  constructor(table: string, connectionOptions: Object, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }, connection, callback) {
+  }: Options, connection: any, callback: (err: ?Error, rowCount: number) => void) {
     super();
 
     this.isBulkLoad = true;
@@ -55,6 +101,9 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.firstRowWritten = false;
     this.streamingMode = false;
+
+    this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
+    this.rowToPacketTransform = new RowTransform(this);
 
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
@@ -75,11 +124,7 @@ module.exports = class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name, type, options) {
-    if (options == null) {
-      options = {};
-    }
-
+  addColumn(name: string, type: Object, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -91,12 +136,12 @@ module.exports = class BulkLoad extends EventEmitter {
       type: type,
       name: name,
       value: null,
-      output: options.output || (options.output = false),
-      length: options.length,
-      precision: options.precision,
-      scale: options.scale,
-      objName: options.objName || name,
-      nullable: options.nullable
+      output: output,
+      length: length,
+      precision: precision,
+      scale: scale,
+      objName: objName,
+      nullable: nullable
     };
 
     if ((type.id & 0x30) === 0x20) {
@@ -122,38 +167,43 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName[name] = column;
   }
 
-  addRow(row) {
+  addRow(...input: Array<{ [string]: any } | any>) {
     if (this.streamingMode) {
       throw new Error('BulkLoad.addRow() cannot be used in streaming mode.');
     }
-    if (!this.rowsData) {
-      this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
-    }
     this.firstRowWritten = true;
 
-    if (arguments.length > 1 || !row || typeof row !== 'object') {
-      // convert arguments to array in a way the optimizer can handle
-      const arrTemp = new Array(arguments.length);
-      for (let i = 0, len = arguments.length; i < len; i++) {
-        const c = arguments[i];
-        arrTemp[i] = c;
-      }
-      row = arrTemp;
+    let row: Array<any> | { [string]: any };
+    if (input.length === 1 && typeof input[0] === 'object') {
+      row = input[0];
+    } else {
+      row = input;
     }
 
     // write row token
     this.rowsData.writeUInt8(TOKEN_TYPE.ROW);
 
     // write each column
-    const arr = row instanceof Array;
-    for (let i = 0, len = this.columns.length; i < len; i++) {
-      const c = this.columns[i];
-      c.type.writeParameterData(this.rowsData, {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: row[arr ? i : c.objName]
-      }, this.options);
+    if (row instanceof Array) {
+      for (let i = 0, len = this.columns.length; i < len; i++) {
+        const c = this.columns[i];
+        c.type.writeParameterData(this.rowsData, {
+          length: c.length,
+          scale: c.scale,
+          precision: c.precision,
+          value: row[i]
+        }, this.options);
+      }
+    } else {
+      for (let i = 0, len = this.columns.length; i < len; i++) {
+        const c = this.columns[i];
+        c.type.writeParameterData(this.rowsData, {
+          length: c.length,
+          scale: c.scale,
+          precision: c.precision,
+          value: row[c.objName]
+        }, this.options);
+      }
     }
   }
 
@@ -292,9 +342,6 @@ module.exports = class BulkLoad extends EventEmitter {
     if (this.executionStarted) {
       throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
     }
-    if (!this.rowToPacketTransform) {
-      this.rowToPacketTransform = new RowTransform(this);
-    }
     this.streamingMode = true;
     return this.rowToPacketTransform;
   }
@@ -306,21 +353,30 @@ module.exports = class BulkLoad extends EventEmitter {
     this.connection.messageIo.outgoingMessageStream.write(message);
     this.rowToPacketTransform.pipe(message);
   }
-};
+}
+
+module.exports = BulkLoad;
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
-  constructor(bulkLoad) {
+  columnMetadataWritten: boolean;
+
+  constructor(bulkLoad: BulkLoad) {
     super({ writableObjectMode: true });
 
     this.bulkLoad = bulkLoad;
     this.mainOptions = bulkLoad.options;
     this.columns = bulkLoad.columns;
 
-    this.push(bulkLoad.getColMetaData());
+    this.columnMetadataWritten = false;
   }
 
-  _transform(row, encoding, callback) {
+  _transform(row, encoding: void, callback: () => void) {
+    if (!this.columnMetadataWritten) {
+      this.push(this.bulkLoad.getColMetaData());
+      this.columnMetadataWritten = true;
+    }
+
     const buf = new WritableTrackingBuffer(1024, 'ucs2', true);
     buf.writeUInt8(TOKEN_TYPE.ROW);
 
@@ -339,7 +395,7 @@ class RowTransform extends Transform {
     callback();
   }
 
-  _flush(callback) {
+  _flush(callback: () => void) {
     this.push(this.bulkLoad.createDoneToken());
 
     callback();
