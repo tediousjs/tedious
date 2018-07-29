@@ -1,3 +1,7 @@
+// @flow
+
+/* globals $PropertyType */
+
 const EventEmitter = require('events').EventEmitter;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
@@ -26,13 +30,63 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-module.exports = class BulkLoad extends EventEmitter {
-  constructor(table, connectionOptions, {
+type InternalOptions = {
+  checkConstraints: boolean,
+  fireTriggers: boolean,
+  keepNulls: boolean,
+  lockTable: boolean,
+};
+
+type Options = {
+  checkConstraints?: $PropertyType<InternalOptions, 'checkConstraints'>,
+  fireTriggers?: $PropertyType<InternalOptions, 'fireTriggers'>,
+  keepNulls?: $PropertyType<InternalOptions, 'keepNulls'>,
+  lockTable?: $PropertyType<InternalOptions, 'lockTable'>,
+};
+
+type Column = {
+  type: Object,
+  name: string,
+  value: null,
+  output: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number,
+  objName: string,
+  nullable: boolean
+};
+
+type ColumnOptions = {
+  output?: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number,
+  objName?: string,
+  nullable?: boolean
+};
+
+class BulkLoad extends EventEmitter {
+  error: Error | typeof undefined;
+  canceled: boolean;
+  table: string;
+
+  options: Object;
+  callback: (err: ?Error, rowCount: number) => void;
+
+  columns: Array<Column>;
+  columnsByName: { [name: string]: Column };
+
+  firstRowWritten: boolean;
+  rowsData: WritableTrackingBuffer;
+
+  bulkOptions: InternalOptions;
+
+  constructor(table: string, connectionOptions: Object, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }, callback) {
+  }: Options, callback: (err: ?Error, rowCount: number) => void) {
     super();
 
     this.error = undefined;
@@ -65,11 +119,7 @@ module.exports = class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name, type, options) {
-    if (options == null) {
-      options = {};
-    }
-
+  addColumn(name: string, type: Object, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -78,12 +128,12 @@ module.exports = class BulkLoad extends EventEmitter {
       type: type,
       name: name,
       value: null,
-      output: options.output || (options.output = false),
-      length: options.length,
-      precision: options.precision,
-      scale: options.scale,
-      objName: options.objName || name,
-      nullable: options.nullable
+      output: output,
+      length: length,
+      precision: precision,
+      scale: scale,
+      objName: objName,
+      nullable: nullable
     };
 
     if ((type.id & 0x30) === 0x20) {
@@ -109,32 +159,38 @@ module.exports = class BulkLoad extends EventEmitter {
     this.columnsByName[name] = column;
   }
 
-  addRow(row) {
+  addRow(input: [ { [string]: any } ] | Array<any>) {
     this.firstRowWritten = true;
 
-    if (arguments.length > 1 || !row || typeof row !== 'object') {
-      // convert arguments to array in a way the optimizer can handle
-      const arrTemp = new Array(arguments.length);
-      for (let i = 0, len = arguments.length; i < len; i++) {
-        const c = arguments[i];
-        arrTemp[i] = c;
-      }
-      row = arrTemp;
+    let row = input[0];
+    if (input.length > 1 || !input[0] || typeof input[0] !== 'object') {
+      row = input;
     }
 
     // write row token
     this.rowsData.writeUInt8(TOKEN_TYPE.ROW);
 
     // write each column
-    const arr = row instanceof Array;
-    for (let i = 0, len = this.columns.length; i < len; i++) {
-      const c = this.columns[i];
-      c.type.writeParameterData(this.rowsData, {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: row[arr ? i : c.objName]
-      }, this.options);
+    if (row instanceof Array) {
+      for (let i = 0, len = this.columns.length; i < len; i++) {
+        const c = this.columns[i];
+        c.type.writeParameterData(this.rowsData, {
+          length: c.length,
+          scale: c.scale,
+          precision: c.precision,
+          value: row[i]
+        }, this.options);
+      }
+    } else {
+      for (let i = 0, len = this.columns.length; i < len; i++) {
+        const c = this.columns[i];
+        c.type.writeParameterData(this.rowsData, {
+          length: c.length,
+          scale: c.scale,
+          precision: c.precision,
+          value: row[c.objName]
+        }, this.options);
+      }
     }
   }
 
@@ -260,4 +316,6 @@ module.exports = class BulkLoad extends EventEmitter {
     }
     return tBuf.data;
   }
-};
+}
+
+module.exports = BulkLoad;
