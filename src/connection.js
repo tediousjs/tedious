@@ -855,10 +855,11 @@ class Connection extends EventEmitter {
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
-    if (this.config.options.requestTimeout) {
+    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
-      }, this.config.options.requestTimeout);
+      }, timeout);
     }
   }
 
