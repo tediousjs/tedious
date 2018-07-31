@@ -37,6 +37,7 @@ module.exports = class Request extends EventEmitter {
   handle: ?any; // TODO: Figure out the type here.
   error: ?Error;
   connection: ?any; // TODO: This should be `Connection`, not `any`.
+  timeout: number | typeof undefined;
 
   callback: (?Error) => void;
 
@@ -53,6 +54,7 @@ module.exports = class Request extends EventEmitter {
     this.paused = false;
     this.error = undefined;
     this.connection = undefined;
+    this.timeout = undefined;
     this.userCallback = callback;
     this.callback = function(err: ?Error) {
       if (this.preparing) {
@@ -205,5 +207,9 @@ module.exports = class Request extends EventEmitter {
     if (this.connection) {
       this.connection.resumeRequest(this);
     }
+  }
+
+  setTimeout(timeout: number | typeof undefined) {
+    this.timeout = timeout;
   }
 };

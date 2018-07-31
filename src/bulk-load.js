@@ -37,6 +37,7 @@ module.exports = class BulkLoad extends EventEmitter {
 
     this.error = undefined;
     this.canceled = false;
+    this.timeout = undefined;
 
     this.table = table;
     this.options = connectionOptions;
@@ -259,5 +260,9 @@ module.exports = class BulkLoad extends EventEmitter {
       tBuf.writeBVarchar(c.name, 'ucs2');
     }
     return tBuf.data;
+  }
+
+  setTimeout(timeout) {
+    this.timeout = timeout;
   }
 };
