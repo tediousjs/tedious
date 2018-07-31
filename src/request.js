@@ -37,7 +37,7 @@ module.exports = class Request extends EventEmitter {
   handle: ?any; // TODO: Figure out the type here.
   error: ?Error;
   connection: ?any; // TODO: This should be `Connection`, not `any`.
-  timeout: ?number | typeof undefined;
+  timeout: number | typeof undefined;
 
   callback: (?Error) => void;
 
