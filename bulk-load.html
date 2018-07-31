@@ -17,6 +17,7 @@ title: API - BulkLoad
   <li><a href="#function_addColumn">bulkLoad.addColumn(name, type, options)</a></li>
   <li><a href="#function_addRow">bulkLoad.addRow(row)</a></li>
   <li><a href="#function_getTableCreationSql">bulkLoad.getTableCreationSql()</a></li>
+  <li><a href="#function_setTimeout">bulkLoad.setTimeout(timeout)</a></li>
 </ul>
 
 <h2 id="usage">Usage</h2>
@@ -172,4 +173,23 @@ var sql = bulkLoad.getTableCreationSql();
   A side note on bulk inserting into temporary tables: if you want to access a local temporary table after
   executing the bulk load, you'll need to use the same connection and execute your requests using 
   <a href="api-connection.html#function_execSqlBatch">connection.execSqlBatch</a> instead of .execSql.
+</p>
+
+<h2 id="function_setTimeout">bulkLoad.setTimeout(timeout)</h2>
+<p>
+ Sets a timeout for this bulk load.
+</p>
+{% highlight javascript %}
+bulkLoad.setTimeout(timeout);
+{% endhighlight %}
+<div class="argument">
+  <div class="name">timeout</div>
+  <div class="description">
+    <p>
+      The number of milliseconds before the bulk load is considered failed, or 0 for no timeout.
+    </p>
+  </div>
+</div>
+<p>
+  When no timeout is set for the bulk load, the <code>options.requestTimeout</code> of the <code>Connection</code> is used.
 </p>
