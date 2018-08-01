@@ -1,3 +1,5 @@
+// @flow
+
 const deprecate = require('depd')('tedious');
 
 const Null = require('./data-types/null');
