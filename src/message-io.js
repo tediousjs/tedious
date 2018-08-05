@@ -1,16 +1,38 @@
+// @flow
+
+/* globals $Values */
+
+import type Debug from './debug';
+import type { Duplex } from 'stream';
+import type { TLSSocket } from 'tls';
+import type { Socket } from 'net';
+
 const tls = require('tls');
 const crypto = require('crypto');
 const DuplexPair = require('native-duplexpair');
-const EventEmitter = require('events').EventEmitter;
+const { EventEmitter} = require('events');
 
-const TYPE = require('./packet').TYPE;
+const { TYPE } = require('./packet');
 
 const Message = require('./message');
 const IncomingMessageStream = require('./incoming-message-stream');
 const OutgoingMessageStream = require('./outgoing-message-stream');
 
 module.exports = class MessageIO extends EventEmitter {
-  constructor(socket, packetSize, debug) {
+  socket: Socket;
+  debug: Debug;
+
+  tlsNegotiationComplete: boolean;
+
+  incomingMessageStream: IncomingMessageStream;
+  outgoingMessageStream: OutgoingMessageStream;
+
+  securePair: {
+    cleartext: TLSSocket,
+    encrypted: Duplex
+  }
+
+  constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
 
     this.socket = socket;
@@ -30,15 +52,16 @@ module.exports = class MessageIO extends EventEmitter {
     this.outgoingMessageStream.pipe(this.socket);
   }
 
-  packetSize(packetSize) {
-    if (arguments.length > 0) {
+  packetSize(...args: [number]) {
+    if (args.length > 0) {
+      const packetSize = args[0];
       this.debug.log('Packet size changed from ' + this.outgoingMessageStream.packetSize + ' to ' + packetSize);
       this.outgoingMessageStream.packetSize = packetSize;
     }
     return this.outgoingMessageStream.packetSize;
   }
 
-  startTls(credentialsDetails, hostname, trustServerCertificate) {
+  startTls(credentialsDetails: Object, hostname: string, trustServerCertificate: boolean) {
     const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
 
     const duplexpair = new DuplexPair();
@@ -64,7 +87,9 @@ module.exports = class MessageIO extends EventEmitter {
 
     securePair.cleartext.on('secureConnect', () => {
       const cipher = securePair.cleartext.getCipher();
-      this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+      if (cipher) {
+        this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+      }
       this.emit('secure', securePair.cleartext);
       this.encryptAllFutureTraffic();
     });
@@ -89,13 +114,13 @@ module.exports = class MessageIO extends EventEmitter {
     this.tlsNegotiationComplete = true;
   }
 
-  tlsHandshakeData(data) {
+  tlsHandshakeData(data: Buffer) {
     this.securePair.encrypted.write(data);
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
-  sendMessage(packetType, data, resetConnection) {
+  sendMessage(packetType: $Values<typeof TYPE>, data: Buffer, resetConnection: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
     this.outgoingMessageStream.write(message);
