@@ -171,7 +171,7 @@ class BulkLoad extends EventEmitter {
     this.columnsByName[name] = column;
   }
 
-  addRow(...input: Array<{ [string]: any } | any>) {
+  addRow(...input: [ { [string]: any } ] | Array<any>) {
     this.firstRowWritten = true;
 
     let row;
