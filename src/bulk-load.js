@@ -346,7 +346,7 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    const buf = new WritableTrackingBuffer(10, 'ucs2', true);
+    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
     buf.writeUInt8(TOKEN_TYPE.ROW);
 
     for (let i = 0; i < this.columns.length; i++) {
