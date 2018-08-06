@@ -71,7 +71,6 @@ type ColumnOptions = {
 class BulkLoad extends EventEmitter {
   error: Error | typeof undefined;
   canceled: boolean;
-  isBulkLoad: boolean;
   executionStarted: boolean;
   streamingMode: boolean;
   table: string;
@@ -112,7 +111,6 @@ class BulkLoad extends EventEmitter {
 
     super();
 
-    this.isBulkLoad = true;
     this.error = undefined;
     this.canceled = false;
     this.executionStarted = false;

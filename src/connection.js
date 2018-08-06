@@ -1502,7 +1502,7 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       return false;
-    } else if (this.request.isBulkLoad) {
+    } else if (this.request instanceof BulkLoad) {
       this.debug.log('Canceling a bulk load has not yet been implemented.');
       return false;
     } else {
