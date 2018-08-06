@@ -33,11 +33,18 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-type Options = {
+type InternalOptions = {
   checkConstraints: boolean,
   fireTriggers: boolean,
   keepNulls: boolean,
-  lockTable: boolean
+  lockTable: boolean,
+};
+
+type Options = {
+  checkConstraints?: $PropertyType<InternalOptions, 'checkConstraints'>,
+  fireTriggers?: $PropertyType<InternalOptions, 'fireTriggers'>,
+  keepNulls?: $PropertyType<InternalOptions, 'keepNulls'>,
+  lockTable?: $PropertyType<InternalOptions, 'lockTable'>,
 };
 
 type Column = {
@@ -61,21 +68,25 @@ type ColumnOptions = {
   nullable?: boolean
 };
 
-// Note that the Connection module uses this class in the same way as the Request class.
 class BulkLoad extends EventEmitter {
-  isBulkLoad: boolean;
   error: Error | typeof undefined;
   canceled: boolean;
+  isBulkLoad: boolean;
   executionStarted: boolean;
-  firstRowWritten: boolean;
   streamingMode: boolean;
   table: string;
+  timeout: number | typeof undefined
+
   options: Object;
   callback: (err: ?Error, rowCount: number) => void;
+
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
-  bulkOptions: Options;
+
+  firstRowWritten: boolean;
   rowToPacketTransform: RowTransform;
+
+  bulkOptions: InternalOptions;
 
   constructor(table: string, connectionOptions: Object, {
     checkConstraints = false,
@@ -163,25 +174,23 @@ class BulkLoad extends EventEmitter {
   }
 
   addRow(...input: Array<{ [string]: any } | any>) {
-    if (this.streamingMode) {
-      throw new Error('BulkLoad.addRow() cannot be used in streaming mode.');
-    }
-
     this.firstRowWritten = true;
 
-    if (input.length === 1 && typeof input[0] === 'object') {
-      if (Array.isArray(input[0])) {
-        const row: Array<any> = input[0];
-        this.rowToPacketTransform.write(row);
-      } else {
-        const row: { [string]: any } = input[0];
-        this.rowToPacketTransform.write(this.columns.map((column) => {
-          return row[column.objName];
-        }));
-      }
+    let row;
+    if (input.length > 1 || !input[0] || typeof input[0] !== 'object') {
+      row = input;
     } else {
-      const row: Array<any> = input;
+      row = input[0];
+    }
+
+    // write each column
+    if (Array.isArray(row)) {
       this.rowToPacketTransform.write(row);
+    } else {
+      const object = row;
+      this.rowToPacketTransform.write(this.columns.map((column) => {
+        return object[column.objName];
+      }));
     }
   }
 
@@ -274,6 +283,10 @@ class BulkLoad extends EventEmitter {
       tBuf.writeBVarchar(c.name, 'ucs2');
     }
     return tBuf.data;
+  }
+
+  setTimeout(timeout: number | typeof undefined) {
+    this.timeout = timeout;
   }
 
   createDoneToken() {

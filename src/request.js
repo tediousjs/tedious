@@ -25,8 +25,8 @@ type ParameterOptions = {
   scale?: number
 }
 
-module.exports = class Request extends EventEmitter {
-  sqlTextOrProcedure: ?string;
+class Request extends EventEmitter {
+  sqlTextOrProcedure: string | typeof undefined;
   parameters: Parameter[];
   parametersByName: { [string]: Parameter };
   originalParameters: Parameter[];
@@ -34,13 +34,14 @@ module.exports = class Request extends EventEmitter {
   canceled: boolean;
   paused: boolean;
   userCallback: CompletionCallback;
-  handle: ?any; // TODO: Figure out the type here.
+  handle: number | typeof undefined;
   error: ?Error;
   connection: ?any; // TODO: This should be `Connection`, not `any`.
+  timeout: number | typeof undefined;
 
   callback: (?Error) => void;
 
-  constructor(sqlTextOrProcedure: ?string, callback: CompletionCallback) {
+  constructor(sqlTextOrProcedure?: string, callback: CompletionCallback) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -53,6 +54,7 @@ module.exports = class Request extends EventEmitter {
     this.paused = false;
     this.error = undefined;
     this.connection = undefined;
+    this.timeout = undefined;
     this.userCallback = callback;
     this.callback = function(err: ?Error) {
       if (this.preparing) {
@@ -206,4 +208,10 @@ module.exports = class Request extends EventEmitter {
       this.connection.resumeRequest(this);
     }
   }
-};
+
+  setTimeout(timeout: number | typeof undefined) {
+    this.timeout = timeout;
+  }
+}
+
+module.exports = Request;
