@@ -1,4 +1,9 @@
 const deprecate = require('depd')('tedious');
+
+const crypto = require('crypto');
+const os = require('os');
+const AuthenticationContext = require('adal-node').AuthenticationContext;
+
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
@@ -16,11 +21,13 @@ const MessageIO = require('./message-io');
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
 const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
-const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
-const AuthenticationContext = require('adal-node').AuthenticationContext;
+const libraryName = require('./library').name;
+const versions = require('./tds-versions').versions;
+
+const { createNTLMRequest } = require('./ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -110,11 +117,30 @@ class Connection extends EventEmitter {
     }
     deprecateNullConfigValue('password', config.password);
 
+    let authentication;
+    if (config.authentication != undefined) {
+      // TODO: Ensure that config.authentication is well formed here.
+      authentication = config.authentication;
+    } else {
+      authentication = config.domain ? {
+        type: 'ntlm',
+        options: {
+          userName: config.userName,
+          password: config.password,
+          domain: config.domain.toUpperCase()
+        }
+      } : {
+        type: 'default',
+        options: {
+          userName: config.userName,
+          password: config.password,
+        }
+      };
+    }
+
     this.config = {
       server: config.server,
-      userName: config.userName,
-      password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
+      authentication: authentication,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -498,32 +524,21 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
-      // Whenever authentication property is used to specify an authentication method,
-      // the client will request encryption (the default value of the Encrypt property will be true)
-      // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
-      let authMethod = undefined;
-      if ((authMethod = config.options.authentication) != undefined) {
-        // check for valid options
-        if (!(authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
-          authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
-          throw new Error('An invalid authentication method is specified');
-        }
-        if (!(authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.SqlPassword ||
-          authMethod.toUpperCase() === this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword)) {
-          throw new Error('An invalid authentication method is specified');
-        }
-
+      if (this.config.authentication.type === 'azure-active-directory') {
         if (this.config.options.tdsVersion < '7_4') {
           throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
         }
+
+        // Whenever authentication property is used to specify an authentication method,
+        // the client will request encryption (the default value of the Encrypt property will be true)
+        // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
+
         this.config.options.encrypt = true;
         if (!config.options.trustServerCertificate) {
           this.config.options.trustServerCertificate = false;
         }
-        // sqlpassword directly authenticates and does not use fedAuth
-        if (authMethod.toUpperCase() !== this.fedAuthInfo.ValidFedAuthEnum.SqlPassword) {
-          this.fedAuthInfo.method = authMethod;
-        }
+
+        this.fedAuthInfo.method = this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword;
       }
     }
 
@@ -648,7 +663,10 @@ class Connection extends EventEmitter {
       if (token.fedAuthInfoData.stsurl && token.fedAuthInfoData.spn) {
         this.fedAuthInfo.responsePending = true;
         var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
-        context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, this.config.userName, this.config.password, clientId, (err, tokenResponse) => {
+
+        const authentication = this.config.authentication;
+
+        context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
           if (err) {
             this.fedAuthInfo.responsePending = false;
             this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
@@ -1107,40 +1125,65 @@ class Connection extends EventEmitter {
   }
 
   sendLogin7Packet(cb) {
-    const sendPayload = function(clientResponse) {
-      const payload = new Login7Payload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        database: this.config.options.database,
-        serverName: this.routingData ? this.routingData.server : this.config.server,
-        appName: this.config.options.appName,
-        packetSize: this.config.options.packetSize,
-        tdsVersion: this.config.options.tdsVersion,
-        initDbFatal: !this.config.options.fallbackToDefaultDb,
-        readOnlyIntent: this.config.options.readOnlyIntent,
-        sspiBlob: clientResponse,
-        language: this.config.options.language,
-        fedAuthInfo: this.fedAuthInfo
-      });
+    const payload = new Login7Payload({
+      tdsVersion: versions[this.config.options.tdsVersion],
+      packetSize: this.config.options.packetSize,
+      clientProgVer: 0,
+      clientPid: process.pid,
+      connectionId: 0,
+      clientTimeZone: new Date().getTimezoneOffset(),
+      clientLcid: 0x00000409
+    });
 
-      this.routingData = undefined;
-      this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+    const authentication = this.config.authentication;
+    switch (authentication.type) {
+      case 'azure-active-directory':
+        this.fedAuthInfo.fedAuthInfoRequested = true;
+        this.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: this.fedAuthInfo.requiredPreLoginResponse,
+          workflow: 'default'
+        };
+        break;
 
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
-    };
+      case 'ntlm':
+        payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
+        break;
 
-    sendPayload.call(this);
+      default:
+        payload.userName = authentication.options.userName;
+        payload.password = authentication.options.password;
+    }
+
+    payload.hostname = os.hostname();
+    payload.serverName = this.routingData ? this.routingData.server : this.config.server;
+    payload.appName = this.config.options.appName || 'Tedious';
+    payload.libraryName = libraryName;
+    payload.language = this.config.options.language;
+    payload.database = this.config.options.database;
+    payload.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+
+    payload.readOnlyIntent = this.config.options.readOnlyIntent;
+    payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
+
+    this.routingData = undefined;
+    this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
+
+    this.debug.payload(function() {
+      return payload.toString('  ');
+    });
+
     process.nextTick(cb);
   }
 
   sendNTLMResponsePacket() {
+    const authentication = this.config.authentication;
+
     const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
+      domain: authentication.options.domain,
+      userName: authentication.options.userName,
+      password: authentication.options.password,
       database: this.config.options.database,
       appName: this.config.options.appName,
       packetSize: this.config.options.packetSize,
