@@ -112,7 +112,7 @@ class NTLMResponsePayload {
   }
 
   createTimestamp(time: number) {
-    const tenthsOfAMicrosecond = new BigInteger(time).plus(11644473600).multiply(10000000);
+    const tenthsOfAMicrosecond = BigInteger(time).plus(11644473600).multiply(10000000);
     const hexArray = [];
 
     let pair = [];
