@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "babel-runtime": "^6.26.0",
-    "big-number": "0.3.1",
+    "big-number": "1.0.0",
     "bl": "^1.2.2",
     "depd": "^1.1.2",
     "native-duplexpair": "^1.0.0",
