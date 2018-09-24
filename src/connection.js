@@ -1,5 +1,8 @@
 const deprecate = require('depd')('tedious');
 
+const crypto = require('crypto');
+const os = require('os');
+
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
 const EventEmitter = require('events').EventEmitter;
@@ -16,10 +19,13 @@ const MessageIO = require('./message-io');
 const TokenStreamParser = require('./token/token-stream-parser').Parser;
 const Transaction = require('./transaction').Transaction;
 const ISOLATION_LEVEL = require('./transaction').ISOLATION_LEVEL;
-const crypto = require('crypto');
 const ConnectionError = require('./errors').ConnectionError;
 const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
+const libraryName = require('./library').name;
+const versions = require('./tds-versions').versions;
+
+const { createNTLMRequest } = require('./ntlm');
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -849,10 +855,11 @@ class Connection extends EventEmitter {
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
-    if (this.config.options.requestTimeout) {
+    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
-      }, this.config.options.requestTimeout);
+      }, timeout);
     }
   }
 
@@ -864,7 +871,7 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
-    const message = 'Failed to connect to ' + this.config.server + ':' + this.config.options.port + ' in ' + this.config.options.connectTimeout + 'ms';
+    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
     this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
@@ -931,7 +938,7 @@ class Connection extends EventEmitter {
   }
 
   socketError(error) {
-    if (this.state === this.STATE.CONNECTING) {
+    if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', ConnectionError(message, 'ESOCKET'));
@@ -952,7 +959,11 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+    if (this.state !== this.STATE.FINAL) {
+      const error = new Error('socket hang up');
+      error.code = 'ECONNRESET';
+      this.socketError(error);
+    }
   }
 
   socketClose() {
@@ -1008,31 +1019,41 @@ class Connection extends EventEmitter {
   }
 
   sendLogin7Packet(cb) {
-    const sendPayload = function(clientResponse) {
-      const payload = new Login7Payload({
-        domain: this.config.domain,
-        userName: this.config.userName,
-        password: this.config.password,
-        database: this.config.options.database,
-        serverName: this.routingData ? this.routingData.server : this.config.server,
-        appName: this.config.options.appName,
-        packetSize: this.config.options.packetSize,
-        tdsVersion: this.config.options.tdsVersion,
-        initDbFatal: !this.config.options.fallbackToDefaultDb,
-        readOnlyIntent: this.config.options.readOnlyIntent,
-        sspiBlob: clientResponse,
-        language: this.config.options.language
-      });
+    const payload = new Login7Payload({
+      tdsVersion: versions[this.config.options.tdsVersion],
+      packetSize: this.config.options.packetSize,
+      clientProgVer: 0,
+      clientPid: process.pid,
+      connectionId: 0,
+      clientTimeZone: new Date().getTimezoneOffset(),
+      clientLcid: 0x00000409
+    });
 
-      this.routingData = undefined;
-      this.messageIo.sendMessage(TYPE.LOGIN7, payload.data);
+    if (this.config.domain) {
+      payload.sspi = createNTLMRequest({ domain: this.config.domain });
+    } else {
+      payload.userName = this.config.userName;
+      payload.password = this.config.password;
+    }
 
-      this.debug.payload(function() {
-        return payload.toString('  ');
-      });
-    };
+    payload.hostname = os.hostname();
+    payload.serverName = this.routingData ? this.routingData.server : this.config.server;
+    payload.appName = this.config.options.appName || 'Tedious';
+    payload.libraryName = libraryName;
+    payload.language = this.config.options.language;
+    payload.database = this.config.options.database;
+    payload.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
 
-    sendPayload.call(this);
+    payload.readOnlyIntent = this.config.options.readOnlyIntent;
+    payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
+
+    this.routingData = undefined;
+    this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
+
+    this.debug.payload(function() {
+      return payload.toString('  ');
+    });
+
     process.nextTick(cb);
   }
 
@@ -1789,7 +1810,8 @@ Connection.prototype.STATE = {
           if (sqlRequest.canceled) {
             sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           } else {
-            const message = 'Timeout: Request failed to complete in ' + this.config.options.requestTimeout + 'ms';
+            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
+            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
             sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
           }
         }

@@ -4,7 +4,7 @@ const Sinon = require('sinon');
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
 
 const getConfig = function() {
-  const config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+  const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
   config.password = 'InvalidPassword';
   config.options.maxRetriesOnTransientErrors = 5;
   config.options.connectionRetryInterval = 25;
@@ -74,7 +74,7 @@ exports['connection retry tests'] = {
     const config = getConfig();
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
-    const clock = this.sinon.useFakeTimers();
+    const clock = this.sinon.useFakeTimers('setTimeout');
 
     test.expect(1);
 

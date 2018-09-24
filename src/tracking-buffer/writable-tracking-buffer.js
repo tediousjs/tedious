@@ -40,14 +40,14 @@ module.exports = class WritableTrackingBuffer {
     return this.compositeBuffer;
   }
 
-  copyFrom(buffer) {
+  copyFrom(buffer: Buffer) {
     const length = buffer.length;
     this.makeRoomFor(length);
     buffer.copy(this.buffer, this.position);
     this.position += length;
   }
 
-  makeRoomFor(requiredLength) {
+  makeRoomFor(requiredLength: number) {
     if (this.buffer.length - this.position < requiredLength) {
       if (this.doubleSizeGrowth) {
         let size = Math.max(128, this.buffer.length * 2);
@@ -61,7 +61,7 @@ module.exports = class WritableTrackingBuffer {
     }
   }
 
-  newBuffer(size) {
+  newBuffer(size: number) {
     const buffer = this.buffer.slice(0, this.position);
     this.compositeBuffer = Buffer.concat([this.compositeBuffer, buffer]);
     this.buffer = (size === 0) ? ZERO_LENGTH_BUFFER : new Buffer(size).fill(0);

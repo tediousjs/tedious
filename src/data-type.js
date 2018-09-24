@@ -1,3 +1,5 @@
+// @flow
+
 const deprecate = require('depd')('tedious');
 
 const Null = require('./data-types/null');
@@ -83,7 +85,6 @@ module.exports.TYPE = {
 };
 
 const typeByName = module.exports.typeByName = {
-  Null,
   TinyInt,
   Bit,
   SmallInt,
@@ -117,6 +118,7 @@ const typeByName = module.exports.typeByName = {
   Variant,
 
   // These are all internal and should not be used directly.
+  Null,
   IntN,
   BitN,
   FloatN,
@@ -143,6 +145,6 @@ const typeByName = module.exports.typeByName = {
   deprecate.property(typeByName, alias, 'The `' + alias + '` data type alias is deprecated, please use `' + name + '` instead.');
 });
 
-['IntN', 'BitN', 'FloatN', 'MoneyN', 'DateTimeN', 'DecimalN', 'NumericN'].forEach(function(name) {
+['IntN', 'BitN', 'FloatN', 'MoneyN', 'DateTimeN', 'DecimalN', 'NumericN', 'Null'].forEach(function(name) {
   deprecate.property(typeByName, name, 'The `' + name + '` data type is internal and will be removed.');
 });

@@ -4,7 +4,7 @@ var TYPES = require('../../src/tedious').TYPES;
 var fs = require('fs');
 
 var config = JSON.parse(
-  fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 

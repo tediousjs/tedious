@@ -1,20 +1,33 @@
+// @flow
+
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
 const BigInteger = require('big-number').n;
 
 const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
-module.exports = class NTLMResponsePayload {
-  constructor(loginData) {
+type Options = {
+  domain: string,
+  userName: string,
+  password: string,
+  ntlmpacket: {
+    target: Buffer,
+    nonce: Buffer
+  }
+};
+
+class NTLMResponsePayload {
+  data: Buffer;
+
+  constructor(loginData: Options) {
     this.data = this.createResponse(loginData);
   }
 
-  toString(indent) {
-    indent || (indent = '');
+  toString(indent: string = '') {
     return indent + 'NTLM Auth';
   }
 
-  createResponse(challenge) {
+  createResponse(challenge: Options) {
     const client_nonce = this.createClientNonce();
     const lmv2len = 24;
     const ntlmv2len = 16;
@@ -82,7 +95,7 @@ module.exports = class NTLMResponsePayload {
     return client_nonce;
   }
 
-  ntlmv2Response(domain, user, password, serverNonce, targetInfo, clientNonce, mytime) {
+  ntlmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, targetInfo: Buffer, clientNonce: Buffer, mytime: number) {
     const timestamp = this.createTimestamp(mytime);
     const hash = this.ntv2Hash(domain, user, password);
     const dataLength = 40 + targetInfo.length;
@@ -98,7 +111,7 @@ module.exports = class NTLMResponsePayload {
     return this.hmacMD5(data, hash);
   }
 
-  createTimestamp(time) {
+  createTimestamp(time: number) {
     const tenthsOfAMicrosecond = new BigInteger(time).plus(11644473600).multiply(10000000);
     const hexArray = [];
 
@@ -119,7 +132,7 @@ module.exports = class NTLMResponsePayload {
     return new Buffer(hexArray.join(''), 'hex');
   }
 
-  lmv2Response(domain, user, password, serverNonce, clientNonce) {
+  lmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, clientNonce: Buffer) {
     const hash = this.ntv2Hash(domain, user, password);
     const data = new Buffer(serverNonce.length + clientNonce.length).fill(0);
 
@@ -135,13 +148,13 @@ module.exports = class NTLMResponsePayload {
     return response;
   }
 
-  ntv2Hash(domain, user, password) {
+  ntv2Hash(domain: string, user: string, password: string) {
     const hash = this.ntHash(password);
     const identity = new Buffer(user.toUpperCase() + domain.toUpperCase(), 'ucs2');
     return this.hmacMD5(identity, hash);
   }
 
-  ntHash(text) {
+  ntHash(text: string) {
     const hash = new Buffer(21).fill(0);
     hash.fill(0);
 
@@ -155,7 +168,7 @@ module.exports = class NTLMResponsePayload {
     return hash;
   }
 
-  hmacMD5(data, key) {
+  hmacMD5(data: Buffer, key: Buffer) {
     const hmac = crypto.createHmac('MD5', key);
     hmac.update(data);
 
@@ -166,4 +179,6 @@ module.exports = class NTLMResponsePayload {
       return new Buffer(result, 'ascii').slice(0, 16);
     }
   }
-};
+}
+
+module.exports = NTLMResponsePayload;

@@ -1,5 +1,6 @@
 var fs = require('fs');
 var InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
+const homedir = require('os').homedir();
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
@@ -7,13 +8,13 @@ var getConfig = function() {
   return {
     server: JSON.parse(
       fs.readFileSync(
-        process.env.HOME + '/.tedious/test-connection.json',
+        homedir + '/.tedious/test-connection.json',
         'utf8'
       )
     ).config.server,
     instanceName: JSON.parse(
       fs.readFileSync(
-        process.env.HOME + '/.tedious/test-connection.json',
+        homedir + '/.tedious/test-connection.json',
         'utf8'
       )
     ).instanceName

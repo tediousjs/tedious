@@ -2,10 +2,11 @@ var async = require('async');
 var Connection = require('../../src/connection');
 var Request = require('../../src/request');
 var fs = require('fs');
+const homedir = require('os').homedir();
 
 var getConfig = function() {
   var config = JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
   config.options.debug = {
@@ -27,13 +28,13 @@ process.on('uncaughtException', function(err) {
 
 var getInstanceName = function() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).instanceName;
 };
 
 var getNtlmConfig = function() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).ntlm;
 };
 
@@ -319,6 +320,26 @@ exports.encrypt = function(test) {
 
   return connection.on('debug', function(text) {
     //console.log(text)
+  });
+};
+
+exports['fails if no cipher can be negotiated'] = function(test) {
+  var config = getConfig();
+  config.options.encrypt = true;
+
+  // Do not allow any cipher to be used
+  config.options.cryptoCredentialsDetails = {
+    ciphers: '!ALL'
+  };
+
+  var connection = new Connection(config);
+  connection.on('connect', function(err) {
+    test.ok(err);
+    test.strictEqual(err.code, 'ESOCKET');
+  });
+
+  connection.on('end', function() {
+    test.done();
   });
 };
 
@@ -633,6 +654,9 @@ exports.closeConnectionRequestPending = function(test) {
 
   connection.on('end', function(info) {
     test.done();
+  });
+
+  connection.on('error', function(err) {
   });
 
   connection.on('infoMessage', function(info) {
