@@ -1,4 +1,8 @@
-const sprintf = require('sprintf-js').sprintf;
+// @flow
+
+/* globals $Values */
+
+const { sprintf } = require('sprintf-js');
 
 const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
 
@@ -47,7 +51,9 @@ const DEFAULT_WINDOW = 0;
 const NL = '\n';
 
 class Packet {
-  constructor(typeOrBuffer) {
+  buffer: Buffer;
+
+  constructor(typeOrBuffer: Buffer | $Values<typeof TYPE>) {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
     } else {
@@ -70,7 +76,7 @@ class Packet {
     return this.buffer.readUInt16BE(OFFSET.Length);
   }
 
-  resetConnection(reset) {
+  resetConnection(reset?: boolean) {
     let status = this.buffer.readUInt8(OFFSET.Status);
     if (reset) {
       status |= STATUS.RESETCONNECTION;
@@ -80,7 +86,7 @@ class Packet {
     this.buffer.writeUInt8(status, OFFSET.Status);
   }
 
-  last(last) {
+  last(last?: boolean) {
     let status = this.buffer.readUInt8(OFFSET.Status);
     if (arguments.length > 0) {
       if (last) {
@@ -97,14 +103,14 @@ class Packet {
     return !!(this.buffer.readUInt8(OFFSET.Status) & STATUS.EOM);
   }
 
-  packetId(packetId) {
+  packetId(packetId?: number) {
     if (packetId) {
       this.buffer.writeUInt8(packetId % 256, OFFSET.PacketID);
     }
     return this.buffer.readUInt8(OFFSET.PacketID);
   }
 
-  addData(data) {
+  addData(data: Buffer) {
     this.buffer = Buffer.concat([this.buffer, data]);
     this.setLength();
     return this;
@@ -135,15 +141,12 @@ class Packet {
     return statuses.join(' ').trim();
   }
 
-  headerToString(indent) {
-    indent || (indent = '');
+  headerToString(indent: string = '') {
     const text = sprintf('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X', this.buffer.readUInt8(OFFSET.Type), typeByValue[this.buffer.readUInt8(OFFSET.Type)], this.buffer.readUInt8(OFFSET.Status), this.statusAsString(), this.buffer.readUInt16BE(OFFSET.Length), this.buffer.readUInt16BE(OFFSET.SPID), this.buffer.readUInt8(OFFSET.PacketID), this.buffer.readUInt8(OFFSET.Window));
     return indent + text;
   }
 
-  dataToString(indent) {
-    indent || (indent = '');
-
+  dataToString(indent: string = '') {
     const BYTES_PER_GROUP = 0x04;
     const CHARS_PER_GROUP = 0x08;
     const BYTES_PER_LINE = 0x20;
@@ -192,8 +195,7 @@ class Packet {
     return dataDump;
   }
 
-  toString(indent) {
-    indent || (indent = '');
+  toString(indent: string = '') {
     return this.headerToString(indent) + '\n' + this.dataToString(indent + indent);
   }
 
@@ -204,7 +206,7 @@ class Packet {
 module.exports.Packet = Packet;
 
 module.exports.isPacketComplete = isPacketComplete;
-function isPacketComplete(potentialPacketBuffer) {
+function isPacketComplete(potentialPacketBuffer: Buffer) {
   if (potentialPacketBuffer.length < HEADER_LENGTH) {
     return false;
   } else {
@@ -213,6 +215,6 @@ function isPacketComplete(potentialPacketBuffer) {
 }
 
 module.exports.packetLength = packetLength;
-function packetLength(potentialPacketBuffer) {
+function packetLength(potentialPacketBuffer: Buffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 }

@@ -1,4 +1,6 @@
-const sprintf = require('sprintf-js').sprintf;
+// @flow
+
+const { sprintf } = require('sprintf-js');
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 
 const optionBufferSize = 20;
@@ -44,15 +46,40 @@ for (const name in MARS) {
 }
 
 
+type Options = {
+  encrypt: boolean
+};
+
 /*
   s2.2.6.4
  */
 module.exports = class PreloginPayload {
-  constructor(bufferOrOptions) {
+  data: Buffer;
+  options: Options;
+
+  version: {
+    major: number,
+    minor: number,
+    patch: number,
+    trivial: number,
+    subbuild: number
+  };
+
+  encryption: number;
+  encryptionString: string;
+
+  instance: number;
+
+  threadId: number;
+
+  mars: number;
+  marsString: string;
+
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
     } else {
-      this.options = bufferOrOptions || {};
+      this.options = bufferOrOptions;
       this.createOptions();
     }
     this.extractOptions();
@@ -185,7 +212,7 @@ module.exports = class PreloginPayload {
     }
   }
 
-  extractVersion(offset) {
+  extractVersion(offset: number) {
     this.version = {
       major: this.data.readUInt8(offset + 0),
       minor: this.data.readUInt8(offset + 1),
@@ -195,30 +222,25 @@ module.exports = class PreloginPayload {
     };
   }
 
-  extractEncryption(offset) {
+  extractEncryption(offset: number) {
     this.encryption = this.data.readUInt8(offset);
     this.encryptionString = encryptByValue[this.encryption];
   }
 
-  extractInstance(offset) {
+  extractInstance(offset: number) {
     this.instance = this.data.readUInt8(offset);
   }
 
-  extractThreadId(offset) {
+  extractThreadId(offset: number) {
     this.threadId = this.data.readUInt32BE(offset);
   }
 
-  extractMars(offset) {
+  extractMars(offset: number) {
     this.mars = this.data.readUInt8(offset);
     this.marsString = marsByValue[this.mars];
   }
 
-  extractFedAuth(offset) {
-    this.fedAuthRequired = this.data.readUInt8(offset);
-  }
-
-  toString(indent) {
-    indent || (indent = '');
-    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s),fedAuthRequired:0x%02X', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0, this.fedAuthRequired ? this.fedAuthRequired : 0);
+  toString(indent: string = '') {
+    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0);
   }
 };

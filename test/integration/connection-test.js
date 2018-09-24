@@ -2,10 +2,11 @@ var async = require('async');
 var Connection = require('../../src/connection');
 var Request = require('../../src/request');
 var fs = require('fs');
+const homedir = require('os').homedir();
 
 var getConfig = function() {
   var config = JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
   config.options.debug = {
@@ -27,13 +28,13 @@ process.on('uncaughtException', function(err) {
 
 var getInstanceName = function() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).instanceName;
 };
 
 var getNtlmConfig = function() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).ntlm;
 };
 

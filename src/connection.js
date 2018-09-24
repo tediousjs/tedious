@@ -959,10 +959,11 @@ class Connection extends EventEmitter {
 
   createRequestTimer() {
     this.clearRequestTimer();                              // release old timer, just to be safe
-    if (this.config.options.requestTimeout) {
+    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
-      }, this.config.options.requestTimeout);
+      }, timeout);
     }
   }
 
@@ -1062,7 +1063,11 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+    if (this.state !== this.STATE.FINAL) {
+      const error = new Error('socket hang up');
+      error.code = 'ECONNRESET';
+      this.socketError(error);
+    }
   }
 
   socketClose() {
@@ -2001,7 +2006,8 @@ Connection.prototype.STATE = {
           if (sqlRequest.canceled) {
             sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           } else {
-            const message = 'Timeout: Request failed to complete in ' + this.config.options.requestTimeout + 'ms';
+            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
+            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
             sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
           }
         }
