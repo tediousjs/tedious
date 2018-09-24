@@ -959,7 +959,11 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+    if (this.state !== this.STATE.FINAL) {
+      const error = new Error('socket hang up');
+      error.code = 'ECONNRESET';
+      this.socketError(error);
+    }
   }
 
   socketClose() {
