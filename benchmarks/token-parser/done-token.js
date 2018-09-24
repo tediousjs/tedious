@@ -9,7 +9,7 @@ var common = require("../common");
 var parser = new Parser({ token: function() { } }, {}, {});
 
 var tokenCount = 500;
-var data = new Buffer(new Array(tokenCount).join("FE0000E0000000000000000000"), "hex");
+var data = Buffer.from(new Array(tokenCount).join("FE0000E0000000000000000000"), "hex");
 
 common.createBenchmark({
   name: "parsing `DONEPROC` tokens",

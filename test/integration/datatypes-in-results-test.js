@@ -401,7 +401,7 @@ exports.varbinary = function(test) {
   execSql(
     test,
     'select cast(0x1234 as varbinary(4))',
-    new Buffer([0x12, 0x34])
+    Buffer.from([0x12, 0x34])
   );
 };
 
@@ -413,7 +413,7 @@ exports.binary = function(test) {
   execSql(
     test,
     'select cast(0x1234 as binary(4))',
-    new Buffer([0x12, 0x34, 0x00, 0x00])
+    Buffer.from([0x12, 0x34, 0x00, 0x00])
   );
 };
 
@@ -425,7 +425,7 @@ exports.varbinaryMax = function(test) {
   execSql(
     test,
     'select cast(0x1234 as varbinary(max))',
-    new Buffer([0x12, 0x34]),
+    Buffer.from([0x12, 0x34]),
     '7_2'
   );
 };
@@ -475,7 +475,7 @@ exports.ntextNull = function(test) {
 };
 
 exports.image = function(test) {
-  execSql(test, 'select cast(0x1234 as image)', new Buffer([0x12, 0x34]));
+  execSql(test, 'select cast(0x1234 as image)', Buffer.from([0x12, 0x34]));
 };
 
 exports.imageNull = function(test) {
@@ -514,7 +514,7 @@ exports.variantVarBin = function(test) {
   execSql(
     test,
     'select cast(0x1234 as sql_variant)',
-    new Buffer([0x12, 0x34], '7_2')
+    Buffer.from([0x12, 0x34], '7_2')
   );
 };
 
@@ -544,7 +544,7 @@ exports.variantMultipleDatatypes = function(test) {
   `;
   const expectedValues = ['abcdШ',
     3148.29,
-    new Buffer([0x12, 0x34]),
+    Buffer.from([0x12, 0x34]),
     '01234567-89AB-CDEF-0123-456789ABCDEF',
     0.00000090000000000,
     new Date('December 4, 2011 10:04:23 GMT'),
@@ -603,7 +603,7 @@ exports.udt = function(test) {
   execSql(
     test,
     "select geography::STGeomFromText('LINESTRING(-122.360 47.656, -122.343 47.656 )', 4326) as geo",
-    new Buffer([
+    Buffer.from([
       230,
       16,
       0,

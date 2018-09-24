@@ -155,7 +155,7 @@ class NTLMResponsePayload {
   }
 
   ntHash(text: string) {
-    const hash = new Buffer(21).fill(0);
+    const hash = Buffer.alloc(21).fill(0);
     hash.fill(0);
 
     const unicodeString = Buffer.from(text, 'ucs2');

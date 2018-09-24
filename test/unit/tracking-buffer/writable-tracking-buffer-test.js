@@ -115,7 +115,7 @@ exports.writeUsVarchar = function(test) {
 
 exports.copyFrom = function(test) {
   var buffer = new TrackingBuffer(10);
-  var source = new Buffer([0x01, 0x02, 0x03, 0x04]);
+  var source = Buffer.from([0x01, 0x02, 0x03, 0x04]);
 
   buffer.copyFrom(source);
   buffer.writeUInt8(5);
@@ -127,7 +127,7 @@ exports.copyFrom = function(test) {
 
 var assertBuffer = function(test, actual, expected) {
   actual = actual.data;
-  expected = new Buffer(expected);
+  expected = Buffer.from(expected);
 
   var comparisonResult = actual.equals(expected);
   if (!comparisonResult) {

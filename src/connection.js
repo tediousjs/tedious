@@ -1042,7 +1042,7 @@ class Connection extends EventEmitter {
     payload.libraryName = libraryName;
     payload.language = this.config.options.language;
     payload.database = this.config.options.database;
-    payload.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    payload.clientId = Buffer.from([1, 2, 3, 4, 5, 6]);
 
     payload.readOnlyIntent = this.config.options.readOnlyIntent;
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;

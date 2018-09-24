@@ -7,7 +7,7 @@ var Parser = require("../../lib/token/token-stream-parser").Parser;
 var common = require("../common");
 
 var parser = new Parser({ token: function() { } }, {}, {});
-var data = new Buffer([
+var data = Buffer.from([
   "810300000000001000380269006400000000000900E7C8000904D00034046E00",
   "61006D006500000000000900E7FFFF0904D000340B6400650073006300720069",
   "007000740069006F006E00D1010000000A0052006F0077002000300044000000",

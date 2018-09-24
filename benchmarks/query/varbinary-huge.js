@@ -18,7 +18,7 @@ common.createBenchmark({
         if (err) return cb(err);
 
         var request = new Request("INSERT INTO #benchmark ([value]) VALUES (@value)", cb);
-        var buf = new Buffer(50 * 1024 * 1024);
+        var buf = Buffer.alloc(50 * 1024 * 1024);
         buf.fill("x");
         request.addParameter("value", TYPES.VarBinary, buf);
         connection.execSql(request);
