@@ -1,5 +1,15 @@
 const Connection = require('../../src/tedious').Connection;
 
+function ensureConnectionIsClosed(connection, callback) {
+  if (connection.closed) {
+    process.nextTick(callback);
+    return;
+  }
+
+  connection.on('end', callback);
+  connection.close();
+}
+
 exports['Connection configuration validation'] = {
   setUp: function(done) {
     this.config = {};
@@ -11,7 +21,7 @@ exports['Connection configuration validation'] = {
   'default transient retry interval': function(test) {
     const connection = new Connection(this.config);
     test.strictEqual(connection.config.options.connectionRetryInterval, 500);
-    test.done();
+    ensureConnectionIsClosed(connection, () => { test.done(); });
   },
 
   'good transient retry interval': function(test) {
@@ -19,7 +29,7 @@ exports['Connection configuration validation'] = {
     this.config.options.connectionRetryInterval = goodRetryInterval;
     const connection = new Connection(this.config);
     test.strictEqual(connection.config.options.connectionRetryInterval, goodRetryInterval);
-    test.done();
+    ensureConnectionIsClosed(connection, () => { test.done(); });
   },
 
   'bad transient retry interval': function(test) {
@@ -41,21 +51,25 @@ exports['Connection configuration validation'] = {
   'default max transient retries': function(test) {
     const connection = new Connection(this.config);
     test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
-    test.done();
+    ensureConnectionIsClosed(connection, () => { test.done(); });
   },
 
   'good max transient retries': function(test) {
     const zeroMaxRetries = 0;
     this.config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
-    let connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, zeroMaxRetries);
+    const firstConnection = new Connection(this.config);
+    test.strictEqual(firstConnection.config.options.maxRetriesOnTransientErrors, zeroMaxRetries);
 
     const nonZeroMaxRetries = 5;
     this.config.options.maxRetriesOnTransientErrors = nonZeroMaxRetries;
-    connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, nonZeroMaxRetries);
+    const secondConnection = new Connection(this.config);
+    test.strictEqual(secondConnection.config.options.maxRetriesOnTransientErrors, nonZeroMaxRetries);
 
-    test.done();
+    ensureConnectionIsClosed(firstConnection, () => {
+      ensureConnectionIsClosed(secondConnection, () => {
+        test.done();
+      });
+    });
   },
 
   'bad max transient retries': function(test) {

@@ -2,7 +2,7 @@ var Connection = require('../lib/tedious').Connection;
 var Request = require('../lib/tedious').Request;
 var fs = require('fs');
 
-var config = JSON.parse(fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')).config;
+var config = JSON.parse(fs.readFileSync(require('os').homedir()+ '/.tedious/test-connection.json', 'utf8')).config;
 
 config.options.requestTimeout = 30 * 1000;
 config.options.debug = {
