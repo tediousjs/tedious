@@ -163,7 +163,7 @@ class NTLMResponsePayload {
     if (md4.copy) {
       md4.copy(hash);
     } else {
-      Buffer.from(md4, 'ascii').copy(hash);
+      Buffer.from(md4).copy(hash);
     }
     return hash;
   }
@@ -176,7 +176,7 @@ class NTLMResponsePayload {
     if (result.copy) {
       return result;
     } else {
-      return Buffer.from(result, 'ascii').slice(0, 16);
+      return Buffer.from(result).slice(0, 16);
     }
   }
 }
