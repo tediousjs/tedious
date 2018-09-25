@@ -493,7 +493,7 @@ class Connection extends EventEmitter {
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
-    this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
+    this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
@@ -959,7 +959,11 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+    if (this.state !== this.STATE.FINAL) {
+      const error = new Error('socket hang up');
+      error.code = 'ECONNRESET';
+      this.socketError(error);
+    }
   }
 
   socketClose() {
@@ -989,7 +993,7 @@ class Connection extends EventEmitter {
   }
 
   emptyMessageBuffer() {
-    this.messageBuffer = new Buffer(0);
+    this.messageBuffer = Buffer.alloc(0);
   }
 
   addToMessageBuffer(data) {
@@ -1038,7 +1042,7 @@ class Connection extends EventEmitter {
     payload.libraryName = libraryName;
     payload.language = this.config.options.language;
     payload.database = this.config.options.database;
-    payload.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    payload.clientId = Buffer.from([1, 2, 3, 4, 5, 6]);
 
     payload.readOnlyIntent = this.config.options.readOnlyIntent;
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
