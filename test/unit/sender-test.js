@@ -7,7 +7,7 @@ const anyPort = 1234;
 const anyIpv4 = '1.2.3.4';
 const anyIpv6 = '2002:20:0:0:0:0:1:3';
 const anyHost = 'myhostname';
-const anyRequest = new Buffer(0x02);
+const anyRequest = Buffer.alloc(0x02);
 
 const udpIpv4 = 'udp4';
 const udpIpv6 = 'udp6';

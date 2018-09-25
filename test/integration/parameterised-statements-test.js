@@ -274,7 +274,7 @@ exports.textSmall = function(test) {
 };
 
 exports.textLarge = function(test) {
-  var dBuf = new Buffer(500000);
+  var dBuf = Buffer.alloc(500000);
   dBuf.fill('x');
   execSql(test, TYPES.Text, dBuf.toString());
 };
@@ -793,7 +793,7 @@ end')\
       connection.close();
     });
 
-    var sample = new Buffer([0x00, 0x01, 0xe2, 0x40]);
+    var sample = Buffer.from([0x00, 0x01, 0xe2, 0x40]);
 
     request.addParameter('in', TYPES.Binary, sample);
     request.addParameter('in2', TYPES.Binary, null);

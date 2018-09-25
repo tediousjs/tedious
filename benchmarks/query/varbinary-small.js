@@ -16,7 +16,7 @@ common.createBenchmark({
         if (err) return cb(err);
 
         var request = new Request("INSERT INTO #benchmark ([value]) VALUES (@value)", cb);
-        request.addParameter("value", TYPES.VarBinary, new Buffer("asdf"));
+        request.addParameter("value", TYPES.VarBinary, Buffer.from("asdf"));
         connection.execSql(request);
       });
 

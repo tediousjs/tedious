@@ -51,7 +51,7 @@ describe('inserting binary data', function() {
             return done(err);
           }
 
-          assert.deepEqual(values, [new Buffer([0x12, 0x34, 0x00, 0xce])]);
+          assert.deepEqual(values, [Buffer.from([0x12, 0x34, 0x00, 0xce])]);
 
           done();
         });
@@ -63,7 +63,7 @@ describe('inserting binary data', function() {
         this.connection.execSql(request);
       });
 
-      request.addParameter('p1', TYPES.Binary, new Buffer([0x12, 0x34, 0x00, 0xce]));
+      request.addParameter('p1', TYPES.Binary, Buffer.from([0x12, 0x34, 0x00, 0xce]));
       this.connection.execSql(request);
     });
 

@@ -25,7 +25,7 @@ module.exports = {
   },
 
   writeParameterData: function(buffer, parameter) {
-    buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
     if (parameter.value != null) {
       buffer.writeInt32LE(parameter.length);
       buffer.writeString(parameter.value.toString(), 'ascii');

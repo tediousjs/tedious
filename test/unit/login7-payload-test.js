@@ -69,7 +69,7 @@ exports.create = function(test) {
 
   var passwordStart = data.readUInt16LE(4 + 32 + 2 * 4);
   var passwordEnd = passwordStart + 2 * payload.password.length;
-  var passwordExpected = new Buffer([0xa2, 0xa5, 0xd2, 0xa5]);
+  var passwordExpected = Buffer.from([0xa2, 0xa5, 0xd2, 0xa5]);
   test.ok(data.slice(passwordStart, passwordEnd).equals(passwordExpected));
 
   test.done();
@@ -94,7 +94,7 @@ exports.createSSPI = function(test) {
   payload.libraryName = 'Tedious';
   payload.attachDbFile = 'c:\\mydbfile.mdf';
   payload.changePassword = 'new_pw';
-  payload.sspi = new Buffer([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9]);
+  payload.sspi = Buffer.from([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9]);
 
   var expectedLength =
     4 +                                             // Length
