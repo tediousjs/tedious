@@ -53,7 +53,7 @@ script:
 jobs:
   include:
     - stage: lint
-      node_js: 4
+      node_js: 6
       before_install: skip
       before_script: skip
       script:

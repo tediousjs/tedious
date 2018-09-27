@@ -7,7 +7,7 @@ const Debug = require('../../src/debug');
 
 describe('OutgoingMessageStream', function() {
   it('wraps the given message contents into a packet', function(done) {
-    const contents = new Buffer('test1234');
+    const contents = Buffer.from('test1234');
 
     const message = new Message({ type: 0x11 });
     message.end(contents);
@@ -39,7 +39,7 @@ describe('OutgoingMessageStream', function() {
   });
 
   it('splits messages that exceed the packetSize - packetHeaderSize into multiple packets', function(done) {
-    const contents = new Buffer('test1234');
+    const contents = Buffer.from('test1234');
 
     const message = new Message({ type: 0x11 });
     message.end(contents);
@@ -77,7 +77,7 @@ describe('OutgoingMessageStream', function() {
   });
 
   it('supports writing multiple different messages', function(done) {
-    const contents = new Buffer('test1234');
+    const contents = Buffer.from('test1234');
 
     const messages = [
       new Message({ type: 0x11 }),

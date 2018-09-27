@@ -12,8 +12,8 @@ const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
-const PLP_NULL = new Buffer([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-const UNKNOWN_PLP_LEN = new Buffer([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
 function readTextPointerNull(parser, type, callback) {
@@ -436,7 +436,7 @@ function readMax(parser, callback) {
 }
 
 function readMaxKnownLength(parser, totalLength, callback) {
-  const data = new Buffer(totalLength).fill(0);
+  const data = Buffer.alloc(totalLength, 0);
 
   let offset = 0;
   function next(done) {

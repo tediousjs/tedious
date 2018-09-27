@@ -136,7 +136,7 @@ class Login7Payload {
   }
 
   toBuffer() {
-    const fixedData = new Buffer(94);
+    const fixedData = Buffer.alloc(94);
     const buffers = [fixedData];
 
     let offset = 0, dataOffset = fixedData.length;
@@ -182,7 +182,7 @@ class Login7Payload {
 
     // cchHostName: 2-byte
     if (this.hostname) {
-      const buffer = new Buffer(this.hostname, 'ucs2');
+      const buffer = Buffer.from(this.hostname, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -197,7 +197,7 @@ class Login7Payload {
 
     // cchUserName: 2-byte
     if (this.userName) {
-      const buffer = new Buffer(this.userName, 'ucs2');
+      const buffer = Buffer.from(this.userName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -212,7 +212,7 @@ class Login7Payload {
 
     // cchPassword: 2-byte
     if (this.password) {
-      const buffer = new Buffer(this.password, 'ucs2');
+      const buffer = Buffer.from(this.password, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -227,7 +227,7 @@ class Login7Payload {
 
     // cchAppName: 2-byte
     if (this.appName) {
-      const buffer = new Buffer(this.appName, 'ucs2');
+      const buffer = Buffer.from(this.appName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -242,7 +242,7 @@ class Login7Payload {
 
     // cchServerName: 2-byte
     if (this.serverName) {
-      const buffer = new Buffer(this.serverName, 'ucs2');
+      const buffer = Buffer.from(this.serverName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -268,7 +268,7 @@ class Login7Payload {
 
     // cchCltIntName: 2-byte
     if (this.libraryName) {
-      const buffer = new Buffer(this.libraryName, 'ucs2');
+      const buffer = Buffer.from(this.libraryName, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -283,7 +283,7 @@ class Login7Payload {
 
     // cchLanguage: 2-byte
     if (this.language) {
-      const buffer = new Buffer(this.language, 'ucs2');
+      const buffer = Buffer.from(this.language, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -298,7 +298,7 @@ class Login7Payload {
 
     // cchDatabase: 2-byte
     if (this.database) {
-      const buffer = new Buffer(this.database, 'ucs2');
+      const buffer = Buffer.from(this.database, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -335,7 +335,7 @@ class Login7Payload {
 
     // cchAtchDBFile: 2-byte
     if (this.attachDbFile) {
-      const buffer = new Buffer(this.attachDbFile, 'ucs2');
+      const buffer = Buffer.from(this.attachDbFile, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;
@@ -350,7 +350,7 @@ class Login7Payload {
 
     // cchChangePassword: 2-byte
     if (this.changePassword) {
-      const buffer = new Buffer(this.changePassword, 'ucs2');
+      const buffer = Buffer.from(this.changePassword, 'ucs2');
 
       offset = fixedData.writeUInt16LE(buffer.length / 2, offset);
       dataOffset += buffer.length;

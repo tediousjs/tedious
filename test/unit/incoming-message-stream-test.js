@@ -7,8 +7,8 @@ const Debug = require('../../src/debug');
 
 describe('IncomingMessageStream', function() {
   it('extract messages from packet data', function(done) {
-    const packetData = new Buffer('test1234');
-    const packetHeader = new Buffer(8);
+    const packetData = Buffer.from('test1234');
+    const packetHeader = Buffer.alloc(8);
 
     let offset = 0;
     offset = packetHeader.writeUInt8(0x11, offset);
@@ -44,8 +44,8 @@ describe('IncomingMessageStream', function() {
   });
 
   it('streams packet data into the message as packets come in', function(done) {
-    const packetData = new Buffer('test1234');
-    const packetHeader = new Buffer(8);
+    const packetData = Buffer.from('test1234');
+    const packetHeader = Buffer.alloc(8);
 
     let offset = 0;
     offset = packetHeader.writeUInt8(0x11, offset);

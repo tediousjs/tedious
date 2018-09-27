@@ -98,7 +98,7 @@ exports['instanceLookup functional unit tests'] = {
     };
 
     this.anyPort = 1234;
-    this.anyRequest = new Buffer(0x02);
+    this.anyRequest = Buffer.alloc(0x02);
     this.anyMessage = 'any message';
     this.anyError = new Error('any error');
     this.anySqlPort = 2345;
