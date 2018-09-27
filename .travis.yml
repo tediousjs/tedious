@@ -87,13 +87,9 @@ jobs:
         echo '{
           "config": {
             "server": "'${AZURE_SERVER}'",
-            "authentication": {
-              "type": "azure-active-directory",
-              "options": {
-                "userName": "'${AZURE_AD_USER}'",
-                "password": "'${AZURE_AD_PASS}'"
-              }
-            },
+            "userName": "'${AZURE_AD_USER}'",
+            "password": "'${AZURE_AD_PASS}'",
+            "authentication": "ActiveDirectoryPassword",
             "options": {
               "database": "test",
               "encrypt": true
