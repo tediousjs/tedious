@@ -120,7 +120,7 @@ class Connection extends EventEmitter {
     let authentication;
     if (config.authentication != undefined) {
       authentication = {
-        type:'azure-active-directory',
+        type: 'azure-active-directory',
         options: {
           userName: config.userName,
           password: config.password
@@ -530,10 +530,9 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
       if (this.config.authentication.type === 'azure-active-directory') {
-        
         if (!Object.values(this.fedAuthInfo.ValidFedAuthEnum).includes(config.authentication.toUpperCase())) {
-         throw new Error(`${config.authentication} is not a valid authentication method`);
-        } 
+          throw new Error(`${config.authentication} is not a valid authentication method`);
+        }
         if (this.config.options.tdsVersion < '7_4') {
           throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
         }
