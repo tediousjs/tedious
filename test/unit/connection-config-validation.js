@@ -84,7 +84,7 @@ exports['Connection configuration validation'] = {
 
   'bad azure ad authentication method': function(test) {
     const authenticationMethod = 'abc';
-    this.config.options.authentication = authenticationMethod;
+    this.config.authentication = authenticationMethod;
     test.throws(() => {
       new Connection(this.config);
     });
@@ -94,7 +94,7 @@ exports['Connection configuration validation'] = {
 
   'bad tds version for with azure ad': function(test) {
     const authenticationMethod = 'activedirectorypassword';
-    this.config.options.authentication = authenticationMethod;
+    this.config.authentication = authenticationMethod;
     this.config.options.tdsVersion = '7_2';
     test.throws(() => {
       new Connection(this.config);

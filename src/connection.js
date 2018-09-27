@@ -119,8 +119,14 @@ class Connection extends EventEmitter {
 
     let authentication;
     if (config.authentication != undefined) {
-      // TODO: Ensure that config.authentication is well formed here.
-      authentication = config.authentication;
+      authentication = {
+        type:'azure-active-directory',
+        options: {
+          userName: config.userName,
+          password: config.password
+        }
+      };
+
     } else {
       authentication = config.domain ? {
         type: 'ntlm',
@@ -523,8 +529,11 @@ class Connection extends EventEmitter {
         deprecateNonBooleanConfigValue('options.useUTC', config.options.useUTC);
         this.config.options.useUTC = config.options.useUTC;
       }
-
       if (this.config.authentication.type === 'azure-active-directory') {
+        
+        if (!Object.values(this.fedAuthInfo.ValidFedAuthEnum).includes(config.authentication.toUpperCase())) {
+         throw new Error(`${config.authentication} is not a valid authentication method`);
+        } 
         if (this.config.options.tdsVersion < '7_4') {
           throw new Error(`Azure Active Directory authentication is not supported in the TDS version ${this.config.options.tdsVersion}`);
         }
@@ -532,13 +541,12 @@ class Connection extends EventEmitter {
         // Whenever authentication property is used to specify an authentication method,
         // the client will request encryption (the default value of the Encrypt property will be true)
         // and it will validate the server certificate (regardless of the encryption setting), unless TrustServerCertificate = true
-
         this.config.options.encrypt = true;
         if (!config.options.trustServerCertificate) {
           this.config.options.trustServerCertificate = false;
         }
 
-        this.fedAuthInfo.method = this.fedAuthInfo.ValidFedAuthEnum.ActiveDirectoryPassword;
+        this.fedAuthInfo.method = config.authentication;
       }
     }
 
