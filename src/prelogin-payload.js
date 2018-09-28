@@ -47,7 +47,8 @@ for (const name in MARS) {
 
 
 type Options = {
-  encrypt: boolean
+  encrypt: boolean,
+  fedAuthRequired: boolean
 };
 
 /*
@@ -240,7 +241,7 @@ module.exports = class PreloginPayload {
     this.marsString = marsByValue[this.mars];
   }
 
-  extractFedAuth(offset) {
+  extractFedAuth(offset: number) {
     this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
