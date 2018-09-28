@@ -48,23 +48,6 @@ exports['instanceLookup invalid args'] = {
     }
   },
 
-  'invalid retries': function(test) {
-    const expectedErrorMessage =
-      'Invalid arguments: "retries" must be a number';
-    try {
-      const notNumber = 'some string';
-      this.instanceLookup({
-        server: 'server',
-        instanceName: 'instance',
-        timeout: 1000,
-        retries: notNumber
-      });
-    } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
-    }
-  },
-
   'invalid callback': function(test) {
     const expectedErrorMessage =
       'Invalid arguments: "callback" must be a function';
@@ -74,8 +57,7 @@ exports['instanceLookup invalid args'] = {
         {
           server: 'server',
           instanceName: 'instance',
-          timeout: 1000,
-          retries: 3
+          timeout: 1000
         },
         notFunction
       );
@@ -93,8 +75,7 @@ exports['instanceLookup functional unit tests'] = {
     this.options = {
       server: 'server',
       instanceName: 'instance',
-      timeout: 1000,
-      retries: 3
+      timeout: 1000
     };
 
     this.anyPort = 1234;
@@ -189,81 +170,6 @@ exports['instanceLookup functional unit tests'] = {
 
       test.ok(this.senderExecuteStub.calledOnce);
       test.ok(this.parseStub.calledOnce);
-      test.done();
-    });
-  },
-
-  'retry success': function(test) {
-    // First invocation of execute will not invoke callback. This will cause a timeout
-    // and trigger a retry. Setup to invoke callback on second invocation.
-    this.senderExecuteStub
-      .onCall(1)
-      .callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub
-      .withArgs(this.anyMessage, this.options.instanceName)
-      .returns(this.anySqlPort);
-
-    const clock = this.sinon.useFakeTimers();
-
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.strictEqual(error, undefined);
-      test.strictEqual(port, this.anySqlPort);
-
-      test.ok(this.createSenderStub.callCount, 2);
-      for (let j = 0; j < this.createSenderStub.callCount; j++) {
-        test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3]);
-      }
-
-      // Execute called twice but parse only called once as the first call to execute times out.
-      test.strictEqual(this.senderExecuteStub.callCount, 2);
-      test.ok(this.parseStub.calledOnce);
-
-      clock.restore();
-      test.done();
-    });
-
-    // Forward clock to trigger timeout.
-    clock.tick(this.options.timeout * 1.1);
-  },
-
-  'retry fail': function(test) {
-    const clock = this.sinon.useFakeTimers();
-
-    const forwardClock = () => {
-      clock.tick(this.options.timeout * 1.1);
-    };
-
-    const scheduleForwardClock = function() {
-      // This function is called in place of sender.execute(). We don't want to
-      // rely on when the timeout is set in relation to execute() in the calling
-      // context. So we setup to forward clock on next tick.
-      process.nextTick(forwardClock);
-    };
-
-    this.senderExecuteStub.restore();
-    this.senderExecuteStub = this.sinon.stub(
-      this.testSender,
-      'execute',
-      scheduleForwardClock
-    );
-
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('Failed to get response') != -1);
-      test.strictEqual(port, undefined);
-
-      test.strictEqual(this.createSenderStub.callCount, this.options.retries);
-      for (let j = 0; j < this.createSenderStub.callCount; j++) {
-        test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3]);
-      }
-
-      // Execute called 'retries' number of times but parse is never called because
-      // all the execute calls timeout.
-      test.strictEqual(this.senderExecuteStub.callCount, this.options.retries);
-      test.strictEqual(this.parseStub.callCount, 0);
-
-      clock.restore();
       test.done();
     });
   },
