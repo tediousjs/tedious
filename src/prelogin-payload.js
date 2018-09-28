@@ -76,7 +76,7 @@ module.exports = class PreloginPayload {
   mars: number;
   marsString: string;
 
-  constructor(bufferOrOptions: Buffer | Options = { encrypt: false }) {
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, fedAuthRequired: false }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
     } else {
