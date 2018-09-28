@@ -48,7 +48,7 @@ for (const name in MARS) {
 
 type Options = {
   encrypt: boolean,
-  fedAuthRequired: boolean
+  fedAuthRequested: boolean
 };
 
 /*
@@ -75,8 +75,9 @@ module.exports = class PreloginPayload {
 
   mars: number;
   marsString: string;
+  fedAuthRequired: number;
 
-  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, fedAuthRequired: false }) {
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, fedAuthRequested: false }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
     } else {
