@@ -35,7 +35,7 @@ module.exports = class Parser extends Transform {
 
   _transform(input, encoding, done) {
     if (input === this.endOfMessageMarker) {
-      done(null, {                                         // generate endOfMessage pseudo token
+      done(null, { // generate endOfMessage pseudo token
         name: 'EOM',
         event: 'endOfMessage'
       });
