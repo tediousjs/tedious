@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "big-number": "1.0.0",
-    "bl": "^1.2.2",
+    "bl": "^2.0.1",
     "depd": "^1.1.2",
     "iconv-lite": "^0.4.23",
     "native-duplexpair": "^1.0.0",
