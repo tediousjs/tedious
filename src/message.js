@@ -1,6 +1,6 @@
 // @flow
 
-const { PassThrough } = require('readable-stream');
+const { PassThrough } = require('stream');
 
 class Message extends PassThrough {
   type: number;

@@ -1,7 +1,7 @@
 // @flow
 
 const BufferList = require('bl');
-const { Duplex } = require('readable-stream');
+const { Duplex } = require('stream');
 
 const { Packet, HEADER_LENGTH } = require('./packet');
 

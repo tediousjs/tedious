@@ -1,7 +1,7 @@
 // @flow
 
 const BufferList = require('bl');
-const { Transform } = require('readable-stream');
+const { Transform } = require('stream');
 
 const Message = require('./message');
 const { Packet, HEADER_LENGTH } = require('./packet');

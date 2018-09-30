@@ -1,4 +1,4 @@
-const Transform = require('readable-stream').Transform;
+const Transform = require('stream').Transform;
 const TYPE = require('./token').TYPE;
 
 const tokenParsers = {};
