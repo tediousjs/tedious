@@ -58,7 +58,7 @@
     "@commitlint/cli": "^7.1.2",
     "@commitlint/config-conventional": "^7.1.2",
     "@commitlint/travis-cli": "^7.1.2",
-    "async": "^1.4.0",
+    "async": "^2.6.1",
     "babel-eslint": "^10.0.1",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
