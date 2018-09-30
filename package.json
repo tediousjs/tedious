@@ -69,7 +69,7 @@
     "nodeunit": "^0.11.3",
     "rimraf": "^2.6.1",
     "semantic-release": "^15.9.16",
-    "sinon": "^1.17.5"
+    "sinon": "^6.3.4"
   },
   "scripts": {
     "lint": "eslint src test && flow",
