@@ -20,6 +20,7 @@ title: API - Request
   <li><a href="#event_doneInProc">Event: 'doneInProc'</a></li>
   <li><a href="#event_doneProc">Event: 'doneProc'</a></li>
   <li><a href="#event_returnValue">Event: 'returnValue'</a></li>
+  <li><a href="#event_order">Event: 'order'</a></li>
   <li><a href="#function_addParameter">request.addParameter(name, type, value, [options])</a></li>
   <li><a href="#function_addOutputParameter">request.addOutputParameter(name, type, [value], [options])</a></li>
   <li><a href="#function_pause">request.pause()</a></li>
@@ -409,6 +410,24 @@ request.on('returnValue', function (parameterName, value, metadata) { });
   </div>
 </div>
 
+<h2 id="event_order">Event: order</h2>
+{% highlight javascript %}
+request.on('order', function (orderColumns) { });
+{% endhighlight %}
+
+<p>
+  This event gives the columns by which data is ordered, if <code>ORDER BY</code> clause is executed in SQL Server.
+</p>
+
+<div class="argument">
+  <div class="name">orderColumns</div>
+  <div class="description">
+    <p>
+      An array of column numbers in the result set by which data is ordered.
+    </p>
+  </div>
+</div>
+
 <h2 id="function_addParameter">request.addParameter(name, type, value, [options])</h2>
 <p>
   Add an input parameter to the request.
@@ -453,7 +472,7 @@ request.addParameter('city', TYPES.VarChar, 'London');
     <p>
       Additional type options. Optional.
       <ul>
-        <li><code>length</code> for VarChar, NVarChar, VarBinary</li>
+        <li><code>length</code> for VarChar, NVarChar, VarBinary. Use length as <code>Infinity</code> for VarChar(max), NVarChar(max) and VarBinary(max).</li>
         <li><code>precision</code> for Numeric, Decimal</li>
         <li><code>scale</code> for Numeric, Decimal, Time, DateTime2, DateTimeOffset</li>
       </ul>
@@ -506,7 +525,7 @@ request.addOutputParameter('id', TYPES.Int);
     <p>
       Additional type options. Optional.
       <ul>
-        <li><code>length</code> for VarChar, NVarChar, VarBinary</li>
+        <li><code>length</code> for VarChar, NVarChar, VarBinary. Use length as <code>Infinity</code> for VarChar(max), NVarChar(max) and VarBinary(max).</li>
         <li><code>precision</code> for Numeric, Decimal</li>
         <li><code>scale</code> for Numeric, Decimal, Time, DateTime2, DateTimeOffset</li>
       </ul>
