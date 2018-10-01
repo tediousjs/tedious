@@ -22,7 +22,7 @@ module.exports = {
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
       buffer.writeUInt8(0x10);
-      buffer.writeBuffer(new Buffer(guidParser.guidToArray(parameter.value)));
+      buffer.writeBuffer(Buffer.from(guidParser.guidToArray(parameter.value)));
     } else {
       buffer.writeUInt8(0);
     }

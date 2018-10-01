@@ -17,7 +17,7 @@ var packetType = 2;
 var packetSize = 8 + 4;
 
 exports.sendSmallerThanOnePacket = function(test) {
-  var payload = new Buffer([1, 2, 3]);
+  var payload = Buffer.from([1, 2, 3]);
 
   var connection = new Connection();
   connection.on('packet', function(packet) {
@@ -33,7 +33,7 @@ exports.sendSmallerThanOnePacket = function(test) {
 };
 
 exports.sendExactlyPacket = function(test) {
-  var payload = new Buffer([1, 2, 3, 4]);
+  var payload = Buffer.from([1, 2, 3, 4]);
 
   var connection = new Connection();
   connection.on('packet', function(packet) {
@@ -49,7 +49,7 @@ exports.sendExactlyPacket = function(test) {
 };
 
 exports.sendOneLongerThanPacket = function(test) {
-  var payload = new Buffer([1, 2, 3, 4, 5]);
+  var payload = Buffer.from([1, 2, 3, 4, 5]);
   var packetNumber = 0;
 
   var connection = new Connection();
@@ -62,12 +62,12 @@ exports.sendOneLongerThanPacket = function(test) {
       case 1:
         test.ok(!packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
-        test.ok(packet.data().equals(new Buffer([1, 2, 3, 4])));
+        test.ok(packet.data().equals(Buffer.from([1, 2, 3, 4])));
         break;
       case 2:
         test.ok(packet.last());
         test.strictEqual(packet.packetId(), packetNumber);
-        test.ok(packet.data().equals(new Buffer([5])));
+        test.ok(packet.data().equals(Buffer.from([5])));
         test.done();
         break;
     }
@@ -80,7 +80,7 @@ exports.sendOneLongerThanPacket = function(test) {
 exports.receiveOnePacket = function(test) {
   test.expect(1);
 
-  var payload = new Buffer([1, 2, 3]);
+  var payload = Buffer.from([1, 2, 3]);
   var connection = new Connection();
 
   var io = new MessageIO(connection, packetSize, new Debug());
@@ -100,7 +100,7 @@ exports.receiveOnePacket = function(test) {
 exports.receiveOnePacketInTwoChunks = function(test) {
   test.expect(1);
 
-  var payload = new Buffer([1, 2, 3]);
+  var payload = Buffer.from([1, 2, 3]);
   var connection = new Connection();
 
   var io = new MessageIO(connection, packetSize, new Debug());
@@ -121,7 +121,7 @@ exports.receiveOnePacketInTwoChunks = function(test) {
 exports.receiveTwoPackets = function(test) {
   test.expect(2);
 
-  var payload = new Buffer([1, 2, 3]);
+  var payload = Buffer.from([1, 2, 3]);
   var payload1 = payload.slice(0, 2);
   var payload2 = payload.slice(2, 3);
 
@@ -158,7 +158,7 @@ exports.receiveTwoPackets = function(test) {
 exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
   test.expect(2);
 
-  var payload = new Buffer([1, 2, 3, 4]);
+  var payload = Buffer.from([1, 2, 3, 4]);
   var payload1 = payload.slice(0, 2);
   var payload2 = payload.slice(2, 4);
 
@@ -201,9 +201,9 @@ exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
 ) {
   test.expect(1);
 
-  var payload = new Buffer([1, 2, 3, 4, 5, 6]);
+  var payload = Buffer.from([1, 2, 3, 4, 5, 6]);
   var connection = new Connection();
-  var receivedData = new Buffer(0);
+  var receivedData = Buffer.alloc(0);
 
   var io = new MessageIO(connection, packetSize, new Debug());
   io.on('data', function(data) {

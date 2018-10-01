@@ -9,7 +9,7 @@ var common = require("../common");
 var parser = new Parser({ token: function() { } }, {}, {});
 
 var tokenCount = 50;
-var data = new Buffer(new Array(tokenCount).join("810300000000001000380269006400000000000900e7c8000904d00034046e0061006d006500000000000900e7ffff0904d000340b6400650073006300720069007000740069006f006e00"), "hex");
+var data = Buffer.from(new Array(tokenCount).join("810300000000001000380269006400000000000900e7c8000904d00034046e0061006d006500000000000900e7ffff0904d000340b6400650073006300720069007000740069006f006e00"), "hex");
 
 common.createBenchmark({
   name: "parsing `COLMETADATA` tokens",

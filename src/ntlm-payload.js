@@ -2,7 +2,7 @@
 
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const crypto = require('crypto');
-const BigInteger = require('big-number').n;
+const BigInteger = require('big-number');
 
 const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
@@ -86,7 +86,7 @@ class NTLMResponsePayload {
   }
 
   createClientNonce() {
-    const client_nonce = new Buffer(8).fill(0);
+    const client_nonce = Buffer.alloc(8, 0);
     let nidx = 0;
     while (nidx < 8) {
       client_nonce.writeUInt8(Math.ceil(Math.random() * 255), nidx);
@@ -99,7 +99,7 @@ class NTLMResponsePayload {
     const timestamp = this.createTimestamp(mytime);
     const hash = this.ntv2Hash(domain, user, password);
     const dataLength = 40 + targetInfo.length;
-    const data = new Buffer(dataLength).fill(0);
+    const data = Buffer.alloc(dataLength, 0);
     serverNonce.copy(data, 0, 0, 8);
     data.writeUInt32LE(0x101, 8);
     data.writeUInt32LE(0x0, 12);
@@ -112,7 +112,7 @@ class NTLMResponsePayload {
   }
 
   createTimestamp(time: number) {
-    const tenthsOfAMicrosecond = new BigInteger(time).plus(11644473600).multiply(10000000);
+    const tenthsOfAMicrosecond = BigInteger(time).plus(11644473600).multiply(10000000);
     const hexArray = [];
 
     let pair = [];
@@ -129,18 +129,18 @@ class NTLMResponsePayload {
       hexArray.push(pair[0] + '0');
     }
 
-    return new Buffer(hexArray.join(''), 'hex');
+    return Buffer.from(hexArray.join(''), 'hex');
   }
 
   lmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, clientNonce: Buffer) {
     const hash = this.ntv2Hash(domain, user, password);
-    const data = new Buffer(serverNonce.length + clientNonce.length).fill(0);
+    const data = Buffer.alloc(serverNonce.length + clientNonce.length, 0);
 
     serverNonce.copy(data);
     clientNonce.copy(data, serverNonce.length, 0, clientNonce.length);
 
     const newhash = this.hmacMD5(data, hash);
-    const response = new Buffer(newhash.length + clientNonce.length).fill(0);
+    const response = Buffer.alloc(newhash.length + clientNonce.length, 0);
 
     newhash.copy(response);
     clientNonce.copy(response, newhash.length, 0, clientNonce.length);
@@ -150,20 +150,19 @@ class NTLMResponsePayload {
 
   ntv2Hash(domain: string, user: string, password: string) {
     const hash = this.ntHash(password);
-    const identity = new Buffer(user.toUpperCase() + domain.toUpperCase(), 'ucs2');
+    const identity = Buffer.from(user.toUpperCase() + domain.toUpperCase(), 'ucs2');
     return this.hmacMD5(identity, hash);
   }
 
   ntHash(text: string) {
-    const hash = new Buffer(21).fill(0);
-    hash.fill(0);
+    const hash = Buffer.alloc(21, 0);
 
-    const unicodeString = new Buffer(text, 'ucs2');
+    const unicodeString = Buffer.from(text, 'ucs2');
     const md4 = crypto.createHash('md4').update(unicodeString).digest();
     if (md4.copy) {
       md4.copy(hash);
     } else {
-      new Buffer(md4, 'ascii').copy(hash);
+      Buffer.from(md4).copy(hash);
     }
     return hash;
   }
@@ -176,7 +175,7 @@ class NTLMResponsePayload {
     if (result.copy) {
       return result;
     } else {
-      return new Buffer(result, 'ascii').slice(0, 16);
+      return Buffer.from(result).slice(0, 16);
     }
   }
 }

@@ -268,7 +268,7 @@ exports.Image = function(test) {
   var value = TYPE.Image.validate(null);
   test.strictEqual(value, null);
 
-  var buffer = new Buffer([0x00, 0x01]);
+  var buffer = Buffer.from([0x00, 0x01]);
   value = TYPE.Image.validate(buffer);
   test.strictEqual(value, buffer);
 
@@ -282,7 +282,7 @@ exports.Binary = function(test) {
   var value = TYPE.Binary.validate(null);
   test.strictEqual(value, null);
 
-  var buffer = new Buffer([0x00, 0x01]);
+  var buffer = Buffer.from([0x00, 0x01]);
   value = TYPE.Binary.validate(buffer);
   test.strictEqual(value, buffer);
 
@@ -296,7 +296,7 @@ exports.VarBinary = function(test) {
   var value = TYPE.VarBinary.validate(null);
   test.strictEqual(value, null);
 
-  var buffer = new Buffer([0x00, 0x01]);
+  var buffer = Buffer.from([0x00, 0x01]);
   value = TYPE.VarBinary.validate(buffer);
   test.strictEqual(value, buffer);
 
@@ -313,7 +313,7 @@ exports.Text = function(test) {
   value = TYPE.Text.validate('asdf');
   test.strictEqual(value, 'asdf');
 
-  value = TYPE.Text.validate(new Buffer('asdf', 'utf8'));
+  value = TYPE.Text.validate(Buffer.from('asdf', 'utf8'));
   test.strictEqual(value, 'asdf');
 
   value = TYPE.Text.validate({ toString: null });
@@ -329,7 +329,7 @@ exports.VarChar = function(test) {
   value = TYPE.VarChar.validate('asdf');
   test.strictEqual(value, 'asdf');
 
-  value = TYPE.VarChar.validate(new Buffer('asdf', 'utf8'));
+  value = TYPE.VarChar.validate(Buffer.from('asdf', 'utf8'));
   test.strictEqual(value, 'asdf');
 
   value = TYPE.VarChar.validate({ toString: null });
@@ -345,7 +345,7 @@ exports.NVarChar = function(test) {
   value = TYPE.NVarChar.validate('asdf');
   test.strictEqual(value, 'asdf');
 
-  value = TYPE.NVarChar.validate(new Buffer('asdf', 'utf8'));
+  value = TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
   test.strictEqual(value, 'asdf');
 
   value = TYPE.NVarChar.validate({ toString: null });
@@ -361,7 +361,7 @@ exports.Char = function(test) {
   value = TYPE.Char.validate('asdf');
   test.strictEqual(value, 'asdf');
 
-  value = TYPE.Char.validate(new Buffer('asdf', 'utf8'));
+  value = TYPE.Char.validate(Buffer.from('asdf', 'utf8'));
   test.strictEqual(value, 'asdf');
 
   value = TYPE.Char.validate({ toString: null });
@@ -377,7 +377,7 @@ exports.NChar = function(test) {
   value = TYPE.NChar.validate('asdf');
   test.strictEqual(value, 'asdf');
 
-  value = TYPE.NChar.validate(new Buffer('asdf', 'utf8'));
+  value = TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
   test.strictEqual(value, 'asdf');
 
   value = TYPE.NChar.validate({ toString: null });

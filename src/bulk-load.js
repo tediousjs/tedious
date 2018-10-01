@@ -15,12 +15,12 @@ const FLAGS = {
   updateableReadWrite: 1 << 2,
   updateableUnknown: 1 << 3,
   identity: 1 << 4,
-  computed: 1 << 5,         // introduced in TDS 7.2
-  fixedLenCLRType: 1 << 8,  // introduced in TDS 7.2
+  computed: 1 << 5, // introduced in TDS 7.2
+  fixedLenCLRType: 1 << 8, // introduced in TDS 7.2
   sparseColumnSet: 1 << 10, // introduced in TDS 7.3.B
-  hidden: 1 << 13,          // introduced in TDS 7.2
-  key: 1 << 14,             // introduced in TDS 7.2
-  nullableUnknown: 1 << 15  // introduced in TDS 7.2
+  hidden: 1 << 13, // introduced in TDS 7.2
+  key: 1 << 14, // introduced in TDS 7.2
+  nullableUnknown: 1 << 15 // introduced in TDS 7.2
 };
 
 const DONE_STATUS = {
