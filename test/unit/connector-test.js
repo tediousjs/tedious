@@ -38,14 +38,12 @@ exports['Connector with MultiSubnetFailover'] = {
     this.mitm = new Mitm();
     this.mitm.enable();
 
-    this.sinon = sinon.sandbox.create();
-
     done();
   },
 
   tearDown: function(done) {
     this.mitm.disable();
-    this.sinon.restore();
+    sinon.restore();
 
     done();
   },
@@ -61,7 +59,7 @@ exports['Connector with MultiSubnetFailover'] = {
   'uses a parallel connection strategy': function(test) {
     const connector = new Connector({ host: 'localhost', port: 12345 }, true);
 
-    const spy = this.sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
+    const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
 
     connector.execute(function(err, socket) {
       test.ifError(err);
@@ -78,14 +76,12 @@ exports['Connector without MultiSubnetFailover'] = {
     this.mitm = new Mitm();
     this.mitm.enable();
 
-    this.sinon = sinon.sandbox.create();
-
     done();
   },
 
   tearDown: function(done) {
     this.mitm.disable();
-    this.sinon.restore();
+    sinon.restore();
 
     done();
   },
@@ -117,7 +113,7 @@ exports['Connector without MultiSubnetFailover'] = {
   'uses a sequential connection strategy': function(test) {
     const connector = new Connector({ host: 'localhost', port: 12345 }, false);
 
-    const spy = this.sinon.spy(
+    const spy = sinon.spy(
       SequentialConnectionStrategy.prototype,
       'connect'
     );
@@ -457,16 +453,14 @@ exports['ParallelConnectionStrategy'] = {
 
 exports['Test unicode SQL Server name'] = {
   setUp: function(done) {
-    this.sinon = sinon.sandbox.create();
-
     // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
-    this.spy = this.sinon.spy(dns, 'lookup');
+    this.spy = sinon.spy(dns, 'lookup');
 
     done();
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
 
     done();
   },

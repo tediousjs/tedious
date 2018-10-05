@@ -1,6 +1,6 @@
 const Connection = require('../../src/tedious').Connection;
 const fs = require('fs');
-const Sinon = require('sinon');
+const sinon = require('sinon');
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
 
 const getConfig = function() {
@@ -15,12 +15,11 @@ const getConfig = function() {
 exports['connection retry tests'] = {
   setUp: function(done) {
     this.invalidLoginError = 18456;
-    this.sinon = Sinon.sandbox.create();
     done();
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 
@@ -28,7 +27,7 @@ exports['connection retry tests'] = {
     const config = getConfig();
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error === this.invalidLoginError;
     });
 
@@ -51,7 +50,7 @@ exports['connection retry tests'] = {
     const config = getConfig();
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error !== this.invalidLoginError;
     });
 
@@ -74,11 +73,11 @@ exports['connection retry tests'] = {
     const config = getConfig();
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
-    const clock = this.sinon.useFakeTimers('setTimeout');
+    const clock = sinon.useFakeTimers({ toFake: [ 'setTimeout' ] });
 
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error === this.invalidLoginError;
     });
 
