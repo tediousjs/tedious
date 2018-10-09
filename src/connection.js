@@ -942,7 +942,7 @@ class Connection extends EventEmitter {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', ConnectionError(message, 'ESOCKET'));
-    } else if (this.state === this.STATE.FINAL){
+    } else if (this.state === this.STATE.FINAL) {
       this.socket.destroy();
     } else {
       const message = `Connection lost - ${error.message}`;
