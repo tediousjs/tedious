@@ -25,7 +25,7 @@ class Connector {
 
       socket.destroy();
 
-      cb(err);
+      cb(err, socket);
     };
 
     const onConnect = () => {

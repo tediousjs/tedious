@@ -814,12 +814,12 @@ class Connection extends EventEmitter {
 
     new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
       if (err) {
+        this.socket = socket;
         return this.socketError(err);
       }
 
       if (this.state === this.STATE.FINAL) {
-        socket.destroy();
-        return;
+        return socket.destroy();
       }
 
       this.socket = socket;
@@ -942,6 +942,8 @@ class Connection extends EventEmitter {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', ConnectionError(message, 'ESOCKET'));
+    } else if (this.state === this.STATE.FINAL){
+      this.socket.destroy();
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
