@@ -493,7 +493,7 @@ class Connection extends EventEmitter {
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
-    this.transactionDescriptors = [new Buffer([0, 0, 0, 0, 0, 0, 0, 0])];
+    this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
@@ -762,7 +762,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.tokenStreamParser.on('endOfMessage', () => {      // EOM pseudo token received
+    this.tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
       if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
         this.dispatchEvent('endOfMessageMarkerReceived');
       }
@@ -854,7 +854,7 @@ class Connection extends EventEmitter {
   }
 
   createRequestTimer() {
-    this.clearRequestTimer();                              // release old timer, just to be safe
+    this.clearRequestTimer(); // release old timer, just to be safe
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
@@ -959,7 +959,11 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    this.transitionTo(this.STATE.FINAL);
+    if (this.state !== this.STATE.FINAL) {
+      const error = new Error('socket hang up');
+      error.code = 'ECONNRESET';
+      this.socketError(error);
+    }
   }
 
   socketClose() {
@@ -989,7 +993,7 @@ class Connection extends EventEmitter {
   }
 
   emptyMessageBuffer() {
-    this.messageBuffer = new Buffer(0);
+    this.messageBuffer = Buffer.alloc(0);
   }
 
   addToMessageBuffer(data) {
@@ -1038,7 +1042,7 @@ class Connection extends EventEmitter {
     payload.libraryName = libraryName;
     payload.language = this.config.options.language;
     payload.database = this.config.options.database;
-    payload.clientId = new Buffer([1, 2, 3, 4, 5, 6]);
+    payload.clientId = Buffer.from([1, 2, 3, 4, 5, 6]);
 
     payload.readOnlyIntent = this.config.options.readOnlyIntent;
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
@@ -1472,7 +1476,7 @@ class Connection extends EventEmitter {
         return payload.toString('  ');
       });
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      if (request.paused) {                                // Request.pause() has been called before the request was started
+      if (request.paused) { // Request.pause() has been called before the request was started
         this.pauseRequest(request);
       }
     }
@@ -1756,7 +1760,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        this.clearRequestTimer();                          // request timer is stopped on first data package
+        this.clearRequestTimer(); // request timer is stopped on first data package
         const ret = this.sendDataToTokenStreamParser(data);
         if (ret === false) {
           // Bridge backpressure from the token stream parser transform to the

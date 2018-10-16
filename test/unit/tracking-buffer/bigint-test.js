@@ -6,7 +6,7 @@ var numberToInt64LE = require('../../../src/tracking-buffer/bigint')
 module.exports.zero = function(test) {
   test.strictEqual(
     '0',
-    convertLEBytesToString(new Buffer([0, 0, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]))
   );
 
   test.done();
@@ -15,11 +15,11 @@ module.exports.zero = function(test) {
 module.exports.smallPositive = function(test) {
   test.strictEqual(
     '1',
-    convertLEBytesToString(new Buffer([1, 0, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([1, 0, 0, 0, 0, 0, 0, 0]))
   );
   test.strictEqual(
     '2',
-    convertLEBytesToString(new Buffer([2, 0, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([2, 0, 0, 0, 0, 0, 0, 0]))
   );
 
   test.done();
@@ -28,11 +28,11 @@ module.exports.smallPositive = function(test) {
 module.exports.smallNegative = function(test) {
   test.strictEqual(
     '-1',
-    convertLEBytesToString(new Buffer([255, 255, 255, 255, 255, 255, 255, 255]))
+    convertLEBytesToString(Buffer.from([255, 255, 255, 255, 255, 255, 255, 255]))
   );
   test.strictEqual(
     '-2',
-    convertLEBytesToString(new Buffer([254, 255, 255, 255, 255, 255, 255, 255]))
+    convertLEBytesToString(Buffer.from([254, 255, 255, 255, 255, 255, 255, 255]))
   );
 
   test.done();
@@ -41,7 +41,7 @@ module.exports.smallNegative = function(test) {
 module.exports.bigPositive = function(test) {
   test.strictEqual(
     '9223372036854775807',
-    convertLEBytesToString(new Buffer([255, 255, 255, 255, 255, 255, 255, 127]))
+    convertLEBytesToString(Buffer.from([255, 255, 255, 255, 255, 255, 255, 127]))
   );
 
   test.done();
@@ -50,7 +50,7 @@ module.exports.bigPositive = function(test) {
 module.exports.bigNegative = function(test) {
   test.strictEqual(
     '-9223372036854775808',
-    convertLEBytesToString(new Buffer([0, 0, 0, 0, 0, 0, 0, 128]))
+    convertLEBytesToString(Buffer.from([0, 0, 0, 0, 0, 0, 0, 128]))
   );
 
   test.done();
@@ -59,19 +59,19 @@ module.exports.bigNegative = function(test) {
 module.exports.powersOf10 = function(test) {
   test.strictEqual(
     '10',
-    convertLEBytesToString(new Buffer([10, 0, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([10, 0, 0, 0, 0, 0, 0, 0]))
   );
   test.strictEqual(
     '100',
-    convertLEBytesToString(new Buffer([100, 0, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([100, 0, 0, 0, 0, 0, 0, 0]))
   );
   test.strictEqual(
     '1000',
-    convertLEBytesToString(new Buffer([232, 3, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([232, 3, 0, 0, 0, 0, 0, 0]))
   );
   test.strictEqual(
     '10000',
-    convertLEBytesToString(new Buffer([16, 39, 0, 0, 0, 0, 0, 0]))
+    convertLEBytesToString(Buffer.from([16, 39, 0, 0, 0, 0, 0, 0]))
   );
 
   test.done();
@@ -176,7 +176,7 @@ var assertBuffer = function(test, actual, expected) {
   for (var i = 0, end = actual.length; i < end; i++) {
     if (actual[i] !== expected[i]) {
       console.log('actual  ', actual);
-      console.log('expected', new Buffer(expected));
+      console.log('expected', Buffer.from(expected));
       test.ok(false);
     }
   }

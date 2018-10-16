@@ -1,5 +1,5 @@
 const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
-const Sinon = require('sinon');
+const sinon = require('sinon');
 const dns = require('dns');
 const punycode = require('punycode');
 
@@ -88,8 +88,6 @@ exports['instanceLookup invalid args'] = {
 
 exports['instanceLookup functional unit tests'] = {
   setUp: function(done) {
-    this.sinon = Sinon.sandbox.create();
-
     this.options = {
       server: 'server',
       instanceName: 'instance',
@@ -98,7 +96,7 @@ exports['instanceLookup functional unit tests'] = {
     };
 
     this.anyPort = 1234;
-    this.anyRequest = new Buffer(0x02);
+    this.anyRequest = Buffer.alloc(0x02);
     this.anyMessage = 'any message';
     this.anyError = new Error('any error');
     this.anySqlPort = 2345;
@@ -113,17 +111,17 @@ exports['instanceLookup functional unit tests'] = {
       this.anyPort,
       this.anyRequest
     );
-    this.createSenderStub = this.sinon.stub(
+    this.createSenderStub = sinon.stub(
       this.instanceLookup,
       'createSender'
     );
     this.createSenderStub.returns(this.testSender);
-    this.senderExecuteStub = this.sinon.stub(this.testSender, 'execute');
+    this.senderExecuteStub = sinon.stub(this.testSender, 'execute');
 
     // Stub parseBrowserResponse so we can mimic success and failure without creating
     // elaborate responses. parseBrowserResponse itself has unit tests to ensure that
     // it functions correctly.
-    this.parseStub = this.sinon.stub(
+    this.parseStub = sinon.stub(
       this.instanceLookup,
       'parseBrowserResponse'
     );
@@ -132,7 +130,7 @@ exports['instanceLookup functional unit tests'] = {
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 
@@ -203,7 +201,7 @@ exports['instanceLookup functional unit tests'] = {
       .withArgs(this.anyMessage, this.options.instanceName)
       .returns(this.anySqlPort);
 
-    const clock = this.sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers();
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
       test.strictEqual(error, undefined);
@@ -228,7 +226,7 @@ exports['instanceLookup functional unit tests'] = {
   },
 
   'retry fail': function(test) {
-    const clock = this.sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers();
 
     const forwardClock = () => {
       clock.tick(this.options.timeout * 1.1);
@@ -242,11 +240,10 @@ exports['instanceLookup functional unit tests'] = {
     };
 
     this.senderExecuteStub.restore();
-    this.senderExecuteStub = this.sinon.stub(
+    this.senderExecuteStub = sinon.stub(
       this.testSender,
       'execute',
-      scheduleForwardClock
-    );
+    ).callsFake(scheduleForwardClock);
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
       test.ok(error.indexOf('Failed to get response') != -1);
@@ -332,16 +329,14 @@ exports['parseBrowserResponse'] = {
 
 exports['Test unicode SQL Server name'] = {
   setUp: function(done) {
-    this.sinon = Sinon.sandbox.create();
-
     // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
-    this.spy = this.sinon.spy(dns, 'lookup');
+    this.spy = sinon.spy(dns, 'lookup');
 
     done();
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
 
     done();
   },

@@ -2,7 +2,7 @@ var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-trackin
 var writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer;
 
 exports.headers = function(test) {
-  var expected = new Buffer([
+  var expected = Buffer.from([
     0x16,
     0x00,
     0x00,
@@ -28,7 +28,7 @@ exports.headers = function(test) {
   ]);
 
   var buffer = new WritableTrackingBuffer(0, 'ucs2');
-  var transactionDescriptor = new Buffer([
+  var transactionDescriptor = Buffer.from([
     0x01,
     0x02,
     0x03,

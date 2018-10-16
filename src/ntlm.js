@@ -44,7 +44,7 @@ function createNTLMRequest(options: { domain: string, workstation?: string }) {
     type1flags -= NTLMFlags.NTLM_NegotiateOemWorkstationSupplied;
   }
 
-  const fixedData = new Buffer(40);
+  const fixedData = Buffer.alloc(40);
   const buffers = [fixedData];
   let offset = 0;
 
@@ -66,8 +66,8 @@ function createNTLMRequest(options: { domain: string, workstation?: string }) {
   offset = fixedData.writeUInt8(0, offset);
   fixedData.writeUInt8(15, offset);
 
-  buffers.push(new Buffer(workstation, 'ascii'));
-  buffers.push(new Buffer(domain, 'ascii'));
+  buffers.push(Buffer.from(workstation, 'ascii'));
+  buffers.push(Buffer.from(domain, 'ascii'));
 
   return Buffer.concat(buffers);
 }

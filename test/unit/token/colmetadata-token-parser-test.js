@@ -39,7 +39,7 @@ module.exports.varchar = function(test) {
   var userType = 2;
   var flags = 3;
   var length = 3;
-  var collation = new Buffer([0x09, 0x04, 0x50, 0x78, 0x9a]);
+  var collation = Buffer.from([0x09, 0x04, 0x50, 0x78, 0x9a]);
   var columnName = 'name';
 
   var buffer = new WritableTrackingBuffer(50, 'ucs2');

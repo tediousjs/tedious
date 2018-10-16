@@ -44,7 +44,7 @@ module.exports = {
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length * 2);
-    buffer.writeBuffer(new Buffer([0x00, 0x00, 0x00, 0x00, 0x00]));
+    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
   writeParameterData: function(buffer, parameter) {

@@ -7,7 +7,7 @@ exports.createEmpty = function(test) {
 
   test.ok(packet);
   test.ok(
-    packet.buffer.equals(new Buffer([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
+    packet.buffer.equals(Buffer.from([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
   );
 
   test.done();
@@ -36,13 +36,13 @@ exports.packetId = function(test) {
 };
 
 exports.data = function(test) {
-  var data1 = new Buffer([0x01, 0x02, 0x03]);
-  var data2 = new Buffer([0xff, 0xfe]);
+  var data1 = Buffer.from([0x01, 0x02, 0x03]);
+  var data2 = Buffer.from([0xff, 0xfe]);
   var allData = Buffer.concat([data1, data2]);
 
   var packet = new Packet(TYPE.PRELOGIN);
   test.strictEqual(packet.length(), 8);
-  test.ok(packet.data().equals(new Buffer(0)));
+  test.ok(packet.data().equals(Buffer.alloc(0)));
 
   packet.addData(data1);
   test.strictEqual(packet.length(), 8 + data1.length);
@@ -56,7 +56,7 @@ exports.data = function(test) {
 };
 
 exports.createFromBuffer = function(test) {
-  var buffer = new Buffer([
+  var buffer = Buffer.from([
     TYPE.PRELOGIN,
     0x01,
     0x00,
@@ -72,13 +72,13 @@ exports.createFromBuffer = function(test) {
 
   test.strictEqual(packet.length(), 0x0a);
   test.ok(packet.isLast());
-  test.ok(packet.data().equals(new Buffer([0x01, 0xff])));
+  test.ok(packet.data().equals(Buffer.from([0x01, 0xff])));
 
   test.done();
 };
 
 exports.headerToString = function(test) {
-  var buffer = new Buffer([
+  var buffer = Buffer.from([
     TYPE.PRELOGIN,
     0x03,
     0x00,
@@ -100,7 +100,7 @@ exports.headerToString = function(test) {
 };
 
 exports.dataToStringShort = function(test) {
-  var data = new Buffer([0x01, 0x02, 0x03]);
+  var data = Buffer.from([0x01, 0x02, 0x03]);
 
   var packet = new Packet(TYPE.PRELOGIN);
   packet.addData(data);
@@ -112,10 +112,10 @@ exports.dataToStringShort = function(test) {
 };
 
 exports.dataExactLinesWorth = function(test) {
-  var dataLine1a = new Buffer([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
-  var dataLine1b = new Buffer([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
-  var dataLine2a = new Buffer([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
-  var dataLine2b = new Buffer([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
+  var dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+  var dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
+  var dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
+  var dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
 
   var packet = new Packet(TYPE.PRELOGIN);
   packet.addData(dataLine1a);
@@ -134,11 +134,11 @@ exports.dataExactLinesWorth = function(test) {
 };
 
 exports.dataToStringMultipleLines = function(test) {
-  var dataLine1a = new Buffer([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
-  var dataLine1b = new Buffer([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
-  var dataLine2a = new Buffer([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
-  var dataLine2b = new Buffer([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
-  var dataLine3a = new Buffer([0x30, 0x31, 0x32]);
+  var dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+  var dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
+  var dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
+  var dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
+  var dataLine3a = Buffer.from([0x30, 0x31, 0x32]);
 
   var packet = new Packet(TYPE.PRELOGIN);
   packet.addData(dataLine1a);
@@ -164,7 +164,7 @@ exports.dataToStringMultipleLines = function(test) {
 };
 
 exports.packetCompleteShorterThanHeader = function(test) {
-  var buffer = new Buffer(7);
+  var buffer = Buffer.alloc(7);
   test.ok(!isPacketComplete(buffer));
 
   test.done();
@@ -179,7 +179,7 @@ exports.packetCompleteJustHeader = function(test) {
 };
 
 exports.packetCompleteTooShort = function(test) {
-  var buffer = new Buffer([
+  var buffer = Buffer.from([
     0x00,
     0x00,
     0x00,
@@ -198,7 +198,7 @@ exports.packetCompleteTooShort = function(test) {
 };
 
 exports.packetCompleteLongEnough = function(test) {
-  var buffer = new Buffer([
+  var buffer = Buffer.from([
     0x00,
     0x00,
     0x00,
