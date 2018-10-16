@@ -1,6 +1,17 @@
 {
   "author": "Mike D Pilsbury <mike.pilsbury@gmail.com>",
-  "contributors": "https://github.com/tediousjs/tedious/graphs/contributors",
+  "contributors": [
+    "Alex Robson",
+    "Arthur Schreiber",
+    "Bret Copeland <bret@atlantisflight.org> (https://github.com/bretcope)",
+    "Bryan Ross <bryan@rossipedia.com> (https://github.com/rossipedia)",
+    "Ciaran Jessup <ciaranj@gmail.com>",
+    "Cort Fritz <cfritz@caa.com>",
+    "lastonesky",
+    "Patrik Simek <patrik@patriksimek.cz>",
+    "Phil Dodderidge <pdodde@poyntz.com>",
+    "Zach Aller"
+  ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
   "keywords": [
