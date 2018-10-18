@@ -1723,6 +1723,9 @@ Connection.prototype.STATE = {
       this.sendInitialSql();
     },
     events: {
+      socketError: function socketError() {
+        this.transitionTo(this.STATE.FINAL);
+      },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
