@@ -1,7 +1,7 @@
 const Dgram = require('dgram');
 const Sender = require('../../src/sender').Sender;
 const ParallelSendStrategy = require('../../src/sender').ParallelSendStrategy;
-const Sinon = require('sinon');
+const sinon = require('sinon');
 
 const anyPort = 1234;
 const anyIpv4 = '1.2.3.4';
@@ -38,15 +38,15 @@ const sendToIpCommonTestSetup = function(ipAddress, udpVersion, sendResult) {
   // Create socket exactly like the Sender class would create while stubbing
   // some methods for unit testing.
   this.testSocket = Dgram.createSocket(udpVersion);
-  this.socketSendStub = this.sinon.stub(this.testSocket, 'send', sendStub);
-  this.socketCloseSpy = this.sinon.spy(this.testSocket, 'close');
+  this.socketSendStub = sinon.stub(this.testSocket, 'send').callsFake(sendStub);
+  this.socketCloseSpy = sinon.spy(this.testSocket, 'close');
 
   // This allows the emitEvent method to emit the right event for the given test.
   this.testSocket.sendResult = sendResult;
 
   // Stub createSocket method to return a socket created exactly like the
   // method would but with a few methods stubbed out above.
-  this.createSocketStub = this.sinon.stub(Dgram, 'createSocket');
+  this.createSocketStub = sinon.stub(Dgram, 'createSocket');
   this.createSocketStub.withArgs(udpVersion).returns(this.testSocket);
 
   this.sender = new Sender(ipAddress, anyPort, anyRequest);
@@ -66,13 +66,8 @@ const sendToIpCommonTestValidation = function(test, ipAddress) {
 };
 
 exports['Sender send to IP address'] = {
-  setUp: function(done) {
-    this.sinon = Sinon.sandbox.create();
-    done();
-  },
-
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 
@@ -143,21 +138,21 @@ const sendToHostCommonTestSetup = function(lookupError) {
     anyRequest
   );
   const callback = () => {};
-  this.strategySendStub = this.sinon.stub(testStrategy, 'send');
+  this.strategySendStub = sinon.stub(testStrategy, 'send');
   this.strategySendStub.withArgs(callback);
-  this.strategyCancelStub = this.sinon.stub(testStrategy, 'cancel');
+  this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
   this.strategyCancelStub.withArgs();
 
   this.sender = new Sender(anyHost, anyPort, anyRequest);
 
   // Stub out the lookupAll method to prevent network activity from doing a DNS
   // lookup. Succeeds or fails depending on lookupError.
-  this.lookupAllStub = this.sinon.stub(this.sender, 'invokeLookupAll');
+  this.lookupAllStub = sinon.stub(this.sender, 'invokeLookupAll');
   this.lookupAllStub.callsArgWithAsync(1, lookupError, this.addresses);
 
   // Stub the create strategy method for the test to return a strategy object created
   // exactly like the method would but with a few methods stubbed.
-  this.createStrategyStub = this.sinon.stub(
+  this.createStrategyStub = sinon.stub(
     this.sender,
     'createParallelSendStrategy'
   );
@@ -170,8 +165,6 @@ const sendToHostCommonTestSetup = function(lookupError) {
 
 exports['Sender send to hostname'] = {
   setUp: function(done) {
-    this.sinon = Sinon.sandbox.create();
-
     // Set of IP addresses to be returned by stubbed out lookupAll method.
     this.addresses = [
       { address: '127.0.0.2' },
@@ -183,7 +176,7 @@ exports['Sender send to hostname'] = {
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 
@@ -275,17 +268,9 @@ const commonStrategyTestSetup = function() {
   this.testSockets[udpIpv4] = Dgram.createSocket(udpIpv4);
   this.testSockets[udpIpv6] = Dgram.createSocket(udpIpv6);
 
-  let key;
-  for (key in this.testSockets) {
-    this.testSockets[key].socketSendStub = this.sinon.stub(
-      this.testSockets[key],
-      'send',
-      sendStub
-    );
-    this.testSockets[key].socketCloseSpy = this.sinon.spy(
-      this.testSockets[key],
-      'close'
-    );
+  for (const key in this.testSockets) {
+    this.testSockets[key].socketSendStub = sinon.stub(this.testSockets[key], 'send').callsFake(sendStub);
+    this.testSockets[key].socketCloseSpy = sinon.spy(this.testSockets[key], 'close');
 
     // This allows emitEvent method to fire an 'error' or 'message' event appropriately.
     // A given test may overwrite this value for specific sockets to test different
@@ -299,7 +284,7 @@ const commonStrategyTestSetup = function() {
 
   // Stub createSocket method to returns a socket created exactly like the
   // method would but with a few methods stubbed out above.
-  this.createSocketStub = this.sinon.stub(Dgram, 'createSocket');
+  this.createSocketStub = sinon.stub(Dgram, 'createSocket');
   this.createSocketStub.withArgs(udpIpv4).returns(this.testSockets[udpIpv4]);
   this.createSocketStub.withArgs(udpIpv6).returns(this.testSockets[udpIpv6]);
 
@@ -311,8 +296,7 @@ const commonStrategyTestSetup = function() {
 };
 
 const commonStrategyTestValidation = function(test) {
-  let key;
-  for (key in this.testSockets) {
+  for (const key in this.testSockets) {
     test.strictEqual(this.testSockets[key].socketSendStub.callCount, 2);
     test.strictEqual(this.testSockets[key].socketCloseSpy.callCount, 1);
   }
@@ -324,13 +308,12 @@ const commonStrategyTestValidation = function(test) {
 
 exports['ParallelSendStrategy'] = {
   setUp: function(done) {
-    this.sinon = Sinon.sandbox.create();
     commonStrategyTestSetup.call(this);
     done();
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 

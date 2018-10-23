@@ -98,19 +98,19 @@ exports.createSSPI = function(test) {
   payload.sspi = Buffer.from([0xa0, 0xa1, 0xa2, 0xa5, 0xd2, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9]);
 
   var expectedLength =
-    4 +                                             // Length
-    32 +                                            // Variable
+    4 + // Length
+    32 + // Variable
     2 + 2 + (2 * payload.hostname.length) +
     2 + 2 + (2 * 0) +
     2 + 2 + (2 * 0) +
     2 + 2 + (2 * payload.appName.length) +
     2 + 2 + (2 * payload.serverName.length) +
-    2 + 2 + (2 * 0) +                               // Reserved
+    2 + 2 + (2 * 0) + // Reserved
     2 + 2 + (2 * payload.libraryName.length) +
     2 + 2 + (2 * payload.language.length) +
     2 + 2 + (2 * payload.database.length) +
     6 +
-    2 + 2 + payload.sspi.length +             // NTLM
+    2 + 2 + payload.sspi.length + // NTLM
     2 + 2 + (2 * payload.attachDbFile.length) +
     2 + 2 + (2 * payload.changePassword.length) +
     4 + // cbSSPILong

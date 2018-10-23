@@ -873,7 +873,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.tokenStreamParser.on('endOfMessage', () => {      // EOM pseudo token received
+    this.tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
       if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
         this.dispatchEvent('endOfMessageMarkerReceived');
       }
@@ -965,7 +965,7 @@ class Connection extends EventEmitter {
   }
 
   createRequestTimer() {
-    this.clearRequestTimer();                              // release old timer, just to be safe
+    this.clearRequestTimer(); // release old timer, just to be safe
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
@@ -1645,7 +1645,7 @@ class Connection extends EventEmitter {
         return payload.toString('  ');
       });
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      if (request.paused) {                                // Request.pause() has been called before the request was started
+      if (request.paused) { // Request.pause() has been called before the request was started
         this.pauseRequest(request);
       }
     }
@@ -1926,6 +1926,9 @@ Connection.prototype.STATE = {
       this.sendInitialSql();
     },
     events: {
+      socketError: function socketError() {
+        this.transitionTo(this.STATE.FINAL);
+      },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1963,7 +1966,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        this.clearRequestTimer();                          // request timer is stopped on first data package
+        this.clearRequestTimer(); // request timer is stopped on first data package
         const ret = this.sendDataToTokenStreamParser(data);
         if (ret === false) {
           // Bridge backpressure from the token stream parser transform to the
