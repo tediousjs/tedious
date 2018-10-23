@@ -55,23 +55,89 @@ class Connection extends EventEmitter {
       throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
-    if (config.domain !== undefined && typeof config.domain !== 'string') {
-      throw new TypeError('The "config.domain" property must be of type string.');
-    }
+    let authentication;
+    if (config.authentication !== undefined) {
+      if (typeof config.authentication !== 'object' || config.authentication === null) {
+        throw new TypeError('The "config.authentication" property must be of type Object.');
+      }
 
-    if (config.userName !== undefined && typeof config.userName !== 'string') {
-      throw new TypeError('The "config.userName" property must be of type string.');
-    }
+      if (typeof config.authentication.type !== 'string') {
+        throw new TypeError('The "config.authentication.type" property must be of type string.');
+      }
 
-    if (config.password !== undefined && typeof config.password !== 'string') {
-      throw new TypeError('The "config.password" property must be of type string.');
+      if (config.authentication.type !== 'default' || config.authentication.type !== 'ntlm') {
+        throw new TypeError('The "config.authentication.type" property must be of type string.');
+      }
+
+      if (config.authentication.options !== undefined) {
+        if (typeof config.authentication.options !== 'object' || config.authentication.options === null) {
+          throw new TypeError('The "config.authentication.options" property must be of type object.');
+        }
+
+        if (config.authentication.type === 'ntlm') {
+          if (typeof config.authentication.options.domain !== 'string') {
+            throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+          }
+        }
+
+        if (config.authentication.options.userName !== undefined && typeof config.authentication.options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (config.authentication.options.password !== undefined && typeof config.authentication.options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+      }
+
+      authentication = {
+        type: config.authentication.type,
+        options: 'ntlm' ? {
+          userName: config.authentication.options.userName,
+          password: config.authentication.options.password
+        } : {
+          userName: config.authentication.options.userName,
+          password: config.authentication.options.password,
+          domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
+        }
+      };
+    } else {
+      if (config.domain !== undefined) {
+        if (typeof config.domain !== 'string') {
+          throw new TypeError('The "config.domain" property must be of type string.');
+        }
+
+        deprecate('The "config.domain" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
+      }
+
+      if (config.userName !== undefined) {
+        if (typeof config.userName !== 'string') {
+          throw new TypeError('The "config.userName" property must be of type string.');
+        }
+
+        deprecate('The "config.userName" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
+      }
+
+      if (config.password !== undefined) {
+        if (typeof config.password !== 'string') {
+          throw new TypeError('The "config.password" property must be of type string.');
+        }
+
+        deprecate('The "config.password" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
+      }
+
+      authentication = {
+        type: config.domain ? 'ntlm' : 'default',
+        options: {
+          userName: config.userName,
+          password: config.password,
+          domain: config.domain && config.domain.toUpperCase()
+        }
+      };
     }
 
     this.config = {
       server: config.server,
-      userName: config.userName,
-      password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
+      authentication: authentication,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -1055,11 +1121,11 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    if (this.config.domain) {
-      payload.sspi = createNTLMRequest({ domain: this.config.domain });
+    if (this.config.authentication.type == 'ntlm') {
+      payload.sspi = createNTLMRequest({ domain: this.config.authentication.options.domain });
     } else {
-      payload.userName = this.config.userName;
-      payload.password = this.config.password;
+      payload.userName = this.config.authentication.options.userName;
+      payload.password = this.config.authentication.options.password;
     }
 
     payload.hostname = os.hostname();
@@ -1084,10 +1150,12 @@ class Connection extends EventEmitter {
   }
 
   sendNTLMResponsePacket() {
+    const { authentication } = this.config;
+
     const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
+      domain: authentication.options.domain,
+      userName: authentication.options.userName,
+      password: authentication.options.password,
       database: this.config.options.database,
       appName: this.config.options.appName,
       packetSize: this.config.options.packetSize,
