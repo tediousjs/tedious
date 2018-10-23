@@ -134,6 +134,7 @@ class Connection extends EventEmitter {
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
+        returnDecimalAndNumericAsString: false,
         encrypt: false,
         fallbackToDefaultDb: false,
         instanceName: undefined,
@@ -350,6 +351,15 @@ class Connection extends EventEmitter {
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
       deprecateNullFallbackToDefaultConfigValue('options.enableQuotedIdentifier', config.options.enableQuotedIdentifier);
+
+      if (config.options.returnDecimalAndNumericAsString !== undefined) {
+        if (typeof config.options.returnDecimalAndNumericAsString !== 'boolean') {
+          throw new TypeError('options.returnDecimalAndNumericAsString must be a boolean (true or false).');
+        }
+
+        this.config.options.returnDecimalAndNumericAsString = config.options.returnDecimalAndNumericAsString;
+      }
+      deprecateNullFallbackToDefaultConfigValue('options.returnDecimalAndNumericAsString', config.options.returnDecimalAndNumericAsString);
 
       if (config.options.encrypt != undefined) {
         deprecateNonBooleanConfigValue('options.encrypt', config.options.encrypt);
