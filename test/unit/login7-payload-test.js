@@ -62,7 +62,7 @@ exports.create = function(test) {
     2 +
     2 +
     2 * payload.changePassword.length +
-    4 +  // cbSSPILong
+    4 + // cbSSPILong
     5; // FeatureExt
 
   const data = payload.toBuffer();
@@ -148,7 +148,7 @@ exports.createFedAuth = function(test) {
   };
 
   var expectedLength =
-  4 +  // Length
+  4 + // Length
   32 + // Fixed data
   // Variable
   2 + 2 + (2 * payload.hostname.length) +
@@ -163,7 +163,7 @@ exports.createFedAuth = function(test) {
   6 + // ClientID
   2 + 2 + (2 * payload.attachDbFile.length) +
   2 + 2 + (2 * payload.changePassword.length) +
-  4 +  // cbSSPILong
+  4 + // cbSSPILong
   4 + // Extension offset
   1 + 1 + 4 + 1 + 1; // Feature ext
 
