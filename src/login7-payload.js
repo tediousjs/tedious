@@ -258,7 +258,7 @@ class Login7Payload {
     // (cchUnused / cbExtension): 2-byte
     const extensions = this.buildFeatureExt();
     offset = fixedData.writeUInt16LE(4, offset);
-    const extensionOffset = new Buffer(4);
+    const extensionOffset = Buffer.alloc(4);
     extensionOffset.writeUInt32LE(dataOffset += 4, 0);
     dataOffset += extensions.length;
     buffers.push(extensionOffset, extensions);
@@ -389,7 +389,7 @@ class Login7Payload {
     if (fedAuth) {
       switch (fedAuth.type) {
         case 'ADAL':
-          const buffer = new Buffer(7);
+          const buffer = Buffer.alloc(7);
           buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, 0);
           buffer.writeUInt32LE(2, 1);
           buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
@@ -398,7 +398,7 @@ class Login7Payload {
       }
     }
 
-    buffers.push(new Buffer([FEATURE_EXT_TERMINATOR]));
+    buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 
     return Buffer.concat(buffers);
   }

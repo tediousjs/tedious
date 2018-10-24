@@ -89,7 +89,6 @@ class Connection extends EventEmitter {
 
     this.fedAuthInfo = {
       ValidFedAuthEnum: {
-        SqlPassword: 'SQLPASSWORD',
         ActiveDirectoryPassword: 'ACTIVEDIRECTORYPASSWORD',
         // TODO: ActiveDirectoryIntegrated
       },
@@ -691,7 +690,7 @@ class Connection extends EventEmitter {
         this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
         this.loggedIn = false;
       }
-      if (fedAuthAck !== undefined) {
+      else if (fedAuthAck !== undefined) {
         if (!this.fedAuthInfo.fedAuthInfoRequested) {
           this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
           this.loggedIn = false;
