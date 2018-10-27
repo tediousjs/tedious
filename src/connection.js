@@ -65,8 +65,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (config.authentication.type !== 'default' || config.authentication.type !== 'ntlm') {
-        throw new TypeError('The "config.authentication.type" property must be of type string.');
+      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm') {
+        throw new TypeError('The "config.authentication.type" property must one of "default" or "ntlm".');
       }
 
       if (config.authentication.options !== undefined) {
