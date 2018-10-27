@@ -93,11 +93,11 @@ class Connection extends EventEmitter {
         type: config.authentication.type,
         options: 'ntlm' ? {
           userName: config.authentication.options.userName,
-          password: config.authentication.options.password
-        } : {
-          userName: config.authentication.options.userName,
           password: config.authentication.options.password,
           domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
+        } : {
+          userName: config.authentication.options.userName,
+          password: config.authentication.options.password
         }
       };
     } else {
