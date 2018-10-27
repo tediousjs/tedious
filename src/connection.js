@@ -47,8 +47,8 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    if (!config) {
-      throw new TypeError('No connection configuration given');
+    if (typeof config !== 'object' || config === null) {
+      throw new TypeError('The "config" argument is required and must be of type Object.');
     }
 
     if (typeof config.server !== 'string') {
