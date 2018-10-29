@@ -31,6 +31,15 @@ module.exports = {
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+    //money： -922337203685477.5808 to 922337203685477.5807
+    //in javascript -922337203685477.5808 === -922337203685477.6
+    //               922337203685477.5807 === 922337203685477.6
+    //javascript number doesn't have enough precision.
+    if (!(value >= -922337203685477.5808 + 0.1 && value <= 922337203685477.5807 - 0.1))
+    {
+      return new TypeError('Value must be between -922337203685477.5808 and 922337203685477.5807.');
+    }
+
     return value;
   }
 };
