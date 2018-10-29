@@ -485,7 +485,7 @@ class Connection extends EventEmitter {
         this.config.options.instanceName = undefined;
       }
 
-      if (config.options.readOnlyIntent != undefined) {
+      if (config.options.readOnlyIntent !== undefined) {
         if (typeof config.options.readOnlyIntent !== 'boolean') {
           throw new TypeError('The "config.options.readOnlyIntent" property must be of type boolean.');
         }
@@ -557,7 +557,7 @@ class Connection extends EventEmitter {
         this.config.options.textsize = config.options.textsize;
       }
 
-      if (config.options.trustServerCertificate != undefined) {
+      if (config.options.trustServerCertificate !== undefined) {
         if (typeof config.options.trustServerCertificate !== 'boolean') {
           throw new TypeError('The "config.options.trustServerCertificate" property must be of type boolean.');
         }
