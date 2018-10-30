@@ -273,7 +273,9 @@ module.exports = class WritableTrackingBuffer {
   }
 
   writeMoney(value: number) {
-    this.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32));
+    //floor(-1.9) === -2
+    //-1.9|0 === -1 
+    this.writeInt32LE((value * SHIFT_RIGHT_32)|0);
     this.writeInt32LE(value & -1);
   }
 };
