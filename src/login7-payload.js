@@ -63,8 +63,6 @@ const FEDAUTH_OPTIONS = {
   ADAL_WORKFLOW_INTEGRATED: 0x02
 };
 
-module.exports.FEDAUTH_OPTIONS = FEDAUTH_OPTIONS;
-
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
 type Options = {
@@ -456,4 +454,4 @@ class Login7Payload {
   }
 }
 
-module.exports.Login7Payload = Login7Payload;
+module.exports = Login7Payload;

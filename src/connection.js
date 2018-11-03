@@ -11,8 +11,7 @@ const InstanceLookup = require('./instance-lookup').InstanceLookup;
 const TransientErrorLookup = require('./transient-error-lookup.js').TransientErrorLookup;
 const TYPE = require('./packet').TYPE;
 const PreloginPayload = require('./prelogin-payload');
-const Login7Payload = require('./login7-payload').Login7Payload;
-const FEDAUTH_OPTIONS = require('./login7-payload').FEDAUTH_OPTIONS;
+const Login7Payload = require('./login7-payload');
 const NTLMResponsePayload = require('./ntlm-payload');
 const Request = require('./request');
 const RpcRequestPayload = require('./rpcrequest-payload');
@@ -1815,19 +1814,17 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       featureExtAck: function(token) {
-        const fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID);
-
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory') {
-          if (fedAuthAck === undefined) {
+          if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
-          } else if (fedAuthAck.length !== 0) {
+          } else if (token.fedAuth.length !== 0) {
             this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
         } else {
-          if (fedAuthAck === undefined) {
+          if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Received acknowledgement for unknown feature');
             this.loggedIn = false;
           } else {
