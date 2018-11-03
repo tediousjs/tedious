@@ -1,4 +1,4 @@
-var Login7Payload = require('../../src/login7-payload').Login7Payload;
+var Login7Payload = require('../../src/login7-payload');
 
 exports.create = function(test) {
   var payload = new Login7Payload({
