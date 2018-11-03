@@ -81,7 +81,7 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (config.authentication.type !== 'default' || config.authentication.type !== 'ntlm' || config.authentication.type !== 'azure-active-directory') {
+      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'azure-active-directory') {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
