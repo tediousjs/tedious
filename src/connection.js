@@ -61,7 +61,6 @@ class Connection extends EventEmitter {
       requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
       responsePending: false,
-      featureExtAckPending: false,
       token: undefined
     };
 
@@ -1358,12 +1357,7 @@ class Connection extends EventEmitter {
   }
 
   processLogin7Response() {
-    // FEDAUTH FeatureId should be acknowledged in featureExtAck before proceeding
-    // TODO: Checking FedAuthId should be checked in a separate state as in 3.2.3.5
-    if (this.fedAuthInfo.featureExtAckPending) {
-      return setImmediate(this.processLogin7Response());
-    }
-    else if (this.loggedIn) {
+    if (this.loggedIn) {
       this.dispatchEvent('loggedIn');
     } else {
       if (this.loginError) {
@@ -1403,7 +1397,6 @@ class Connection extends EventEmitter {
 
   processLogin7FedAuthResponse() {
     if (this.fedAuthInfo.fedAuthInfoRequested && !this.loginError) {
-      this.fedAuthInfo.featureExtAckPending = true;
       return this.dispatchEvent('receivedFedAuthInfo');
     } else {
       if (this.loginError) {
@@ -1865,8 +1858,6 @@ Connection.prototype.STATE = {
           this.loginError = ConnectionError('Received acknowledgement for unknown feature');
           this.loggedIn = false;
         }
-
-        this.fedAuthInfo.featureExtAckPending = false;
       },
       message: function() {
         this.processLogin7Response();
