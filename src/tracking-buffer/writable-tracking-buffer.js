@@ -82,24 +82,6 @@ module.exports = class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeUInt32LEatOffset(value: number, offset: number) {
-    if (offset < this.compositeBuffer.length) {
-      this.compositeBuffer.writeUInt32LE(value, offset);
-    }
-    else {
-      offset = (this.compositeBuffer.length !== 0) ? this.compositeBuffer.length - offset : offset;
-      this.buffer.writeUInt32LE(value, offset);
-    }
-  }
-
-  getPos() {
-    return this.compositeBuffer.length + this.position;
-  }
-
-  getLen() {
-    return this.buffer.length;
-  }
-
   writeUShort(value: number) {
     this.writeUInt16LE(value);
   }
