@@ -83,17 +83,6 @@ exports.writeSignedInt = function(test) {
   test.done();
 };
 
-exports.writeUInt32LEatOffset = function(test) {
-  var buffer = new TrackingBuffer(10);
-
-  buffer.writeUInt32LE(1);
-  buffer.writeUInt32LE(2);
-  buffer.writeUInt32LEatOffset(2, 1);
-  assertBuffer(test, buffer, [0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-
-  test.done();
-};
-
 exports.writeString = function(test) {
   var buffer = new TrackingBuffer(2, 'ucs2');
 
