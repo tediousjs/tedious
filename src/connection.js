@@ -729,12 +729,11 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
-      let fedAuthAck = undefined;
-      if (this.fedAuthInfo.fedAuthInfoRequested && (fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID)) === undefined) {
+      const fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID);
+      if (this.fedAuthInfo.fedAuthInfoRequested && fedAuthAck === undefined) {
         this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
         this.loggedIn = false;
-      }
-      else if (fedAuthAck !== undefined) {
+      } else if (fedAuthAck !== undefined) {
         if (!this.fedAuthInfo.fedAuthInfoRequested) {
           this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
           this.loggedIn = false;
@@ -747,8 +746,7 @@ class Connection extends EventEmitter {
             }
           }
         }
-      }
-      else {
+      } else {
         this.loginError = ConnectionError('Received acknowledgement for unknown feature');
         this.loggedIn = false;
       }
