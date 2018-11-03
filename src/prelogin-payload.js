@@ -47,8 +47,7 @@ for (const name in MARS) {
 
 
 type Options = {
-  encrypt: boolean,
-  fedAuthRequested: boolean
+  encrypt: boolean
 };
 
 /*
@@ -77,7 +76,7 @@ module.exports = class PreloginPayload {
   marsString: string;
   fedAuthRequired: number;
 
-  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, fedAuthRequested: false }) {
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
     } else {
@@ -93,12 +92,9 @@ module.exports = class PreloginPayload {
       this.createEncryptionOption(),
       this.createInstanceOption(),
       this.createThreadIdOption(),
-      this.createMarsOption()
+      this.createMarsOption(),
+      this.createFedAuthOption()
     ];
-
-    if (this.options.fedAuthRequested) {
-      options.push(this.createFedAuthOption());
-    }
 
     let length = 0;
     for (let i = 0, len = options.length; i < len; i++) {

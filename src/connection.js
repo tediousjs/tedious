@@ -1133,8 +1133,7 @@ class Connection extends EventEmitter {
 
   sendPreLogin() {
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt,
-      fedAuthRequested: this.config.authentication.type === 'azure-active-directory'
+      encrypt: this.config.options.encrypt
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
