@@ -19,8 +19,8 @@ module.exports.fedauthInfo = function(test) {
   parser.write(buffer.data);
   const token = parser.read();
 
-  test.strictEqual(token.fedAuthInfoData.stsurl, 'stsurl');
-  test.strictEqual(token.fedAuthInfoData.spn, 'spn');
+  test.strictEqual(token.stsurl, 'stsurl');
+  test.strictEqual(token.spn, 'spn');
 
   test.done();
 };

@@ -1909,23 +1909,21 @@ Connection.prototype.STATE = {
         this.fedAuthInfoToken = token;
       },
       message: function() {
-        if (this.fedAuthInfoToken) {
+        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
           const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          if (this.fedAuthInfoToken.fedAuthInfoData.stsurl && this.fedAuthInfoToken.fedAuthInfoData.spn) {
-            const context = new AuthenticationContext(this.fedAuthInfoToken.fedAuthInfoData.stsurl);
-            const authentication = this.config.authentication;
+          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
+          const authentication = this.config.authentication;
 
-            context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.fedAuthInfoData.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
-              if (err) {
-                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-                this.emit('connect', this.loginError);
-                this.dispatchEvent('loginFailed');
-                return;
-              }
+          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+            if (err) {
+              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.emit('connect', this.loginError);
+              this.dispatchEvent('loginFailed');
+              return;
+            }
 
-              this.sendFedAuthResponsePacket(tokenResponse);
-            });
-          }
+            this.sendFedAuthResponsePacket(tokenResponse);
+          });
         } else {
           if (this.loginError) {
             this.emit('connect', this.loginError);
