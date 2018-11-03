@@ -5,10 +5,10 @@ const TransientErrorLookup = require('../../src/transient-error-lookup').Transie
 
 const getConfig = function() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
-  config.password = 'InvalidPassword';
-  if (config.authentication && config.authentication.options)
-  {
+  if (config.authentication) {
     config.authentication.options.password = 'InvalidPassword';
+  } else {
+    config.password = 'InvalidPassword';
   }
   config.options.maxRetriesOnTransientErrors = 5;
   config.options.connectionRetryInterval = 25;
@@ -29,6 +29,11 @@ exports['connection retry tests'] = {
 
   'retry specified number of times on transient errors': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory') {
+      return test.done();
+    }
+
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
     sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
@@ -52,6 +57,11 @@ exports['connection retry tests'] = {
 
   'no retries on non-transient errors': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory') {
+      return test.done();
+    }
+
     test.expect(1);
 
     sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
@@ -75,6 +85,11 @@ exports['connection retry tests'] = {
 
   'no retries if connection timeout fires': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory') {
+      return test.done();
+    }
+
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
     const clock = sinon.useFakeTimers({ toFake: [ 'setTimeout' ] });
