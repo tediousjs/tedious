@@ -49,8 +49,8 @@ class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    if (!config) {
-      throw new TypeError('No connection configuration given');
+    if (typeof config !== 'object' || config === null) {
+      throw new TypeError('The "config" argument is required and must be of type Object.');
     }
 
     if (typeof config.server !== 'string') {
@@ -82,7 +82,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'azure-active-directory') {
-        throw new TypeError('The "config.authentication.type" property must be of type string.');
+        throw new TypeError('The "config.authentication.type" property must one of "default", "ntlm" or "azure-active-directory".');
       }
 
       if (config.authentication.options !== undefined) {
@@ -109,11 +109,11 @@ class Connection extends EventEmitter {
         type: config.authentication.type,
         options: 'ntlm' ? {
           userName: config.authentication.options.userName,
-          password: config.authentication.options.password
-        } : {
-          userName: config.authentication.options.userName,
           password: config.authentication.options.password,
           domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
+        } : {
+          userName: config.authentication.options.userName,
+          password: config.authentication.options.password
         }
       };
     } else {
@@ -501,7 +501,7 @@ class Connection extends EventEmitter {
         this.config.options.instanceName = undefined;
       }
 
-      if (config.options.readOnlyIntent != undefined) {
+      if (config.options.readOnlyIntent !== undefined) {
         if (typeof config.options.readOnlyIntent !== 'boolean') {
           throw new TypeError('The "config.options.readOnlyIntent" property must be of type boolean.');
         }
@@ -573,7 +573,7 @@ class Connection extends EventEmitter {
         this.config.options.textsize = config.options.textsize;
       }
 
-      if (config.options.trustServerCertificate != undefined) {
+      if (config.options.trustServerCertificate !== undefined) {
         if (typeof config.options.trustServerCertificate !== 'boolean') {
           throw new TypeError('The "config.options.trustServerCertificate" property must be of type boolean.');
         }
