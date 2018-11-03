@@ -1208,10 +1208,8 @@ class Connection extends EventEmitter {
     const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
     const data = new Buffer(8 + accessTokenLen);
     let offset = 0;
-    data.writeUInt32LE(accessTokenLen + 4, offset);
-    offset += 4;
-    data.writeUInt32LE(accessTokenLen, offset);
-    offset += 4;
+    offset = data.writeUInt32LE(accessTokenLen + 4, offset);
+    offset = data.writeUInt32LE(accessTokenLen, offset);
     data.write(tokenResponse.accessToken, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
