@@ -58,7 +58,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthInfo = {
-      fedAuthLibrary: undefined,
       requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
       responsePending: false,
@@ -739,17 +738,14 @@ class Connection extends EventEmitter {
         if (!this.fedAuthInfo.fedAuthInfoRequested) {
           this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
           this.loggedIn = false;
-        }
-        switch (this.fedAuthInfo.fedAuthLibrary) {
-          case FEDAUTH_OPTIONS.LIBRARY_ADAL:
+        } else {
+          const { authentication } = this.config;
+          if (authentication.type === 'azure-active-directory') {
             if (0 !== fedAuthAck.length) {
-              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${this.config.authentication.type} authentication method includes extra data`);
+              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
               this.loggedIn = false;
             }
-            break;
-          default:
-            this.loginError = ConnectionError('Attempting to use unknown Active Directory authentication library');
-            this.loggedIn = false;
+          }
         }
       }
       else {
@@ -1195,7 +1191,6 @@ class Connection extends EventEmitter {
     switch (authentication.type) {
       case 'azure-active-directory':
         this.fedAuthInfo.fedAuthInfoRequested = true;
-        this.fedAuthInfo.fedAuthLibrary = FEDAUTH_OPTIONS.LIBRARY_ADAL;
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthInfo.requiredPreLoginResponse,
