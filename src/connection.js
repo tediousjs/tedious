@@ -1111,16 +1111,11 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-    if (this.config.authentication.type === 'azure-active-directory') {
-      if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
-        this.emit('connect', ConnectionError(`Server sent an unexpected response for Active Directory authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
-        return this.close();
-      }
 
-      if (preloginPayload.fedAuthRequired === 1) {
-        this.fedAuthRequired = true;
-      }
+    if (preloginPayload.fedAuthRequired === 1) {
+      this.fedAuthRequired = true;
     }
+
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
         this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
