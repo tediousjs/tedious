@@ -1783,11 +1783,11 @@ Connection.prototype.STATE = {
             const { authentication } = this.config;
 
             if (authentication.type === 'azure-active-directory') {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (this.config.domain) {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
-              return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           });
         }
