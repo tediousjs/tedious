@@ -57,8 +57,9 @@ class Connection extends EventEmitter {
       throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
+    this.fedAuthRequired = false;
+
     this.fedAuthInfo = {
-      requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
       responsePending: false,
       token: undefined
@@ -1120,7 +1121,10 @@ class Connection extends EventEmitter {
         this.emit('connect', ConnectionError(`Server sent an unexpected response for Active Directory authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
         return this.close();
       }
-      this.fedAuthInfo.requiredPreLoginResponse = (preloginPayload.fedAuthRequired == 1);
+
+      if (preloginPayload.fedAuthRequired === 1) {
+        this.fedAuthRequired = true;
+      }
     }
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
@@ -1151,7 +1155,7 @@ class Connection extends EventEmitter {
         this.fedAuthInfo.fedAuthInfoRequested = true;
         payload.fedAuth = {
           type: 'ADAL',
-          echo: this.fedAuthInfo.requiredPreLoginResponse,
+          echo: this.fedAuthRequired,
           workflow: 'default'
         };
         break;
@@ -1802,7 +1806,9 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
-            if (this.fedAuthInfo.requiredPreLoginResponse) {
+            const { authentication } = this.config;
+
+            if (authentication.type === 'azure-active-directory') {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (this.config.domain) {
               return this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
