@@ -58,7 +58,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthInfo = {
-      method: undefined,
       fedAuthLibrary: undefined,
       requiredPreLoginResponse: false,
       fedAuthInfoRequested: false,
@@ -744,7 +743,7 @@ class Connection extends EventEmitter {
         switch (this.fedAuthInfo.fedAuthLibrary) {
           case FEDAUTH_OPTIONS.LIBRARY_ADAL:
             if (0 !== fedAuthAck.length) {
-              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${this.fedAuthInfo.method} authentication method includes extra data`);
+              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${this.config.authentication.type} authentication method includes extra data`);
               this.loggedIn = false;
             }
             break;
