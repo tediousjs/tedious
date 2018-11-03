@@ -1267,7 +1267,7 @@ exports.testDateFormatCustom = function(test) {
 };
 
 var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag, defaultOn) {
-  test.expect(5);
+  test.expect(6);
 
   var config = getConfig();
   config.options[optionName] = optionValue;
@@ -1301,6 +1301,8 @@ var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag
   });
 
   connection.on('connect', function(err) {
+    test.ifError(err);
+
     connection.execSql(request);
   });
 
