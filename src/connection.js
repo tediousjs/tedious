@@ -593,7 +593,6 @@ class Connection extends EventEmitter {
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
     this.transitionTo(this.STATE.CONNECTING);
 
-
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
       // events are utilized to maintain inTransaction property state which in
