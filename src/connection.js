@@ -1145,7 +1145,7 @@ class Connection extends EventEmitter {
   sendPreLogin() {
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt,
-      fedAuthRequested: (this.fedAuthInfo.method !== undefined)
+      fedAuthRequested: this.config.authentication.type === 'azure-active-directory'
     });
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
@@ -1166,7 +1166,7 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
     });
-    if (this.fedAuthInfo.method != undefined) {
+    if (this.config.authentication.type === 'azure-active-directory') {
       if (0 !== preloginPayload.fedAuthRequired && 1 !== preloginPayload.fedAuthRequired) {
         this.emit('connect', ConnectionError(`Server sent an unexpected response for Active Directory authentication value during negotiation. Value was ${preloginPayload.fedAuthRequired}`, 'EFEDAUTH'));
         return this.close();
