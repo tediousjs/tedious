@@ -58,10 +58,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthInfo = {
-      ValidFedAuthEnum: {
-        ActiveDirectoryPassword: 'ACTIVEDIRECTORYPASSWORD',
-        // TODO: ActiveDirectoryIntegrated
-      },
       method: undefined,
       fedAuthLibrary: undefined,
       requiredPreLoginResponse: false,
