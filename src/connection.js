@@ -709,49 +709,11 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('fedAuthInfo', (token) => {
-      const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-      if (token.fedAuthInfoData.stsurl && token.fedAuthInfoData.spn) {
-        this.fedAuthInfo.responsePending = true;
-        var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
-
-        const authentication = this.config.authentication;
-
-        context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
-          if (err) {
-            this.fedAuthInfo.responsePending = false;
-            this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-          } else {
-            this.fedAuthInfo.responsePending = false;
-            this.fedAuthInfo.token = tokenResponse;
-          }
-        });
-      }
+      this.dispatchEvent('fedAuthInfo', token);
     });
 
     this.tokenStreamParser.on('featureExtAck', (token) => {
-      const fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID);
-      if (this.fedAuthInfo.fedAuthInfoRequested && fedAuthAck === undefined) {
-        this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
-        this.loggedIn = false;
-      } else if (fedAuthAck !== undefined) {
-        if (!this.fedAuthInfo.fedAuthInfoRequested) {
-          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-          this.loggedIn = false;
-        } else {
-          const { authentication } = this.config;
-          if (authentication.type === 'azure-active-directory') {
-            if (0 !== fedAuthAck.length) {
-              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
-              this.loggedIn = false;
-            }
-          }
-        }
-      } else {
-        this.loginError = ConnectionError('Received acknowledgement for unknown feature');
-        this.loggedIn = false;
-      }
-
-      this.fedAuthInfo.featureExtAckPending = false;
+      this.dispatchEvent('featureExtAck', token);
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -1880,6 +1842,32 @@ Connection.prototype.STATE = {
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
       },
+      featureExtAck: function(token) {
+        const fedAuthAck = token.featureAckOpts.get(FEDAUTH_OPTIONS.FEATURE_ID);
+
+        if (this.fedAuthInfo.fedAuthInfoRequested && fedAuthAck === undefined) {
+          this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+          this.loggedIn = false;
+        } else if (fedAuthAck !== undefined) {
+          if (!this.fedAuthInfo.fedAuthInfoRequested) {
+            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+            this.loggedIn = false;
+          } else {
+            const { authentication } = this.config;
+            if (authentication.type === 'azure-active-directory') {
+              if (0 !== fedAuthAck.length) {
+                this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+                this.loggedIn = false;
+              }
+            }
+          }
+        } else {
+          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+          this.loggedIn = false;
+        }
+
+        this.fedAuthInfo.featureExtAckPending = false;
+      },
       message: function() {
         this.processLogin7Response();
       }
@@ -1951,6 +1939,25 @@ Connection.prototype.STATE = {
       },
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
+      },
+      fedAuthInfo: function(token) {
+        const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+        if (token.fedAuthInfoData.stsurl && token.fedAuthInfoData.spn) {
+          this.fedAuthInfo.responsePending = true;
+          var context = new AuthenticationContext(token.fedAuthInfoData.stsurl);
+
+          const authentication = this.config.authentication;
+
+          context.acquireTokenWithUsernamePassword(token.fedAuthInfoData.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+            if (err) {
+              this.fedAuthInfo.responsePending = false;
+              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+            } else {
+              this.fedAuthInfo.responsePending = false;
+              this.fedAuthInfo.token = tokenResponse;
+            }
+          });
+        }
       },
       message: function() {
         if (this.fedAuthInfo.responsePending) {
