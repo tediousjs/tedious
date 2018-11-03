@@ -1206,7 +1206,7 @@ class Connection extends EventEmitter {
 
   sendFedAuthResponsePacket(tokenResponse) {
     const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
-    const data = new Buffer(8 + accessTokenLen);
+    const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
