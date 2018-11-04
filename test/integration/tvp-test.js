@@ -2,6 +2,7 @@ const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const TYPES = require('../../src/tedious').TYPES;
 const fs = require('fs');
+const async = require('async');
 
 const { assert } = require('chai');
 
@@ -62,7 +63,20 @@ describe('calling a procedure that takes and returns a TVP', function() {
           this.skip();
         }
 
-        done();
+        async.series([
+          (done) => {
+            const sql = 'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
+            connection.execSqlBatch(new Request(sql, done));
+          },
+          (done) => {
+            const sql = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
+            connection.execSqlBatch(new Request(sql, done));
+          },
+          (done) => {
+            const sql = 'CREATE PROCEDURE __tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END';
+            connection.execSqlBatch(new Request(sql, done));
+          }
+        ], done);
       });
 
       request.on('row', (columns) => {
@@ -71,21 +85,6 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
       connection.execSql(request);
     });
-  });
-
-  beforeEach(function(done) {
-    var sql = 'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
-    connection.execSqlBatch(new Request(sql, done));
-  });
-
-  beforeEach(function(done) {
-    var sql = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
-    connection.execSqlBatch(new Request(sql, done));
-  });
-
-  beforeEach(function(done) {
-    const sql = 'CREATE PROCEDURE __tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END';
-    connection.execSqlBatch(new Request(sql, done));
   });
 
   it('returns the same data', function(done) {
