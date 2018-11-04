@@ -27,7 +27,13 @@ describe('calling a procedure that takes and returns a TVP', function() {
   let connection;
 
   beforeEach(function(done) {
-    connection = new Connection(getConfig());
+    const config = getConfig();
+
+    if (config.options.tdsVersion < '7_3_A') {
+      this.skip();
+    }
+
+    connection = new Connection(config);
 
     connection.on(
       'infoMessage',
