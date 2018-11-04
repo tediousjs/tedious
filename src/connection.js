@@ -2,7 +2,7 @@ const deprecate = require('depd')('tedious');
 
 const crypto = require('crypto');
 const os = require('os');
-const { AuthenticationContext, MemoryCache } = require('adal-node');
+const { AuthenticationContext } = require('adal-node');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -1908,7 +1908,7 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
           const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl, undefined, new MemoryCache());
+          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
           const authentication = this.config.authentication;
 
           context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {

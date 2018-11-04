@@ -79,8 +79,10 @@ exports.badCredentials = function(test) {
   }
 
   if (config.authentication) {
+    config.authentication.options.userName = 'bad-user';
     config.authentication.options.password = 'bad-password';
   } else {
+    config.userName = 'bad-user';
     config.password = 'bad-password';
   }
 
