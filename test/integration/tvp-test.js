@@ -53,42 +53,21 @@ describe('calling a procedure that takes and returns a TVP', function() {
         return done(err);
       }
 
-      let hasPermission = false;
-      const request = new Request("SELECT HAS_PERMS_BY_NAME(db_name(), 'DATABASE', 'CREATE PROCEDURE')", (err, rowCount) => {
-        if (err) {
-          return done(err);
+      async.series([
+        (done) => {
+          const sql = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
+          connection.execSqlBatch(new Request(sql, done));
+        },
+        (done) => {
+          const sql = 'CREATE PROCEDURE #__tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END';
+          connection.execSqlBatch(new Request(sql, done));
         }
-
-        if (!hasPermission) {
-          this.skip();
-        }
-
-        async.series([
-          (done) => {
-            const sql = 'BEGIN TRY DROP PROCEDURE __tediousTvpTest DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
-            connection.execSqlBatch(new Request(sql, done));
-          },
-          (done) => {
-            const sql = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
-            connection.execSqlBatch(new Request(sql, done));
-          },
-          (done) => {
-            const sql = 'CREATE PROCEDURE __tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END';
-            connection.execSqlBatch(new Request(sql, done));
-          }
-        ], done);
-      });
-
-      request.on('row', (columns) => {
-        hasPermission = (columns[0].value === 1);
-      });
-
-      connection.execSql(request);
+      ], done);
     });
   });
 
   it('returns the same data', function(done) {
-    var request4 = new Request('__tediousTvpTest', done);
+    var request4 = new Request('#__tediousTvpTest', done);
 
     request4.on('doneInProc', function(rowCount, more) {
       assert.strictEqual(rowCount, 1);
