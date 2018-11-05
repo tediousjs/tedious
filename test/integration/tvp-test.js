@@ -25,6 +25,8 @@ function getConfig() {
 }
 
 describe('calling a procedure that takes and returns a TVP', function() {
+  this.timeout(5000);
+
   let connection;
 
   beforeEach(function(done) {
