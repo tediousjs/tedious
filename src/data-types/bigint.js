@@ -16,7 +16,7 @@ module.exports = {
 
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
-      const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
+      const val = typeof parameter.value !== 'number' ? parameter.value : Math.round(parameter.value);
       buffer.writeUInt8(8);
       buffer.writeInt64LE(val);
     } else {
