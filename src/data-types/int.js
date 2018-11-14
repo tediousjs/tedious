@@ -17,7 +17,7 @@ module.exports = {
   writeParameterData: function(buffer, parameter) {
     if (parameter.value != null) {
       buffer.writeUInt8(4);
-      buffer.writeInt32LE(parseInt(parameter.value));
+      buffer.writeInt32LE(Math.round(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
@@ -27,7 +27,7 @@ module.exports = {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+    value = Math.round(value);
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
