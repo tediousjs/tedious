@@ -72,7 +72,7 @@ exports.badPort = function(test) {
 exports.badCredentials = function(test) {
   var config = getConfig();
 
-  if (config.authentication && config.authentication.type === 'azure-active-directory') {
+  if (config.authentication && config.authentication.type === 'active-directory-password') {
     test.expect(1); // No `errorMessage` event emitted.
   } else {
     test.expect(2);
