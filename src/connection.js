@@ -95,7 +95,7 @@ class Connection extends EventEmitter {
 
       authentication = {
         type: config.authentication.type,
-        options: 'ntlm' ? {
+        options: config.authentication.type === 'ntlm' ? {
           userName: config.authentication.options.userName,
           password: config.authentication.options.password,
           domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
@@ -1713,7 +1713,8 @@ Connection.prototype.STATE = {
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
-          if (this.config.domain) {
+          const { authentication } = this.config;
+          if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1782,7 +1783,7 @@ Connection.prototype.STATE = {
 
             if (authentication.type === 'active-directory-password') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (this.config.domain) {
+            } else if (authentication.type === 'ntlm') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
