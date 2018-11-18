@@ -84,7 +84,7 @@ jobs:
           "config": {
             "server": "'${AZURE_SERVER}'",
             "authentication": {
-              "type": "azure-active-directory",
+              "type": "active-directory-password",
               "options": {
                 "userName": "'${AZURE_AD_USER}'",
                 "password": "'${AZURE_AD_PASS}'"
