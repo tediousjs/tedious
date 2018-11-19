@@ -30,7 +30,7 @@ exports['connection retry tests'] = {
   'retry specified number of times on transient errors': function(test) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'active-directory-password') {
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
       return test.done();
     }
 
@@ -58,7 +58,7 @@ exports['connection retry tests'] = {
   'no retries on non-transient errors': function(test) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'active-directory-password') {
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
       return test.done();
     }
 
@@ -86,7 +86,7 @@ exports['connection retry tests'] = {
   'no retries if connection timeout fires': function(test) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'active-directory-password') {
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
       return test.done();
     }
 

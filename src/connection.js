@@ -69,8 +69,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'active-directory-password') {
-        throw new TypeError('The "config.authentication.type" property must one of "default", "ntlm" or "active-directory-password".');
+      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'azure-active-directory-password') {
+        throw new TypeError('The "config.authentication.type" property must one of "default", "ntlm" or "azure-active-directory-password".');
       }
 
       if (config.authentication.options !== undefined) {
@@ -1139,7 +1139,7 @@ class Connection extends EventEmitter {
 
     const { authentication } = this.config;
     switch (authentication.type) {
-      case 'active-directory-password':
+      case 'azure-active-directory-password':
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -1781,7 +1781,7 @@ Connection.prototype.STATE = {
           this.sendLogin7Packet(() => {
             const { authentication } = this.config;
 
-            if (authentication.type === 'active-directory-password') {
+            if (authentication.type === 'azure-active-directory-password') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (authentication.type === 'ntlm') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -1816,7 +1816,7 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'active-directory-password') {
+        if (authentication.type === 'azure-active-directory-password') {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
