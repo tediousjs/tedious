@@ -40,6 +40,7 @@
     "tag": "next"
   },
   "dependencies": {
+    "adal-node": "^0.1.22",
     "big-number": "1.0.0",
     "bl": "^2.0.1",
     "depd": "^1.1.2",

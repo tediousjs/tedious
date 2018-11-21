@@ -2,6 +2,7 @@ const deprecate = require('depd')('tedious');
 
 const crypto = require('crypto');
 const os = require('os');
+const { AuthenticationContext } = require('adal-node');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -55,6 +56,9 @@ class Connection extends EventEmitter {
       throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
+    this.fedAuthRequired = false;
+    this.fedAuthInfoToken = undefined;
+
     let authentication;
     if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
@@ -65,8 +69,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm') {
-        throw new TypeError('The "config.authentication.type" property must one of "default" or "ntlm".');
+      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'azure-active-directory-password') {
+        throw new TypeError('The "config.authentication.type" property must one of "default", "ntlm" or "azure-active-directory-password".');
       }
 
       if (config.authentication.options !== undefined) {
@@ -697,6 +701,14 @@ class Connection extends EventEmitter {
       this.emit('charsetChange', token.newValue);
     });
 
+    this.tokenStreamParser.on('fedAuthInfo', (token) => {
+      this.dispatchEvent('fedAuthInfo', token);
+    });
+
+    this.tokenStreamParser.on('featureExtAck', (token) => {
+      this.dispatchEvent('featureExtAck', token);
+    });
+
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
@@ -1098,6 +1110,10 @@ class Connection extends EventEmitter {
       return preloginPayload.toString('  ');
     });
 
+    if (preloginPayload.fedAuthRequired === 1) {
+      this.fedAuthRequired = true;
+    }
+
     if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
       if (!this.config.options.encrypt) {
         this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
@@ -1121,11 +1137,23 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    if (this.config.authentication.type == 'ntlm') {
-      payload.sspi = createNTLMRequest({ domain: this.config.authentication.options.domain });
-    } else {
-      payload.userName = this.config.authentication.options.userName;
-      payload.password = this.config.authentication.options.password;
+    const { authentication } = this.config;
+    switch (authentication.type) {
+      case 'azure-active-directory-password':
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: this.fedAuthRequired,
+          workflow: 'default'
+        };
+        break;
+
+      case 'ntlm':
+        payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
+        break;
+
+      default:
+        payload.userName = authentication.options.userName;
+        payload.password = authentication.options.password;
     }
 
     payload.hostname = os.hostname();
@@ -1171,6 +1199,20 @@ class Connection extends EventEmitter {
 
     process.nextTick(() => {
       this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
+    });
+  }
+
+  sendFedAuthResponsePacket(tokenResponse) {
+    const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
+    const data = Buffer.alloc(8 + accessTokenLen);
+    let offset = 0;
+    offset = data.writeUInt32LE(accessTokenLen + 4, offset);
+    offset = data.writeUInt32LE(accessTokenLen, offset);
+    data.write(tokenResponse.accessToken, offset, 'ucs2');
+    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
+    // sent the fedAuth token message, the rest is similar to standard login 7
+    process.nextTick(() => {
+      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
     });
   }
 
@@ -1738,7 +1780,10 @@ Connection.prototype.STATE = {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet(() => {
             const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
+
+            if (authentication.type === 'azure-active-directory-password') {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            } else if (authentication.type === 'ntlm') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1768,6 +1813,26 @@ Connection.prototype.STATE = {
       },
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
+      },
+      featureExtAck: function(token) {
+        const { authentication } = this.config;
+        if (authentication.type === 'azure-active-directory-password') {
+          if (token.fedAuth === undefined) {
+            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+            this.loggedIn = false;
+          } else if (token.fedAuth.length !== 0) {
+            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+            this.loggedIn = false;
+          }
+        } else {
+          if (token.fedAuth === undefined) {
+            this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+            this.loggedIn = false;
+          } else {
+            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+            this.loggedIn = false;
+          }
+        }
       },
       message: function() {
         this.processLogin7Response();
@@ -1820,6 +1885,52 @@ Connection.prototype.STATE = {
       },
       message: function() {
         this.processLogin7NTLMAck();
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
+    events: {
+      socketError: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      data: function(data) {
+        this.sendDataToTokenStreamParser(data);
+      },
+      loginFailed: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      fedAuthInfo: function(token) {
+        this.fedAuthInfoToken = token;
+      },
+      message: function() {
+        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
+          const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
+          const authentication = this.config.authentication;
+
+          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+            if (err) {
+              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.emit('connect', this.loginError);
+              this.dispatchEvent('loginFailed');
+              return;
+            }
+
+            this.sendFedAuthResponsePacket(tokenResponse);
+          });
+        } else {
+          if (this.loginError) {
+            this.emit('connect', this.loginError);
+          } else {
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          }
+
+          this.dispatchEvent('loginFailed');
+        }
       }
     }
   },

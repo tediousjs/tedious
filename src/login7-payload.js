@@ -49,8 +49,21 @@ const FLAGS_3 = {
   CHANGE_PASSWORD_YES: 0x01,
   BINARY_XML: 0x02,
   SPAWN_USER_INSTANCE: 0x04,
-  UNKNOWN_COLLATION_HANDLING: 0x08
+  UNKNOWN_COLLATION_HANDLING: 0x08,
+  EXTENSION_USED: 0x10
 };
+
+const FEDAUTH_OPTIONS = {
+  FEATURE_ID: 0x02,
+  LIBRARY_SECURITYTOKEN: 0x01,
+  LIBRARY_ADAL: 0x02,
+  FEDAUTH_YES_ECHO: 0x01,
+  FEDAUTH_NO_ECHO: 0x00,
+  ADAL_WORKFLOW_USER_PASS: 0x01,
+  ADAL_WORKFLOW_INTEGRATED: 0x02
+};
+
+const FEATURE_EXT_TERMINATOR = 0xFF;
 
 type Options = {
   tdsVersion: number,
@@ -65,7 +78,7 @@ type Options = {
 /*
   s2.2.6.3
  */
-module.exports = class Login7Payload {
+class Login7Payload {
   tdsVersion: number;
   packetSize: number;
   clientProgVer: number;
@@ -90,6 +103,8 @@ module.exports = class Login7Payload {
   attachDbFile: string | typeof undefined;
   changePassword: string | typeof undefined;
 
+  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | typeof undefined;
+
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
@@ -101,6 +116,8 @@ module.exports = class Login7Payload {
 
     this.readOnlyIntent = false;
     this.initDbFatal = false;
+
+    this.fedAuth = undefined;
 
     this.userName = undefined;
     this.password = undefined;
@@ -237,7 +254,12 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
-    offset = fixedData.writeUInt16LE(0, offset);
+    const extensions = this.buildFeatureExt();
+    offset = fixedData.writeUInt16LE(4, offset);
+    const extensionOffset = Buffer.alloc(4);
+    extensionOffset.writeUInt32LE(dataOffset += 4, 0);
+    dataOffset += extensions.length;
+    buffers.push(extensionOffset, extensions);
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
@@ -358,6 +380,27 @@ module.exports = class Login7Payload {
     return flags1;
   }
 
+  buildFeatureExt() {
+    const buffers = [];
+
+    const fedAuth = this.fedAuth;
+    if (fedAuth) {
+      switch (fedAuth.type) {
+        case 'ADAL':
+          const buffer = Buffer.alloc(7);
+          buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, 0);
+          buffer.writeUInt32LE(2, 1);
+          buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
+          buffer.writeUInt8(fedAuth.workflow == 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
+          buffers.push(buffer);
+      }
+    }
+
+    buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
+
+    return Buffer.concat(buffers);
+  }
+
   buildOptionFlags2() {
     let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
     if (this.sspi) {
@@ -379,7 +422,7 @@ module.exports = class Login7Payload {
   }
 
   buildOptionFlags3() {
-    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING | FLAGS_3.EXTENSION_USED;
   }
 
   scramblePassword(password: Buffer) {
@@ -409,4 +452,6 @@ module.exports = class Login7Payload {
         this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
-};
+}
+
+module.exports = Login7Payload;
