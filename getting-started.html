@@ -17,12 +17,15 @@ title: Getting started
   var Connection = require('tedious').Connection;
 
   var config = {
-    userName: 'test',
-    password: 'test',
-    server: '192.168.1.210',
-    
+    server: "192.168.1.210",
     // If you're on Windows Azure, you will need this:
-    options: {encrypt: true}
+    options: {encrypt: true},
+    authentication: {
+      type: "default",
+      options: {  
+        userName: "test",
+        password: "test",
+    }
   };
 
   var connection = new Connection(config);
