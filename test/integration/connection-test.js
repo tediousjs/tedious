@@ -334,13 +334,34 @@ exports.encrypt = function(test) {
   });
 };
 
+exports['potentially throws an error on invalid crypto credential details'] = function(test) {
+  var config = getConfig();
+  config.options.encrypt = true;
+
+  // On newer Node.js versions, this will throw an error when passed to `tls.createSecureContext`
+  config.options.cryptoCredentialsDetails = {
+    ciphers: '!ALL'
+  };
+
+  try {
+    const { createSecureContext } = require('tls');
+    createSecureContext(config.options.cryptoCredentialsDetails);
+  } catch (err) {
+    test.throws(() => {
+      new Connection(config);
+    });
+  }
+
+  test.done();
+};
+
 exports['fails if no cipher can be negotiated'] = function(test) {
   var config = getConfig();
   config.options.encrypt = true;
 
-  // Do not allow any cipher to be used
+  // Specify a cipher that should never be supported by SQL Server
   config.options.cryptoCredentialsDetails = {
-    ciphers: '!ALL'
+    ciphers: 'NULL'
   };
 
   var connection = new Connection(config);
