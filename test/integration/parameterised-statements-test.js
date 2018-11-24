@@ -757,10 +757,7 @@ exports.callProcedureWithParameters = function(test) {
   var config = getConfig();
 
   var setupSql = `\
-if exists (select * from sys.procedures where name = '__test5')
-  exec('drop procedure [dbo].[__test5]')
-
-exec('create procedure [dbo].[__test5]
+exec('create procedure #__test5
   @in BINARY(4),
   @in2 BINARY(4) = NULL,
   @in3 VARBINARY(MAX),
@@ -787,7 +784,7 @@ end')\
   var request = new Request(setupSql, function(err) {
     test.ifError(err);
 
-    request = new Request('__test5', function(err) {
+    request = new Request('#__test5', function(err) {
       test.ifError(err);
 
       connection.close();

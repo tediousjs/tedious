@@ -581,19 +581,27 @@ exports.xmlWithSchema = function(test) {
 </xsd:schema>`;
 
   var sql = `\
-IF OBJECT_ID('${tableName}', 'U') IS NOT NULL
-  DROP TABLE [${tableName}];
+-- Check if we have permissions to create schema collections
+IF HAS_PERMS_BY_NAME(db_name(), 'DATABASE', 'CREATE XML SCHEMA COLLECTION') = 1
+BEGIN
+  IF OBJECT_ID('${tableName}', 'U') IS NOT NULL
+    DROP TABLE [${tableName}];
 
-IF EXISTS (SELECT * FROM [sys].[xml_schema_collections] WHERE [name] = '${schemaName}' AND [schema_id] = SCHEMA_ID())
-  DROP XML SCHEMA COLLECTION [${schemaName}];
+  IF EXISTS (SELECT * FROM [sys].[xml_schema_collections] WHERE [name] = '${schemaName}' AND [schema_id] = SCHEMA_ID())
+    DROP XML SCHEMA COLLECTION [${schemaName}];
 
-CREATE XML SCHEMA COLLECTION [${schemaName}] AS N'${schema}';
+  CREATE XML SCHEMA COLLECTION [${schemaName}] AS N'${schema}';
 
-EXEC('CREATE TABLE [${tableName}] ([xml] [xml]([${schemaName}]))');
+  EXEC('CREATE TABLE [${tableName}] ([xml] [xml]([${schemaName}]))');
 
-INSERT INTO [${tableName}] ([xml]) VALUES ('${xml}');
+  INSERT INTO [${tableName}] ([xml]) VALUES ('${xml}');
 
-SELECT [xml] FROM [${tableName}];\
+  SELECT [xml] FROM [${tableName}];\
+END
+ELSE
+BEGIN
+  SELECT '<root/>'
+END
 `;
 
   execSql(test, sql, xml, '7_2');
