@@ -61,33 +61,38 @@ var connection = new Connection(config);
   <div class="description">
     <dl>
       <dt>
-        <code>userName</code>
+        <code>server</code>
       </dt>
       <dd>
-        <p>
+        Hostname to connect to.
+      </dd>
+	  
+      <dt>
+        <code>authentication.type</code>
+      </dt>
+      <dd>
+          Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>, <code>azure-active-directory-password</code>
+      </dd>
+      
+	  <dt>
+        <code>authentication.options.userName</code>
+      </dt>
+      <dd>
           User name to use for authentication.
-        </p>
       </dd>
 
       <dt>
-        <code>password</code>
+        <code>authentication.options.password</code>
       </dt>
       <dd>
         Password to use for authentication.
       </dd>
 
       <dt>
-        <code>server</code>
+        <code>authentication.options.domain</code>
       </dt>
       <dd>
-        Hostname to connect to.
-      </dd>
-
-      <dt>
-        <code>domain</code>
-      </dt>
-      <dd>
-        Once you set domain, driver will connect to SQL Server using domain login.
+        Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
       </dd>
 
       <dt>
