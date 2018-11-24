@@ -3,8 +3,8 @@ sudo: false
 node_js:
   - "6"
   - "8"
-  - "9"
   - "10"
+  - "11"
 
 stages:
   - test
