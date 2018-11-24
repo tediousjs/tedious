@@ -31,7 +31,7 @@ exports.connectionDoesNotModifyPassedConfig = function(test) {
       encrypt: false,
       port: 1234,
       cryptoCredentialsDetails: {
-        ciphers: 'RC4-MD5'
+        ciphers: 'DEFAULT'
       }
     }
   };
