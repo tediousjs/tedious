@@ -39,12 +39,15 @@ const Date : DataType = {
     if (value == null) {
       return null;
     }
+
     if (!(value instanceof globalDate)) {
-      value = globalDate.parse(value);
+      value = new globalDate(globalDate.parse(value));
     }
+
     if (isNaN(value)) {
       return new TypeError('Invalid date.');
     }
+
     return value;
   }
 };
