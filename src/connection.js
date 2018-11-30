@@ -2,6 +2,10 @@ const deprecate = require('depd')('tedious');
 
 const crypto = require('crypto');
 const os = require('os');
+// $FlowFixMe
+const constants = require('constants');
+const { createSecureContext } = require('tls');
+
 const { AuthenticationContext } = require('adal-node');
 
 const BulkLoad = require('./bulk-load');
@@ -585,6 +589,22 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
     }
+
+    let credentialsDetails = this.config.options.cryptoCredentialsDetails;
+    if (credentialsDetails.secureOptions === undefined) {
+      // If the caller has not specified their own `secureOptions`,
+      // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
+      // Older SQL Server instances running on older Windows versions have
+      // trouble with the BEAST workaround in OpenSSL.
+      // As BEAST is a browser specific exploit, we can just disable this option here.
+      credentialsDetails = Object.create(credentialsDetails, {
+        secureOptions: {
+          value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
+        }
+      });
+    }
+
+    this.secureContext = createSecureContext(credentialsDetails);
 
     this.createDebug();
     this.createTokenStreamParser();
@@ -1722,7 +1742,7 @@ Connection.prototype.STATE = {
         });
       },
       tls: function() {
-        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
+        this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
       }
     }
