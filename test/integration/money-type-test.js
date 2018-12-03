@@ -7,7 +7,7 @@ const config = JSON.parse(
 ).config;
 
 
-for (const value of [100, -100, 922337203685477, -922337203685477])
+for (const value of [100, -100, 922337203685477, -922337203685477, 922337203685477 - 1, -922337203685477 + 1])
 {
   exports[`testMoneyValue${value}`] = function(test)
   {
@@ -15,19 +15,37 @@ for (const value of [100, -100, 922337203685477, -922337203685477])
   };
 }
 
+exports.testMoneyValueError1 = function(test)
+{
+  testMoneyValue(test, 922337203685477 + 1, undefined);
+};
+exports.testMoneyValueError2 = function(test)
+{
+  testMoneyValue(test, -922337203685477 - 1, undefined);
+};
+
+//if expectValue === undefined, the error is expected.
 function testMoneyValue(test, inputValue, expectValue)
 {
   const sql = 'select @v1;';
   var request = new Request(sql, function(err)
   {
-    test.ifError(err);
+    if (expectValue === undefined)
+    {
+      test.ok(err);
+    }
+    else
+    {
+      test.ifError(err);
+    }
     connection.close();
   });
   request.addParameter('v1', TYPES.Money, inputValue);
 
   request.on('row', (data) =>
   {
-    test.equal(data[0].value, expectValue);
+    if (expectValue !== undefined)
+      test.equal(data[0].value, expectValue);
   });
 
   var connection = new Connection(config);
@@ -50,6 +68,6 @@ function testMoneyValue(test, inputValue, expectValue)
 
   connection.on('debug', function(message)
   {
-    console.log(message);
+    //console.log(message);
   });
 }
