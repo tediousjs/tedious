@@ -74,6 +74,10 @@ exports.badCredentials = function(test) {
 
   var config = getConfig();
   config.password = 'bad-password';
+  if (config.authentication && config.authentication.options)
+  {
+    config.authentication.options.password = 'bad-password';
+  }
 
   var connection = new Connection(config);
 
@@ -92,8 +96,8 @@ exports.badCredentials = function(test) {
   });
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
-    return test.ok(~error.message.indexOf('failed'));
+    //console.log(`${error.number} : ${error.message}`)
+    return test.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
   });
 
   return connection.on(
