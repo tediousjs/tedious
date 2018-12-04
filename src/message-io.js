@@ -8,7 +8,6 @@ import type { TLSSocket } from 'tls';
 import type { Socket } from 'net';
 
 const tls = require('tls');
-const crypto = require('crypto');
 const DuplexPair = require('native-duplexpair');
 const { EventEmitter} = require('events');
 
@@ -61,15 +60,13 @@ module.exports = class MessageIO extends EventEmitter {
     return this.outgoingMessageStream.packetSize;
   }
 
-  startTls(credentialsDetails: Object, hostname: string, trustServerCertificate: boolean) {
-    const credentials = tls.createSecureContext ? tls.createSecureContext(credentialsDetails) : crypto.createCredentials(credentialsDetails);
-
+  startTls(secureContext: Object, hostname: string, trustServerCertificate: boolean) {
     const duplexpair = new DuplexPair();
     const securePair = this.securePair = {
       cleartext: tls.connect({
         socket: duplexpair.socket1,
         servername: hostname,
-        secureContext: credentials,
+        secureContext: secureContext,
         rejectUnauthorized: !trustServerCertificate
       }),
       encrypted: duplexpair.socket2

@@ -70,13 +70,20 @@ exports.badPort = function(test) {
 };
 
 exports.badCredentials = function(test) {
-  test.expect(2);
-
   var config = getConfig();
-  config.password = 'bad-password';
-  if (config.authentication && config.authentication.options)
-  {
+
+  if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+    test.expect(1); // No `errorMessage` event emitted.
+  } else {
+    test.expect(2);
+  }
+
+  if (config.authentication) {
+    config.authentication.options.userName = 'bad-user';
     config.authentication.options.password = 'bad-password';
+  } else {
+    config.userName = 'bad-user';
+    config.password = 'bad-password';
   }
 
   var connection = new Connection(config);
@@ -327,13 +334,34 @@ exports.encrypt = function(test) {
   });
 };
 
+exports['potentially throws an error on invalid crypto credential details'] = function(test) {
+  var config = getConfig();
+  config.options.encrypt = true;
+
+  // On newer Node.js versions, this will throw an error when passed to `tls.createSecureContext`
+  config.options.cryptoCredentialsDetails = {
+    ciphers: '!ALL'
+  };
+
+  try {
+    const { createSecureContext } = require('tls');
+    createSecureContext(config.options.cryptoCredentialsDetails);
+  } catch (err) {
+    test.throws(() => {
+      new Connection(config);
+    });
+  }
+
+  test.done();
+};
+
 exports['fails if no cipher can be negotiated'] = function(test) {
   var config = getConfig();
   config.options.encrypt = true;
 
-  // Do not allow any cipher to be used
+  // Specify a cipher that should never be supported by SQL Server
   config.options.cryptoCredentialsDetails = {
-    ciphers: '!ALL'
+    ciphers: 'NULL'
   };
 
   var connection = new Connection(config);
@@ -1262,7 +1290,7 @@ exports.testDateFormatCustom = function(test) {
 };
 
 var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag, defaultOn) {
-  test.expect(5);
+  test.expect(6);
 
   var config = getConfig();
   config.options[optionName] = optionValue;
@@ -1296,6 +1324,8 @@ var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag
   });
 
   connection.on('connect', function(err) {
+    test.ifError(err);
+
     connection.execSql(request);
   });
 
