@@ -1470,15 +1470,18 @@ class Connection extends EventEmitter {
       this.request.rows = [];
       this.request.rst = [];
       this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
-      this.resetConnectionOnNextRequest = false;
-      this.debug.payload(function() {
-        return payload.toString('  ');
+
+      payload.getData((data) => {
+        this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload.toString('  ');
+        });
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+        if (request.paused) {                                // Request.pause() has been called before the request was started
+          this.pauseRequest(request);
+        }
       });
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      if (request.paused) {                                // Request.pause() has been called before the request was started
-        this.pauseRequest(request);
-      }
     }
   }
 
