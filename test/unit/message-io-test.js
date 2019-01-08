@@ -1,3 +1,5 @@
+const BufferList = require('bl');
+
 var Debug = require('../../src/debug');
 var Duplex = require('stream').Duplex;
 var MessageIO = require('../../src/message-io');
@@ -78,17 +80,18 @@ exports.sendOneLongerThanPacket = function(test) {
 };
 
 exports.receiveOnePacket = function(test) {
-  test.expect(1);
+  test.expect(2);
 
   var payload = Buffer.from([1, 2, 3]);
   var connection = new Connection();
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    test.ok(data.equals(payload));
-  });
-  io.on('message', function() {
-    test.done();
+  io.on('data', function(message) {
+    message.pipe(BufferList(function(err, data) {
+      test.ifError(err);
+      test.ok(data.equals(payload));
+      test.done();
+    }));
   });
 
   var packet = new Packet(packetType);
@@ -98,17 +101,18 @@ exports.receiveOnePacket = function(test) {
 };
 
 exports.receiveOnePacketInTwoChunks = function(test) {
-  test.expect(1);
+  test.expect(2);
 
   var payload = Buffer.from([1, 2, 3]);
   var connection = new Connection();
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    test.ok(data.equals(payload));
-  });
-  io.on('message', function() {
-    test.done();
+  io.on('data', function(message) {
+    message.pipe(BufferList(function(err, data) {
+      test.ifError(err);
+      test.ok(data.equals(payload));
+      test.done();
+    }));
   });
 
   var packet = new Packet(packetType);
@@ -129,20 +133,24 @@ exports.receiveTwoPackets = function(test) {
   var receivedPacketCount = 0;
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedPacketCount++;
 
-    switch (receivedPacketCount) {
-      case 1:
-        test.ok(data.equals(payload1));
-        break;
-      case 2:
-        test.ok(data.equals(payload2));
-        break;
-    }
-  });
-  io.on('message', function() {
-    test.done();
+  io.on('data', function(message) {
+    message.on('data', function(data) {
+      receivedPacketCount++;
+
+      switch (receivedPacketCount) {
+        case 1:
+          test.ok(data.equals(payload1));
+          break;
+        case 2:
+          test.ok(data.equals(payload2));
+          break;
+      }
+    });
+
+    message.on('end', function() {
+      test.done();
+    });
   });
 
   var packet = new Packet(packetType);
@@ -166,20 +174,23 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
   var receivedPacketCount = 0;
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedPacketCount++;
+  io.on('data', function(message) {
+    message.on('data', function(data) {
+      receivedPacketCount++;
 
-    switch (receivedPacketCount) {
-      case 1:
-        test.ok(data.equals(payload1));
-        break;
-      case 2:
-        test.ok(data.equals(payload2));
-        break;
-    }
-  });
-  io.on('message', function() {
-    test.done();
+      switch (receivedPacketCount) {
+        case 1:
+          test.ok(data.equals(payload1));
+          break;
+        case 2:
+          test.ok(data.equals(payload2));
+          break;
+      }
+    });
+
+    message.on('end', function() {
+      test.done();
+    });
   });
 
   var packet1 = new Packet(packetType);
@@ -199,20 +210,18 @@ exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
 exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
   test
 ) {
-  test.expect(1);
+  test.expect(2);
 
   var payload = Buffer.from([1, 2, 3, 4, 5, 6]);
   var connection = new Connection();
-  var receivedData = Buffer.alloc(0);
 
   var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedData = Buffer.concat([receivedData, data]);
-  });
-
-  io.on('message', function() {
-    test.deepEqual(payload, receivedData);
-    test.done();
+  io.on('data', function(message) {
+    message.pipe(BufferList(function(err, data) {
+      test.ifError(err);
+      test.deepEqual(payload, data);
+      test.done();
+    }));
   });
 
   var packet1 = new Packet(packetType);

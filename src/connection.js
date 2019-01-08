@@ -957,8 +957,17 @@ class Connection extends EventEmitter {
         this.socketEnd();
       });
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+
+      this.messageIo.on('data', (message) => {
+        message.on('data', (chunk) => {
+          this.dispatchEvent('data', chunk);
+        });
+
+        message.on('end', () => {
+          this.dispatchEvent('message');
+        });
+      });
+
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
       this.socketConnect();
