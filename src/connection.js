@@ -1923,6 +1923,9 @@ Connection.prototype.STATE = {
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
       },
+      routingChange: function() {
+        this.transitionTo(this.STATE.REROUTING);
+      },
       fedAuthInfo: function(token) {
         this.fedAuthInfoToken = token;
       },
