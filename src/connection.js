@@ -959,13 +959,7 @@ class Connection extends EventEmitter {
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
 
       this.messageIo.on('data', (message) => {
-        message.on('data', (chunk) => {
-          this.dispatchEvent('data', chunk);
-        });
-
-        message.on('end', () => {
-          this.dispatchEvent('message');
-        });
+        this.dispatchEvent('message', message);
       });
 
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
@@ -1734,11 +1728,14 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.addToMessageBuffer(data);
-      },
-      message: function() {
-        this.processPreLoginResponse();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.addToMessageBuffer(data);
+        });
+
+        message.on('end', () => {
+          this.processPreLoginResponse();
+        });
       },
       noTls: function() {
         this.sendLogin7Packet(() => {
@@ -1802,23 +1799,26 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.messageIo.tlsHandshakeData(data);
-      },
-      message: function() {
-        if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet(() => {
-            const { authentication } = this.config;
+      message: function(message) {
+        message.on('data', (data) => {
+          this.messageIo.tlsHandshakeData(data);
+        });
 
-            if (authentication.type === 'azure-active-directory-password') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          });
-        }
+        message.on('end', () => {
+          if (this.messageIo.tlsNegotiationComplete) {
+            this.sendLogin7Packet(() => {
+              const { authentication } = this.config;
+
+              if (authentication.type === 'azure-active-directory-password') {
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+              } else if (authentication.type === 'ntlm') {
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+              } else {
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+              }
+            });
+          }
+        });
       }
     }
   },
@@ -1830,9 +1830,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
       },
       loggedIn: function() {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -1863,8 +1860,14 @@ Connection.prototype.STATE = {
           }
         }
       },
-      message: function() {
-        this.processLogin7Response();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
+
+        message.on('end', () => {
+          this.processLogin7Response();
+        });
       }
     }
   },
@@ -1877,17 +1880,20 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
       receivedChallenge: function() {
         this.sendNTLMResponsePacket();
       },
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      message: function() {
-        this.processLogin7NTLMResponse();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
+
+        message.on('end', () => {
+          this.processLogin7NTLMResponse();
+        });
       }
     }
   },
@@ -1900,9 +1906,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
       loggedIn: function() {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       },
@@ -1912,8 +1915,14 @@ Connection.prototype.STATE = {
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
       },
-      message: function() {
-        this.processLogin7NTLMAck();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
+
+        message.on('end', () => {
+          this.processLogin7NTLMAck();
+        });
       }
     }
   },
@@ -1926,9 +1935,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
       loginFailed: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1938,31 +1944,37 @@ Connection.prototype.STATE = {
       fedAuthInfo: function(token) {
         this.fedAuthInfoToken = token;
       },
-      message: function() {
-        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
-          const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
-          const authentication = this.config.authentication;
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
 
-          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
-            if (err) {
-              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+        message.on('end', () => {
+          if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
+            const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+            const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
+            const authentication = this.config.authentication;
+
+            context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+              if (err) {
+                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+                this.emit('connect', this.loginError);
+                this.dispatchEvent('loginFailed');
+                return;
+              }
+
+              this.sendFedAuthResponsePacket(tokenResponse);
+            });
+          } else {
+            if (this.loginError) {
               this.emit('connect', this.loginError);
-              this.dispatchEvent('loginFailed');
-              return;
+            } else {
+              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
             }
 
-            this.sendFedAuthResponsePacket(tokenResponse);
-          });
-        } else {
-          if (this.loginError) {
-            this.emit('connect', this.loginError);
-          } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.dispatchEvent('loginFailed');
           }
-
-          this.dispatchEvent('loginFailed');
-        }
+        });
       }
     }
   },
@@ -1978,12 +1990,15 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      message: function() {
-        this.transitionTo(this.STATE.LOGGED_IN);
-        this.processedInitialSql();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
+
+        message.on('end', () => {
+          this.transitionTo(this.STATE.LOGGED_IN);
+          this.processedInitialSql();
+        });
       }
     }
   },
@@ -2011,20 +2026,25 @@ Connection.prototype.STATE = {
         sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.clearRequestTimer(); // request timer is stopped on first data package
-        const ret = this.sendDataToTokenStreamParser(data);
-        if (ret === false) {
-          // Bridge backpressure from the token stream parser transform to the
-          // packet stream transform.
-          this.messageIo.pause();
-        }
-      },
-      message: function() {
-        // We have to channel the 'message' (EOM) event through the token stream
-        // parser transform, to keep it in line with the flow of the tokens, when
-        // the incoming data flow is paused and resumed.
-        this.tokenStreamParser.addEndOfMessageMarker();
+      message: function(message) {
+        // request timer is stopped once the incoming message is received
+        this.clearRequestTimer();
+
+        message.on('data', (data) => {
+          const ret = this.sendDataToTokenStreamParser(data);
+          if (ret === false) {
+            // Bridge backpressure from the token stream parser transform to the
+            // packet stream transform.
+            this.messageIo.pause();
+          }
+        });
+
+        message.on('end', () => {
+          // We have to channel the 'message' (EOM) event through the token stream
+          // parser transform, to keep it in line with the flow of the tokens, when
+          // the incoming data flow is paused and resumed.
+          this.tokenStreamParser.addEndOfMessageMarker();
+        });
       },
       endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
@@ -2046,27 +2066,30 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
       attention: function() {
         this.attentionReceived = true;
       },
-      message: function() {
-        // 3.2.5.7 Sent Attention State
-        // Discard any data contained in the response, until we receive the attention response
-        if (this.attentionReceived) {
-          const sqlRequest = this.request;
-          this.request = undefined;
-          this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
-          } else {
-            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
-            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+      message: function(message) {
+        message.on('data', (data) => {
+          this.sendDataToTokenStreamParser(data);
+        });
+
+        message.on('end', () => {
+          // 3.2.5.7 Sent Attention State
+          // Discard any data contained in the response, until we receive the attention response
+          if (this.attentionReceived) {
+            const sqlRequest = this.request;
+            this.request = undefined;
+            this.transitionTo(this.STATE.LOGGED_IN);
+            if (sqlRequest.canceled) {
+              sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            } else {
+              const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
+              const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+              sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            }
           }
-        }
+        });
       }
     }
   },
