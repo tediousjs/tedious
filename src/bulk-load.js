@@ -183,7 +183,7 @@ class BulkLoad extends EventEmitter {
           scale: c.scale,
           precision: c.precision,
           value: row[i]
-        }, this.options);
+        }, this.options, () => {});
       }
     } else {
       for (let i = 0, len = this.columns.length; i < len; i++) {
@@ -193,7 +193,7 @@ class BulkLoad extends EventEmitter {
           scale: c.scale,
           precision: c.precision,
           value: row[c.objName]
-        }, this.options);
+        }, this.options, () => {});
       }
     }
   }

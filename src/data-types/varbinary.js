@@ -46,7 +46,7 @@ module.exports = {
     }
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       if (parameter.length <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value);
@@ -61,6 +61,7 @@ module.exports = {
         buffer.writeUInt32LE(0xFFFFFFFF);
       }
     }
+    cb();
   },
 
   validate: function(value) {

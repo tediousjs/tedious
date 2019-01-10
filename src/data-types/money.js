@@ -14,13 +14,14 @@ module.exports = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(8);
       buffer.writeMoney(parameter.value * 10000);
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {

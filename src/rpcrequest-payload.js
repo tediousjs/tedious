@@ -47,10 +47,10 @@ module.exports = class RpcRequestPayload {
         return;
       }
 
-      this._writeParameterData(parameters[i], buffer);
-
-      setImmediate(() => {
-        writeNext(i + 1);
+      this._writeParameterData(parameters[i], buffer, () => {
+        setImmediate(() => {
+          writeNext(i + 1);
+        });
       });
     };
     writeNext(0);
@@ -61,7 +61,7 @@ module.exports = class RpcRequestPayload {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter, buffer) {
+  _writeParameterData(parameter, buffer, cb) {
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -101,6 +101,8 @@ module.exports = class RpcRequestPayload {
     }
 
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options);
+    type.writeParameterData(buffer, param, this.options, () => {
+      cb();
+    });
   }
 };
