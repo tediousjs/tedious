@@ -1061,16 +1061,14 @@ class Connection extends EventEmitter {
       return;
     }
 
-    if (this.state && this.state.exit) {
-      this.state.exit.call(this, newState);
+    if (this.state) {
+      this.state.exit(newState);
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
     this.state = newState;
 
-    if (this.state.enter) {
-      this.state.enter.apply(this);
-    }
+    this.state.enter();
   }
 
   dispatchEvent(eventName, ...args) {
@@ -1720,19 +1718,17 @@ class State {
     this.connection = connection;
 
     this.name = name;
-    this.enter = enter;
     this.events = events;
-    this.exit = exit;
   }
+
+  enter() {}
+  exit() {}
 }
 
 class ConnectingState extends State {
   constructor(connection) {
     super(connection, {
       name: 'Connecting',
-      enter: function() {
-        this.initialiseConnection();
-      },
       events: {
         socketError: function() {
           this.transitionTo(this.STATE.FINAL);
@@ -1747,15 +1743,16 @@ class ConnectingState extends State {
       }
     });
   }
+
+  enter() {
+    this.connection.initialiseConnection();
+  }
 }
 
 class SentPreloginState extends State {
   constructor(connection) {
     super(connection, {
       name: 'SentPrelogin',
-      enter: function() {
-        this.emptyMessageBuffer();
-      },
       events: {
         socketError: function() {
           this.transitionTo(this.STATE.FINAL);
@@ -1789,15 +1786,16 @@ class SentPreloginState extends State {
       }
     });
   }
+
+  enter() {
+    this.connection.emptyMessageBuffer();
+  }
 }
 
 class ReRoutingState extends State {
   constructor(connection) {
     super(connection, {
       name: 'ReRouting',
-      enter: function() {
-        this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
-      },
       events: {
         message: function() {},
         socketError: function() {
@@ -1812,16 +1810,16 @@ class ReRoutingState extends State {
       }
     });
   }
+
+  enter() {
+    this.connection.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
+  }
 }
 
 class TransientFailureRetryState extends State {
   constructor(connection) {
     super(connection, {
       name: 'TRANSIENT_FAILURE_RETRY',
-      enter: function() {
-        this.curTransientRetryCount++;
-        this.cleanupConnection(this.cleanupTypeEnum.RETRY);
-      },
       events: {
         message: function() {},
         socketError: function() {
@@ -1835,6 +1833,11 @@ class TransientFailureRetryState extends State {
         }
       }
     });
+  }
+
+  enter() {
+    this.connection.curTransientRetryCount++;
+    this.connection.cleanupConnection(this.cleanupTypeEnum.RETRY);
   }
 }
 
@@ -2055,9 +2058,6 @@ class LoggedInSendingInitialSqlState extends State {
   constructor(connection) {
     super(connection, {
       name: 'LoggedInSendingInitialSql',
-      enter: function() {
-        this.sendInitialSql();
-      },
       events: {
         socketError: function socketError() {
           this.transitionTo(this.STATE.FINAL);
@@ -2078,6 +2078,10 @@ class LoggedInSendingInitialSqlState extends State {
       }
     });
   }
+
+  enter() {
+    this.connection.sendInitialSql();
+  }
 }
 
 class LoggedInState extends State {
@@ -2097,13 +2101,6 @@ class SentClientRequestState extends State {
   constructor(connection) {
     super(connection, {
       name: 'SentClientRequest',
-      exit: function(nextState) {
-        this.clearRequestTimer();
-
-        if (nextState !== this.STATE.FINAL) {
-          this.tokenStreamParser.resume();
-        }
-      },
       events: {
         socketError: function(err) {
           const sqlRequest = this.request;
@@ -2143,15 +2140,20 @@ class SentClientRequestState extends State {
       }
     });
   }
+
+  exit(nextState) {
+    this.connection.clearRequestTimer();
+
+    if (nextState !== this.connection.STATE.FINAL) {
+      this.connection.tokenStreamParser.resume();
+    }
+  }
 }
 
 class SentAttentionState extends State {
   constructor(connection) {
     super(connection, {
       name: 'SentAttention',
-      enter: function() {
-        this.attentionReceived = false;
-      },
       events: {
         socketError: function() {
           this.transitionTo(this.STATE.FINAL);
@@ -2184,15 +2186,16 @@ class SentAttentionState extends State {
       }
     });
   }
+
+  enter() {
+    this.connection.attentionReceived = false;
+  }
 }
 
 class FinalState extends State {
   constructor(connection) {
     super(connection, {
       name: 'Final',
-      enter: function() {
-        this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
-      },
       events: {
         loginFailed: function() {
           // Do nothing. The connection was probably closed by the client code.
@@ -2208,5 +2211,9 @@ class FinalState extends State {
         }
       }
     });
+  }
+
+  enter() {
+    this.connection.cleanupConnection(this.connection.cleanupTypeEnum.NORMAL);
   }
 }
