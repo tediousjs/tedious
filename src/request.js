@@ -192,10 +192,22 @@ class Request extends EventEmitter {
     if (this.paused) {
       return;
     }
+
     this.paused = true;
-    if (this.connection) {
-      this.connection.pauseRequest(this);
+    this.emit('pause');
+  }
+
+  cancel() {
+    if (this.canceled) {
+      return;
     }
+
+    this.canceled = true;
+    this.emit('cancel');
+  }
+
+  isPaused() {
+    return this.paused;
   }
 
   // Resumes the flow of data from the database.
@@ -203,10 +215,9 @@ class Request extends EventEmitter {
     if (!this.paused) {
       return;
     }
+
     this.paused = false;
-    if (this.connection) {
-      this.connection.resumeRequest(this);
-    }
+    this.emit('resume');
   }
 
   setTimeout(timeout: number | typeof undefined) {

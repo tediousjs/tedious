@@ -26,7 +26,6 @@ module.exports = class Parser extends Transform {
     this.debug = debug;
     this.colMetadata = colMetadata;
     this.options = options;
-    this.endOfMessageMarker = {};
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
@@ -36,13 +35,6 @@ module.exports = class Parser extends Transform {
   }
 
   _transform(input, encoding, done) {
-    if (input === this.endOfMessageMarker) {
-      done(null, { // generate endOfMessage pseudo token
-        name: 'EOM',
-        event: 'endOfMessage'
-      });
-      return;
-    }
     if (this.position === this.buffer.length) {
       this.buffer = input;
     } else {

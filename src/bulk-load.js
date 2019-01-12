@@ -324,6 +324,10 @@ class BulkLoad extends EventEmitter {
   setTimeout(timeout: number | typeof undefined) {
     this.timeout = timeout;
   }
+
+  isPaused() {
+    return false;
+  }
 }
 
 module.exports = BulkLoad;

@@ -28,19 +28,19 @@ class Parser extends EventEmitter {
     this.parser.on('drain', () => {
       this.emit('drain');
     });
+
+    this.parser.on('pause', () => {
+      this.emit('pause');
+    });
+
+    this.parser.on('resume', () => {
+      this.emit('resume');
+    });
   }
 
   // Returns false to apply backpressure.
   addBuffer(buffer) {
     return this.parser.write(buffer);
-  }
-
-  // Writes an end-of-message (EOM) marker into the parser transform input
-  // queue. StreamParser will emit a 'data' event with an 'endOfMessage'
-  // pseudo token when the EOM marker has passed through the transform stream.
-  // Returns false to apply backpressure.
-  addEndOfMessageMarker() {
-    return this.parser.write(this.parser.endOfMessageMarker);
   }
 
   isEnd() {
@@ -50,6 +50,10 @@ class Parser extends EventEmitter {
   // Temporarily suspends the token stream parser transform from emitting events.
   pause() {
     this.parser.pause();
+  }
+
+  isPaused() {
+    return this.parser.isPaused();
   }
 
   // Resumes the token stream parser transform.
