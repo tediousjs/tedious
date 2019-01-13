@@ -1,11 +1,15 @@
 const Connection = require('../../src/tedious').Connection;
 const fs = require('fs');
-const Sinon = require('sinon');
+const sinon = require('sinon');
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
 
 const getConfig = function() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
-  config.password = 'InvalidPassword';
+  if (config.authentication) {
+    config.authentication.options.password = 'InvalidPassword';
+  } else {
+    config.password = 'InvalidPassword';
+  }
   config.options.maxRetriesOnTransientErrors = 5;
   config.options.connectionRetryInterval = 25;
 
@@ -15,20 +19,24 @@ const getConfig = function() {
 exports['connection retry tests'] = {
   setUp: function(done) {
     this.invalidLoginError = 18456;
-    this.sinon = Sinon.sandbox.create();
     done();
   },
 
   tearDown: function(done) {
-    this.sinon.restore();
+    sinon.restore();
     done();
   },
 
   'retry specified number of times on transient errors': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error === this.invalidLoginError;
     });
 
@@ -49,9 +57,14 @@ exports['connection retry tests'] = {
 
   'no retries on non-transient errors': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error !== this.invalidLoginError;
     });
 
@@ -72,13 +85,18 @@ exports['connection retry tests'] = {
 
   'no retries if connection timeout fires': function(test) {
     const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
     config.options.connectTimeout = config.options.connectionRetryInterval / 2;
 
-    const clock = this.sinon.useFakeTimers('setTimeout');
+    const clock = sinon.useFakeTimers({ toFake: [ 'setTimeout' ] });
 
     test.expect(1);
 
-    this.sinon.stub(TransientErrorLookup.prototype, 'isTransientError', (error) => {
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
       return error === this.invalidLoginError;
     });
 

@@ -36,4 +36,5 @@ var assertPayload = function(test, payload, encryptionString) {
   test.strictEqual(payload.instance, 0);
   test.strictEqual(payload.threadId, 0);
   test.strictEqual(payload.marsString, 'OFF');
+  test.strictEqual(payload.fedAuthRequired, 1);
 };

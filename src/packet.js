@@ -15,7 +15,8 @@ const TYPE = module.exports.TYPE = {
   TRANSACTION_MANAGER: 0x0E,
   LOGIN7: 0x10,
   NTLMAUTH_PKT: 0x11,
-  PRELOGIN: 0x12
+  PRELOGIN: 0x12,
+  FEDAUTH_TOKEN: 0x08
 };
 
 const typeByValue = {};
