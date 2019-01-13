@@ -16,6 +16,7 @@ title: API - BulkLoad
   <li><a href="#usage">Usage</a></li>
   <li><a href="#function_addColumn">bulkLoad.addColumn(name, type, options)</a></li>
   <li><a href="#function_addRow">bulkLoad.addRow(row)</a></li>
+  <li><a href="#function_getRowStream">bulkLoad.getRowStream()</a></li>
   <li><a href="#function_getTableCreationSql">bulkLoad.getTableCreationSql()</a></li>
   <li><a href="#function_setTimeout">bulkLoad.setTimeout(timeout)</a></li>
 </ul>
@@ -159,6 +160,30 @@ bulkLoad.addRow( col0, col1, ... colN )
     </p>
   </div>
 </div>
+
+<h2 id="function_getRowStream">bulkLoad.getRowStream()</h2>
+<p>
+  Switches the <code>BulkLoad</code> object into streaming mode and returns a
+  <a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_streams">writable stream</a>
+  that can be used to send a large amount of rows to the server.
+</p>
+{% highlight javascript %}
+const bulkLoad = connection.newBulkLoad(...);
+bulkLoad.addColumn(...);
+const rowStream = bulkLoad.getRowStream();
+connection.execBulkLoad(bulkLoad);
+rowSource.pipe(rowStream);
+{% endhighlight %}
+<p>
+  In streaming mode, <code>bulkLoad.addRow()</code> cannot be used. Instead all data rows must be written to the returned stream object.
+</p>
+<p>
+  The stream implementation uses data flow control to prevent memory overload.
+  <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback">stream.write()</a></code>
+  returns <code>false</code> to indicate that data transfer should be paused.
+  After that, the stream emits a <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain">'drain' event</a></code>
+  when it is ready to resume data transfer.
+</p>
 
 <h2 id="function_getTableCreationSql">bulkLoad.getTableCreationSql()</h2>
 <p>
