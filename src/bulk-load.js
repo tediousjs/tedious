@@ -3,8 +3,11 @@
 /* globals $PropertyType */
 
 const EventEmitter = require('events').EventEmitter;
+const Transform = require('readable-stream').Transform;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
+const Message = require('./message');
+const PACKET_TYPE = require('./packet').TYPE;
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -68,6 +71,8 @@ type ColumnOptions = {
 class BulkLoad extends EventEmitter {
   error: Error | typeof undefined;
   canceled: boolean;
+  executionStarted: boolean;
+  streamingMode: boolean;
   table: string;
   timeout: number | typeof undefined
 
@@ -78,7 +83,7 @@ class BulkLoad extends EventEmitter {
   columnsByName: { [name: string]: Column };
 
   firstRowWritten: boolean;
-  rowsData: WritableTrackingBuffer;
+  rowToPacketTransform: RowTransform;
 
   bulkOptions: InternalOptions;
 
@@ -88,20 +93,6 @@ class BulkLoad extends EventEmitter {
     keepNulls = false,
     lockTable = false,
   }: Options, callback: (err: ?Error, rowCount: number) => void) {
-    super();
-
-    this.error = undefined;
-    this.canceled = false;
-    this.timeout = undefined;
-
-    this.table = table;
-    this.options = connectionOptions;
-    this.callback = callback;
-    this.columns = [];
-    this.columnsByName = {};
-    this.rowsData = new WritableTrackingBuffer(1024, 'ucs2', true);
-    this.firstRowWritten = false;
-
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }
@@ -118,12 +109,31 @@ class BulkLoad extends EventEmitter {
       throw new TypeError('The "options.lockTable" property must be of type boolean.');
     }
 
+    super();
+
+    this.error = undefined;
+    this.canceled = false;
+    this.executionStarted = false;
+
+    this.table = table;
+    this.options = connectionOptions;
+    this.callback = callback;
+    this.columns = [];
+    this.columnsByName = {};
+    this.firstRowWritten = false;
+    this.streamingMode = false;
+
+    this.rowToPacketTransform = new RowTransform(this);
+
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
   addColumn(name: string, type: Object, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
+    }
+    if (this.executionStarted) {
+      throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
 
     const column = {
@@ -171,30 +181,14 @@ class BulkLoad extends EventEmitter {
       row = input[0];
     }
 
-    // write row token
-    this.rowsData.writeUInt8(TOKEN_TYPE.ROW);
-
     // write each column
-    if (row instanceof Array) {
-      for (let i = 0, len = this.columns.length; i < len; i++) {
-        const c = this.columns[i];
-        c.type.writeParameterData(this.rowsData, {
-          length: c.length,
-          scale: c.scale,
-          precision: c.precision,
-          value: row[i]
-        }, this.options);
-      }
+    if (Array.isArray(row)) {
+      this.rowToPacketTransform.write(row);
     } else {
-      for (let i = 0, len = this.columns.length; i < len; i++) {
-        const c = this.columns[i];
-        c.type.writeParameterData(this.rowsData, {
-          length: c.length,
-          scale: c.scale,
-          precision: c.precision,
-          value: row[c.objName]
-        }, this.options);
-      }
+      const object = row;
+      this.rowToPacketTransform.write(this.columns.map((column) => {
+        return object[column.objName];
+      }));
     }
   }
 
@@ -255,38 +249,6 @@ class BulkLoad extends EventEmitter {
     return sql;
   }
 
-  getPayload() {
-    // Create COLMETADATA token
-    const metaData = this.getColMetaData();
-    let length = metaData.length;
-
-    // row data
-    const rows = this.rowsData.data;
-    length += rows.length;
-
-    // Create DONE token
-    // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
-    tBuf.writeUInt8(TOKEN_TYPE.DONE);
-    const status = DONE_STATUS.FINAL;
-    tBuf.writeUInt16LE(status);
-    tBuf.writeUInt16LE(0); // CurCmd (TDS ignores this)
-    tBuf.writeUInt32LE(0); // row count - doesn't really matter
-    if (this.options.tdsVersion >= '7_2') {
-      tBuf.writeUInt32LE(0); // row count is 64 bits in >= TDS 7.2
-    }
-
-    const done = tBuf.data;
-    length += done.length;
-
-    // composite payload
-    const payload = new WritableTrackingBuffer(length);
-    payload.copyFrom(metaData);
-    payload.copyFrom(rows);
-    payload.copyFrom(done);
-    return payload;
-  }
-
   getColMetaData() {
     const tBuf = new WritableTrackingBuffer(100, null, true);
     // TokenType
@@ -324,6 +286,87 @@ class BulkLoad extends EventEmitter {
   setTimeout(timeout: number | typeof undefined) {
     this.timeout = timeout;
   }
+
+  createDoneToken() {
+    // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
+    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
+    tBuf.writeUInt8(TOKEN_TYPE.DONE);
+    const status = DONE_STATUS.FINAL;
+    tBuf.writeUInt16LE(status);
+    tBuf.writeUInt16LE(0); // CurCmd (TDS ignores this)
+    tBuf.writeUInt32LE(0); // row count - doesn't really matter
+    if (this.options.tdsVersion >= '7_2') {
+      tBuf.writeUInt32LE(0); // row count is 64 bits in >= TDS 7.2
+    }
+    return tBuf.data;
+  }
+
+  // This method switches the BulkLoad object into streaming mode and returns
+  // a stream.Writable for streaming rows to the server.
+  getRowStream() {
+    if (this.firstRowWritten) {
+      throw new Error('BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
+    }
+    if (this.executionStarted) {
+      throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
+    }
+    this.streamingMode = true;
+    return this.rowToPacketTransform;
+  }
+
+  getMessageStream() {
+    const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
+    this.rowToPacketTransform.pipe(message);
+    return message;
+  }
 }
 
 module.exports = BulkLoad;
+
+// A transform that converts rows to packets.
+class RowTransform extends Transform {
+  columnMetadataWritten: boolean;
+  bulkLoad: BulkLoad;
+  mainOptions: $PropertyType<BulkLoad, 'options'>;
+  columns: $PropertyType<BulkLoad, 'columns'>;
+
+  constructor(bulkLoad: BulkLoad) {
+    super({ writableObjectMode: true });
+
+    this.bulkLoad = bulkLoad;
+    this.mainOptions = bulkLoad.options;
+    this.columns = bulkLoad.columns;
+
+    this.columnMetadataWritten = false;
+  }
+
+  _transform(row, encoding, callback) {
+    if (!this.columnMetadataWritten) {
+      this.push(this.bulkLoad.getColMetaData());
+      this.columnMetadataWritten = true;
+    }
+
+    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
+    buf.writeUInt8(TOKEN_TYPE.ROW);
+
+    for (let i = 0; i < this.columns.length; i++) {
+      const c = this.columns[i];
+      c.type.writeParameterData(buf, {
+        length: c.length,
+        scale: c.scale,
+        precision: c.precision,
+        value: row[i]
+      }, this.mainOptions);
+    }
+
+    this.push(buf.data);
+
+    callback();
+  }
+
+  _flush(callback: () => void) {
+    this.push(this.bulkLoad.createDoneToken());
+
+    callback();
+  }
+}

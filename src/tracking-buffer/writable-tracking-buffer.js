@@ -30,7 +30,7 @@ module.exports = class WritableTrackingBuffer {
     this.encoding = encoding || 'ucs2';
     this.doubleSizeGrowth = doubleSizeGrowth || false;
     this.buffer = Buffer.alloc(this.initialSize, 0);
-    this.compositeBuffer = Buffer.alloc(0);
+    this.compositeBuffer = ZERO_LENGTH_BUFFER;
     this.position = 0;
   }
 
