@@ -690,13 +690,15 @@ class Connection extends EventEmitter {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
         if (this.request) {
-          this.request.error = RequestError(token.message, 'EREQUEST');
-          this.request.error.number = token.number;
-          this.request.error.state = token.state;
-          this.request.error['class'] = token['class'];
-          this.request.error.serverName = token.serverName;
-          this.request.error.procName = token.procName;
-          this.request.error.lineNumber = token.lineNumber;
+          if (!this.request.canceled) {
+            this.request.error = RequestError(token.message, 'EREQUEST');
+            this.request.error.number = token.number;
+            this.request.error.state = token.state;
+            this.request.error['class'] = token['class'];
+            this.request.error.serverName = token.serverName;
+            this.request.error.procName = token.procName;
+            this.request.error.lineNumber = token.lineNumber;
+          }
         }
       } else {
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
@@ -784,19 +786,21 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
       if (this.request) {
-        let columns;
-        if (this.config.options.useColumnNames) {
-          columns = {};
-          for (let j = 0, len = token.columns.length; j < len; j++) {
-            const col = token.columns[j];
-            if (columns[col.colName] == null) {
-              columns[col.colName] = col;
+        if (!this.request.canceled) {
+          let columns;
+          if (this.config.options.useColumnNames) {
+            columns = {};
+            for (let j = 0, len = token.columns.length; j < len; j++) {
+              const col = token.columns[j];
+              if (columns[col.colName] == null) {
+                columns[col.colName] = col;
+              }
             }
+          } else {
+            columns = token.columns;
           }
-        } else {
-          columns = token.columns;
+          this.request.emit('columnMetadata', columns);
         }
-        this.request.emit('columnMetadata', columns);
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
         this.close();
@@ -805,7 +809,9 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('order', (token) => {
       if (this.request) {
-        this.request.emit('order', token.orderColumns);
+        if (!this.request.canceled) {
+          this.request.emit('order', token.orderColumns);
+        }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
         this.close();
@@ -814,14 +820,16 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('row', (token) => {
       if (this.request) {
-        if (this.config.options.rowCollectionOnRequestCompletion) {
-          this.request.rows.push(token.columns);
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst.push(token.columns);
-        }
-        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-          this.request.emit('row', token.columns);
+        if (!this.request.canceled) {
+          if (this.config.options.rowCollectionOnRequestCompletion) {
+            this.request.rows.push(token.columns);
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst.push(token.columns);
+          }
+          if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
+            this.request.emit('row', token.columns);
+          }
         }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
@@ -831,38 +839,46 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('returnStatus', (token) => {
       if (this.request) {
-        // Keep value for passing in 'doneProc' event.
-        this.procReturnStatusValue = token.value;
+        if (!this.request.canceled) {
+          // Keep value for passing in 'doneProc' event.
+          this.procReturnStatusValue = token.value;
+        }
       }
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
       if (this.request) {
-        this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        if (!this.request.canceled) {
+          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
       if (this.request) {
-        this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = undefined;
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+        if (!this.request.canceled) {
+          this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
+          this.procReturnStatusValue = undefined;
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
       if (this.request) {
-        this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+        if (!this.request.canceled) {
+          this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
@@ -872,16 +888,19 @@ class Connection extends EventEmitter {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
-        if (token.sqlError && !this.request.error) {
-          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-          this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-        }
-        this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+
+        if (!this.request.canceled) {
+          if (token.sqlError && !this.request.error) {
+            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+            this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+          }
+          this.request.emit('done', token.rowCount, token.more, this.request.rst);
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
@@ -1625,6 +1644,10 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
+    } else if (request.canceled) {
+      process.nextTick(() => {
+        request.callback(RequestError('Canceled.', 'ECANCEL'));
+      });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
