@@ -2111,7 +2111,10 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+        sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
