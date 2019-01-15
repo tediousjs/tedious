@@ -1029,7 +1029,7 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.cancel();
+    this.request.cancel();
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
     this.request.error = RequestError(message, 'ETIMEOUT');
@@ -1486,8 +1486,7 @@ class Connection extends EventEmitter {
     });
 
     bulkLoad.once('cancel', () => {
-      request.canceled = true;
-      request.emit('cancel');
+      request.cancel();
     });
 
     this.execSqlBatch(request);
@@ -1736,8 +1735,7 @@ class Connection extends EventEmitter {
       return false;
     }
 
-    this.request.canceled = true;
-    this.request.emit('cancel');
+    this.request.cancel();
     return true;
   }
 

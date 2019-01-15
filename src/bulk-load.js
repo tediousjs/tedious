@@ -324,12 +324,20 @@ class BulkLoad extends EventEmitter {
     // to call `message.end` to finish the request.
     this.rowToPacketTransform.once('error', (err) => {
       this.error = err;
-      this.canceled = true;
-      this.emit('cancel');
+      this.cancel();
       message.end();
     });
 
     return message;
+  }
+
+  cancel() {
+    if (this.canceled) {
+      return;
+    }
+
+    this.canceled = true;
+    this.emit('cancel');
   }
 }
 

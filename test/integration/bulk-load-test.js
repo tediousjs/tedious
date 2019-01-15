@@ -271,7 +271,7 @@ exports['bulkLoad - cancel after request send does nothing'] = function(test) {
     test.ifError(err);
     bulkLoad.addRow({ id: 1234 });
     connection.execBulkLoad(bulkLoad);
-    connection.cancel();
+    bulkLoad.cancel();
   });
 
   const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
@@ -295,7 +295,7 @@ exports['bulkLoad - cancel after request completed'] = function(test) {
   const bulkLoad = connection.newBulkLoad('#tmpTestTable5', {keepNulls: true}, function(err, rowCount) {
     test.ifError(err);
 
-    connection.cancel();
+    bulkLoad.cancel();
 
     connection.execSqlBatch(request_verifyBulkLoad);
   });
@@ -434,7 +434,7 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
         process.nextTick(() => {
           while (rowCount < totalRows) {
             if (rowCount === totalRows - 100) {
-              connection.cancel();
+              bulkLoad.cancel();
             }
 
             const i = rowCount++;
