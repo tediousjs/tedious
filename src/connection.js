@@ -893,6 +893,7 @@ class Connection extends EventEmitter {
           // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
           // We assume this is the indication that an in-flight request was canceled.
           if (token.sqlError && !this.request.error) {
+            this.clearCancelTimer();
             this.request.error = RequestError('Canceled.', 'ECANCEL');
           }
         } else {
@@ -1002,6 +1003,16 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
   }
 
+  createCancelTimer() {
+    this.clearCancelTimer();
+    const timeout = this.config.options.cancelTimeout;
+    if (timeout > 0) {
+      this.cancelTimer = setTimeout(() => {
+        this.cancelTimeout();
+      }, timeout);
+    }
+  }
+
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
@@ -1027,6 +1038,12 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
+  cancelTimeout() {
+    const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
+    this.debug.log(message);
+    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+  }
+
   requestTimeout() {
     this.requestTimer = undefined;
     this.request.cancel();
@@ -1044,6 +1061,12 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
+    }
+  }
+
+  clearCancelTimer() {
+    if (this.cancelTimer) {
+      clearTimeout(this.cancelTimer);
     }
   }
 
@@ -1693,6 +1716,7 @@ class Connection extends EventEmitter {
         }
 
         this.clearRequestTimer();
+        this.createCancelTimer();
       });
 
       if (request instanceof BulkLoad) {
@@ -2127,6 +2151,8 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
+          this.clearCancelTimer();
+
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
