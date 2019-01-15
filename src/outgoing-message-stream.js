@@ -33,6 +33,10 @@ class OutgoingMessageStream extends Duplex {
 
     this.currentMessage = message;
     this.currentMessage.on('data', (data) => {
+      if (this.currentMessage.ignore) {
+        return;
+      }
+
       this.bl.append(data);
 
       while (this.bl.length > length) {
@@ -63,6 +67,7 @@ class OutgoingMessageStream extends Duplex {
       packet.packetId(packetNumber += 1);
       packet.resetConnection(message.resetConnection);
       packet.last(true);
+      packet.ignore(message.ignore);
       packet.addData(data);
 
       this.debug.packet('Sent', packet);

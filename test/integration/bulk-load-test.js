@@ -1,5 +1,5 @@
 const fs = require('fs');
-const Readable = require('readable-stream').Readable;
+const { pipeline, Readable } = require('readable-stream');
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const TYPES = require('../../src/data-type').typeByName;
@@ -253,6 +253,79 @@ exports['bulkLoad - verify null value'] = function(test) {
   connection.execSqlBatch(request);
 };
 
+exports['bulkLoad - cancel after request send does nothing'] = function(test) {
+  const connection = this.connection;
+
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+    test.ok(err);
+    test.strictEqual(err.message, 'Canceled.');
+
+    connection.execSqlBatch(request_verifyBulkLoad);
+  });
+
+  bulkLoad.addColumn('id', TYPES.Int, {
+    nullable: true
+  });
+
+  const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    test.ifError(err);
+    bulkLoad.addRow({ id: 1234 });
+    connection.execBulkLoad(bulkLoad);
+    connection.cancel();
+  });
+
+  const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
+    test.ifError(err);
+
+    test.strictEqual(rowCount, 0);
+
+    test.done();
+  });
+
+  request_verifyBulkLoad.on('row', function(columns) {
+    test.deepEqual(columns[0].value, null);
+  });
+
+  connection.execSqlBatch(request);
+};
+
+exports['bulkLoad - cancel after request completed'] = function(test) {
+  const connection = this.connection;
+
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', {keepNulls: true}, function(err, rowCount) {
+    test.ifError(err);
+
+    connection.cancel();
+
+    connection.execSqlBatch(request_verifyBulkLoad);
+  });
+
+  bulkLoad.addColumn('id', TYPES.Int, {
+    nullable: true
+  });
+
+  const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    test.ifError(err);
+    bulkLoad.addRow({ id: 1234 });
+    connection.execBulkLoad(bulkLoad);
+  });
+
+  const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
+    test.ifError(err);
+
+    test.strictEqual(rowCount, 1);
+
+    test.done();
+  });
+
+  request_verifyBulkLoad.on('row', function(columns) {
+    test.strictEqual(columns[0].value, 1234);
+  });
+
+  connection.execSqlBatch(request);
+};
+
+
 exports.testStreamingBulkLoad = function(test) {
   const totalRows = 500000;
   const connection = this.connection;
@@ -279,7 +352,25 @@ exports.testStreamingBulkLoad = function(test) {
     bulkLoad.addColumn('i', TYPES.Int, {nullable: false});
     const rowStream = bulkLoad.getRowStream();
     connection.execBulkLoad(bulkLoad);
-    const rowSource = new RowSource(totalRows);
+
+    let rowCount = 0;
+    const rowSource = new Readable({
+      objectMode: true,
+
+      read() {
+        while (rowCount < totalRows) {
+          const i = rowCount++;
+          const row = [i];
+
+          if (!this.push(row)) {
+            return;
+          }
+        }
+
+        this.push(null);
+      }
+    });
+
     rowSource.pipe(rowStream);
   }
 
@@ -295,7 +386,7 @@ exports.testStreamingBulkLoad = function(test) {
         'from ' + tableName + ' a ' +
           'inner join ' + tableName + ' b on a.i = b.i - 1';
     const request = new Request(sql, completeVerifyTableContent);
-    request.on('data', (row) => {
+    request.on('row', (row) => {
       test.equals(row[0].value, totalRows - 1);
     });
     connection.execSqlBatch(request);
@@ -306,24 +397,88 @@ exports.testStreamingBulkLoad = function(test) {
     test.equal(rowCount, 1);
     test.done();
   }
+};
 
-  class RowSource extends Readable {
-    constructor(totalRows) {
-      super({
-        objectMode: true
-      });
-      this.totalRows = totalRows;
-      this.rowCount = 0;
-    }
-    _read() {
-      while (this.rowCount < this.totalRows) {
-        const i = this.rowCount++;
-        const row = [i];
-        if (!this.push(row)) {
-          return;
-        }
+exports.testStreamingBulkLoadWithCancel = function(test) {
+  const totalRows = 500000;
+  const connection = this.connection;
+
+  connection.on('error', function(err) {
+    test.ifError(err);
+  });
+  startCreateTable();
+
+  function startCreateTable() {
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, completeCreateTable);
+    connection.execSqlBatch(request);
+  }
+
+  function completeCreateTable(err) {
+    test.ifError(err);
+    startBulkLoad();
+  }
+
+  function startBulkLoad() {
+    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+
+    let rowCount = 0;
+    const rowSource = new Readable({
+      objectMode: true,
+
+      read() {
+        process.nextTick(() => {
+          while (rowCount < totalRows) {
+            if (rowCount === totalRows - 100) {
+              connection.cancel();
+            }
+
+            const i = rowCount++;
+            const row = [i];
+
+            if (!this.push(row)) {
+              return;
+            }
+          }
+
+          this.push(null);
+        });
       }
-      this.push(null);
-    }
+    });
+
+    pipeline(rowSource, rowStream, function(err) {
+      test.ifError(err);
+    });
+  }
+
+  function completeBulkLoad(err, rowCount) {
+    test.ok(err);
+    test.strictEqual(err.message, 'Canceled.');
+
+    test.equal(rowCount, 0);
+    startVerifyTableContent();
+  }
+
+  function startVerifyTableContent() {
+    const sql = `
+      select count(*)
+      from #stream_test a
+      inner join #stream_test b on a.i = b.i - 1
+    `;
+    const request = new Request(sql, completeVerifyTableContent);
+    request.on('row', (row) => {
+      test.equals(row[0].value, 0);
+    });
+    connection.execSqlBatch(request);
+  }
+
+  function completeVerifyTableContent(err, rowCount) {
+    test.ifError(err);
+    test.equal(rowCount, 1);
+    test.done();
   }
 };

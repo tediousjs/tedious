@@ -316,7 +316,19 @@ class BulkLoad extends EventEmitter {
 
   getMessageStream() {
     const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
+
     this.rowToPacketTransform.pipe(message);
+
+    // if an error happens on the `rowToPacketTransform`,
+    // it will be unpiped from `message`, but we still need
+    // to call `message.end` to finish the request.
+    this.rowToPacketTransform.once('error', (err) => {
+      this.error = err;
+      this.canceled = true;
+      this.emit('cancel');
+      message.end();
+    });
+
     return message;
   }
 }
@@ -361,12 +373,12 @@ class RowTransform extends Transform {
 
     this.push(buf.data);
 
-    callback();
+    process.nextTick(callback);
   }
 
   _flush(callback: () => void) {
     this.push(this.bulkLoad.createDoneToken());
 
-    callback();
+    process.nextTick(callback);
   }
 }

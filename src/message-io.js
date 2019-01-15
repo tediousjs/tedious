@@ -121,6 +121,7 @@ module.exports = class MessageIO extends EventEmitter {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
     this.outgoingMessageStream.write(message);
+    return message;
   }
 
   // Temporarily suspends the flow of incoming packets.
