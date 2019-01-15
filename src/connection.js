@@ -1023,8 +1023,10 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    this.transitionTo(this.STATE.SENT_ATTENTION);
+    this.cancel();
+    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+    this.request.error = RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -2094,12 +2096,11 @@ Connection.prototype.STATE = {
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
           } else {
-            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
-            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }

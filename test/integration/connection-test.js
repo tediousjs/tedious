@@ -1047,7 +1047,7 @@ exports.cancelRequest = function(test) {
 };
 
 exports.requestTimeout = function(test) {
-  test.expect(8);
+  test.expect(1);
 
   var config = getConfig();
   config.options.requestTimeout = 1000;
@@ -1066,22 +1066,19 @@ exports.requestTimeout = function(test) {
   });
 
   request.on('doneProc', function(rowCount, more) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('done', function(rowCount, more, rows) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 1);
+    test.ok(false);
   });
 
   request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-    test.strictEqual(columns[0].value, 1);
+    test.ok(false);
   });
 
   var connection = new Connection(config);
