@@ -1803,6 +1803,7 @@ Connection.prototype.STATE = {
           } else {
             this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
           }
+
           this.transitionTo(this.STATE.FINAL);
         }
       }
@@ -1840,45 +1841,18 @@ Connection.prototype.STATE = {
           this.debug.payload(function() {
             return payload.toString('  ');
           });
-
-          this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
         } else {
-          if (this.loginError) {
-            this.emit('connect', this.loginError);
+          if (this.loggedIn) {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-          }
+            if (this.loginError) {
+              this.emit('connect', this.loginError);
+            } else {
+              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            }
 
-          this.transitionTo(this.STATE.FINAL);
-        }
-      }
-    }
-  },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        if (this.loggedIn) {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else {
-          if (this.loginError) {
-            this.emit('connect', this.loginError);
-          } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.transitionTo(this.STATE.FINAL);
           }
-          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
