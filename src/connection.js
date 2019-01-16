@@ -690,13 +690,15 @@ class Connection extends EventEmitter {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
         if (this.request) {
-          this.request.error = RequestError(token.message, 'EREQUEST');
-          this.request.error.number = token.number;
-          this.request.error.state = token.state;
-          this.request.error['class'] = token['class'];
-          this.request.error.serverName = token.serverName;
-          this.request.error.procName = token.procName;
-          this.request.error.lineNumber = token.lineNumber;
+          if (!this.request.canceled) {
+            this.request.error = RequestError(token.message, 'EREQUEST');
+            this.request.error.number = token.number;
+            this.request.error.state = token.state;
+            this.request.error['class'] = token['class'];
+            this.request.error.serverName = token.serverName;
+            this.request.error.procName = token.procName;
+            this.request.error.lineNumber = token.lineNumber;
+          }
         }
       } else {
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
@@ -784,19 +786,21 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
       if (this.request) {
-        let columns;
-        if (this.config.options.useColumnNames) {
-          columns = {};
-          for (let j = 0, len = token.columns.length; j < len; j++) {
-            const col = token.columns[j];
-            if (columns[col.colName] == null) {
-              columns[col.colName] = col;
+        if (!this.request.canceled) {
+          let columns;
+          if (this.config.options.useColumnNames) {
+            columns = {};
+            for (let j = 0, len = token.columns.length; j < len; j++) {
+              const col = token.columns[j];
+              if (columns[col.colName] == null) {
+                columns[col.colName] = col;
+              }
             }
+          } else {
+            columns = token.columns;
           }
-        } else {
-          columns = token.columns;
+          this.request.emit('columnMetadata', columns);
         }
-        this.request.emit('columnMetadata', columns);
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
         this.close();
@@ -805,7 +809,9 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('order', (token) => {
       if (this.request) {
-        this.request.emit('order', token.orderColumns);
+        if (!this.request.canceled) {
+          this.request.emit('order', token.orderColumns);
+        }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
         this.close();
@@ -814,14 +820,16 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('row', (token) => {
       if (this.request) {
-        if (this.config.options.rowCollectionOnRequestCompletion) {
-          this.request.rows.push(token.columns);
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst.push(token.columns);
-        }
-        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-          this.request.emit('row', token.columns);
+        if (!this.request.canceled) {
+          if (this.config.options.rowCollectionOnRequestCompletion) {
+            this.request.rows.push(token.columns);
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst.push(token.columns);
+          }
+          if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
+            this.request.emit('row', token.columns);
+          }
         }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
@@ -831,38 +839,46 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('returnStatus', (token) => {
       if (this.request) {
-        // Keep value for passing in 'doneProc' event.
-        this.procReturnStatusValue = token.value;
+        if (!this.request.canceled) {
+          // Keep value for passing in 'doneProc' event.
+          this.procReturnStatusValue = token.value;
+        }
       }
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
       if (this.request) {
-        this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        if (!this.request.canceled) {
+          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
       if (this.request) {
-        this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = undefined;
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+        if (!this.request.canceled) {
+          this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
+          this.procReturnStatusValue = undefined;
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
       if (this.request) {
-        this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+        if (!this.request.canceled) {
+          this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
@@ -872,16 +888,26 @@ class Connection extends EventEmitter {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
-        if (token.sqlError && !this.request.error) {
-          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-          this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-        }
-        this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+
+        if (this.request.canceled) {
+          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
+          // We assume this is the indication that an in-flight request was canceled.
+          if (token.sqlError && !this.request.error) {
+            this.clearCancelTimer();
+            this.request.error = RequestError('Canceled.', 'ECANCEL');
+          }
+        } else {
+          if (token.sqlError && !this.request.error) {
+            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+            this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+          }
+          this.request.emit('done', token.rowCount, token.more, this.request.rst);
+          if (token.rowCount !== undefined) {
+            this.request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            this.request.rst = [];
+          }
         }
       }
     });
@@ -977,6 +1003,16 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
   }
 
+  createCancelTimer() {
+    this.clearCancelTimer();
+    const timeout = this.config.options.cancelTimeout;
+    if (timeout > 0) {
+      this.cancelTimer = setTimeout(() => {
+        this.cancelTimeout();
+      }, timeout);
+    }
+  }
+
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
@@ -1002,10 +1038,18 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
+  cancelTimeout() {
+    const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
+    this.debug.log(message);
+    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+  }
+
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    this.transitionTo(this.STATE.SENT_ATTENTION);
+    this.request.cancel();
+    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+    this.request.error = RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -1017,6 +1061,12 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
+    }
+  }
+
+  clearCancelTimer() {
+    if (this.cancelTimer) {
+      clearTimeout(this.cancelTimer);
     }
   }
 
@@ -1368,6 +1418,10 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, undefined);
     });
 
+    bulkLoad.once('cancel', () => {
+      request.cancel();
+    });
+
     this.execSqlBatch(request);
   }
 
@@ -1535,6 +1589,10 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
+    } else if (request.canceled) {
+      process.nextTick(() => {
+        request.callback(RequestError('Canceled.', 'ECANCEL'));
+      });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
@@ -1548,8 +1606,31 @@ class Connection extends EventEmitter {
       this.request.rows = [];
       this.request.rst = [];
 
+      let message;
+
+      this.request.once('cancel', () => {
+        if (!this.isRequestActive(request)) {
+          // Cancel was called on a request that is no longer active on this connection
+          return;
+        }
+
+        // There's two ways to handle request cancelation:
+        if (message.writable) {
+          // - if the message is still writable, we'll set the ignore bit
+          message.ignore = true;
+        } else {
+          // - but if the message has been ended (and thus has been fully sent off),
+          //   we need to send an `ATTENTION` message to the server
+          this.messageIo.sendMessage(TYPE.ATTENTION);
+          this.transitionTo(this.STATE.SENT_ATTENTION);
+        }
+
+        this.clearRequestTimer();
+        this.createCancelTimer();
+      });
+
       if (request instanceof BulkLoad) {
-        const message = request.getMessageStream();
+        message = request.getMessageStream();
 
         // If the bulkload was not put into streaming mode by the user,
         // we end the rowToPacketTransform here for them.
@@ -1562,7 +1643,9 @@ class Connection extends EventEmitter {
         this.messageIo.outgoingMessageStream.write(message);
       } else {
         this.createRequestTimer();
-        this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+
+        message = this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
           return payload.toString('  ');
@@ -1578,19 +1661,16 @@ class Connection extends EventEmitter {
   }
 
   cancel() {
-    if (this.state !== this.STATE.SENT_CLIENT_REQUEST) {
-      const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
-      this.debug.log(message);
+    if (!this.request) {
       return false;
-    } else if (this.request instanceof BulkLoad) {
-      this.debug.log('Canceling a bulk load has not yet been implemented.');
-      return false;
-    } else {
-      this.request.canceled = true;
-      this.messageIo.sendMessage(TYPE.ATTENTION);
-      this.transitionTo(this.STATE.SENT_ATTENTION);
-      return true;
     }
+
+    if (this.request.canceled) {
+      return false;
+    }
+
+    this.request.cancel();
+    return true;
   }
 
   reset(callback) {
@@ -1977,7 +2057,10 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+        sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
@@ -1990,15 +2073,16 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
+          this.clearCancelTimer();
+
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
           } else {
-            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
-            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }

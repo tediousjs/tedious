@@ -209,6 +209,15 @@ class Request extends EventEmitter {
     }
   }
 
+  cancel() {
+    if (this.canceled) {
+      return;
+    }
+
+    this.canceled = true;
+    this.emit('cancel');
+  }
+
   setTimeout(timeout: number | typeof undefined) {
     this.timeout = timeout;
   }
