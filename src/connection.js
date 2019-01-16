@@ -1174,28 +1174,6 @@ class Connection extends EventEmitter {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
-  processPreLoginResponse() {
-    const preloginPayload = new PreloginPayload(this.messageBuffer);
-    this.debug.payload(function() {
-      return preloginPayload.toString('  ');
-    });
-
-    if (preloginPayload.fedAuthRequired === 1) {
-      this.fedAuthRequired = true;
-    }
-
-    if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-      if (!this.config.options.encrypt) {
-        this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
-      }
-
-      this.dispatchEvent('tls');
-    } else {
-      this.dispatchEvent('noTls');
-    }
-  }
-
   sendLogin7Packet(cb) {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
@@ -1243,33 +1221,6 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return payload.toString('  ');
     });
-
-    process.nextTick(cb);
-  }
-
-  sendNTLMResponsePacket() {
-    const { authentication } = this.config;
-
-    const payload = new NTLMResponsePayload({
-      domain: authentication.options.domain,
-      userName: authentication.options.userName,
-      password: authentication.options.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    this.debug.payload(function() {
-      return payload.toString('  ');
-    });
-
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-    });
   }
 
   sendFedAuthResponsePacket(tokenResponse) {
@@ -1281,9 +1232,7 @@ class Connection extends EventEmitter {
     data.write(tokenResponse.accessToken, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-    });
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
@@ -1413,45 +1362,6 @@ class Connection extends EventEmitter {
   processedInitialSql() {
     this.clearConnectTimer();
     this.emit('connect');
-  }
-
-  processLogin7Response() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMResponse() {
-    if (this.ntlmpacket) {
-      this.dispatchEvent('receivedChallenge');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMAck() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
   }
 
   execSqlBatch(request) {
@@ -1831,21 +1741,33 @@ Connection.prototype.STATE = {
         this.addToMessageBuffer(data);
       },
       message: function() {
-        this.processPreLoginResponse();
-      },
-      noTls: function() {
-        this.sendLogin7Packet(() => {
+        const preloginPayload = new PreloginPayload(this.messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
+          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        } else {
+          this.sendLogin7Packet();
+
           const { authentication } = this.config;
           if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
-        });
-      },
-      tls: function() {
-        this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
-        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        }
       }
     }
   },
@@ -1900,17 +1822,17 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet(() => {
-            const { authentication } = this.config;
+          this.sendLogin7Packet();
 
-            if (authentication.type === 'azure-active-directory-password') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          });
+          const { authentication } = this.config;
+
+          if (authentication.type === 'azure-active-directory-password') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+          } else if (authentication.type === 'ntlm') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
         }
       }
     }
@@ -1927,14 +1849,8 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
@@ -1957,7 +1873,17 @@ Connection.prototype.STATE = {
         }
       },
       message: function() {
-        this.processLogin7Response();
+        if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else {
+          if (this.loginError) {
+            this.emit('connect', this.loginError);
+          } else {
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          }
+
+          this.transitionTo(this.STATE.FINAL);
+        }
       }
     }
   },
@@ -1973,40 +1899,39 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       message: function() {
-        this.processLogin7NTLMResponse();
-      }
-    }
-  },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        this.processLogin7NTLMAck();
+        if (this.ntlmpacket) {
+          const { authentication } = this.config;
+
+          const payload = new NTLMResponsePayload({
+            domain: authentication.options.domain,
+            userName: authentication.options.userName,
+            password: authentication.options.password,
+            database: this.config.options.database,
+            appName: this.config.options.appName,
+            packetSize: this.config.options.packetSize,
+            tdsVersion: this.config.options.tdsVersion,
+            ntlmpacket: this.ntlmpacket,
+            additional: this.additional
+          });
+
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+        } else {
+          if (this.loggedIn) {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          } else {
+            if (this.loginError) {
+              this.emit('connect', this.loginError);
+            } else {
+              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            }
+
+            this.transitionTo(this.STATE.FINAL);
+          }
+        }
       }
     }
   },
@@ -2021,9 +1946,6 @@ Connection.prototype.STATE = {
       },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
       },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
@@ -2041,7 +1963,7 @@ Connection.prototype.STATE = {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
-              this.dispatchEvent('loginFailed');
+              this.transitionTo(this.STATE.FINAL);
               return;
             }
 
@@ -2054,7 +1976,7 @@ Connection.prototype.STATE = {
             this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
           }
 
-          this.dispatchEvent('loginFailed');
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
