@@ -1182,9 +1182,7 @@ class Connection extends EventEmitter {
     data.write(tokenResponse.accessToken, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-    });
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
