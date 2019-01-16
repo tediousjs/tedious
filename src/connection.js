@@ -701,13 +701,14 @@ class Connection extends EventEmitter {
           }
         }
       } else {
+        const error = ConnectionError(token.message, 'ELOGIN');
+
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          this.debug.log('Initiating retry on transient error = ', token.number);
-          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        } else {
-          this.loginError = ConnectionError(token.message, 'ELOGIN');
+          error.isTransient = true;
         }
+
+        this.loginError = error;
       }
     });
 
@@ -1877,12 +1878,17 @@ Connection.prototype.STATE = {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         } else {
           if (this.loginError) {
-            this.emit('connect', this.loginError);
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else {
             this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.transitionTo(this.STATE.FINAL);
           }
-
-          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
@@ -1924,12 +1930,17 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
           } else {
             if (this.loginError) {
-              this.emit('connect', this.loginError);
+              if (this.loginError.isTransient) {
+                this.debug.log('Initiating retry on transient error');
+                this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              } else {
+                this.emit('connect', this.loginError);
+                this.transitionTo(this.STATE.FINAL);
+              }
             } else {
               this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+              this.transitionTo(this.STATE.FINAL);
             }
-
-            this.transitionTo(this.STATE.FINAL);
           }
         }
       }
@@ -1971,12 +1982,17 @@ Connection.prototype.STATE = {
           });
         } else {
           if (this.loginError) {
-            this.emit('connect', this.loginError);
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else {
             this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.transitionTo(this.STATE.FINAL);
           }
-
-          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
