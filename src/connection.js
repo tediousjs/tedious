@@ -61,7 +61,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthRequired = false;
-    this.fedAuthInfoToken = undefined;
 
     let authentication;
     if (config.authentication !== undefined) {
@@ -1186,14 +1185,6 @@ class Connection extends EventEmitter {
     });
   }
 
-  emptyMessageBuffer() {
-    this.messageBuffer = Buffer.alloc(0);
-  }
-
-  addToMessageBuffer(data) {
-    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
-  }
-
   sendLogin7Packet(cb) {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
@@ -1764,7 +1755,7 @@ class SentPrelogin extends State {
     super(connection);
 
     this.enter = function() {
-      this.emptyMessageBuffer();
+      this.state.messageBuffer = Buffer.alloc(0);
     };
 
     this.events = {
@@ -1775,10 +1766,10 @@ class SentPrelogin extends State {
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        this.addToMessageBuffer(data);
+        this.state.messageBuffer = Buffer.concat([this.state.messageBuffer, data]);
       },
       message: function() {
-        const preloginPayload = new PreloginPayload(this.messageBuffer);
+        const preloginPayload = new PreloginPayload(this.state.messageBuffer);
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
         });
@@ -1807,6 +1798,8 @@ class SentPrelogin extends State {
         }
       }
     };
+
+    this.messageBuffer = Buffer.alloc(0);
   }
 }
 
@@ -2024,15 +2017,17 @@ class SentLogin7WithFedAuth extends State {
         this.transitionTo(this.STATE.REROUTING);
       },
       fedAuthInfo: function(token) {
-        this.fedAuthInfoToken = token;
+        this.state.fedAuthInfoToken = token;
       },
       message: function() {
-        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
+        const fedAuthInfoToken = this.state.fedAuthInfoToken;
+
+        if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
           const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
+          const context = new AuthenticationContext(fedAuthInfoToken.stsurl);
           const authentication = this.config.authentication;
 
-          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+          context.acquireTokenWithUsernamePassword(fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
@@ -2058,6 +2053,8 @@ class SentLogin7WithFedAuth extends State {
         }
       }
     };
+
+    this.fedAuthInfoToken = undefined;
   }
 }
 
@@ -2151,7 +2148,7 @@ class SentAttention extends State {
     super(connection);
 
     this.enter = function() {
-      this.attentionReceived = false;
+      this.state.attentionReceived = false;
     };
 
     this.events = {
@@ -2167,12 +2164,12 @@ class SentAttention extends State {
         this.sendDataToTokenStreamParser(data);
       },
       attention: function() {
-        this.attentionReceived = true;
+        this.state.attentionReceived = true;
       },
       message: function() {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
-        if (this.attentionReceived) {
+        if (this.state.attentionReceived) {
           this.clearCancelTimer();
 
           const sqlRequest = this.request;
@@ -2187,6 +2184,8 @@ class SentAttention extends State {
         }
       }
     };
+
+    this.attentionReceived = false;
   }
 }
 
