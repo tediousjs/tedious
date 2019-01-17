@@ -695,15 +695,6 @@ class Connection extends EventEmitter {
       this.emit('infoMessage', token);
     });
 
-    this.tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
-
-      this.emit('sspichallenge', token);
-    });
-
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
@@ -740,14 +731,6 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('charsetChange', (token) => {
       this.emit('charsetChange', token.newValue);
-    });
-
-    this.tokenStreamParser.on('fedAuthInfo', (token) => {
-      this.dispatchEvent('fedAuthInfo', token);
-    });
-
-    this.tokenStreamParser.on('featureExtAck', (token) => {
-      this.dispatchEvent('featureExtAck', token);
     });
 
     this.tokenStreamParser.on('loginack', (token) => {
@@ -904,10 +887,6 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('done', (token) => {
       if (this.request) {
-        if (token.attention) {
-          this.dispatchEvent('attention');
-        }
-
         if (this.request.canceled) {
           // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
           // We assume this is the indication that an in-flight request was canceled.
@@ -1940,6 +1919,18 @@ class SentLogin7WithStandardLogin extends State {
         }
       }
     };
+
+    this.onFeatureExtAckToken = (token) => {
+      this.connection.dispatchEvent('featureExtAck', token);
+    };
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.on('featureExtAck', this.onFeatureExtAckToken);
+  }
+
+  exit() {
+    this.connection.tokenStreamParser.removeListener('featureExtAck', this.onFeatureExtAckToken);
   }
 }
 
@@ -1997,6 +1988,23 @@ class SentLogin7WithNTLMLogin extends State {
         }
       }
     };
+
+    this.onSspiToken = (token) => {
+      if (token.ntlmpacket) {
+        this.connection.ntlmpacket = token.ntlmpacket;
+        this.connection.ntlmpacketBuffer = token.ntlmpacketBuffer;
+      }
+
+      this.connection.emit('sspichallenge', token);
+    };
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.on('sspichallenge', this.onSspiToken);
+  }
+
+  exit() {
+    this.connection.tokenStreamParser.removeListener('sspichallenge', this.onSspiToken);
   }
 }
 
@@ -2016,9 +2024,6 @@ class SentLogin7WithFedAuth extends State {
       },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
-      },
-      fedAuthInfo: function(token) {
-        this.state.fedAuthInfoToken = token;
       },
       message: function() {
         const fedAuthInfoToken = this.state.fedAuthInfoToken;
@@ -2056,6 +2061,20 @@ class SentLogin7WithFedAuth extends State {
     };
 
     this.fedAuthInfoToken = undefined;
+
+    this.onFedAuthInfoToken = (token) => {
+      this.fedAuthInfoToken = token;
+    };
+  }
+
+  enter() {
+    this.fedAuthInfoToken = undefined;
+    this.tokenStreamParser.on('fedAuthInfo', this.onFedAuthInfoToken);
+  }
+
+  exit() {
+    this.fedAuthInfoToken = undefined;
+    this.tokenStreamParser.removeListener('fedAuthInfo', this.onFedAuthInfoToken);
   }
 }
 
@@ -2160,9 +2179,6 @@ class SentAttention extends State {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      attention: function() {
-        this.state.attentionReceived = true;
-      },
       message: function() {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
@@ -2183,10 +2199,22 @@ class SentAttention extends State {
     };
 
     this.attentionReceived = false;
+
+    this.onDoneToken = (token) => {
+      if (token.attention) {
+        this.attentionReceived = true;
+      }
+    };
   }
 
   enter() {
     this.attentionReceived = false;
+    this.connection.tokenStreamParser.on('done', this.onDoneToken);
+  }
+
+  exit() {
+    this.attentionReceived = false;
+    this.connection.tokenStreamParser.removeListener('done', this.onDoneToken);
   }
 }
 
