@@ -664,7 +664,7 @@ exports.execBadSql = function(test) {
 };
 
 exports.closeConnectionRequestPending = function(test) {
-  test.expect(1);
+  test.expect(3);
 
   var config = getConfig();
 

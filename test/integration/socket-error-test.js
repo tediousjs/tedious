@@ -1,6 +1,8 @@
+const fs = require('fs');
+const { assert } = require('chai');
+
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
-const fs = require('fs');
 
 function getConfig() {
   const config = JSON.parse(
@@ -20,27 +22,89 @@ function getConfig() {
   return config;
 }
 
-exports.socketError = function(test) {
-  const connection = new Connection(getConfig());
+describe('A `error` on the network socket', function() {
+  let connection;
 
-  test.expect(3);
+  beforeEach(() => {
+    connection = new Connection(getConfig());
+  });
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
+  afterEach(() => {
+    connection.close();
+  });
 
-    const request = new Request('WAITFOR 00:00:30', function(err) {
-      test.ok(~err.message.indexOf('socket error'));
+  it('forwards the error to in-flight requests', function(done) {
+    const socketError = new Error('socket error');
+
+    connection.on('error', () => {});
+    connection.on('connect', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const request = new Request('WAITFOR 00:00:30', function(err) {
+        assert.strictEqual(err, socketError);
+
+        done();
+      });
+
+      connection.execSql(request);
+      process.nextTick(() => {
+        connection.socket.emit('error', socketError);
+      });
+    });
+  });
+
+  it('calls the request completion callback after closing the connection', function(done) {
+    const socketError = new Error('socket error');
+
+    connection.on('error', () => {});
+    connection.on('connect', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const request = new Request('WAITFOR 00:00:30', function(err) {
+        assert.strictEqual(connection.closed, true);
+
+        done();
+      });
+
+      connection.execSql(request);
+      process.nextTick(() => {
+        connection.socket.emit('error', socketError);
+      });
+    });
+  });
+
+  it('calls the request completion callback before emitting the `end` event', function(done) {
+    const socketError = new Error('socket error');
+
+    connection.on('error', () => {});
+
+    let endEmitted = false;
+    connection.on('end', () => {
+      endEmitted = true;
     });
 
-    connection.execSql(request);
-    connection.socket.emit('error', new Error('socket error'));
-  });
+    connection.on('connect', (err) => {
+      if (err) {
+        return done(err);
+      }
 
-  connection.on('end', function() {
-    test.done();
-  });
+      const request = new Request('WAITFOR 00:00:30', function(err) {
+        assert.strictEqual(endEmitted, false);
 
-  connection.on('error', function(err) {
-    test.ok(~err.message.indexOf('socket error'));
+        process.nextTick(() => {
+          assert.strictEqual(endEmitted, true);
+          done();
+        });
+      });
+
+      connection.execSql(request);
+      process.nextTick(() => {
+        connection.socket.emit('error', socketError);
+      });
+    });
   });
-};
+});
