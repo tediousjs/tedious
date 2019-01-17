@@ -650,7 +650,9 @@ class Connection extends EventEmitter {
       if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
         this.emit('rerouting');
       } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-        this.emit('end');
+        process.nextTick(() => {
+          this.emit('end');
+        });
       }
       if (this.request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
@@ -2038,8 +2040,9 @@ Connection.prototype.STATE = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
-        sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.clearRequestTimer(); // request timer is stopped on first data package
@@ -2076,8 +2079,10 @@ Connection.prototype.STATE = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
-        sqlRequest.callback(err);
+
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
