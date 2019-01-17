@@ -61,7 +61,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthRequired = false;
-    this.fedAuthInfoToken = undefined;
 
     let authentication;
     if (config.authentication !== undefined) {
@@ -610,6 +609,23 @@ class Connection extends EventEmitter {
     this.createTokenStreamParser();
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
+
+    this.STATE = {
+      CONNECTING: new Connecting(this),
+      SENT_PRELOGIN: new SentPrelogin(this),
+      REROUTING: new ReRouting(this),
+      TRANSIENT_FAILURE_RETRY: new TransientFailureRetry(this),
+      SENT_TLSSSLNEGOTIATION: new SentTLSSSLNegotiation(this),
+      SENT_LOGIN7_WITH_STANDARD_LOGIN: new SentLogin7WithStandardLogin(this),
+      SENT_LOGIN7_WITH_NTLM: new SentLogin7WithNTLMLogin(this),
+      SENT_LOGIN7_WITH_FEDAUTH: new SentLogin7WithFedAuth(this),
+      LOGGED_IN_SENDING_INITIAL_SQL: new LoggedInSendingInitialSql(this),
+      LOGGED_IN: new LoggedIn(this),
+      SENT_CLIENT_REQUEST: new SentClientRequest(this),
+      SENT_ATTENTION: new SentAttention(this),
+      FINAL: new Final(this)
+    };
+
     this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
@@ -679,39 +695,8 @@ class Connection extends EventEmitter {
       this.emit('infoMessage', token);
     });
 
-    this.tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
-
-      this.emit('sspichallenge', token);
-    });
-
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
-      if (this.loggedIn) {
-        if (this.request) {
-          if (!this.request.canceled) {
-            this.request.error = RequestError(token.message, 'EREQUEST');
-            this.request.error.number = token.number;
-            this.request.error.state = token.state;
-            this.request.error['class'] = token['class'];
-            this.request.error.serverName = token.serverName;
-            this.request.error.procName = token.procName;
-            this.request.error.lineNumber = token.lineNumber;
-          }
-        }
-      } else {
-        const error = ConnectionError(token.message, 'ELOGIN');
-
-        const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
-        if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          error.isTransient = true;
-        }
-
-        this.loginError = error;
-      }
     });
 
     this.tokenStreamParser.on('databaseChange', (token) => {
@@ -724,210 +709,6 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('charsetChange', (token) => {
       this.emit('charsetChange', token.newValue);
-    });
-
-    this.tokenStreamParser.on('fedAuthInfo', (token) => {
-      this.dispatchEvent('fedAuthInfo', token);
-    });
-
-    this.tokenStreamParser.on('featureExtAck', (token) => {
-      this.dispatchEvent('featureExtAck', token);
-    });
-
-    this.tokenStreamParser.on('loginack', (token) => {
-      if (!token.tdsVersion) {
-        // unsupported TDS version
-        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
-        this.loggedIn = false;
-        return;
-      }
-
-      if (!token['interface']) {
-        // unsupported interface
-        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
-        this.loggedIn = false;
-        return;
-      }
-
-      // use negotiated version
-      this.config.options.tdsVersion = token.tdsVersion;
-      this.loggedIn = true;
-    });
-
-    this.tokenStreamParser.on('routingChange', (token) => {
-      this.routingData = token.newValue;
-      this.dispatchEvent('routingChange');
-    });
-
-    this.tokenStreamParser.on('packetSizeChange', (token) => {
-      this.messageIo.packetSize(token.newValue);
-    });
-
-    // A new top-level transaction was started. This is not fired
-    // for nested transactions.
-    this.tokenStreamParser.on('beginTransaction', (token) => {
-      this.transactionDescriptors.push(token.newValue);
-      this.inTransaction = true;
-    });
-
-    // A top-level transaction was committed. This is not fired
-    // for nested transactions.
-    this.tokenStreamParser.on('commitTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      this.inTransaction = false;
-    });
-
-    // A top-level transaction was rolled back. This is not fired
-    // for nested transactions. This is also fired if a batch
-    // aborting error happened that caused a rollback.
-    this.tokenStreamParser.on('rollbackTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      // An outermost transaction was rolled back. Reset the transaction counter
-      this.inTransaction = false;
-      this.emit('rollbackTransaction');
-    });
-
-    this.tokenStreamParser.on('columnMetadata', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          let columns;
-          if (this.config.options.useColumnNames) {
-            columns = {};
-            for (let j = 0, len = token.columns.length; j < len; j++) {
-              const col = token.columns[j];
-              if (columns[col.colName] == null) {
-                columns[col.colName] = col;
-              }
-            }
-          } else {
-            columns = token.columns;
-          }
-          this.request.emit('columnMetadata', columns);
-        }
-      } else {
-        this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    this.tokenStreamParser.on('order', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('order', token.orderColumns);
-        }
-      } else {
-        this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    this.tokenStreamParser.on('row', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          if (this.config.options.rowCollectionOnRequestCompletion) {
-            this.request.rows.push(token.columns);
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            this.request.rst.push(token.columns);
-          }
-          if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-            this.request.emit('row', token.columns);
-          }
-        }
-      } else {
-        this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    this.tokenStreamParser.on('returnStatus', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          // Keep value for passing in 'doneProc' event.
-          this.procReturnStatusValue = token.value;
-        }
-      }
-    });
-
-    this.tokenStreamParser.on('returnValue', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
-        }
-      }
-    });
-
-    this.tokenStreamParser.on('doneProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-          this.procReturnStatusValue = undefined;
-          if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
-          }
-        }
-      }
-    });
-
-    this.tokenStreamParser.on('doneInProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-          if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
-          }
-        }
-      }
-    });
-
-    this.tokenStreamParser.on('done', (token) => {
-      if (this.request) {
-        if (token.attention) {
-          this.dispatchEvent('attention');
-        }
-
-        if (this.request.canceled) {
-          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
-          // We assume this is the indication that an in-flight request was canceled.
-          if (token.sqlError && !this.request.error) {
-            this.clearCancelTimer();
-            this.request.error = RequestError('Canceled.', 'ECANCEL');
-          }
-        } else {
-          if (token.sqlError && !this.request.error) {
-            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-          }
-          this.request.emit('done', token.rowCount, token.more, this.request.rst);
-          if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
-          }
-        }
-      }
-    });
-
-    this.tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
-      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
-        this.dispatchEvent('endOfMessageMarkerReceived');
-      }
-    });
-
-    this.tokenStreamParser.on('resetConnection', () => {
-      this.emit('resetConnection');
-    });
-
-    this.tokenStreamParser.on('tokenStreamError', (error) => {
-      this.emit('error', error);
-      this.close();
     });
 
     this.tokenStreamParser.on('drain', () => {
@@ -1089,19 +870,19 @@ class Connection extends EventEmitter {
 
   transitionTo(newState) {
     if (this.state === newState) {
-      this.debug.log('State is already ' + newState.name);
+      this.debug.log('State is already ' + newState.constructor.name);
       return;
     }
 
-    if (this.state && this.state.exit) {
-      this.state.exit.call(this, newState);
+    if (this.state) {
+      this.state.exit(newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.constructor.name : undefined) + ' -> ' + newState.constructor.name);
     this.state = newState;
 
-    if (this.state.enter) {
-      this.state.enter.apply(this);
+    if (this.state) {
+      this.state.enter(this);
     }
   }
 
@@ -1109,7 +890,7 @@ class Connection extends EventEmitter {
     if (this.state.events[eventName]) {
       this.state.events[eventName].apply(this, args);
     } else {
-      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
+      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.constructor.name}'`));
       this.close();
     }
   }
@@ -1167,14 +948,6 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return payload.toString('  ');
     });
-  }
-
-  emptyMessageBuffer() {
-    this.messageBuffer = Buffer.alloc(0);
-  }
-
-  addToMessageBuffer(data) {
-    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
   sendLogin7Packet(cb) {
@@ -1589,7 +1362,7 @@ class Connection extends EventEmitter {
 
   makeRequest(request, packetType, payload) {
     if (this.state !== this.STATE.LOGGED_IN) {
-      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
+      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.constructor.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
@@ -1709,13 +1482,22 @@ class Connection extends EventEmitter {
 
 module.exports = Connection;
 
-Connection.prototype.STATE = {
-  CONNECTING: {
-    name: 'Connecting',
-    enter: function() {
-      this.initialiseConnection();
-    },
-    events: {
+class State {
+  constructor(connection) {
+    this.connection = connection;
+
+    this.events = undefined;
+  }
+
+  enter() {}
+  exit(newState) {}
+}
+
+class Connecting extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1726,14 +1508,19 @@ Connection.prototype.STATE = {
         this.sendPreLogin();
         this.transitionTo(this.STATE.SENT_PRELOGIN);
       }
-    }
-  },
-  SENT_PRELOGIN: {
-    name: 'SentPrelogin',
-    enter: function() {
-      this.emptyMessageBuffer();
-    },
-    events: {
+    };
+  }
+
+  enter() {
+    this.connection.initialiseConnection();
+  }
+}
+
+class SentPrelogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1741,10 +1528,10 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       data: function(data) {
-        this.addToMessageBuffer(data);
+        this.state.messageBuffer = Buffer.concat([this.state.messageBuffer, data]);
       },
       message: function() {
-        const preloginPayload = new PreloginPayload(this.messageBuffer);
+        const preloginPayload = new PreloginPayload(this.state.messageBuffer);
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
         });
@@ -1772,14 +1559,21 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  REROUTING: {
-    name: 'ReRouting',
-    enter: function() {
-      this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
-    },
-    events: {
+    };
+
+    this.messageBuffer = Buffer.alloc(0);
+  }
+
+  enter() {
+    this.messageBuffer = Buffer.alloc(0);
+  }
+}
+
+class ReRouting extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       message: function() {},
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1790,15 +1584,19 @@ Connection.prototype.STATE = {
       reconnect: function() {
         this.transitionTo(this.STATE.CONNECTING);
       }
-    }
-  },
-  TRANSIENT_FAILURE_RETRY: {
-    name: 'TRANSIENT_FAILURE_RETRY',
-    enter: function() {
-      this.curTransientRetryCount++;
-      this.cleanupConnection(this.cleanupTypeEnum.RETRY);
-    },
-    events: {
+    };
+  }
+
+  enter() {
+    this.connection.cleanupConnection(this.connection.cleanupTypeEnum.REDIRECT);
+  }
+}
+
+class TransientFailureRetry extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       message: function() {},
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1809,11 +1607,20 @@ Connection.prototype.STATE = {
       retry: function() {
         this.createRetryTimer();
       }
-    }
-  },
-  SENT_TLSSSLNEGOTIATION: {
-    name: 'SentTLSSSLNegotiation',
-    events: {
+    };
+  }
+
+  enter() {
+    this.connection.curTransientRetryCount++;
+    this.connection.cleanupConnection(this.connection.cleanupTypeEnum.RETRY);
+  }
+}
+
+class SentTLSSSLNegotiation extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1838,11 +1645,15 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  SENT_LOGIN7_WITH_STANDARD_LOGIN: {
-    name: 'SentLogin7WithStandardLogin',
-    events: {
+    };
+  }
+}
+
+class SentLogin7WithStandardLogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1852,52 +1663,203 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      featureExtAck: function(token) {
-        const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password') {
-          if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
-            this.loggedIn = false;
-          } else if (token.fedAuth.length !== 0) {
-            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
-            this.loggedIn = false;
-          }
-        } else {
-          if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Received acknowledgement for unknown feature');
-            this.loggedIn = false;
-          } else {
-            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-            this.loggedIn = false;
-          }
-        }
-      },
       message: function() {
-        if (this.loggedIn) {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
+        const { doneToken, loginAckToken, routingChangeToken, featureExtAckToken, errorMessageToken } = this.state;
+
+        if (!doneToken) {
+          // TODO: Fail?
+        }
+
+        if (loginAckToken) {
+          if (!loginAckToken.tdsVersion) {
+            this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+            return;
+          }
+
+          if (!loginAckToken.interface) {
+            // unsupported interface
+            this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+            return;
+          }
+
+          if (routingChangeToken) {
+            this.routingData = routingChangeToken.newValue;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.config.options.tdsVersion = loginAckToken.tdsVersion;
+            this.loggedIn = true;
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
+
+          return;
+        }
+
+        if (featureExtAckToken) {
+          const { authentication } = this.config;
+
+          if (authentication.type === 'azure-active-directory-password') {
+            if (featureExtAckToken.fedAuth === undefined) {
+              this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
               this.emit('connect', this.loginError);
               this.transitionTo(this.STATE.FINAL);
+              return;
+            } else if (featureExtAckToken.fedAuth.length !== 0) {
+              this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+              return;
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            if (featureExtAckToken.fedAuth === undefined) {
+              this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+              return;
+            } else {
+              this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+              return;
+            }
           }
         }
+
+        if (errorMessageToken) {
+          const { message, number } = errorMessageToken;
+
+          const isTransient = this.transientErrorLookup.isTransientError(number);
+          if (isTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            return;
+          }
+
+          this.loginError = ConnectionError(message, 'ELOGIN');
+          this.emit('connect', this.loginError);
+          this.transitionTo(this.STATE.FINAL);
+          return;
+        }
+
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+        this.transitionTo(this.STATE.FINAL);
       }
+    };
+
+    this.onToken = (token) => {
+      switch (token.event) {
+        case 'databaseChange':
+        case 'sqlCollationChange':
+        case 'languageChange':
+        case 'charsetChange':
+        case 'packetSizeChange':
+        case 'routingChange':
+          this.onEnvChangeToken(token);
+          break;
+
+        case 'infoMessage':
+          this.onInfoMessage(token);
+          break;
+
+        case 'errorMessage':
+          this.onErrorMessage(token);
+          break;
+
+        case 'loginack':
+          this.onLoginAckToken(token);
+          break;
+
+        case 'done':
+          this.onDoneToken(token);
+          break;
+
+        case 'doneInProc':
+          this.onDoneInProcToken(token);
+          break;
+
+        case 'featureExtAck':
+          this.onFeatureExtAckToken(token);
+          break;
+
+        default:
+          // TODO: Should we fail here?
+          // console.log(`Unexpected token ${token.event} in ${this.constructor.name}`);
+      }
+    };
+  }
+
+  onEnvChangeToken(token) {
+    switch (token.event) {
+      case 'databaseChange':
+        //this.connection.emit('databaseChange', token.newValue);
+        break;
+
+      case 'languageChange':
+        //this.connection.emit('languageChange', token.newValue);
+        break;
+
+      case 'charsetChange':
+        //this.connection.emit('charsetChange', token.newValue);
+        break;
+
+      case 'sqlCollationChange':
+        // TODO:
+        break;
+
+      case 'packetSizeChange':
+        this.connection.messageIo.packetSize(token.newValue);
+        break;
+
+      case 'routingChange':
+        this.routingChangeToken = token;
+        break;
+
+      default:
+        // TODO: Should we fail here?
     }
-  },
-  SENT_LOGIN7_WITH_NTLM: {
-    name: 'SentLogin7WithNTLMLogin',
-    events: {
+  }
+
+  onLoginAckToken(token) {
+    this.loginAckToken = token;
+  }
+
+  onDoneToken(token) {
+    this.doneToken = token;
+  }
+
+  onDoneInProcToken(token) {
+    this.doneInProcToken = token;
+  }
+
+  onFeatureExtAckToken(token) {
+    this.featureExtAckToken = token;
+  }
+
+  onInfoMessage(token) {
+    this.connection.emit('infoMessage', token);
+  }
+
+  onErrorMessage(token) {
+    this.errorMessageToken = token;
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.parser.on('data', this.onToken);
+  }
+
+  exit() {
+    this.connection.tokenStreamParser.parser.removeListener('data', this.onToken);
+  }
+}
+
+class SentLogin7WithNTLMLogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1946,11 +1908,32 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  SENT_LOGIN7_WITH_FEDAUTH: {
-    name: 'SentLogin7Withfedauth',
-    events: {
+    };
+
+    this.onToken = (token) => {
+      // if (token.ntlmpacket) {
+      //   this.connection.ntlmpacket = token.ntlmpacket;
+      //   this.connection.ntlmpacketBuffer = token.ntlmpacketBuffer;
+      // }
+      //
+      // this.connection.emit('sspichallenge', token);
+    };
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.parser.on('data', this.onToken);
+  }
+
+  exit() {
+    this.connection.tokenStreamParser.parser.removeListener('data', this.onToken);
+  }
+}
+
+class SentLogin7WithFedAuth extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1960,51 +1943,172 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      fedAuthInfo: function(token) {
-        this.fedAuthInfoToken = token;
-      },
       message: function() {
-        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
-          const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
-          const authentication = this.config.authentication;
+        const { doneToken, loginAckToken, routingChangeToken, fedAuthInfoToken, errorMessageToken } = this;
 
-          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
-            if (err) {
-              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-              return;
-            }
+        if (!doneToken) {
+          // TODO: Fail?
+        }
 
-            this.sendFedAuthResponsePacket(tokenResponse);
-          });
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        if (loginAckToken) {
+          if (routingChangeToken) {
+            this.routingData = routingChangeToken.newValue;
+            this.transitionTo(this.STATE.REROUTING);
+            return;
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            this.loggedIn = true;
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+            return;
           }
         }
+
+        if (fedAuthInfoToken) {
+          if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+            const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+            const context = new AuthenticationContext(fedAuthInfoToken.stsurl);
+            const authentication = this.config.authentication;
+
+            context.acquireTokenWithUsernamePassword(fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+              if (err) {
+                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+                this.emit('connect', this.loginError);
+                this.transitionTo(this.STATE.FINAL);
+                return;
+              }
+
+              this.sendFedAuthResponsePacket(tokenResponse);
+              return;
+            });
+
+            return;
+          }
+        }
+
+        if (errorMessageToken) {
+          const { message, number } = errorMessageToken;
+
+          const isTransient = this.transientErrorLookup.isTransientError(number);
+          if (isTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            return;
+          }
+
+          this.loginError = ConnectionError(message, 'ELOGIN');
+          this.emit('connect', this.loginError);
+          this.transitionTo(this.STATE.FINAL);
+          return;
+        }
+
+        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+        this.transitionTo(this.STATE.FINAL);
       }
+    };
+
+    this.onToken = (token) => {
+      switch (token.event) {
+        case 'databaseChange':
+        case 'sqlCollationChange':
+        case 'languageChange':
+        case 'charsetChange':
+        case 'packetSizeChange':
+        case 'routingChange':
+          this.onEnvChangeToken(token);
+          break;
+
+        case 'infoMessage':
+          this.onInfoMessage(token);
+          break;
+
+        case 'errorMessage':
+          this.onErrorMessage(token);
+          break;
+
+        case 'loginack':
+          this.onLoginAckToken(token);
+          break;
+
+        case 'fedAuthInfo':
+          this.onFedAuthInfoToken(token);
+          break;
+
+        case 'done':
+          this.onDoneToken(token);
+          break;
+
+        default:
+          // TODO: Should we fail here?
+          // console.log(`Unexpected token ${token.event} in ${this.constructor.name}`);
+      }
+    };
+  }
+
+  onEnvChangeToken(token) {
+    switch (token.event) {
+      case 'databaseChange':
+        //this.connection.emit('databaseChange', token.newValue);
+        break;
+
+      case 'languageChange':
+        //this.connection.emit('languageChange', token.newValue);
+        break;
+
+      case 'charsetChange':
+        //this.connection.emit('charsetChange', token.newValue);
+        break;
+
+      case 'sqlCollationChange':
+        // TODO:
+        break;
+
+      case 'packetSizeChange':
+        this.connection.messageIo.packetSize(token.newValue);
+        break;
+
+      case 'routingChange':
+        this.routingChangeToken = token;
+        break;
+
+      default:
+        // TODO: Should we fail here?
+        // console.log(`Unknown env change token: ${token.event}`);
     }
-  },
-  LOGGED_IN_SENDING_INITIAL_SQL: {
-    name: 'LoggedInSendingInitialSql',
-    enter: function() {
-      this.sendInitialSql();
-    },
-    events: {
+  }
+
+  onLoginAckToken(token) {
+    this.loginAckToken = token;
+  }
+
+  onDoneToken(token) {
+    this.doneToken = token;
+  }
+
+  onFedAuthInfoToken(token) {
+    this.fedAuthInfoToken = token;
+  }
+
+  onInfoMessage(token) {
+    //this.connection.emit('infoMessage', token);
+  }
+
+  onErrorMessage(token) {
+    this.errorMessageToken = token;
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.parser.on('data', this.onToken);
+  }
+
+  exit() {
+    this.connection.tokenStreamParser.parser.removeListener('data', this.onToken);
+  }
+}
+
+class LoggedInSendingInitialSql extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function socketError() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -2018,25 +2122,31 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
       }
-    }
-  },
-  LOGGED_IN: {
-    name: 'LoggedIn',
-    events: {
+    };
+  }
+
+  enter() {
+    this.connection.sendInitialSql();
+  }
+}
+
+class LoggedIn extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       }
-    }
-  },
-  SENT_CLIENT_REQUEST: {
-    name: 'SentClientRequest',
-    exit: function(nextState) {
-      this.clearRequestTimer();
-      if (nextState !== this.STATE.FINAL) {
-        this.tokenStreamParser.resume();
-      }
-    },
-    events: {
+    };
+  }
+}
+
+class SentClientRequest extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
@@ -2068,14 +2178,251 @@ Connection.prototype.STATE = {
         }
         sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
       }
+    };
+
+    this.onToken = (token) => {
+      switch (token.event) {
+        case 'infoMessage':
+          // Do nothing...
+          break;
+
+        case 'errorMessage':
+          this.onErrorMessageToken(token);
+          break;
+
+        case 'columnMetadata':
+          this.onColumnMetadataToken(token);
+          break;
+
+        case 'done':
+          this.onDoneToken(token);
+          break;
+
+        case 'doneInProc':
+          this.onDoneInProcToken(token);
+          break;
+
+        case 'doneProc':
+          this.onDoneProcToken(token);
+          break;
+
+        case 'order':
+          this.onOrderToken(token);
+          break;
+
+        case 'row':
+          this.onRowToken(token);
+          break;
+
+        case 'returnStatus':
+          this.onReturnStatusToken(token);
+          break;
+
+        case 'returnValue':
+          this.onReturnValueToken(token);
+          break;
+
+        case 'endOfMessage':
+          this.connection.dispatchEvent('endOfMessageMarkerReceived');
+          break;
+
+        case 'resetConnection':
+          this.connection.emit('resetConnection');
+          break;
+
+        case 'languageChange':
+          // Do nothing...
+          break;
+
+        // A new top-level transaction was started. This is not fired
+        // for nested transactions.
+        case 'beginTransaction':
+          this.connection.transactionDescriptors.push(token.newValue);
+          this.connection.inTransaction = true;
+          break;
+
+        // A top-level transaction was committed. This is not fired
+        // for nested transactions.
+        case 'commitTransaction':
+          this.connection.transactionDescriptors.length = 1;
+          this.connection.inTransaction = false;
+          break;
+
+        // A top-level transaction was rolled back. This is not fired
+        // for nested transactions. This is also fired if a batch
+        // aborting error happened that caused a rollback.
+        case 'rollbackTransaction':
+          this.connection.transactionDescriptors.length = 1;
+          // An outermost transaction was rolled back. Reset the transaction counter
+          this.connection.inTransaction = false;
+          this.connection.emit('rollbackTransaction');
+          break;
+
+        default:
+          // TODO: Should we fail here?
+          // console.log(`Unexpected token ${token.event} in ${this.constructor.name}`);
+      }
+    };
+  }
+
+  onErrorMessageToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      request.error = RequestError(token.message, 'EREQUEST');
+      request.error.number = token.number;
+      request.error.state = token.state;
+      request.error['class'] = token['class'];
+      request.error.serverName = token.serverName;
+      request.error.procName = token.procName;
+      request.error.lineNumber = token.lineNumber;
     }
-  },
-  SENT_ATTENTION: {
-    name: 'SentAttention',
-    enter: function() {
-      this.attentionReceived = false;
-    },
-    events: {
+  }
+
+  onColumnMetadataToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      let columns;
+
+      if (this.connection.config.options.useColumnNames) {
+        columns = {};
+        for (let j = 0, len = token.columns.length; j < len; j++) {
+          const col = token.columns[j];
+          if (columns[col.colName] == null) {
+            columns[col.colName] = col;
+          }
+        }
+      } else {
+        columns = token.columns;
+      }
+
+      request.emit('columnMetadata', columns);
+    }
+  }
+
+  onDoneToken(token) {
+    const request = this.connection.request;
+
+    if (request.canceled) {
+      // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
+      // We assume this is the indication that an in-flight request was canceled.
+      if (token.sqlError && !request.error) {
+        this.connection.clearCancelTimer();
+        request.error = RequestError('Canceled.', 'ECANCEL');
+      }
+    } else {
+      if (token.sqlError && !request.error) {
+        // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+        request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+      }
+
+      request.emit('done', token.rowCount, token.more, request.rst);
+
+      if (token.rowCount !== undefined) {
+        request.rowCount += token.rowCount;
+      }
+      if (this.connection.config.options.rowCollectionOnDone) {
+        request.rst = [];
+      }
+    }
+  }
+
+  onDoneInProcToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      request.emit('doneInProc', token.rowCount, token.more, request.rst);
+
+      if (token.rowCount !== undefined) {
+        request.rowCount += token.rowCount;
+      }
+
+      if (this.connection.config.options.rowCollectionOnDone) {
+        request.rst = [];
+      }
+    }
+  }
+
+  onDoneProcToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      request.emit('doneProc', token.rowCount, token.more, this.connection.procReturnStatusValue, request.rst);
+
+      this.connection.procReturnStatusValue = undefined;
+
+      if (token.rowCount !== undefined) {
+        request.rowCount += token.rowCount;
+      }
+
+      if (this.connection.config.options.rowCollectionOnDone) {
+        request.rst = [];
+      }
+    }
+  }
+
+  onOrderToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      request.emit('order', token.orderColumns);
+    }
+  }
+
+  onRowToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      if (this.connection.config.options.rowCollectionOnRequestCompletion) {
+        request.rows.push(token.columns);
+      }
+      if (this.connection.config.options.rowCollectionOnDone) {
+        request.rst.push(token.columns);
+      }
+      if (!(this.connection.state === this.connection.STATE.SENT_ATTENTION && request.paused)) {
+        request.emit('row', token.columns);
+      }
+    }
+  }
+
+  onReturnStatusToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      // Keep value for passing in 'doneProc' event.
+      this.connection.procReturnStatusValue = token.value;
+    }
+  }
+
+  onReturnValueToken(token) {
+    const request = this.connection.request;
+
+    if (!request.canceled) {
+      request.emit('returnValue', token.paramName, token.value, token.metadata);
+    }
+  }
+
+  enter() {
+    this.connection.tokenStreamParser.parser.on('data', this.onToken);
+  }
+
+  exit(nextState) {
+    this.connection.tokenStreamParser.parser.removeListener('data', this.onToken);
+
+    this.connection.clearRequestTimer();
+
+    if (nextState !== this.connection.STATE.FINAL) {
+      this.connection.tokenStreamParser.resume();
+    }
+  }
+}
+
+class SentAttention extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
@@ -2087,13 +2434,10 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      attention: function() {
-        this.attentionReceived = true;
-      },
       message: function() {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
-        if (this.attentionReceived) {
+        if (this.state.attentionReceived) {
           this.clearCancelTimer();
 
           const sqlRequest = this.request;
@@ -2107,14 +2451,37 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  FINAL: {
-    name: 'Final',
-    enter: function() {
-      this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
-    },
-    events: {
+    };
+
+    this.attentionReceived = false;
+
+    this.onToken = (token) => {
+      // We only care about the DONE token with the attention bit
+      if (token.event === 'done' && token.attention) {
+        this.attentionReceived = true;
+      }
+    };
+  }
+
+  enter() {
+    this.attentionReceived = false;
+    this.connection.tokenStreamParser.parser.on('data', this.onToken);
+  }
+
+  exit() {
+    this.attentionReceived = false;
+    this.connection.tokenStreamParser.parser.removeListener('data', this.onToken);
+  }
+}
+
+class Final extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
+      socketConnect: function() {
+
+      },
       loginFailed: function() {
         // Do nothing. The connection was probably closed by the client code.
       },
@@ -2127,6 +2494,10 @@ Connection.prototype.STATE = {
       socketError: function() {
         // Do nothing
       }
-    }
+    };
   }
-};
+
+  enter() {
+    this.connection.cleanupConnection(this.connection.cleanupTypeEnum.NORMAL);
+  }
+}
