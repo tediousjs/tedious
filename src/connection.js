@@ -610,6 +610,23 @@ class Connection extends EventEmitter {
     this.createTokenStreamParser();
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
+
+    this.STATE = {
+      CONNECTING: new Connecting(this),
+      SENT_PRELOGIN: new SentPrelogin(this),
+      REROUTING: new ReRouting(this),
+      TRANSIENT_FAILURE_RETRY: new TransientFailureRetry(this),
+      SENT_TLSSSLNEGOTIATION: new SentTLSSSLNegotiation(this),
+      SENT_LOGIN7_WITH_STANDARD_LOGIN: new SentLogin7WithStandardLogin(this),
+      SENT_LOGIN7_WITH_NTLM: new SentLogin7WithNTLMLogin(this),
+      SENT_LOGIN7_WITH_FEDAUTH: new SentLogin7WithFedAuth(this),
+      LOGGED_IN_SENDING_INITIAL_SQL: new LoggedInSendingInitialSql(this),
+      LOGGED_IN: new LoggedIn(this),
+      SENT_CLIENT_REQUEST: new SentClientRequest(this),
+      SENT_ATTENTION: new SentAttention(this),
+      FINAL: new Final(this)
+    };
+
     this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
@@ -1089,7 +1106,7 @@ class Connection extends EventEmitter {
 
   transitionTo(newState) {
     if (this.state === newState) {
-      this.debug.log('State is already ' + newState.name);
+      this.debug.log('State is already ' + newState.constructor.name);
       return;
     }
 
@@ -1097,7 +1114,7 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.constructor.name : undefined) + ' -> ' + newState.constructor.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -1109,7 +1126,7 @@ class Connection extends EventEmitter {
     if (this.state.events[eventName]) {
       this.state.events[eventName].apply(this, args);
     } else {
-      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
+      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.constructor.name}'`));
       this.close();
     }
   }
@@ -1589,7 +1606,7 @@ class Connection extends EventEmitter {
 
   makeRequest(request, packetType, payload) {
     if (this.state !== this.STATE.LOGGED_IN) {
-      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
+      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.constructor.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
@@ -1709,13 +1726,25 @@ class Connection extends EventEmitter {
 
 module.exports = Connection;
 
-Connection.prototype.STATE = {
-  CONNECTING: {
-    name: 'Connecting',
-    enter: function() {
+class State {
+  constructor(connection) {
+    this.connection = connection;
+
+    this.enter = undefined;
+    this.events = undefined;
+    this.exit = undefined;
+  }
+}
+
+class Connecting extends State {
+  constructor(connection) {
+    super();
+
+    this.enter = function() {
       this.initialiseConnection();
-    },
-    events: {
+    };
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1726,14 +1755,19 @@ Connection.prototype.STATE = {
         this.sendPreLogin();
         this.transitionTo(this.STATE.SENT_PRELOGIN);
       }
-    }
-  },
-  SENT_PRELOGIN: {
-    name: 'SentPrelogin',
-    enter: function() {
+    };
+  }
+}
+
+class SentPrelogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.emptyMessageBuffer();
-    },
-    events: {
+    };
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1772,14 +1806,19 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  REROUTING: {
-    name: 'ReRouting',
-    enter: function() {
+    };
+  }
+}
+
+class ReRouting extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
-    },
-    events: {
+    };
+
+    this.events = {
       message: function() {},
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1790,15 +1829,20 @@ Connection.prototype.STATE = {
       reconnect: function() {
         this.transitionTo(this.STATE.CONNECTING);
       }
-    }
-  },
-  TRANSIENT_FAILURE_RETRY: {
-    name: 'TRANSIENT_FAILURE_RETRY',
-    enter: function() {
+    };
+  }
+}
+
+class TransientFailureRetry extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.curTransientRetryCount++;
       this.cleanupConnection(this.cleanupTypeEnum.RETRY);
-    },
-    events: {
+    };
+
+    this.events = {
       message: function() {},
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1809,11 +1853,15 @@ Connection.prototype.STATE = {
       retry: function() {
         this.createRetryTimer();
       }
-    }
-  },
-  SENT_TLSSSLNEGOTIATION: {
-    name: 'SentTLSSSLNegotiation',
-    events: {
+    };
+  }
+}
+
+class SentTLSSSLNegotiation extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1838,11 +1886,15 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  SENT_LOGIN7_WITH_STANDARD_LOGIN: {
-    name: 'SentLogin7WithStandardLogin',
-    events: {
+    };
+  }
+}
+
+class SentLogin7WithStandardLogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1893,11 +1945,15 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  SENT_LOGIN7_WITH_NTLM: {
-    name: 'SentLogin7WithNTLMLogin',
-    events: {
+    };
+  }
+}
+
+class SentLogin7WithNTLMLogin extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1946,11 +2002,15 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  SENT_LOGIN7_WITH_FEDAUTH: {
-    name: 'SentLogin7Withfedauth',
-    events: {
+    };
+  }
+}
+
+class SentLogin7WithFedAuth extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1997,14 +2057,19 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  LOGGED_IN_SENDING_INITIAL_SQL: {
-    name: 'LoggedInSendingInitialSql',
-    enter: function() {
+    };
+  }
+}
+
+class LoggedInSendingInitialSql extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.sendInitialSql();
-    },
-    events: {
+    };
+
+    this.events = {
       socketError: function socketError() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -2018,25 +2083,34 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
       }
-    }
-  },
-  LOGGED_IN: {
-    name: 'LoggedIn',
-    events: {
+    };
+  }
+}
+
+class LoggedIn extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.events = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       }
-    }
-  },
-  SENT_CLIENT_REQUEST: {
-    name: 'SentClientRequest',
-    exit: function(nextState) {
+    };
+  }
+}
+
+class SentClientRequest extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.exit = function(nextState) {
       this.clearRequestTimer();
       if (nextState !== this.STATE.FINAL) {
         this.tokenStreamParser.resume();
       }
-    },
-    events: {
+    };
+
+    this.events = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
@@ -2068,14 +2142,19 @@ Connection.prototype.STATE = {
         }
         sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
       }
-    }
-  },
-  SENT_ATTENTION: {
-    name: 'SentAttention',
-    enter: function() {
+    };
+  }
+}
+
+class SentAttention extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.attentionReceived = false;
-    },
-    events: {
+    };
+
+    this.events = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
@@ -2107,14 +2186,22 @@ Connection.prototype.STATE = {
           }
         }
       }
-    }
-  },
-  FINAL: {
-    name: 'Final',
-    enter: function() {
+    };
+  }
+}
+
+class Final extends State {
+  constructor(connection) {
+    super(connection);
+
+    this.enter = function() {
       this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
-    },
-    events: {
+    };
+
+    this.events = {
+      socketConnect: function() {
+
+      },
       loginFailed: function() {
         // Do nothing. The connection was probably closed by the client code.
       },
@@ -2127,6 +2214,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         // Do nothing
       }
-    }
+    };
   }
-};
+}
