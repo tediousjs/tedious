@@ -624,12 +624,6 @@ class Connection extends EventEmitter {
 
     this.curTransientRetryCount = 0;
     this.transientErrorLookup = new TransientErrorLookup();
-
-    this.cleanupTypeEnum = {
-      NORMAL: 0,
-      REDIRECT: 1,
-      RETRY: 2
-    };
   }
 
   close() {
@@ -641,24 +635,45 @@ class Connection extends EventEmitter {
     this.createConnectTimer();
   }
 
-  cleanupConnection(cleanupTypeEnum) {
+  cleanupConnection() {
     if (!this.closed) {
       this.clearConnectTimer();
       this.clearRequestTimer();
       this.clearRetryTimer();
-      this.closeConnection();
-      if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
-        this.emit('rerouting');
-      } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
+
+      if (this.socket) {
+        // Close the writable side of the socket
+        this.socket.end();
+
+        // And wait for the socket to be fully closed
+        this.socket.on('close', () => {
+          this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+
+          if (this.state === this.STATE.REROUTING) {
+            this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+            this.transitionTo(this.STATE.CONNECTING);
+          } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
+            const server = this.routingData ? this.routingData.server : this.server;
+            const port = this.routingData ? this.routingData.port : this.config.options.port;
+            this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+            this.createRetryTimer();
+          } else {
+            this.emit('end');
+          }
+        });
+      } else {
         process.nextTick(() => {
           this.emit('end');
         });
       }
+
       if (this.request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
         this.request.callback(err);
         this.request = undefined;
       }
+
       this.closed = true;
       this.loggedIn = false;
       this.loginError = null;
@@ -949,6 +964,7 @@ class Connection extends EventEmitter {
         if (this.state === this.STATE.FINAL) {
           return;
         }
+
         if (message) {
           this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
         } else {
@@ -971,7 +987,7 @@ class Connection extends EventEmitter {
       }
 
       if (this.state === this.STATE.FINAL) {
-        socket.destroy();
+        socket.end();
         return;
       }
 
@@ -979,9 +995,7 @@ class Connection extends EventEmitter {
       this.socket.on('error', (error) => {
         this.socketError(error);
       });
-      this.socket.on('close', () => {
-        this.socketClose();
-      });
+
       this.socket.on('end', () => {
         this.socketEnd();
       });
@@ -992,12 +1006,6 @@ class Connection extends EventEmitter {
 
       this.socketConnect();
     });
-  }
-
-  closeConnection() {
-    if (this.socket) {
-      this.socket.destroy();
-    }
   }
 
   createConnectTimer() {
@@ -1136,26 +1144,10 @@ class Connection extends EventEmitter {
 
   socketEnd() {
     this.debug.log('socket ended');
-    if (this.state !== this.STATE.FINAL) {
+    if (this.state !== this.STATE.FINAL && this.state !== this.STATE.TRANSIENT_FAILURE_RETRY && this.state !== this.STATE.REROUTING) {
       const error = new Error('socket hang up');
       error.code = 'ECONNRESET';
       this.socketError(error);
-    }
-  }
-
-  socketClose() {
-    this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
-    if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
-      this.dispatchEvent('reconnect');
-    } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
-      const server = this.routingData ? this.routingData.server : this.server;
-      const port = this.routingData ? this.routingData.port : this.config.options.port;
-      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
-
-      this.dispatchEvent('retry');
-    } else {
-      this.transitionTo(this.STATE.FINAL);
     }
   }
 
@@ -1777,7 +1769,7 @@ Connection.prototype.STATE = {
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
-      this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
+      this.cleanupConnection();
     },
     events: {
       message: function() {},
@@ -1786,9 +1778,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      reconnect: function() {
-        this.transitionTo(this.STATE.CONNECTING);
       }
     }
   },
@@ -1796,7 +1785,7 @@ Connection.prototype.STATE = {
     name: 'TRANSIENT_FAILURE_RETRY',
     enter: function() {
       this.curTransientRetryCount++;
-      this.cleanupConnection(this.cleanupTypeEnum.RETRY);
+      this.cleanupConnection();
     },
     events: {
       message: function() {},
@@ -1805,9 +1794,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      retry: function() {
-        this.createRetryTimer();
       }
     }
   },
@@ -2112,7 +2098,7 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     enter: function() {
-      this.cleanupConnection(this.cleanupTypeEnum.NORMAL);
+      this.cleanupConnection();
     },
     events: {
       loginFailed: function() {

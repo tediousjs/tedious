@@ -505,12 +505,13 @@ exports.transactionHelperBatchAbortingError = function(test) {
 };
 
 exports.transactionHelperSocketError = function(test) {
-  test.expect(3);
+  test.expect(4);
 
   var connection = new Connection(config);
   connection.on('end', function(info) {
     test.done();
   });
+
   connection.on('error', function(err) {
     test.ok(~err.message.indexOf('socket error'));
   });
