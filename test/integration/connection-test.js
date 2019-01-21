@@ -664,19 +664,23 @@ exports.execBadSql = function(test) {
 };
 
 exports.closeConnectionRequestPending = function(test) {
-  test.expect(3);
+  test.expect(4);
 
   var config = getConfig();
 
   var request = new Request('select 8 as C1', function(err, rowCount) {
     test.ok(err);
-    test.strictEqual(err.code, 'ECLOSE');
+    test.strictEqual(err.code, 'ESOCKET');
   });
 
   var connection = new Connection(config);
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
+  connection.on('error', function(err) {
+    test.ok(err);
+    test.strictEqual(err.code, 'ESOCKET');
+  });
+
+  connection.on('connect', function() {
     connection.execSql(request);
 
     // This should trigger request callback with error as there is

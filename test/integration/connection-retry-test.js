@@ -16,12 +16,9 @@ const getConfig = function() {
   return config;
 };
 
-exports['connection retry tests'] = {
-  setUp: function(done) {
-    this.invalidLoginError = 18456;
-    done();
-  },
+const INVALID_LOGIN_ERROR = 18456;
 
+exports['connection retry tests'] = {
   tearDown: function(done) {
     sinon.restore();
     done();
@@ -36,8 +33,8 @@ exports['connection retry tests'] = {
 
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
-    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
-      return error === this.invalidLoginError;
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
     });
 
     const connection = new Connection(config);
@@ -55,6 +52,76 @@ exports['connection retry tests'] = {
     });
   },
 
+  'stops retries once connection is gracefully closed': function(test) {
+    const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
+    test.expect(1);
+
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
+    });
+
+    const connection = new Connection(config);
+
+    let retryCount = 0;
+    connection.on('retry', () => {
+      retryCount += 1;
+
+      if (retryCount == 3) {
+        connection.close();
+      }
+    });
+
+    connection.on('connect', (err) => {
+      test.ok(false);
+    });
+
+    connection.on('end', () => {
+      test.strictEqual(retryCount, 3);
+
+      test.done();
+    });
+  },
+
+  'stops retries once connection is forcefully destroyed': function(test) {
+    const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
+    test.expect(1);
+
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
+    });
+
+    const connection = new Connection(config);
+
+    let retryCount = 0;
+    connection.on('retry', () => {
+      retryCount += 1;
+
+      if (retryCount == 3) {
+        connection.destroy();
+      }
+    });
+
+    connection.on('connect', (err) => {
+      test.ok(false);
+    });
+
+    connection.on('end', () => {
+      test.strictEqual(retryCount, 3);
+
+      test.done();
+    });
+  },
+
   'no retries on non-transient errors': function(test) {
     const config = getConfig();
 
@@ -65,7 +132,7 @@ exports['connection retry tests'] = {
     test.expect(1);
 
     sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
-      return error !== this.invalidLoginError;
+      return error !== INVALID_LOGIN_ERROR;
     });
 
     const connection = new Connection(config);
@@ -96,8 +163,8 @@ exports['connection retry tests'] = {
 
     test.expect(1);
 
-    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((error) => {
-      return error === this.invalidLoginError;
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
     });
 
     const connection = new Connection(config);

@@ -610,7 +610,6 @@ class Connection extends EventEmitter {
     this.createTokenStreamParser();
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
-    this.transitionTo(this.STATE.CONNECTING);
 
     if (this.config.options.tdsVersion < '7_2') {
       // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -624,60 +623,112 @@ class Connection extends EventEmitter {
 
     this.curTransientRetryCount = 0;
     this.transientErrorLookup = new TransientErrorLookup();
+
+    this.closed = true;
+
+    this.transitionTo(this.STATE.CONNECTING);
   }
 
   close() {
-    this.transitionTo(this.STATE.FINAL);
+    this.closing = true;
+
+    if (this.socket) {
+      this.socket.end();
+    }
+  }
+
+  destroy(error, callback) {
+    if (this.destroyed) {
+      if (callback) {
+        callback(error);
+      } else if (error) {
+        process.nextTick(() => {
+          this.emit('error', error);
+        });
+      }
+
+      return this;
+    }
+
+    this.destroyed = true;
+    this.closing = false;
+    this.closed = true;
+    this.loggedIn = false;
+    this.loginError = undefined;
+    this.routingData = undefined;
+    this.inTransaction = false;
+    this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
+    this.curTransientRetryCount = 0;
+
+    if (this.config.options.tdsVersion < '7_2') {
+      this.transactionDepth = 0;
+      this.isSqlBatch = false;
+    }
+
+    this.clearConnectTimer();
+    this.clearRequestTimer();
+    this.clearRetryTimer();
+
+    const wasConnecting = this.state === this.STATE.CONNECTING ||
+      this.state === this.STATE.SENT_PRELOGIN ||
+      this.state === this.STATE.REROUTING ||
+      this.state === this.STATE.TRANSIENT_FAILURE_RETRY ||
+      this.state === this.STATE.SENT_TLSSSLNEGOTIATION ||
+      this.state === this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN ||
+      this.state === this.STATE.SENT_LOGIN7_WITH_NTLM ||
+      this.state === this.STATE.SENT_LOGIN7_WITH_FEDAUTH ||
+      this.state === this.STATE.LOGGED_IN_SENDING_INITIAL_SQL;
+
+    this.state = this.STATE.FINAL;
+
+    if (this.socket) {
+      this.socket.destroy();
+    }
+
+    if (this.messageIo) {
+      this.messageIo.incomingMessageStream.destroy();
+      this.messageIo.outgoingMessageStream.destroy();
+    }
+
+    if (this.request) {
+      this.request.callback(error || RequestError('Connection closed before request completed.', 'ECLOSE'));
+      this.request = undefined;
+    }
+
+    if (wasConnecting && error) {
+      process.nextTick(() => {
+        this.emit('connect', error);
+        this.emit('end');
+      });
+
+      if (callback) {
+        callback(error);
+      }
+    } else if (error) {
+      process.nextTick(() => {
+        this.emit('error', error);
+        this.emit('end');
+      });
+
+      if (callback) {
+        callback(error);
+      }
+    } else {
+      process.nextTick(() => {
+        this.emit('end');
+      });
+
+      if (callback) {
+        callback();
+      }
+    }
+
+    return this;
   }
 
   initialiseConnection() {
     this.connect();
     this.createConnectTimer();
-  }
-
-  cleanupConnection() {
-    if (!this.closed) {
-      this.clearConnectTimer();
-      this.clearRequestTimer();
-      this.clearRetryTimer();
-
-      if (this.socket) {
-        // Close the writable side of the socket
-        this.socket.end();
-
-        // And wait for the socket to be fully closed
-        this.socket.on('close', () => {
-          this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
-
-          if (this.state === this.STATE.REROUTING) {
-            this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
-            this.transitionTo(this.STATE.CONNECTING);
-          } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
-            const server = this.routingData ? this.routingData.server : this.server;
-            const port = this.routingData ? this.routingData.port : this.config.options.port;
-            this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
-
-            this.createRetryTimer();
-          } else {
-            this.emit('end');
-          }
-        });
-      } else {
-        process.nextTick(() => {
-          this.emit('end');
-        });
-      }
-
-      if (this.request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
-        this.request = undefined;
-      }
-
-      this.closed = true;
-      this.loggedIn = false;
-      this.loginError = null;
-    }
   }
 
   createDebug() {
@@ -820,8 +871,7 @@ class Connection extends EventEmitter {
           this.request.emit('columnMetadata', columns);
         }
       } else {
-        this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
-        this.close();
+        this.destroy(new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
       }
     });
 
@@ -831,8 +881,7 @@ class Connection extends EventEmitter {
           this.request.emit('order', token.orderColumns);
         }
       } else {
-        this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
-        this.close();
+        this.destroy(new Error("Received 'order' when no sqlRequest is in progress"));
       }
     });
 
@@ -850,8 +899,7 @@ class Connection extends EventEmitter {
           }
         }
       } else {
-        this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
-        this.close();
+        this.destroy(new Error("Received 'row' when no sqlRequest is in progress"));
       }
     });
 
@@ -941,8 +989,7 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('tokenStreamError', (error) => {
-      this.emit('error', error);
-      this.close();
+      this.destroy(error);
     });
 
     this.tokenStreamParser.on('drain', () => {
@@ -961,12 +1008,16 @@ class Connection extends EventEmitter {
         instanceName: this.config.options.instanceName,
         timeout: this.config.options.connectTimeout
       }, (message, port) => {
-        if (this.state === this.STATE.FINAL) {
+        if (this.closing || this.destroyed) {
+          if (!this.destroyed) {
+            this.destroy();
+          }
+
           return;
         }
 
         if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+          this.destroy(ConnectionError(message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
@@ -986,12 +1037,19 @@ class Connection extends EventEmitter {
         return this.socketError(err);
       }
 
-      if (this.state === this.STATE.FINAL) {
+      if (this.closing || this.destroyed) {
         socket.end();
+
+        if (!this.destroyed) {
+          this.destroy();
+        }
+
         return;
       }
 
       this.socket = socket;
+      this.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
       this.socket.on('error', (error) => {
         this.socketError(error);
       });
@@ -999,12 +1057,16 @@ class Connection extends EventEmitter {
       this.socket.on('end', () => {
         this.socketEnd();
       });
+
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
-      this.socketConnect();
+      this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+      this.sendPreLogin();
+      this.transitionTo(this.STATE.SENT_PRELOGIN);
     });
   }
 
@@ -1042,29 +1104,34 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
+    this.connectTimer = undefined;
+
     const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = undefined;
-    this.dispatchEvent('connectTimeout');
+
+    this.destroy(ConnectionError(message, 'ETIMEOUT'));
   }
 
   cancelTimeout() {
+    this.cancelTimer = undefined;
+
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.destroy(ConnectionError(message, 'ETIMEOUT'));
   }
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.request.cancel();
+
     const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
     this.request.error = RequestError(message, 'ETIMEOUT');
+    this.request.cancel();
   }
 
   retryTimeout() {
     this.retryTimer = undefined;
+
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
   }
@@ -1117,8 +1184,7 @@ class Connection extends EventEmitter {
     if (this.state.events[eventName]) {
       this.state.events[eventName].apply(this, args);
     } else {
-      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
-      this.close();
+      this.destroy(new Error(`No event '${eventName}' in state '${this.state.name}'`));
     }
   }
 
@@ -1126,28 +1192,27 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.destroy(ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.destroy(ConnectionError(message, 'ESOCKET'));
     }
-    this.dispatchEvent('socketError', error);
-  }
-
-  socketConnect() {
-    this.socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-    this.closed = false;
-    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-    this.dispatchEvent('socketConnect');
   }
 
   socketEnd() {
     this.debug.log('socket ended');
-    if (this.state !== this.STATE.FINAL && this.state !== this.STATE.TRANSIENT_FAILURE_RETRY && this.state !== this.STATE.REROUTING) {
+
+    if (!this.closing) {
+      if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY || this.state === this.STATE.REROUTING) {
+        return;
+      }
+
       const error = new Error('socket hang up');
       error.code = 'ECONNRESET';
       this.socketError(error);
+    } else {
+      this.destroy();
     }
   }
 
@@ -1534,18 +1599,15 @@ class Connection extends EventEmitter {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
       } else {
         if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
+          if (this.config.options.tdsVersion < '7_2') {
+            this.transactionDepth--;
+          }
+
+          done(null, ...args);
         } else {
           return this.commitTransaction((txErr) => {
             done(txErr, ...args);
@@ -1707,18 +1769,7 @@ Connection.prototype.STATE = {
     enter: function() {
       this.initialiseConnection();
     },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      socketConnect: function() {
-        this.sendPreLogin();
-        this.transitionTo(this.STATE.SENT_PRELOGIN);
-      }
-    }
+    events: {}
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
@@ -1726,12 +1777,6 @@ Connection.prototype.STATE = {
       this.emptyMessageBuffer();
     },
     events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.addToMessageBuffer(data);
       },
@@ -1747,8 +1792,8 @@ Connection.prototype.STATE = {
 
         if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
           if (!this.config.options.encrypt) {
-            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-            return this.close();
+            this.destroy(ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return;
           }
 
           this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
@@ -1769,43 +1814,37 @@ Connection.prototype.STATE = {
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
-      this.cleanupConnection();
+      this.socket.end(() => {
+        this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+        this.transitionTo(this.STATE.CONNECTING);
+      });
     },
     events: {
       message: function() {},
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
     }
   },
   TRANSIENT_FAILURE_RETRY: {
     name: 'TRANSIENT_FAILURE_RETRY',
     enter: function() {
+      this.clearConnectTimer();
+
       this.curTransientRetryCount++;
-      this.cleanupConnection();
+
+      this.socket.end(() => {
+        const server = this.routingData ? this.routingData.server : this.server;
+        const port = this.routingData ? this.routingData.port : this.config.options.port;
+        this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+        this.createRetryTimer();
+      });
     },
     events: {
       message: function() {},
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
     }
   },
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
     events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.messageIo.tlsHandshakeData(data);
       },
@@ -1829,12 +1868,6 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -1870,12 +1903,10 @@ Connection.prototype.STATE = {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              this.destroy(this.loginError);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
           }
         }
       }
@@ -1884,12 +1915,6 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -1922,12 +1947,10 @@ Connection.prototype.STATE = {
                 this.debug.log('Initiating retry on transient error');
                 this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
               } else {
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
+                this.destroy(this.loginError);
               }
             } else {
-              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-              this.transitionTo(this.STATE.FINAL);
+              this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
             }
           }
         }
@@ -1937,12 +1960,6 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7Withfedauth',
     events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -1961,8 +1978,7 @@ Connection.prototype.STATE = {
           context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              this.destroy(this.loginError);
               return;
             }
 
@@ -1974,12 +1990,10 @@ Connection.prototype.STATE = {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              this.destroy(this.loginError);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
           }
         }
       }
@@ -1991,12 +2005,6 @@ Connection.prototype.STATE = {
       this.sendInitialSql();
     },
     events: {
-      socketError: function socketError() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -2008,11 +2016,7 @@ Connection.prototype.STATE = {
   },
   LOGGED_IN: {
     name: 'LoggedIn',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
@@ -2023,13 +2027,6 @@ Connection.prototype.STATE = {
       }
     },
     events: {
-      socketError: function(err) {
-        const sqlRequest = this.request;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
       data: function(data) {
         this.clearRequestTimer(); // request timer is stopped on first data package
         const ret = this.sendDataToTokenStreamParser(data);
@@ -2062,14 +2059,6 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
-      socketError: function(err) {
-        const sqlRequest = this.request;
-        this.request = undefined;
-
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -2097,20 +2086,8 @@ Connection.prototype.STATE = {
   },
   FINAL: {
     name: 'Final',
-    enter: function() {
-      this.cleanupConnection();
-    },
     events: {
-      loginFailed: function() {
-        // Do nothing. The connection was probably closed by the client code.
-      },
-      connectTimeout: function() {
-        // Do nothing, as the timer should be cleaned up.
-      },
       message: function() {
-        // Do nothing
-      },
-      socketError: function() {
         // Do nothing
       }
     }
