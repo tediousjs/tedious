@@ -74,8 +74,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password') {
-        throw new TypeError('The "type" property must one of "default", "ntlm" or "azure-active-directory-password".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password" or "azure-active-directory-access-token".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -117,6 +117,17 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
+          }
+        };
+      } else if (type === 'azure-active-directory-access-token') {
+        if (typeof options.token !== 'string') {
+          throw new TypeError('The "config.authentication.options.token" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            token: options.token
           }
         };
       } else {
@@ -1212,6 +1223,14 @@ class Connection extends EventEmitter {
           type: 'ADAL',
           echo: this.fedAuthRequired,
           workflow: 'default'
+        };
+        break;
+
+      case 'azure-active-directory-access-token':
+        payload.fedAuth = {
+          type: 'SECURITYTOKEN',
+          echo: this.fedAuthRequired,
+          fedAuthToken: authentication.options.token
         };
         break;
 
