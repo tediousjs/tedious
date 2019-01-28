@@ -681,13 +681,12 @@ class Connection extends EventEmitter {
 
     this.state = this.STATE.FINAL;
 
-    if (this.socket) {
-      this.socket.destroy();
+    if (this.messageIo) {
+      this.messageIo.destroy();
     }
 
-    if (this.messageIo) {
-      this.messageIo.incomingMessageStream.destroy();
-      this.messageIo.outgoingMessageStream.destroy();
+    if (this.socket) {
+      this.socket.destroy();
     }
 
     if (this.request) {

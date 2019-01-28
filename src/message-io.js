@@ -18,6 +18,7 @@ const IncomingMessageStream = require('./incoming-message-stream');
 const OutgoingMessageStream = require('./outgoing-message-stream');
 
 module.exports = class MessageIO extends EventEmitter {
+  destroyed: boolean;
   socket: Socket;
   debug: Debug;
 
@@ -34,6 +35,7 @@ module.exports = class MessageIO extends EventEmitter {
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
 
+    this.destroyed = false;
     this.socket = socket;
     this.debug = debug;
 
@@ -41,14 +43,29 @@ module.exports = class MessageIO extends EventEmitter {
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
     this.incomingMessageStream.on('data', (message) => {
-      message.on('data', (chunk) => { this.emit('data', chunk); });
-      message.on('end', () => { this.emit('message'); });
+      message.on('data', (chunk) => {
+        if (!this.destroyed) {
+          this.emit('data', chunk);
+        }
+      });
+
+      message.on('end', () => {
+        if (!this.destroyed) {
+          this.emit('message');
+        }
+      });
     });
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
     this.socket.pipe(this.incomingMessageStream);
     this.outgoingMessageStream.pipe(this.socket);
+  }
+
+  destroy() {
+    this.destroyed = true;
+    this.incomingMessageStream.destroy();
+    this.outgoingMessageStream.destroy();
   }
 
   packetSize(...args: [number]) {
