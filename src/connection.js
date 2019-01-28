@@ -1136,10 +1136,23 @@ class Connection extends EventEmitter {
   }
 
   retryTimeout() {
-    this.retryTimer = undefined;
+    if (this.closing) {
+      this.destroy();
+      return;
+    }
 
+    this.retryTimer = undefined;
     this.emit('retry');
-    this.transitionTo(this.STATE.CONNECTING);
+
+    // Destroy the connection if `.close()` was called in an event handler.
+    if (this.closing) {
+      this.destroy();
+    }
+
+    // Only retry connecting if the connection is still alive.
+    if (!this.destroyed) {
+      this.transitionTo(this.STATE.CONNECTING);
+    }
   }
 
   clearConnectTimer() {

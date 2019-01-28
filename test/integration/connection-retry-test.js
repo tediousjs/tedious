@@ -52,7 +52,7 @@ exports['connection retry tests'] = {
     });
   },
 
-  'stops retries once connection is gracefully closed': function(test) {
+  'stops retries once connection is gracefully closed during `retry` event': function(test) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
@@ -87,7 +87,7 @@ exports['connection retry tests'] = {
     });
   },
 
-  'stops retries once connection is forcefully destroyed': function(test) {
+  'stops retries once connection is forcefully destroyed  during `retry` event': function(test) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
@@ -118,6 +118,74 @@ exports['connection retry tests'] = {
     connection.on('end', () => {
       test.strictEqual(retryCount, 3);
 
+      test.done();
+    });
+  },
+
+  'does handle connection destruction during connection retry interval': function(test) {
+    const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
+    config.options.connectionRetryInterval = 250;
+
+    test.expect(0);
+
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
+    });
+
+    const connection = new Connection(config);
+
+    setTimeout(() => {
+      connection.destroy();
+    }, 100);
+
+    connection.on('retry', () => {
+      test.ok(false);
+    });
+
+    connection.on('connect', (err) => {
+      test.ok(false);
+    });
+
+    connection.on('end', () => {
+      test.done();
+    });
+  },
+
+  'does handle connection close during connection retry interval': function(test) {
+    const config = getConfig();
+
+    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+      return test.done();
+    }
+
+    config.options.connectionRetryInterval = 250;
+
+    test.expect(0);
+
+    sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
+      return errorNumber === INVALID_LOGIN_ERROR;
+    });
+
+    const connection = new Connection(config);
+
+    setTimeout(() => {
+      connection.close();
+    }, 100);
+
+    connection.on('retry', () => {
+      test.ok(false);
+    });
+
+    connection.on('connect', (err) => {
+      test.ok(false);
+    });
+
+    connection.on('end', () => {
       test.done();
     });
   },
