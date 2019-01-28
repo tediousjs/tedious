@@ -921,7 +921,14 @@ class Connection extends EventEmitter {
 
     this.tokenStreamParser.on('doneProc', (token) => {
       if (this.request) {
-        if (!this.request.canceled) {
+        if (this.request.canceled) {
+          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
+          // We assume this is the indication that an in-flight request was canceled.
+          if (token.sqlError && !this.request.error) {
+            this.clearCancelTimer();
+            this.request.error = RequestError('Canceled.', 'ECANCEL');
+          }
+        } else {
           this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
           this.procReturnStatusValue = undefined;
           if (token.rowCount !== undefined) {
