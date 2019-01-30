@@ -667,6 +667,7 @@ class Connection extends EventEmitter {
 
     this.clearConnectTimer();
     this.clearRequestTimer();
+    this.clearCancelTimer();
     this.clearRetryTimer();
 
     const wasConnecting = this.state === this.STATE.CONNECTING ||
