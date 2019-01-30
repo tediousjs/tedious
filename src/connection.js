@@ -1485,7 +1485,14 @@ class Connection extends EventEmitter {
 
   execBulkLoad(bulkLoad) {
     bulkLoad.executionStarted = true;
+
+    const onBulkLoadCancel = () => {
+      request.cancel();
+    };
+
     const request = new Request(bulkLoad.getBulkInsertSql(), (error) => {
+      bulkLoad.removeListener('cancel', onBulkLoadCancel);
+
       if (error) {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
@@ -1498,9 +1505,7 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, undefined);
     });
 
-    bulkLoad.once('cancel', () => {
-      request.cancel();
-    });
+    bulkLoad.once('cancel', onBulkLoadCancel);
 
     this.execSqlBatch(request);
   }
