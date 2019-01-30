@@ -663,21 +663,26 @@ exports.execBadSql = function(test) {
 };
 
 exports.closeConnectionRequestPending = function(test) {
-  test.expect(4);
+  test.expect(2);
 
   var config = getConfig();
 
-  var request = new Request('select 8 as C1', function(err, rowCount) {
+  var request = new Request(`
+    with cte1 as
+      (select 1 as i union all select i + 1 from cte1 where i < 1000)
+    select i from cte1 option (maxrecursion 0);
+  `, function(err, rowCount) {
+
     test.ok(err);
-    test.strictEqual(err.code, 'ESOCKET');
+
+    if (this.connection.config.options.encrypt) {
+      test.strictEqual(err.message, 'Connection closed before request completed.');
+    } else {
+      test.strictEqual(err.message, 'Canceled.');
+    }
   });
 
   var connection = new Connection(config);
-
-  connection.on('error', function(err) {
-    test.ok(err);
-    test.strictEqual(err.code, 'ESOCKET');
-  });
 
   connection.on('connect', function() {
     connection.execSql(request);

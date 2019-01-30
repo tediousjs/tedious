@@ -632,8 +632,15 @@ class Connection extends EventEmitter {
   close() {
     this.closing = true;
 
-    if (this.socket) {
-      this.socket.end();
+    if (this.messageIo) {
+      this.messageIo.outgoingMessageStream.end();
+    }
+
+    // If we have an in-flight request, we mark the request as canceled,
+    // SQL Server handles the closing of the incoming side of the TCP
+    // connection as a cancellation signal.
+    if (this.request) {
+      this.request.cancel();
     }
   }
 
@@ -1224,16 +1231,11 @@ class Connection extends EventEmitter {
     this.debug.log('socket ended');
 
     if (!this.closing) {
-      if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY || this.state === this.STATE.REROUTING) {
-        return;
-      }
-
-      const error = new Error('socket hang up');
-      error.code = 'ECONNRESET';
-      this.socketError(error);
-    } else {
-      this.destroy();
+      this.dispatchEvent('socketEnd');
+      return;
     }
+
+    this.destroy();
   }
 
   sendPreLogin() {
@@ -1696,15 +1698,27 @@ class Connection extends EventEmitter {
           return;
         }
 
-        // There's two ways to handle request cancelation:
-        if (message.writable) {
-          // - if the message is still writable, we'll set the ignore bit
-          message.ignore = true;
-        } else {
-          // - but if the message has been ended (and thus has been fully sent off),
-          //   we need to send an `ATTENTION` message to the server
-          this.messageIo.sendMessage(TYPE.ATTENTION);
-          this.transitionTo(this.STATE.SENT_ATTENTION);
+        this.request.canceled = true;
+
+        // If the request is paused, we need to resume it, otherwise
+        // the request callback will never fire.
+        if (this.request.paused) {
+          this.request.resume();
+        }
+
+        // If the request was cancelled due to the connection
+        // being closed, there's nothing for us to do.
+        if (!this.closing) {
+          // There's two ways to handle request cancelation:
+          if (message.writable) {
+            // - if the message is still writable, we'll set the ignore bit
+            message.ignore = true;
+          } else {
+            // - but if the message has been ended (and thus has been fully sent off),
+            //   we need to send an `ATTENTION` message to the server
+            this.messageIo.sendMessage(TYPE.ATTENTION);
+            this.transitionTo(this.STATE.SENT_ATTENTION);
+          }
         }
 
         this.clearRequestTimer();
@@ -1802,6 +1816,11 @@ Connection.prototype.STATE = {
       this.emptyMessageBuffer();
     },
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.addToMessageBuffer(data);
       },
@@ -1838,13 +1857,11 @@ Connection.prototype.STATE = {
   },
   REROUTING: {
     name: 'ReRouting',
-    enter: function() {
-      this.socket.end(() => {
+    events: {
+      socketEnd: function() {
         this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
         this.transitionTo(this.STATE.CONNECTING);
-      });
-    },
-    events: {
+      },
       message: function() {},
     }
   },
@@ -1852,24 +1869,27 @@ Connection.prototype.STATE = {
     name: 'TRANSIENT_FAILURE_RETRY',
     enter: function() {
       this.clearConnectTimer();
-
       this.curTransientRetryCount++;
-
-      this.socket.end(() => {
+    },
+    events: {
+      socketEnd: function() {
         const server = this.routingData ? this.routingData.server : this.server;
         const port = this.routingData ? this.routingData.port : this.config.options.port;
         this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
         this.createRetryTimer();
-      });
-    },
-    events: {
+      },
       message: function() {},
     }
   },
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.messageIo.tlsHandshakeData(data);
       },
@@ -1893,6 +1913,11 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -1928,10 +1953,16 @@ Connection.prototype.STATE = {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
-              this.destroy(this.loginError);
+              this.messageIo.outgoingMessageStream.end();
+              this.messageIo.incomingMessageStream.on('end', () => {
+                this.destroy(this.loginError);
+              });
             }
           } else {
-            this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+            this.messageIo.outgoingMessageStream.end();
+            this.messageIo.incomingMessageStream.on('end', () => {
+              this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+            });
           }
         }
       }
@@ -1940,6 +1971,11 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -1972,10 +2008,16 @@ Connection.prototype.STATE = {
                 this.debug.log('Initiating retry on transient error');
                 this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
               } else {
-                this.destroy(this.loginError);
+                this.messageIo.outgoingMessageStream.end();
+                this.messageIo.incomingMessageStream.on('end', () => {
+                  this.destroy(this.loginError);
+                });
               }
             } else {
-              this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+              this.messageIo.outgoingMessageStream.end();
+              this.messageIo.incomingMessageStream.on('end', () => {
+                this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+              });
             }
           }
         }
@@ -1985,6 +2027,11 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7Withfedauth',
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -2015,10 +2062,16 @@ Connection.prototype.STATE = {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
-              this.destroy(this.loginError);
+              this.messageIo.outgoingMessageStream.end();
+              this.messageIo.incomingMessageStream.on('end', () => {
+                this.destroy(this.loginError);
+              });
             }
           } else {
-            this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+            this.messageIo.outgoingMessageStream.end();
+            this.messageIo.incomingMessageStream.on('end', () => {
+              this.destroy(ConnectionError('Login failed.', 'ELOGIN'));
+            });
           }
         }
       }
@@ -2030,6 +2083,11 @@ Connection.prototype.STATE = {
       this.sendInitialSql();
     },
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -2041,7 +2099,13 @@ Connection.prototype.STATE = {
   },
   LOGGED_IN: {
     name: 'LoggedIn',
-    events: {}
+    events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      }
+    }
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
@@ -2052,6 +2116,11 @@ Connection.prototype.STATE = {
       }
     },
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.clearRequestTimer(); // request timer is stopped on first data package
         const ret = this.sendDataToTokenStreamParser(data);
@@ -2084,6 +2153,11 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
+      socketEnd: function() {
+        const error = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        this.socketError(error);
+      },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
@@ -2111,10 +2185,6 @@ Connection.prototype.STATE = {
   },
   FINAL: {
     name: 'Final',
-    events: {
-      message: function() {
-        // Do nothing
-      }
-    }
+    events: {}
   }
 };

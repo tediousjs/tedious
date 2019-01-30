@@ -28,27 +28,34 @@ exports.tearDown = function(done) {
 exports.testPausedRequestDoesNotEmitRowsAfterConnectionClose = function(test) {
   const sql = `
     with cte1 as
-      (select 1 as i union all select i + 1 from cte1 where i < 20000)
-    select i from cte1 option (maxrecursion 0)
+      (select 1 as i union all select i + 1 from cte1 where i < 200000)
+    select i from cte1 option (maxrecursion 0);
   `;
 
   const request = new Request(sql, (error) => {
     test.ok(error);
+
+    if (this.connection.config.options.encrypt) {
+      test.strictEqual(error.message, 'Connection closed before request completed.');
+    } else {
+      test.strictEqual(error.message, 'Canceled.');
+    }
   });
 
   request.on('row', (columns) => {
-    if (columns[0].value == 1000) {
+    if (columns[0].value == 1) {
       request.pause();
 
-      setTimeout(() => {
-        this.connection.on('end', () => {
-          process.nextTick(() => {
-            test.done();
-          });
-        });
+      setImmediate(() => {
         this.connection.close();
-      }, 200);
+      });
+    } else {
+      test.ok(false);
     }
+  });
+
+  this.connection.on('end', () => {
+    test.done();
   });
 
   this.connection.execSql(request);
