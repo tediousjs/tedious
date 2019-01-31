@@ -170,7 +170,7 @@ exports.guidToArray = (test) => {
 exports.arrayToGuid = (test) => {
   for (let i = 0; i < arrays.length; i++) {
     const array = arrays[i];
-    test.strictEqual(guidParser.arrayToGuid(array), upperGuids[i]);
+    test.strictEqual(guidParser.arrayToGuid(array), lowerGuids[i]);
   }
 
   test.done();
