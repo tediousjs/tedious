@@ -137,7 +137,7 @@ exports.uniqueIdentifier = function(test) {
   execSql(
     test,
     TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
+    '01234567-89ab-cdef-0123-456789abcdef'
   );
 };
 
@@ -546,7 +546,7 @@ exports.outputUniqueIdentifier = function(test) {
   execSqlOutput(
     test,
     TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
+    '01234567-89ab-cdef-0123-456789abcdef'
   );
 };
 

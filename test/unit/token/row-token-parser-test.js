@@ -673,7 +673,7 @@ module.exports.guidN = function(test) {
   test.strictEqual(token.columns.length, 2);
   test.strictEqual(token.columns[0].value, null);
   test.deepEqual(
-    '67452301-AB89-EFCD-0123-456789ABCDEF',
+    '67452301-ab89-efcd-0123-456789abcdef',
     token.columns[1].value
   );
 

@@ -485,8 +485,8 @@ exports.imageNull = function(test) {
 exports.guid = function(test) {
   execSql(
     test,
-    "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)",
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
+    "select cast('01234567-89ab-cdef-0123-456789abcdef' as uniqueidentifier)",
+    '01234567-89ab-cdef-0123-456789abcdef'
   );
 };
 
@@ -536,7 +536,7 @@ exports.variantMultipleDatatypes = function(test) {
   insert into #tab1 ([c1]) values (N'abcdШ');
   insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));	
   insert into #tab1 ([c1]) select cast(0x1234 as varbinary(16));
-  insert into #tab1 ([c1]) select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier); 
+  insert into #tab1 ([c1]) select cast('01234567-89ab-cdef-0123-456789abcdef' as uniqueidentifier); 
   insert into #tab1 ([c1]) values (0.00000090000000000);	--decimal(38,17);
   insert into #tab1 ([c1]) select cast('2011-12-4 10:04:23' as datetime);
   insert into #tab1 ([c1]) select cast('abcde' as varchar(10));
@@ -545,7 +545,7 @@ exports.variantMultipleDatatypes = function(test) {
   const expectedValues = ['abcdШ',
     3148.29,
     Buffer.from([0x12, 0x34]),
-    '01234567-89AB-CDEF-0123-456789ABCDEF',
+    '01234567-89ab-cdef-0123-456789abcdef',
     0.00000090000000000,
     new Date('December 4, 2011 10:04:23 GMT'),
     'abcde'];
