@@ -1927,6 +1927,8 @@ Connection.prototype.STATE = {
           this.debug.payload(function() {
             return payload.toString('  ');
           });
+
+          this.ntlmpacket = undefined;
         } else {
           if (this.loggedIn) {
             this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
