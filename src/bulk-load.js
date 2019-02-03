@@ -8,6 +8,7 @@ const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buff
 const TOKEN_TYPE = require('./token/token').TYPE;
 const Message = require('./message');
 const PACKET_TYPE = require('./packet').TYPE;
+const { RequestError } = require('./errors');
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -319,14 +320,16 @@ class BulkLoad extends EventEmitter {
 
     this.rowToPacketTransform.pipe(message);
 
-    // if an error happens on the `rowToPacketTransform`,
-    // it will be unpiped from `message`, but we still need
-    // to call `message.end` to finish the request.
-    this.rowToPacketTransform.once('error', (err) => {
-      this.error = err;
-      this.cancel();
-      message.end();
+    this.rowToPacketTransform.once('finish', () => {
+      this.removeListener('cancel', onCancel);
     });
+
+    const onCancel = () => {
+      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
+      this.rowToPacketTransform.destroy();
+    };
+
+    this.once('cancel', onCancel);
 
     return message;
   }

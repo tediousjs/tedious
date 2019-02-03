@@ -403,9 +403,6 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
   const totalRows = 500000;
   const connection = this.connection;
 
-  connection.on('error', function(err) {
-    test.ifError(err);
-  });
   startCreateTable();
 
   function startCreateTable() {
@@ -433,7 +430,7 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
       read() {
         process.nextTick(() => {
           while (rowCount < totalRows) {
-            if (rowCount === totalRows - 100) {
+            if (rowCount === 10000) {
               bulkLoad.cancel();
             }
 
@@ -451,7 +448,9 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
     });
 
     pipeline(rowSource, rowStream, function(err) {
-      test.ifError(err);
+      test.ok(err);
+      test.strictEqual(err.message, 'Canceled.');
+      test.strictEqual(rowCount, 10000);
     });
   }
 
