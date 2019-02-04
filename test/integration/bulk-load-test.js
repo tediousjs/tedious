@@ -481,3 +481,168 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
     test.done();
   }
 };
+
+exports.testStreamingBulkLoadWithCancelBeforeStreamIsStarted = function(test) {
+  const totalRows = 500000;
+  const connection = this.connection;
+
+  startCreateTable();
+
+  function startCreateTable() {
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, completeCreateTable);
+    connection.execSqlBatch(request);
+  }
+
+  function completeCreateTable(err) {
+    test.ifError(err);
+    startBulkLoad();
+  }
+
+  function startBulkLoad() {
+    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+
+    process.nextTick(() => {
+      bulkLoad.cancel();
+    });
+
+    let rowCount = 0;
+    const rowSource = new Readable({
+      objectMode: true,
+
+      read() {
+        process.nextTick(() => {
+          while (rowCount < totalRows) {
+            const i = rowCount++;
+            const row = [i];
+
+            if (!this.push(row)) {
+              return;
+            }
+          }
+
+          this.push(null);
+        });
+      }
+    });
+
+    pipeline(rowSource, rowStream, function(err) {
+      test.ok(err);
+      test.strictEqual(err.message, 'Canceled.');
+      test.strictEqual(rowCount, 10000);
+    });
+  }
+
+  function completeBulkLoad(err, rowCount) {
+    test.ok(err);
+    test.strictEqual(err.message, 'Canceled.');
+
+    test.equal(rowCount, undefined);
+    startVerifyTableContent();
+  }
+
+  function startVerifyTableContent() {
+    const sql = `
+      select count(*)
+      from #stream_test a
+      inner join #stream_test b on a.i = b.i - 1
+    `;
+    const request = new Request(sql, completeVerifyTableContent);
+    request.on('row', (row) => {
+      test.equals(row[0].value, 0);
+    });
+    connection.execSqlBatch(request);
+  }
+
+  function completeVerifyTableContent(err, rowCount) {
+    test.ifError(err);
+    test.equal(rowCount, 1);
+    test.done();
+  }
+};
+
+exports.testStreamingBulkLoadWithCancelAfterRowStreamIsFinished = function(test) {
+  const totalRows = 50000;
+  const connection = this.connection;
+
+  startCreateTable();
+
+  function startCreateTable() {
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, completeCreateTable);
+    connection.execSqlBatch(request);
+  }
+
+  function completeCreateTable(err) {
+    test.ifError(err);
+    startBulkLoad();
+  }
+
+  function startBulkLoad() {
+    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+
+    rowStream.on('finish', () => {
+      bulkLoad.cancel();
+    });
+
+    let rowCount = 0;
+    const rowSource = new Readable({
+      objectMode: true,
+
+      read() {
+        process.nextTick(() => {
+          while (rowCount < totalRows) {
+            const i = rowCount++;
+            const row = [i];
+
+            if (!this.push(row)) {
+              return;
+            }
+          }
+
+          this.push(null);
+        });
+      }
+    });
+
+    pipeline(rowSource, rowStream, function(err) {
+      test.ifError(err);
+      test.strictEqual(rowCount, 50000);
+    });
+  }
+
+  function completeBulkLoad(err, rowCount) {
+    test.ok(err);
+    test.strictEqual(err.message, 'Canceled.');
+
+    test.equal(rowCount, 0);
+    startVerifyTableContent();
+  }
+
+  function startVerifyTableContent() {
+    const sql = `
+      select count(*)
+      from #stream_test a
+      inner join #stream_test b on a.i = b.i - 1
+    `;
+    const request = new Request(sql, completeVerifyTableContent);
+    request.on('row', (row) => {
+      test.equals(row[0].value, 0);
+    });
+    connection.execSqlBatch(request);
+  }
+
+  function completeVerifyTableContent(err, rowCount) {
+    test.ifError(err);
+    test.equal(rowCount, 1);
+    test.done();
+  }
+};

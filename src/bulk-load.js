@@ -320,7 +320,7 @@ class BulkLoad extends EventEmitter {
 
     this.rowToPacketTransform.pipe(message);
 
-    this.rowToPacketTransform.once('finish', () => {
+    this.rowToPacketTransform.prependListener('finish', () => {
       this.removeListener('cancel', onCancel);
     });
 
