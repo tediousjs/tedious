@@ -380,7 +380,6 @@ exports['does not emit error after connect timeout'] = function(test) {
   config.options.connectTimeout = 1;
 
   const connection = new Connection(config);
-  connection.on('error', (error) => { test.ifError(error); });
   connection.on('connect', (err) => {});
 
   setTimeout(() => { test.done(); }, 500);
@@ -686,9 +685,6 @@ exports.closeConnectionRequestPending = function(test) {
 
   connection.on('end', function(info) {
     test.done();
-  });
-
-  connection.on('error', function(err) {
   });
 
   connection.on('infoMessage', function(info) {

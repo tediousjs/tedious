@@ -36,7 +36,6 @@ describe('A `error` on the network socket', function() {
   it('forwards the error to in-flight requests', function(done) {
     const socketError = new Error('socket error');
 
-    connection.on('error', () => {});
     connection.on('connect', (err) => {
       if (err) {
         return done(err);
@@ -58,7 +57,6 @@ describe('A `error` on the network socket', function() {
   it('calls the request completion callback after closing the connection', function(done) {
     const socketError = new Error('socket error');
 
-    connection.on('error', () => {});
     connection.on('connect', (err) => {
       if (err) {
         return done(err);
@@ -79,8 +77,6 @@ describe('A `error` on the network socket', function() {
 
   it('calls the request completion callback before emitting the `end` event', function(done) {
     const socketError = new Error('socket error');
-
-    connection.on('error', () => {});
 
     let endEmitted = false;
     connection.on('end', () => {

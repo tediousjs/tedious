@@ -123,10 +123,6 @@ exports.testPausingRequestPausesTransforms = function(test) {
 };
 
 exports.testPausedRequestCanBeCancelled = function(test) {
-  this.connection.on('error', (err) => {
-    test.ifError(err);
-  });
-
   const pauseAndCancelRequest = (next) => {
     const sql = `
       with cte1 as
@@ -171,10 +167,6 @@ exports.testPausedRequestCanBeCancelled = function(test) {
 };
 
 exports.testImmediatelyPausedRequestDoesNotEmitRowsUntilResumed = function(test) {
-  this.connection.on('error', (err) => {
-    test.ifError(err);
-  });
-
   const request = new Request('SELECT 1', (error) => {
     test.ifError(error);
     test.done();

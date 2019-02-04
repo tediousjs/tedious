@@ -331,9 +331,6 @@ exports.testStreamingBulkLoad = function(test) {
   const connection = this.connection;
   const tableName = '#streamingBulkLoadTest';
 
-  connection.on('error', function(err) {
-    test.ifError(err);
-  });
   startCreateTable();
 
   function startCreateTable() {
@@ -403,9 +400,6 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
   const totalRows = 500000;
   const connection = this.connection;
 
-  connection.on('error', function(err) {
-    test.ifError(err);
-  });
   startCreateTable();
 
   function startCreateTable() {
