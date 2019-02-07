@@ -689,7 +689,7 @@ class Connection extends EventEmitter {
 
       this.closed = true;
       this.loggedIn = false;
-      this.loginError = null;
+      this.loginError = undefined;
     }
   }
 
