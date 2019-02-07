@@ -427,7 +427,7 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
       read() {
         process.nextTick(() => {
           while (rowCount < totalRows) {
-            if (rowCount === totalRows - 100) {
+            if (rowCount === 10000) {
               bulkLoad.cancel();
             }
 
@@ -445,7 +445,9 @@ exports.testStreamingBulkLoadWithCancel = function(test) {
     });
 
     pipeline(rowSource, rowStream, function(err) {
-      test.ifError(err);
+      test.ok(err);
+      test.strictEqual(err.message, 'Canceled.');
+      test.strictEqual(rowCount, 10000);
     });
   }
 

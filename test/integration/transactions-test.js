@@ -502,7 +502,7 @@ exports.transactionHelperBatchAbortingError = function(test) {
 };
 
 exports.transactionHelperSocketError = function(test) {
-  test.expect(4);
+  test.expect(5);
 
   var connection = new Connection(config);
   connection.on('end', function(info) {
@@ -522,6 +522,8 @@ exports.transactionHelperSocketError = function(test) {
         test.ifError(err);
 
         var request = new Request('WAITFOR 00:00:30', function(err) {
+          test.ok(~err.message.indexOf('socket error'));
+
           innerDone(err, outerDone, function(err) {
             test.ok(~err.message.indexOf('socket error'));
           });

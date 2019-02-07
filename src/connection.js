@@ -887,12 +887,14 @@ class Connection extends EventEmitter {
           this.emit('end');
         });
       }
+
       const request = this.request;
       if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
+        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
         request.callback(err);
         this.request = undefined;
       }
+
       this.closed = true;
       this.loggedIn = false;
       this.loginError = undefined;
@@ -1969,7 +1971,6 @@ class Connection extends EventEmitter {
           if (this.config.options.tdsVersion < '7_2') {
             this.transactionDepth--;
           }
-
           done(null, ...args);
         } else {
           this.commitTransaction((txErr) => {
@@ -2037,7 +2038,9 @@ class Connection extends EventEmitter {
         // There's two ways to handle request cancelation:
         if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
+          //   and end the message.
           message.ignore = true;
+          message.end();
         } else {
           // - but if the message has been ended (and thus has been fully sent off),
           //   we need to send an `ATTENTION` message to the server
