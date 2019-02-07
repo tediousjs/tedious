@@ -2,6 +2,8 @@
 
 /* globals $PropertyType */
 
+import type Connection from './connection';
+
 const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
 const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
@@ -68,6 +70,8 @@ type ColumnOptions = {
   nullable?: boolean
 };
 
+import type { CompletionCallback } from './request.js';
+
 class BulkLoad extends EventEmitter {
   error: Error | typeof undefined;
   canceled: boolean;
@@ -77,7 +81,7 @@ class BulkLoad extends EventEmitter {
   timeout: number | typeof undefined
 
   options: Object;
-  callback: (err: ?Error, rowCount: number) => void;
+  callback: CompletionCallback;
 
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
@@ -87,12 +91,18 @@ class BulkLoad extends EventEmitter {
 
   bulkOptions: InternalOptions;
 
+  connection: Connection | void;
+
+  rst: any[];
+  rows: any[];
+  rowCount: number;
+
   constructor(table: string, connectionOptions: Object, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, callback: (err: ?Error, rowCount: number) => void) {
+  }: Options, callback: CompletionCallback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }
@@ -122,6 +132,10 @@ class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.firstRowWritten = false;
     this.streamingMode = false;
+
+    this.rst = [];
+    this.rows = [];
+    this.rowCount = 0;
 
     this.rowToPacketTransform = new RowTransform(this);
 

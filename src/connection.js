@@ -1,3 +1,5 @@
+// @flow
+
 const deprecate = require('depd')('tedious');
 
 const crypto = require('crypto');
@@ -32,6 +34,11 @@ const versions = require('./tds-versions').versions;
 
 const { createNTLMRequest } = require('./ntlm');
 
+import type { CompletionCallback as RequestCompletionCallback } from './request';
+import type { Socket } from 'net';
+
+/* global $Values, $PropertyType, TimeoutID */
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -41,15 +48,213 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000;
 const DEFAULT_CANCEL_TIMEOUT = 5 * 1000;
 const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
 const DEFAULT_PACKET_SIZE = 4 * 1024;
-const DEFAULT_TEXTSIZE = '2147483647';
+const DEFAULT_TEXTSIZE = 2147483647;
 const DEFAULT_DATEFIRST = 7;
 const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
 const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
 
+type InternalConfig = {
+  server: string,
+
+  authentication: {
+    type: 'default',
+    options: {
+      userName: string,
+      password: string
+    }
+  } | {
+    type: 'ntlm',
+    options: {
+      userName: string,
+      password: string,
+      domain: string
+    }
+  } | {
+    type: 'azure-active-directory-password',
+    options: {
+      userName: string,
+      password: string
+    }
+  };
+
+  options: InternalConfigOptions
+};
+
+type InternalConfigOptions = {
+  appName: string | void,
+  abortTransactionOnError: boolean | null,
+  connectionIsolationLevel: boolean | null,
+  textsize: number | null,
+  enableQuotedIdentifier: boolean | null,
+  enableNumericRoundabort: boolean | null,
+  language: string | null,
+  dateFormat: string | null,
+  datefirst: number | null,
+  enableImplicitTransactions: boolean | null,
+  enableCursorCloseOnCommit: boolean | null,
+  enableArithAbort: boolean | null,
+  enableConcatNullYieldsNull: boolean | null,
+  enableAnsiWarnings: boolean | null,
+  enableAnsiPadding: boolean | null,
+  enableAnsiNullDefault: boolean | null,
+  enableAnsiNull: boolean | null,
+  fallbackToDefaultDb: boolean,
+  readOnlyIntent: boolean,
+  database: string | void,
+  tdsVersion: string,
+  isolationLevel: $Values<ISOLATION_LEVEL>,
+  packetSize: number,
+  encrypt: boolean,
+  port: number,
+  requestTimeout: number,
+  cancelTimeout: number,
+  connectTimeout: number,
+  instanceName: string | void,
+  connectionRetryInterval: number,
+  multiSubnetFailover: boolean,
+  localAddress: string | void,
+  rowCollectionOnDone: boolean,
+  rowCollectionOnRequestCompletion: boolean,
+  useColumnNames: boolean,
+  maxRetriesOnTransientErrors: number,
+  debug: DebugOptions,
+  useUTC: boolean,
+  cryptoCredentialsDetails: { secureOptions?: number },
+  trustServerCertificate: boolean,
+  columnNameReplacer: Function | void,
+  camelCaseColumns: boolean
+};
+
+type DebugOptions = {
+  data: boolean | void,
+  packet: boolean | void,
+  payload: boolean | void,
+  token: boolean | void
+};
+
+/**
+  A <code>Connection</code> instance represents a single connection to a database server.
+
+  Only one request at a time may be executed on a connection.
+
+  Once a <a href="api-request.html"><code>Request</code></a> has been initiated
+  (with <a href="#function_callProcedure"><code>callProcedure</code></a>,
+  <a href="#function_execSql"><code>execSql</code></a>, or
+  <a href="#function_execSqlBatch"><code>execSqlBatch</code></a>),
+  another should not be initiated until the <code>Request</code>'s completion callback is called.
+
+  @example
+    var Connection = require('tedious').Connection;
+    var config = {...};
+    var connection = new Connection(config);
+
+  @param {Object} config
+  @param {string} config.server
+    Hostname to connect to.
+
+  @param {Object?} config.authentication
+  @param {string?} [config.authentication.type='default']
+    Type of the authentication method, valid types are `default`, `ntlm`, `azure-active-directory-password`
+  @param {Object?} config.authentication.options
+    Authentication type specific options.
+  @param {string?} [config.authentication.options.userName='']
+    User name to use for authentication.
+  @param {string?} [config.authentication.options.password='']
+    Password to use for authentication.
+  @param {string?} config.authentication.options.domain
+    Domain to use for authentication. Only supported with the `ntlm` authentication type.
+
+  @param {Object?} config.options
+  @param {number?} [config.options.port=1433]
+    Port to connect to.
+
+    Mutually exclusive with `options.instanceName`.
+  @param {string?} config.options.instanceName
+    The instance name to connect to.
+    The SQL Server Browser service must be running on the database server,
+    and UDP port 1434 on the database server must be reachable.
+
+    (no default)
+
+    Mutually exclusive with `options.port`.
+  @param {string?} config.options.database
+    Database to connect to (default: dependent on server configuration).
+  @param {boolean?} [config.options.fallbackToDefaultDb=false]
+    By default, if the database requested by <code>options.database</code> cannot be accessed,
+    the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
+    set to <code>true</code>, then the user's default database will be used instead.
+
+*/
 class Connection extends EventEmitter {
-  constructor(config) {
+  fedAuthRequired: boolean;
+  fedAuthInfoToken: { stsurl?: string, spn?: string } | void;
+
+  config: InternalConfig;
+
+  secureContext: any;
+
+  isSqlBatch: boolean;
+
+  curTransientRetryCount: number;
+
+  inTransaction: boolean;
+  transactionDepth: number;
+  transactionDescriptors: Array<Buffer>;
+
+  transientErrorLookup: TransientErrorLookup;
+
+  cleanupTypeEnum: {
+    NORMAL: 0,
+    REDIRECT: 1,
+    RETRY: 2
+  };
+
+  tokenStreamParser: TokenStreamParser;
+
+  request: Request | BulkLoad | void;
+  messageIo: MessageIO;
+
+  routingData: { server: string, port: number } | void;
+
+  socket: Socket;
+
+  state: $Values<$PropertyType<Connection, 'STATE'>>;
+  STATE: {
+    [key: 'CONNECTING' | 'FINAL' | 'LOGGED_IN' | 'LOGGED_IN_SENDING_INITIAL_SQL' | 'REROUTING' | 'SENT_ATTENTION' | 'SENT_CLIENT_REQUEST' | 'SENT_LOGIN7_WITH_FEDAUTH' | 'SENT_LOGIN7_WITH_NTLM' | 'SENT_LOGIN7_WITH_STANDARD_LOGIN' | 'SENT_PRELOGIN' | 'SENT_TLSSSLNEGOTIATION' | 'TRANSIENT_FAILURE_RETRY']: {
+      name: string,
+      enter?: () => void,
+      exit?: () => void,
+      events: {
+        loginFailed?: () => void,
+        connectTimeout?: () => void,
+        message?: () => void,
+        socketError?: (ConnectionError) => void,
+        data?: (data: Buffer) => void
+      }
+    }
+  };
+
+  debug: Debug;
+
+  cancelTimer: TimeoutID | void;
+  retryTimer: TimeoutID | void;
+  requestTimer: TimeoutID | void;
+  connectTimer: TimeoutID | void;
+
+  procReturnStatusValue: mixed;
+  ntlmpacket: any | void;
+  ntlmpacketBuffer: Buffer | void;
+
+  closed: boolean;
+  loggedIn: boolean;
+  loginError: ConnectionError | void;
+  resetConnectionOnNextRequest: boolean;
+
+  messageBuffer: Buffer;
+
+  constructor(config: any) {
     super();
 
     if (typeof config !== 'object' || config === null) {
@@ -97,17 +302,32 @@ class Connection extends EventEmitter {
         }
       }
 
-      authentication = {
-        type: config.authentication.type,
-        options: config.authentication.type === 'ntlm' ? {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password,
-          domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
-        } : {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password
-        }
-      };
+      if (config.authentication.type === 'ntlm') {
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password,
+            domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
+          }
+        };
+      } else if (config.authentication.type === 'azure-active-directory-password') {
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password,
+          }
+        };
+      } else {
+        authentication = {
+          type: 'default',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password
+          }
+        };
+      }
     } else {
       if (config.domain !== undefined) {
         if (typeof config.domain !== 'string') {
@@ -133,20 +353,30 @@ class Connection extends EventEmitter {
         deprecate('The "config.password" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
       }
 
-      authentication = {
-        type: config.domain ? 'ntlm' : 'default',
-        options: {
-          userName: config.userName,
-          password: config.password,
-          domain: config.domain && config.domain.toUpperCase()
-        }
-      };
+      if (config.domain) {
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: config.userName,
+            password: config.password,
+            domain: config.domain && config.domain.toUpperCase()
+          }
+        };
+      } else {
+        authentication = {
+          type: 'default',
+          options: {
+            userName: config.userName,
+            password: config.password
+          }
+        };
+      }
     }
 
     this.config = {
       server: config.server,
       authentication: authentication,
-      options: {
+      options: ({
         abortTransactionOnError: false,
         appName: undefined,
         camelCaseColumns: false,
@@ -194,7 +424,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true
-      }
+      }: InternalConfigOptions)
     };
 
     if (config.options) {
@@ -437,7 +667,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.instanceName = config.options.instanceName;
-        this.config.options.port = undefined;
       }
 
       if (config.options.isolationLevel !== undefined) {
@@ -490,7 +719,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
-        this.config.options.instanceName = undefined;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -632,6 +860,11 @@ class Connection extends EventEmitter {
     };
   }
 
+  /**
+    Closes the connection to the database.
+
+    The <a href="#event_end"><code>end</code></a> will be emitted once the connection has been closed.
+  */
   close() {
     this.transitionTo(this.STATE.FINAL);
   }
@@ -641,7 +874,7 @@ class Connection extends EventEmitter {
     this.createConnectTimer();
   }
 
-  cleanupConnection(cleanupTypeEnum) {
+  cleanupConnection(cleanupTypeEnum: $Values<$PropertyType<Connection, 'cleanupTypeEnum'>>) {
     if (!this.closed) {
       this.clearConnectTimer();
       this.clearRequestTimer();
@@ -654,14 +887,15 @@ class Connection extends EventEmitter {
           this.emit('end');
         });
       }
-      if (this.request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
+      const request = this.request;
+      if (request) {
+        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
+        request.callback(err);
         this.request = undefined;
       }
       this.closed = true;
       this.loggedIn = false;
-      this.loginError = null;
+      this.loginError = undefined;
     }
   }
 
@@ -691,19 +925,21 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
-        if (this.request) {
-          if (!this.request.canceled) {
-            this.request.error = RequestError(token.message, 'EREQUEST');
-            this.request.error.number = token.number;
-            this.request.error.state = token.state;
-            this.request.error['class'] = token['class'];
-            this.request.error.serverName = token.serverName;
-            this.request.error.procName = token.procName;
-            this.request.error.lineNumber = token.lineNumber;
+        const request = this.request;
+        if (request) {
+          if (!request.canceled) {
+            const error = new RequestError(token.message, 'EREQUEST');
+            error.number = token.number;
+            error.state = token.state;
+            error.class = token.class;
+            error.serverName = token.serverName;
+            error.procName = token.procName;
+            error.lineNumber = token.lineNumber;
+            request.error = error;
           }
         }
       } else {
-        const error = ConnectionError(token.message, 'ELOGIN');
+        const error = new ConnectionError(token.message, 'ELOGIN');
 
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
@@ -737,14 +973,14 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
-        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+        this.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
         this.loggedIn = false;
         return;
       }
 
       if (!token['interface']) {
         // unsupported interface
-        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+        this.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
         return;
       }
@@ -788,8 +1024,9 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           let columns;
           if (this.config.options.useColumnNames) {
             columns = {};
@@ -802,7 +1039,7 @@ class Connection extends EventEmitter {
           } else {
             columns = token.columns;
           }
-          this.request.emit('columnMetadata', columns);
+          request.emit('columnMetadata', columns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
@@ -811,9 +1048,10 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('order', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('order', token.orderColumns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('order', token.orderColumns);
         }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
@@ -822,16 +1060,17 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('row', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           if (this.config.options.rowCollectionOnRequestCompletion) {
-            this.request.rows.push(token.columns);
+            request.rows.push(token.columns);
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst.push(token.columns);
+            request.rst.push(token.columns);
           }
-          if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-            this.request.emit('row', token.columns);
+          if (!(this.state === this.STATE.SENT_ATTENTION && request.paused)) {
+            request.emit('row', token.columns);
           }
         }
       } else {
@@ -841,8 +1080,9 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnStatus', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           // Keep value for passing in 'doneProc' event.
           this.procReturnStatusValue = token.value;
         }
@@ -850,66 +1090,70 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('returnValue', token.paramName, token.value, token.metadata);
         }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
           this.procReturnStatusValue = undefined;
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneInProc', token.rowCount, token.more, request.rst);
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
     });
 
     this.tokenStreamParser.on('done', (token) => {
-      if (this.request) {
+      const request = this.request;
+      if (request) {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
 
-        if (this.request.canceled) {
+        if (request.canceled) {
           // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
           // We assume this is the indication that an in-flight request was canceled.
-          if (token.sqlError && !this.request.error) {
+          if (token.sqlError && !request.error) {
             this.clearCancelTimer();
-            this.request.error = RequestError('Canceled.', 'ECANCEL');
+            request.error = new RequestError('Canceled.', 'ECANCEL');
           }
         } else {
-          if (token.sqlError && !this.request.error) {
+          if (token.sqlError && !request.error) {
             // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+            request.error = new RequestError('An unknown error has occurred.', 'UNKNOWN');
           }
-          this.request.emit('done', token.rowCount, token.more, this.request.rst);
+          request.emit('done', token.rowCount, token.more, request.rst);
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
@@ -938,9 +1182,7 @@ class Connection extends EventEmitter {
   }
 
   connect() {
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
-    } else {
+    if (this.config.options.instanceName) {
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName,
@@ -949,16 +1191,19 @@ class Connection extends EventEmitter {
         if (this.state === this.STATE.FINAL) {
           return;
         }
+
         if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+          this.emit('connect', new ConnectionError(message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
       });
+    } else {
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     }
   }
 
-  connectOnPort(port, multiSubnetFailover) {
+  connectOnPort(port: number, multiSubnetFailover: boolean) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
@@ -1018,7 +1263,11 @@ class Connection extends EventEmitter {
 
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+
+    const request = this.request;
+    if (!request) { return; }
+
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
@@ -1034,9 +1283,9 @@ class Connection extends EventEmitter {
   }
 
   connectTimeout() {
-    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
+    const message = `Failed to connect to ${this.config.server}${this.config.options.instanceName ? `\\${this.config.options.instanceName}` : `:${this.config.options.port}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
+    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -1044,15 +1293,19 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
   }
 
   requestTimeout() {
+    const request = this.request;
+    // This check here is for flow to understand that the request can not be undefined.
+    if (!request) { return; }
+
     this.requestTimer = undefined;
-    this.request.cancel();
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    request.cancel();
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    this.request.error = RequestError(message, 'ETIMEOUT');
+    request.error = new RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -1087,7 +1340,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  transitionTo(newState) {
+  transitionTo(newState: $Values<$PropertyType<Connection, 'STATE'>>) {
     if (this.state === newState) {
       this.debug.log('State is already ' + newState.name);
       return;
@@ -1097,7 +1350,7 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -1105,7 +1358,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  dispatchEvent(eventName, ...args) {
+  dispatchEvent<T>(eventName: string, ...args: T) {
     if (this.state.events[eventName]) {
       this.state.events[eventName].apply(this, args);
     } else {
@@ -1114,15 +1367,15 @@ class Connection extends EventEmitter {
     }
   }
 
-  socketError(error) {
+  socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
     this.dispatchEvent('socketError', error);
   }
@@ -1137,7 +1390,7 @@ class Connection extends EventEmitter {
   socketEnd() {
     this.debug.log('socket ended');
     if (this.state !== this.STATE.FINAL) {
-      const error = new Error('socket hang up');
+      const error = new ConnectionError('socket hang up');
       error.code = 'ECONNRESET';
       this.socketError(error);
     }
@@ -1146,10 +1399,12 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+      const routingData = this.routingData;
+      if (!routingData) { return; }
+      this.debug.log('Rerouting to ' + routingData.server + ':' + routingData.port);
       this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
-      const server = this.routingData ? this.routingData.server : this.server;
+      const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
       this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
@@ -1173,11 +1428,11 @@ class Connection extends EventEmitter {
     this.messageBuffer = Buffer.alloc(0);
   }
 
-  addToMessageBuffer(data) {
+  addToMessageBuffer(data: Buffer) {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
-  sendLogin7Packet(cb) {
+  sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -1226,20 +1481,20 @@ class Connection extends EventEmitter {
     });
   }
 
-  sendFedAuthResponsePacket(tokenResponse) {
+  sendFedAuthResponsePacket(tokenResponse: { accessToken: string }) {
     const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
     const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
-    data.write(tokenResponse.accessToken, offset, 'ucs2');
+    data.write(tokenResponse.accessToken, offset, accessTokenLen, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
-  sendDataToTokenStreamParser(data) {
+  sendDataToTokenStreamParser(data: Buffer) {
     return this.tokenStreamParser.addBuffer(data);
   }
 
@@ -1247,21 +1502,21 @@ class Connection extends EventEmitter {
   // It has to check whether the passed Request object represents the currently
   // active request, because the application might have called Request.pause()
   // on an old inactive Request object.
-  pauseRequest(request) {
+  pauseRequest(request: Request | BulkLoad) {
     if (this.isRequestActive(request)) {
       this.tokenStreamParser.pause();
     }
   }
 
   // This is an internal method that is called from Request.resume().
-  resumeRequest(request) {
+  resumeRequest(request: Request | BulkLoad) {
     if (this.isRequestActive(request)) {
       this.tokenStreamParser.resume();
     }
   }
 
   // Returns true if the passed request is the currently active request of the connection.
-  isRequestActive(request) {
+  isRequestActive(request: Request | BulkLoad) {
     return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
   }
 
@@ -1367,17 +1622,54 @@ class Connection extends EventEmitter {
     this.emit('connect');
   }
 
-  execSqlBatch(request) {
+  /**
+    Execute the SQL batch represented by <code>request</code>.
+
+    There is no param support, and unlike <code>execSql</code>,
+    it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+
+    In almost all cases, <code>execSql</code> will be a better choice.
+
+    @param {Request} request
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+  */
+  execSqlBatch(request: Request) {
+    if (typeof request.sqlTextOrProcedure !== 'string') {
+      throw new Error('');
+    }
+
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  execSql(request) {
+  /**
+    Execute the SQL represented by <code>request</code>.
+
+    As <code>sp_executesql</code> is used to execute the SQL, if the same SQL is executed multiples times
+    using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+    for the first execution.  This may also result in SQL server treating the request like a stored procedure
+    which can result in the <a href="api-request.html#event_doneInProc"><code>doneInProc</code></a> or
+    <a href="api-request.html#event_doneProc"><code>doneProc</code></a> events being emitted instead of the
+    <a href="api-request.html#event_done"><code>done</code></a> event you might expect.  Using
+    <code>execSqlBatch</code> will prevent this from occurring but may have a negative performance impact.
+
+    Beware of the way that scoping rules apply, and how they may
+    <a href="http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx">affect local temp tables</a>.
+    If you're running in to scoping issues, then <code>execSqlBatch</code> may be a better choice.
+    See also <a href="https://github.com/pekim/tedious/issues/24">issue #24</a>.
+
+    @param {Request} request
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+  */
+  execSql(request: Request) {
     request.transformIntoExecuteSqlRpc();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1386,16 +1678,26 @@ class Connection extends EventEmitter {
   }
 
   /**
-   @function newBulkLoad
-   @param {string} table - Table's name.
-   @param {Object} [options] - BulkLoad options.
-   @param {boolean} [options.checkConstraints=false] - Honors constraints during bulk load, it is disabled by default.
-   @param {boolean} [options.fireTriggers=false] - Honors insert triggers during bulk load, it is disabled by default.
-   @param {boolean} [options.keepNulls=false] - Honors null value passed, ignores the default values set on table.
-   @param {boolean} [options.tableLock=false] - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
-   @param {callback} callback - Function to call after BulkLoad executes.
+    Creates a new <a href="bulk-load.html">BulkLoad</a> instance.
+
+    @param {string} table
+      The name of the table to bulk-insert into.
+    @param {Object} [options]
+      BulkLoad options.
+    @param {boolean} [options.checkConstraints=false]
+      Honors constraints during bulk load, it is disabled by default.
+    @param {boolean} [options.fireTriggers=false]
+      Honors insert triggers during bulk load, it is disabled by default.
+    @param {boolean} [options.keepNulls=false]
+      Honors null value passed, ignores the default values set on table.
+    @param {boolean} [options.tableLock=false]
+      Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
+    @param {Function} callback
+      A function which will be called after the BulkLoad finishes executing. <code>rowCount</code> will equal the
+      number of rows inserted.
+    @return {BulkLoad}
   */
-  newBulkLoad(table, options, callback) {
+  newBulkLoad(table: string, options: Object | RequestCompletionCallback, callback: RequestCompletionCallback | void) {
     if (callback === undefined) {
       callback = options;
       options = {};
@@ -1406,7 +1708,12 @@ class Connection extends EventEmitter {
     return new BulkLoad(table, this.config.options, options, callback);
   }
 
-  execBulkLoad(bulkLoad) {
+  /**
+    Executes a <a href="bulk-load.html">BulkLoad</a>.
+
+    @param {BulkLoad} bulkLoad
+  */
+  execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
     const request = new Request(bulkLoad.getBulkInsertSql(), (error) => {
       if (error) {
@@ -1428,23 +1735,51 @@ class Connection extends EventEmitter {
     this.execSqlBatch(request);
   }
 
-  prepare(request) {
+  /**
+    Prepare the SQL represented by the request.
+
+    The request can then be used in subsequent calls to
+    <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
+
+    @param request
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+
+      Parameters only require a name and type. Parameter values are ignored.
+  */
+  prepare(request: Request) {
     request.transformIntoPrepareRpc();
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  unprepare(request) {
+  /**
+    Release the SQL Server resources associated with a previously prepared request.
+
+    @param request
+  */
+  unprepare(request: Request) {
     request.transformIntoUnprepareRpc();
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  execute(request, parameters) {
+  /**
+    Execute previously prepared SQL, using the supplied parameters.
+
+    @param {Request} request
+      A previously prepared <a href="api-request.html"><code>Request</code></a>.
+    @param {Object} parameters
+      An object whose names correspond to the names of parameters that were added to the
+      <code>request</code> before it was prepared.
+      The object's values are passed as the parameters' values when the request is executed.
+  */
+  execute(request: Request, parameters: Object) {
     request.transformIntoExecuteRpc(parameters);
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
 
       return;
@@ -1453,13 +1788,21 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  callProcedure(request) {
+  /**
+    Call a stored procedure represented by <code>request</code>.
+
+    @param {Request} request
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+  */
+  callProcedure(request: Request) {
     request.validateParameters();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1467,7 +1810,49 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  beginTransaction(callback, name, isolationLevel) {
+  /**
+    The callback is called when the request to start the transaction has completed,
+    either successfully or with an error.
+    If an error occurred then <code>err</code> will describe the error.
+
+    As only one request at a time may be executed on a connection, another request should not
+    be initiated until this callback is called.
+
+    @callback Connection~beginTransactionCallback
+    @param {Error?} err
+    @return void
+  */
+
+  /**
+    Start a transaction.
+
+    @param {Connection~beginTransactionCallback} callback
+      The callback is called when the request to start the transaction has completed,
+      either successfully or with an error.
+      If an error occurred then <code>err</code> will describe the error.
+
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    @param {string} name
+      A string representing a name to associate with the transaction.
+
+      Optional, and defaults to an empty string.
+      Required when <code>isolationLevel</code> is present.
+    @param {string} isolationLevel
+      The isolation level that the transaction is to be run with.
+      The isolation levels are available from <code>require('tedious').ISOLATION_LEVEL</code> .
+
+      <ul>
+        <li><code>READ_UNCOMMITTED</code></li>
+        <li><code>READ_COMMITTED</code></li>
+        <li><code>REPEATABLE_READ</code></li>
+        <li><code>SERIALIZABLE</code></li>
+        <li><code>SNAPSHOT</code></li>
+      </ul>
+
+      Optional, and defaults to the Connection's isolation level.
+  */
+  beginTransaction(callback: RequestCompletionCallback, name: string | void, isolationLevel: $Values<ISOLATION_LEVEL> | void) {
     isolationLevel || (isolationLevel = this.config.options.isolationLevel);
     const transaction = new Transaction(name || '', isolationLevel);
     if (this.config.options.tdsVersion < '7_2') {
@@ -1480,13 +1865,20 @@ class Connection extends EventEmitter {
       }));
     }
 
-    const request = new Request(undefined, (err) => {
-      return callback(err, this.currentTransactionDescriptor());
-    });
+    const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
   }
 
-  commitTransaction(callback, name) {
+
+  /**
+    Commit a transaction.
+
+    There should be an active transaction.
+    That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+
+    @param {Function} callback
+  */
+  commitTransaction(callback: RequestCompletionCallback, name: string | void) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (...args) => {
@@ -1501,7 +1893,15 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
   }
 
-  rollbackTransaction(callback, name) {
+  /**
+    Rollback a transaction.
+
+    There should be an active transaction.
+    That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+
+    @param {Function} callback
+  */
+  rollbackTransaction(callback: RequestCompletionCallback, name: string | void) {
     const transaction = new Transaction(name || '');
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (...args) => {
@@ -1516,7 +1916,15 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
   }
 
-  saveTransaction(callback, name) {
+  /**
+    Set a savepoint within a transaction.
+
+    There should be an active transaction.
+    That is, <a href="#function_beginTransaction"><code>beginTransaction</code></a> should have been previously called.
+
+    @param {Function} callback
+  */
+  saveTransaction(callback: RequestCompletionCallback, name: string) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (...args) => {
@@ -1528,7 +1936,19 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
 
-  transaction(cb, isolationLevel) {
+  /**
+    Run the given callback after starting a transaction, and commit or rollback the transaction afterwards.
+
+    This is a helper that employs <a href="#function_beginTransaction"><code>beginTransaction</code></a>,
+    <a href="#function_commitTransaction"><code>commitTransaction</code></a>,
+    <a href="#function_rollbackTransaction"><code>rollbackTransaction</code></a> and
+    <a href="#function_saveTransaction"><code>saveTransaction</code></a> to greatly simplify the
+    use of database transactions and automatically handle transaction nesting.
+
+    @param {Function} callback
+    @param {string?} isolationLevel
+  */
+  transaction<T: mixed[]>(cb: (err: ?Error, cb?: (err: ?Error, done: (err: ?Error, ...args: T) => void, ...args: T) => void) => void, isolationLevel: $Values<ISOLATION_LEVEL> | void) {
     if (typeof cb !== 'function') {
       throw new TypeError('`cb` must be a function');
     }
@@ -1538,24 +1958,21 @@ class Connection extends EventEmitter {
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction((txErr) => {
+          this.rollbackTransaction((txErr) => {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
       } else {
         if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
+          if (this.config.options.tdsVersion < '7_2') {
+            this.transactionDepth--;
+          }
+
+          done(null, ...args);
         } else {
-          return this.commitTransaction((txErr) => {
+          this.commitTransaction((txErr) => {
             done(txErr, ...args);
           }, name);
         }
@@ -1587,14 +2004,14 @@ class Connection extends EventEmitter {
     }
   }
 
-  makeRequest(request, packetType, payload) {
+  makeRequest(request: Request | BulkLoad, packetType: $Values<typeof TYPE>, payload: SqlBatchPayload | RpcRequestPayload | void) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
       process.nextTick(() => {
-        request.callback(RequestError('Canceled.', 'ECANCEL'));
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
@@ -1644,14 +2061,18 @@ class Connection extends EventEmitter {
           request.rowToPacketTransform.end();
         }
         this.messageIo.outgoingMessageStream.write(message);
-      } else {
+      } else if (payload) {
         this.createRequestTimer();
 
         message = this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
 
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
-          return payload.toString('  ');
+          if (payload) {
+            return payload.toString('  ');
+          } else {
+            return '';
+          }
         });
       }
 
@@ -1663,6 +2084,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+    Cancel currently executing request.
+  */
   cancel() {
     if (!this.request) {
       return false;
@@ -1676,7 +2100,13 @@ class Connection extends EventEmitter {
     return true;
   }
 
-  reset(callback) {
+  /**
+    Reset the connection to its initial state.
+    Can be useful for connection pool implementations.
+
+    @param {Function} callback
+  */
+  reset(callback: (err: ?Error) => void) {
     const request = new Request(this.getInitialSql(), (err) => {
       if (this.config.options.tdsVersion < '7_2') {
         this.inTransaction = false;
@@ -1684,14 +2114,14 @@ class Connection extends EventEmitter {
       callback(err);
     });
     this.resetConnectionOnNextRequest = true;
-    return this.execSqlBatch(request);
+    this.execSqlBatch(request);
   }
 
   currentTransactionDescriptor() {
     return this.transactionDescriptors[this.transactionDescriptors.length - 1];
   }
 
-  getIsolationLevelText(isolationLevel) {
+  getIsolationLevelText(isolationLevel: $Values<ISOLATION_LEVEL>) {
     switch (isolationLevel) {
       case ISOLATION_LEVEL.READ_UNCOMMITTED:
         return 'read uncommitted';
@@ -1740,7 +2170,7 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
+      data: function(data: Buffer) {
         this.addToMessageBuffer(data);
       },
       message: function() {
@@ -1755,7 +2185,7 @@ Connection.prototype.STATE = {
 
         if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
           if (!this.config.options.encrypt) {
-            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
             return this.close();
           }
 
@@ -1859,18 +2289,18 @@ Connection.prototype.STATE = {
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password') {
           if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+            this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
           } else if (token.fedAuth.length !== 0) {
-            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+            this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
         } else {
           if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+            this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
             this.loggedIn = false;
           } else {
-            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+            this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
             this.loggedIn = false;
           }
         }
@@ -1888,7 +2318,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
         }
@@ -1942,7 +2372,7 @@ Connection.prototype.STATE = {
                 this.transitionTo(this.STATE.FINAL);
               }
             } else {
-              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+              this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
               this.transitionTo(this.STATE.FINAL);
             }
           }
@@ -1976,7 +2406,7 @@ Connection.prototype.STATE = {
 
           context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
             if (err) {
-              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.loginError = new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
               this.transitionTo(this.STATE.FINAL);
               return;
@@ -1994,7 +2424,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
         }
@@ -2086,7 +2516,7 @@ Connection.prototype.STATE = {
 
         sqlRequest.callback(err);
       },
-      data: function(data) {
+      data: function(data: Buffer) {
         this.sendDataToTokenStreamParser(data);
       },
       attention: function() {
@@ -2105,7 +2535,7 @@ Connection.prototype.STATE = {
           if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
             sqlRequest.callback(sqlRequest.error);
           } else {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }

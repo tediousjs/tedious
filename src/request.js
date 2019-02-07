@@ -4,8 +4,19 @@ const EventEmitter = require('events').EventEmitter;
 const TYPES = require('./data-type').typeByName;
 const RequestError = require('./errors').RequestError;
 
+import type Connection from './connection';
+import type { ConnectionError } from './errors';
+
 // TODO: Figure out how to type the `rows` parameter here.
-type CompletionCallback = (error: ?Error, rowCount: ?number, rows: any) => void;
+/**
+  the request completion callback
+
+  @callback
+  @param {?Error} error
+  @param {?number} rowCount
+  @param {any} rows
+*/
+export type CompletionCallback = (error: ?(Error | ConnectionError | RequestError), rowCount: ?number, rows: any) => void;
 
 type Parameter = {
   // TODO: `type` must be a valid TDS value type
@@ -25,6 +36,9 @@ type ParameterOptions = {
   scale?: number
 }
 
+/**
+  A <code>Request</code> instance represents a request that can be executed on a connection.
+*/
 class Request extends EventEmitter {
   sqlTextOrProcedure: string | typeof undefined;
   parameters: Parameter[];
@@ -36,8 +50,12 @@ class Request extends EventEmitter {
   userCallback: CompletionCallback;
   handle: number | typeof undefined;
   error: ?Error;
-  connection: ?any; // TODO: This should be `Connection`, not `any`.
+  connection: Connection | void;
   timeout: number | typeof undefined;
+
+  rst: any[];
+  rows: any[];
+  rowCount: number;
 
   callback: (?Error) => void;
 
@@ -55,6 +73,11 @@ class Request extends EventEmitter {
     this.error = undefined;
     this.connection = undefined;
     this.timeout = undefined;
+
+    this.rst = [];
+    this.rows = [];
+    this.rowCount = 0;
+
     this.userCallback = callback;
     this.callback = function(err: ?Error) {
       if (this.preparing) {
@@ -146,7 +169,7 @@ class Request extends EventEmitter {
       if (name === 'handle') {
         this.handle = value;
       } else {
-        this.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+        this.error = new RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
       }
     });
   }

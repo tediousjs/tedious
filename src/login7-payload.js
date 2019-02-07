@@ -96,7 +96,7 @@ class Login7Payload {
   appName: string | typeof undefined;
   hostname: string | typeof undefined;
   libraryName: string | typeof undefined;
-  language: string | typeof undefined;
+  language: string | void | null;
   database: string | typeof undefined;
   clientId: Buffer | typeof undefined;
   sspi: Buffer | typeof undefined;

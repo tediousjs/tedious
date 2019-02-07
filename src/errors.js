@@ -1,45 +1,57 @@
-const util = require('util');
+// @flow
 
-module.exports.ConnectionError = ConnectionError;
-function ConnectionError(message, code) {
-  if (!(this instanceof ConnectionError)) {
-    if (message instanceof ConnectionError) {
-      return message;
-    }
+module.exports.ConnectionError = class ConnectionError extends Error {
+  code: string | void;
+  name: string;
+  isTransient: boolean | void;
 
-    return new ConnectionError(message, code);
+  constructor(message: string, code: string | void) {
+    super(message);
+
+    this.code = code;
+    this.name = 'ConnectionError';
+
+    Error.captureStackTrace(this, this.constructor);
   }
+};
 
-  Error.call(this);
+module.exports.RequestError = class RequestError extends Error {
+  code: string | void;
+  name: string;
 
-  this.message = message;
-  this.code = code;
+  procName: string | void;
+  serverName: string | void;
+  class: string | void;
+  state: string | void;
 
-  Error.captureStackTrace(this, this.constructor);
-}
+  constructor(message: string, code: string | void) {
+    super(message);
 
-util.inherits(ConnectionError, Error);
+    this.code = code;
+    this.name = 'RequestError';
 
-ConnectionError.prototype.name = 'ConnectionError';
-
-module.exports.RequestError = RequestError;
-function RequestError(message, code) {
-  if (!(this instanceof RequestError)) {
-    if (message instanceof RequestError) {
-      return message;
-    }
-
-    return new RequestError(message, code);
+    Error.captureStackTrace(this, this.constructor);
   }
+};
 
-  Error.call(this);
-
-  this.message = message;
-  this.code = code;
-
-  Error.captureStackTrace(this, this.constructor);
-}
-
-util.inherits(RequestError, Error);
-
-RequestError.prototype.name = 'RequestError';
+//
+// module.exports.RequestError = function(message, code) {
+//   if (!(this instanceof RequestError)) {
+//     if (message instanceof RequestError) {
+//       return message;
+//     }
+//
+//     return new RequestError(message, code);
+//   }
+//
+//   Error.call(this);
+//
+//   this.message = message;
+//   this.code = code;
+//
+//   Error.captureStackTrace(this, this.constructor);
+// }
+//
+// util.inherits(RequestError, Error);
+//
+// RequestError.prototype.name = 'RequestError';

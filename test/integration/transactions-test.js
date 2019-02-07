@@ -141,11 +141,8 @@ GO`,
   }
 
   beginTransaction(callback, transactionName) {
-    this.connection.beginTransaction((err, transactionDescriptor) => {
+    this.connection.beginTransaction((err) => {
       this.test.ifError(err);
-      this.test.ok(
-        config.options.tdsVersion < '7_2' ? true : transactionDescriptor
-      );
 
       callback(err);
     }, transactionName);
@@ -187,7 +184,7 @@ GO`,
 }
 
 exports.transactionCommit = function(test) {
-  test.expect(8);
+  test.expect(7);
 
   var tester = new Tester(test);
   tester.run([
@@ -201,7 +198,7 @@ exports.transactionCommit = function(test) {
 };
 
 exports.transactionRollback = function(test) {
-  test.expect(7);
+  test.expect(6);
 
   var tester = new Tester(test);
   tester.run([
@@ -215,7 +212,7 @@ exports.transactionRollback = function(test) {
 };
 
 exports.nestedTransactionCommit = function(test) {
-  test.expect(11);
+  test.expect(9);
 
   var tester = new Tester(test);
   tester.run([
@@ -231,7 +228,7 @@ exports.nestedTransactionCommit = function(test) {
 };
 
 exports.nestedTransactionRollbackOuter = function(test) {
-  test.expect(10);
+  test.expect(8);
 
   var tester = new Tester(test);
   tester.run([
@@ -247,7 +244,7 @@ exports.nestedTransactionRollbackOuter = function(test) {
 };
 
 exports.nestedTransactionInProcCommit = function(test) {
-  test.expect(9);
+  test.expect(8);
 
   var tester = new Tester(test);
   tester.run([
@@ -262,7 +259,7 @@ exports.nestedTransactionInProcCommit = function(test) {
 };
 
 exports.nestedTransactionInProcRollbackOuter = function(test) {
-  test.expect(8);
+  test.expect(7);
 
   var tester = new Tester(test);
   tester.run([
@@ -505,7 +502,7 @@ exports.transactionHelperBatchAbortingError = function(test) {
 };
 
 exports.transactionHelperSocketError = function(test) {
-  test.expect(3);
+  test.expect(4);
 
   var connection = new Connection(config);
   connection.on('end', function(info) {
