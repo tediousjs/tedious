@@ -1581,24 +1581,20 @@ class Connection extends EventEmitter {
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction((txErr) => {
+          this.rollbackTransaction((txErr) => {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
       } else {
         if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
+          if (this.config.options.tdsVersion < '7_2') {
+            this.transactionDepth--;
+          }
+          done(null, ...args);
         } else {
-          return this.commitTransaction((txErr) => {
+          this.commitTransaction((txErr) => {
             done(txErr, ...args);
           }, name);
         }
