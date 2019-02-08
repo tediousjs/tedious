@@ -334,13 +334,34 @@ exports.encrypt = function(test) {
   });
 };
 
+exports['potentially throws an error on invalid crypto credential details'] = function(test) {
+  var config = getConfig();
+  config.options.encrypt = true;
+
+  // On newer Node.js versions, this will throw an error when passed to `tls.createSecureContext`
+  config.options.cryptoCredentialsDetails = {
+    ciphers: '!ALL'
+  };
+
+  try {
+    const { createSecureContext } = require('tls');
+    createSecureContext(config.options.cryptoCredentialsDetails);
+  } catch (err) {
+    test.throws(() => {
+      new Connection(config);
+    });
+  }
+
+  test.done();
+};
+
 exports['fails if no cipher can be negotiated'] = function(test) {
   var config = getConfig();
   config.options.encrypt = true;
 
-  // Do not allow any cipher to be used
+  // Specify a cipher that should never be supported by SQL Server
   config.options.cryptoCredentialsDetails = {
-    ciphers: '!ALL'
+    ciphers: 'NULL'
   };
 
   var connection = new Connection(config);
@@ -643,7 +664,7 @@ exports.execBadSql = function(test) {
 };
 
 exports.closeConnectionRequestPending = function(test) {
-  test.expect(1);
+  test.expect(3);
 
   var config = getConfig();
 
@@ -972,7 +993,7 @@ exports.resetConnection = function(test) {
 };
 
 exports.cancelRequest = function(test) {
-  test.expect(8);
+  test.expect(1);
 
   var config = getConfig();
 
@@ -990,22 +1011,19 @@ exports.cancelRequest = function(test) {
   });
 
   request.on('doneProc', function(rowCount, more) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('done', function(rowCount, more, rows) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 1);
+    test.ok(false);
   });
 
   request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-    test.strictEqual(columns[0].value, 1);
+    test.ok(false);
   });
 
   var connection = new Connection(config);
@@ -1029,7 +1047,7 @@ exports.cancelRequest = function(test) {
 };
 
 exports.requestTimeout = function(test) {
-  test.expect(8);
+  test.expect(1);
 
   var config = getConfig();
   config.options.requestTimeout = 1000;
@@ -1048,22 +1066,19 @@ exports.requestTimeout = function(test) {
   });
 
   request.on('doneProc', function(rowCount, more) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('done', function(rowCount, more, rows) {
-    test.ok(!rowCount);
-    test.strictEqual(more, false);
+    test.ok(false);
   });
 
   request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 1);
+    test.ok(false);
   });
 
   request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-    test.strictEqual(columns[0].value, 1);
+    test.ok(false);
   });
 
   var connection = new Connection(config);

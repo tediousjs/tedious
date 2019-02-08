@@ -7,9 +7,6 @@ import type { Duplex } from 'stream';
 import type { TLSSocket } from 'tls';
 import type { Socket } from 'net';
 
-// $FlowFixMe
-const constants = require('constants');
-
 const tls = require('tls');
 const DuplexPair = require('native-duplexpair');
 const { EventEmitter} = require('events');
@@ -63,28 +60,13 @@ module.exports = class MessageIO extends EventEmitter {
     return this.outgoingMessageStream.packetSize;
   }
 
-  startTls(credentialsDetails: Object, hostname: string, trustServerCertificate: boolean) {
-    if (credentialsDetails.secureOptions === undefined) {
-      // If the caller has not specified their own `secureOptions`,
-      // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
-      // Older SQL Server instances running on older Windows versions have
-      // trouble with the BEAST workaround in OpenSSL.
-      // As BEAST is a browser specific exploit, we can just disable this option here.
-      credentialsDetails = Object.create(credentialsDetails, {
-        secureOptions: {
-          value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
-        }
-      });
-    }
-
-    const credentials = tls.createSecureContext(credentialsDetails);
-
+  startTls(secureContext: Object, hostname: string, trustServerCertificate: boolean) {
     const duplexpair = new DuplexPair();
     const securePair = this.securePair = {
       cleartext: tls.connect({
         socket: duplexpair.socket1,
         servername: hostname,
-        secureContext: credentials,
+        secureContext: secureContext,
         rejectUnauthorized: !trustServerCertificate
       }),
       encrypted: duplexpair.socket2
@@ -139,6 +121,7 @@ module.exports = class MessageIO extends EventEmitter {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
     this.outgoingMessageStream.write(message);
+    return message;
   }
 
   // Temporarily suspends the flow of incoming packets.

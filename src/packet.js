@@ -76,7 +76,7 @@ class Packet {
     return this.buffer.readUInt16BE(OFFSET.Length);
   }
 
-  resetConnection(reset?: boolean) {
+  resetConnection(reset: boolean) {
     let status = this.buffer.readUInt8(OFFSET.Status);
     if (reset) {
       status |= STATUS.RESETCONNECTION;
@@ -97,6 +97,16 @@ class Packet {
       this.buffer.writeUInt8(status, OFFSET.Status);
     }
     return this.isLast();
+  }
+
+  ignore(last: boolean) {
+    let status = this.buffer.readUInt8(OFFSET.Status);
+    if (last) {
+      status |= STATUS.IGNORE;
+    } else {
+      status &= 0xFF - STATUS.IGNORE;
+    }
+    this.buffer.writeUInt8(status, OFFSET.Status);
   }
 
   isLast() {

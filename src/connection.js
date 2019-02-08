@@ -2,6 +2,10 @@ const deprecate = require('depd')('tedious');
 
 const crypto = require('crypto');
 const os = require('os');
+// $FlowFixMe
+const constants = require('constants');
+const { createSecureContext } = require('tls');
+
 const { AuthenticationContext } = require('adal-node');
 
 const BulkLoad = require('./bulk-load');
@@ -93,17 +97,32 @@ class Connection extends EventEmitter {
         }
       }
 
-      authentication = {
-        type: config.authentication.type,
-        options: config.authentication.type === 'ntlm' ? {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password,
-          domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
-        } : {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password
-        }
-      };
+      if (config.authentication.type === 'ntlm') {
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password,
+            domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
+          }
+        };
+      } else if (config.authentication.type === 'azure-active-directory-password') {
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password,
+          }
+        };
+      } else {
+        authentication = {
+          type: 'default',
+          options: {
+            userName: config.authentication.options.userName,
+            password: config.authentication.options.password
+          }
+        };
+      }
     } else {
       if (config.domain !== undefined) {
         if (typeof config.domain !== 'string') {
@@ -129,14 +148,24 @@ class Connection extends EventEmitter {
         deprecate('The "config.password" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
       }
 
-      authentication = {
-        type: config.domain ? 'ntlm' : 'default',
-        options: {
-          userName: config.userName,
-          password: config.password,
-          domain: config.domain && config.domain.toUpperCase()
-        }
-      };
+      if (config.domain) {
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: config.userName,
+            password: config.password,
+            domain: config.domain && config.domain.toUpperCase()
+          }
+        };
+      } else {
+        authentication = {
+          type: 'default',
+          options: {
+            userName: config.userName,
+            password: config.password
+          }
+        };
+      }
     }
 
     this.config = {
@@ -583,6 +612,22 @@ class Connection extends EventEmitter {
       }
     }
 
+    let credentialsDetails = this.config.options.cryptoCredentialsDetails;
+    if (credentialsDetails.secureOptions === undefined) {
+      // If the caller has not specified their own `secureOptions`,
+      // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
+      // Older SQL Server instances running on older Windows versions have
+      // trouble with the BEAST workaround in OpenSSL.
+      // As BEAST is a browser specific exploit, we can just disable this option here.
+      credentialsDetails = Object.create(credentialsDetails, {
+        secureOptions: {
+          value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
+        }
+      });
+    }
+
+    this.secureContext = createSecureContext(credentialsDetails);
+
     this.createDebug();
     this.createTokenStreamParser();
     this.inTransaction = false;
@@ -627,16 +672,21 @@ class Connection extends EventEmitter {
       if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
         this.emit('rerouting');
       } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-        this.emit('end');
+        process.nextTick(() => {
+          this.emit('end');
+        });
       }
-      if (this.request) {
+
+      const request = this.request;
+      if (request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
+        request.callback(err);
         this.request = undefined;
       }
+
       this.closed = true;
       this.loggedIn = false;
-      this.loginError = null;
+      this.loginError = undefined;
     }
   }
 
@@ -666,23 +716,28 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
-        if (this.request) {
-          this.request.error = RequestError(token.message, 'EREQUEST');
-          this.request.error.number = token.number;
-          this.request.error.state = token.state;
-          this.request.error['class'] = token['class'];
-          this.request.error.serverName = token.serverName;
-          this.request.error.procName = token.procName;
-          this.request.error.lineNumber = token.lineNumber;
+        const request = this.request;
+        if (request) {
+          if (!request.canceled) {
+            const error = new RequestError(token.message, 'EREQUEST');
+            error.number = token.number;
+            error.state = token.state;
+            error.class = token.class;
+            error.serverName = token.serverName;
+            error.procName = token.procName;
+            error.lineNumber = token.lineNumber;
+            request.error = error;
+          }
         }
       } else {
+        const error = ConnectionError(token.message, 'ELOGIN');
+
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          this.debug.log('Initiating retry on transient error = ', token.number);
-          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        } else {
-          this.loginError = ConnectionError(token.message, 'ELOGIN');
+          error.isTransient = true;
         }
+
+        this.loginError = error;
       }
     });
 
@@ -760,20 +815,23 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
-      if (this.request) {
-        let columns;
-        if (this.config.options.useColumnNames) {
-          columns = {};
-          for (let j = 0, len = token.columns.length; j < len; j++) {
-            const col = token.columns[j];
-            if (columns[col.colName] == null) {
-              columns[col.colName] = col;
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          let columns;
+          if (this.config.options.useColumnNames) {
+            columns = {};
+            for (let j = 0, len = token.columns.length; j < len; j++) {
+              const col = token.columns[j];
+              if (columns[col.colName] == null) {
+                columns[col.colName] = col;
+              }
             }
+          } else {
+            columns = token.columns;
           }
-        } else {
-          columns = token.columns;
+          request.emit('columnMetadata', columns);
         }
-        this.request.emit('columnMetadata', columns);
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
         this.close();
@@ -781,8 +839,11 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('order', (token) => {
-      if (this.request) {
-        this.request.emit('order', token.orderColumns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('order', token.orderColumns);
+        }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
         this.close();
@@ -790,15 +851,18 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('row', (token) => {
-      if (this.request) {
-        if (this.config.options.rowCollectionOnRequestCompletion) {
-          this.request.rows.push(token.columns);
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst.push(token.columns);
-        }
-        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-          this.request.emit('row', token.columns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          if (this.config.options.rowCollectionOnRequestCompletion) {
+            request.rows.push(token.columns);
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst.push(token.columns);
+          }
+          if (!(this.state === this.STATE.SENT_ATTENTION && request.paused)) {
+            request.emit('row', token.columns);
+          }
         }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
@@ -807,58 +871,81 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnStatus', (token) => {
-      if (this.request) {
-        // Keep value for passing in 'doneProc' event.
-        this.procReturnStatusValue = token.value;
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          // Keep value for passing in 'doneProc' event.
+          this.procReturnStatusValue = token.value;
+        }
       }
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
-      if (this.request) {
-        this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
-      if (this.request) {
-        this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = undefined;
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
+          this.procReturnStatusValue = undefined;
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
-      if (this.request) {
-        this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneInProc', token.rowCount, token.more, request.rst);
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('done', (token) => {
-      if (this.request) {
+      const request = this.request;
+      if (request) {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
-        if (token.sqlError && !this.request.error) {
-          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-          this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-        }
-        this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+
+        if (request.canceled) {
+          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
+          // We assume this is the indication that an in-flight request was canceled.
+          if (token.sqlError && !request.error) {
+            this.clearCancelTimer();
+            request.error = RequestError('Canceled.', 'ECANCEL');
+          }
+        } else {
+          if (token.sqlError && !request.error) {
+            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+          }
+          request.emit('done', token.rowCount, token.more, request.rst);
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
@@ -954,9 +1041,20 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
   }
 
+  createCancelTimer() {
+    this.clearCancelTimer();
+    const timeout = this.config.options.cancelTimeout;
+    if (timeout > 0) {
+      this.cancelTimer = setTimeout(() => {
+        this.cancelTimeout();
+      }, timeout);
+    }
+  }
+
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const request = this.request;
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
@@ -979,10 +1077,19 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
+  cancelTimeout() {
+    const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
+    this.debug.log(message);
+    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+  }
+
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    this.transitionTo(this.STATE.SENT_ATTENTION);
+    const request = this.request;
+    request.cancel();
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
+    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+    request.error = RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -994,6 +1101,12 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
+    }
+  }
+
+  clearCancelTimer() {
+    if (this.cancelTimer) {
+      clearTimeout(this.cancelTimer);
     }
   }
 
@@ -1021,7 +1134,7 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -1101,29 +1214,7 @@ class Connection extends EventEmitter {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
-  processPreLoginResponse() {
-    const preloginPayload = new PreloginPayload(this.messageBuffer);
-    this.debug.payload(function() {
-      return preloginPayload.toString('  ');
-    });
-
-    if (preloginPayload.fedAuthRequired === 1) {
-      this.fedAuthRequired = true;
-    }
-
-    if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-      if (!this.config.options.encrypt) {
-        this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
-      }
-
-      this.dispatchEvent('tls');
-    } else {
-      this.dispatchEvent('noTls');
-    }
-  }
-
-  sendLogin7Packet(cb) {
+  sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -1170,33 +1261,6 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return payload.toString('  ');
     });
-
-    process.nextTick(cb);
-  }
-
-  sendNTLMResponsePacket() {
-    const { authentication } = this.config;
-
-    const payload = new NTLMResponsePayload({
-      domain: authentication.options.domain,
-      userName: authentication.options.userName,
-      password: authentication.options.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    this.debug.payload(function() {
-      return payload.toString('  ');
-    });
-
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-    });
   }
 
   sendFedAuthResponsePacket(tokenResponse) {
@@ -1208,9 +1272,7 @@ class Connection extends EventEmitter {
     data.write(tokenResponse.accessToken, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-    });
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
@@ -1342,45 +1404,6 @@ class Connection extends EventEmitter {
     this.emit('connect');
   }
 
-  processLogin7Response() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMResponse() {
-    if (this.ntlmpacket) {
-      this.dispatchEvent('receivedChallenge');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMAck() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
   execSqlBatch(request) {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, this.currentTransactionDescriptor(), this.config.options));
   }
@@ -1388,10 +1411,11 @@ class Connection extends EventEmitter {
   execSql(request) {
     request.transformIntoExecuteSqlRpc();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1421,6 +1445,7 @@ class Connection extends EventEmitter {
   }
 
   execBulkLoad(bulkLoad) {
+    bulkLoad.executionStarted = true;
     const request = new Request(bulkLoad.getBulkInsertSql(), (error) => {
       if (error) {
         if (error.code === 'UNKNOWN') {
@@ -1428,9 +1453,14 @@ class Connection extends EventEmitter {
         }
         bulkLoad.error = error;
         bulkLoad.callback(error);
-      } else {
-        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
+        return;
       }
+
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, undefined);
+    });
+
+    bulkLoad.once('cancel', () => {
+      request.cancel();
     });
 
     this.execSqlBatch(request);
@@ -1449,10 +1479,11 @@ class Connection extends EventEmitter {
   execute(request, parameters) {
     request.transformIntoExecuteRpc(parameters);
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
 
       return;
@@ -1464,10 +1495,11 @@ class Connection extends EventEmitter {
   callProcedure(request) {
     request.validateParameters();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1546,24 +1578,20 @@ class Connection extends EventEmitter {
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction((txErr) => {
+          this.rollbackTransaction((txErr) => {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
       } else {
         if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
+          if (this.config.options.tdsVersion < '7_2') {
+            this.transactionDepth--;
+          }
+          done(null, ...args);
         } else {
-          return this.commitTransaction((txErr) => {
+          this.commitTransaction((txErr) => {
             done(txErr, ...args);
           }, name);
         }
@@ -1600,6 +1628,10 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
+    } else if (request.canceled) {
+      process.nextTick(() => {
+        request.callback(RequestError('Canceled.', 'ECANCEL'));
+      });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
@@ -1612,13 +1644,57 @@ class Connection extends EventEmitter {
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
-      this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
-      this.resetConnectionOnNextRequest = false;
-      this.debug.payload(function() {
-        return payload.toString('  ');
+
+      let message;
+
+      this.request.once('cancel', () => {
+        if (!this.isRequestActive(request)) {
+          // Cancel was called on a request that is no longer active on this connection
+          return;
+        }
+
+        // There's two ways to handle request cancelation:
+        if (message.writable) {
+          // - if the message is still writable, we'll set the ignore bit
+          //   and end the message.
+          message.ignore = true;
+          message.end();
+        } else {
+          // - but if the message has been ended (and thus has been fully sent off),
+          //   we need to send an `ATTENTION` message to the server
+          this.messageIo.sendMessage(TYPE.ATTENTION);
+          this.transitionTo(this.STATE.SENT_ATTENTION);
+        }
+
+        this.clearRequestTimer();
+        this.createCancelTimer();
       });
+
+      if (request instanceof BulkLoad) {
+        message = request.getMessageStream();
+
+        // If the bulkload was not put into streaming mode by the user,
+        // we end the rowToPacketTransform here for them.
+        //
+        // If it was put into streaming mode, it's the user's responsibility
+        // to end the stream.
+        if (!request.streamingMode) {
+          request.rowToPacketTransform.end();
+        }
+        this.messageIo.outgoingMessageStream.write(message);
+      } else {
+        this.createRequestTimer();
+
+        message = this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload.toString('  ');
+        });
+      }
+
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
       if (request.paused) { // Request.pause() has been called before the request was started
         this.pauseRequest(request);
       }
@@ -1626,16 +1702,16 @@ class Connection extends EventEmitter {
   }
 
   cancel() {
-    if (this.state !== this.STATE.SENT_CLIENT_REQUEST) {
-      const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
-      this.debug.log(message);
+    if (!this.request) {
       return false;
-    } else {
-      this.request.canceled = true;
-      this.messageIo.sendMessage(TYPE.ATTENTION);
-      this.transitionTo(this.STATE.SENT_ATTENTION);
-      return true;
     }
+
+    if (this.request.canceled) {
+      return false;
+    }
+
+    this.request.cancel();
+    return true;
   }
 
   reset(callback) {
@@ -1646,7 +1722,7 @@ class Connection extends EventEmitter {
       callback(err);
     });
     this.resetConnectionOnNextRequest = true;
-    return this.execSqlBatch(request);
+    this.execSqlBatch(request);
   }
 
   currentTransactionDescriptor() {
@@ -1706,21 +1782,33 @@ Connection.prototype.STATE = {
         this.addToMessageBuffer(data);
       },
       message: function() {
-        this.processPreLoginResponse();
-      },
-      noTls: function() {
-        this.sendLogin7Packet(() => {
+        const preloginPayload = new PreloginPayload(this.messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
+          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        } else {
+          this.sendLogin7Packet();
+
           const { authentication } = this.config;
           if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
-        });
-      },
-      tls: function() {
-        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
-        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        }
       }
     }
   },
@@ -1775,17 +1863,17 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet(() => {
-            const { authentication } = this.config;
+          this.sendLogin7Packet();
 
-            if (authentication.type === 'azure-active-directory-password') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          });
+          const { authentication } = this.config;
+
+          if (authentication.type === 'azure-active-directory-password') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+          } else if (authentication.type === 'ntlm') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
         }
       }
     }
@@ -1802,14 +1890,8 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
@@ -1832,7 +1914,22 @@ Connection.prototype.STATE = {
         }
       },
       message: function() {
-        this.processLogin7Response();
+        if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else {
+          if (this.loginError) {
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
+          } else {
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.transitionTo(this.STATE.FINAL);
+          }
+        }
       }
     }
   },
@@ -1848,40 +1945,46 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       message: function() {
-        this.processLogin7NTLMResponse();
-      }
-    }
-  },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
-      message: function() {
-        this.processLogin7NTLMAck();
+        if (this.ntlmpacket) {
+          const { authentication } = this.config;
+
+          const payload = new NTLMResponsePayload({
+            domain: authentication.options.domain,
+            userName: authentication.options.userName,
+            password: authentication.options.password,
+            database: this.config.options.database,
+            appName: this.config.options.appName,
+            packetSize: this.config.options.packetSize,
+            tdsVersion: this.config.options.tdsVersion,
+            ntlmpacket: this.ntlmpacket,
+            additional: this.additional
+          });
+
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.ntlmpacket = undefined;
+        } else {
+          if (this.loggedIn) {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          } else {
+            if (this.loginError) {
+              if (this.loginError.isTransient) {
+                this.debug.log('Initiating retry on transient error');
+                this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              } else {
+                this.emit('connect', this.loginError);
+                this.transitionTo(this.STATE.FINAL);
+              }
+            } else {
+              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+              this.transitionTo(this.STATE.FINAL);
+            }
+          }
+        }
       }
     }
   },
@@ -1897,8 +2000,8 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
+      routingChange: function() {
+        this.transitionTo(this.STATE.REROUTING);
       },
       fedAuthInfo: function(token) {
         this.fedAuthInfoToken = token;
@@ -1913,7 +2016,7 @@ Connection.prototype.STATE = {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
-              this.dispatchEvent('loginFailed');
+              this.transitionTo(this.STATE.FINAL);
               return;
             }
 
@@ -1921,12 +2024,17 @@ Connection.prototype.STATE = {
           });
         } else {
           if (this.loginError) {
-            this.emit('connect', this.loginError);
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else {
             this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.transitionTo(this.STATE.FINAL);
           }
-
-          this.dispatchEvent('loginFailed');
         }
       }
     }
@@ -1964,7 +2072,6 @@ Connection.prototype.STATE = {
     name: 'SentClientRequest',
     exit: function(nextState) {
       this.clearRequestTimer();
-
       if (nextState !== this.STATE.FINAL) {
         this.tokenStreamParser.resume();
       }
@@ -1973,8 +2080,9 @@ Connection.prototype.STATE = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
-        sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.clearRequestTimer(); // request timer is stopped on first data package
@@ -2008,8 +2116,13 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
@@ -2021,15 +2134,16 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
+          this.clearCancelTimer();
+
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
           } else {
-            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
-            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }
