@@ -78,13 +78,8 @@ exports.badCredentials = function(test) {
     test.expect(2);
   }
 
-  if (config.authentication) {
-    config.authentication.options.userName = 'bad-user';
-    config.authentication.options.password = 'bad-password';
-  } else {
-    config.userName = 'bad-user';
-    config.password = 'bad-password';
-  }
+  config.authentication.options.userName = 'bad-user';
+  config.authentication.options.password = 'bad-password';
 
   var connection = new Connection(config);
 
@@ -232,7 +227,8 @@ var DomainCaseEnum = {
 };
 
 var runNtlmTest = function(test, domainCase) {
-  if (!getNtlmConfig()) {
+  var ntlmConfig = getNtlmConfig();
+  if (!ntlmConfig) {
     console.log('Skipping ntlm test');
     test.done();
     return;
@@ -240,27 +236,20 @@ var runNtlmTest = function(test, domainCase) {
 
   test.expect(1);
 
-  var config = getConfig();
-  var ntlmConfig = getNtlmConfig();
-
-  config.userName = ntlmConfig.userName;
-  config.password = ntlmConfig.password;
-
   switch (domainCase) {
     case DomainCaseEnum.AsIs:
-      config.domain = ntlmConfig.domain;
       break;
     case DomainCaseEnum.Lower:
-      config.domain = ntlmConfig.domain.toLowerCase();
+      ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toLowerCase();
       break;
     case DomainCaseEnum.Upper:
-      config.domain = ntlmConfig.domain.toUpperCase();
+      ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toUpperCase();
       break;
     default:
       test.ok(false, 'Unexpected value for domainCase: ' + domainCase);
   }
 
-  var connection = new Connection(config);
+  var connection = new Connection(ntlmConfig);
 
   connection.on('connect', function(err) {
     test.ifError(err);
