@@ -30,8 +30,13 @@ before_install:
     echo '{
       "config": {
         "server": "localhost",
-        "userName": "sa",
-        "password": "yourStrong(!)Password",
+        "authentication": {
+          "type": "default",
+          "options": {
+            "userName": "sa",
+            "password": "yourStrong(!)Password"
+          }
+        },
         "options": {
           "port": 1433,
           "database": "master"
@@ -68,8 +73,13 @@ jobs:
         echo '{
           "config": {
             "server": "'${AZURE_SERVER}'",
-            "userName": "'${AZURE_USERNAME}'",
-            "password": "'${AZURE_PASS}'",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "'${AZURE_USERNAME}'",
+                "password": "'${AZURE_PASS}'"
+              }
+            },
             "options": {
               "database": "test"
             }

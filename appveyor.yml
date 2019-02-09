@@ -36,8 +36,13 @@ before_test:
       Set-Content -Value $('{
         "config": {
           "server": "localhost",
-          "userName": "sa",
-          "password": "Password12!",
+          "authentication": {
+            "type": "default",
+            "options": {
+              "userName": "sa",
+              "password": "Password12!"
+            }
+          },
           "options": {
             "database": "master"
           }
@@ -45,9 +50,14 @@ before_test:
 
         "ntlm": {
           "server": "localhost",
-          "userName": "' + $env:username + '",
-          "password": "' + [Microsoft.Win32.Registry]::GetValue("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "DefaultPassword", '') + '",
-          "domain": "' + $env:computername + '",
+          "authentication": {
+            "type": "ntlm",
+            "options": {
+              "userName": "' + $env:username + '",
+              "password": "' + [Microsoft.Win32.Registry]::GetValue("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "DefaultPassword", '') + '",
+              "domain": "' + $env:computername + '"
+            }
+          },
           "options": {
             "database": "master"
           }
