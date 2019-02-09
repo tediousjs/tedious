@@ -71,8 +71,7 @@ jobs:
             "userName": "'${AZURE_USERNAME}'",
             "password": "'${AZURE_PASS}'",
             "options": {
-              "database": "test",
-              "encrypt": true
+              "database": "test"
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -95,8 +94,7 @@ jobs:
               }
             },
             "options": {
-              "database": "test",
-              "encrypt": true
+              "database": "test"
             }
           }
         }' > ~/.tedious/test-connection.json

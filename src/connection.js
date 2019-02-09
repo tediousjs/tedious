@@ -444,8 +444,7 @@ class Connection extends EventEmitter {
 
         this.config.options.encrypt = config.options.encrypt;
       } else {
-        deprecate('The default value for `options.encrypt` will change from `false` to `true`. Please pass `false` explicitly if you want to retain current behaviour.');
-        this.config.options.encrypt = false;
+        this.config.options.encrypt = true;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
