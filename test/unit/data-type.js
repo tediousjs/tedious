@@ -1,38 +1,6 @@
 var TYPES = require('../../src/data-type');
 var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 
-function deprecationHandler() { }
-
-exports['Data Types with alias'] = {
-  setUp(done) {
-    process.on('deprecation', deprecationHandler);
-    done();
-  },
-
-  'should be available under both names': function(test) {
-    for (var alias of [
-      'UniqueIdentifier',
-      'Date',
-      'Time',
-      'DateTime2',
-      'DateTimeOffset'
-    ]) {
-      test.strictEqual(
-        TYPES.typeByName[alias],
-        TYPES.typeByName[`${alias}N`],
-        `Alias ${alias} is not pointing to ${alias}N type.`
-      );
-    }
-
-    test.done();
-  },
-
-  tearDown(done) {
-    process.removeListener('deprecation', deprecationHandler);
-    done();
-  }
-};
-
 // Test date calculation for non utc date during daylight savings period
 exports.smallDateTimeDaylightSaving = function(test) {
   var type = TYPES.typeByName['SmallDateTime'];
