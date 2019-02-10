@@ -133,11 +133,29 @@ exports.money = function(test) {
   execSql(test, TYPES.Money, 956455842.4566);
 };
 
-exports.uniqueIdentifier = function(test) {
+exports['UniqueIdentifier when `lowerCaseGuids` option is `false`'] = function(test) {
   execSql(
     test,
     TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
+    '01234567-89AB-CDEF-0123-456789ABCDEF',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    { lowerCaseGuids: false }
+  );
+};
+
+exports['UniqueIdentifier when `lowerCaseGuids` option is `true`'] = function(test) {
+  execSql(
+    test,
+    TYPES.UniqueIdentifier,
+    '01234567-89ab-cdef-0123-456789abcdef',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    { lowerCaseGuids: true }
   );
 };
 
@@ -542,12 +560,12 @@ exports.outputFloat = function(test) {
   execSqlOutput(test, TYPES.Float, 9654.2546456567565767644);
 };
 
-exports.outputUniqueIdentifier = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
-  );
+exports['UniqueIdentifier as output parameter when `lowerCaseGuids` option is `false`'] = function(test) {
+  execSqlOutput(test, TYPES.UniqueIdentifier, '01234567-89AB-CDEF-0123-456789ABCDEF', undefined, { lowerCaseGuids: false });
+};
+
+exports['UniqueIdentifier as output parameter when `lowerCaseGuids` option is `true`'] = function(test) {
+  execSqlOutput(test, TYPES.UniqueIdentifier, '01234567-89ab-cdef-0123-456789abcdef', undefined, { lowerCaseGuids: true });
 };
 
 exports.outputIntNull = function(test) {
@@ -836,7 +854,7 @@ end')\
   });
 };
 
-function execSql(test, type, value, tdsVersion, options, expectedValue, cast) {
+function execSql(test, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
   var config = getConfig();
   // config.options.packetSize = 32768
 
@@ -880,7 +898,9 @@ function execSql(test, type, value, tdsVersion, options, expectedValue, cast) {
     }
   });
 
-  var connection = new Connection(config);
+
+  const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
+  var connection = new Connection(connectionConfig);
 
   connection.on('connect', function(err) {
     test.ifError(err);
@@ -900,7 +920,7 @@ function execSql(test, type, value, tdsVersion, options, expectedValue, cast) {
   });
 }
 
-function execSqlOutput(test, type, value, expectedValue) {
+function execSqlOutput(test, type, value, expectedValue, connectionOptions) {
   test.expect(7);
 
   var config = getConfig();
@@ -939,7 +959,8 @@ function execSqlOutput(test, type, value, expectedValue) {
     test.ok(metadata);
   });
 
-  var connection = new Connection(config);
+  const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
+  var connection = new Connection(connectionConfig);
 
   connection.on('connect', function(err) {
     test.ifError(err);

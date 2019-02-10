@@ -167,10 +167,19 @@ exports.guidToArray = (test) => {
   test.done();
 };
 
-exports.arrayToGuid = (test) => {
+exports.arrayToLowerCaseGuid = (test) => {
   for (let i = 0; i < arrays.length; i++) {
     const array = arrays[i];
-    test.strictEqual(guidParser.arrayToGuid(array), upperGuids[i]);
+    test.strictEqual(guidParser.arrayToLowerCaseGuid(array), lowerGuids[i]);
+  }
+
+  test.done();
+};
+
+exports.arrayToUpperCaseGuid = (test) => {
+  for (let i = 0; i < arrays.length; i++) {
+    const array = arrays[i];
+    test.strictEqual(guidParser.arrayToUpperCaseGuid(array), upperGuids[i]);
   }
 
   test.done();
