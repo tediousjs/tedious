@@ -485,7 +485,7 @@ exports.imageNull = function(test) {
 exports.guid = function(test) {
   execSql(
     test,
-    "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)",
+    "select cast('01234567-89ab-cdef-0123-456789abcdef' as uniqueidentifier)",
     '01234567-89AB-CDEF-0123-456789ABCDEF'
   );
 };
@@ -534,9 +534,9 @@ exports.variantMultipleDatatypes = function(test) {
   [c0] [int] IDENTITY(1,1),
   [c1] [sql_variant] NULL);
   insert into #tab1 ([c1]) values (N'abcdШ');
-  insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));	
+  insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));
   insert into #tab1 ([c1]) select cast(0x1234 as varbinary(16));
-  insert into #tab1 ([c1]) select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier); 
+  insert into #tab1 ([c1]) select cast('01234567-89ab-cdef-0123-456789abcdef' as uniqueidentifier);
   insert into #tab1 ([c1]) values (0.00000090000000000);	--decimal(38,17);
   insert into #tab1 ([c1]) select cast('2011-12-4 10:04:23' as datetime);
   insert into #tab1 ([c1]) select cast('abcde' as varchar(10));

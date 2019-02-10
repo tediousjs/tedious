@@ -633,7 +633,7 @@ module.exports.intN = function(test) {
   test.done();
 };
 
-module.exports.guidN = function(test) {
+module.exports['parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`'] = function(test) {
   var colMetaData = [
     { type: dataTypeByName.UniqueIdentifier },
     { type: dataTypeByName.UniqueIdentifier }
@@ -665,7 +665,7 @@ module.exports.guidN = function(test) {
   );
   // console.log(buffer.data)
 
-  var parser = new Parser({ token() {} }, colMetaData, options);
+  var parser = new Parser({ token() {} }, colMetaData, Object.assign({ lowerCaseGuids: false }, options));
   parser.write(buffer.data);
   var token = parser.read();
   //console.log(token)
@@ -674,6 +674,53 @@ module.exports.guidN = function(test) {
   test.strictEqual(token.columns[0].value, null);
   test.deepEqual(
     '67452301-AB89-EFCD-0123-456789ABCDEF',
+    token.columns[1].value
+  );
+
+  test.done();
+};
+
+module.exports['parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`'] = function(test) {
+  var colMetaData = [
+    { type: dataTypeByName.UniqueIdentifier },
+    { type: dataTypeByName.UniqueIdentifier }
+  ];
+
+  var buffer = new WritableTrackingBuffer(0, 'ucs2');
+  buffer.writeUInt8(0xd1);
+  buffer.writeBuffer(
+    Buffer.from([
+      0,
+      16,
+      0x01,
+      0x23,
+      0x45,
+      0x67,
+      0x89,
+      0xab,
+      0xcd,
+      0xef,
+      0x01,
+      0x23,
+      0x45,
+      0x67,
+      0x89,
+      0xab,
+      0xcd,
+      0xef
+    ])
+  );
+  // console.log(buffer.data)
+
+  var parser = new Parser({ token() {} }, colMetaData, Object.assign({ lowerCaseGuids: true }, options));
+  parser.write(buffer.data);
+  var token = parser.read();
+  //console.log(token)
+
+  test.strictEqual(token.columns.length, 2);
+  test.strictEqual(token.columns[0].value, null);
+  test.deepEqual(
+    '67452301-ab89-efcd-0123-456789abcdef',
     token.columns[1].value
   );
 
