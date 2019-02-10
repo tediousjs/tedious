@@ -749,7 +749,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      if (!token['interface']) {
+      if (!token.interface) {
         // unsupported interface
         this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
@@ -1564,17 +1564,15 @@ class Connection extends EventEmitter {
         } else {
           done(err, ...args);
         }
-      } else {
-        if (useSavepoint) {
-          if (this.config.options.tdsVersion < '7_2') {
-            this.transactionDepth--;
-          }
-          done(null, ...args);
-        } else {
-          this.commitTransaction((txErr) => {
-            done(txErr, ...args);
-          }, name);
+      } else if (useSavepoint) {
+        if (this.config.options.tdsVersion < '7_2') {
+          this.transactionDepth--;
         }
+        done(null, ...args);
+      } else {
+        this.commitTransaction((txErr) => {
+          done(txErr, ...args);
+        }, name);
       }
     };
 
@@ -1883,32 +1881,28 @@ Connection.prototype.STATE = {
             this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
+        } else if (token.fedAuth === undefined) {
+          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+          this.loggedIn = false;
         } else {
-          if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Received acknowledgement for unknown feature');
-            this.loggedIn = false;
-          } else {
-            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-            this.loggedIn = false;
-          }
+          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+          this.loggedIn = false;
         }
       },
       message: function() {
         if (this.loggedIn) {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
@@ -1947,23 +1941,19 @@ Connection.prototype.STATE = {
           });
 
           this.ntlmpacket = undefined;
-        } else {
-          if (this.loggedIn) {
-            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            if (this.loginError) {
-              if (this.loginError.isTransient) {
-                this.debug.log('Initiating retry on transient error');
-                this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-              } else {
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
-              }
-            } else {
-              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-              this.transitionTo(this.STATE.FINAL);
-            }
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
@@ -2002,19 +1992,17 @@ Connection.prototype.STATE = {
 
             this.sendFedAuthResponsePacket(tokenResponse);
           });
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }

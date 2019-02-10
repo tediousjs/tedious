@@ -85,9 +85,9 @@ exports.extendedErrorInfo = function(test) {
     // The procedure name will actually be padded to 128 chars with underscores and
     // some random hexadecimal digits.
     test.ok(
-      (err.procName != null
-        ? err.procName.indexOf('#testExtendedErrorInfo')
-        : undefined) === 0,
+      (err.procName != null ?
+        err.procName.indexOf('#testExtendedErrorInfo') :
+        undefined) === 0,
       `err.procName should begin with #testExtendedErrorInfo, was actually ${err.procName}`
     );
     test.strictEqual(err.lineNumber, 1, 'err.lineNumber should be 1');
@@ -119,7 +119,7 @@ exports.extendedErrorInfo = function(test) {
   }
 };
 
-var execSql = function(test, sql, requestCallback) {
+function execSql(test, sql, requestCallback) {
   var connection = new Connection(config);
 
   var request = new Request(sql, function() {
@@ -141,4 +141,4 @@ var execSql = function(test, sql, requestCallback) {
       console.log(message);
     });
   }
-};
+}

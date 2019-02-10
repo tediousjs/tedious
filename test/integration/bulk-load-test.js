@@ -139,10 +139,7 @@ exports.bulkLoadError = function(test) {
 
 exports['bulkLoad - verify constraints'] = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable3', {checkConstraints: true}, function(
-    err,
-    rowCount
-  ) {
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, function(err, rowCount) {
     test.ok(
       err,
       'An error should have been thrown to indicate the conflict with the CHECK constraint.'
@@ -152,26 +149,22 @@ exports['bulkLoad - verify constraints'] = function(test) {
   bulkLoad.addColumn('id', TYPES.Int, {
     nullable: true
   });
-  const request = new Request(
-    'CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))',
-    function(err) {
-      test.ifError(err);
-      bulkLoad.addRow({
-        id: 555
-      });
-      connection.execBulkLoad(bulkLoad);
-    }
-  );
+  const request = new Request(`
+    CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))
+  `, function(err) {
+    test.ifError(err);
+    bulkLoad.addRow({
+      id: 555
+    });
+    connection.execBulkLoad(bulkLoad);
+  });
   connection.execSqlBatch(request);
 };
 
 exports['bulkLoad - verify trigger'] = function(test) {
   test.expect(6);
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('testTable4', {fireTriggers: true}, function(
-    err,
-    rowCount
-  ) {
+  const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, function(err, rowCount) {
     test.ifError(err);
     connection.execSql(request_verify);
   });
@@ -179,30 +172,27 @@ exports['bulkLoad - verify trigger'] = function(test) {
     nullable: true
   });
   const createTable = 'CREATE TABLE testTable4 ([id] int);';
-  const createTrigger =
-    `CREATE TRIGGER bulkLoadTest on testTable4
+  const createTrigger = `
+    CREATE TRIGGER bulkLoadTest on testTable4
     AFTER INSERT
     AS
-    INSERT INTO testTable4 SELECT * FROM testTable4;`;
+    INSERT INTO testTable4 SELECT * FROM testTable4;
+  `;
   const verifyTrigger = 'SELECT COUNT(*) FROM testTable4';
   const dropTable = 'DROP TABLE testTable4';
 
-  const request_table = new Request(createTable,
-    function(err) {
-      test.ifError(err);
-      connection.execSql(request_trigger);
-    }
-  );
+  const request_table = new Request(createTable, function(err) {
+    test.ifError(err);
+    connection.execSql(request_trigger);
+  });
 
-  const request_trigger = new Request(createTrigger,
-    function(err) {
-      test.ifError(err);
-      bulkLoad.addRow({
-        id: 555
-      });
-      connection.execBulkLoad(bulkLoad);
-    }
-  );
+  const request_trigger = new Request(createTrigger, function(err) {
+    test.ifError(err);
+    bulkLoad.addRow({
+      id: 555
+    });
+    connection.execBulkLoad(bulkLoad);
+  });
 
   const request_verify = new Request(verifyTrigger, function(err) {
     test.ifError(err);
@@ -223,7 +213,7 @@ exports['bulkLoad - verify trigger'] = function(test) {
 
 exports['bulkLoad - verify null value'] = function(test) {
   const connection = this.connection;
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', {keepNulls: true}, function(
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(
     err,
     rowCount
   ) {
@@ -233,16 +223,15 @@ exports['bulkLoad - verify null value'] = function(test) {
   bulkLoad.addColumn('id', TYPES.Int, {
     nullable: true
   });
-  const request = new Request(
-    'CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)',
-    function(err) {
-      test.ifError(err);
-      bulkLoad.addRow({
-        id: null
-      });
-      connection.execBulkLoad(bulkLoad);
-    }
-  );
+  const request = new Request(`
+    CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)
+  `, function(err) {
+    test.ifError(err);
+    bulkLoad.addRow({
+      id: null
+    });
+    connection.execBulkLoad(bulkLoad);
+  });
   const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err) {
     test.ifError(err);
     test.done();
@@ -292,7 +281,7 @@ exports['bulkLoad - cancel after request send does nothing'] = function(test) {
 exports['bulkLoad - cancel after request completed'] = function(test) {
   const connection = this.connection;
 
-  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', {keepNulls: true}, function(err, rowCount) {
+  const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
     test.ifError(err);
 
     bulkLoad.cancel();
@@ -349,7 +338,7 @@ exports.testStreamingBulkLoad = function(test) {
 
   function startBulkLoad() {
     const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
-    bulkLoad.addColumn('i', TYPES.Int, {nullable: false});
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
     const rowStream = bulkLoad.getRowStream();
     connection.execBulkLoad(bulkLoad);
 
@@ -381,11 +370,11 @@ exports.testStreamingBulkLoad = function(test) {
   }
 
   function startVerifyTableContent() {
-    const sql =
-      'select count(*) ' +
-        'from ' + tableName + ' a ' +
-          'inner join ' + tableName + ' b on a.i = b.i - 1';
-    const request = new Request(sql, completeVerifyTableContent);
+    const request = new Request(`
+      select count(*)
+      from ${tableName} a
+      inner join ${tableName} b on a.i = b.i - 1
+    `, completeVerifyTableContent);
     request.on('row', (row) => {
       test.equals(row[0].value, totalRows - 1);
     });

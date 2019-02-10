@@ -40,7 +40,7 @@ module.exports.tokenSplitAcrossBuffers = function(test) {
   test.done();
 };
 
-var createDbChangeBuffer = function() {
+function createDbChangeBuffer() {
   var oldDb = 'old';
   var newDb = 'new';
   var buffer = new WritableTrackingBuffer(50, 'ucs2');
@@ -54,7 +54,7 @@ var createDbChangeBuffer = function() {
   buffer.writeString(oldDb);
 
   buffer.data.writeUInt16LE(buffer.data.length - (1 + 2), 1);
-  //console.log(buffer)
+  // console.log(buffer)
 
   return buffer.data;
-};
+}

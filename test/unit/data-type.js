@@ -3,7 +3,7 @@ var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-trackin
 
 // Test date calculation for non utc date during daylight savings period
 exports.smallDateTimeDaylightSaving = function(test) {
-  var type = TYPES.typeByName['SmallDateTime'];
+  var type = TYPES.typeByName.SmallDateTime;
   for (var testSet of [
     [new Date(2015, 5, 18, 23, 59, 59), 42171],
     [new Date(2015, 5, 19, 0, 0, 0), 42172],
@@ -20,7 +20,7 @@ exports.smallDateTimeDaylightSaving = function(test) {
 };
 
 exports.dateTimeDaylightSaving = function(test) {
-  var type = TYPES.typeByName['DateTime'];
+  var type = TYPES.typeByName.DateTime;
   for (var testSet of [
     [new Date(2015, 5, 18, 23, 59, 59), 42171],
     [new Date(2015, 5, 19, 0, 0, 0), 42172],
@@ -37,7 +37,7 @@ exports.dateTimeDaylightSaving = function(test) {
 };
 
 exports.dateTime2DaylightSaving = function(test) {
-  var type = TYPES.typeByName['DateTime2'];
+  var type = TYPES.typeByName.DateTime2;
   for (const [value, expectedBuffer] of [
     [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('067f5101163a0b', 'hex')],
     [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('06000000173a0b', 'hex')],
@@ -52,7 +52,7 @@ exports.dateTime2DaylightSaving = function(test) {
 };
 
 exports.dateDaylightSaving = function(test) {
-  var type = TYPES.typeByName['Date'];
+  var type = TYPES.typeByName.Date;
   for (const [value, expectedBuffer] of [
     [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('03163a0b', 'hex')],
     [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('03173a0b', 'hex')],
@@ -69,7 +69,7 @@ exports.dateDaylightSaving = function(test) {
 
 // Test rounding of nanosecondDelta
 exports.nanoSecondRounding = function(test) {
-  const type = TYPES.typeByName['Time'];
+  const type = TYPES.typeByName.Time;
   for (const [value, nanosecondDelta, scale, expectedBuffer] of [
     [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, Buffer.from('0568fc624b91', 'hex')],
     [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, Buffer.from('05c422ceb80c', 'hex')],

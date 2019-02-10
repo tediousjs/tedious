@@ -1,7 +1,7 @@
 var Parser = require('../../../src/token/stream-parser');
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
-var parse = function(status, curCmd, doneRowCount) {
+function parse(status, curCmd, doneRowCount) {
   var doneRowCountLow = doneRowCount % 0x100000000;
   var doneRowCountHi = ~~(doneRowCount / 0x100000000);
 
@@ -16,7 +16,7 @@ var parse = function(status, curCmd, doneRowCount) {
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
   return parser.read();
-};
+}
 
 module.exports.done = function(test) {
   var status = 0x0000;

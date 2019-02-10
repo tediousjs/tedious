@@ -9,7 +9,7 @@ import type { Socket } from 'net';
 
 const tls = require('tls');
 const DuplexPair = require('native-duplexpair');
-const { EventEmitter} = require('events');
+const { EventEmitter } = require('events');
 
 const { TYPE } = require('./packet');
 

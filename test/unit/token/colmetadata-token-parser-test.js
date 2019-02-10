@@ -17,12 +17,12 @@ module.exports.int = function(test) {
   buffer.writeUInt16LE(flags);
   buffer.writeUInt8(dataTypeByName.Int.id);
   buffer.writeBVarchar(columnName);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new TokenStreamParser({ token() {} }, {}, {});
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.ok(!token.error);
   test.strictEqual(token.columns.length, 1);
@@ -52,12 +52,12 @@ module.exports.varchar = function(test) {
   buffer.writeUInt16LE(length);
   buffer.writeBuffer(collation);
   buffer.writeBVarchar(columnName);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new TokenStreamParser({ token() {} }, {}, {});
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.ok(!token.error);
   test.strictEqual(token.columns.length, 1);

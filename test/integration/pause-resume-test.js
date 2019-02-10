@@ -37,7 +37,7 @@ exports.testPausedRequestDoesNotEmitRowsAfterConnectionClose = function(test) {
   });
 
   request.on('row', (columns) => {
-    if (columns[0].value == 1000) {
+    if (columns[0].value === 1000) {
       request.pause();
 
       setTimeout(() => {
@@ -79,7 +79,7 @@ exports.testPausedRequestCanBeResumed = function(test) {
 
     test.strictEqual(columns[0].value, rowsReceived);
 
-    if (columns[0].value == 1000) {
+    if (columns[0].value === 1000) {
       paused = true;
       request.pause();
 
@@ -107,7 +107,7 @@ exports.testPausingRequestPausesTransforms = function(test) {
   });
 
   request.on('row', (columns) => {
-    if (columns[0].value == 1000) {
+    if (columns[0].value === 1000) {
       request.pause();
 
       setTimeout(() => {
@@ -142,7 +142,7 @@ exports.testPausedRequestCanBeCancelled = function(test) {
     });
 
     request.on('row', (columns) => {
-      if (columns[0].value == 1000) {
+      if (columns[0].value === 1000) {
         request.pause();
 
         setTimeout(() => {

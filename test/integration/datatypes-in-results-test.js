@@ -534,21 +534,23 @@ exports.variantMultipleDatatypes = function(test) {
   [c0] [int] IDENTITY(1,1),
   [c1] [sql_variant] NULL);
   insert into #tab1 ([c1]) values (N'abcdШ');
-  insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));	
+  insert into #tab1 ([c1]) select cast(3148.29 as decimal(20,8));
   insert into #tab1 ([c1]) select cast(0x1234 as varbinary(16));
-  insert into #tab1 ([c1]) select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier); 
-  insert into #tab1 ([c1]) values (0.00000090000000000);	--decimal(38,17);
+  insert into #tab1 ([c1]) select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier);
+  insert into #tab1 ([c1]) values (0.00000090000000000); -- decimal(38,17);
   insert into #tab1 ([c1]) select cast('2011-12-4 10:04:23' as datetime);
   insert into #tab1 ([c1]) select cast('abcde' as varchar(10));
   select [c1] from #tab1 ORDER BY [c0];
   `;
-  const expectedValues = ['abcdШ',
+  const expectedValues = [
+    'abcdШ',
     3148.29,
     Buffer.from([0x12, 0x34]),
     '01234567-89AB-CDEF-0123-456789ABCDEF',
     0.00000090000000000,
     new Date('December 4, 2011 10:04:23 GMT'),
-    'abcde'];
+    'abcde'
+  ];
   execSql(test, sql, expectedValues);
 };
 
@@ -659,7 +661,7 @@ exports.udtNull = function(test) {
   execSql(test, 'select cast(null as geography)', null, '7_2');
 };
 
-var execSql = function(test, sql, expectedValue, tdsVersion) {
+function execSql(test, sql, expectedValue, tdsVersion) {
   if (tdsVersion && tdsVersion > config.options.tdsVersion) {
     test.done();
     return;
@@ -707,4 +709,4 @@ var execSql = function(test, sql, expectedValue, tdsVersion) {
       console.log(message);
     }
   });
-};
+}

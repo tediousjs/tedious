@@ -9,7 +9,7 @@ const SequentialConnectionStrategy = require('../../src/connector')
   .SequentialConnectionStrategy;
 const Connector = require('../../src/connector').Connector;
 
-const connectToIpTestImpl = function(hostIp, localIp, mitm, test) {
+function connectToIpTestImpl(hostIp, localIp, mitm, test) {
   const connectionOptions = {
     host: hostIp,
     port: 12345,
@@ -31,17 +31,17 @@ const connectToIpTestImpl = function(hostIp, localIp, mitm, test) {
 
     test.done();
   });
-};
+}
 
 exports['Connector with MultiSubnetFailover'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.mitm = new Mitm();
     this.mitm.enable();
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     this.mitm.disable();
     sinon.restore();
 
@@ -72,14 +72,14 @@ exports['Connector with MultiSubnetFailover'] = {
 };
 
 exports['Connector without MultiSubnetFailover'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.mitm = new Mitm();
     this.mitm.enable();
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     this.mitm.disable();
     sinon.restore();
 
@@ -128,15 +128,15 @@ exports['Connector without MultiSubnetFailover'] = {
   }
 };
 
-exports['SequentialConnectionStrategy'] = {
-  setUp: function(done) {
+exports.SequentialConnectionStrategy = {
+  'setUp': function(done) {
     this.mitm = new Mitm();
     this.mitm.enable();
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     this.mitm.disable();
 
     done();
@@ -315,15 +315,15 @@ exports['SequentialConnectionStrategy'] = {
   }
 };
 
-exports['ParallelConnectionStrategy'] = {
-  setUp: function(done) {
+exports.ParallelConnectionStrategy = {
+  'setUp': function(done) {
     this.mitm = new Mitm();
     this.mitm.enable();
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     this.mitm.disable();
 
     done();
@@ -452,14 +452,14 @@ exports['ParallelConnectionStrategy'] = {
 };
 
 exports['Test unicode SQL Server name'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
     this.spy = sinon.spy(dns, 'lookup');
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
 
     done();

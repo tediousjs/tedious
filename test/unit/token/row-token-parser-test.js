@@ -48,7 +48,7 @@ module.exports.bigint = function(test) {
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 2);
   test.strictEqual('1', token.columns[0].value);
@@ -68,7 +68,7 @@ module.exports.real = function(test) {
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -90,7 +90,7 @@ module.exports.float = function(test) {
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -129,7 +129,7 @@ module.exports.money = function(test) {
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 6);
   test.strictEqual(token.columns[0].value, value);
@@ -156,12 +156,12 @@ module.exports.varCharWithoutCodepage = function(test) {
   var buffer = new WritableTrackingBuffer(0, 'ascii');
   buffer.writeUInt8(0xd1);
   buffer.writeUsVarchar(value);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -184,12 +184,12 @@ module.exports.varCharWithCodepage = function(test) {
   var buffer = new WritableTrackingBuffer(0, 'ascii');
   buffer.writeUInt8(0xd1);
   buffer.writeUsVarchar(value);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -206,12 +206,12 @@ module.exports.nVarChar = function(test) {
   buffer.writeUInt8(0xd1);
   buffer.writeUInt16LE(value.length * 2);
   buffer.writeString(value);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -228,12 +228,12 @@ module.exports.varBinary = function(test) {
   buffer.writeUInt8(0xd1);
   buffer.writeUInt16LE(value.length);
   buffer.writeBuffer(Buffer.from(value));
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.deepEqual(token.columns[0].value, value);
@@ -250,12 +250,12 @@ module.exports.binary = function(test) {
   buffer.writeUInt8(0xd1);
   buffer.writeUInt16LE(value.length);
   buffer.writeBuffer(Buffer.from(value));
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.deepEqual(token.columns[0].value, value);
@@ -280,12 +280,12 @@ module.exports.varCharMaxNull = function(test) {
   buffer.writeBuffer(
     Buffer.from([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
   );
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);
@@ -316,12 +316,12 @@ module.exports.varCharMaxUnknownLength = function(test) {
   buffer.writeUInt32LE(3);
   buffer.writeString(value.slice(3, 6));
   buffer.writeUInt32LE(0);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -350,12 +350,12 @@ module.exports.varCharMaxKnownLength = function(test) {
   buffer.writeUInt32LE(3);
   buffer.writeString(value.slice(3, 6));
   buffer.writeUInt32LE(0);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -384,12 +384,12 @@ module.exports.varCharMaxWithCodepage = function(test) {
   buffer.writeUInt32LE(3);
   buffer.writeString(value.slice(3, 6));
   buffer.writeUInt32LE(0);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -415,14 +415,14 @@ module.exports.varCharMaxKnownLengthWrong = function(test) {
   buffer.writeUInt32LE(3);
   buffer.writeString(value.slice(3, 6));
   buffer.writeUInt32LE(0);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   try {
     var parser = new Parser({ token() {} }, colMetaData, options);
     parser.write(buffer.data);
     parser.read();
     test.ok(false);
-  } catch (exception) {
+  } catch {
     test.done();
   }
 };
@@ -440,12 +440,12 @@ module.exports.varBinaryMaxNull = function(test) {
   buffer.writeBuffer(
     Buffer.from([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
   );
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);
@@ -473,12 +473,12 @@ module.exports.varBinaryMaxUnknownLength = function(test) {
   buffer.writeUInt32LE(2);
   buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
   buffer.writeUInt32LE(0);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.deepEqual(token.columns[0].value, value);
@@ -609,12 +609,12 @@ module.exports.intN = function(test) {
       0
     ])
   );
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 12);
   test.strictEqual(token.columns[0].value, null);
@@ -668,7 +668,7 @@ module.exports.guidN = function(test) {
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 2);
   test.strictEqual(token.columns[0].value, null);
@@ -708,12 +708,12 @@ module.exports.floatN = function(test) {
       0x40
     ])
   );
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 3);
   test.strictEqual(token.columns[0].value, null);
@@ -734,12 +734,12 @@ module.exports.datetime = function(test) {
 
   buffer.writeInt32LE(days);
   buffer.writeUInt32LE(threeHundredthsOfSecond);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, { useUTC: false });
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(
@@ -750,7 +750,7 @@ module.exports.datetime = function(test) {
   parser = new Parser({ token() {} }, colMetaData, { useUTC: true });
   parser.write(buffer.data);
   token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(
@@ -768,12 +768,12 @@ module.exports.datetimeN = function(test) {
   buffer.writeUInt8(0xd1);
 
   buffer.writeUInt8(0);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);
@@ -798,12 +798,12 @@ module.exports.numeric4Bytes = function(test) {
   buffer.writeUInt8(1 + 4);
   buffer.writeUInt8(1); // positive
   buffer.writeUInt32LE(93);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -828,12 +828,12 @@ module.exports.numeric4BytesNegative = function(test) {
   buffer.writeUInt8(1 + 4);
   buffer.writeUInt8(0); // negative
   buffer.writeUInt32LE(93);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -859,12 +859,12 @@ module.exports.numeric8Bytes = function(test) {
   buffer.writeUInt8(1); // positive
   buffer.writeUInt32LE(93);
   buffer.writeUInt32LE(1);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -891,12 +891,12 @@ module.exports.numeric12Bytes = function(test) {
   buffer.writeUInt32LE(93);
   buffer.writeUInt32LE(2);
   buffer.writeUInt32LE(1);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -929,12 +929,12 @@ module.exports.numeric16Bytes = function(test) {
   buffer.writeUInt32LE(3);
   buffer.writeUInt32LE(2);
   buffer.writeUInt32LE(1);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, value);
@@ -955,12 +955,12 @@ module.exports.numericNull = function(test) {
   buffer.writeUInt8(0xd1);
 
   buffer.writeUInt8(0);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, colMetaData, options);
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 1);
   test.strictEqual(token.columns[0].value, null);

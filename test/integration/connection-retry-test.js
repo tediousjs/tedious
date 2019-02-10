@@ -3,7 +3,7 @@ const fs = require('fs');
 const sinon = require('sinon');
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
 
-const getConfig = function() {
+function getConfig() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
   if (config.authentication) {
     config.authentication.options.password = 'InvalidPassword';
@@ -14,15 +14,15 @@ const getConfig = function() {
   config.options.connectionRetryInterval = 25;
 
   return config;
-};
+}
 
 exports['connection retry tests'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.invalidLoginError = 18456;
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
     done();
   },

@@ -25,7 +25,7 @@ exports.createFromBuffer = function(test) {
   test.done();
 };
 
-var assertPayload = function(test, payload, encryptionString) {
+function assertPayload(test, payload, encryptionString) {
   test.strictEqual(payload.version.major, 0);
   test.strictEqual(payload.version.minor, 0);
   test.strictEqual(payload.version.patch, 0);
@@ -37,4 +37,4 @@ var assertPayload = function(test, payload, encryptionString) {
   test.strictEqual(payload.threadId, 0);
   test.strictEqual(payload.marsString, 'OFF');
   test.strictEqual(payload.fedAuthRequired, 1);
-};
+}

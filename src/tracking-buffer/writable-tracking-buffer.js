@@ -182,7 +182,7 @@ module.exports = class WritableTrackingBuffer {
   }
 
   writeString(value: string, encoding: ?Encoding) {
-    if (encoding == undefined) {
+    if (encoding == null) {
       encoding = this.encoding;
     }
 
@@ -206,7 +206,7 @@ module.exports = class WritableTrackingBuffer {
 
   // TODO: Figure out what types are passed in other than `Buffer`
   writeUsVarbyte(value: any, encoding: ?Encoding) {
-    if (encoding == undefined) {
+    if (encoding == null) {
       encoding = this.encoding;
     }
 
