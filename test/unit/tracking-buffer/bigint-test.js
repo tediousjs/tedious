@@ -172,7 +172,7 @@ module.exports.toInt64LE = function(test) {
   test.done();
 };
 
-var assertBuffer = function(test, actual, expected) {
+function assertBuffer(test, actual, expected) {
   for (var i = 0, end = actual.length; i < end; i++) {
     if (actual[i] !== expected[i]) {
       console.log('actual  ', actual);
@@ -180,4 +180,4 @@ var assertBuffer = function(test, actual, expected) {
       test.ok(false);
     }
   }
-};
+}

@@ -2,58 +2,6 @@ const net = require('net');
 const dns = require('dns');
 const punycode = require('punycode');
 
-class Connector {
-  constructor(options, multiSubnetFailover) {
-    this.options = options;
-    this.multiSubnetFailover = multiSubnetFailover;
-  }
-
-  execute(cb) {
-    if (net.isIP(this.options.host)) {
-      this.executeForIP(cb);
-    } else {
-      this.executeForHostname(cb);
-    }
-  }
-
-  executeForIP(cb) {
-    const socket = net.connect(this.options);
-
-    const onError = (err) => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
-      socket.destroy();
-
-      cb(err);
-    };
-
-    const onConnect = () => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
-      cb(null, socket);
-    };
-
-    socket.on('error', onError);
-    socket.on('connect', onConnect);
-  }
-
-  executeForHostname(cb) {
-    dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
-      if (err) {
-        return cb(err);
-      }
-
-      if (this.multiSubnetFailover) {
-        new ParallelConnectionStrategy(addresses, this.options).connect(cb);
-      } else {
-        new SequentialConnectionStrategy(addresses, this.options).connect(cb);
-      }
-    });
-  }
-}
-
 class ParallelConnectionStrategy {
   constructor(addresses, options) {
     this.addresses = addresses;
@@ -65,7 +13,7 @@ class ParallelConnectionStrategy {
     const sockets = new Array(addresses.length);
 
     let errorCount = 0;
-    const onError = function(err) {
+    function onError(err) {
       errorCount += 1;
 
       this.removeListener('error', onError);
@@ -74,9 +22,9 @@ class ParallelConnectionStrategy {
       if (errorCount === addresses.length) {
         callback(new Error('Could not connect (parallel)'));
       }
-    };
+    }
 
-    const onConnect = function() {
+    function onConnect() {
       for (let j = 0; j < sockets.length; j++) {
         const socket = sockets[j];
 
@@ -90,7 +38,7 @@ class ParallelConnectionStrategy {
       }
 
       callback(null, this);
-    };
+    }
 
     for (let i = 0, len = addresses.length; i < len; i++) {
       const socket = sockets[i] = net.connect(Object.create(this.options, {
@@ -141,6 +89,58 @@ class SequentialConnectionStrategy {
 
     socket.on('error', onError);
     socket.on('connect', onConnect);
+  }
+}
+
+class Connector {
+  constructor(options, multiSubnetFailover) {
+    this.options = options;
+    this.multiSubnetFailover = multiSubnetFailover;
+  }
+
+  execute(cb) {
+    if (net.isIP(this.options.host)) {
+      this.executeForIP(cb);
+    } else {
+      this.executeForHostname(cb);
+    }
+  }
+
+  executeForIP(cb) {
+    const socket = net.connect(this.options);
+
+    const onError = (err) => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
+
+      socket.destroy();
+
+      cb(err);
+    };
+
+    const onConnect = () => {
+      socket.removeListener('error', onError);
+      socket.removeListener('connect', onConnect);
+
+      cb(null, socket);
+    };
+
+    socket.on('error', onError);
+    socket.on('connect', onConnect);
+  }
+
+  executeForHostname(cb) {
+    dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
+      if (err) {
+        return cb(err);
+      }
+
+      if (this.multiSubnetFailover) {
+        new ParallelConnectionStrategy(addresses, this.options).connect(cb);
+      } else {
+        new SequentialConnectionStrategy(addresses, this.options).connect(cb);
+      }
+    });
   }
 }
 

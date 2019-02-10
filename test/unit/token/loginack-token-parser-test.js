@@ -26,7 +26,7 @@ module.exports.info = function(test) {
 
   var data = buffer.data;
   data.writeUInt16LE(data.length - 3, 1);
-  //console.log(buffer)
+  // console.log(buffer)
 
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(data);

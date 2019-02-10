@@ -3,61 +3,6 @@ const dns = require('dns');
 const net = require('net');
 const punycode = require('punycode');
 
-class Sender {
-  constructor(host, port, request) {
-    this.host = host;
-    this.port = port;
-    this.request = request;
-
-    this.parallelSendStrategy = null;
-  }
-
-  execute(cb) {
-    if (net.isIP(this.host)) {
-      this.executeForIP(cb);
-    } else {
-      this.executeForHostname(cb);
-    }
-  }
-
-  executeForIP(cb) {
-    this.executeForAddresses([{ address: this.host }], cb);
-  }
-
-  // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
-  invokeLookupAll(host, cb) {
-    dns.lookup(punycode.toASCII(host), { all: true }, cb);
-  }
-
-  executeForHostname(cb) {
-    this.invokeLookupAll(this.host, (err, addresses) => {
-      if (err) {
-        return cb(err);
-      }
-
-      this.executeForAddresses(addresses, cb);
-    });
-  }
-
-  // Wrapper for stubbing creation of Strategy object. Sinon support for constructors
-  // seems limited.
-  createParallelSendStrategy(addresses, port, request) {
-    return new ParallelSendStrategy(addresses, port, request);
-  }
-
-  executeForAddresses(addresses, cb) {
-    this.parallelSendStrategy =
-      this.createParallelSendStrategy(addresses, this.port, this.request);
-    this.parallelSendStrategy.send(cb);
-  }
-
-  cancel() {
-    if (this.parallelSendStrategy) {
-      this.parallelSendStrategy.cancel();
-    }
-  }
-}
-
 class ParallelSendStrategy {
   constructor(addresses, port, request) {
     this.addresses = addresses;
@@ -143,6 +88,61 @@ class ParallelSendStrategy {
 
   cancel() {
     this.clearSockets();
+  }
+}
+
+class Sender {
+  constructor(host, port, request) {
+    this.host = host;
+    this.port = port;
+    this.request = request;
+
+    this.parallelSendStrategy = null;
+  }
+
+  execute(cb) {
+    if (net.isIP(this.host)) {
+      this.executeForIP(cb);
+    } else {
+      this.executeForHostname(cb);
+    }
+  }
+
+  executeForIP(cb) {
+    this.executeForAddresses([{ address: this.host }], cb);
+  }
+
+  // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
+  invokeLookupAll(host, cb) {
+    dns.lookup(punycode.toASCII(host), { all: true }, cb);
+  }
+
+  executeForHostname(cb) {
+    this.invokeLookupAll(this.host, (err, addresses) => {
+      if (err) {
+        return cb(err);
+      }
+
+      this.executeForAddresses(addresses, cb);
+    });
+  }
+
+  // Wrapper for stubbing creation of Strategy object. Sinon support for constructors
+  // seems limited.
+  createParallelSendStrategy(addresses, port, request) {
+    return new ParallelSendStrategy(addresses, port, request);
+  }
+
+  executeForAddresses(addresses, cb) {
+    this.parallelSendStrategy =
+      this.createParallelSendStrategy(addresses, this.port, this.request);
+    this.parallelSendStrategy.send(cb);
+  }
+
+  cancel() {
+    if (this.parallelSendStrategy) {
+      this.parallelSendStrategy.cancel();
+    }
   }
 }
 

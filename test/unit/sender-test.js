@@ -17,24 +17,22 @@ const sendResultError = 1;
 const sendResultCancel = 2;
 
 // Stub function to mimic socket emitting 'error' and 'message' events.
-const emitEvent = function() {
+function emitEvent() {
   if (this.sendResult === sendResultError) {
     if (this.listeners('error') && this.listeners('error').length > 0) {
       this.emit('error', this);
     }
-  } else {
-    if (this.listeners('message') && this.listeners('message').length > 0) {
-      this.emit('message', this);
-    }
+  } else if (this.listeners('message') && this.listeners('message').length > 0) {
+    this.emit('message', this);
   }
-};
+}
 
 // Stub function to mimic socket 'send' without causing network activity.
-const sendStub = function(buffer, offset, length, port, ipAddress) {
+function sendStub(buffer, offset, length, port, ipAddress) {
   process.nextTick(emitEvent.bind(this));
-};
+}
 
-const sendToIpCommonTestSetup = function(ipAddress, udpVersion, sendResult) {
+function sendToIpCommonTestSetup(ipAddress, udpVersion, sendResult) {
   // Create socket exactly like the Sender class would create while stubbing
   // some methods for unit testing.
   this.testSocket = Dgram.createSocket(udpVersion);
@@ -50,9 +48,9 @@ const sendToIpCommonTestSetup = function(ipAddress, udpVersion, sendResult) {
   this.createSocketStub.withArgs(udpVersion).returns(this.testSocket);
 
   this.sender = new Sender(ipAddress, anyPort, anyRequest);
-};
+}
 
-const sendToIpCommonTestValidation = function(test, ipAddress) {
+function sendToIpCommonTestValidation(test, ipAddress) {
   test.ok(this.createSocketStub.calledOnce);
   test.ok(
     this.socketSendStub.withArgs(
@@ -63,10 +61,10 @@ const sendToIpCommonTestValidation = function(test, ipAddress) {
       ipAddress
     ).calledOnce
   );
-};
+}
 
 exports['Sender send to IP address'] = {
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
     done();
   },
@@ -128,7 +126,7 @@ exports['Sender send to IP address'] = {
   }
 };
 
-const sendToHostCommonTestSetup = function(lookupError) {
+function sendToHostCommonTestSetup(lookupError) {
   // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
   // method(s) on the ParallelSendStrategy class are/is being invoked. So we stub out
   // the methods to validate they're invoked correctly.
@@ -161,10 +159,10 @@ const sendToHostCommonTestSetup = function(lookupError) {
     .returns(testStrategy);
 
   this.sender.execute(callback);
-};
+}
 
 exports['Sender send to hostname'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     // Set of IP addresses to be returned by stubbed out lookupAll method.
     this.addresses = [
       { address: '127.0.0.2' },
@@ -175,7 +173,7 @@ exports['Sender send to hostname'] = {
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
     done();
   },
@@ -253,7 +251,7 @@ exports['Sender send to hostname'] = {
   }
 };
 
-const commonStrategyTestSetup = function() {
+function commonStrategyTestSetup() {
   // IP addresses returned by DNS reverse lookup and passed to the Strategy.
   this.testData = [
     { address: '1.2.3.4', udpVersion: udpIpv4 },
@@ -293,9 +291,9 @@ const commonStrategyTestSetup = function() {
     anyPort,
     anyRequest
   );
-};
+}
 
-const commonStrategyTestValidation = function(test) {
+function commonStrategyTestValidation(test) {
   for (const key in this.testSockets) {
     test.strictEqual(this.testSockets[key].socketSendStub.callCount, 2);
     test.strictEqual(this.testSockets[key].socketCloseSpy.callCount, 1);
@@ -304,15 +302,15 @@ const commonStrategyTestValidation = function(test) {
   test.strictEqual(this.createSocketStub.callCount, 2);
 
   test.done();
-};
+}
 
-exports['ParallelSendStrategy'] = {
-  setUp: function(done) {
+exports.ParallelSendStrategy = {
+  'setUp': function(done) {
     commonStrategyTestSetup.call(this);
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
     done();
   },

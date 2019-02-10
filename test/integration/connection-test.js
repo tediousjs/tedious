@@ -4,7 +4,7 @@ var Request = require('../../src/request');
 var fs = require('fs');
 const homedir = require('os').homedir();
 
-var getConfig = function() {
+function getConfig() {
   var config = JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
@@ -20,23 +20,23 @@ var getConfig = function() {
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
-};
+}
 
 process.on('uncaughtException', function(err) {
   console.error(err.stack);
 });
 
-var getInstanceName = function() {
+function getInstanceName() {
   return JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).instanceName;
-};
+}
 
-var getNtlmConfig = function() {
+function getNtlmConfig() {
   return JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).ntlm;
-};
+}
 
 exports.badServer = function(test) {
   var config = getConfig();
@@ -53,7 +53,7 @@ exports.badServer = function(test) {
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -94,18 +94,18 @@ exports.badCredentials = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('errorMessage', function(error) {
-    //console.log(`${error.number} : ${error.message}`)
+    // console.log(`${error.number} : ${error.message}`)
     return test.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
   });
 
   return connection.on(
     'debug',
     function(text) {}
-    //console.log(text)
+    // console.log(text)
   );
 };
 
@@ -138,11 +138,11 @@ exports.connectByPort = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -177,11 +177,11 @@ exports.connectByInstanceName = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -212,11 +212,11 @@ exports.connectByInvalidInstanceName = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -226,7 +226,7 @@ var DomainCaseEnum = {
   Upper: 2,
 };
 
-var runNtlmTest = function(test, domainCase) {
+function runNtlmTest(test, domainCase) {
   var ntlmConfig = getNtlmConfig();
   if (!ntlmConfig) {
     console.log('Skipping ntlm test');
@@ -262,13 +262,13 @@ var runNtlmTest = function(test, domainCase) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
-};
+}
 
 exports.ntlm = function(test) {
   runNtlmTest(test, DomainCaseEnum.AsIs);
@@ -315,11 +315,11 @@ exports.encrypt = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -335,7 +335,7 @@ exports['potentially throws an error on invalid crypto credential details'] = fu
   try {
     const { createSecureContext } = require('tls');
     createSecureContext(config.options.cryptoCredentialsDetails);
-  } catch (err) {
+  } catch {
     test.throws(() => {
       new Connection(config);
     });
@@ -412,11 +412,11 @@ exports.execSql = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   return connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -453,11 +453,11 @@ exports.numericColumnName = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -499,11 +499,11 @@ exports.duplicateColumnNames = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -515,7 +515,7 @@ exports.execSqlMultipleTimes = function(test) {
 
   var config = getConfig();
 
-  var execSql = function() {
+  function execSql() {
     if (sqlExecCount === timesToExec) {
       connection.close();
       return;
@@ -544,7 +544,7 @@ exports.execSqlMultipleTimes = function(test) {
     });
 
     connection.execSql(request);
-  };
+  }
 
   var connection = new Connection(config);
 
@@ -557,11 +557,11 @@ exports.execSqlMultipleTimes = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -609,15 +609,15 @@ exports.execSqlWithOrder = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
+    // console.log("#{error.number} : #{error.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -643,12 +643,12 @@ exports.execBadSql = function(test) {
   });
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
+    // console.log("#{error.number} : #{error.message}")
     test.ok(error);
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -681,11 +681,11 @@ exports.closeConnectionRequestPending = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -725,11 +725,11 @@ exports.sqlWithMultipleResultSets = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -763,11 +763,11 @@ update #tab1 set name = 'a3' where name like 'a%'\
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -803,11 +803,11 @@ exports.rowCollectionOnRequestCompletion = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -853,11 +853,11 @@ exports.rowCollectionOnDone = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -897,11 +897,11 @@ exports.execProcAsSql = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -910,15 +910,15 @@ exports.resetConnection = function(test) {
 
   var config = getConfig();
 
-  var testAnsiNullsOptionOn = function(callback) {
+  function testAnsiNullsOptionOn(callback) {
     testAnsiNullsOption(true, callback);
-  };
+  }
 
-  var testAnsiNullsOptionOff = function(callback) {
+  function testAnsiNullsOptionOff(callback) {
     testAnsiNullsOption(false, callback);
-  };
+  }
 
-  var testAnsiNullsOption = function(expectedOptionOn, callback) {
+  function testAnsiNullsOption(expectedOptionOn, callback) {
     var request = new Request('select @@options & 32', function(err, rowCount) {
       callback(err);
     });
@@ -929,15 +929,15 @@ exports.resetConnection = function(test) {
     });
 
     connection.execSql(request);
-  };
+  }
 
-  var setAnsiNullsOptionOff = function(callback) {
+  function setAnsiNullsOptionOff(callback) {
     var request = new Request('set ansi_nulls off', function(err, rowCount) {
       callback(err);
     });
 
     connection.execSqlBatch(request);
-  };
+  }
 
   var connection = new Connection(config);
 
@@ -973,11 +973,11 @@ exports.resetConnection = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -1027,11 +1027,11 @@ exports.cancelRequest = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -1081,15 +1081,15 @@ exports.requestTimeout = function(test) {
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
-var runSqlBatch = function(test, config, sql, requestCallback) {
+function runSqlBatch(test, config, sql, requestCallback) {
   var connection = new Connection(config);
 
   var request = new Request(sql, function() {
@@ -1105,7 +1105,7 @@ var runSqlBatch = function(test, config, sql, requestCallback) {
   connection.on('end', function(info) {
     test.done();
   });
-};
+}
 
 // Test that the default behavior allows adding null values to a
 // temporary table where the nullability is not explicitly declared.
@@ -1193,7 +1193,7 @@ exports.badDatefirst = function(test) {
 };
 
 
-var testLanguage = function(test, language) {
+function testLanguage(test, language) {
   language = language || 'us_english';
   test.expect(3);
   var config = getConfig();
@@ -1219,7 +1219,7 @@ var testLanguage = function(test, language) {
   connection.on('end', function(info) {
     test.done();
   });
-};
+}
 
 // Test that the default setting for LANGUAGE is us_english
 exports.testLanguageDefault = function(test) {
@@ -1231,7 +1231,7 @@ exports.testLanguageCustom = function(test) {
   testLanguage(test, 'Deutsch');
 };
 
-var testDateFormat = function(test, dateFormat) {
+function testDateFormat(test, dateFormat) {
   dateFormat = dateFormat || 'mdy';
   test.expect(3);
   var config = getConfig();
@@ -1260,7 +1260,7 @@ var testDateFormat = function(test, dateFormat) {
   connection.on('end', function(info) {
     test.done();
   });
-};
+}
 
 // Test that the default setting for DATEFORMAT is mdy
 exports.testDateFormatDefault = function(test) {
@@ -1272,7 +1272,7 @@ exports.testDateFormatCustom = function(test) {
   testDateFormat(test, 'dmy');
 };
 
-var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag, defaultOn) {
+function testBooleanConfigOption(test, optionName, optionValue, optionFlag, defaultOn) {
   test.expect(6);
 
   var config = getConfig();
@@ -1315,9 +1315,9 @@ var testBooleanConfigOption = function(test, optionName, optionValue, optionFlag
   connection.on('end', function(info) {
     test.done();
   });
-};
+}
 
-var testBadBooleanConfigOption = function(test, optionName) {
+function testBadBooleanConfigOption(test, optionName) {
   var config = getConfig();
   config.options[optionName] = 'on';
 
@@ -1326,7 +1326,7 @@ var testBadBooleanConfigOption = function(test, optionName) {
   });
 
   test.done();
-};
+}
 
 exports.testAnsiNullDefault = function(test) {
   testBooleanConfigOption(test, 'enableAnsiNull', undefined, 32, true);

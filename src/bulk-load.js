@@ -84,7 +84,7 @@ class BulkLoad extends EventEmitter {
   columnsByName: { [name: string]: Column };
 
   firstRowWritten: boolean;
-  rowToPacketTransform: RowTransform;
+  rowToPacketTransform: RowTransform; // eslint-disable-line no-use-before-define
 
   bulkOptions: InternalOptions;
 
@@ -124,7 +124,7 @@ class BulkLoad extends EventEmitter {
     this.firstRowWritten = false;
     this.streamingMode = false;
 
-    this.rowToPacketTransform = new RowTransform(this);
+    this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
@@ -150,19 +150,19 @@ class BulkLoad extends EventEmitter {
     };
 
     if ((type.id & 0x30) === 0x20) {
-      if (column.length == undefined && type.resolveLength) {
+      if (column.length == null && type.resolveLength) {
         column.length = type.resolveLength(column);
       }
     }
 
     if (type.hasPrecision) {
-      if (column.precision == undefined && type.resolvePrecision) {
+      if (column.precision == null && type.resolvePrecision) {
         column.precision = type.resolvePrecision(column);
       }
     }
 
     if (type.hasScale) {
-      if (column.scale == undefined && type.resolveScale) {
+      if (column.scale == null && type.resolveScale) {
         column.scale = type.resolveScale(column);
       }
     }

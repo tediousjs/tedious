@@ -137,7 +137,8 @@ class Login7Payload {
     const fixedData = Buffer.alloc(94);
     const buffers = [fixedData];
 
-    let offset = 0, dataOffset = fixedData.length;
+    let offset = 0;
+    let dataOffset = fixedData.length;
 
     // Length: 4-byte
     offset = fixedData.writeUInt32LE(0, offset);
@@ -391,7 +392,7 @@ class Login7Payload {
           buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, 0);
           buffer.writeUInt32LE(2, 1);
           buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
-          buffer.writeUInt8(fedAuth.workflow == 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
+          buffer.writeUInt8(fedAuth.workflow === 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
           buffers.push(buffer);
       }
     }
@@ -440,16 +441,16 @@ class Login7Payload {
   toString(indent?: string = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
-        this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
+              this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
       ) + '\n' + indent + '         ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
-        this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
+              this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
       ) + '\n' + indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
-        this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
+              this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
       ) + '\n' + indent + '         ' +
       sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
-        this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
+              this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
 }

@@ -3,7 +3,7 @@ var Request = require('../../src/request');
 var fs = require('fs');
 var TYPES = require('../../src/data-type').typeByName;
 
-var getConfig = function() {
+function getConfig() {
   var config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
@@ -19,7 +19,7 @@ var getConfig = function() {
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
-};
+}
 
 exports.bitTrue = function(test) {
   execSql(test, TYPES.Bit, true);
@@ -155,11 +155,11 @@ exports.varChar = function(test) {
 
 /* Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and beyond. */
 exports.varCharN = function(test) {
-  execSql(test, TYPES.VarChar, 'qaz', null, {length: 8000});
+  execSql(test, TYPES.VarChar, 'qaz', null, { length: 8000 });
 };
 
 exports.varCharN_7_2_AndLater = function(test) {
-  execSql(test, TYPES.VarChar, 'qaz', '7_2', {length: 8001});
+  execSql(test, TYPES.VarChar, 'qaz', '7_2', { length: 8001 });
 };
 
 exports.varCharEmptyString = function(test) {
@@ -184,11 +184,11 @@ exports.varCharMax = function(test) {
 };
 
 exports.varCharMaxEmptyString = function(test) {
-  execSql(test, TYPES.VarChar, '', null, {length: 8000});
+  execSql(test, TYPES.VarChar, '', null, { length: 8000 });
 };
 
 exports.varCharMaxEmptyString_7_2_AndLater = function(test) {
-  execSql(test, TYPES.VarChar, '', '7_2', {length: 8001});
+  execSql(test, TYPES.VarChar, '', '7_2', { length: 8001 });
 };
 
 exports.nVarChar = function(test) {
@@ -201,11 +201,11 @@ beyond. Since NVarChar is unicode, that'd be 4000. More explict in:
 https://msdn.microsoft.com/en-us/library/ms186939.aspx
 */
 exports.nVarCharN = function(test) {
-  execSql(test, TYPES.NVarChar, 'qaz', null, {length: 4000});
+  execSql(test, TYPES.NVarChar, 'qaz', null, { length: 4000 });
 };
 
 exports.nVarCharN_7_2_AndLater = function(test) {
-  execSql(test, TYPES.NVarChar, 'qaz', '7_2', {length: 4001});
+  execSql(test, TYPES.NVarChar, 'qaz', '7_2', { length: 4001 });
 };
 
 exports.nVarCharEmptyString = function(test) {
@@ -230,11 +230,11 @@ exports.nVarCharMax = function(test) {
 };
 
 exports.nVarCharMaxEmptyString = function(test) {
-  execSql(test, TYPES.NVarChar, '', null, {length: 4000});
+  execSql(test, TYPES.NVarChar, '', null, { length: 4000 });
 };
 
 exports.nVarCharMaxEmptyString_7_2_AndLater = function(test) {
-  execSql(test, TYPES.NVarChar, '', '7_2', {length: 4001});
+  execSql(test, TYPES.NVarChar, '', '7_2', { length: 4001 });
 };
 
 exports.Char = function(test) {
@@ -242,7 +242,7 @@ exports.Char = function(test) {
 };
 
 exports.CharN = function(test) {
-  execSql(test, TYPES.Char, 'qaz', null, {length: 3});
+  execSql(test, TYPES.Char, 'qaz', null, { length: 3 });
 };
 
 exports.CharNull = function(test) {
@@ -254,7 +254,7 @@ exports.NChar = function(test) {
 };
 
 exports.NCharN = function(test) {
-  execSql(test, TYPES.NChar, 'qaz', null, {length: 3});
+  execSql(test, TYPES.NChar, 'qaz', null, { length: 3 });
 };
 
 exports.NCharNull = function(test) {
@@ -279,38 +279,38 @@ exports.textLarge = function(test) {
   execSql(test, TYPES.Text, dBuf.toString());
 };
 
-var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), {nanosecondDelta: 0.1111111});
+var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
 
 exports.time = function(test) {
   execSql(test, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
 };
 
 exports.time1 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 1}, '00:00:00.1', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
 };
 
 exports.time2 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 2}, '00:00:00.11', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
 };
 
 exports.time3 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 3}, '00:00:00.111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
 };
 
 exports.time4 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 4}, '00:00:00.1111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
 };
 
 exports.time5 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 5}, '00:00:00.11111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
 };
 
 exports.time6 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 6}, '00:00:00.111111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
 };
 
 exports.time7 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', {scale: 7}, '00:00:00.1111111', true);
+  execSql(test, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
 };
 
 exports.smallDateTime = function(test) {
@@ -470,7 +470,7 @@ exports.dateTimePrecision_9_hr_flip = function(test) {
 };
 
 // This test fails on the version of SQL Server in AppVeyor.
-//exports.dateTimePrecision_9_day_flip = (test) ->
+// exports.dateTimePrecision_9_day_flip = (test) ->
 //  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
 
 exports.dateTime2 = function(test) {
@@ -707,7 +707,7 @@ exports.outputDatePrecision_9_hr_flip = function(test) {
 };
 
 // This test fails on the version of SQL Server in AppVeyor.
-//exports.outputDatePrecision_9_day_flip = (test) ->
+// exports.outputDatePrecision_9_day_flip = (test) ->
 //  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
 
 exports.multipleParameters = function(test) {
@@ -747,7 +747,7 @@ exports.multipleParameters = function(test) {
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -798,7 +798,7 @@ end')\
     request.addParameter('in4', TYPES.VarBinary, null);
     request.addParameter('in5', TYPES.Image, sample);
     request.addParameter('in6', TYPES.Image, null);
-    request.addOutputParameter('out', TYPES.Binary, null, {length: 4});
+    request.addOutputParameter('out', TYPES.Binary, null, { length: 4 });
     request.addOutputParameter('out2', TYPES.VarBinary);
 
     request.on('doneInProc', function(rowCount, more) {
@@ -832,13 +832,13 @@ end')\
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
-var execSql = function(test, type, value, tdsVersion, options, expectedValue, cast) {
+function execSql(test, type, value, tdsVersion, options, expectedValue, cast) {
   var config = getConfig();
-  //config.options.packetSize = 32768
+  // config.options.packetSize = 32768
 
   if (tdsVersion && tdsVersion > config.options.tdsVersion) {
     test.done();
@@ -896,11 +896,11 @@ var execSql = function(test, type, value, tdsVersion, options, expectedValue, ca
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
-};
+}
 
-var execSqlOutput = function(test, type, value, expectedValue) {
+function execSqlOutput(test, type, value, expectedValue) {
   test.expect(7);
 
   var config = getConfig();
@@ -953,4 +953,4 @@ var execSqlOutput = function(test, type, value, expectedValue) {
   connection.on('debug', function(text) {
     // console.log(text)
   });
-};
+}

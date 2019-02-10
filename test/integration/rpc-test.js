@@ -3,7 +3,7 @@ var Request = require('../../src/request');
 var TYPES = require('../../src/data-type').typeByName;
 var fs = require('fs');
 
-var getConfig = function() {
+function getConfig() {
   var config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
@@ -19,7 +19,7 @@ var getConfig = function() {
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
-};
+}
 
 exports.execProcVarChar = function(test) {
   testProc(test, TYPES.VarChar, 'varchar(10)', 'test');
@@ -189,18 +189,18 @@ exports.execProcWithBadName = function(test) {
   connection.on(
     'infoMessage',
     function(info) {}
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   );
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
+    // console.log("#{error.number} : #{error.message}")
     test.ok(error);
   });
 
   connection.on(
     'debug',
     function(text) {}
-    //console.log(text)
+    // console.log(text)
   );
 };
 
@@ -246,22 +246,22 @@ return -1\
   connection.on(
     'infoMessage',
     function(info) {}
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   );
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
+    // console.log("#{error.number} : #{error.message}")
     test.ok(error);
   });
 
   connection.on(
     'debug',
     function(text) {}
-    //console.log(text)
+    // console.log(text)
   );
 };
 
-var execSqlBatch = function(test, connection, sql, doneCallback) {
+function execSqlBatch(test, connection, sql, doneCallback) {
   var request = new Request(sql, function(err) {
     if (err) {
       console.log(err);
@@ -272,9 +272,9 @@ var execSqlBatch = function(test, connection, sql, doneCallback) {
   });
 
   connection.execSqlBatch(request);
-};
+}
 
-var testProc = function(test, type, typeAsString, value) {
+function testProc(test, type, typeAsString, value) {
   test.expect(5);
 
   var config = getConfig();
@@ -329,7 +329,7 @@ select @param\
   connection.on(
     'infoMessage',
     function(info) {}
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   );
 
   connection.on('errorMessage', function(error) {
@@ -339,11 +339,11 @@ select @param\
   connection.on(
     'debug',
     function(text) {}
-    //console.log(text)
+    // console.log(text)
   );
-};
+}
 
-var testProcOutput = function(test, type, typeAsString, value) {
+function testProcOutput(test, type, typeAsString, value) {
   test.expect(7);
 
   var config = getConfig();
@@ -400,7 +400,7 @@ set @paramOut = @paramIn\
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('errorMessage', function(error) {
@@ -408,6 +408,6 @@ set @paramOut = @paramIn\
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
-};
+}
