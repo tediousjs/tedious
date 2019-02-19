@@ -1,5 +1,6 @@
 var TYPE = require('../../src/data-type').typeByName;
 var assert = require('chai').assert
+
 describe('Validations', function() {
   it('Bit', () => {
     var value = TYPE.Bit.validate(null);
