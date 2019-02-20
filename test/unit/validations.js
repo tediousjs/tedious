@@ -1,29 +1,29 @@
 var TYPE = require('../../src/data-type').typeByName;
-var assert = require('chai').assert
+var assert = require('chai').assert;
 
 describe('Validations', function() {
   it('Bit', () => {
     var value = TYPE.Bit.validate(null);
     assert.strictEqual(value, null);
 
-    var value = TYPE.Bit.validate(true);
+    value = TYPE.Bit.validate(true);
     assert.strictEqual(value, true);
 
-    var value = TYPE.Bit.validate('asdf');
+    value = TYPE.Bit.validate('asdf');
     assert.strictEqual(value, true);
 
-    var value = TYPE.Bit.validate('');
+    value = TYPE.Bit.validate('');
     assert.strictEqual(value, false);
 
-    var value = TYPE.Bit.validate(55);
+    value = TYPE.Bit.validate(55);
     assert.strictEqual(value, true);
 
-    var value = TYPE.Bit.validate(0);
+    value = TYPE.Bit.validate(0);
     assert.strictEqual(value, false);
 
   });
 
-  it('TinyInt', () =>  {
+  it('TinyInt', () => {
     var value = TYPE.TinyInt.validate(null);
     assert.strictEqual(value, null);
 
@@ -37,7 +37,7 @@ describe('Validations', function() {
     assert.ok(value instanceof TypeError);
   });
 
-  it('SmallInt', () =>  {
+  it('SmallInt', () => {
     var value = TYPE.SmallInt.validate(null);
     assert.strictEqual(value, null);
 
@@ -48,7 +48,7 @@ describe('Validations', function() {
     assert.ok(value instanceof TypeError);
   });
 
-  it('Int', () =>  {
+  it('Int', () => {
     var value = TYPE.Int.validate(null);
     assert.strictEqual(value, null);
 
@@ -59,7 +59,7 @@ describe('Validations', function() {
     assert.ok(value instanceof TypeError);
   });
 
-  it('BigInt', () =>  {
+  it('BigInt', () => {
     var value = TYPE.BigInt.validate(null);
     assert.strictEqual(value, null);
 
@@ -352,4 +352,4 @@ describe('Validations', function() {
     value = TYPE.TVP.validate({});
     assert.ok(value instanceof TypeError);
   });
-})
+});

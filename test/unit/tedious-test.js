@@ -1,25 +1,25 @@
 const Connection = require('../../src/tedious').Connection;
 const ISOLATION_LEVEL = require('../../src/tedious').ISOLATION_LEVEL;
 const TYPES = require('../../src/tedious').TYPES;
-var assert = require('chai').assert
+var assert = require('chai').assert;
 
 describe('tedious-test', function() {
 
-  it('types' ,()=> {
+  it('types', () => {
     assert.ok(TYPES);
     assert.ok(TYPES.VarChar);
   });
 
-  it('isolationLevel' ,()=> {
+  it('isolationLevel', () => {
     assert.ok(ISOLATION_LEVEL);
     assert.ok(ISOLATION_LEVEL.READ_UNCOMMITTED);
   });
 
-  it('connection' ,()=> {
+  it('connection', () => {
     assert.ok(Connection);
   });
 
-  it('connectionDoesNotModifyPassedConfig' ,()=> {
+  it('connectionDoesNotModifyPassedConfig', () => {
     var config = {
       server: 'localhost',
       userName: 'sa',
@@ -45,4 +45,4 @@ describe('tedious-test', function() {
       config.options.cryptoCredentialsDetails
     );
   });
-})
+});

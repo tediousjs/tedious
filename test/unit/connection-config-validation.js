@@ -1,5 +1,5 @@
 const Connection = require('../../src/tedious').Connection;
-var assert = require('chai').assert
+var assert = require('chai').assert;
 
 function ensureConnectionIsClosed(connection, callback) {
   if (connection.closed) {
@@ -20,15 +20,15 @@ describe('Connection configuration validation', function() {
     config.options = { encrypt: false };
     config.server = 'localhost';
     done();
-  })
+  });
 
-  it('default transient retry interval',() =>  {
+  it('default transient retry interval', () => {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good transient retry interval',() => {
+  it('good transient retry interval', () => {
     const goodRetryInterval = 75;
     config.options.connectionRetryInterval = goodRetryInterval;
     const connection = new Connection(config);
@@ -36,7 +36,7 @@ describe('Connection configuration validation', function() {
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('bad transient retry interval',() =>  {
+  it('bad transient retry interval', () => {
     const zeroRetryInterval = 0;
     config.options.connectionRetryInterval = zeroRetryInterval;
     assert.throws(() => {
@@ -50,13 +50,13 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('default max transient retries',() =>  {
+  it('default max transient retries', () => {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good max transient retries',() =>  {
+  it('good max transient retries', () => {
     const zeroMaxRetries = 0;
     config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
     const firstConnection = new Connection(config);
@@ -72,7 +72,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad max transient retries',() =>  {
+  it('bad max transient retries', () => {
     const negativeMaxRetries = -5;
     config.options.maxRetriesOnTransientErrors = negativeMaxRetries;
     assert.throws(() => {
@@ -80,7 +80,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad azure ad authentication method',() =>  {
+  it('bad azure ad authentication method', () => {
     const authenticationMethod = 'abc';
     config.authentication = authenticationMethod;
     assert.throws(() => {
@@ -88,13 +88,12 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad tds version for with azure ad',() =>  {
+  it('bad tds version for with azure ad', () => {
     const authenticationMethod = 'activedirectorypassword';
     config.authentication = authenticationMethod;
     config.options.tdsVersion = '7_2';
     assert.throws(() => {
       new Connection(config);
     });
-  })
-
-})
+  });
+});
