@@ -45,6 +45,7 @@ const DEFAULT_PORT = 1433;
 const DEFAULT_TDS_VERSION = '7_4';
 const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
+const DEFAULT_MAX_RETRIES_ON_TRANSIENT_ERRORS = 3;
 
 class Connection extends EventEmitter {
   constructor(config) {
@@ -153,10 +154,12 @@ class Connection extends EventEmitter {
         abortTransactionOnError: false,
         appName: undefined,
         camelCaseColumns: false,
-        cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
+        cancelTimeout:
+          config.options.cancelTimeout || DEFAULT_CANCEL_TIMEOUT,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
-        connectTimeout: DEFAULT_CONNECT_TIMEOUT,
+        connectTimeout:
+          config.options.connectTimeout || DEFAULT_CONNECT_TIMEOUT,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
@@ -184,15 +187,19 @@ class Connection extends EventEmitter {
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
         localAddress: undefined,
-        maxRetriesOnTransientErrors: 3,
+        maxRetriesOnTransientErrors:
+          config.options.maxRetriesOnTransientErrors ||
+          DEFAULT_MAX_RETRIES_ON_TRANSIENT_ERRORS,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
         port: DEFAULT_PORT,
         readOnlyIntent: false,
-        requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
+        requestTimeout:
+          config.options.requestTimeout || DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
-        tdsVersion: DEFAULT_TDS_VERSION,
+        tdsVersion:
+          config.options.tdsVersion || DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
         useColumnNames: false,
