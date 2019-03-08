@@ -102,6 +102,9 @@ class Request extends EventEmitter {
   makeParamsParameter(parameters: Parameter[]) {
     let paramsParameter = '';
     for (let i = 0, len = parameters.length; i < len; i++) {
+      if (!parameters.hasOwnProperty(i)) {
+        continue;
+      }
       const parameter = parameters[i];
       if (paramsParameter.length > 0) {
         paramsParameter += ', ';
@@ -128,6 +131,9 @@ class Request extends EventEmitter {
     }
 
     for (let i = 0, len = this.originalParameters.length; i < len; i++) {
+      if (!this.originalParameters.hasOwnProperty(i)) {
+        continue;
+      }
       const parameter = this.originalParameters[i];
       this.parameters.push(parameter);
     }
@@ -162,6 +168,9 @@ class Request extends EventEmitter {
     this.addParameter('handle', TYPES.Int, this.handle);
 
     for (let i = 0, len = this.originalParameters.length; i < len; i++) {
+      if (!this.originalParameters.hasOwnProperty(i)) {
+        continue;
+      }
       const parameter = this.originalParameters[i];
       parameter.value = parameters[parameter.name];
       this.parameters.push(parameter);
@@ -176,6 +185,9 @@ class Request extends EventEmitter {
 
   validateParameters() {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
+      if (!this.parameters.hasOwnProperty(i)) {
+        continue;
+      }
       const parameter = this.parameters[i];
       const value = parameter.type.validate(parameter.value);
       if (value instanceof TypeError) {
