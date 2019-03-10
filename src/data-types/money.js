@@ -5,6 +5,13 @@ module.exports = {
   type: 'MONEY',
   name: 'Money',
 
+  fromBuffer(buffer, offset) {
+    const high = buffer.readInt32LE(offset);
+    const low = buffer.readUInt32LE(offset + 4);
+
+    return (low + (0x100000000 * high)) / 10000;
+  },
+
   declaration: function() {
     return 'money';
   },

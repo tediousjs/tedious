@@ -5,6 +5,10 @@ module.exports = {
   type: 'INT1',
   name: 'TinyInt',
 
+  fromBuffer(buffer, offset) {
+    return buffer.readUInt8(offset);
+  },
+
   declaration: function() {
     return 'tinyint';
   },

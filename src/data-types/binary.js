@@ -7,6 +7,10 @@ module.exports = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
+  fromBuffer(buffer, offset, dataLength) {
+    return buffer.slice(offset, offset + dataLength);
+  },
+
   declaration: function(parameter) {
     var length;
     if (parameter.length) {

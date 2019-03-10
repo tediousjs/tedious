@@ -5,6 +5,10 @@ module.exports = {
   type: 'FLT4',
   name: 'Real',
 
+  fromBuffer(buffer, offset) {
+    return buffer.readFloatLE(offset);
+  },
+
   declaration: function() {
     return 'real';
   },

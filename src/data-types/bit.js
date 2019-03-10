@@ -5,6 +5,10 @@ module.exports = {
   type: 'BIT',
   name: 'Bit',
 
+  fromBuffer(buffer, offset, length) {
+    return !!buffer.readUInt8(offset);
+  },
+
   declaration: function() {
     return 'bit';
   },

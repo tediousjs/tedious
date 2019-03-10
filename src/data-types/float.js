@@ -5,6 +5,10 @@ module.exports = {
   type: 'FLT8',
   name: 'Float',
 
+  fromBuffer(buffer, offset) {
+    return buffer.readDoubleLE(offset);
+  },
+
   declaration: function() {
     return 'float';
   },

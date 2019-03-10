@@ -8,6 +8,10 @@ module.exports = {
   dataLengthLength: 2,
   maximumLength: 4000,
 
+  fromBuffer(buffer, offset, dataLength) {
+    return buffer.toString('ucs2', offset, offset + dataLength);
+  },
+
   declaration: function(parameter) {
     let length;
     if (parameter.length) {

@@ -1,5 +1,6 @@
 const DateTimeN = require('./datetimen');
 
+const THREE_AND_A_THIRD = 3 + (1 / 3);
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
@@ -7,6 +8,21 @@ module.exports = {
   id: 0x3D,
   type: 'DATETIME',
   name: 'DateTime',
+
+  fromBuffer(buffer, offset, { useUTC }) {
+    const days = buffer.readUInt32LE(offset);
+    const threeHundredthsOfSecond = buffer.readUInt32LE(offset + 4);
+    const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
+
+    let value;
+    if (useUTC) {
+      value = new Date(Date.UTC(1900, 0, 1 + days, 0, 0, 0, milliseconds));
+    } else {
+      value = new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
+    }
+
+    return value;
+  },
 
   declaration: function() {
     return 'datetime';

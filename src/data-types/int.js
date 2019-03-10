@@ -5,6 +5,10 @@ module.exports = {
   type: 'INT4',
   name: 'Int',
 
+  fromBuffer(buffer, offset) {
+    return buffer.readUInt32LE(offset);
+  },
+
   declaration: function() {
     return 'int';
   },

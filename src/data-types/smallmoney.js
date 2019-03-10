@@ -5,6 +5,10 @@ module.exports = {
   type: 'MONEY4',
   name: 'SmallMoney',
 
+  fromBuffer(buffer, offset) {
+    return buffer.readInt32LE(offset) / 10000;
+  },
+
   declaration: function() {
     return 'smallmoney';
   },

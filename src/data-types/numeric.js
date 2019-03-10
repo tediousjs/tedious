@@ -48,6 +48,7 @@ module.exports = {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
+
       if (parameter.precision <= 9) {
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);

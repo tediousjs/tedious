@@ -6,6 +6,10 @@ module.exports = {
   name: 'UniqueIdentifier',
   dataLengthLength: 1,
 
+  fromBuffer(buffer, offset) {
+    return guidParser.arrayToGuid(buffer.slice(offset, offset + 16));
+  },
+
   declaration: function() {
     return 'uniqueidentifier';
   },

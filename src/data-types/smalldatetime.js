@@ -8,6 +8,20 @@ module.exports = {
   type: 'DATETIM4',
   name: 'SmallDateTime',
 
+  fromBuffer(buffer, offset, { useUTC }) {
+    const days = buffer.readUInt16LE(offset);
+    const minutes = buffer.readUInt16LE(offset + 2);
+
+    let value;
+    if (useUTC) {
+      value = new Date(Date.UTC(1900, 0, 1 + days, 0, minutes));
+    } else {
+      value = new Date(1900, 0, 1 + days, 0, minutes);
+    }
+
+    return value;
+  },
+
   declaration: function() {
     return 'smalldatetime';
   },

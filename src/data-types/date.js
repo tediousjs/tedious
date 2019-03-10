@@ -8,6 +8,16 @@ module.exports = {
   dataLengthLength: 1,
   fixedDataLength: 3,
 
+  fromBuffer(buffer, offset, { useUTC }) {
+    const days = buffer.readUIntLE(offset, 3);
+
+    if (useUTC) {
+      return new Date(Date.UTC(2000, 0, days - 730118));
+    } else {
+      return new Date(2000, 0, days - 730118);
+    }
+  },
+
   declaration: function() {
     return 'date';
   },

@@ -5,6 +5,39 @@ module.exports = {
   hasScale: true,
   dataLengthLength: 1,
 
+  fromBuffer(buffer, offset, scale, { useUTC }) {
+    let value;
+    if (0 <= scale && scale <= 2) {
+      value = buffer.readUIntLE(offset, 3);
+    } else if (3 <= scale && scale <= 4) {
+      value = buffer.readUIntLE(offset, 4);
+    } else if (5 <= scale && scale <= 7) {
+      value = buffer.readUIntLE(offset, 5);
+    } else {
+
+    }
+
+    if (scale < 7) {
+      for (let i = scale; i < 7; i++) {
+        value *= 10;
+      }
+    }
+
+    let date;
+    if (useUTC) {
+      date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000));
+    } else {
+      date = new Date(1970, 0, 1, 0, 0, 0, value / 10000);
+    }
+
+    Object.defineProperty(date, 'nanosecondsDelta', {
+      enumerable: false,
+      value: (value % 10000) / Math.pow(10, 7)
+    });
+
+    return date;
+  },
+
   dataLengthFromScale: function(scale) {
     switch (scale) {
       case 0:

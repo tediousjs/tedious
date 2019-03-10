@@ -1,9 +1,15 @@
 const IntN = require('./intn');
 
+const { convertLEBytesToString } = require('../tracking-buffer/bigint');
+
 module.exports = {
   id: 0x7F,
   type: 'INT8',
   name: 'BigInt',
+
+  fromBuffer(buffer, offset) {
+    return convertLEBytesToString(buffer.slice(offset, offset + 8));
+  },
 
   declaration: function() {
     return 'bigint';

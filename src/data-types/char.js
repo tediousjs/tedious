@@ -1,3 +1,5 @@
+const iconv = require('iconv-lite');
+
 const NULL = (1 << 16) - 1;
 
 module.exports = {
@@ -7,6 +9,14 @@ module.exports = {
   hasCollation: true,
   dataLengthLength: 2,
   maximumLength: 8000,
+
+  fromBuffer(buffer, offset, dataLength, codepage = 'utf8') {
+    if (codepage === 'utf8') {
+      return buffer.toString('utf8', offset, offset + dataLength);
+    } else {
+      return iconv.decode(buffer.slice(offset, offset + dataLength), codepage);
+    }
+  },
 
   declaration: function(parameter) {
     let length;
