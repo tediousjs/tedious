@@ -1,3 +1,5 @@
+const BufferList = require('bl');
+
 const iconv = require('iconv-lite');
 const sprintf = require('sprintf-js').sprintf;
 const { typeByName: TYPES } = require('./data-type');
@@ -477,8 +479,14 @@ function readMax(parser, callback) {
   parser.readBuffer(8, (type) => {
     if (type.equals(PLP_NULL)) {
       return callback(null);
-    } else if (type.equals(UNKNOWN_PLP_LEN)) {
-      return readMaxUnknownLength(parser, callback);
+    }
+
+    if (type.equals(UNKNOWN_PLP_LEN)) {
+      const bufferList = new BufferList((err, data) => {
+        callback(data);
+      });
+
+      readPLPStream(parser, bufferList, callback);
     } else {
       const low = type.readUInt32LE(0);
       const high = type.readUInt32LE(4);
@@ -488,59 +496,30 @@ function readMax(parser, callback) {
       }
 
       const expectedLength = low + (0x100000000 * high);
-      return readMaxKnownLength(parser, expectedLength, callback);
+
+      const bufferList = new BufferList((err, data) => {
+        if (data.length !== expectedLength) {
+          parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + data.length + ' bytes'));
+        }
+
+        callback(data);
+      });
+
+      readPLPStream(parser, bufferList, callback);
     }
   });
 }
 
-function readMaxKnownLength(parser, totalLength, callback) {
-  const data = Buffer.alloc(totalLength, 0);
-
-  let offset = 0;
-  function next(done) {
-    parser.readUInt32LE((chunkLength) => {
-      if (!chunkLength) {
-        return done();
-      }
-
-      parser.readBuffer(chunkLength, (chunk) => {
-        chunk.copy(data, offset);
-        offset += chunkLength;
-
-        next(done);
-      });
-    });
-  }
-
-  next(() => {
-    if (offset !== totalLength) {
-      parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes'));
+function readPLPStream(parser, bufferList) {
+  parser.readUInt32LE((chunkLength) => {
+    if (!chunkLength) {
+      return bufferList.end();
     }
 
-    callback(data);
-  });
-}
+    parser.readBuffer(chunkLength, (chunk) => {
+      bufferList.write(chunk);
 
-function readMaxUnknownLength(parser, callback) {
-  const chunks = [];
-
-  let length = 0;
-  function next(done) {
-    parser.readUInt32LE((chunkLength) => {
-      if (!chunkLength) {
-        return done();
-      }
-
-      parser.readBuffer(chunkLength, (chunk) => {
-        chunks.push(chunk);
-        length += chunkLength;
-
-        next(done);
-      });
+      readPLPStream(parser, bufferList);
     });
-  }
-
-  next(() => {
-    callback(Buffer.concat(chunks, length));
   });
 }
