@@ -29,36 +29,6 @@ function readTextPointerNull(parser, type, callback) {
   }
 }
 
-function readDataLength(parser, type, metaData, callback) {
-  // s2.2.4.2.1
-  switch (type.id & 0x30) {
-    case 0x10: // xx01xxxx - s2.2.4.2.1.1
-      return callback(0);
-
-    case 0x20: // xx10xxxx - s2.2.4.2.1.3
-      // Variable length
-      switch (type.dataLengthLength) {
-        case 0:
-          return callback(undefined);
-
-        case 1:
-          return parser.readUInt8(callback);
-
-        case 2:
-          return parser.readUInt16LE(callback);
-
-        case 4:
-          return parser.readUInt32LE(callback);
-
-        default:
-          return parser.emit('error', new Error('Unsupported dataLengthLength ' + type.dataLengthLength + ' for data type ' + type.name));
-      }
-
-    case 0x30:
-      return callback(1 << ((type.id & 0x0C) >> 2));
-  }
-}
-
 module.exports = valueParse;
 function valueParse(parser, metaData, options, callback) {
   const type = metaData.type;
@@ -96,7 +66,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'IntN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -131,12 +101,10 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'Real':
-      return readDataLength(parser, type, metaData, (dataLength) => {
-        return parser.awaitData(4, () => {
-          const result = TYPES.Real.fromBuffer(parser.buffer, parser.position);
-          parser.position += 4;
-          callback(result);
-        });
+      return parser.awaitData(4, () => {
+        const result = TYPES.Real.fromBuffer(parser.buffer, parser.position);
+        parser.position += 4;
+        callback(result);
       });
 
     case 'Float':
@@ -147,7 +115,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'FloatN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -174,7 +142,7 @@ function valueParse(parser, metaData, options, callback) {
     case 'Money':
     case 'SmallMoney':
     case 'MoneyN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -206,7 +174,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'BitN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -227,7 +195,7 @@ function valueParse(parser, metaData, options, callback) {
       if (metaData.dataLength === MAX) {
         return readMaxChars(parser, codepage, callback);
       } else {
-        return readDataLength(parser, type, metaData, (dataLength) => {
+        return parser.readUInt16LE((dataLength) => {
           if (dataLength === NULL) {
             return callback(null);
           } else {
@@ -245,7 +213,7 @@ function valueParse(parser, metaData, options, callback) {
       if (metaData.dataLength === MAX) {
         return readMaxNChars(parser, callback);
       } else {
-        return readDataLength(parser, type, metaData, (dataLength) => {
+        return parser.readUInt16LE((dataLength) => {
           if (dataLength === NULL) {
             return callback(null);
           } else {
@@ -263,7 +231,7 @@ function valueParse(parser, metaData, options, callback) {
       if (metaData.dataLength === MAX) {
         return readMaxBinary(parser, callback);
       } else {
-        return readDataLength(parser, type, metaData, (dataLength) => {
+        return parser.readUInt16LE((dataLength) => {
           if (dataLength === NULL) {
             return null;
           } else {
@@ -282,7 +250,7 @@ function valueParse(parser, metaData, options, callback) {
           return callback(null);
         }
 
-        readDataLength(parser, type, metaData, (dataLength) => {
+        parser.readUInt32LE((dataLength) => {
           if (dataLength === PLP_NULL) {
             return callback(null);
           } else {
@@ -301,7 +269,7 @@ function valueParse(parser, metaData, options, callback) {
           return callback(null);
         }
 
-        readDataLength(parser, type, metaData, (dataLength) => {
+        parser.readUInt32LE((dataLength) => {
           if (dataLength === PLP_NULL) {
             return callback(null);
           } else {
@@ -320,7 +288,7 @@ function valueParse(parser, metaData, options, callback) {
           return callback(null);
         }
 
-        readDataLength(parser, type, metaData, (dataLength) => {
+        parser.readUInt32LE((dataLength) => {
           if (dataLength === PLP_NULL) {
             return callback(null);
           } else {
@@ -351,7 +319,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'DateTimeN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -373,7 +341,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'Time':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         } else {
@@ -386,7 +354,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'Date':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         } else {
@@ -399,7 +367,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'DateTime2':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         } else {
@@ -412,7 +380,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'DateTimeOffset':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         } else {
@@ -426,7 +394,7 @@ function valueParse(parser, metaData, options, callback) {
 
     case 'NumericN':
     case 'DecimalN':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         } else {
@@ -439,7 +407,7 @@ function valueParse(parser, metaData, options, callback) {
       });
 
     case 'UniqueIdentifier':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt8((dataLength) => {
         switch (dataLength) {
           case 0:
             return callback(null);
@@ -460,7 +428,7 @@ function valueParse(parser, metaData, options, callback) {
       return readMaxBinary(parser, callback);
 
     case 'Variant':
-      return readDataLength(parser, type, metaData, (dataLength) => {
+      return parser.readUInt32LE((dataLength) => {
         if (dataLength === 0) {
           return callback(null);
         }
