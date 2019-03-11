@@ -12,25 +12,6 @@ const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
-function readTextPointerNull(parser, type, callback) {
-  if (type.hasTextPointerAndTimestamp) {
-    parser.readUInt8((textPointerLength) => {
-      if (textPointerLength !== 0) {
-        // Appear to be dummy values, so consume and discard them.
-        parser.readBuffer(textPointerLength, () => {
-          parser.readBuffer(8, () => {
-            callback(undefined);
-          });
-        });
-      } else {
-        callback(true);
-      }
-    });
-  } else {
-    callback(undefined);
-  }
-}
-
 module.exports = valueParse;
 function valueParse(parser, metaData, options, callback) {
   const type = metaData.type;
@@ -247,59 +228,71 @@ function valueParse(parser, metaData, options, callback) {
       }
 
     case 'Text':
-      return readTextPointerNull(parser, type, (textPointerNull) => {
-        if (textPointerNull) {
+      return parser.readUInt8((textPointerLength) => {
+        if (textPointerLength === 0) {
           return callback(null);
         }
 
-        parser.readUInt32LE((dataLength) => {
-          if (dataLength === PLP_NULL) {
-            return callback(null);
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.Char.fromBuffer(parser.buffer, parser.position, dataLength, metaData.collation.codepage);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
+        parser.awaitData(8 + textPointerLength, () => {
+          parser.position += 8 + textPointerLength;
+
+          parser.readUInt32LE((dataLength) => {
+            if (dataLength === PLP_NULL) {
+              return callback(null);
+            } else {
+              return parser.awaitData(dataLength, () => {
+                const result = TYPES.Char.fromBuffer(parser.buffer, parser.position, dataLength, metaData.collation.codepage);
+                parser.position += dataLength;
+                callback(result);
+              });
+            }
+          });
         });
       });
 
     case 'NText':
-      return readTextPointerNull(parser, type, (textPointerNull) => {
-        if (textPointerNull) {
+      return parser.readUInt8((textPointerLength) => {
+        if (textPointerLength === 0) {
           return callback(null);
         }
 
-        parser.readUInt32LE((dataLength) => {
-          if (dataLength === PLP_NULL) {
-            return callback(null);
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.NChar.fromBuffer(parser.buffer, parser.position, dataLength);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
+        parser.awaitData(8 + textPointerLength, () => {
+          parser.position += 8 + textPointerLength;
+
+          parser.readUInt32LE((dataLength) => {
+            if (dataLength === PLP_NULL) {
+              return callback(null);
+            } else {
+              return parser.awaitData(dataLength, () => {
+                const result = TYPES.NChar.fromBuffer(parser.buffer, parser.position, dataLength);
+                parser.position += dataLength;
+                callback(result);
+              });
+            }
+          });
         });
       });
 
     case 'Image':
-      return readTextPointerNull(parser, type, (textPointerNull) => {
-        if (textPointerNull) {
+      return parser.readUInt8((textPointerLength) => {
+        if (textPointerLength === 0) {
           return callback(null);
         }
 
-        parser.readUInt32LE((dataLength) => {
-          if (dataLength === PLP_NULL) {
-            return callback(null);
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.Binary.fromBuffer(parser.buffer, parser.position, dataLength);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
+        parser.awaitData(8 + textPointerLength, () => {
+          parser.position += 8 + textPointerLength;
+
+          parser.readUInt32LE((dataLength) => {
+            if (dataLength === PLP_NULL) {
+              return callback(null);
+            } else {
+              return parser.awaitData(dataLength, () => {
+                const result = TYPES.Binary.fromBuffer(parser.buffer, parser.position, dataLength);
+                parser.position += dataLength;
+                callback(result);
+              });
+            }
+          });
         });
       });
 
