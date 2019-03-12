@@ -6,8 +6,8 @@ const { typeByName: TYPES } = require('./data-type');
 
 const NumericN = require('./data-types/numericn');
 
-const NULL = (1 << 16) - 1;
-const MAX = (1 << 16) - 1;
+const NULL = 0xFFFF;
+const MAX = 0xFFFF;
 const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
@@ -15,6 +15,29 @@ const DEFAULT_ENCODING = 'utf8';
 module.exports = valueParse;
 function valueParse(parser, metaData, options, callback) {
   const type = metaData.type;
+
+  switch (type.name) {
+    case 'VarChar':
+      if (metaData.dataLength === MAX) {
+        return readMaxChars(parser, metaData.collation.codepage, callback);
+      }
+
+      break;
+
+    case 'NVarChar':
+      if (metaData.dataLength === MAX) {
+        return readMaxNChars(parser, callback);
+      }
+
+      break;
+
+    case 'VarBinary':
+      if (metaData.dataLength === MAX) {
+        return readMaxBinary(parser, callback);
+      }
+
+      break;
+  }
 
   switch (type.name) {
     case 'Null':
@@ -175,57 +198,45 @@ function valueParse(parser, metaData, options, callback) {
     case 'VarChar':
     case 'Char':
       const codepage = metaData.collation.codepage;
-      if (metaData.dataLength === MAX) {
-        return readMaxChars(parser, codepage, callback);
-      } else {
-        return parser.readUInt16LE((dataLength) => {
-          if (dataLength === NULL) {
-            return callback(null);
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.Char.fromBuffer(parser.buffer, parser.position, dataLength, codepage);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
-        });
-      }
+      return parser.readUInt16LE((dataLength) => {
+        if (dataLength === NULL) {
+          return callback(null);
+        } else {
+          return parser.awaitData(dataLength, () => {
+            const result = TYPES.Char.fromBuffer(parser.buffer, parser.position, dataLength, codepage);
+            parser.position += dataLength;
+            callback(result);
+          });
+        }
+      });
 
     case 'NVarChar':
     case 'NChar':
-      if (metaData.dataLength === MAX) {
-        return readMaxNChars(parser, callback);
-      } else {
-        return parser.readUInt16LE((dataLength) => {
-          if (dataLength === NULL) {
-            return callback(null);
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.NChar.fromBuffer(parser.buffer, parser.position, dataLength);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
-        });
-      }
+      return parser.readUInt16LE((dataLength) => {
+        if (dataLength === NULL) {
+          return callback(null);
+        } else {
+          return parser.awaitData(dataLength, () => {
+            const result = TYPES.NChar.fromBuffer(parser.buffer, parser.position, dataLength);
+            parser.position += dataLength;
+            callback(result);
+          });
+        }
+      });
 
     case 'VarBinary':
     case 'Binary':
-      if (metaData.dataLength === MAX) {
-        return readMaxBinary(parser, callback);
-      } else {
-        return parser.readUInt16LE((dataLength) => {
-          if (dataLength === NULL) {
-            return null;
-          } else {
-            return parser.awaitData(dataLength, () => {
-              const result = TYPES.Binary.fromBuffer(parser.buffer, parser.position, dataLength);
-              parser.position += dataLength;
-              callback(result);
-            });
-          }
-        });
-      }
+      return parser.readUInt16LE((dataLength) => {
+        if (dataLength === NULL) {
+          return null;
+        } else {
+          return parser.awaitData(dataLength, () => {
+            const result = TYPES.Binary.fromBuffer(parser.buffer, parser.position, dataLength);
+            parser.position += dataLength;
+            callback(result);
+          });
+        }
+      });
 
     case 'Text':
       return parser.readUInt8((textPointerLength) => {
