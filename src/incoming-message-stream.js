@@ -26,6 +26,22 @@ class IncomingMessageStream extends Transform {
     this.bl = new BufferList();
   }
 
+  pause() {
+    super.pause();
+
+    if (this.currentMessage) {
+      this.currentMessage.pause();
+    }
+  }
+
+  resume() {
+    super.resume();
+
+    if (this.currentMessage) {
+      this.currentMessage.resume();
+    }
+  }
+
   processBufferedData(callback: () => void) {
     // The packet header is always 8 bytes of length.
     while (this.bl.length >= HEADER_LENGTH) {
