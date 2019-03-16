@@ -676,51 +676,81 @@ function readMaxNChars(parser, callback) {
   });
 }
 
-function readMax(parser, callback) {
-  parser.readBuffer(8, (type) => {
-    if (type.equals(PLP_NULL)) {
-      return callback(null);
-    }
+const { Transform } = require('readable-stream');
 
-    if (type.equals(UNKNOWN_PLP_LEN)) {
-      const bufferList = new BufferList((err, data) => {
-        callback(data);
-      });
+class PLPStream extends Transform {
+  constructor(expectedLength) {
+    super();
 
-      readPLPStream(parser, bufferList, callback);
+    this.expectedLength = expectedLength;
+    this.receivedLength = 0;
+  }
+
+  _transform(chunk, encoding, callback) {
+    this.receivedLength += chunk.length;
+    callback(null, chunk);
+  }
+
+  _flush(callback) {
+    if (this.expectedLength !== undefined && this.receivedLength !== this.expectedLength) {
+      callback(new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.receivedLength + ' bytes'));
     } else {
-      const low = type.readUInt32LE(0);
-      const high = type.readUInt32LE(4);
-
-      if (high >= (2 << (53 - 32))) {
-        console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
-      }
-
-      const expectedLength = low + (0x100000000 * high);
-
-      const bufferList = new BufferList((err, data) => {
-        if (data.length !== expectedLength) {
-          parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + data.length + ' bytes'));
-        }
-
-        callback(data);
-      });
-
-      readPLPStream(parser, bufferList, callback);
+      callback();
     }
-  });
+  }
 }
 
-function readPLPStream(parser, bufferList) {
-  parser.readUInt32LE((chunkLength) => {
-    if (!chunkLength) {
-      return bufferList.end();
+function readMax(parser, callback) {
+  if (parser.buffer.length < parser.position + 8) {
+    return parser.awaitData(8, () => {
+      readMax(parser, callback);
+    });
+  }
+
+  const low = parser.buffer.readUInt32LE(parser.position);
+  const high = parser.buffer.readUInt32LE(parser.position + 4);
+  parser.position += 8;
+
+  let stream;
+  if (low === 0xFFFFFFFE && high === 0xFFFFFFFF) {
+    stream = new PLPStream();
+  } else {
+    if (high >= (2 << (53 - 32))) {
+      console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
     }
 
-    parser.readBuffer(chunkLength, (chunk) => {
-      bufferList.write(chunk);
+    const expectedLength = low + (0x100000000 * high);
+    stream = new PLPStream(expectedLength);
+  }
 
-      readPLPStream(parser, bufferList);
+  stream.pipe(new BufferList((err, data) => {
+    callback(data);
+  }));
+
+  readPLPStream(parser, stream);
+}
+
+function readPLPStream(parser, stream) {
+  if (parser.buffer.length < parser.position + 4) {
+    return parser.awaitData(4, () => {
+      readPLPStream(parser, stream);
     });
-  });
+  }
+
+  const chunkLength = parser.buffer.readUInt32LE(parser.position);
+
+  if (!chunkLength) {
+    parser.position += 4;
+    return stream.end();
+  }
+
+  if (parser.buffer.length < parser.position + 4 + chunkLength) {
+    return parser.awaitData(4 + chunkLength, () => {
+      readPLPStream(parser, stream);
+    });
+  }
+
+  stream.write(parser.buffer.slice(parser.position += 4, parser.position += chunkLength));
+
+  readPLPStream(parser, stream);
 }
