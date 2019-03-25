@@ -119,7 +119,8 @@ jobs:
 
     - stage: tag-latest
       node_js: 8
-      before_install: skip
+      before_install:
+        - echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > .npmrc
       before_script: skip
       script:
         - |
