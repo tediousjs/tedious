@@ -394,6 +394,22 @@ class Login7Payload {
           buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
           buffer.writeUInt8(fedAuth.workflow === 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
           buffers.push(buffer);
+          break;
+
+        case 'SECURITYTOKEN':
+          const token = Buffer.from(fedAuth.fedAuthToken, 'ucs2');
+          const buf = Buffer.alloc(10);
+
+          let offset = 0;
+          offset = buf.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, offset);
+          offset = buf.writeUInt32LE(token.length + 4 + 1, offset);
+          offset = buf.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_SECURITYTOKEN << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), offset);
+          buf.writeInt32LE(token.length, offset);
+
+          buffers.push(buf);
+          buffers.push(token);
+
+          break;
       }
     }
 
