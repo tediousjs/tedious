@@ -9,11 +9,10 @@ function getConfig() {
   var config = JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
-  
-  var token = getMSIToken(config)
-  if('undefined' !== token)
-  {
-    config.authentication.options.token = token
+
+  var token = getMSIToken(config);
+  if ('undefined' !== token) {
+    config.authentication.options.token = token;
   }
 
   config.options.debug = {
@@ -45,26 +44,25 @@ function getNtlmConfig() {
   ).ntlm;
 }
 
-function getMSIToken(config){
+function getMSIToken(config) {
   var token;
-  var authType=config.authentication.type
-  if('azure-active-directory-access-token' === authType)
-  {
-    var uid= config.authentication.options.userName
-    var pwd= config.authentication.options.password
-    const spn = "https://database.windows.net/";
-    const stsurl = "https://login.windows.net/136C5EF1-C066-4A88-8B91-4B8BCD2708BB";
-    const clientId = "7f98cb04-cd1e-40df-9140-3bf7e2cea4db";
+  var authType = config.authentication.type;
+  if ('azure-active-directory-access-token' === authType) {
+    var uid = config.authentication.options.userName;
+    var pwd = config.authentication.options.password;
+    const spn = 'https://database.windows.net/';
+    const stsurl = 'https://login.windows.net/136C5EF1-C066-4A88-8B91-4B8BCD2708BB';
+    const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
     const context = new AuthenticationContext(stsurl);
     context.acquireTokenWithUsernamePassword(spn, uid, pwd, clientId, (err, tokenResponse) => {
       if (err) {
         console.log('Token cannot be successfully retrived: ' + err.stack);
         return token;
       }
-      token= tokenResponse
-    })
+      token = tokenResponse;
+    });
   }
-  return token
+  return token;
 }
 
 exports.badServer = function(test) {
@@ -107,7 +105,7 @@ exports.badCredentials = function(test) {
     test.expect(2);
   }
 
-  config.authentication.options.token = {accessToken:'bad-token'};
+  config.authentication.options.token = { accessToken: 'bad-token' };
   config.authentication.options.userName = 'bad-user';
   config.authentication.options.password = 'bad-password';
 
