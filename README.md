@@ -11,7 +11,7 @@ Previous behavior can be restored using `config.options.enableAnsiNullDefault = 
 
 **NOTE: Default login behavior has changed slightly as of version 1.2**
 
-See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for version history.
+See the [changelog](https://github.com/tediousjs/tedious/releases) for version history.
 
 
 ### Supported TDS versions
