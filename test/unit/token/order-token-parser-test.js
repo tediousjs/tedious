@@ -11,12 +11,12 @@ module.exports.oneColumn = function(test) {
   buffer.writeUInt8(0xa9);
   buffer.writeUInt16LE(length);
   buffer.writeUInt16LE(column);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.orderColumns.length, 1);
   test.strictEqual(token.orderColumns[0], column);
@@ -36,12 +36,12 @@ module.exports.twoColumns = function(test) {
   buffer.writeUInt16LE(length);
   buffer.writeUInt16LE(column1);
   buffer.writeUInt16LE(column2);
-  //console.log(buffer.data)
+  // console.log(buffer.data)
 
   var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.orderColumns.length, 2);
   test.strictEqual(token.orderColumns[0], column1);

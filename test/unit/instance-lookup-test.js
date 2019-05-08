@@ -4,7 +4,7 @@ const dns = require('dns');
 const punycode = require('punycode');
 
 exports['instanceLookup invalid args'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.instanceLookup = new InstanceLookup().instanceLookup;
     done();
   },
@@ -87,7 +87,7 @@ exports['instanceLookup invalid args'] = {
 };
 
 exports['instanceLookup functional unit tests'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.options = {
       server: 'server',
       instanceName: 'instance',
@@ -129,12 +129,12 @@ exports['instanceLookup functional unit tests'] = {
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
     done();
   },
 
-  success: function(test) {
+  'success': function(test) {
     this.senderExecuteStub.callsArgWithAsync(0, null, this.anyMessage);
     this.parseStub
       .withArgs(this.anyMessage, this.options.instanceName)
@@ -232,12 +232,12 @@ exports['instanceLookup functional unit tests'] = {
       clock.tick(this.options.timeout * 1.1);
     };
 
-    const scheduleForwardClock = function() {
+    function scheduleForwardClock() {
       // This function is called in place of sender.execute(). We don't want to
       // rely on when the timeout is set in relation to execute() in the calling
       // context. So we setup to forward clock on next tick.
       process.nextTick(forwardClock);
-    };
+    }
 
     this.senderExecuteStub.restore();
     this.senderExecuteStub = sinon.stub(
@@ -246,7 +246,7 @@ exports['instanceLookup functional unit tests'] = {
     ).callsFake(scheduleForwardClock);
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('Failed to get response') != -1);
+      test.ok(error.indexOf('Failed to get response') !== -1);
       test.strictEqual(port, undefined);
 
       test.strictEqual(this.createSenderStub.callCount, this.options.retries);
@@ -273,8 +273,8 @@ exports['instanceLookup functional unit tests'] = {
       .withArgs(message, this.options.instanceName);
 
     this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('XXXXXXXXXX') == -1);
-      test.ok(error.indexOf('YYYYYYYYYY') == -1);
+      test.ok(error.indexOf('XXXXXXXXXX') === -1);
+      test.ok(error.indexOf('YYYYYYYYYY') === -1);
       test.strictEqual(port, undefined);
 
       test.ok(this.createSenderStub.calledOnce);
@@ -285,7 +285,7 @@ exports['instanceLookup functional unit tests'] = {
   }
 };
 
-exports['parseBrowserResponse'] = {
+exports.parseBrowserResponse = {
   setUp: function(done) {
     this.parse = new InstanceLookup().parseBrowserResponse;
     done();
@@ -328,14 +328,14 @@ exports['parseBrowserResponse'] = {
 };
 
 exports['Test unicode SQL Server name'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
     this.spy = sinon.spy(dns, 'lookup');
 
     done();
   },
 
-  tearDown: function(done) {
+  'tearDown': function(done) {
     sinon.restore();
 
     done();

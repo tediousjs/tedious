@@ -1,4 +1,3 @@
-
 var Parser = require('../../../src/token/stream-parser');
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
@@ -21,7 +20,7 @@ module.exports.fedauth = function(test) {
 
   buffer.writeUInt8(0xFF); // terminator
 
-  var parser = new Parser({token() {}}, {}, {});
+  var parser = new Parser({ token() {} }, {}, {});
   parser.write(buffer.data);
 
   var token = parser.read();

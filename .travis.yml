@@ -7,12 +7,16 @@ node_js:
   - "11"
 
 stages:
-  - test
+  - name: test
+    if: (type = push) OR (type = pull_request)
   - name: azure
-    if: type = push
-  - lint
+    if: (type = push)
+  - name: lint
+    if: (type = push) OR (type = pull_request)
   - name: release
-    if: (branch = master) AND (type = push)
+    if: (type = push) AND (branch = master)
+  - name: tag-latest
+    if: (type = cron)
 
 services:
   - docker
@@ -26,8 +30,13 @@ before_install:
     echo '{
       "config": {
         "server": "localhost",
-        "userName": "sa",
-        "password": "yourStrong(!)Password",
+        "authentication": {
+          "type": "default",
+          "options": {
+            "userName": "sa",
+            "password": "yourStrong(!)Password"
+          }
+        },
         "options": {
           "port": 1433,
           "database": "master"
@@ -64,11 +73,15 @@ jobs:
         echo '{
           "config": {
             "server": "'${AZURE_SERVER}'",
-            "userName": "'${AZURE_USERNAME}'",
-            "password": "'${AZURE_PASS}'",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "'${AZURE_USERNAME}'",
+                "password": "'${AZURE_PASS}'"
+              }
+            },
             "options": {
-              "database": "test",
-              "encrypt": true
+              "database": "test"
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -91,8 +104,7 @@ jobs:
               }
             },
             "options": {
-              "database": "test",
-              "encrypt": true
+              "database": "test"
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -104,3 +116,21 @@ jobs:
       before_install: skip
       before_script: skip
       script: npm run semantic-release
+
+    - stage: tag-latest
+      node_js: 8
+      before_install: skip
+      before_script: skip
+      script:
+        - |
+          read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
+          if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
+            date_format="%Y-%m-%dT%H:%M:%SZ"
+
+            publish_date=$(date -d $(npm info tedious --json | jq -r '.time["'"$next"'"]') +$date_format)
+            week_ago=$(date -d '-7 days' +$date_format)
+
+            if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
+              npm dist-tag add "tedious@$next" latest
+            fi
+          fi

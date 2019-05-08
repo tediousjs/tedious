@@ -53,13 +53,11 @@ module.exports = {
       } else {
         buffer.writePLPBody(parameter.value);
       }
+    } else if (parameter.length <= this.maximumLength) {
+      buffer.writeUInt16LE(NULL);
     } else {
-      if (parameter.length <= this.maximumLength) {
-        buffer.writeUInt16LE(NULL);
-      } else {
-        buffer.writeUInt32LE(0xFFFFFFFF);
-        buffer.writeUInt32LE(0xFFFFFFFF);
-      }
+      buffer.writeUInt32LE(0xFFFFFFFF);
+      buffer.writeUInt32LE(0xFFFFFFFF);
     }
   },
 

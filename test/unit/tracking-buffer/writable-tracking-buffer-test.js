@@ -125,7 +125,7 @@ exports.copyFrom = function(test) {
   test.done();
 };
 
-var assertBuffer = function(test, actual, expected) {
+function assertBuffer(test, actual, expected) {
   actual = actual.data;
   expected = Buffer.from(expected);
 
@@ -135,4 +135,4 @@ var assertBuffer = function(test, actual, expected) {
     console.log('expected', expected);
     test.ok(false);
   }
-};
+}

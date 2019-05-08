@@ -4,7 +4,7 @@ const homedir = require('os').homedir();
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
-var getConfig = function() {
+function getConfig() {
   return {
     server: JSON.parse(
       fs.readFileSync(
@@ -19,7 +19,7 @@ var getConfig = function() {
       )
     ).instanceName
   };
-};
+}
 
 exports.goodInstance = function(test) {
   var config = getConfig();
@@ -31,56 +31,40 @@ exports.goodInstance = function(test) {
     return;
   }
 
-  var callback = function(err, port) {
+  new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function(err, port) {
     test.ifError(err);
     test.ok(port);
 
     test.done();
-  };
-
-  new InstanceLookup().instanceLookup(
-    { server: config.server, instanceName: config.instanceName },
-    callback
-  );
+  });
 };
 
 exports.badInstance = function(test) {
   var config = getConfig();
 
-  var callback = function(err, port) {
+  new InstanceLookup().instanceLookup({
+    server: config.server,
+    instanceName: 'badInstanceName',
+    timeout: 100,
+    retries: 1
+  }, function(err, port) {
     test.ok(err);
     test.ok(!port);
 
     test.done();
-  };
-
-  new InstanceLookup().instanceLookup(
-    {
-      server: config.server,
-      instanceName: 'badInstanceName',
-      timeout: 100,
-      retries: 1
-    },
-    callback
-  );
+  });
 };
 
 exports.badServer = function(test) {
-
-  var callback = function(err, port) {
+  new InstanceLookup().instanceLookup({
+    server: RESERVED_IP_ADDRESS,
+    instanceName: 'badInstanceName',
+    timeout: 100,
+    retries: 1
+  }, function(err, port) {
     test.ok(err);
     test.ok(!port);
 
     test.done();
-  };
-
-  new InstanceLookup().instanceLookup(
-    {
-      server: RESERVED_IP_ADDRESS,
-      instanceName: 'badInstanceName',
-      timeout: 100,
-      retries: 1
-    },
-    callback
-  );
+  });
 };

@@ -33,16 +33,36 @@ before_test:
 
   - mkdir C:\Users\appveyor\.tedious
   - ps: >-
-      Set-Content -Value '{
+      Set-Content -Value $('{
         "config": {
           "server": "localhost",
-          "userName": "sa",
-          "password": "Password12!",
+          "authentication": {
+            "type": "default",
+            "options": {
+              "userName": "sa",
+              "password": "Password12!"
+            }
+          },
+          "options": {
+            "database": "master"
+          }
+        },
+
+        "ntlm": {
+          "server": "localhost",
+          "authentication": {
+            "type": "ntlm",
+            "options": {
+              "userName": "' + $env:username + '",
+              "password": "' + [Microsoft.Win32.Registry]::GetValue("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "DefaultPassword", '') + '",
+              "domain": "' + $env:computername + '"
+            }
+          },
           "options": {
             "database": "master"
           }
         }
-      }' -Path C:\Users\appveyor\.tedious\test-connection.json
+      }') -Path C:\Users\appveyor\.tedious\test-connection.json
 
 
 test_script:

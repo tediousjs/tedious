@@ -186,7 +186,7 @@ module.exports = class Parser extends Transform {
 
   readInt64LE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + (this.buffer[this.position + 4] & 0x80 === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
+      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
       this.position += 8;
       callback(data);
     });
@@ -194,7 +194,7 @@ module.exports = class Parser extends Transform {
 
   readInt64BE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + (this.buffer[this.position] & 0x80 === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
+      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
       this.position += 8;
       callback(data);
     });

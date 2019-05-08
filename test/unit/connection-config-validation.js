@@ -11,7 +11,7 @@ function ensureConnectionIsClosed(connection, callback) {
 }
 
 exports['Connection configuration validation'] = {
-  setUp: function(done) {
+  'setUp': function(done) {
     this.config = {};
     this.config.options = { encrypt: false };
     this.config.server = 'localhost';

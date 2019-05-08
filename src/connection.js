@@ -1,5 +1,3 @@
-const deprecate = require('depd')('tedious');
-
 const crypto = require('crypto');
 const os = require('os');
 // $FlowFixMe
@@ -69,76 +67,81 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication" property must be of type Object.');
       }
 
-      if (typeof config.authentication.type !== 'string') {
+      const type = config.authentication.type;
+      const options = config.authentication.options === undefined ? {} : config.authentication.options;
+
+      if (typeof type !== 'string') {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (config.authentication.type !== 'default' && config.authentication.type !== 'ntlm' && config.authentication.type !== 'azure-active-directory-password') {
-        throw new TypeError('The "config.authentication.type" property must one of "default", "ntlm" or "azure-active-directory-password".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password') {
+        throw new TypeError('The "type" property must one of "default", "ntlm" or "azure-active-directory-password".');
       }
 
-      if (config.authentication.options !== undefined) {
-        if (typeof config.authentication.options !== 'object' || config.authentication.options === null) {
-          throw new TypeError('The "config.authentication.options" property must be of type object.');
+      if (typeof options !== 'object' || options === null) {
+        throw new TypeError('The "config.authentication.options" property must be of type object.');
+      }
+
+      if (type === 'ntlm') {
+        if (typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
         }
 
-        if (config.authentication.type === 'ntlm') {
-          if (typeof config.authentication.options.domain !== 'string') {
-            throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
-          }
-        }
-
-        if (config.authentication.options.userName !== undefined && typeof config.authentication.options.userName !== 'string') {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
           throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
 
-        if (config.authentication.options.password !== undefined && typeof config.authentication.options.password !== 'string') {
+        if (options.password !== undefined && typeof options.password !== 'string') {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
-      }
 
-      authentication = {
-        type: config.authentication.type,
-        options: config.authentication.type === 'ntlm' ? {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password,
-          domain: config.authentication.options.domain && config.authentication.options.domain.toUpperCase()
-        } : {
-          userName: config.authentication.options.userName,
-          password: config.authentication.options.password
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: options.userName,
+            password: options.password,
+            domain: options.domain && options.domain.toUpperCase()
+          }
+        };
+      } else if (type === 'azure-active-directory-password') {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
-      };
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            userName: options.userName,
+            password: options.password,
+          }
+        };
+      } else {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'default',
+          options: {
+            userName: options.userName,
+            password: options.password
+          }
+        };
+      }
     } else {
-      if (config.domain !== undefined) {
-        if (typeof config.domain !== 'string') {
-          throw new TypeError('The "config.domain" property must be of type string.');
-        }
-
-        deprecate('The "config.domain" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
-      if (config.userName !== undefined) {
-        if (typeof config.userName !== 'string') {
-          throw new TypeError('The "config.userName" property must be of type string.');
-        }
-
-        deprecate('The "config.userName" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
-      if (config.password !== undefined) {
-        if (typeof config.password !== 'string') {
-          throw new TypeError('The "config.password" property must be of type string.');
-        }
-
-        deprecate('The "config.password" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
       authentication = {
-        type: config.domain ? 'ntlm' : 'default',
+        type: 'default',
         options: {
-          userName: config.userName,
-          password: config.password,
-          domain: config.domain && config.domain.toUpperCase()
+          userName: undefined,
+          password: undefined
         }
       };
     }
@@ -193,7 +196,8 @@ class Connection extends EventEmitter {
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
         useColumnNames: false,
-        useUTC: true
+        useUTC: true,
+        lowerCaseGuids: false
       }
     };
 
@@ -419,8 +423,7 @@ class Connection extends EventEmitter {
 
         this.config.options.encrypt = config.options.encrypt;
       } else {
-        deprecate('The default value for `options.encrypt` will change from `false` to `true`. Please pass `false` explicitly if you want to retain current behaviour.');
-        this.config.options.encrypt = false;
+        this.config.options.encrypt = true;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
@@ -588,6 +591,14 @@ class Connection extends EventEmitter {
 
         this.config.options.useUTC = config.options.useUTC;
       }
+
+      if (config.options.lowerCaseGuids !== undefined) {
+        if (typeof config.options.lowerCaseGuids !== 'boolean') {
+          throw new TypeError('The "config.options.lowerCaseGuids" property must be of type boolean.');
+        }
+
+        this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
+      }
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -654,14 +665,17 @@ class Connection extends EventEmitter {
           this.emit('end');
         });
       }
-      if (this.request) {
+
+      const request = this.request;
+      if (request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
+        request.callback(err);
         this.request = undefined;
       }
+
       this.closed = true;
       this.loggedIn = false;
-      this.loginError = null;
+      this.loginError = undefined;
     }
   }
 
@@ -691,15 +705,17 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
-        if (this.request) {
-          if (!this.request.canceled) {
-            this.request.error = RequestError(token.message, 'EREQUEST');
-            this.request.error.number = token.number;
-            this.request.error.state = token.state;
-            this.request.error['class'] = token['class'];
-            this.request.error.serverName = token.serverName;
-            this.request.error.procName = token.procName;
-            this.request.error.lineNumber = token.lineNumber;
+        const request = this.request;
+        if (request) {
+          if (!request.canceled) {
+            const error = new RequestError(token.message, 'EREQUEST');
+            error.number = token.number;
+            error.state = token.state;
+            error.class = token.class;
+            error.serverName = token.serverName;
+            error.procName = token.procName;
+            error.lineNumber = token.lineNumber;
+            request.error = error;
           }
         }
       } else {
@@ -742,7 +758,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      if (!token['interface']) {
+      if (!token.interface) {
         // unsupported interface
         this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
@@ -788,8 +804,9 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           let columns;
           if (this.config.options.useColumnNames) {
             columns = {};
@@ -802,7 +819,7 @@ class Connection extends EventEmitter {
           } else {
             columns = token.columns;
           }
-          this.request.emit('columnMetadata', columns);
+          request.emit('columnMetadata', columns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
@@ -811,9 +828,10 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('order', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('order', token.orderColumns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('order', token.orderColumns);
         }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
@@ -822,16 +840,17 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('row', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           if (this.config.options.rowCollectionOnRequestCompletion) {
-            this.request.rows.push(token.columns);
+            request.rows.push(token.columns);
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst.push(token.columns);
+            request.rst.push(token.columns);
           }
-          if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-            this.request.emit('row', token.columns);
+          if (!(this.state === this.STATE.SENT_ATTENTION && request.paused)) {
+            request.emit('row', token.columns);
           }
         }
       } else {
@@ -841,8 +860,9 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnStatus', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           // Keep value for passing in 'doneProc' event.
           this.procReturnStatusValue = token.value;
         }
@@ -850,66 +870,70 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
           this.request.emit('returnValue', token.paramName, token.value, token.metadata);
         }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
           this.procReturnStatusValue = undefined;
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
-      if (this.request) {
-        if (!this.request.canceled) {
-          this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneInProc', token.rowCount, token.more, request.rst);
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
     });
 
     this.tokenStreamParser.on('done', (token) => {
-      if (this.request) {
+      const request = this.request;
+      if (request) {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
 
-        if (this.request.canceled) {
+        if (request.canceled) {
           // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
           // We assume this is the indication that an in-flight request was canceled.
-          if (token.sqlError && !this.request.error) {
+          if (token.sqlError && !request.error) {
             this.clearCancelTimer();
-            this.request.error = RequestError('Canceled.', 'ECANCEL');
+            request.error = RequestError('Canceled.', 'ECANCEL');
           }
         } else {
-          if (token.sqlError && !this.request.error) {
+          if (token.sqlError && !request.error) {
             // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
           }
-          this.request.emit('done', token.rowCount, token.more, this.request.rst);
+          request.emit('done', token.rowCount, token.more, request.rst);
           if (token.rowCount !== undefined) {
-            this.request.rowCount += token.rowCount;
+            request.rowCount += token.rowCount;
           }
           if (this.config.options.rowCollectionOnDone) {
-            this.request.rst = [];
+            request.rst = [];
           }
         }
       }
@@ -1018,7 +1042,8 @@ class Connection extends EventEmitter {
 
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const request = this.request;
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
@@ -1049,10 +1074,11 @@ class Connection extends EventEmitter {
 
   requestTimeout() {
     this.requestTimer = undefined;
-    this.request.cancel();
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const request = this.request;
+    request.cancel();
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    this.request.error = RequestError(message, 'ETIMEOUT');
+    request.error = RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -1097,7 +1123,7 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -1177,7 +1203,7 @@ class Connection extends EventEmitter {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
-  sendLogin7Packet(cb) {
+  sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -1374,10 +1400,11 @@ class Connection extends EventEmitter {
   execSql(request) {
     request.transformIntoExecuteSqlRpc();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1441,10 +1468,11 @@ class Connection extends EventEmitter {
   execute(request, parameters) {
     request.transformIntoExecuteRpc(parameters);
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
 
       return;
@@ -1456,10 +1484,11 @@ class Connection extends EventEmitter {
   callProcedure(request) {
     request.validateParameters();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1538,27 +1567,21 @@ class Connection extends EventEmitter {
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction((txErr) => {
+          this.rollbackTransaction((txErr) => {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
+      } else if (useSavepoint) {
+        if (this.config.options.tdsVersion < '7_2') {
+          this.transactionDepth--;
+        }
+        done(null, ...args);
       } else {
-        if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
-        } else {
-          return this.commitTransaction((txErr) => {
-            done(txErr, ...args);
-          }, name);
-        }
+        this.commitTransaction((txErr) => {
+          done(txErr, ...args);
+        }, name);
       }
     };
 
@@ -1620,7 +1643,9 @@ class Connection extends EventEmitter {
         // There's two ways to handle request cancelation:
         if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
+          //   and end the message.
           message.ignore = true;
+          message.end();
         } else {
           // - but if the message has been ended (and thus has been fully sent off),
           //   we need to send an `ATTENTION` message to the server
@@ -1684,7 +1709,7 @@ class Connection extends EventEmitter {
       callback(err);
     });
     this.resetConnectionOnNextRequest = true;
-    return this.execSqlBatch(request);
+    this.execSqlBatch(request);
   }
 
   currentTransactionDescriptor() {
@@ -1865,32 +1890,28 @@ Connection.prototype.STATE = {
             this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
+        } else if (token.fedAuth === undefined) {
+          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+          this.loggedIn = false;
         } else {
-          if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Received acknowledgement for unknown feature');
-            this.loggedIn = false;
-          } else {
-            this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-            this.loggedIn = false;
-          }
+          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+          this.loggedIn = false;
         }
       },
       message: function() {
         if (this.loggedIn) {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
@@ -1927,23 +1948,21 @@ Connection.prototype.STATE = {
           this.debug.payload(function() {
             return payload.toString('  ');
           });
-        } else {
-          if (this.loggedIn) {
-            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+
+          this.ntlmpacket = undefined;
+        } else if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            if (this.loginError) {
-              if (this.loginError.isTransient) {
-                this.debug.log('Initiating retry on transient error');
-                this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-              } else {
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
-              }
-            } else {
-              this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-              this.transitionTo(this.STATE.FINAL);
-            }
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
@@ -1982,19 +2001,17 @@ Connection.prototype.STATE = {
 
             this.sendFedAuthResponsePacket(tokenResponse);
           });
-        } else {
-          if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }

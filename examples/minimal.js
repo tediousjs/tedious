@@ -3,8 +3,13 @@ var Request = require('../lib/tedious').Request;
 
 var config = {
   server: '192.168.1.212',
-  userName: 'test',
-  password: 'test'
+  authentication: {
+    type: 'default',
+    options: {
+      userName: 'test',
+      password: 'test'
+    }
+  }
   /*
   ,options: {
     debug: {

@@ -41,13 +41,13 @@ describe('calling a procedure that takes and returns a TVP', function() {
     connection.on(
       'infoMessage',
       function(info) {}
-      //console.log("#{info.number} : #{info.message}")
+      // console.log("#{info.number} : #{info.message}")
     );
 
     connection.on(
       'debug',
       function(text) {}
-      //console.log(text)
+      // console.log(text)
     );
 
     connection.on('connect', done);

@@ -5,7 +5,7 @@ var TYPES = require('../../src/data-type').typeByName;
 
 /* eslint-disable no-unused-vars */
 
-var getConfig = function() {
+function getConfig() {
   var config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
@@ -21,7 +21,7 @@ var getConfig = function() {
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
-};
+}
 
 exports.prepareExecute = function(test) {
   test.expect(5);
@@ -39,7 +39,7 @@ exports.prepareExecute = function(test) {
 
   request.on('prepared', function() {
     test.ok(request.handle);
-    connection.execute(request, {param: value});
+    connection.execute(request, { param: value });
   });
 
   request.on('row', function(columns) {
@@ -57,7 +57,7 @@ exports.prepareExecute = function(test) {
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };
 
@@ -89,6 +89,6 @@ exports.unprepare = function(test) {
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
 };

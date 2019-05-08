@@ -8,8 +8,6 @@ const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 class InstanceLookup {
-  constructor() { }
-
   // Wrapper allows for stubbing Sender when unit testing instance-lookup.
   createSender(host, port, request) {
     return new Sender(host, port, request);
@@ -40,7 +38,8 @@ class InstanceLookup {
       throw new TypeError('Invalid arguments: "callback" must be a function');
     }
 
-    let sender, timer, retriesLeft = retries;
+    let sender, timer;
+    let retriesLeft = retries;
 
     const onTimeout = () => {
       sender.cancel();
@@ -57,7 +56,7 @@ class InstanceLookup {
           clearTimeout(timer);
           if (err) {
             callback('Failed to lookup instance on ' + server + ' - ' + err.message);
-            return;
+
           } else {
             message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
             const port = this.parseBrowserResponse(message, instanceName);
