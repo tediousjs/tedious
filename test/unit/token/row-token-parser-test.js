@@ -715,7 +715,7 @@ module.exports['parsing a UniqueIdentifier value when `lowerCaseGuids` option is
   var parser = new Parser({ token() {} }, colMetaData, Object.assign({ lowerCaseGuids: true }, options));
   parser.write(buffer.data);
   var token = parser.read();
-  //console.log(token)
+  // console.log(token)
 
   test.strictEqual(token.columns.length, 2);
   test.strictEqual(token.columns[0].value, null);
