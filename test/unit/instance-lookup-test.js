@@ -2,75 +2,80 @@ const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const sinon = require('sinon');
 const dns = require('dns');
 const punycode = require('punycode');
+var assert = require('chai').assert;
+var expect = require('chai').expect;
 
-exports['instanceLookup invalid args'] = {
-  'setUp': function(done) {
-    this.instanceLookup = new InstanceLookup().instanceLookup;
+describe('instanceLookup invalid args', function() {
+
+  var instanceLookup;
+
+  beforeEach(function(done) {
+    instanceLookup = new InstanceLookup().instanceLookup;
     done();
-  },
+  });
 
-  'invalid server': function(test) {
+  it('invalid server', (done) => {
     const expectedErrorMessage = 'Invalid arguments: "server" must be a string';
     try {
       const notString = 4;
-      this.instanceLookup({ server: notString });
+      instanceLookup({ server: notString });
     } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
+      assert.strictEqual(err.message, expectedErrorMessage);
+      done();
     }
-  },
+  });
 
-  'invalid instanceName': function(test) {
+  it('invalid instanceName', (done) => {
     const expectedErrorMessage =
       'Invalid arguments: "instanceName" must be a string';
     try {
       const notString = 4;
-      this.instanceLookup({ server: 'serverName', instanceName: notString });
+      instanceLookup({ server: 'serverName', instanceName: notString });
     } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
+      assert.strictEqual(err.message, expectedErrorMessage);
+      done();
     }
-  },
+  });
 
-  'invalid timeout': function(test) {
+  it('invalid timeout', (done) => {
     const expectedErrorMessage =
       'Invalid arguments: "timeout" must be a number';
     try {
       const notNumber = 'some string';
-      this.instanceLookup({
+      instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: notNumber
       });
     } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
+      assert.strictEqual(err.message, expectedErrorMessage);
+      done();
     }
-  },
+  });
 
-  'invalid retries': function(test) {
+  it('invalid retries', (done) => {
     const expectedErrorMessage =
       'Invalid arguments: "retries" must be a number';
     try {
       const notNumber = 'some string';
-      this.instanceLookup({
+      instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: 1000,
         retries: notNumber
       });
     } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
+      assert.strictEqual(err.message, expectedErrorMessage);
+      done();
     }
-  },
+  });
 
-  'invalid callback': function(test) {
+  it('invalid callback', (done) => {
     const expectedErrorMessage =
       'Invalid arguments: "callback" must be a function';
     try {
       const notFunction = 4;
-      this.instanceLookup(
+      instanceLookup(
         {
           server: 'server',
           instanceName: 'instance',
@@ -80,156 +85,170 @@ exports['instanceLookup invalid args'] = {
         notFunction
       );
     } catch (err) {
-      test.strictEqual(err.message, expectedErrorMessage);
-      test.done();
+      assert.strictEqual(err.message, expectedErrorMessage);
+      done();
     }
-  }
-};
+  });
+});
 
-exports['instanceLookup functional unit tests'] = {
-  'setUp': function(done) {
-    this.options = {
+describe('instanceLookup functional unit tests', function() {
+
+  var options;
+  var anyPort;
+  var anyRequest;
+  var anyMessage;
+  var anyError;
+  var anySqlPort;
+  var instanceLookup;
+  var testSender;
+  var createSenderStub;
+  var senderExecuteStub;
+  var parseStub;
+
+
+  beforeEach(function(done) {
+    options = {
       server: 'server',
       instanceName: 'instance',
       timeout: 1000,
       retries: 3
     };
 
-    this.anyPort = 1234;
-    this.anyRequest = Buffer.alloc(0x02);
-    this.anyMessage = 'any message';
-    this.anyError = new Error('any error');
-    this.anySqlPort = 2345;
+    anyPort = 1234;
+    anyRequest = Buffer.alloc(0x02);
+    anyMessage = 'any message';
+    anyError = new Error('any error');
+    anySqlPort = 2345;
 
-    this.instanceLookup = new InstanceLookup();
+    instanceLookup = new InstanceLookup();
 
     // Stub out createSender method to return the Sender we create. This allows us
     // to override the execute method on Sender so we can test instance lookup code
     // without triggering network activity.
-    this.testSender = this.instanceLookup.createSender(
-      this.options.server,
-      this.anyPort,
-      this.anyRequest
+    testSender = instanceLookup.createSender(
+      options.server,
+      anyPort,
+      anyRequest
     );
-    this.createSenderStub = sinon.stub(
-      this.instanceLookup,
+    createSenderStub = sinon.stub(
+      instanceLookup,
       'createSender'
     );
-    this.createSenderStub.returns(this.testSender);
-    this.senderExecuteStub = sinon.stub(this.testSender, 'execute');
+    createSenderStub.returns(testSender);
+    senderExecuteStub = sinon.stub(testSender, 'execute');
 
     // Stub parseBrowserResponse so we can mimic success and failure without creating
     // elaborate responses. parseBrowserResponse itself has unit tests to ensure that
     // it functions correctly.
-    this.parseStub = sinon.stub(
-      this.instanceLookup,
+    parseStub = sinon.stub(
+      instanceLookup,
       'parseBrowserResponse'
     );
 
     done();
-  },
+  });
 
-  'tearDown': function(done) {
+  afterEach(function(done) {
     sinon.restore();
     done();
-  },
+  }),
 
-  'success': function(test) {
-    this.senderExecuteStub.callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub
-      .withArgs(this.anyMessage, this.options.instanceName)
-      .returns(this.anySqlPort);
+  it('success', (done) => {
+    senderExecuteStub.callsArgWithAsync(0, null, anyMessage);
+    parseStub
+      .withArgs(anyMessage, options.instanceName)
+      .returns(anySqlPort);
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.strictEqual(error, undefined);
-      test.strictEqual(port, this.anySqlPort);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.strictEqual(error, undefined);
+      assert.strictEqual(port, anySqlPort);
 
-      test.ok(this.createSenderStub.calledOnce);
-      test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3]);
+      assert.ok(createSenderStub.calledOnce);
+      assert.strictEqual(createSenderStub.args[0][0], options.server);
+      assert.strictEqual(createSenderStub.args[0][3]);
 
-      test.ok(this.senderExecuteStub.calledOnce);
-      test.ok(this.parseStub.calledOnce);
-      test.done();
+      assert.ok(senderExecuteStub.calledOnce);
+      assert.ok(parseStub.calledOnce);
+      done();
     });
-  },
+  }),
 
-  'sender fail': function(test) {
-    this.senderExecuteStub.callsArgWithAsync(0, this.anyError, undefined);
+  it('sender fail', (done) => {
+    senderExecuteStub.callsArgWithAsync(0, anyError, undefined);
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf(this.anyError.message) !== -1);
-      test.strictEqual(port, undefined);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.ok(error.indexOf(anyError.message) !== -1);
+      assert.strictEqual(port, undefined);
 
-      test.ok(this.createSenderStub.calledOnce);
-      test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3]);
+      assert.ok(createSenderStub.calledOnce);
+      assert.strictEqual(createSenderStub.args[0][0], options.server);
+      assert.strictEqual(createSenderStub.args[0][3]);
 
-      test.ok(this.senderExecuteStub.calledOnce);
-      test.strictEqual(this.parseStub.callCount, 0);
-      test.done();
+      assert.ok(senderExecuteStub.calledOnce);
+      assert.strictEqual(parseStub.callCount, 0);
+      done();
     });
-  },
+  }),
 
-  'parse fail': function(test) {
-    this.senderExecuteStub.callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub
-      .withArgs(this.anyMessage, this.options.instanceName)
+  it('parse fail', (done) => {
+    senderExecuteStub.callsArgWithAsync(0, null, anyMessage);
+    parseStub
+      .withArgs(anyMessage, options.instanceName)
       .returns(null);
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('not found') !== -1);
-      test.strictEqual(port, undefined);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.ok(error.indexOf('not found') !== -1);
+      assert.strictEqual(port, undefined);
 
-      test.ok(this.createSenderStub.calledOnce);
-      test.strictEqual(this.createSenderStub.args[0][0], this.options.server);
-      test.strictEqual(this.createSenderStub.args[0][3]);
+      assert.ok(createSenderStub.calledOnce);
+      assert.strictEqual(createSenderStub.args[0][0], options.server);
+      assert.strictEqual(createSenderStub.args[0][3]);
 
-      test.ok(this.senderExecuteStub.calledOnce);
-      test.ok(this.parseStub.calledOnce);
-      test.done();
+      assert.ok(senderExecuteStub.calledOnce);
+      assert.ok(parseStub.calledOnce);
+      done();
     });
-  },
+  }),
 
-  'retry success': function(test) {
+  it('retry success', (done) => {
     // First invocation of execute will not invoke callback. This will cause a timeout
     // and trigger a retry. Setup to invoke callback on second invocation.
-    this.senderExecuteStub
+    senderExecuteStub
       .onCall(1)
-      .callsArgWithAsync(0, null, this.anyMessage);
-    this.parseStub
-      .withArgs(this.anyMessage, this.options.instanceName)
-      .returns(this.anySqlPort);
+      .callsArgWithAsync(0, null, anyMessage);
+    parseStub
+      .withArgs(anyMessage, options.instanceName)
+      .returns(anySqlPort);
 
     const clock = sinon.useFakeTimers();
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.strictEqual(error, undefined);
-      test.strictEqual(port, this.anySqlPort);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.strictEqual(error, undefined);
+      assert.strictEqual(port, anySqlPort);
 
-      test.ok(this.createSenderStub.callCount, 2);
-      for (let j = 0; j < this.createSenderStub.callCount; j++) {
-        test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3]);
+      assert.ok(createSenderStub.callCount, 2);
+      for (let j = 0; j < createSenderStub.callCount; j++) {
+        assert.strictEqual(createSenderStub.args[j][0], options.server);
+        assert.strictEqual(createSenderStub.args[j][3]);
       }
 
       // Execute called twice but parse only called once as the first call to execute times out.
-      test.strictEqual(this.senderExecuteStub.callCount, 2);
-      test.ok(this.parseStub.calledOnce);
+      assert.strictEqual(senderExecuteStub.callCount, 2);
+      assert.ok(parseStub.calledOnce);
 
       clock.restore();
-      test.done();
+      done();
     });
 
     // Forward clock to trigger timeout.
-    clock.tick(this.options.timeout * 1.1);
-  },
+    clock.tick(options.timeout * 1.1);
+  }),
 
-  'retry fail': function(test) {
+  it('retry fail', (done) => {
     const clock = sinon.useFakeTimers();
 
     const forwardClock = () => {
-      clock.tick(this.options.timeout * 1.1);
+      clock.tick(options.timeout * 1.1);
     };
 
     function scheduleForwardClock() {
@@ -239,129 +258,132 @@ exports['instanceLookup functional unit tests'] = {
       process.nextTick(forwardClock);
     }
 
-    this.senderExecuteStub.restore();
-    this.senderExecuteStub = sinon.stub(
-      this.testSender,
+    senderExecuteStub.restore();
+    senderExecuteStub = sinon.stub(
+      testSender,
       'execute',
     ).callsFake(scheduleForwardClock);
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('Failed to get response') !== -1);
-      test.strictEqual(port, undefined);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.ok(error.indexOf('Failed to get response') !== -1);
+      assert.strictEqual(port, undefined);
 
-      test.strictEqual(this.createSenderStub.callCount, this.options.retries);
-      for (let j = 0; j < this.createSenderStub.callCount; j++) {
-        test.strictEqual(this.createSenderStub.args[j][0], this.options.server);
-        test.strictEqual(this.createSenderStub.args[j][3]);
+      assert.strictEqual(createSenderStub.callCount, options.retries);
+      for (let j = 0; j < createSenderStub.callCount; j++) {
+        assert.strictEqual(createSenderStub.args[j][0], options.server);
+        assert.strictEqual(createSenderStub.args[j][3]);
       }
 
       // Execute called 'retries' number of times but parse is never called because
       // all the execute calls timeout.
-      test.strictEqual(this.senderExecuteStub.callCount, this.options.retries);
-      test.strictEqual(this.parseStub.callCount, 0);
+      assert.strictEqual(senderExecuteStub.callCount, options.retries);
+      assert.strictEqual(parseStub.callCount, 0);
 
       clock.restore();
-      test.done();
+      done();
     });
-  },
+  }),
 
-  'incorrect instanceName': function(test) {
+  it('incorrect instanceName', (done) => {
     const message = 'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
-    this.senderExecuteStub.callsArgWithAsync(0, null, message);
-    this.parseStub
-      .withArgs(message, this.options.instanceName);
+    senderExecuteStub.callsArgWithAsync(0, null, message);
+    parseStub
+      .withArgs(message, options.instanceName);
 
-    this.instanceLookup.instanceLookup(this.options, (error, port) => {
-      test.ok(error.indexOf('XXXXXXXXXX') === -1);
-      test.ok(error.indexOf('YYYYYYYYYY') === -1);
-      test.strictEqual(port, undefined);
+    instanceLookup.instanceLookup(options, (error, port) => {
+      assert.ok(error.indexOf('XXXXXXXXXX') === -1);
+      assert.ok(error.indexOf('YYYYYYYYYY') === -1);
+      assert.strictEqual(port, undefined);
 
-      test.ok(this.createSenderStub.calledOnce);
-      test.ok(this.senderExecuteStub.calledOnce);
-      test.ok(this.parseStub.calledOnce);
-      test.done();
+      assert.ok(createSenderStub.calledOnce);
+      assert.ok(senderExecuteStub.calledOnce);
+      assert.ok(parseStub.calledOnce);
+      done();
     });
-  }
-};
+  });
+});
 
-exports.parseBrowserResponse = {
-  setUp: function(done) {
-    this.parse = new InstanceLookup().parseBrowserResponse;
+describe('parseBrowserResponse', function() {
+
+  var parse;
+
+  beforeEach(function(done) {
+    parse = new InstanceLookup().parseBrowserResponse;
     done();
-  },
+  });
 
-  oneInstanceFound: function(test) {
+  it('oneInstanceFound', (done) => {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    test.strictEqual(this.parse(response, 'sqlexpress'), 1433);
-    test.done();
-  },
+    assert.strictEqual(parse(response, 'sqlexpress'), 1433);
+    done();
+  });
 
-  twoInstancesFoundInFirst: function(test) {
+  it('twoInstancesFoundInFirst', (done) => {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    test.strictEqual(this.parse(response, 'sqlexpress'), 1433);
-    test.done();
-  },
+    assert.strictEqual(parse(response, 'sqlexpress'), 1433);
+    done();
+  });
 
-  twoInstancesFoundInSecond: function(test) {
+  it('twoInstancesFoundInSecond', (done) => {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    test.strictEqual(this.parse(response, 'sqlexpress'), 1433);
-    test.done();
-  },
+    assert.strictEqual(parse(response, 'sqlexpress'), 1433);
+    done();
+  });
 
-  twoInstancesNotFound: function(test) {
+  it('twoInstancesNotFound', (done) => {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    test.strictEqual(this.parse(response, 'sqlexpress'), undefined);
-    test.done();
-  }
-};
-
-exports['Test unicode SQL Server name'] = {
-  'setUp': function(done) {
-    // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
-    this.spy = sinon.spy(dns, 'lookup');
-
+    assert.strictEqual(parse(response, 'sqlexpress'), undefined);
     done();
-  },
+  });
+});
 
-  'tearDown': function(done) {
+describe('parseBrowserResponse', function() {
+
+  var spy;
+
+  beforeEach(function(done) {
+    spy = sinon.spy(dns, 'lookup');
+    done();
+  });
+
+  afterEach(function(done) {
     sinon.restore();
-
     done();
-  },
+  });
 
-  'test IDN Server name': function(test) {
-    test.expect(2);
+  it('test IDN Server name', (done) => {
+    expect(2);
     const options = {
       server: '本地主机.ad',
       instanceName: 'instance',
     };
     new InstanceLookup().instanceLookup(options, () => { });
-    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
-    test.ok(this.spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpcted hostname passed to dns.lookup');
-    test.done();
-  },
+    assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
+    assert.ok(spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpcted hostname passed to dns.lookup');
+    done();
+  });
 
-  'test ASCII Server name': function(test) {
-    test.expect(2);
+  it('test ASCII Server name', (done) => {
+    expect(2);
     const options = {
       server: 'localhost',
       instanceName: 'instance',
     };
     new InstanceLookup().instanceLookup(options, () => { });
-    test.ok(this.spy.called, 'Failed to call dns.lookup on hostname');
-    test.ok(this.spy.calledWithMatch(options.server), 'Unexpcted hostname passed to dns.lookup');
-    test.done();
-  }
-};
+    assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
+    assert.ok(spy.calledWithMatch(options.server), 'Unexpcted hostname passed to dns.lookup');
+    done();
+  });
+});
