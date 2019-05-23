@@ -59,7 +59,7 @@ class IncomingMessageStream extends Transform {
 
         let message = this.currentMessage;
         if (message === undefined) {
-          message = new Message({ type: packet.type(), resetConnection: false });
+          this.currentMessage = message = new Message({ type: packet.type(), resetConnection: false });
           this.push(message);
         }
 
@@ -73,7 +73,6 @@ class IncomingMessageStream extends Transform {
           message.end(packet.data());
           return;
         } else {
-          this.currentMessage = message;
           // If too much data is buffering up in the
           // current message, wait for it to drain.
           if (!message.write(packet.data())) {
