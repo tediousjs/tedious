@@ -78,8 +78,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (authType !== 'default' && authType !== 'ntlm' && authType !== 'azure-active-directory-password' && authType !== 'azure-active-directory-access-token' && authType !== 'azure-active-directory-MSI') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token" or "azure-active-directory-MSI".');
+      if (authType !== 'default' && authType !== 'ntlm' && authType !== 'azure-active-directory-password' && authType !== 'azure-active-directory-access-token' && authType !== 'azure-active-directory-msi') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token" or "azure-active-directory-msi".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -120,7 +120,7 @@ class Connection extends EventEmitter {
             token: options.token
           };
           break;
-        case 'azure-active-directory-MSI':
+        case 'azure-active-directory-msi':
           authentication.options = {
             MSIclientID: ''
           };
@@ -1258,7 +1258,7 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'azure-active-directory-MSI':
+      case 'azure-active-directory-msi':
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -1985,7 +1985,7 @@ Connection.prototype.STATE = {
 
           const { authentication } = this.config;
 
-          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-MSI') {
+          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
           } else if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -2013,7 +2013,7 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-MSI') {
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi') {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
@@ -2134,7 +2134,7 @@ Connection.prototype.STATE = {
 
               this.sendFedAuthResponsePacket(tokenResponse);
             });
-          } else if (authentication.type === 'azure-active-directory-MSI') {
+          } else if (authentication.type === 'azure-active-directory-msi') {
             this.getMSIToken();
           } else if (this.loginError) {
             if (this.loginError.isTransient) {
