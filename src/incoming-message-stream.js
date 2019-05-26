@@ -64,23 +64,21 @@ class IncomingMessageStream extends Transform {
         }
 
         if (packet.isLast()) {
-          this.currentMessage = undefined;
           // Wait until the current message was fully processed before we
           // continue processing any remaining messages.
           message.once('end', () => {
+            this.currentMessage = undefined;
             this.processBufferedData(callback);
           });
           message.end(packet.data());
           return;
-        } else {
+        } else if (!message.write(packet.data())) {
           // If too much data is buffering up in the
           // current message, wait for it to drain.
-          if (!message.write(packet.data())) {
-            message.once('drain', () => {
-              this.processBufferedData(callback);
-            });
-            return;
-          }
+          message.once('drain', () => {
+            this.processBufferedData(callback);
+          });
+          return;
         }
       } else {
         break;
