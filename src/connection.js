@@ -1309,7 +1309,7 @@ class Connection extends EventEmitter {
   getRequestOptions() {
     var tokenHost = '169.254.169.254';
     var tokenEndpoint = '/metadata/identity/oauth2/token';
-    var clinetIdKeyName = '&client_id=';
+    var clientIdKeyName = '&client_id=';
     const apiVersionKeyName = '&api-version=';
     const clinetId = this.config.authentication.options.MSIclientID;
     const msiEndpoint = process.env.MSI_ENDPOINT;
@@ -1323,7 +1323,21 @@ class Connection extends EventEmitter {
     // If MSI_ENDPOINT and MSI_SECRET are defined, used these instead of the hard-coded host
     if (undefined !== msiEndpoint && undefined !== msiSecret) {
       // Parse the environment variable as a url and set corresponding request components
-      var appUrl = url.parse(msiEndpoint, true);
+      var appUrl;
+      try {
+        appUrl = url.parse(msiEndpoint, true);
+      } catch (error) {
+        this.loginError = ConnectionError(error.message, 'EFEDAUTH');
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        return;
+      }
+      if (null === appUrl.hostname || null === appUrl.pathname || null === appUrl.port) {
+        this.loginError = ConnectionError('The passed in MSI_ENDPOINT is malformed.', 'EFEDAUTH');
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        return;
+      }
       tokenHost = appUrl.hostname;
       tokenPath = appUrl.pathname;
       tokenPort = appUrl.port;
@@ -1332,7 +1346,7 @@ class Connection extends EventEmitter {
       };
       // Api version supported on Azure App
       apiVersion = '2017-09-01';
-      clinetIdKeyName = '&clientid=';
+      clientIdKeyName = '&clientid=';
     } else {
       tokenPath = tokenEndpoint;
     }
@@ -1341,7 +1355,7 @@ class Connection extends EventEmitter {
 
     // If connection config contians a client id
     if ('' !== clinetId) {
-      tokenPath += clinetIdKeyName + clinetId;
+      tokenPath += clientIdKeyName + clinetId;
     }
 
     tokenPath += apiVersionKeyName + apiVersion;
@@ -1359,9 +1373,29 @@ class Connection extends EventEmitter {
 
   getMSIToken() {
     // Get the token from the azure source
-    http.get(this.getRequestOptions(), (tokenReponse) => {
-      let data = '';
+    var options = this.getRequestOptions();
+    http.get(options, (tokenReponse) => {
+      // Check for possible http request errors
+      const { statusCode } = tokenReponse;
+      const contentType = tokenReponse.headers['content-type'];
+      let error;
+      // Azure token request suppose to return a http 200 as status code and response as a json object
+      // Only check the response type for Azure VM attempt only, since the one for Azure function app does not return a content-type.
+      if (statusCode !== 200) {
+        error = new Error(`Token acquire request failed with status code: ${statusCode}`);
+      } else if (undefined !== options.headers.Metadata && !/^application\/json/.test(contentType)) {
+        error = new Error(`Invalid content-type: expected application/json but received ${contentType}`);
+      }
+      if (error) {
+        this.loginError = ConnectionError(error.message, 'EFEDAUTH');
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        tokenReponse.resume();
+        return;
+      }
 
+      // Retrive the token response
+      let data = '';
       // Keep getting the packages
       tokenReponse.on('data', (chunk) => {
         data += chunk;
@@ -1369,27 +1403,40 @@ class Connection extends EventEmitter {
 
       // Done getting the packages
       tokenReponse.on('end', () => {
-        // If the response data contains an error or empty
-        if (-1 !== data.indexOf('error') || '' === data) {
-          this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+        // Validat the response data, if it is valid, pass it to next step
+        var reponseObj;
+        try {
+          reponseObj = JSON.parse(data);
+        } catch (error) {
+          this.loginError = ConnectionError('The token respone is malformed with this message: ' + error.message, 'EFEDAUTH');
           this.emit('connect', this.loginError);
           this.transitionTo(this.STATE.FINAL);
           return;
         }
 
-        this.sendMSIFedAuthResponsePacket(JSON.parse(data));
+        if (undefined !== reponseObj.access_token) {
+          this.sendMSIFedAuthResponsePacket(reponseObj.access_token);
+        } else {
+          this.loginError = ConnectionError('The token respone does not include the token.', 'EFEDAUTH');
+          this.emit('connect', this.loginError);
+          this.transitionTo(this.STATE.FINAL);
+        }
       });
 
+    }).on('error', (error) => {
+      this.loginError = ConnectionError('The http request fails for retrieving the token with this message: ' + error.message, 'EFEDAUTH');
+      this.emit('connect', this.loginError);
+      this.transitionTo(this.STATE.FINAL);
     });
   }
 
-  sendMSIFedAuthResponsePacket(tokenResponse) {
-    const accessTokenLen = Buffer.byteLength(tokenResponse.access_token, 'ucs2');
+  sendMSIFedAuthResponsePacket(token) {
+    const accessTokenLen = Buffer.byteLength(token, 'ucs2');
     const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
-    data.write(tokenResponse.access_token, offset, 'ucs2');
+    data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
