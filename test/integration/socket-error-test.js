@@ -2,6 +2,7 @@ const fs = require('fs');
 const { assert } = require('chai');
 
 const Connection = require('../../src/connection');
+const { ConnectionError } = require('../../src/errors');
 const Request = require('../../src/request');
 
 function getConfig() {
@@ -33,7 +34,7 @@ describe('A `error` on the network socket', function() {
     connection.close();
   });
 
-  it('forwards the error to in-flight requests', function(done) {
+  it('wraps and forwards the error to in-flight requests', function(done) {
     const socketError = new Error('socket error');
 
     connection.on('error', () => {});
@@ -43,7 +44,8 @@ describe('A `error` on the network socket', function() {
       }
 
       const request = new Request('WAITFOR 00:00:30', function(err) {
-        assert.strictEqual(err, socketError);
+        assert.instanceOf(err, ConnectionError);
+        assert.strictEqual(err.message, 'Connection lost - socket error');
 
         done();
       });
