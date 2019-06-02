@@ -624,7 +624,7 @@ class Connection extends EventEmitter {
     this.curTransientRetryCount = 0;
     this.transientErrorLookup = new TransientErrorLookup();
 
-    this.closed = true;
+    this.closed = false;
 
     this.transitionTo(this.STATE.CONNECTING);
   }
