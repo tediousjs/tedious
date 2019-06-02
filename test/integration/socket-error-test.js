@@ -85,8 +85,14 @@ describe('A `error` on the network socket', function() {
     connection.on('error', () => {});
 
     let endEmitted = false;
+    let callbackCalled = false;
+
     connection.on('end', () => {
+      assert.strictEqual(callbackCalled, true);
+
       endEmitted = true;
+
+      done();
     });
 
     connection.on('connect', (err) => {
@@ -97,10 +103,7 @@ describe('A `error` on the network socket', function() {
       const request = new Request('WAITFOR 00:00:30', function(err) {
         assert.strictEqual(endEmitted, false);
 
-        process.nextTick(() => {
-          assert.strictEqual(endEmitted, true);
-          done();
-        });
+        callbackCalled = true;
       });
 
       connection.execSql(request);
