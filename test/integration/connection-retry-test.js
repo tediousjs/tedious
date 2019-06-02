@@ -31,6 +31,8 @@ exports['connection retry tests'] = {
       return test.done();
     }
 
+    config.options.connectTimeout = 5000;
+
     test.expect(config.options.maxRetriesOnTransientErrors + 1);
 
     sinon.stub(TransientErrorLookup.prototype, 'isTransientError').callsFake((errorNumber) => {
