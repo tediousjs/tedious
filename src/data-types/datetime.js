@@ -19,20 +19,24 @@ module.exports = {
 
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
+      const time = new Date(parameter.value);
+      if ('Invalid Date' === time.toString()) {
+        throw new TypeError('Invalid date.');
+      }
       let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getUTCHours() * 60 * 60;
-        seconds += parameter.value.getUTCMinutes() * 60;
-        seconds += parameter.value.getUTCSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
+        days = Math.floor((time.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        seconds = time.getUTCHours() * 60 * 60;
+        seconds += time.getUTCMinutes() * 60;
+        seconds += time.getUTCSeconds();
+        milliseconds = (seconds * 1000) + time.getUTCMilliseconds();
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getHours() * 60 * 60;
-        seconds += parameter.value.getMinutes() * 60;
-        seconds += parameter.value.getSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
+        dstDiff = -(time.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((time.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        seconds = time.getHours() * 60 * 60;
+        seconds += time.getMinutes() * 60;
+        seconds += time.getSeconds();
+        milliseconds = (seconds * 1000) + time.getMilliseconds();
       }
 
       threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));

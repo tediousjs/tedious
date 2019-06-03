@@ -18,12 +18,16 @@ module.exports = {
 
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
+      var time = new Date(parameter.value);
+      if ('Invalid Date' === time.toString()) {
+        throw new TypeError('Invalid date.');
+      }
       buffer.writeUInt8(3);
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+time - UTC_YEAR_ONE) / 86400000));
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        const dstDiff = -(time.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        buffer.writeUInt24LE(Math.floor((+time - YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
