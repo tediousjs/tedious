@@ -14,7 +14,7 @@ module.exports = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
       buffer.writeUInt8(8);
@@ -22,6 +22,7 @@ module.exports = {
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {

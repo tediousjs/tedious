@@ -8,18 +8,23 @@ const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
  */
 class SqlBatchPayload {
   sqlText: string;
-  data: Buffer;
+  txnDescriptor: Buffer;
+  options: { tdsVersion: string };
 
   constructor(sqlText: string, txnDescriptor: Buffer, options: { tdsVersion: string }) {
     this.sqlText = sqlText;
+    this.txnDescriptor = txnDescriptor;
+    this.options = options;
+  }
 
+  getData(cb: (data: Buffer) => void) {
     const buffer = new WritableTrackingBuffer(100 + 2 * this.sqlText.length, 'ucs2');
-    if (options.tdsVersion >= '7_2') {
+    if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
-      writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount);
+      writeAllHeaders(buffer, this.txnDescriptor, outstandingRequestCount);
     }
     buffer.writeString(this.sqlText, 'ucs2');
-    this.data = buffer.data;
+    cb(buffer.data);
   }
 
   toString(indent: string = '') {
