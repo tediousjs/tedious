@@ -17,7 +17,7 @@ module.exports = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       const time = new Date(parameter.value);
       if ('Invalid Date' === time.toString()) {
@@ -49,6 +49,7 @@ module.exports = {
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {
