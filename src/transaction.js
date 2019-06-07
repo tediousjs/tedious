@@ -46,7 +46,7 @@ class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      data: buffer.data,
+      getData: (cb) => { cb(buffer.data); },
       toString: () => {
         return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
       }
@@ -63,6 +63,7 @@ class Transaction {
     buffer.writeUInt8(0);
 
     return {
+      getData: (cb) => { cb(buffer.data); },
       data: buffer.data,
       toString: () => {
         return 'Commit Transaction: name=' + this.name;
@@ -80,7 +81,7 @@ class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      data: buffer.data,
+      getData: (cb) => { cb(buffer.data); },
       toString: () => {
         return 'Rollback Transaction: name=' + this.name;
       }
@@ -95,7 +96,7 @@ class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      data: buffer.data,
+      getData: (cb) => { cb(buffer.data); },
       toString: () => {
         return 'Save Transaction: name=' + this.name;
       }

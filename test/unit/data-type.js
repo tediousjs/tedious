@@ -13,7 +13,7 @@ exports.smallDateTimeDaylightSaving = function(test) {
     var buffer = new WritableTrackingBuffer(8);
     var parameter = { value: testSet[0] };
     var expectedNoOfDays = testSet[1];
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
     test.strictEqual(buffer.buffer.readUInt16LE(1), expectedNoOfDays);
   }
   test.done();
@@ -30,7 +30,7 @@ exports.dateTimeDaylightSaving = function(test) {
     var buffer = new WritableTrackingBuffer(16);
     var parameter = { value: testSet[0] };
     var expectedNoOfDays = testSet[1];
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
     test.strictEqual(buffer.buffer.readInt32LE(1), expectedNoOfDays);
   }
   test.done();
@@ -45,7 +45,7 @@ exports.dateTime2DaylightSaving = function(test) {
     [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('06000000183a0b', 'hex')]
   ]) {
     var buffer = new WritableTrackingBuffer(16);
-    type.writeParameterData(buffer, { value: value, scale: 0 }, { useUTC: false });
+    type.writeParameterData(buffer, { value: value, scale: 0 }, { useUTC: false }, () => {});
     test.deepEqual(buffer.data, expectedBuffer);
   }
   test.done();
@@ -60,7 +60,7 @@ exports.dateDaylightSaving = function(test) {
     [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('03183a0b', 'hex')]
   ]) {
     var buffer = new WritableTrackingBuffer(16);
-    type.writeParameterData(buffer, { value: value }, { useUTC: false });
+    type.writeParameterData(buffer, { value: value }, { useUTC: false }, () => {});
 
     test.deepEqual(buffer.data, expectedBuffer);
   }
@@ -79,7 +79,7 @@ exports.nanoSecondRounding = function(test) {
     parameter.value.nanosecondDelta = nanosecondDelta;
 
     const buffer = new WritableTrackingBuffer(16);
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
 
     test.deepEqual(buffer.data, expectedBuffer);
   }

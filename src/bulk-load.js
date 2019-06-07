@@ -383,7 +383,7 @@ class RowTransform extends Transform {
         scale: c.scale,
         precision: c.precision,
         value: row[i]
-      }, this.mainOptions);
+      }, this.mainOptions, () => {});
     }
 
     this.push(buf.data);
