@@ -363,7 +363,7 @@ class RowTransform extends Transform {
     this.columnMetadataWritten = false;
   }
 
-  _transform(row, encoding, callback) {
+  _transform(row: Array<any>, encoding: void, callback: () => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
