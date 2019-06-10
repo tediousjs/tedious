@@ -42,7 +42,7 @@
   "dependencies": {
     "adal-node": "^0.1.22",
     "big-number": "1.0.0",
-    "bl": "^2.2.0",
+    "bl": "^3.0.0",
     "depd": "^1.1.2",
     "iconv-lite": "^0.4.23",
     "native-duplexpair": "^1.0.0",
