@@ -105,7 +105,7 @@ exports.dateInputWithSlashSeparator = function(test) {
     ['2015/06/18 23:59:59', Buffer.from('03163a0b', 'hex')],
   ]) {
     var buffer = new WritableTrackingBuffer(16);
-    type.writeParameterData(buffer, { value: value }, { useUTC: false });
+    type.writeParameterData(buffer, { value: value }, { useUTC: false }, () => {});
 
     test.deepEqual(buffer.data, expectedBuffer);
   }
@@ -120,7 +120,7 @@ exports.dateTimeInputWithSlashSeparator = function(test) {
     var buffer = new WritableTrackingBuffer(16);
     var parameter = { value: testSet[0] };
     var expectedNoOfDays = testSet[1];
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
     test.strictEqual(buffer.buffer.readInt32LE(1), expectedNoOfDays);
   }
   test.done();
@@ -132,7 +132,7 @@ exports.dateTypeWithErrorInput = function(test) {
   var buffer = new WritableTrackingBuffer(8);
   var parameter = { value: 'wrongvalue' };
   try {
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
   } catch (err) {
     test.strictEqual(err.message, 'Invalid date.');
   }
@@ -145,7 +145,7 @@ exports.dateTimeTypeWithErrorInput = function(test) {
   var buffer = new WritableTrackingBuffer(8);
   var parameter = { value: 'wrongvalue' };
   try {
-    type.writeParameterData(buffer, parameter, { useUTC: false });
+    type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
   } catch (err) {
     test.strictEqual(err.message, 'Invalid date.');
   }
