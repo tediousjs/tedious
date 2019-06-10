@@ -69,7 +69,7 @@
     "mocha": "^5.2.0",
     "nodeunit": "^0.11.3",
     "rimraf": "^2.6.3",
-    "semantic-release": "^15.13.3",
+    "semantic-release": "^15.13.12",
     "sinon": "^6.3.5"
   },
   "scripts": {
