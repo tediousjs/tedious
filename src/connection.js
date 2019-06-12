@@ -1471,7 +1471,9 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    return this.messageIo.sendMessage(TYPE.SQL_BATCH, payload.data);
+    payload.getData((data) => {
+      return this.messageIo.sendMessage(TYPE.SQL_BATCH, data);
+    });
   }
 
   getInitialSql() {
@@ -1818,8 +1820,15 @@ class Connection extends EventEmitter {
           return;
         }
 
-        // There's two ways to handle request cancelation:
-        if (message.writable) {
+        // There's three ways to handle request cancelation:
+        if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
+          // The request was cancelled before buffering finished
+          const sqlRequest = this.request;
+          this.request = undefined;
+          sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+        } else if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
           //   and end the message.
           message.ignore = true;
@@ -1847,22 +1856,41 @@ class Connection extends EventEmitter {
           request.rowToPacketTransform.end();
         }
         this.messageIo.outgoingMessageStream.write(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+        if (request.paused) { // Request.pause() has been called before the request was started
+          this.pauseRequest(request);
+        }
       } else {
         this.createRequestTimer();
 
-        message = this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+        // Transition to an intermediate state to ensure that no new requests
+        // are made on the connection while the buffer is being populated.
+        this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);
 
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload.toString('  ');
+        payload.getData((data) => {
+          if (this.state !== this.STATE.BUILDING_CLIENT_REQUEST) {
+            // Something else has happened on the connection since starting to
+            // build the request. That state change should have invoked the
+            // request handler so there is nothing to do at this point.
+            return;
+          }
+
+          message = this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
+
+          this.resetConnectionOnNextRequest = false;
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+          if (request.paused) { // Request.pause() has been called before the request was started
+            this.pauseRequest(request);
+          }
         });
       }
 
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-      if (request.paused) { // Request.pause() has been called before the request was started
-        this.pauseRequest(request);
-      }
     }
   }
 
@@ -2225,6 +2253,18 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+      }
+    }
+  },
+  BUILDING_CLIENT_REQUEST: {
+    name: 'BuildingClientRequest',
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       }
     }
   },

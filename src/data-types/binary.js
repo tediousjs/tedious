@@ -34,13 +34,14 @@ module.exports = {
     buffer.writeUInt16LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt16LE(parameter.length);
       buffer.writeBuffer(parameter.value.slice(0, Math.min(parameter.length, this.maximumLength)));
     } else {
       buffer.writeUInt16LE(NULL);
     }
+    cb();
   },
 
   validate: function(value) {

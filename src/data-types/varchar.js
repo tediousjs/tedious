@@ -52,7 +52,7 @@ module.exports = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       if (parameter.length <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value, 'ascii');
@@ -65,6 +65,7 @@ module.exports = {
       buffer.writeUInt32LE(0xFFFFFFFF);
       buffer.writeUInt32LE(0xFFFFFFFF);
     }
+    cb();
   },
 
   validate: function(value) {

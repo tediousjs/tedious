@@ -363,7 +363,7 @@ class RowTransform extends Transform {
     this.columnMetadataWritten = false;
   }
 
-  _transform(row, encoding, callback) {
+  _transform(row: Array<any>, encoding: void, callback: () => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
@@ -379,7 +379,7 @@ class RowTransform extends Transform {
         scale: c.scale,
         precision: c.precision,
         value: row[i]
-      }, this.mainOptions);
+      }, this.mainOptions, () => {});
     }
 
     this.push(buf.data);

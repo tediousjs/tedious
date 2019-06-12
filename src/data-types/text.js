@@ -24,7 +24,7 @@ module.exports = {
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
     if (parameter.value != null) {
       buffer.writeInt32LE(parameter.length);
@@ -32,6 +32,7 @@ module.exports = {
     } else {
       buffer.writeInt32LE(parameter.length);
     }
+    cb();
   },
 
   validate: function(value) {
