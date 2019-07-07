@@ -140,7 +140,7 @@ class Connection extends EventEmitter {
         authentication = {
           type: 'azure-active-directory-msi',
           options: {
-            MSIclientID: options.clientID
+            clientID: options.clientID
           }
         };
       } else {
@@ -1300,7 +1300,7 @@ class Connection extends EventEmitter {
     var tokenEndpoint = '/metadata/identity/oauth2/token';
     var clientIdKeyName = '&client_id=';
     const apiVersionKeyName = '&api-version=';
-    const clinetId = this.config.authentication.options.MSIclientID;
+    const clinetId = this.config.authentication.options.clientID;
     const msiEndpoint = process.env.MSI_ENDPOINT;
     const msiSecret = process.env.MSI_SECRET;
     var tokenPath = '';
