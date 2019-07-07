@@ -2188,18 +2188,18 @@ Connection.prototype.STATE = {
             });
           } else if (authentication.type === 'azure-active-directory-msi') {
             this.getMSIToken();
-          } else if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+          }
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
         }
       }
     }
