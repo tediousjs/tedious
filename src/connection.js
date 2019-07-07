@@ -1283,13 +1283,13 @@ class Connection extends EventEmitter {
     });
   }
 
-  sendFedAuthResponsePacket(tokenResponse) {
-    const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
+  sendFedAuthTokenMessage(token) {
+    const accessTokenLen = Buffer.byteLength(token, 'ucs2');
     const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
-    data.write(tokenResponse.accessToken, offset, 'ucs2');
+    data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1404,7 +1404,7 @@ class Connection extends EventEmitter {
         }
 
         if (undefined !== reponseObj.access_token) {
-          this.sendMSIFedAuthResponsePacket(reponseObj.access_token);
+          this.sendFedAuthTokenMessage(reponseObj.access_token);
         } else {
           this.loginError = ConnectionError('The token respone does not include the token.', 'EFEDAUTH');
           this.emit('connect', this.loginError);
@@ -1417,18 +1417,6 @@ class Connection extends EventEmitter {
       this.emit('connect', this.loginError);
       this.transitionTo(this.STATE.FINAL);
     });
-  }
-
-  sendMSIFedAuthResponsePacket(token) {
-    const accessTokenLen = Buffer.byteLength(token, 'ucs2');
-    const data = Buffer.alloc(8 + accessTokenLen);
-    let offset = 0;
-    offset = data.writeUInt32LE(accessTokenLen + 4, offset);
-    offset = data.writeUInt32LE(accessTokenLen, offset);
-    data.write(token, offset, 'ucs2');
-    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
-    // sent the fedAuth token message, the rest is similar to standard login 7
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
@@ -2196,7 +2184,7 @@ Connection.prototype.STATE = {
                 return;
               }
 
-              this.sendFedAuthResponsePacket(tokenResponse);
+              this.sendFedAuthTokenMessage(tokenResponse.accessToken);
             });
           } else if (authentication.type === 'azure-active-directory-msi') {
             this.getMSIToken();
