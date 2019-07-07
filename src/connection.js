@@ -1,5 +1,3 @@
-const deprecate = require('depd')('tedious');
-
 const crypto = require('crypto');
 const http = require('http');
 const url = require('url');
@@ -71,14 +69,14 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication" property must be of type Object.');
       }
 
-      const authType = config.authentication.type;
+      const type = config.authentication.type;
       const options = config.authentication.options === undefined ? {} : config.authentication.options;
 
-      if (typeof authType !== 'string') {
+      if (typeof type !== 'string') {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (authType !== 'default' && authType !== 'ntlm' && authType !== 'azure-active-directory-password' && authType !== 'azure-active-directory-access-token' && authType !== 'azure-active-directory-msi') {
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi') {
         throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token" or "azure-active-directory-msi".');
       }
 
@@ -86,7 +84,7 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.options" property must be of type object.');
       }
 
-      if (authType === 'ntlm') {
+      if (type === 'ntlm') {
         if (typeof options.domain !== 'string') {
           throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
         }
@@ -98,86 +96,78 @@ class Connection extends EventEmitter {
         if (options.password !== undefined && typeof options.password !== 'string') {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
-      }
 
-      authentication = { type: authType };
-      switch (authentication.type) {
-        case 'ntlm':
-          authentication.options = {
-            userName: options.userName,
-            password: options.password,
-            domain: options.domain && options.domain.toUpperCase()
-          };
-          break;
-        case 'azure-active-directory-access-password':
-          authentication.options = {
-            userName: options.userName,
-            password: options.password
-          };
-          break;
-        case 'azure-active-directory-access-token':
-          authentication.options = {
-            token: options.token
-          };
-          break;
-        case 'azure-active-directory-msi':
-          authentication.options = {
-            MSIclientID: ''
-          };
-          if (undefined !== options) {
-            if (typeof options.clientID === 'string')
-              authentication.options.MSIclientID = options.clientID;
-          }
-          break;
-        default:
-          authentication.options = {
-            userName: options.userName,
-            password: options.password
-          };
-      }
-    } else {
-      if (config.domain !== undefined) {
-        if (typeof config.domain !== 'string') {
-          throw new TypeError('The "config.domain" property must be of type string.');
-        }
-
-        deprecate('The "config.domain" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
-      if (config.userName !== undefined) {
-        if (typeof config.userName !== 'string') {
-          throw new TypeError('The "config.userName" property must be of type string.');
-        }
-
-        deprecate('The "config.userName" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
-      if (config.password !== undefined) {
-        if (typeof config.password !== 'string') {
-          throw new TypeError('The "config.password" property must be of type string.');
-        }
-
-        deprecate('The "config.password" property is deprecated and future tedious versions will no longer support it. Please switch to using the new "config.authentication" property instead.');
-      }
-
-      if (config.domain) {
         authentication = {
           type: 'ntlm',
           options: {
-            userName: config.userName,
-            password: config.password,
-            domain: config.domain && config.domain.toUpperCase()
+            userName: options.userName,
+            password: options.password,
+            domain: options.domain && options.domain.toUpperCase()
+          }
+        };
+      } else if (type === 'azure-active-directory-password') {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            userName: options.userName,
+            password: options.password,
+          }
+        };
+      } else if (type === 'azure-active-directory-access-token') {
+        if (typeof options.token !== 'string') {
+          throw new TypeError('The "config.authentication.options.token" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-access-token',
+          options: {
+            token: options.token
+          }
+        };
+      } else if (type === 'azure-active-directory-msi') {
+        if (options.clientID !== undefined && typeof options.clientID !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientID" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi',
+          options: {
+            MSIclientID: options.clientID
           }
         };
       } else {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
         authentication = {
           type: 'default',
           options: {
-            userName: config.userName,
-            password: config.password
+            userName: options.userName,
+            password: options.password
           }
         };
       }
+    } else {
+      authentication = {
+        type: 'default',
+        options: {
+          userName: undefined,
+          password: undefined
+        }
+      };
     }
 
     this.config = {
@@ -456,8 +446,7 @@ class Connection extends EventEmitter {
 
         this.config.options.encrypt = config.options.encrypt;
       } else {
-        deprecate('The default value for `options.encrypt` will change from `false` to `true`. Please pass `false` explicitly if you want to retain current behaviour.');
-        this.config.options.encrypt = false;
+        this.config.options.encrypt = true;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
@@ -1254,7 +1243,7 @@ class Connection extends EventEmitter {
         payload.fedAuth = {
           type: 'SECURITYTOKEN',
           echo: this.fedAuthRequired,
-          fedAuthToken: authentication.options.token.accessToken
+          fedAuthToken: authentication.options.token
         };
         break;
 
