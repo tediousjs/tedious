@@ -1,12 +1,10 @@
 const crypto = require('crypto');
-const http = require('http');
-const url = require('url');
 const os = require('os');
 // $FlowFixMe
 const constants = require('constants');
 const { createSecureContext } = require('tls');
 
-const { AuthenticationContext } = require('adal-node');
+const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -76,8 +74,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token" or "azure-active-directory-msi".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -132,15 +130,41 @@ class Connection extends EventEmitter {
             token: options.token
           }
         };
-      } else if (type === 'azure-active-directory-msi') {
-        if (options.clientID !== undefined && typeof options.clientID !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientID" property must be of type string.');
+      } else if (type === 'azure-active-directory-msi-vm') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
         }
 
         authentication = {
-          type: 'azure-active-directory-msi',
+          type: 'azure-active-directory-msi-vm',
           options: {
-            clientID: options.clientID
+            clientId: options.clientId,
+            msiEndpoint: options.msiEndpoint
+          }
+        };
+      } else if (type === 'azure-active-directory-msi-app-service') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
+        }
+
+        if (options.msiSecret !== undefined && typeof options.msiSecret !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiSecret" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi-app-service',
+          options: {
+            clientId: clientId,
+            msiEndpoint: options.msiEndpoint,
+            msiSecret: options.msiSecret
           }
         };
       } else {
@@ -1247,7 +1271,8 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'azure-active-directory-msi':
+      case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-msi-app-service':
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -1293,130 +1318,6 @@ class Connection extends EventEmitter {
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-  }
-
-  getRequestOptions() {
-    var tokenHost = '169.254.169.254';
-    var tokenEndpoint = '/metadata/identity/oauth2/token';
-    var clientIdKeyName = '&client_id=';
-    const apiVersionKeyName = '&api-version=';
-    const clinetId = this.config.authentication.options.clientID;
-    const msiEndpoint = process.env.MSI_ENDPOINT;
-    const msiSecret = process.env.MSI_SECRET;
-    var tokenPath = '';
-    var tokenPort = '';
-    var tokenHeaders = { 'Metadata': true };
-    // Api version supported on Azure VM
-    var apiVersion = '2018-02-01';
-
-    // If MSI_ENDPOINT and MSI_SECRET are defined, used these instead of the hard-coded host
-    if (undefined !== msiEndpoint && undefined !== msiSecret) {
-      // Parse the environment variable as a url and set corresponding request components
-      var appUrl;
-      try {
-        appUrl = url.parse(msiEndpoint, true);
-      } catch (error) {
-        this.loginError = ConnectionError(error.message, 'EFEDAUTH');
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
-      }
-      if (null === appUrl.hostname || null === appUrl.pathname || null === appUrl.port) {
-        this.loginError = ConnectionError('The passed in MSI_ENDPOINT is malformed.', 'EFEDAUTH');
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
-      }
-      tokenHost = appUrl.hostname;
-      tokenPath = appUrl.pathname;
-      tokenPort = appUrl.port;
-      tokenHeaders = {
-        'Secret': msiSecret
-      };
-      // Api version supported on Azure App
-      apiVersion = '2017-09-01';
-      clientIdKeyName = '&clientid=';
-    } else {
-      tokenPath = tokenEndpoint;
-    }
-
-    tokenPath += '?resource=' + this.fedAuthInfoToken.spn;
-
-    // If connection config contians a client id
-    if ('' !== clinetId) {
-      tokenPath += clientIdKeyName + clinetId;
-    }
-
-    tokenPath += apiVersionKeyName + apiVersion;
-
-    // Append the API version for connection within an Azure VM
-    var options = {
-      host: tokenHost,
-      path: tokenPath,
-      port: tokenPort,
-      method: 'GET',
-      headers: tokenHeaders
-    };
-    return options;
-  }
-
-  getMSIToken() {
-    // Get the token from the azure source
-    var options = this.getRequestOptions();
-    http.get(options, (tokenReponse) => {
-      // Check for possible http request errors
-      const { statusCode } = tokenReponse;
-      const contentType = tokenReponse.headers['content-type'];
-      let error;
-      // Azure token request suppose to return a http 200 as status code and response as a json object
-      // Only check the response type for Azure VM attempt only, since the one for Azure function app does not return a content-type.
-      if (statusCode !== 200) {
-        error = new Error(`Token acquire request failed with status code: ${statusCode}`);
-      } else if (undefined !== options.headers.Metadata && !/^application\/json/.test(contentType)) {
-        error = new Error(`Invalid content-type: expected application/json but received ${contentType}`);
-      }
-      if (error) {
-        this.loginError = ConnectionError(error.message, 'EFEDAUTH');
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        tokenReponse.resume();
-        return;
-      }
-
-      // Retrive the token response
-      let data = '';
-      // Keep getting the packages
-      tokenReponse.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      // Done getting the packages
-      tokenReponse.on('end', () => {
-        // Validat the response data, if it is valid, pass it to next step
-        var reponseObj;
-        try {
-          reponseObj = JSON.parse(data);
-        } catch (error) {
-          this.loginError = ConnectionError('The token respone is malformed with this message: ' + error.message, 'EFEDAUTH');
-          this.emit('connect', this.loginError);
-          this.transitionTo(this.STATE.FINAL);
-          return;
-        }
-
-        if (undefined !== reponseObj.access_token) {
-          this.sendFedAuthTokenMessage(reponseObj.access_token);
-        } else {
-          this.loginError = ConnectionError('The token respone does not include the token.', 'EFEDAUTH');
-          this.emit('connect', this.loginError);
-          this.transitionTo(this.STATE.FINAL);
-        }
-      });
-
-    }).on('error', (error) => {
-      this.loginError = ConnectionError('The http request fails for retrieving the token with this message: ' + error.message, 'EFEDAUTH');
-      this.emit('connect', this.loginError);
-      this.transitionTo(this.STATE.FINAL);
-    });
   }
 
   // Returns false to apply backpressure.
@@ -2037,7 +1938,7 @@ Connection.prototype.STATE = {
 
           const { authentication } = this.config;
 
-          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi') {
+          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
           } else if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -2065,7 +1966,7 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi') {
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
@@ -2171,24 +2072,39 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
           const { authentication } = this.config;
-          if (authentication.type === 'azure-active-directory-password') {
-            const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-            const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
-            const authentication = this.config.authentication;
 
-            context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
-              if (err) {
-                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
-                return;
-              }
+          const getToken = (callback) => {
+            if (authentication.type === 'azure-active-directory-password') {
+              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
+                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                tokenAudience: this.fedAuthInfoToken.spn
+              }, callback);
+            } else if (authentication.type === 'azure-active-directory-msi-vm') {
+              loginWithVmMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                resource: this.fedAuthInfoToken.spn
+              }, callback);
+            } else if (authentication.type === 'azure-active-directory-msi-app-service') {
+              loginWithAppServiceMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                msiSecret: authentication.options.msiSecret,
+                resource: this.fedAuthInfoToken.spn
+              }, callback);
+            }
+          };
 
-              this.sendFedAuthTokenMessage(tokenResponse.accessToken);
-            });
-          } else if (authentication.type === 'azure-active-directory-msi') {
-            this.getMSIToken();
-          }
+          getToken((err, tokenResponse) => {
+            if (err) {
+              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+              return;
+            }
+
+            this.sendFedAuthTokenMessage(tokenResponse.accessToken);
+          });
         } else if (this.loginError) {
           if (this.loginError.isTransient) {
             this.debug.log('Initiating retry on transient error');
