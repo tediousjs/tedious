@@ -670,7 +670,7 @@ class Connection extends EventEmitter {
 
       const request = this.request;
       if (request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
         request.callback(err);
         this.request = undefined;
       }
@@ -721,7 +721,7 @@ class Connection extends EventEmitter {
           }
         }
       } else {
-        const error = ConnectionError(token.message, 'ELOGIN');
+        const error = new ConnectionError(token.message, 'ELOGIN');
 
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
@@ -755,14 +755,14 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
-        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+        this.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
         this.loggedIn = false;
         return;
       }
 
       if (!token.interface) {
         // unsupported interface
-        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+        this.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
         return;
       }
@@ -923,12 +923,12 @@ class Connection extends EventEmitter {
           // We assume this is the indication that an in-flight request was canceled.
           if (token.sqlError && !request.error) {
             this.clearCancelTimer();
-            request.error = RequestError('Canceled.', 'ECANCEL');
+            request.error = new RequestError('Canceled.', 'ECANCEL');
           }
         } else {
           if (token.sqlError && !request.error) {
             // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+            request.error = new RequestError('An unknown error has occurred.', 'UNKNOWN');
           }
           request.emit('done', token.rowCount, token.more, request.rst);
           if (token.rowCount !== undefined) {
@@ -976,7 +976,7 @@ class Connection extends EventEmitter {
           return;
         }
         if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+          this.emit('connect', new ConnectionError(message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port, this.config.options.multiSubnetFailover);
         }
@@ -1063,7 +1063,7 @@ class Connection extends EventEmitter {
   connectTimeout() {
     const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
+    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -1071,7 +1071,7 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
   }
 
   requestTimeout() {
@@ -1080,7 +1080,7 @@ class Connection extends EventEmitter {
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = RequestError(message, 'ETIMEOUT');
+    request.error = new RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -1146,11 +1146,11 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
     this.dispatchEvent('socketError', error);
   }
@@ -1626,10 +1626,10 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
       process.nextTick(() => {
-        request.callback(RequestError('Canceled.', 'ECANCEL'));
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
@@ -1657,7 +1657,7 @@ class Connection extends EventEmitter {
           // The request was cancelled before buffering finished
           const sqlRequest = this.request;
           this.request = undefined;
-          sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+          sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
           this.transitionTo(this.STATE.LOGGED_IN);
 
         } else if (message.writable) {
@@ -1818,7 +1818,7 @@ Connection.prototype.STATE = {
 
         if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
           if (!this.config.options.encrypt) {
-            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
             return this.close();
           }
 
@@ -1922,17 +1922,17 @@ Connection.prototype.STATE = {
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token') {
           if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+            this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
           } else if (token.fedAuth.length !== 0) {
-            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+            this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
         } else if (token.fedAuth === undefined) {
-          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+          this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
           this.loggedIn = false;
         } else {
-          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+          this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
           this.loggedIn = false;
         }
       },
@@ -1948,7 +1948,7 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
         }
       }
@@ -1999,7 +1999,7 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
         }
       }
@@ -2031,7 +2031,7 @@ Connection.prototype.STATE = {
 
           context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
             if (err) {
-              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.loginError = new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH', err);
               this.emit('connect', this.loginError);
               this.transitionTo(this.STATE.FINAL);
               return;
@@ -2048,7 +2048,7 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
         }
       }
@@ -2170,7 +2170,7 @@ Connection.prototype.STATE = {
           if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
             sqlRequest.callback(sqlRequest.error);
           } else {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }
