@@ -1276,7 +1276,7 @@ class Connection extends EventEmitter {
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
-          workflow: 'msi'
+          workflow: 'integrated'
         };
         break;
 

@@ -104,7 +104,7 @@ class Login7Payload {
   attachDbFile: string | typeof undefined;
   changePassword: string | typeof undefined;
 
-  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' | 'msi' } | typeof undefined;
+  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | typeof undefined;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
@@ -395,10 +395,6 @@ class Login7Payload {
           buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
 
           switch (fedAuth.workflow) {
-            case 'msi':
-              buffer.writeUInt8(FEDAUTH_OPTIONS.ADAL_WORKFLOW_MSI, 6);
-              break;
-
             case 'integrated':
               buffer.writeUInt8(FEDAUTH_OPTIONS.ADAL_WORKFLOW_INTEGRATED, 6);
               break;
