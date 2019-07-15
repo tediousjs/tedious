@@ -162,7 +162,7 @@ class Connection extends EventEmitter {
         authentication = {
           type: 'azure-active-directory-msi-app-service',
           options: {
-            clientId: clientId,
+            clientId: options.clientId,
             msiEndpoint: options.msiEndpoint,
             msiSecret: options.msiSecret
           }
