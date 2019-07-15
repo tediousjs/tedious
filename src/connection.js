@@ -2074,28 +2074,38 @@ Connection.prototype.STATE = {
           const { authentication } = this.config;
 
           const getToken = (callback) => {
+            const getTokenFromCredentials = (err, credentials) => {
+              if (err) {
+                return callback(err);
+              }
+
+              credentials.getToken().then((tokenResponse) => {
+                callback(null, tokenResponse.accessToken);
+              }, callback);
+            };
+
             if (authentication.type === 'azure-active-directory-password') {
               loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
                 clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
                 tokenAudience: this.fedAuthInfoToken.spn
-              }, callback);
+              }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
                 clientId: authentication.options.clientId,
                 msiEndpoint: authentication.options.msiEndpoint,
                 resource: this.fedAuthInfoToken.spn
-              }, callback);
+              }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-msi-app-service') {
               loginWithAppServiceMSI({
                 clientId: authentication.options.clientId,
                 msiEndpoint: authentication.options.msiEndpoint,
                 msiSecret: authentication.options.msiSecret,
                 resource: this.fedAuthInfoToken.spn
-              }, callback);
+              }, getTokenFromCredentials);
             }
           };
 
-          getToken((err, tokenResponse) => {
+          getToken((err, token) => {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
@@ -2103,7 +2113,7 @@ Connection.prototype.STATE = {
               return;
             }
 
-            this.sendFedAuthTokenMessage(tokenResponse.accessToken);
+            this.sendFedAuthTokenMessage(token);
           });
         } else if (this.loginError) {
           if (this.loginError.isTransient) {
