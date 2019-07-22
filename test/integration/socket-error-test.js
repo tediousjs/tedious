@@ -27,6 +27,9 @@ describe('A `error` on the network socket', function() {
 
   beforeEach(() => {
     connection = new Connection(getConfig());
+    connection.on('debug', function(text) {
+      console.log(text);
+    });
   });
 
   afterEach(() => {
