@@ -9,28 +9,71 @@ TSQL for stored procedure:
     set @outputCount = LEN(@inputVal);
     GO
 */
+
 var Connection = require('tedious').Connection,
   Request = require('tedious').Request,
   TYPES = require('tedious').TYPES;
 
-var connection = new Connection({
+const Connection = require('tedious').Connection;
+const Request = require('tedious').Request;
+const TYPES = require('tedious').TYPES;
+
+const config = {
   server: '192.168.1.212',
-  authentication: {
-    type: 'default',
-    options: {
-      userName: 'test',
-      password: 'test'
-    }
+  authentication:{
+      type:'default',
+      options:{
+          userName: 'test',
+          password: 'test'
+      }
+  },
+  options: {
+      port: 1433 //Default Port
   }
-});
+};
+
+var connection = new Connection(config);
+
+const storedProcedure = '[dbo].[test_proced]'
 
 connection.on('connect', function(err) {
-  var request = new Request('countChar',
+  if(err){
+    console.log('Connection Failed!');
+    throw err;
+  }
+  createStoredProcedure();
+});
+
+//Creating new procedure called [dbo].[test_proced]
+//--------------------------------------------------------------------------------
+function createStoredProcedure(){
+  const sql = `CREATE PROCEDURE ${storedProcedure}
+                  @inputVal varchar(30),
+                  @outputCount int OUTPUT
+                AS
+                  set @outputCount = LEN(@inputVal);`
+
+  const request = new Request(sql, (err) => {
+    if(err){
+      throw err;
+    } else {
+      console.log(`${storedProcedure} created!`)
+      callProcedureWithParameters();
+    }
+  })
+
+  connection.execSql(request);
+}
+
+//Calling procedure with Input and Output Parameters
+//--------------------------------------------------------------------------------
+function callProcedureWithParameters(){
+   var request = new Request(storedProcedure,
     function(err) {
       if (err) {
         console.log(err);
       }
-
+      console.log('DONE!')
       connection.close();
     });
 
@@ -42,4 +85,4 @@ connection.on('connect', function(err) {
   });
 
   connection.callProcedure(request);
-});
+}

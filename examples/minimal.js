@@ -1,54 +1,45 @@
 var Connection = require('../lib/tedious').Connection;
 var Request = require('../lib/tedious').Request;
-
+ 
 var config = {
   server: '192.168.1.212',
   authentication: {
     type: 'default',
     options: {
       userName: 'test',
-      password: 'test'
+      password: 'test',
     }
+  },
+  options: {
+    port: 1433 //Default Port
   }
-  /*
-  ,options: {
-    debug: {
-      packet: true,
-      data: true,
-      payload: true,
-      token: false,
-      log: true
-    },
-    database: 'DBName',
-    encrypt: true // for Azure users
-  }
-  */
 };
 
 var connection = new Connection(config);
 
 connection.on('connect', function(err) {
-    // If no error, then good to go...
-    executeStatement();
+    if(err) {
+      console.log('Connection Failed');
+      throw err
+    } else {
+      executeStatement();
+    }
   }
 );
 
-connection.on('debug', function(text) {
-    //console.log(text);
-  }
-);
 
 function executeStatement() {
   request = new Request("select 42, 'hello world'", function(err, rowCount) {
     if (err) {
       console.log(err);
+      throw err;
     } else {
-      console.log(rowCount + ' rows');
+      console.log('DONE!')
     }
-
     connection.close();
   });
 
+  //Emits a 'DoneInProc' event when completed.
   request.on('row', function(columns) {
     columns.forEach(function(column) {
       if (column.value === null) {
@@ -59,7 +50,7 @@ function executeStatement() {
     });
   });
 
-  request.on('done', function(rowCount, more) {
+  request.on('doneInProc', function(rowCount, more) {
     console.log(rowCount + ' rows returned');
   });
 
