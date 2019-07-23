@@ -1,5 +1,5 @@
-var Connection = require('../lib/tedious').Connection;
-var Request = require('../lib/tedious').Request;
+const Connection = require('../lib/tedious').Connection;
+const Request = require('../lib/tedious').Request;
 
 const config = {
     server: '192.168.1.212',
@@ -28,7 +28,7 @@ connection.on('connect', (err) => {
     }
 })
 
-//Creating new table called [dbo].[table_transact]
+//Creating new table called [dbo].[test_transact]
 //--------------------------------------------------------------------------------
 function createTable() {
     const sql = `CREATE TABLE ${table} (c1 int UNIQUE) `
