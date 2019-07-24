@@ -116,7 +116,7 @@ function createStoredProcedure() {
 
 }
 
-//Creating new stored procedure called [dbo].[test_sp_tvp]
+//Using table valued parameters
 //--------------------------------------------------------------------------------
 function passingTableValue() {
   /* Setting table value */
