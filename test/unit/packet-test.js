@@ -1,219 +1,222 @@
-var Packet = require('../../src/packet').Packet;
-var TYPE = require('../../src/packet').TYPE;
-var isPacketComplete = require('../../src/packet').isPacketComplete;
+const assert = require('chai').assert;
+const Packet = require('../../lib/packet').Packet;
+const TYPE = require('../../lib/packet').TYPE;
+const isPacketComplete = require('../../lib/packet').isPacketComplete;
 
-exports.createEmpty = function(test) {
-  var packet = new Packet(TYPE.PRELOGIN);
+describe('packet type tests', () => {
+  it('should create Empty', (done) => {
+    const packet = new Packet(TYPE.PRELOGIN);
 
-  test.ok(packet);
-  test.ok(
-    packet.buffer.equals(Buffer.from([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
-  );
+    assert.isOk(packet);
+    assert.isOk(
+      packet.buffer.equals(Buffer.from([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
+    );
 
-  test.done();
-};
+    done();
+  })
 
-exports.last = function(test) {
-  var packet = new Packet(TYPE.PRELOGIN);
-  test.ok(!packet.isLast());
+  it('should be last', (done) => {
+    let packet = new Packet(TYPE.PRELOGIN);
+    assert.isOk(!packet.isLast());
 
-  packet = new Packet(TYPE.PRELOGIN);
-  test.ok(!packet.last());
-  packet.last(true);
-  test.ok(packet.last());
+    packet = new Packet(TYPE.PRELOGIN);
+    assert.isOk(!packet.last());
+    packet.last(true);
+    assert.isOk(packet.last());
 
-  test.done();
-};
+    done();
+  })
 
-exports.packetId = function(test) {
-  var packet = new Packet(TYPE.PRELOGIN);
-  test.strictEqual(packet.packetId(), 1);
+  it('should have correct packet id', (done) => {
+    const packet = new Packet(TYPE.PRELOGIN);
+    assert.strictEqual(packet.packetId(), 1);
 
-  packet.packetId(2);
-  test.strictEqual(packet.packetId(), 2);
+    packet.packetId(2);
+    assert.strictEqual(packet.packetId(), 2);
 
-  test.done();
-};
+    done();
+  })
 
-exports.data = function(test) {
-  var data1 = Buffer.from([0x01, 0x02, 0x03]);
-  var data2 = Buffer.from([0xff, 0xfe]);
-  var allData = Buffer.concat([data1, data2]);
+  it('should add data', (done) => {
+    const data1 = Buffer.from([0x01, 0x02, 0x03]);
+    const data2 = Buffer.from([0xff, 0xfe]);
+    const allData = Buffer.concat([data1, data2]);
 
-  var packet = new Packet(TYPE.PRELOGIN);
-  test.strictEqual(packet.length(), 8);
-  test.ok(packet.data().equals(Buffer.alloc(0)));
+    const packet = new Packet(TYPE.PRELOGIN);
+    assert.strictEqual(packet.length(), 8);
+    assert.isOk(packet.data().equals(Buffer.alloc(0)));
 
-  packet.addData(data1);
-  test.strictEqual(packet.length(), 8 + data1.length);
-  test.ok(packet.data().equals(data1));
+    packet.addData(data1);
+    assert.strictEqual(packet.length(), 8 + data1.length);
+    assert.isOk(packet.data().equals(data1));
 
-  packet.addData(data2);
-  test.strictEqual(packet.length(), 8 + allData.length);
-  test.ok(packet.data().equals(allData));
+    packet.addData(data2);
+    assert.strictEqual(packet.length(), 8 + allData.length);
+    assert.isOk(packet.data().equals(allData));
 
-  test.done();
-};
+    done();
+  })
 
-exports.createFromBuffer = function(test) {
-  var buffer = Buffer.from([
-    TYPE.PRELOGIN,
-    0x01,
-    0x00,
-    0x0a,
-    0,
-    0,
-    0,
-    0,
-    0x01,
-    0xff
-  ]);
-  var packet = new Packet(buffer);
+  it('should create from buffer', (done) => {
+    const buffer = Buffer.from([
+      TYPE.PRELOGIN,
+      0x01,
+      0x00,
+      0x0a,
+      0,
+      0,
+      0,
+      0,
+      0x01,
+      0xff
+    ]);
+    const packet = new Packet(buffer);
 
-  test.strictEqual(packet.length(), 0x0a);
-  test.ok(packet.isLast());
-  test.ok(packet.data().equals(Buffer.from([0x01, 0xff])));
+    assert.strictEqual(packet.length(), 0x0a);
+    assert.isOk(packet.isLast());
+    assert.isOk(packet.data().equals(Buffer.from([0x01, 0xff])));
 
-  test.done();
-};
+    done();
+  })
 
-exports.headerToString = function(test) {
-  var buffer = Buffer.from([
-    TYPE.PRELOGIN,
-    0x03,
-    0x00,
-    0x0a,
-    0,
-    1,
-    2,
-    3,
-    0x01,
-    0xff
-  ]);
-  var packet = new Packet(buffer);
+  it('should convert header to string', (done) => {
+    const buffer = Buffer.from([
+      TYPE.PRELOGIN,
+      0x03,
+      0x00,
+      0x0a,
+      0,
+      1,
+      2,
+      3,
+      0x01,
+      0xff
+    ]);
+    const packet = new Packet(buffer);
 
-  var expectedText =
-    '--type:0x12(PRELOGIN), status:0x03(EOM IGNORE), length:0x000A, spid:0x0001, packetId:0x02, window:0x03';
-  test.strictEqual(packet.headerToString('--'), expectedText);
+    const expectedText =
+      '--type:0x12(PRELOGIN), status:0x03(EOM IGNORE), length:0x000A, spid:0x0001, packetId:0x02, window:0x03';
+    assert.strictEqual(packet.headerToString('--'), expectedText);
 
-  test.done();
-};
+    done();
+  })
 
-exports.dataToStringShort = function(test) {
-  var data = Buffer.from([0x01, 0x02, 0x03]);
+  it('should convert data to string short', (done) => {
+    const data = Buffer.from([0x01, 0x02, 0x03]);
 
-  var packet = new Packet(TYPE.PRELOGIN);
-  packet.addData(data);
+    const packet = new Packet(TYPE.PRELOGIN);
+    packet.addData(data);
 
-  var expectedText = '--0000  010203  ...';
-  test.strictEqual(packet.dataToString('--'), expectedText);
+    const expectedText = '--0000  010203  ...';
+    assert.strictEqual(packet.dataToString('--'), expectedText);
 
-  test.done();
-};
+    done();
+  })
 
-exports.dataExactLinesWorth = function(test) {
-  var dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
-  var dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
-  var dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
-  var dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
+  it('should data with exact lines worth', (done) => {
+    const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+    const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
+    const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
+    const dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
 
-  var packet = new Packet(TYPE.PRELOGIN);
-  packet.addData(dataLine1a);
-  packet.addData(dataLine1b);
-  packet.addData(dataLine2a);
-  packet.addData(dataLine2b);
+    const packet = new Packet(TYPE.PRELOGIN);
+    packet.addData(dataLine1a);
+    packet.addData(dataLine1b);
+    packet.addData(dataLine2a);
+    packet.addData(dataLine2b);
 
-  var expectedTextLine1a = '--0000  00010203 04050607 08090A0B 0C0D0E0F';
-  var expectedTextLine1b = ' 10111213 14151617 18191A1B 1C1D1E1F';
-  var expectedTextLine1c = '  ........ ........ ........ ........';
-  var expectedText =
-    expectedTextLine1a + expectedTextLine1b + expectedTextLine1c;
-  test.strictEqual(packet.dataToString('--'), expectedText);
+    const expectedTextLine1a = '--0000  00010203 04050607 08090A0B 0C0D0E0F';
+    const expectedTextLine1b = ' 10111213 14151617 18191A1B 1C1D1E1F';
+    const expectedTextLine1c = '  ........ ........ ........ ........';
+    const expectedText =
+      expectedTextLine1a + expectedTextLine1b + expectedTextLine1c;
+    assert.strictEqual(packet.dataToString('--'), expectedText);
 
-  test.done();
-};
+    done();
+  })
 
-exports.dataToStringMultipleLines = function(test) {
-  var dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
-  var dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
-  var dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
-  var dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
-  var dataLine3a = Buffer.from([0x30, 0x31, 0x32]);
+  it('should convert data to strings in mulitple lines', (done) => {
+    const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+    const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
+    const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
+    const dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
+    const dataLine3a = Buffer.from([0x30, 0x31, 0x32]);
 
-  var packet = new Packet(TYPE.PRELOGIN);
-  packet.addData(dataLine1a);
-  packet.addData(dataLine1b);
-  packet.addData(dataLine2a);
-  packet.addData(dataLine2b);
-  packet.addData(dataLine3a);
+    let packet = new Packet(TYPE.PRELOGIN);
+    packet.addData(dataLine1a);
+    packet.addData(dataLine1b);
+    packet.addData(dataLine2a);
+    packet.addData(dataLine2b);
+    packet.addData(dataLine3a);
 
-  var expectedTextLine1a = '--0000  00010203 04050607 08090A0B 0C0D0E0F';
-  var expectedTextLine1b = ' 10111213 14151617 18191A1B 1C1D1E1F';
-  var expectedTextLine1c = '  ........ ........ ........ ........\n';
-  var expectedTextLine2a = '--0020  303132';
-  var expectedTextLine2b = '  012';
-  var expectedText =
-    expectedTextLine1a +
-    expectedTextLine1b +
-    expectedTextLine1c +
-    expectedTextLine2a +
-    expectedTextLine2b;
-  test.strictEqual(packet.dataToString('--'), expectedText);
+    const expectedTextLine1a = '--0000  00010203 04050607 08090A0B 0C0D0E0F';
+    const expectedTextLine1b = ' 10111213 14151617 18191A1B 1C1D1E1F';
+    const expectedTextLine1c = '  ........ ........ ........ ........\n';
+    const expectedTextLine2a = '--0020  303132';
+    const expectedTextLine2b = '  012';
+    const expectedText =
+      expectedTextLine1a +
+      expectedTextLine1b +
+      expectedTextLine1c +
+      expectedTextLine2a +
+      expectedTextLine2b;
+    assert.strictEqual(packet.dataToString('--'), expectedText);
 
-  test.done();
-};
+    done();
+  })
 
-exports.packetCompleteShorterThanHeader = function(test) {
-  var buffer = Buffer.alloc(7);
-  test.ok(!isPacketComplete(buffer));
+  it('should packet complete shorter than header', (done) => {
+    const buffer = Buffer.alloc(7);
+    assert.isOk(!isPacketComplete(buffer));
 
-  test.done();
-};
+    done();
+  })
 
-exports.packetCompleteJustHeader = function(test) {
-  var buffer = new Packet(TYPE.PRELOGIN).buffer;
+  it('should packet complete with just header', (done) => {
+    const buffer = new Packet(TYPE.PRELOGIN).buffer;
 
-  test.ok(isPacketComplete(buffer));
+    assert.isOk(isPacketComplete(buffer));
 
-  test.done();
-};
+    done();
+  })
 
-exports.packetCompleteTooShort = function(test) {
-  var buffer = Buffer.from([
-    0x00,
-    0x00,
-    0x00,
-    0x0c,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00
-  ]);
+  it('should not packet complete too short', (done) => {
+    const buffer = Buffer.from([
+      0x00,
+      0x00,
+      0x00,
+      0x0c,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00
+    ]);
+  
+    assert.isOk(!isPacketComplete(buffer));
+  
+    done();
+  })
 
-  test.ok(!isPacketComplete(buffer));
-
-  test.done();
-};
-
-exports.packetCompleteLongEnough = function(test) {
-  var buffer = Buffer.from([
-    0x00,
-    0x00,
-    0x00,
-    0x0c,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00
-  ]);
-
-  test.ok(isPacketComplete(buffer));
-
-  test.done();
-};
+  it('should packet complete long enough', (done) => {
+    const buffer = Buffer.from([
+      0x00,
+      0x00,
+      0x00,
+      0x0c,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00
+    ]);
+  
+    assert.isOk(isPacketComplete(buffer));
+  
+    done();
+  })
+})

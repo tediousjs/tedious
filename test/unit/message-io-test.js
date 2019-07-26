@@ -1,10 +1,12 @@
-var Debug = require('../../src/debug');
-var Duplex = require('stream').Duplex;
-var MessageIO = require('../../src/message-io');
-var Packet = require('../../src/packet').Packet;
+const Debug = require('../../src/debug');
+const Duplex = require('stream').Duplex;
+const MessageIO = require('../../src/message-io');
+const Packet = require('../../src/packet').Packet;
+const assert = require('chai').assert;
+
 
 class Connection extends Duplex {
-  _read(size) {}
+  _read(size) { }
 
   _write(chunk, encoding, callback) {
     var packet = new Packet(chunk);
@@ -13,222 +15,212 @@ class Connection extends Duplex {
   }
 }
 
-var packetType = 2;
-var packetSize = 8 + 4;
+let packetType = 2;
+let packetSize = 8 + 4;
 
-exports.sendSmallerThanOnePacket = function(test) {
-  var payload = Buffer.from([1, 2, 3]);
+describe('Message IO', () => {
+  it('should send smaller than one packet', (done) => {
+    const payload = Buffer.from([1, 2, 3]);
 
-  var connection = new Connection();
-  connection.on('packet', function(packet) {
-    test.ok(packet.last());
-    test.strictEqual(packet.type(), packetType);
-    test.ok(packet.data().equals(payload));
+    const connection = new Connection();
+    connection.on('packet', function (packet) {
+      assert.isOk(packet.last());
+      assert.strictEqual(packet.type(), packetType);
+      assert.isOk(packet.data().equals(payload));
 
-    test.done();
-  });
+      done();
+    });
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.sendMessage(packetType, payload);
-};
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.sendMessage(packetType, payload);
+  })
 
-exports.sendExactlyPacket = function(test) {
-  var payload = Buffer.from([1, 2, 3, 4]);
+  it('should send exact packet', (done) => {
+    const payload = Buffer.from([1, 2, 3, 4]);
 
-  var connection = new Connection();
-  connection.on('packet', function(packet) {
-    test.ok(packet.last());
-    test.strictEqual(packet.type(), packetType);
-    test.ok(packet.data().equals(payload));
+    const connection = new Connection();
+    connection.on('packet', function (packet) {
+      assert.isOk(packet.last());
+      assert.strictEqual(packet.type(), packetType);
+      assert.isOk(packet.data().equals(payload));
 
-    test.done();
-  });
+      done();
+    });
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.sendMessage(packetType, payload);
-};
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.sendMessage(packetType, payload);
+  })
 
-exports.sendOneLongerThanPacket = function(test) {
-  var payload = Buffer.from([1, 2, 3, 4, 5]);
-  var packetNumber = 0;
+  it('should send one longer than packet', (done) => {
+    const payload = Buffer.from([1, 2, 3, 4, 5]);
+    let packetNumber = 0;
 
-  var connection = new Connection();
-  connection.on('packet', function(packet) {
-    packetNumber++;
+    const connection = new Connection();
+    connection.on('packet', function (packet) {
+      packetNumber++;
 
-    test.strictEqual(packet.type(), packetType);
+      assert.strictEqual(packet.type(), packetType);
 
-    switch (packetNumber) {
-      case 1:
-        test.ok(!packet.last());
-        test.strictEqual(packet.packetId(), packetNumber);
-        test.ok(packet.data().equals(Buffer.from([1, 2, 3, 4])));
-        break;
-      case 2:
-        test.ok(packet.last());
-        test.strictEqual(packet.packetId(), packetNumber);
-        test.ok(packet.data().equals(Buffer.from([5])));
-        test.done();
-        break;
-    }
-  });
+      switch (packetNumber) {
+        case 1:
+          assert.isOk(!packet.last());
+          assert.strictEqual(packet.packetId(), packetNumber);
+          assert.isOk(packet.data().equals(Buffer.from([1, 2, 3, 4])));
+          break;
+        case 2:
+          assert.isOk(packet.last());
+          assert.strictEqual(packet.packetId(), packetNumber);
+          assert.isOk(packet.data().equals(Buffer.from([5])));
+          done();
+          break;
+      }
+    });
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.sendMessage(packetType, payload);
-};
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.sendMessage(packetType, payload);
+  })
 
-exports.receiveOnePacket = function(test) {
-  test.expect(1);
+  it('should recieve one packet', (done) => {
+    const payload = Buffer.from([1, 2, 3]);
+    const connection = new Connection();
 
-  var payload = Buffer.from([1, 2, 3]);
-  var connection = new Connection();
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.on('data', function (data) {
+      assert.isOk(data.equals(payload));
+    });
+    io.on('message', function () {
+      done();
+    });
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    test.ok(data.equals(payload));
-  });
-  io.on('message', function() {
-    test.done();
-  });
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+    connection.push(packet.buffer);
+  })
 
-  var packet = new Packet(packetType);
-  packet.last(true);
-  packet.addData(payload);
-  connection.push(packet.buffer);
-};
+  it('should recieve one packet in two chunks', (done) => {
+    const payload = Buffer.from([1, 2, 3]);
+    const connection = new Connection();
 
-exports.receiveOnePacketInTwoChunks = function(test) {
-  test.expect(1);
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.on('data', function (data) {
+      assert.isOk(data.equals(payload));
+    });
+    io.on('message', function () {
+      done();
+    });
 
-  var payload = Buffer.from([1, 2, 3]);
-  var connection = new Connection();
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+    connection.push(packet.buffer.slice(0, 4));
+    connection.push(packet.buffer.slice(4));
+  })
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    test.ok(data.equals(payload));
-  });
-  io.on('message', function() {
-    test.done();
-  });
+  it('should recieve two packets', (done) => {
+    const payload = Buffer.from([1, 2, 3]);
+    const payload1 = payload.slice(0, 2);
+    const payload2 = payload.slice(2, 3);
 
-  var packet = new Packet(packetType);
-  packet.last(true);
-  packet.addData(payload);
-  connection.push(packet.buffer.slice(0, 4));
-  connection.push(packet.buffer.slice(4));
-};
+    const connection = new Connection();
+    let receivedPacketCount = 0;
 
-exports.receiveTwoPackets = function(test) {
-  test.expect(2);
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.on('data', function (data) {
+      receivedPacketCount++;
 
-  var payload = Buffer.from([1, 2, 3]);
-  var payload1 = payload.slice(0, 2);
-  var payload2 = payload.slice(2, 3);
+      switch (receivedPacketCount) {
+        case 1:
+          assert.isOk(data.equals(payload1));
+          break;
+        case 2:
+          assert.isOk(data.equals(payload2));
+          break;
+      }
+    });
+    io.on('message', function () {
+      done();
+    });
 
-  var connection = new Connection();
-  var receivedPacketCount = 0;
+    let packet = new Packet(packetType);
+    packet.addData(payload1);
+    connection.push(packet.buffer);
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedPacketCount++;
+    packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload2);
+    connection.push(packet.buffer);
+  })
 
-    switch (receivedPacketCount) {
-      case 1:
-        test.ok(data.equals(payload1));
-        break;
-      case 2:
-        test.ok(data.equals(payload2));
-        break;
-    }
-  });
-  io.on('message', function() {
-    test.done();
-  });
+  it('should recieve two packets with chunk spanning packets', (done) => {
+    const payload = Buffer.from([1, 2, 3, 4]);
+    const payload1 = payload.slice(0, 2);
+    const payload2 = payload.slice(2, 4);
 
-  var packet = new Packet(packetType);
-  packet.addData(payload1);
-  connection.push(packet.buffer);
+    const connection = new Connection();
+    let receivedPacketCount = 0;
 
-  packet = new Packet(packetType);
-  packet.last(true);
-  packet.addData(payload2);
-  connection.push(packet.buffer);
-};
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.on('data', function (data) {
+      receivedPacketCount++;
 
-exports.receiveTwoPacketsWithChunkSpanningPackets = function(test) {
-  test.expect(2);
+      switch (receivedPacketCount) {
+        case 1:
+          assert.isOk(data.equals(payload1));
+          break;
+        case 2:
+          assert.isOk(data.equals(payload2));
+          break;
+      }
+    });
+    io.on('message', function () {
+      done();
+    });
 
-  var payload = Buffer.from([1, 2, 3, 4]);
-  var payload1 = payload.slice(0, 2);
-  var payload2 = payload.slice(2, 4);
+    const packet1 = new Packet(packetType);
+    packet1.addData(payload.slice(0, 2));
 
-  var connection = new Connection();
-  var receivedPacketCount = 0;
+    const packet2 = new Packet(packetType);
+    packet2.last(true);
+    packet2.addData(payload.slice(2, 4));
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedPacketCount++;
+    connection.push(packet1.buffer.slice(0, 6));
+    connection.push(
+      Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)])
+    );
+    connection.push(packet2.buffer.slice(4));
+  })
 
-    switch (receivedPacketCount) {
-      case 1:
-        test.ok(data.equals(payload1));
-        break;
-      case 2:
-        test.ok(data.equals(payload2));
-        break;
-    }
-  });
-  io.on('message', function() {
-    test.done();
-  });
+  it('should recieve multiple packets with more than one packet from one chunk', (done) => {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const connection = new Connection();
+    let receivedData = Buffer.alloc(0);
 
-  var packet1 = new Packet(packetType);
-  packet1.addData(payload.slice(0, 2));
+    const io = new MessageIO(connection, packetSize, new Debug());
+    io.on('data', function (data) {
+      receivedData = Buffer.concat([receivedData, data]);
+    });
 
-  var packet2 = new Packet(packetType);
-  packet2.last(true);
-  packet2.addData(payload.slice(2, 4));
+    io.on('message', function () {
+      assert.deepEqual(payload, receivedData);
+      done();
+    });
 
-  connection.push(packet1.buffer.slice(0, 6));
-  connection.push(
-    Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)])
-  );
-  connection.push(packet2.buffer.slice(4));
-};
+    const packet1 = new Packet(packetType);
+    packet1.addData(payload.slice(0, 2));
 
-exports.receiveMultiplePacketsWithMoreThanOnePacketFromOneChunk = function(
-  test
-) {
-  test.expect(1);
+    const packet2 = new Packet(packetType);
+    packet2.addData(payload.slice(2, 4));
 
-  var payload = Buffer.from([1, 2, 3, 4, 5, 6]);
-  var connection = new Connection();
-  var receivedData = Buffer.alloc(0);
+    const packet3 = new Packet(packetType);
+    packet3.last(true);
+    packet3.addData(payload.slice(4, 6));
 
-  var io = new MessageIO(connection, packetSize, new Debug());
-  io.on('data', function(data) {
-    receivedData = Buffer.concat([receivedData, data]);
-  });
+    const allData = Buffer.concat([packet1.buffer, packet2.buffer, packet3.buffer]);
+    const data1 = allData.slice(0, 5);
+    const data2 = allData.slice(5);
 
-  io.on('message', function() {
-    test.deepEqual(payload, receivedData);
-    test.done();
-  });
-
-  var packet1 = new Packet(packetType);
-  packet1.addData(payload.slice(0, 2));
-
-  var packet2 = new Packet(packetType);
-  packet2.addData(payload.slice(2, 4));
-
-  var packet3 = new Packet(packetType);
-  packet3.last(true);
-  packet3.addData(payload.slice(4, 6));
-
-  var allData = Buffer.concat([packet1.buffer, packet2.buffer, packet3.buffer]);
-  var data1 = allData.slice(0, 5);
-  var data2 = allData.slice(5);
-
-  connection.push(data1);
-  connection.push(data2);
-};
+    connection.push(data1);
+    connection.push(data2);
+  })
+})

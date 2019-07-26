@@ -2,6 +2,7 @@ const Dgram = require('dgram');
 const Sender = require('../../src/sender').Sender;
 const ParallelSendStrategy = require('../../src/sender').ParallelSendStrategy;
 const sinon = require('sinon');
+const assert = require('chai').assert;
 
 const anyPort = 1234;
 const anyIpv4 = '1.2.3.4';
@@ -50,9 +51,9 @@ function sendToIpCommonTestSetup(ipAddress, udpVersion, sendResult) {
   this.sender = new Sender(ipAddress, anyPort, anyRequest);
 }
 
-function sendToIpCommonTestValidation(test, ipAddress) {
-  test.ok(this.createSocketStub.calledOnce);
-  test.ok(
+function sendToIpCommonTestValidation(ipAddress) {
+  assert.isOk(this.createSocketStub.calledOnce);
+  assert.isOk(
     this.socketSendStub.withArgs(
       anyRequest,
       0,
@@ -63,68 +64,82 @@ function sendToIpCommonTestValidation(test, ipAddress) {
   );
 }
 
-exports['Sender send to IP address'] = {
-  'tearDown': function(done) {
+//TODO: Refactor functions above ^^^^^^^
+
+describe('Sender send to IP address', () => {
+  const glob = {};
+
+  it('should tear down', (done) => {
     sinon.restore();
     done();
-  },
+  })
 
-  'send to IPv4': function(test) {
-    sendToIpCommonTestSetup.call(this, anyIpv4, udpIpv4, sendResultSuccess);
+  describe('Send', () => {
 
-    this.sender.execute((error, message) => {
-      test.strictEqual(error, null);
-      test.strictEqual(message, this.testSocket);
+    afterEach(() => {
+      glob.socketSendStub.restore();
+      glob.socketCloseSpy.restore();
+      glob.createSocketStub.restore();
+    })
 
-      test.ok(this.socketCloseSpy.withArgs().calledOnce);
-      test.done();
-    });
+    it('should send to IPv4', (done) => {
 
-    sendToIpCommonTestValidation.call(this, test, anyIpv4);
-  },
+      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultSuccess);
 
-  'send to IPv6': function(test) {
-    sendToIpCommonTestSetup.call(this, anyIpv6, udpIpv6, sendResultSuccess);
+      glob.sender.execute((error, message) => {
+        assert.strictEqual(error, null);
+        assert.strictEqual(message, glob.testSocket);
 
-    this.sender.execute((error, message) => {
-      test.strictEqual(error, null);
-      test.strictEqual(message, this.testSocket);
+        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
+        done();
+      });
 
-      test.ok(this.socketCloseSpy.withArgs().calledOnce);
-      test.done();
-    });
+      sendToIpCommonTestValidation.call(glob, anyIpv4);
+    })
 
-    sendToIpCommonTestValidation.call(this, test, anyIpv6);
-  },
+    it('should sent to IPv6', (done) => {
+      sendToIpCommonTestSetup.call(glob, anyIpv6, udpIpv6, sendResultSuccess);
 
-  'send fails': function(test) {
-    sendToIpCommonTestSetup.call(this, anyIpv4, udpIpv4, sendResultError);
+      glob.sender.execute((error, message) => {
+        assert.strictEqual(error, null);
+        assert.strictEqual(message, glob.testSocket);
 
-    this.sender.execute((error, message) => {
-      test.strictEqual(error, this.testSocket);
-      test.strictEqual(message, undefined);
+        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
+        done();
+      });
 
-      test.ok(this.socketCloseSpy.withArgs().calledOnce);
-      test.done();
-    });
+      sendToIpCommonTestValidation.call(glob, anyIpv6);
+    })
 
-    sendToIpCommonTestValidation.call(this, test, anyIpv4);
-  },
+    it('should send fails', (done) => {
+      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultError);
 
-  'send cancel': function(test) {
-    sendToIpCommonTestSetup.call(this, anyIpv4, udpIpv4, sendResultCancel);
+      glob.sender.execute((error, message) => {
+        assert.strictEqual(error, glob.testSocket);
+        assert.strictEqual(message, undefined);
 
-    this.sender.execute((error, message) => {
-      test.ok(false, 'Should never get here.');
-    });
+        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
+        done();
+      });
 
-    sendToIpCommonTestValidation.call(this, test, anyIpv4);
+      sendToIpCommonTestValidation.call(glob, anyIpv4);
+    })
 
-    this.sender.cancel();
-    test.ok(this.socketCloseSpy.withArgs().calledOnce);
-    test.done();
-  }
-};
+    it('should send cancel', (done) => {
+      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultCancel);
+
+      glob.sender.execute((error, message) => {
+        assert.isOk(false, 'Should never get here.');
+      });
+
+      sendToIpCommonTestValidation.call(glob, anyIpv4);
+
+      glob.sender.cancel();
+      assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
+      done();
+    })
+  })
+})
 
 function sendToHostCommonTestSetup(lookupError) {
   // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
@@ -135,7 +150,7 @@ function sendToHostCommonTestSetup(lookupError) {
     anyPort,
     anyRequest
   );
-  const callback = () => {};
+  const callback = () => { };
   this.strategySendStub = sinon.stub(testStrategy, 'send');
   this.strategySendStub.withArgs(callback);
   this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
@@ -161,95 +176,103 @@ function sendToHostCommonTestSetup(lookupError) {
   this.sender.execute(callback);
 }
 
-exports['Sender send to hostname'] = {
-  'setUp': function(done) {
+describe('Sender send to hostnam', () => {
+  const glob = {};
+  it('should setUp', (done) => {
     // Set of IP addresses to be returned by stubbed out lookupAll method.
-    this.addresses = [
+    glob.addresses = [
       { address: '127.0.0.2' },
       { address: '2002:20:0:0:0:0:1:3' },
       { address: '127.0.0.4' }
     ];
 
     done();
-  },
+  })
 
-  'tearDown': function(done) {
+  it('should tearDown', (done) => {
     sinon.restore();
     done();
-  },
+  })
 
-  // lookupAll is async. So we push out validation to next tick to run
-  // after lookupAll asyn callback is done in all the tests below.
+  describe('Send', () => {
+    afterEach(() => {
+      glob.strategySendStub.restore();
+      glob.strategyCancelStub.restore();
+      glob.lookupAllStub.restore();
+      glob.createStrategyStub.restore();
+    })
 
-  'send basic': function(test) {
-    const lookupError = null;
-    sendToHostCommonTestSetup.call(this, lookupError);
+    it('should send basic', (done) => {
+      const lookupError = null;
+      sendToHostCommonTestSetup.call(glob, lookupError);
 
-    test.ok(this.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupAllStub.calledOnce);
 
-    const validate = () => {
-      test.ok(this.createStrategyStub.calledOnce);
-      test.ok(this.strategySendStub.calledOnce);
-      test.done();
-    };
+      const validate = () => {
+        assert.isOk(glob.createStrategyStub.calledOnce);
+        assert.isOk(glob.strategySendStub.calledOnce);
+        done();
+      };
 
-    process.nextTick(validate);
-  },
+      process.nextTick(validate);
+    })
 
-  'send cancel': function(test) {
-    const lookupError = null;
-    sendToHostCommonTestSetup.call(this, lookupError);
+    it('should send cancel', (done) => {
+      const lookupError = null;
+      sendToHostCommonTestSetup.call(glob, lookupError);
 
-    test.ok(this.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupAllStub.calledOnce);
 
-    const validate = () => {
-      test.ok(this.createStrategyStub.calledOnce);
-      test.ok(this.strategySendStub.calledOnce);
+      const validate = () => {
+        assert.isOk(glob.createStrategyStub.calledOnce);
+        assert.isOk(glob.strategySendStub.calledOnce);
 
-      this.sender.cancel();
-      test.ok(this.strategyCancelStub.calledOnce);
-      test.done();
-    };
+        glob.sender.cancel();
+        assert.isOk(glob.strategyCancelStub.calledOnce);
+        done();
+      };
 
-    process.nextTick(validate);
-  },
+      process.nextTick(validate);
+    })
 
-  'send lookup error': function(test) {
-    const lookupError = new Error('some error.');
+    it('should look up error', (done) => {
+      const lookupError = new Error('some error.');
 
-    sendToHostCommonTestSetup.call(this, lookupError);
+      sendToHostCommonTestSetup.call(glob, lookupError);
 
-    test.ok(this.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupAllStub.calledOnce);
 
-    const validate = () => {
-      // Strategy object should not be created on lookup error.
-      test.strictEqual(this.createStrategyStub.callCount, 0);
-      test.strictEqual(this.strategySendStub.callCount, 0);
-      test.done();
-    };
+      const validate = () => {
+        // Strategy object should not be created on lookup error.
+        assert.strictEqual(glob.createStrategyStub.callCount, 0);
+        assert.strictEqual(glob.strategySendStub.callCount, 0);
+        done();
+      };
 
-    process.nextTick(validate);
-  },
+      process.nextTick(validate);
+    })
 
-  'send cancel on lookup error': function(test) {
-    const lookupError = new Error('some error.');
+    it('should send cancel on lookup error', (done) => {
+      const lookupError = new Error('some error.');
 
-    sendToHostCommonTestSetup.call(this, lookupError);
-    this.sender.cancel();
+      sendToHostCommonTestSetup.call(glob, lookupError);
+      glob.sender.cancel();
 
-    test.ok(this.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupAllStub.calledOnce);
 
-    const validate = () => {
-      // Strategy object should not be created on lookup error.
-      test.strictEqual(this.createStrategyStub.callCount, 0);
-      test.strictEqual(this.strategySendStub.callCount, 0);
-      test.strictEqual(this.strategyCancelStub.callCount, 0);
-      test.done();
-    };
+      const validate = () => {
+        // Strategy object should not be created on lookup error.
+        assert.strictEqual(glob.createStrategyStub.callCount, 0);
+        assert.strictEqual(glob.strategySendStub.callCount, 0);
+        assert.strictEqual(glob.strategyCancelStub.callCount, 0);
+        done();
+      };
 
-    process.nextTick(validate);
-  }
-};
+      process.nextTick(validate);
+    })
+  })
+
+})
 
 function commonStrategyTestSetup() {
   // IP addresses returned by DNS reverse lookup and passed to the Strategy.
@@ -293,99 +316,117 @@ function commonStrategyTestSetup() {
   );
 }
 
-function commonStrategyTestValidation(test) {
+
+function commonStrategyTestValidation(done) {
   for (const key in this.testSockets) {
-    test.strictEqual(this.testSockets[key].socketSendStub.callCount, 2);
-    test.strictEqual(this.testSockets[key].socketCloseSpy.callCount, 1);
+    assert.strictEqual(this.testSockets[key].socketSendStub.callCount, 2);
+    assert.strictEqual(this.testSockets[key].socketCloseSpy.callCount, 1);
   }
 
-  test.strictEqual(this.createSocketStub.callCount, 2);
+  assert.strictEqual(this.createSocketStub.callCount, 2);
 
-  test.done();
+  done();
 }
 
-exports.ParallelSendStrategy = {
-  'setUp': function(done) {
-    commonStrategyTestSetup.call(this);
+describe('Parallel Send Strategy', () => {
+  let glob;
+  it('should setUp', (done) => {
+    glob = {};
+    commonStrategyTestSetup.call(glob);
     done();
-  },
+  })
 
-  'tearDown': function(done) {
+  it('should tearDown', (done) => {
     sinon.restore();
     done();
-  },
+  })
 
-  'send all IPs success.': function(test) {
-    this.parallelSendStrategy.send((error, message) => {
-      test.strictEqual(error, null);
+  describe('Send', () => {
+    beforeEach(() => {
+      glob = {};
+      commonStrategyTestSetup.call(glob);
+    })
 
-      // We should get the message only on the first socket, which is Ipv4.
-      test.strictEqual(this.testData[0].udpVersion, udpIpv4);
-      test.strictEqual(message, this.testSockets[udpIpv4]);
-      commonStrategyTestValidation.call(this, test);
-    });
-  },
+    afterEach(()=> {
+      for(const key in glob.testSockets){
+        glob.testSockets[key].socketSendStub.restore();
+        glob.testSockets[key].socketCloseSpy.restore();
+        glob.createSocketStub.restore();
+      }
+    })
 
-  'send IPv4 fail.': function(test) {
-    // Setup sends to fail on Ipv4 socket.
-    this.testSockets[udpIpv4].sendResult = sendResultError;
+    it('should send all IPs success', (done) => {
+      glob.parallelSendStrategy.send((error, message) => {
+        assert.strictEqual(error, null);
 
-    this.parallelSendStrategy.send((error, message) => {
-      // Even though the IPv4 socket sends fail, we should not get an error
-      // as the other sockets succeed.
-      test.strictEqual(error, null);
+        // We should get the message only on the first socket, which is Ipv4.
+        assert.strictEqual(glob.testData[0].udpVersion, udpIpv4);
+        assert.strictEqual(message, glob.testSockets[udpIpv4]);
+        commonStrategyTestValidation.call(glob, done);
+      });
+    })
 
-      // We setup the IPv4 socket sends to fail. So we should get the message on the
-      // Ipv6 socket.
-      test.strictEqual(message, this.testSockets[udpIpv6]);
+    it('should send IPv4 fail', (done) => {
+      // Setup sends to fail on Ipv4 socket.
+      glob.testSockets[udpIpv4].sendResult = sendResultError;
 
-      commonStrategyTestValidation.call(this, test);
-    });
-  },
+      glob.parallelSendStrategy.send((error, message) => {
+        // Even though the IPv4 socket sends fail, we should not get an error
+        // as the other sockets succeed.
+        assert.strictEqual(error, null);
 
-  'send IPv6 fail.': function(test) {
-    // Setup sends to fail on Ipv6 socket.
-    this.testSockets[udpIpv6].sendResult = sendResultError;
+        // We setup the IPv4 socket sends to fail. So we should get the message on the
+        // Ipv6 socket.
+        assert.strictEqual(message, glob.testSockets[udpIpv6]);
 
-    this.parallelSendStrategy.send((error, message) => {
-      // Even though the IPv6 socket sends fail, we should not get an error
-      // as the other sockets succeed.
-      test.strictEqual(error, null);
+        commonStrategyTestValidation.call(glob, done);
+      });
+    })
 
-      // We setup the IPv6 socket sends to fail. So we should get the message on the
-      // Ipv4 socket.
-      test.strictEqual(message, this.testSockets[udpIpv4]);
+    it('should send IPV6 fail', (done) => {
+      // Setup sends to fail on Ipv6 socket.
+      glob.testSockets[udpIpv6].sendResult = sendResultError;
 
-      commonStrategyTestValidation.call(this, test);
-    });
-  },
+      glob.parallelSendStrategy.send((error, message) => {
+        // Even though the IPv6 socket sends fail, we should not get an error
+        // as the other sockets succeed.
+        assert.strictEqual(error, null);
 
-  'send all IPs fail.': function(test) {
-    // Setup IPv4 and IPv6 sockets to fail on socket send.
-    this.testSockets[udpIpv4].sendResult = sendResultError;
-    this.testSockets[udpIpv6].sendResult = sendResultError;
+        // We setup the IPv6 socket sends to fail. So we should get the message on the
+        // Ipv4 socket.
+        assert.strictEqual(message, glob.testSockets[udpIpv4]);
 
-    this.parallelSendStrategy.send((error, message) => {
-      // All socket sends fail. We should get an error on the last socket fail.
-      test.strictEqual(
-        error,
-        this.testSockets[this.testData[this.testData.length - 1].udpVersion]
-      );
+        commonStrategyTestValidation.call(glob, done);
+      });
+    })
 
-      test.strictEqual(message, undefined);
+    it('should send all IPs fail', (done) => {
+      // Setup IPv4 and IPv6 sockets to fail on socket send.
+      glob.testSockets[udpIpv4].sendResult = sendResultError;
+      glob.testSockets[udpIpv6].sendResult = sendResultError;
 
-      commonStrategyTestValidation.call(this, test);
-    });
-  },
+      glob.parallelSendStrategy.send((error, message) => {
+        // All socket sends fail. We should get an error on the last socket fail.
+        assert.strictEqual(
+          error,
+          glob.testSockets[glob.testData[glob.testData.length - 1].udpVersion]
+        );
 
-  'send cancel.': function(test) {
-    this.parallelSendStrategy.send((error, message) => {
-      // We should not get a callback as the send got cancelled.
-      test.ok(false, 'Should never get here.');
-    });
+        assert.strictEqual(message, undefined);
 
-    this.parallelSendStrategy.cancel();
+        commonStrategyTestValidation.call(glob, done);
+      });
+    })
 
-    commonStrategyTestValidation.call(this, test);
-  }
-};
+    it('should send cancel', (done) => {
+      glob.parallelSendStrategy.send((error, message) => {
+        // We should not get a callback as the send got cancelled.
+        assert.isOk(false, 'Should never get here.');
+      });
+
+      glob.parallelSendStrategy.cancel();
+
+      commonStrategyTestValidation.call(glob, done);
+    })
+  })
+})
