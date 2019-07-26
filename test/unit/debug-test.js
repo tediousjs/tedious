@@ -18,7 +18,7 @@ describe('Packet Tests', () => {
 
     const debug = new Debug({ packet: true });
 
-    debug.on('debug', function (text) {
+    debug.on('debug', function(text) {
       emitCount++;
 
       switch (emitCount) {
@@ -33,73 +33,73 @@ describe('Packet Tests', () => {
     });
 
     return debug.packet('dir', new Packet());
-  })
+  });
 
   it('should enable payload', (done) => {
     const debug = new Debug({ payload: true });
-    debug.on('debug', function (text) {
+    debug.on('debug', function(text) {
       assert.strictEqual(text, payload);
 
       done();
     });
 
-    return debug.payload(function () {
+    return debug.payload(function() {
       return payload;
     });
-  })
+  });
 
   it('should not enable payload', (done) => {
     const debug = new Debug();
-    debug.on('debug', function (text) {
+    debug.on('debug', function(text) {
       assert.isOk(false);
     });
 
     debug.payload(payload);
 
     done();
-  })
+  });
 
   it('should enable data', (done) => {
     const debug = new Debug({ data: true });
-    debug.on('debug', function (text) {
+    debug.on('debug', function(text) {
       assert.strictEqual(text, 'data');
 
       done();
     });
 
     debug.data(new Packet());
-  })
+  });
 
   it('should not enable data', (done) => {
     const debug = new Debug();
-    debug.on('debug', function (text) {
+    debug.on('debug', function(text) {
       assert.isOk(false);
     });
 
     debug.data(new Packet());
 
     done();
-  })
+  });
 
   it('should enable token', (done) => {
     const debug = new Debug({ token: true });
-    debug.on('debug', function (token) {
+    debug.on('debug', function(token) {
       assert.isOk(token.indexOf('test') !== 0);
 
       done();
     });
 
     debug.token({ name: 'test' });
-  })
+  });
 
   it('should not enable payload', (done) => {
     const debug = new Debug();
-    debug.on('debug', function (token) {
+    debug.on('debug', function(token) {
       assert.isOk(false);
     });
 
     debug.token({ name: 'test' });
 
     done();
-  })
-})
+  });
+});

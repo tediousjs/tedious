@@ -12,9 +12,9 @@ describe('ntlm payload test', () => {
         nonce: Buffer.from([187, 187, 187, 187, 187, 187, 187, 187])
       }
     };
-  
+
     const response = new NTLMPayload(challenge);
-  
+
     const expectedLength =
       8 + // NTLM protocol header
       4 + // NTLM message type
@@ -34,17 +34,17 @@ describe('ntlm payload test', () => {
       4 + // placeholder
       4 + // target data
       4; // placeholder
-  
-      const domainName = response.data.slice(64, 76).toString('ucs2');
-      const userName = response.data.slice(76, 92).toString('ucs2');
-      const targetData = response.data.slice(160, 164).toString('hex');
-  
+
+    const domainName = response.data.slice(64, 76).toString('ucs2');
+    const userName = response.data.slice(76, 92).toString('ucs2');
+    const targetData = response.data.slice(160, 164).toString('hex');
+
     assert.strictEqual(domainName, 'domain');
     assert.strictEqual(userName, 'username');
     assert.strictEqual(targetData, 'aaaaaaaa');
-  
+
     assert.strictEqual(expectedLength, response.data.length);
-  
+
     done();
-  })
-})
+  });
+});

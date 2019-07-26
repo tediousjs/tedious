@@ -20,19 +20,18 @@ describe('prelogin-payload-assert', () => {
     const payload = new PreloginPayload();
     assertPayload(payload, 'NOT_SUP');
     done();
-  })
+  });
 
   it('should encrypt', (done) => {
     const payload = new PreloginPayload({ encrypt: true });
     assertPayload(payload, 'ON');
     done();
-  })
+  });
 
   it('should create from buffer', (done) => {
     const payload = new PreloginPayload();
     new PreloginPayload(payload.data);
     assertPayload(payload, 'NOT_SUP');
     done();
-  })
-})
-
+  });
+});

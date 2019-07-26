@@ -13,7 +13,7 @@ describe('packet type tests', () => {
     );
 
     done();
-  })
+  });
 
   it('should be last', (done) => {
     let packet = new Packet(TYPE.PRELOGIN);
@@ -25,7 +25,7 @@ describe('packet type tests', () => {
     assert.isOk(packet.last());
 
     done();
-  })
+  });
 
   it('should have correct packet id', (done) => {
     const packet = new Packet(TYPE.PRELOGIN);
@@ -35,7 +35,7 @@ describe('packet type tests', () => {
     assert.strictEqual(packet.packetId(), 2);
 
     done();
-  })
+  });
 
   it('should add data', (done) => {
     const data1 = Buffer.from([0x01, 0x02, 0x03]);
@@ -55,7 +55,7 @@ describe('packet type tests', () => {
     assert.isOk(packet.data().equals(allData));
 
     done();
-  })
+  });
 
   it('should create from buffer', (done) => {
     const buffer = Buffer.from([
@@ -77,7 +77,7 @@ describe('packet type tests', () => {
     assert.isOk(packet.data().equals(Buffer.from([0x01, 0xff])));
 
     done();
-  })
+  });
 
   it('should convert header to string', (done) => {
     const buffer = Buffer.from([
@@ -99,7 +99,7 @@ describe('packet type tests', () => {
     assert.strictEqual(packet.headerToString('--'), expectedText);
 
     done();
-  })
+  });
 
   it('should convert data to string short', (done) => {
     const data = Buffer.from([0x01, 0x02, 0x03]);
@@ -111,7 +111,7 @@ describe('packet type tests', () => {
     assert.strictEqual(packet.dataToString('--'), expectedText);
 
     done();
-  })
+  });
 
   it('should data with exact lines worth', (done) => {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
@@ -133,7 +133,7 @@ describe('packet type tests', () => {
     assert.strictEqual(packet.dataToString('--'), expectedText);
 
     done();
-  })
+  });
 
   it('should convert data to strings in mulitple lines', (done) => {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
@@ -142,7 +142,7 @@ describe('packet type tests', () => {
     const dataLine2b = Buffer.from([0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f]);
     const dataLine3a = Buffer.from([0x30, 0x31, 0x32]);
 
-    let packet = new Packet(TYPE.PRELOGIN);
+    const packet = new Packet(TYPE.PRELOGIN);
     packet.addData(dataLine1a);
     packet.addData(dataLine1b);
     packet.addData(dataLine2a);
@@ -163,14 +163,14 @@ describe('packet type tests', () => {
     assert.strictEqual(packet.dataToString('--'), expectedText);
 
     done();
-  })
+  });
 
   it('should packet complete shorter than header', (done) => {
     const buffer = Buffer.alloc(7);
     assert.isOk(!isPacketComplete(buffer));
 
     done();
-  })
+  });
 
   it('should packet complete with just header', (done) => {
     const buffer = new Packet(TYPE.PRELOGIN).buffer;
@@ -178,7 +178,7 @@ describe('packet type tests', () => {
     assert.isOk(isPacketComplete(buffer));
 
     done();
-  })
+  });
 
   it('should not packet complete too short', (done) => {
     const buffer = Buffer.from([
@@ -193,11 +193,11 @@ describe('packet type tests', () => {
       0x00,
       0x00
     ]);
-  
+
     assert.isOk(!isPacketComplete(buffer));
-  
+
     done();
-  })
+  });
 
   it('should packet complete long enough', (done) => {
     const buffer = Buffer.from([
@@ -214,9 +214,9 @@ describe('packet type tests', () => {
       0x00,
       0x00
     ]);
-  
+
     assert.isOk(isPacketComplete(buffer));
-  
+
     done();
-  })
-})
+  });
+});

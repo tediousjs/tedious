@@ -2,7 +2,7 @@ const assert = require('chai').assert;
 const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 const writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer;
 
-describe('all headers test', ()=> {
+describe('all headers test', () => {
   it('should write headers', (done) => {
     const expected = Buffer.from([
       0x16,
@@ -28,7 +28,7 @@ describe('all headers test', ()=> {
       0x00,
       0x00
     ]);
-  
+
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     const transactionDescriptor = Buffer.from([
       0x01,
@@ -41,9 +41,9 @@ describe('all headers test', ()=> {
       0x08
     ]);
     writeAllHeaders(buffer, transactionDescriptor, 1);
-  
+
     assert.isOk(buffer.data.equals(expected));
-  
+
     done();
-  })
-})
+  });
+});

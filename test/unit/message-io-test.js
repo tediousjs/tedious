@@ -15,15 +15,15 @@ class Connection extends Duplex {
   }
 }
 
-let packetType = 2;
-let packetSize = 8 + 4;
+const packetType = 2;
+const packetSize = 8 + 4;
 
 describe('Message IO', () => {
   it('should send smaller than one packet', (done) => {
     const payload = Buffer.from([1, 2, 3]);
 
     const connection = new Connection();
-    connection.on('packet', function (packet) {
+    connection.on('packet', function(packet) {
       assert.isOk(packet.last());
       assert.strictEqual(packet.type(), packetType);
       assert.isOk(packet.data().equals(payload));
@@ -33,13 +33,13 @@ describe('Message IO', () => {
 
     const io = new MessageIO(connection, packetSize, new Debug());
     io.sendMessage(packetType, payload);
-  })
+  });
 
   it('should send exact packet', (done) => {
     const payload = Buffer.from([1, 2, 3, 4]);
 
     const connection = new Connection();
-    connection.on('packet', function (packet) {
+    connection.on('packet', function(packet) {
       assert.isOk(packet.last());
       assert.strictEqual(packet.type(), packetType);
       assert.isOk(packet.data().equals(payload));
@@ -49,14 +49,14 @@ describe('Message IO', () => {
 
     const io = new MessageIO(connection, packetSize, new Debug());
     io.sendMessage(packetType, payload);
-  })
+  });
 
   it('should send one longer than packet', (done) => {
     const payload = Buffer.from([1, 2, 3, 4, 5]);
     let packetNumber = 0;
 
     const connection = new Connection();
-    connection.on('packet', function (packet) {
+    connection.on('packet', function(packet) {
       packetNumber++;
 
       assert.strictEqual(packet.type(), packetType);
@@ -78,17 +78,17 @@ describe('Message IO', () => {
 
     const io = new MessageIO(connection, packetSize, new Debug());
     io.sendMessage(packetType, payload);
-  })
+  });
 
   it('should recieve one packet', (done) => {
     const payload = Buffer.from([1, 2, 3]);
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', function (data) {
+    io.on('data', function(data) {
       assert.isOk(data.equals(payload));
     });
-    io.on('message', function () {
+    io.on('message', function() {
       done();
     });
 
@@ -96,17 +96,17 @@ describe('Message IO', () => {
     packet.last(true);
     packet.addData(payload);
     connection.push(packet.buffer);
-  })
+  });
 
   it('should recieve one packet in two chunks', (done) => {
     const payload = Buffer.from([1, 2, 3]);
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', function (data) {
+    io.on('data', function(data) {
       assert.isOk(data.equals(payload));
     });
-    io.on('message', function () {
+    io.on('message', function() {
       done();
     });
 
@@ -115,7 +115,7 @@ describe('Message IO', () => {
     packet.addData(payload);
     connection.push(packet.buffer.slice(0, 4));
     connection.push(packet.buffer.slice(4));
-  })
+  });
 
   it('should recieve two packets', (done) => {
     const payload = Buffer.from([1, 2, 3]);
@@ -126,7 +126,7 @@ describe('Message IO', () => {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', function (data) {
+    io.on('data', function(data) {
       receivedPacketCount++;
 
       switch (receivedPacketCount) {
@@ -138,7 +138,7 @@ describe('Message IO', () => {
           break;
       }
     });
-    io.on('message', function () {
+    io.on('message', function() {
       done();
     });
 
@@ -150,7 +150,7 @@ describe('Message IO', () => {
     packet.last(true);
     packet.addData(payload2);
     connection.push(packet.buffer);
-  })
+  });
 
   it('should recieve two packets with chunk spanning packets', (done) => {
     const payload = Buffer.from([1, 2, 3, 4]);
@@ -161,7 +161,7 @@ describe('Message IO', () => {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', function (data) {
+    io.on('data', function(data) {
       receivedPacketCount++;
 
       switch (receivedPacketCount) {
@@ -173,7 +173,7 @@ describe('Message IO', () => {
           break;
       }
     });
-    io.on('message', function () {
+    io.on('message', function() {
       done();
     });
 
@@ -189,7 +189,7 @@ describe('Message IO', () => {
       Buffer.concat([packet1.buffer.slice(6), packet2.buffer.slice(0, 4)])
     );
     connection.push(packet2.buffer.slice(4));
-  })
+  });
 
   it('should recieve multiple packets with more than one packet from one chunk', (done) => {
     const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
@@ -197,11 +197,11 @@ describe('Message IO', () => {
     let receivedData = Buffer.alloc(0);
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', function (data) {
+    io.on('data', function(data) {
       receivedData = Buffer.concat([receivedData, data]);
     });
 
-    io.on('message', function () {
+    io.on('message', function() {
       assert.deepEqual(payload, receivedData);
       done();
     });
@@ -222,5 +222,5 @@ describe('Message IO', () => {
 
     connection.push(data1);
     connection.push(data2);
-  })
-})
+  });
+});

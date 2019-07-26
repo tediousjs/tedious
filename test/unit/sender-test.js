@@ -64,7 +64,7 @@ function sendToIpCommonTestValidation(ipAddress) {
   );
 }
 
-//TODO: Refactor functions above ^^^^^^^
+// TODO: Refactor functions above ^^^^^^^
 
 describe('Sender send to IP address', () => {
   const glob = {};
@@ -72,7 +72,7 @@ describe('Sender send to IP address', () => {
   it('should tear down', (done) => {
     sinon.restore();
     done();
-  })
+  });
 
   describe('Send', () => {
 
@@ -80,7 +80,7 @@ describe('Sender send to IP address', () => {
       glob.socketSendStub.restore();
       glob.socketCloseSpy.restore();
       glob.createSocketStub.restore();
-    })
+    });
 
     it('should send to IPv4', (done) => {
 
@@ -95,7 +95,7 @@ describe('Sender send to IP address', () => {
       });
 
       sendToIpCommonTestValidation.call(glob, anyIpv4);
-    })
+    });
 
     it('should sent to IPv6', (done) => {
       sendToIpCommonTestSetup.call(glob, anyIpv6, udpIpv6, sendResultSuccess);
@@ -109,7 +109,7 @@ describe('Sender send to IP address', () => {
       });
 
       sendToIpCommonTestValidation.call(glob, anyIpv6);
-    })
+    });
 
     it('should send fails', (done) => {
       sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultError);
@@ -123,7 +123,7 @@ describe('Sender send to IP address', () => {
       });
 
       sendToIpCommonTestValidation.call(glob, anyIpv4);
-    })
+    });
 
     it('should send cancel', (done) => {
       sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultCancel);
@@ -137,9 +137,9 @@ describe('Sender send to IP address', () => {
       glob.sender.cancel();
       assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
       done();
-    })
-  })
-})
+    });
+  });
+});
 
 function sendToHostCommonTestSetup(lookupError) {
   // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
@@ -187,12 +187,12 @@ describe('Sender send to hostnam', () => {
     ];
 
     done();
-  })
+  });
 
   it('should tearDown', (done) => {
     sinon.restore();
     done();
-  })
+  });
 
   describe('Send', () => {
     afterEach(() => {
@@ -200,7 +200,7 @@ describe('Sender send to hostnam', () => {
       glob.strategyCancelStub.restore();
       glob.lookupAllStub.restore();
       glob.createStrategyStub.restore();
-    })
+    });
 
     it('should send basic', (done) => {
       const lookupError = null;
@@ -215,7 +215,7 @@ describe('Sender send to hostnam', () => {
       };
 
       process.nextTick(validate);
-    })
+    });
 
     it('should send cancel', (done) => {
       const lookupError = null;
@@ -233,7 +233,7 @@ describe('Sender send to hostnam', () => {
       };
 
       process.nextTick(validate);
-    })
+    });
 
     it('should look up error', (done) => {
       const lookupError = new Error('some error.');
@@ -250,7 +250,7 @@ describe('Sender send to hostnam', () => {
       };
 
       process.nextTick(validate);
-    })
+    });
 
     it('should send cancel on lookup error', (done) => {
       const lookupError = new Error('some error.');
@@ -269,10 +269,10 @@ describe('Sender send to hostnam', () => {
       };
 
       process.nextTick(validate);
-    })
-  })
+    });
+  });
 
-})
+});
 
 function commonStrategyTestSetup() {
   // IP addresses returned by DNS reverse lookup and passed to the Strategy.
@@ -334,26 +334,26 @@ describe('Parallel Send Strategy', () => {
     glob = {};
     commonStrategyTestSetup.call(glob);
     done();
-  })
+  });
 
   it('should tearDown', (done) => {
     sinon.restore();
     done();
-  })
+  });
 
   describe('Send', () => {
     beforeEach(() => {
       glob = {};
       commonStrategyTestSetup.call(glob);
-    })
+    });
 
-    afterEach(()=> {
-      for(const key in glob.testSockets){
+    afterEach(() => {
+      for (const key in glob.testSockets) {
         glob.testSockets[key].socketSendStub.restore();
         glob.testSockets[key].socketCloseSpy.restore();
         glob.createSocketStub.restore();
       }
-    })
+    });
 
     it('should send all IPs success', (done) => {
       glob.parallelSendStrategy.send((error, message) => {
@@ -364,7 +364,7 @@ describe('Parallel Send Strategy', () => {
         assert.strictEqual(message, glob.testSockets[udpIpv4]);
         commonStrategyTestValidation.call(glob, done);
       });
-    })
+    });
 
     it('should send IPv4 fail', (done) => {
       // Setup sends to fail on Ipv4 socket.
@@ -381,7 +381,7 @@ describe('Parallel Send Strategy', () => {
 
         commonStrategyTestValidation.call(glob, done);
       });
-    })
+    });
 
     it('should send IPV6 fail', (done) => {
       // Setup sends to fail on Ipv6 socket.
@@ -398,7 +398,7 @@ describe('Parallel Send Strategy', () => {
 
         commonStrategyTestValidation.call(glob, done);
       });
-    })
+    });
 
     it('should send all IPs fail', (done) => {
       // Setup IPv4 and IPv6 sockets to fail on socket send.
@@ -416,7 +416,7 @@ describe('Parallel Send Strategy', () => {
 
         commonStrategyTestValidation.call(glob, done);
       });
-    })
+    });
 
     it('should send cancel', (done) => {
       glob.parallelSendStrategy.send((error, message) => {
@@ -427,6 +427,6 @@ describe('Parallel Send Strategy', () => {
       glob.parallelSendStrategy.cancel();
 
       commonStrategyTestValidation.call(glob, done);
-    })
-  })
-})
+    });
+  });
+});
