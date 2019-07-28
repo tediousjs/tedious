@@ -25,6 +25,7 @@ title: Getting started
       options: {  
         userName: "test",
         password: "test",
+      }
     }
   };
 
@@ -32,9 +33,8 @@ title: Getting started
 
   connection.on('connect', function(err) {
     // If no error, then good to go...
-      executeStatement();
-    }
-  );
+    executeStatement();
+  });
 {% endhighlight %}
 
 <p>
