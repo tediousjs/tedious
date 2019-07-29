@@ -76,7 +76,7 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "lint": "eslint src test && flow",
+    "lint": "eslint src test && tsc && flow",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
