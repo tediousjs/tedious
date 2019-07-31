@@ -23,12 +23,12 @@ describe('Connection Retry Test', () => {
   beforeEach((done) => {
     invalidLoginError = 18456;
     done();
-  })
+  });
 
   afterEach((done) => {
     sinon.restore();
     done();
-  })
+  });
 
   it('should retry specified number of times on transient errors', (done) => {
     const config = getConfig();
@@ -54,7 +54,7 @@ describe('Connection Retry Test', () => {
     connection.on('end', (info) => {
       done();
     });
-  })
+  });
 
   it('should no retries on non-transient errors', (done) => {
     const config = getConfig();
@@ -80,7 +80,7 @@ describe('Connection Retry Test', () => {
     connection.on('end', (info) => {
       done();
     });
-  })
+  });
 
   it('should no retries if connection timeout fires', (done) => {
     const config = getConfig();
@@ -116,6 +116,5 @@ describe('Connection Retry Test', () => {
       clock.restore();
       done();
     });
-  })
-})
-
+  });
+});

@@ -24,13 +24,13 @@ function getConfig() {
   return config;
 }
 
-describe('Prepare Execute Statement', function () {
-  it('should prepare execute', function (done) {
-    let value = 8;
+describe('Prepare Execute Statement', function() {
+  it('should prepare execute', function(done) {
+    const value = 8;
 
-    let config = getConfig();
+    const config = getConfig();
 
-    let request = new Request('select @param', function (err) {
+    const request = new Request('select @param', function(err) {
       assert.ifError(err);
       connection.close();
     });
@@ -38,57 +38,55 @@ describe('Prepare Execute Statement', function () {
 
     let connection = new Connection(config);
 
-    request.on('prepared', function () {
+    request.on('prepared', function() {
       assert.ok(request.handle);
       connection.execute(request, { param: value });
     });
 
-    request.on('row', function (columns) {
+    request.on('row', function(columns) {
       assert.strictEqual(columns.length, 1);
       assert.strictEqual(columns[0].value, value);
     });
 
-    connection.on('connect', function (err) {
+    connection.on('connect', function(err) {
       assert.ifError(err);
       connection.prepare(request);
     });
 
-    connection.on('end', function (info) {
+    connection.on('end', function(info) {
       done();
     });
 
-    connection.on('debug', function (text) {
+    connection.on('debug', function(text) {
       // console.log(text)
     });
-  })
+  });
 
-  it('should test unprepare', function (done) {
-    let config = getConfig();
-    let prepared = false;
-
-    let request = new Request('select 3', function (err) {
+  it('should test unprepare', function(done) {
+    const config = getConfig();
+    const request = new Request('select 3', function(err) {
       assert.ifError(err);
       connection.close();
     });
 
     let connection = new Connection(config);
 
-    request.on('prepared', function () {
+    request.on('prepared', function() {
       assert.ok(request.handle);
       connection.unprepare(request);
     });
 
-    connection.on('connect', function (err) {
+    connection.on('connect', function(err) {
       assert.ifError(err);
       connection.prepare(request);
     });
 
-    connection.on('end', function (info) {
+    connection.on('end', function(info) {
       done();
     });
 
-    connection.on('debug', function (text) {
+    connection.on('debug', function(text) {
       // console.log(text)
     });
-  })
-})
+  });
+});

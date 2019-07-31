@@ -25,5 +25,5 @@ describe('Fedauth Info Parser', () => {
     assert.strictEqual(token.spn, 'spn');
 
     done();
-  })
-})
+  });
+});

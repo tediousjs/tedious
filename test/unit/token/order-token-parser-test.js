@@ -24,7 +24,7 @@ describe('Order Token Parser', () => {
     assert.strictEqual(token.orderColumns[0], column);
 
     done();
-  })
+  });
 
   it('should have two columns', (done) => {
     const numberOfColumns = 2;
@@ -50,6 +50,5 @@ describe('Order Token Parser', () => {
     assert.strictEqual(token.orderColumns[1], column2);
 
     done();
-  })
-})
-
+  });
+});

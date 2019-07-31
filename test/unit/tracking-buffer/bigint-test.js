@@ -13,15 +13,15 @@ function assertBuffer(actual, expected) {
   }
 }
 
-describe('Bigint Test', ()=> {
-  it('should be zero', (done)=> {
+describe('Bigint Test', () => {
+  it('should be zero', (done) => {
     assert.strictEqual(
       '0',
       convertLEBytesToString(Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]))
     );
-  
+
     done();
-  })
+  });
 
   it('should be small positive', (done) => {
     assert.strictEqual(
@@ -32,9 +32,9 @@ describe('Bigint Test', ()=> {
       '2',
       convertLEBytesToString(Buffer.from([2, 0, 0, 0, 0, 0, 0, 0]))
     );
-  
+
     done();
-  })
+  });
 
   it('should be small negative', (done) => {
     assert.strictEqual(
@@ -45,27 +45,27 @@ describe('Bigint Test', ()=> {
       '-2',
       convertLEBytesToString(Buffer.from([254, 255, 255, 255, 255, 255, 255, 255]))
     );
-  
-    done();
-  })
 
-  it('should be big positive', (done)=> {
+    done();
+  });
+
+  it('should be big positive', (done) => {
     assert.strictEqual(
       '9223372036854775807',
       convertLEBytesToString(Buffer.from([255, 255, 255, 255, 255, 255, 255, 127]))
     );
-  
+
     done();
-  })
+  });
 
   it('should be big negative', (done) => {
     assert.strictEqual(
       '-9223372036854775808',
       convertLEBytesToString(Buffer.from([0, 0, 0, 0, 0, 0, 0, 128]))
     );
-  
+
     done();
-  })
+  });
 
   it('should be powersOf10', (done) => {
     assert.strictEqual(
@@ -84,9 +84,9 @@ describe('Bigint Test', ()=> {
       '10000',
       convertLEBytesToString(Buffer.from([16, 39, 0, 0, 0, 0, 0, 0]))
     );
-  
+
     done();
-  })
+  });
 
   it('should be toInt64LE', (done) => {
     assertBuffer(numberToInt64LE(-3500000000), [
@@ -179,8 +179,7 @@ describe('Bigint Test', ()=> {
       0xff,
       0xff
     ]);
-  
-    done();
-  })
-})
 
+    done();
+  });
+});

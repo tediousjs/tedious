@@ -51,7 +51,7 @@ describe('sspi token parser', () => {
     assert.isOk(challenge.ntlmpacketBuffer.equals(data.slice(3)));
 
     done();
-  })
+  });
 
 
-})
+});

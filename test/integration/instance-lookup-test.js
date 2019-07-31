@@ -22,7 +22,7 @@ function getConfig() {
   };
 }
 
-describe('Instance Lookup Test', function () {
+describe('Instance Lookup Test', function() {
   it('should test good instance', (done) => {
     var config = getConfig();
 
@@ -33,13 +33,13 @@ describe('Instance Lookup Test', function () {
       return;
     }
 
-    new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function (err, port) {
+    new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function(err, port) {
       assert.ifError(err);
       assert.ok(port);
 
       done();
     });
-  })
+  });
 
   it('should test bad Instance', (done) => {
     var config = getConfig();
@@ -49,13 +49,13 @@ describe('Instance Lookup Test', function () {
       instanceName: 'badInstanceName',
       timeout: 100,
       retries: 1
-    }, function (err, port) {
+    }, function(err, port) {
       assert.ok(err);
       assert.ok(!port);
 
       done();
     });
-  })
+  });
 
   it('should test bad Server', (done) => {
     new InstanceLookup().instanceLookup({
@@ -63,12 +63,11 @@ describe('Instance Lookup Test', function () {
       instanceName: 'badInstanceName',
       timeout: 100,
       retries: 1
-    }, function (err, port) {
+    }, function(err, port) {
       assert.ok(err);
       assert.ok(!port);
 
       done();
     });
-  })
-})
-
+  });
+});

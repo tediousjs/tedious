@@ -30,5 +30,5 @@ describe('Feature Ext Praser', () => {
     assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
 
     done();
-  })
-})
+  });
+});

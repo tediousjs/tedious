@@ -27,29 +27,29 @@ config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 function execSql(done, sql, requestCallback) {
   const connection = new Connection(config);
 
-  const request = new Request(sql, function () {
+  const request = new Request(sql, function() {
     requestCallback.apply(this, arguments);
     connection.close();
   });
 
-  connection.on('connect', function (err) {
+  connection.on('connect', function(err) {
     assert.ifError(err);
     connection.execSqlBatch(request);
   });
 
-  connection.on('end', function (info) {
+  connection.on('end', function(info) {
     done();
   });
 
   if (debug) {
-    connection.on('debug', function (message) {
+    connection.on('debug', function(message) {
       console.log(message);
     });
   }
 }
 
-describe('Errors Test', function () {
-  it('should test unique constraints', function (done) {
+describe('Errors Test', function() {
+  it('should test unique constraints', function(done) {
     const sql = `\
   create table #testUnique (id int unique);
   insert #testUnique values (1), (2), (3);
@@ -57,45 +57,45 @@ describe('Errors Test', function () {
   drop table #testUnique;\
   `;
 
-    execSql(done, sql, function (err) {
+    execSql(done, sql, function(err) {
       assert.ok(err instanceof Error);
       assert.strictEqual(err.number, 2627);
     });
-  })
+  });
 
-  it('should test nullabe', function (done) {
+  it('should test nullabe', function(done) {
     const sql = `\
   create table #testNullable (id int not null);
   insert #testNullable values (null);
   drop table #testNullable;\
   `;
 
-    execSql(done, sql, function (err) {
+    execSql(done, sql, function(err) {
       assert.ok(err instanceof Error);
       assert.strictEqual(err.number, 515);
     });
-  })
+  });
 
-  it('should test', function (done) {
+  it('should test', function(done) {
     const sql = '\
   drop procedure #nonexistentProcedure;\
   ';
 
-    execSql(done, sql, function (err) {
+    execSql(done, sql, function(err) {
       assert.ok(err instanceof Error);
       assert.strictEqual(err.number, 3701);
     });
-  })
+  });
 
 
   // Create a temporary stored procedure to test that err.procName,
   // err.lineNumber, err.class, and err.state are correct.
   //
   // We can't really test serverName reliably, other than that it exists.
-  it('should test extended error info', function (done) {
+  it('should test extended error info', function(done) {
     const connection = new Connection(config);
 
-    const execProc = new Request('#testExtendedErrorInfo', function (err) {
+    const execProc = new Request('#testExtendedErrorInfo', function(err) {
       assert.ok(err instanceof Error);
 
       assert.strictEqual(err.number, 50000);
@@ -119,26 +119,25 @@ describe('Errors Test', function () {
 
     const createProc = new Request(
       "create procedure #testExtendedErrorInfo as raiserror('test error message', 14, 42)",
-      function (err) {
+      function(err) {
         assert.ifError(err);
         connection.callProcedure(execProc);
       }
     );
 
-    connection.on('connect', function (err) {
+    connection.on('connect', function(err) {
       assert.ifError(err);
       connection.execSqlBatch(createProc);
     });
 
-    connection.on('end', function (info) {
+    connection.on('end', function(info) {
       done();
     });
 
     if (debug) {
-      connection.on('debug', function (message) {
+      connection.on('debug', function(message) {
         console.log(message);
       });
     }
-  })
-})
-
+  });
+});

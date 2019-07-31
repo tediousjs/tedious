@@ -40,5 +40,5 @@ describe('Loginack Token Parser', () => {
     assert.deepEqual(token.progVersion, progVersion);
 
     done();
-  })
-})
+  });
+});

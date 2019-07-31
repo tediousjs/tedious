@@ -40,5 +40,5 @@ describe('Infoerror token parser', () => {
     assert.strictEqual(token.lineNumber, lineNumber);
 
     done();
-  })
-})
+  });
+});

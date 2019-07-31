@@ -27,7 +27,7 @@ describe('Env Change Token Parser', () => {
     assert.strictEqual(token.newValue, 'new');
 
     done();
-  })
+  });
 
   it('should write with correct packet size', (done) => {
     const oldSize = '1024';
@@ -53,7 +53,7 @@ describe('Env Change Token Parser', () => {
     assert.strictEqual(token.newValue, 2048);
 
     done();
-  })
+  });
 
   it('should be of bad type', (done) => {
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
@@ -71,5 +71,5 @@ describe('Env Change Token Parser', () => {
 
     assert.strictEqual(token, null);
     done();
-  })
-})
+  });
+});

@@ -30,7 +30,7 @@ describe('Token Stream Parser', () => {
     var buffer = createDbChangeBuffer();
 
     var parser = new Parser(debug);
-    parser.on('databaseChange', function (event) {
+    parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
 
@@ -39,13 +39,13 @@ describe('Token Stream Parser', () => {
     assert.isOk(parser.isEnd());
 
     done();
-  })
+  });
 
   it('should split token across buffers', (done) => {
     var buffer = createDbChangeBuffer();
 
     var parser = new Parser(debug);
-    parser.on('databaseChange', function (event) {
+    parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
 
@@ -55,7 +55,5 @@ describe('Token Stream Parser', () => {
     assert.isOk(parser.isEnd());
 
     done();
-  })
-})
-
-
+  });
+});

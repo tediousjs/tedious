@@ -32,7 +32,7 @@ describe('Done Token Parser', () => {
     assert.isOk(!token.rowCount);
 
     done();
-  })
+  });
 
   it('should more', (done) => {
     const status = 0x0001;
@@ -46,7 +46,7 @@ describe('Done Token Parser', () => {
     assert.isOk(!token.rowCount);
 
     done();
-  })
+  });
 
   it('should done row count', (done) => {
     const status = 0x0010;
@@ -60,6 +60,5 @@ describe('Done Token Parser', () => {
     assert.strictEqual(token.rowCount, doneRowCount);
 
     done();
-  })
-})
-
+  });
+});

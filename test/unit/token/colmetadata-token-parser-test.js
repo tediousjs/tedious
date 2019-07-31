@@ -33,7 +33,7 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].colName, 'name');
 
     done();
-  })
+  });
 
   it('should varchar', (done) => {
     const numberOfColumns = 1;
@@ -74,5 +74,5 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].dataLength, length);
 
     done();
-  })
-})
+  });
+});
