@@ -1,11 +1,12 @@
-var async = require('async');
-var Connection = require('../../src/connection');
-var Request = require('../../src/request');
-var fs = require('fs');
+const async = require('async');
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
 const homedir = require('os').homedir();
+const assert = require('chai').assert;
 
 function getConfig() {
-  var config = JSON.parse(
+  const config = JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
@@ -22,7 +23,7 @@ function getConfig() {
   return config;
 }
 
-process.on('uncaughtException', function(err) {
+process.on('uncaughtException', function (err) {
   console.error(err.stack);
 });
 
@@ -38,1468 +39,1430 @@ function getNtlmConfig() {
   ).ntlm;
 }
 
-exports.badServer = function(test) {
-  var config = getConfig();
-  config.server = 'bad-server';
+describe('Initiate Connect Test', function() {
+  this.timeout(20000);
 
-  var connection = new Connection(config);
+  it('should be bad server', function(done) {
+    let config = getConfig();
+    config.server = 'bad-server';
 
-  connection.on('connect', function(err) {
-    test.ok(err);
-  });
+    let connection = new Connection(config);
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    connection.on('connect', function (err) {
+      assert.ok(err);
+    });
 
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
+    connection.on('end', function (info) {
+      done();
+    });
 
-exports.badPort = function(test) {
-  var config = getConfig();
-  config.options.port = -1;
-  config.options.connectTimeout = 200;
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
 
-  test.throws(function() {
-    new Connection(config);
-  });
+  it('should be bad port', (done) => {
+    let config = getConfig();
+    config.options.port = -1;
+    config.options.connectTimeout = 200;
 
-  test.done();
-};
-
-exports.badCredentials = function(test) {
-  var config = getConfig();
-
-  if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
-    test.expect(1); // No `errorMessage` event emitted.
-  } else {
-    test.expect(2);
-  }
-
-  config.authentication.options.userName = 'bad-user';
-  config.authentication.options.password = 'bad-password';
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ok(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('errorMessage', function(error) {
-    // console.log(`${error.number} : ${error.message}`)
-    return test.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
-  });
-
-  return connection.on(
-    'debug',
-    function(text) {}
-    // console.log(text)
-  );
-};
-
-exports.connectByPort = function(test) {
-  var config = getConfig();
-
-  if ((config.options != null ? config.options.port : undefined) == null) {
-    // Config says don't do this test (probably because ports are dynamic).
-    console.log('Skipping connectByPort test');
-    test.done();
-    return;
-  }
-
-  test.expect(2);
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('databaseChange', function(database) {
-    test.strictEqual(database, config.options.database);
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.connectByInstanceName = function(test) {
-  if (!getInstanceName()) {
-    // Config says don't do this test (probably because SQL Server Browser is not available).
-    console.log('Skipping connectByInstanceName test');
-    test.done();
-    return;
-  }
-
-  test.expect(2);
-
-  var config = getConfig();
-  delete config.options.port;
-  config.options.instanceName = getInstanceName();
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('databaseChange', function(database) {
-    test.strictEqual(database, config.options.database);
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.connectByInvalidInstanceName = function(test) {
-  if (!getInstanceName()) {
-    // Config says don't do this test (probably because SQL Server Browser is not available).
-    console.log('Skipping connectByInvalidInstanceName test');
-    test.done();
-    return;
-  }
-
-  test.expect(1);
-
-  var config = getConfig();
-  delete config.options.port;
-  config.options.instanceName = `${getInstanceName()}X`;
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ok(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-var DomainCaseEnum = {
-  AsIs: 0,
-  Lower: 1,
-  Upper: 2,
-};
-
-function runNtlmTest(test, domainCase) {
-  var ntlmConfig = getNtlmConfig();
-  if (!ntlmConfig) {
-    console.log('Skipping ntlm test');
-    test.done();
-    return;
-  }
-
-  test.expect(1);
-
-  switch (domainCase) {
-    case DomainCaseEnum.AsIs:
-      break;
-    case DomainCaseEnum.Lower:
-      ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toLowerCase();
-      break;
-    case DomainCaseEnum.Upper:
-      ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toUpperCase();
-      break;
-    default:
-      test.ok(false, 'Unexpected value for domainCase: ' + domainCase);
-  }
-
-  var connection = new Connection(ntlmConfig);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-}
-
-exports.ntlm = function(test) {
-  runNtlmTest(test, DomainCaseEnum.AsIs);
-};
-
-exports.ntlmLower = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Lower);
-};
-
-exports.ntlmUpper = function(test) {
-  runNtlmTest(test, DomainCaseEnum.Upper);
-};
-
-exports.encrypt = function(test) {
-  test.expect(5);
-
-  var config = getConfig();
-  config.options.encrypt = true;
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('rerouting', function(info) {
-    test.expect(8);
-  });
-
-  connection.on('databaseChange', function(database) {
-    test.strictEqual(database, config.options.database);
-  });
-
-  connection.on('secure', function(cleartext) {
-    test.ok(cleartext);
-    test.ok(cleartext.getCipher());
-    test.ok(cleartext.getPeerCertificate());
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports['potentially throws an error on invalid crypto credential details'] = function(test) {
-  var config = getConfig();
-  config.options.encrypt = true;
-
-  // On newer Node.js versions, this will throw an error when passed to `tls.createSecureContext`
-  config.options.cryptoCredentialsDetails = {
-    ciphers: '!ALL'
-  };
-
-  try {
-    const { createSecureContext } = require('tls');
-    createSecureContext(config.options.cryptoCredentialsDetails);
-  } catch {
-    test.throws(() => {
+    assert.throws(function () {
       new Connection(config);
     });
-  }
 
-  test.done();
-};
+    done();
+  })
 
-exports['fails if no cipher can be negotiated'] = function(test) {
-  var config = getConfig();
-  config.options.encrypt = true;
+  it('should be bad credentials', (done) => {
+    let config = getConfig();
 
-  // Specify a cipher that should never be supported by SQL Server
-  config.options.cryptoCredentialsDetails = {
-    ciphers: 'NULL'
-  };
+    config.authentication.options.userName = 'bad-user';
+    config.authentication.options.password = 'bad-password';
 
-  var connection = new Connection(config);
-  connection.on('connect', function(err) {
-    test.ok(err);
-    test.strictEqual(err.code, 'ESOCKET');
-  });
+    let connection = new Connection(config);
 
-  connection.on('end', function() {
-    test.done();
-  });
-};
+    connection.on('connect', function (err) {
+      assert.ok(err);
 
-exports['does not emit error after connect timeout'] = function(test) {
-  const config = getConfig();
-  config.options.connectTimeout = 1;
-
-  const connection = new Connection(config);
-  connection.on('error', (error) => { test.ifError(error); });
-  connection.on('connect', (err) => {});
-
-  setTimeout(() => { test.done(); }, 500);
-};
-
-exports.execSql = function(test) {
-  test.expect(7);
-
-  var config = getConfig();
-
-  var request = new Request('select 8 as C1', function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 1);
-
-    connection.close();
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-    test.strictEqual(rowCount, 1);
-  });
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-    test.strictEqual(columns[0].value, 8);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  return connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.numericColumnName = function(test) {
-  test.expect(5);
-
-  var config = getConfig();
-  config.options.useColumnNames = true;
-
-  var request = new Request('select 8 as [123]', function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 1);
-
-    connection.close();
-  });
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(Object.keys(columnsMetadata).length, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(Object.keys(columns).length, 1);
-    test.strictEqual(columns[123].value, 8);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.duplicateColumnNames = function(test) {
-  test.expect(6);
-
-  var config = getConfig();
-  config.options.useColumnNames = true;
-
-  var request = new Request("select 1 as abc, 2 as xyz, '3' as abc", function(
-    err,
-    rowCount
-  ) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 1);
-
-    connection.close();
-  });
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(Object.keys(columnsMetadata).length, 2);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(Object.keys(columns).length, 2);
-
-    test.strictEqual(columns.abc.value, 1);
-    test.strictEqual(columns.xyz.value, 2);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.execSqlMultipleTimes = function(test) {
-  var timesToExec = 5;
-  var sqlExecCount = 0;
-
-  test.expect(timesToExec * 7);
-
-  var config = getConfig();
-
-  function execSql() {
-    if (sqlExecCount === timesToExec) {
       connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('errorMessage', function (error) {
+      // console.log(`${error.number} : ${error.message}`)
+      return assert.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
+    });
+
+    return connection.on(
+      'debug',
+      function (text) { }
+      // console.log(text)
+    );
+  })
+
+  it('should connect by port', (done) => {
+    let config = getConfig();
+
+    if ((config.options != null ? config.options.port : undefined) == null) {
+      // Config says don't do this test (probably because ports are dynamic).
+      console.log('Skipping connectByPort test');
+      done();
       return;
     }
 
-    var request = new Request('select 8 as C1', function(err, rowCount) {
-      test.ifError(err);
-      test.strictEqual(rowCount, 1);
+    let connection = new Connection(config);
 
-      sqlExecCount++;
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('databaseChange', function (database) {
+      assert.strictEqual(database, config.options.database);
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should connect by instance name', (done) => {
+    if (!getInstanceName()) {
+      // Config says don't do this test (probably because SQL Server Browser is not available).
+      console.log('Skipping connectByInstanceName test');
+      done();
+      return;
+    }
+
+    let config = getConfig();
+    delete config.options.port;
+    config.options.instanceName = getInstanceName();
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('databaseChange', function (database) {
+      assert.strictEqual(database, config.options.database);
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should connect by invalid instance name', (done) => {
+    if (!getInstanceName()) {
+      // Config says don't do this test (probably because SQL Server Browser is not available).
+      console.log('Skipping connectByInvalidInstanceName test');
+      done();
+      return;
+    }
+
+    let config = getConfig();
+    delete config.options.port;
+    config.options.instanceName = `${getInstanceName()}X`;
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      assert.ok(err);
+
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should potentially throw an error on invalid crypto credential details', (done) => {
+    let config = getConfig();
+    config.options.encrypt = true;
+
+    // On newer Node.js versions, this will throw an error when passed to `tls.createSecureContext`
+    config.options.cryptoCredentialsDetails = {
+      ciphers: '!ALL'
+    };
+
+    try {
+      const { createSecureContext } = require('tls');
+      createSecureContext(config.options.cryptoCredentialsDetails);
+    } catch {
+      assert.throws(() => {
+        new Connection(config);
+      });
+    }
+
+    done();
+  })
+
+  it('should fail if no cipher can be negotiated', (done) => {
+    let config = getConfig();
+    config.options.encrypt = true;
+
+    // Specify a cipher that should never be supported by SQL Server
+    config.options.cryptoCredentialsDetails = {
+      ciphers: 'NULL'
+    };
+
+    let connection = new Connection(config);
+    connection.on('connect', function (err) {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'ESOCKET');
+    });
+
+    connection.on('end', function () {
+      done();
+    });
+  })
+
+  it('should not emit error after connect timeout', function (done) {
+    const config = getConfig();
+    config.options.connectTimeout = 1;
+
+    const connection = new Connection(config);
+    connection.on('error', (error) => { assert.ifError(error); });
+    connection.on('connect', (err) => { });
+
+    setTimeout(() => { done(); }, 500);
+  })
+
+})
+
+
+describe('Ntlm Test', () => {
+  let DomainCaseEnum = {
+    AsIs: 0,
+    Lower: 1,
+    Upper: 2,
+  };
+
+  function runNtlmTest(done, domainCase) {
+    let ntlmConfig = getNtlmConfig();
+    if (!ntlmConfig) {
+      console.log('Skipping ntlm test');
+      done();
+      return;
+    }
+
+    switch (domainCase) {
+      case DomainCaseEnum.AsIs:
+        break;
+      case DomainCaseEnum.Lower:
+        ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toLowerCase();
+        break;
+      case DomainCaseEnum.Upper:
+        ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toUpperCase();
+        break;
+      default:
+        assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
+    }
+
+    let connection = new Connection(ntlmConfig);
+
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  }
+
+  it('should ntlm', (done) => {
+    runNtlmTest(done, DomainCaseEnum.AsIs);
+  })
+
+  it('should ntlm lower', (done) => {
+    runNtlmTest(done, DomainCaseEnum.Lower);
+  })
+
+  it('should ntlm upper', (done) => {
+    runNtlmTest(done, DomainCaseEnum.Upper);
+  })
+})
+
+describe('Encrypt Test', () => {
+  it('should encrypt', (done) => {
+    let config = getConfig();
+    config.options.encrypt = true;
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('databaseChange', function (database) {
+      assert.strictEqual(database, config.options.database);
+    });
+
+    connection.on('secure', function (cleartext) {
+      assert.ok(cleartext);
+      assert.ok(cleartext.getCipher());
+      assert.ok(cleartext.getPeerCertificate());
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+})
+
+describe('Insertion Tests', function() {
+  this.timeout(30000)
+
+  it('should execSql', (done) => {
+    let config = getConfig();
+
+    let request = new Request('select 8 as C1', function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('doneInProc', function (rowCount, more) {
+      assert.ok(more);
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function (columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, 8);
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    return connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should numeric column name', (done) => {
+    let config = getConfig();
+    config.options.useColumnNames = true;
+
+    let request = new Request('select 8 as [123]', function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+    });
+
+    request.on('row', function (columns) {
+      assert.strictEqual(Object.keys(columns).length, 1);
+      assert.strictEqual(columns[123].value, 8);
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should duplicate column name', (done) => {
+    let config = getConfig();
+    config.options.useColumnNames = true;
+
+    let request = new Request("select 1 as abc, 2 as xyz, '3' as abc", function (
+      err,
+      rowCount
+    ) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(Object.keys(columnsMetadata).length, 2);
+    });
+
+    request.on('row', function (columns) {
+      assert.strictEqual(Object.keys(columns).length, 2);
+
+      assert.strictEqual(columns.abc.value, 1);
+      assert.strictEqual(columns.xyz.value, 2);
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should exec Sql multiple times', (done) => {
+    let timesToExec = 5;
+    let sqlExecCount = 0;
+    let config = getConfig();
+
+    function execSql() {
+      if (sqlExecCount === timesToExec) {
+        connection.close();
+        return;
+      }
+
+      let request = new Request('select 8 as C1', function (err, rowCount) {
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
+
+        sqlExecCount++;
+        execSql();
+      });
+
+      request.on('doneInProc', function (rowCount, more) {
+        assert.ok(more);
+        assert.strictEqual(rowCount, 1);
+      });
+
+      request.on('columnMetadata', function (columnsMetadata) {
+        assert.strictEqual(columnsMetadata.length, 1);
+      });
+
+      request.on('row', function (columns) {
+        assert.strictEqual(columns.length, 1);
+        assert.strictEqual(columns[0].value, 8);
+      });
+
+      connection.execSql(request);
+    }
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
       execSql();
     });
 
-    request.on('doneInProc', function(rowCount, more) {
-      test.ok(more);
-      test.strictEqual(rowCount, 1);
+    connection.on('end', function (info) {
+      done();
     });
 
-    request.on('columnMetadata', function(columnsMetadata) {
-      test.strictEqual(columnsMetadata.length, 1);
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
     });
 
-    request.on('row', function(columns) {
-      test.strictEqual(columns.length, 1);
-      test.strictEqual(columns[0].value, 8);
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should exec sql with order', (done) => {
+    let config = getConfig();
+
+    let sql =
+      'select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id';
+    let request = new Request(sql, function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
+
+      connection.close();
     });
 
-    connection.execSql(request);
-  }
+    request.on('doneInProc', function (rowCount, more) {
+      assert.ok(more);
+      assert.strictEqual(rowCount, 2);
+    });
 
-  var connection = new Connection(config);
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 4);
+    });
 
-  connection.on('connect', function(err) {
-    execSql();
-  });
+    request.on('order', function (orderColumns) {
+      assert.strictEqual(orderColumns.length, 2);
+      assert.strictEqual(orderColumns[0], 2);
+      assert.strictEqual(orderColumns[1], 4);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    request.on('row', function (columns) {
+      assert.strictEqual(columns.length, 4);
+    });
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+    let connection = new Connection(config);
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
 
-exports.execSqlWithOrder = function(test) {
-  test.expect(10);
+    connection.on('end', function (info) {
+      done();
+    });
 
-  var config = getConfig();
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
 
-  var sql =
-    'select top 2 object_id, name, column_id, system_type_id from sys.columns order by name, system_type_id';
-  var request = new Request(sql, function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 2);
+    connection.on('errorMessage', function (error) {
+      // console.log("#{error.number} : #{error.message}")
+    });
 
-    connection.close();
-  });
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
 
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-    test.strictEqual(rowCount, 2);
-  });
+  it('should exec Bad Sql', (done) => {
+    let config = getConfig();
 
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 4);
-  });
+    let request = new Request('bad syntax here', function (err) {
+      assert.ok(err);
 
-  request.on('order', function(orderColumns) {
-    test.strictEqual(orderColumns.length, 2);
-    test.strictEqual(orderColumns[0], 2);
-    test.strictEqual(orderColumns[1], 4);
-  });
+      connection.close();
+    });
 
-  request.on('row', function(columns) {
-    test.strictEqual(columns.length, 4);
-  });
+    let connection = new Connection(config);
 
-  var connection = new Connection(config);
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
 
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
+    connection.on('end', function (info) {
+      done();
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    connection.on('errorMessage', function (error) {
+      // console.log("#{error.number} : #{error.message}")
+      assert.ok(error);
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should close connection request pending', (done) => {
+    let config = getConfig();
+
+    let request = new Request('select 8 as C1', function (err, rowCount) {
+      assert.ok(err);
+      assert.strictEqual(err.code, 'ECLOSE');
+    });
+
+    let connection = new Connection(config);
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+      connection.execSql(request);
 
-  connection.on('errorMessage', function(error) {
-    // console.log("#{error.number} : #{error.message}")
-  });
+      // This should trigger request callback with error as there is
+      // request pending now.
+      connection.close();
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('error', function (err) {
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should sql with multiple result sets', (done) => {
+    let config = getConfig();
+    let row = 0;
+
+    let request = new Request('select 1; select 2;', function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
+
+      connection.close();
+    });
+
+    request.on('doneInProc', function (rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function (columns) {
+      assert.strictEqual(columns[0].value, ++row);
+    });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.execBadSql = function(test) {
-  test.expect(2);
-
-  var config = getConfig();
-
-  var request = new Request('bad syntax here', function(err) {
-    test.ok(err);
-
-    connection.close();
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('errorMessage', function(error) {
-    // console.log("#{error.number} : #{error.message}")
-    test.ok(error);
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.closeConnectionRequestPending = function(test) {
-  test.expect(3);
-
-  var config = getConfig();
-
-  var request = new Request('select 8 as C1', function(err, rowCount) {
-    test.ok(err);
-    test.strictEqual(err.code, 'ECLOSE');
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-
-    // This should trigger request callback with error as there is
-    // request pending now.
-    connection.close();
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('error', function(err) {
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.sqlWithMultipleResultSets = function(test) {
-  test.expect(8);
-
-  var config = getConfig();
-  var row = 0;
-
-  var request = new Request('select 1; select 2;', function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 2);
-
-    connection.close();
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    test.strictEqual(rowCount, 1);
-  });
-
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(columnsMetadata.length, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(columns[0].value, ++row);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.rowCountForUpdate = function(test) {
-  test.expect(2);
-
-  var config = getConfig();
-
-  var setupSql = `\
-create table #tab1 (id int, name nvarchar(10));
-insert into #tab1 values(1, N'a1');
-insert into #tab1 values(2, N'a2');
-insert into #tab1 values(3, N'b1');
-update #tab1 set name = 'a3' where name like 'a%'\
-`;
-
-  var request = new Request(setupSql, function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 5);
-    connection.close();
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.rowCollectionOnRequestCompletion = function(test) {
-  test.expect(5);
-
-  var config = getConfig();
-  config.options.rowCollectionOnRequestCompletion = true;
-
-  var request = new Request('select 1 as a; select 2 as b;', function(
-    err,
-    rowCount,
-    rows
-  ) {
-    test.strictEqual(rows.length, 2);
-
-    test.strictEqual(rows[0][0].metadata.colName, 'a');
-    test.strictEqual(rows[0][0].value, 1);
-    test.strictEqual(rows[1][0].metadata.colName, 'b');
-    test.strictEqual(rows[1][0].value, 2);
-
-    connection.close();
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.rowCollectionOnDone = function(test) {
-  test.expect(6);
-
-  var config = getConfig();
-  config.options.rowCollectionOnDone = true;
-
-  var doneCount = 0;
-
-  var request = new Request('select 1 as a; select 2 as b;', function(
-    err,
-    rowCount,
-    rows
-  ) {
-    connection.close();
-  });
-
-  request.on('doneInProc', function(rowCount, more, rows) {
-    test.strictEqual(rows.length, 1);
-
-    switch (++doneCount) {
-      case 1:
-        test.strictEqual(rows[0][0].metadata.colName, 'a');
-        test.strictEqual(rows[0][0].value, 1);
-        break;
-      case 2:
-        test.strictEqual(rows[0][0].metadata.colName, 'b');
-        test.strictEqual(rows[0][0].value, 2);
-        break;
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should row count for update', (done) => {
+    let config = getConfig();
+
+    let setupSql = `\
+  create table #tab1 (id int, name nvarchar(10));
+  insert into #tab1 values(1, N'a1');
+  insert into #tab1 values(2, N'a2');
+  insert into #tab1 values(3, N'b1');
+  update #tab1 set name = 'a3' where name like 'a%'\
+  `;
+
+    let request = new Request(setupSql, function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 5);
+      connection.close();
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should row collection on request completion', (done) => {
+    let config = getConfig();
+    config.options.rowCollectionOnRequestCompletion = true;
+
+    let request = new Request('select 1 as a; select 2 as b;', function (
+      err,
+      rowCount,
+      rows
+    ) {
+      assert.strictEqual(rows.length, 2);
+
+      assert.strictEqual(rows[0][0].metadata.colName, 'a');
+      assert.strictEqual(rows[0][0].value, 1);
+      assert.strictEqual(rows[1][0].metadata.colName, 'b');
+      assert.strictEqual(rows[1][0].value, 2);
+
+      connection.close();
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should row collection on Done', (done) => {
+    let config = getConfig();
+    config.options.rowCollectionOnDone = true;
+
+    let doneCount = 0;
+
+    let request = new Request('select 1 as a; select 2 as b;', function (
+      err,
+      rowCount,
+      rows
+    ) {
+      connection.close();
+    });
+
+    request.on('doneInProc', function (rowCount, more, rows) {
+      assert.strictEqual(rows.length, 1);
+
+      switch (++doneCount) {
+        case 1:
+          assert.strictEqual(rows[0][0].metadata.colName, 'a');
+          assert.strictEqual(rows[0][0].value, 1);
+          break;
+        case 2:
+          assert.strictEqual(rows[0][0].metadata.colName, 'b');
+          assert.strictEqual(rows[0][0].value, 2);
+          break;
+      }
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should exec proc as sql', (done) => {
+    let config = getConfig();
+
+    let request = new Request('exec sp_help int', function (err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 0);
+
+      connection.close();
+    });
+
+    request.on('doneProc', function (rowCount, more, returnStatus) {
+      assert.ok(!more);
+      assert.strictEqual(returnStatus, 0);
+    });
+
+    request.on('doneInProc', function (rowCount, more) {
+      assert.ok(more);
+    });
+
+    request.on('row', function (columns) {
+      assert.ok(true);
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should reset Connection', (done) => {
+    let config = getConfig();
+
+    function testAnsiNullsOptionOn(callback) {
+      testAnsiNullsOption(true, callback);
     }
-  });
 
-  var connection = new Connection(config);
+    function testAnsiNullsOptionOff(callback) {
+      testAnsiNullsOption(false, callback);
+    }
 
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
+    function testAnsiNullsOption(expectedOptionOn, callback) {
+      let request = new Request('select @@options & 32', function (err, rowCount) {
+        callback(err);
+      });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+      request.on('row', function (columns) {
+        let optionOn = columns[0].value === 32;
+        assert.strictEqual(optionOn, expectedOptionOn);
+      });
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+      connection.execSql(request);
+    }
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
+    function setAnsiNullsOptionOff(callback) {
+      let request = new Request('set ansi_nulls off', function (err, rowCount) {
+        callback(err);
+      });
 
-exports.execProcAsSql = function(test) {
-  test.expect(7);
+      connection.execSqlBatch(request);
+    }
 
-  var config = getConfig();
+    let connection = new Connection(config);
 
-  var request = new Request('exec sp_help int', function(err, rowCount) {
-    test.ifError(err);
-    test.strictEqual(rowCount, 0);
-
-    connection.close();
-  });
-
-  request.on('doneProc', function(rowCount, more, returnStatus) {
-    test.ok(!more);
-    test.strictEqual(returnStatus, 0);
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-  });
-
-  request.on('row', function(columns) {
-    test.ok(true);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.resetConnection = function(test) {
-  test.expect(4);
-
-  var config = getConfig();
-
-  function testAnsiNullsOptionOn(callback) {
-    testAnsiNullsOption(true, callback);
-  }
-
-  function testAnsiNullsOptionOff(callback) {
-    testAnsiNullsOption(false, callback);
-  }
-
-  function testAnsiNullsOption(expectedOptionOn, callback) {
-    var request = new Request('select @@options & 32', function(err, rowCount) {
-      callback(err);
+    connection.on('resetConnection', function () {
+      assert.ok(true);
     });
 
-    request.on('row', function(columns) {
-      var optionOn = columns[0].value === 32;
-      test.strictEqual(optionOn, expectedOptionOn);
+    connection.on('connect', function (err) {
+      async.series([
+        testAnsiNullsOptionOn,
+        setAnsiNullsOptionOff,
+        testAnsiNullsOptionOff,
+        function (callback) {
+          connection.reset(function (err) {
+            if (connection.config.options.tdsVersion < '7_2') {
+              // TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
+              assert.ok(true);
+            }
+
+            callback(err);
+          });
+        },
+        testAnsiNullsOptionOn,
+        function (callback) {
+          connection.close();
+          callback();
+        },
+      ]);
     });
 
-    connection.execSql(request);
-  }
-
-  function setAnsiNullsOptionOff(callback) {
-    var request = new Request('set ansi_nulls off', function(err, rowCount) {
-      callback(err);
+    connection.on('end', function (info) {
+      done();
     });
 
-    connection.execSqlBatch(request);
-  }
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
 
-  var connection = new Connection(config);
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
 
-  connection.on('resetConnection', function() {
-    test.ok(true);
-  });
+  it('should cancel request', (done) => {
+    let config = getConfig();
 
-  connection.on('connect', function(err) {
-    async.series([
-      testAnsiNullsOptionOn,
-      setAnsiNullsOptionOff,
-      testAnsiNullsOptionOff,
-      function(callback) {
-        connection.reset(function(err) {
-          if (connection.config.options.tdsVersion < '7_2') {
-            // TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
-            test.ok(true);
-          }
+    let request = new Request(
+      "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
+      function (err, rowCount, rows) {
+        assert.strictEqual(err.message, 'Canceled.');
 
-          callback(err);
-        });
-      },
-      testAnsiNullsOptionOn,
-      function(callback) {
         connection.close();
-        callback();
-      },
-    ]);
-  });
+      }
+    );
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    request.on('doneInProc', function (rowCount, more) {
+      assert.ok(false);
+    });
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+    request.on('doneProc', function (rowCount, more) {
+      assert.ok(false);
+    });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
+    request.on('done', function (rowCount, more, rows) {
+      assert.ok(false);
+    });
 
-exports.cancelRequest = function(test) {
-  test.expect(1);
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.ok(false);
+    });
 
-  var config = getConfig();
+    request.on('row', function (columns) {
+      assert.ok(false);
+    });
 
-  var request = new Request(
-    "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
-    function(err, rowCount, rows) {
-      test.strictEqual(err.message, 'Canceled.');
+    let connection = new Connection(config);
 
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+      setTimeout(connection.cancel.bind(connection), 2000);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+
+  it('should request timeout', (done) => {
+    let config = getConfig();
+    config.options.requestTimeout = 1000;
+
+    let request = new Request(
+      "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
+      function (err, rowCount, rows) {
+        assert.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
+
+        connection.close();
+      }
+    );
+
+    request.on('doneInProc', function (rowCount, more) {
+      assert.ok(false);
+    });
+
+    request.on('doneProc', function (rowCount, more) {
+      assert.ok(false);
+    });
+
+    request.on('done', function (rowCount, more, rows) {
+      assert.ok(false);
+    });
+
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.ok(false);
+    });
+
+    request.on('row', function (columns) {
+      assert.ok(false);
+    });
+
+    let connection = new Connection(config);
+
+    connection.on('connect', function (err) {
+      connection.execSql(request);
+    });
+
+    connection.on('end', function (info) {
+      done();
+    });
+
+    connection.on('infoMessage', function (info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('debug', function (text) {
+      // console.log(text)
+    });
+  })
+})
+
+describe('Advanced Input Test', () => {
+  function runSqlBatch(done, config, sql, requestCallback) {
+    let connection = new Connection(config);
+
+    let request = new Request(sql, function () {
+      requestCallback.apply(this, arguments);
       connection.close();
-    }
-  );
+    });
 
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(false);
-  });
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+      connection.execSqlBatch(request);
+    });
 
-  request.on('doneProc', function(rowCount, more) {
-    test.ok(false);
-  });
+    connection.on('end', function (info) {
+      done();
+    });
+  }
 
-  request.on('done', function(rowCount, more, rows) {
-    test.ok(false);
-  });
+  // Test that the default behavior allows adding null values to a
+  // temporary table where the nullability is not explicitly declared.
+  it('should test AnsiNullDefault', (done) => {
+    let sql =
+      'create table #testAnsiNullDefault (id int);\n' +
+      'insert #testAnsiNullDefault values (null);\n' +
+      'drop table #testAnsiNullDefault;';
 
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.ok(false);
-  });
+    runSqlBatch(done, getConfig(), sql, function (err) {
+      assert.ifError(err);
+    });
+  })
 
-  request.on('row', function(columns) {
-    test.ok(false);
-  });
+  // Test that the default behavior can be overridden (so that temporary
+  // table columns are non-nullable by default).
+  it('should disable ansi null default', (done) => {
+    let sql =
+      'create table #testAnsiNullDefaults (id int);\n' +
+      'insert #testAnsiNullDefaults values (null);\n' +
+      'drop table #testAnsiNullDefaults;';
 
-  var connection = new Connection(config);
+    let config = getConfig();
+    config.options.enableAnsiNullDefault = false;
 
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-    setTimeout(connection.cancel.bind(connection), 2000);
-  });
+    runSqlBatch(done, config, sql, function (err) {
+      assert.ok(err instanceof Error);
+      assert.strictEqual(err != null ? err.number : undefined, 515);
+    }); // Cannot insert the value NULL
+  })
+})
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+describe('Date Insert Test', () => {
+  let testDateFirstImpl = (done, datefirst) => {
+    datefirst = datefirst || 7;
+    let config = getConfig();
+    config.options.datefirst = datefirst;
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+    let connection = new Connection(config);
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-exports.requestTimeout = function(test) {
-  test.expect(1);
-
-  var config = getConfig();
-  config.options.requestTimeout = 1000;
-
-  var request = new Request(
-    "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
-    function(err, rowCount, rows) {
-      test.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
-
+    let request = new Request('select @@datefirst', function (err) {
+      assert.ifError(err);
       connection.close();
-    }
-  );
+    });
 
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(false);
-  });
+    request.on('row', function (columns) {
+      let dateFirstActual = columns[0].value;
+      assert.strictEqual(dateFirstActual, datefirst);
+    });
 
-  request.on('doneProc', function(rowCount, more) {
-    test.ok(false);
-  });
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
 
-  request.on('done', function(rowCount, more, rows) {
-    test.ok(false);
-  });
+    connection.on('end', function (info) {
+      done();
+    });
+  };
 
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.ok(false);
-  });
+  // Test that the default setting for DATEFIRST is 7
+  it('should test date first default', (done) => {
+    testDateFirstImpl(done, undefined);
+  })
 
-  request.on('row', function(columns) {
-    test.ok(false);
-  });
+  // Test that the DATEFIRST setting can be changed via an optional configuration
+  it('should test date first custom', (done) => {
+    testDateFirstImpl(done, 3);
+  })
 
-  var connection = new Connection(config);
+  // Test that an invalid DATEFIRST setting throws
+  it('should test bad date first', (done) => {
+    let config = getConfig();
+    config.options.datefirst = -1;
 
-  connection.on('connect', function(err) {
-    connection.execSql(request);
-  });
+    assert.throws(function () {
+      new Connection(config);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    done();
+  })
+})
 
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
+describe('Language Insert Test', () => {
+  function testLanguage(done, language) {
+    language = language || 'us_english';
+    let config = getConfig();
+    config.options.language = language;
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
+    let connection = new Connection(config);
 
-function runSqlBatch(test, config, sql, requestCallback) {
-  var connection = new Connection(config);
-
-  var request = new Request(sql, function() {
-    requestCallback.apply(this, arguments);
-    connection.close();
-  });
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSqlBatch(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-}
-
-// Test that the default behavior allows adding null values to a
-// temporary table where the nullability is not explicitly declared.
-exports.testAnsiNullDefault = function(test) {
-  test.expect(2);
-
-  var sql =
-    'create table #testAnsiNullDefault (id int);\n' +
-    'insert #testAnsiNullDefault values (null);\n' +
-    'drop table #testAnsiNullDefault;';
-
-  runSqlBatch(test, getConfig(), sql, function(err) {
-    test.ifError(err);
-  });
-};
-
-// Test that the default behavior can be overridden (so that temporary
-// table columns are non-nullable by default).
-exports.disableAnsiNullDefault = function(test) {
-  test.expect(3);
-
-  var sql =
-    'create table #testAnsiNullDefaults (id int);\n' +
-    'insert #testAnsiNullDefaults values (null);\n' +
-    'drop table #testAnsiNullDefaults;';
-
-  var config = getConfig();
-  config.options.enableAnsiNullDefault = false;
-
-  runSqlBatch(test, config, sql, function(err) {
-    test.ok(err instanceof Error);
-    test.strictEqual(err != null ? err.number : undefined, 515);
-  }); // Cannot insert the value NULL
-};
-
-var testDateFirstImpl = (test, datefirst) => {
-  datefirst = datefirst || 7;
-  test.expect(3);
-  var config = getConfig();
-  config.options.datefirst = datefirst;
-
-  var connection = new Connection(config);
-
-  var request = new Request('select @@datefirst', function(err) {
-    test.ifError(err);
-    connection.close();
-  });
-
-  request.on('row', function(columns) {
-    var dateFirstActual = columns[0].value;
-    test.strictEqual(dateFirstActual, datefirst);
-  });
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-};
-
-// Test that the default setting for DATEFIRST is 7
-exports.testDatefirstDefault = function(test) {
-  testDateFirstImpl(test, undefined);
-};
-
-// Test that the DATEFIRST setting can be changed via an optional configuration
-exports.testDatefirstCustom = function(test) {
-  testDateFirstImpl(test, 3);
-};
-
-// Test that an invalid DATEFIRST setting throws
-exports.badDatefirst = function(test) {
-  test.expect(1);
-  var config = getConfig();
-  config.options.datefirst = -1;
-
-  test.throws(function() {
-    new Connection(config);
-  });
-
-  test.done();
-};
-
-
-function testLanguage(test, language) {
-  language = language || 'us_english';
-  test.expect(3);
-  var config = getConfig();
-  config.options.language = language;
-
-  var connection = new Connection(config);
-
-  var request = new Request('select @@language', function(err) {
-    test.ifError(err);
-    connection.close();
-  });
-
-  request.on('row', function(columns) {
-    var languageActual = columns[0].value;
-    test.strictEqual(languageActual, language);
-  });
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-}
-
-// Test that the default setting for LANGUAGE is us_english
-exports.testLanguageDefault = function(test) {
-  testLanguage(test, undefined);
-};
-
-// Test that the LANGUAGE setting can be changed via an optional configuration
-exports.testLanguageCustom = function(test) {
-  testLanguage(test, 'Deutsch');
-};
-
-function testDateFormat(test, dateFormat) {
-  dateFormat = dateFormat || 'mdy';
-  test.expect(3);
-  var config = getConfig();
-  config.options.dateFormat = dateFormat;
-
-  var connection = new Connection(config);
-
-  var request = new Request(
-    'SELECT DATE_FORMAT FROM sys.dm_exec_sessions WHERE SESSION_ID = @@SPID ',
-    function(err) {
-      test.ifError(err);
+    let request = new Request('select @@language', function (err) {
+      assert.ifError(err);
       connection.close();
-    }
-  );
+    });
 
-  request.on('row', function(columns) {
-    var dateFormatActual = columns[0].value;
-    test.strictEqual(dateFormatActual, dateFormat);
-  });
+    request.on('row', function (columns) {
+      let languageActual = columns[0].value;
+      assert.strictEqual(languageActual, language);
+    });
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-  });
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
-}
+    connection.on('end', function (info) {
+      done();
+    });
+  }
+  // Test that the default setting for LANGUAGE is us_english
+  it('should test language default', (done) => {
+    testLanguage(done, undefined);
+  })
 
-// Test that the default setting for DATEFORMAT is mdy
-exports.testDateFormatDefault = function(test) {
-  testDateFormat(test, undefined);
-};
+  // Test that the LANGUAGE setting can be changed via an optional configuration
+  it('should test language custom', (done) => {
+    testLanguage(done, 'Deutsch');
+  })
+})
 
-// Test that the DATEFORMAT setting can be changed via an optional configuration
-exports.testDateFormatCustom = function(test) {
-  testDateFormat(test, 'dmy');
-};
+describe('should test date format', () => {
+  function testDateFormat(done, dateFormat) {
+    dateFormat = dateFormat || 'mdy';
+    let config = getConfig();
+    config.options.dateFormat = dateFormat;
 
-function testBooleanConfigOption(test, optionName, optionValue, optionFlag, defaultOn) {
-  test.expect(6);
+    let connection = new Connection(config);
 
-  var config = getConfig();
-  config.options[optionName] = optionValue;
-  var connection = new Connection(config);
+    let request = new Request(
+      'SELECT DATE_FORMAT FROM sys.dm_exec_sessions WHERE SESSION_ID = @@SPID ',
+      function (err) {
+        assert.ifError(err);
+        connection.close();
+      }
+    );
 
-  var request = new Request(
-    `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
-    function(err, rowCount) {
-      test.ifError(err);
-      test.strictEqual(rowCount, 1);
+    request.on('row', function (columns) {
+      let dateFormatActual = columns[0].value;
+      assert.strictEqual(dateFormatActual, dateFormat);
+    });
 
-      connection.close();
-    }
-  );
+    connection.on('connect', function (err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
 
-  request.on('columnMetadata', function(columnsMetadata) {
-    test.strictEqual(Object.keys(columnsMetadata).length, 1);
-  });
+    connection.on('end', function (info) {
+      done();
+    });
+  }
+  // Test that the default setting for DATEFORMAT is mdy
+  it('should test date format default', (done) => {
+    testDateFormat(done, undefined);
+  })
 
-  request.on('row', function(columns) {
-    test.strictEqual(Object.keys(columns).length, 1);
+  // Test that the DATEFORMAT setting can be changed via an optional configuration
+  it('should test custom dateformat', (done) => {
+    testDateFormat(done, 'dmy');
+  })
+})
 
-    var expectedValue;
-    if (optionValue === true || (optionValue === undefined && defaultOn)) {
-      expectedValue = optionFlag;
-    } else {
-      expectedValue = 0;
-    }
+describe('Boolean Config Options Test', () => {
+  function testBooleanConfigOption(done, optionName, optionValue, optionFlag, defaultOn) {
+    let config = getConfig();
+    config.options[optionName] = optionValue;
+    let connection = new Connection(config);
 
-    test.strictEqual(columns[0].value, expectedValue);
-  });
+    let request = new Request(
+      `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
+      function (err, rowCount) {
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
+        connection.close();
+      }
+    );
 
-    connection.execSql(request);
-  });
+    request.on('columnMetadata', function (columnsMetadata) {
+      assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
-}
+    request.on('row', function (columns) {
+      assert.strictEqual(Object.keys(columns).length, 1);
 
-function testBadBooleanConfigOption(test, optionName) {
-  var config = getConfig();
-  config.options[optionName] = 'on';
+      let expectedValue;
+      if (optionValue === true || (optionValue === undefined && defaultOn)) {
+        expectedValue = optionFlag;
+      } else {
+        expectedValue = 0;
+      }
 
-  test.throws(function() {
-    new Connection(config);
-  });
+      assert.strictEqual(columns[0].value, expectedValue);
+    });
 
-  test.done();
-}
+    connection.on('connect', function (err) {
+      assert.ifError(err);
 
-exports.testAnsiNullDefault = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNull', undefined, 32, true);
-};
+      connection.execSql(request);
+    });
 
-exports.testAnsiNullOn = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNull', true, 32, true);
-};
+    connection.on('end', function (info) {
+      done();
+    });
+  }
 
-exports.testAnsiNullOff = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNull', false, 32, true);
-};
 
-exports.badAnsiNull = function(test) {
-  testBadBooleanConfigOption(test, 'enableAnsiNull');
-};
+  function testBadBooleanConfigOption(done, optionName) {
+    let config = getConfig();
+    config.options[optionName] = 'on';
 
-exports.testAnsiNullDefaultDefault = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNullDefault', undefined, 1024, true);
-};
+    assert.throws(function () {
+      new Connection(config);
+    });
 
-exports.testAnsiNullDefaultOn = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNullDefault', true, 1024, true);
-};
+    done();
+  }
 
-exports.testAnsiNullDefaultOff = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiNullDefault', false, 1024, true);
-};
+  it('should test ansi null default', (done)=> {
+    testBooleanConfigOption(done, 'enableAnsiNull', undefined, 32, true);
+  })
 
-exports.badAnsiNullDefault = function(test) {
-  testBadBooleanConfigOption(test, 'enableAnsiNullDefault');
-};
+  it('should test ansi null on', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiNull', true, 32, true);
+  })
 
-exports.testAnsiPaddingDefault = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiPadding', undefined, 16, true);
-};
+  it('should test ansi null off', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiNull', false, 32, true);
+  })
 
-exports.testAnsiPaddingOn = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiPadding', true, 16, true);
-};
+  it('should test bad ansi null', (done) => {
+    testBadBooleanConfigOption(done, 'enableAnsiNull');
+  })
 
-exports.testAnsiPaddingOff = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiPadding', false, 16, true);
-};
+  it('should test ansi null default default', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiNullDefault', undefined, 1024, true);
+  })
 
-exports.badAnsiPadding = function(test) {
-  testBadBooleanConfigOption(test, 'enableAnsiPadding');
-};
+  it('should test ansi null default on', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiNullDefault', true, 1024, true);
+  })
 
-exports.testAnsiWarningsDefault = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiWarnings', undefined, 8, true);
-};
+  it('should test ansi null default off', (done) => {
+     testBooleanConfigOption(done, 'enableAnsiNullDefault', false, 1024, true);
+  })
 
-exports.testAnsiWarningsOn = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiWarnings', true, 8, true);
-};
+  it('should test bad ansi null default', (done) => {
+     testBadBooleanConfigOption(done, 'enableAnsiNullDefault');
+  })
 
-exports.testAnsiWarningsOff = function(test) {
-  testBooleanConfigOption(test, 'enableAnsiWarnings', false, 8, true);
-};
+  it('should test ansi padding default', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiPadding', undefined, 16, true);
+  })
 
-exports.badAnsiWarnings = function(test) {
-  testBadBooleanConfigOption(test, 'enableAnsiWarnings');
-};
+  it('should test ansi padding on', (done) => {
+     testBooleanConfigOption(done, 'enableAnsiPadding', true, 16, true);
+  })
 
-exports.testArithAbortDefault = function(test) {
-  testBooleanConfigOption(test, 'enableArithAbort', undefined, 64, false);
-};
+  it('should test ansi padding off', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiPadding', false, 16, true);
+  })
 
-exports.testArithAbortOn = function(test) {
-  testBooleanConfigOption(test, 'enableArithAbort', true, 64, false);
-};
+  it('should test bad ansi padding', (done) => {
+    testBadBooleanConfigOption(done, 'enableAnsiPadding');
+  })
 
-exports.testArithAbortOff = function(test) {
-  testBooleanConfigOption(test, 'enableArithAbort', false, 64, false);
-};
+  it('should test ansi warnings default', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiWarnings', undefined, 8, true);
+  })
 
-exports.badArithAbort = function(test) {
-  testBadBooleanConfigOption(test, 'enableArithAbort');
-};
+  it('should test ansi warnings on', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiWarnings', true, 8, true);
+  })
 
-exports.testConcatNullYieldsNullDefault = function(test) {
-  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', undefined, 4096, true);
-};
+  it('should test ansi warnings off', (done) => {
+    testBooleanConfigOption(done, 'enableAnsiWarnings', false, 8, true);
+  })
 
-exports.testConcatNullYieldsNullOn = function(test) {
-  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', true, 4096, true);
-};
+  it('should test bad ansi warnings', (done) => {
+    testBadBooleanConfigOption(done, 'enableAnsiWarnings');
+  })
 
-exports.testConcatNullYieldsNullOff = function(test) {
-  testBooleanConfigOption(test, 'enableConcatNullYieldsNull', false, 4096, true);
-};
+  it('should test arith abort default', (done) => {
+    testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, false);
+  })
 
-exports.badConcatNullYieldsNull = function(test) {
-  testBadBooleanConfigOption(test, 'enableConcatNullYieldsNull');
-};
+  it('should test arith abort on', (done) => {
+    testBooleanConfigOption(done, 'enableArithAbort', true, 64, false);
+  })
 
-exports.testCursorCloseOnCommitDefault = function(test) {
-  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', undefined, 4, false);
-};
+  it('should test arith abort off', (done) => {
+    testBooleanConfigOption(done, 'enableArithAbort', false, 64, false);
+  })
 
-exports.testCursorCloseOnCommitOn = function(test) {
-  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', true, 4, false);
-};
+  it('should test bad arith abort', (done) => {
+    testBadBooleanConfigOption(done, 'enableArithAbort');
+  })
 
-exports.testCursorCloseOnCommitOff = function(test) {
-  testBooleanConfigOption(test, 'enableCursorCloseOnCommit', false, 4, false);
-};
+  it('should test concat null yield null default', (done) => {
+    testBooleanConfigOption(done, 'enableConcatNullYieldsNull', undefined, 4096, true);
+  })
 
-exports.badCursorCloseOnCommit = function(test) {
-  testBadBooleanConfigOption(test, 'enableCursorCloseOnCommit');
-};
+  it('should test concat null yields null on', (done) => {
+    testBooleanConfigOption(done, 'enableConcatNullYieldsNull', true, 4096, true);
+  })
 
-exports.testImplicitTransactionsDefault = function(test) {
-  testBooleanConfigOption(test, 'enableImplicitTransactions', undefined, 2, false);
-};
+  it('should test ocncat null yields null off', (done) => {
+    testBooleanConfigOption(done, 'enableConcatNullYieldsNull', false, 4096, true);
+  })
 
-exports.testImplicitTransactionsOn = function(test) {
-  testBooleanConfigOption(test, 'enableImplicitTransactions', true, 2, false);
-};
+  it('should test bad concat null yields null', (done) => {
+    testBadBooleanConfigOption(done, 'enableConcatNullYieldsNull');
+  })
 
-exports.testImplicitTransactionsOff = function(test) {
-  testBooleanConfigOption(test, 'enableImplicitTransactions', false, 2, false);
-};
+  it('should test cursor close on commit default', (done) => {
+    testBooleanConfigOption(done, 'enableCursorCloseOnCommit', undefined, 4, false);
+  })
 
-exports.badImplicitTransactions = function(test) {
-  testBadBooleanConfigOption(test, 'enableImplicitTransactions');
-};
+  it('should test cursor close on commit on', (done) => {
+    testBooleanConfigOption(done, 'enableCursorCloseOnCommit', true, 4, false);
+  })
 
-exports.testNumericRoundabortDefault = function(test) {
-  testBooleanConfigOption(test, 'enableNumericRoundabort', undefined, 8192, false);
-};
+  it('should test cursor close on commit off', (done) => {
+    testBooleanConfigOption(done, 'enableCursorCloseOnCommit', false, 4, false);
+  })
 
-exports.testNumericRoundabortOn = function(test) {
-  testBooleanConfigOption(test, 'enableNumericRoundabort', true, 8192, false);
-};
+  it('should test bad cursor close on commit', (done) => {
+    testBadBooleanConfigOption(done, 'enableCursorCloseOnCommit');
+  })
 
-exports.testNumericRoundabortOff = function(test) {
-  testBooleanConfigOption(test, 'enableNumericRoundabort', false, 8192, false);
-};
+  it('should test implicit transactions default', (done) => {
+    testBooleanConfigOption(done, 'enableImplicitTransactions', undefined, 2, false);
+  })
 
-exports.badNumericRoundabort = function(test) {
-  testBadBooleanConfigOption(test, 'enableNumericRoundabort');
-};
+  it('should test implicit transactions on', (done) => {
+    testBooleanConfigOption(done, 'enableImplicitTransactions', true, 2, false);
+  })
 
-exports.testQuotedIdentifierDefault = function(test) {
-  testBooleanConfigOption(test, 'enableQuotedIdentifier', undefined, 256, true);
-};
+  it('should test implicit transactions off', (done) => {
+     testBooleanConfigOption(done, 'enableImplicitTransactions', false, 2, false);
+  })
 
-exports.testQuotedIdentifierOn = function(test) {
-  testBooleanConfigOption(test, 'enableQuotedIdentifier', true, 256, true);
-};
+  it('should test bad implicit transactions', (done) => {
+    testBadBooleanConfigOption(done, 'enableImplicitTransactions');
+  })
 
-exports.testQuotedIdentifierOff = function(test) {
-  testBooleanConfigOption(test, 'enableQuotedIdentifier', false, 256, true);
-};
+  it('should test numeric round abort default', (done) => {
+    testBooleanConfigOption(done, 'enableNumericRoundabort', undefined, 8192, false);
+  })
 
-exports.badQuotedIdentifier = function(test) {
-  testBadBooleanConfigOption(test, 'enableQuotedIdentifier');
-};
+  it('should test numeric round abort on', (done) => {
+    testBooleanConfigOption(done, 'enableNumericRoundabort', true, 8192, false);
+  })
 
-exports.testAbortTransactionOnErrorDefault = function(test) {
-  testBooleanConfigOption(test, 'abortTransactionOnError', undefined, 16384, false);
-};
+  it('should test numeric round abort off', (done) => {
+    testBooleanConfigOption(done, 'enableNumericRoundabort', false, 8192, false);
+  })
 
-exports.testAbortTransactionOnErrorOn = function(test) {
-  testBooleanConfigOption(test, 'abortTransactionOnError', true, 16384, false);
-};
+  it('should test bad numeric round abort', (done) => {
+    testBadBooleanConfigOption(done, 'enableNumericRoundabort');
+  })
 
-exports.testAbortTransactionOnErrorOff = function(test) {
-  testBooleanConfigOption(test, 'abortTransactionOnError', false, 16384, false);
-};
+  it('should test quoted identifier default', (done) => {
+    testBooleanConfigOption(done, 'enableQuotedIdentifier', undefined, 256, true);
+  })
 
-exports.badAbortTransactionOnError = function(test) {
-  testBadBooleanConfigOption(test, 'abortTransactionOnError');
-};
+  it('should test quoted identifier on', (done) => {
+    testBooleanConfigOption(done, 'enableQuotedIdentifier', true, 256, true);
+  })
+
+  it('should test quoted identifier off', (done) => {
+    testBooleanConfigOption(done, 'enableQuotedIdentifier', false, 256, true);
+  })
+
+  it('should test bad quoted identifier', (done) => {
+    testBadBooleanConfigOption(done, 'enableQuotedIdentifier');
+  })
+
+  it('should test abort transaction on error default', (done) => {
+     testBooleanConfigOption(done, 'abortTransactionOnError', undefined, 16384, false);
+  })
+
+  it('should test abort transaction on error on', (done) => {
+    testBooleanConfigOption(done, 'abortTransactionOnError', true, 16384, false);
+  })
+  
+  it('should test abort transaction on error off', (done) => {
+    testBooleanConfigOption(done, 'abortTransactionOnError', false, 16384, false);
+  })
+
+  it('should test bad abort transaction on error', (done) => {
+     testBadBooleanConfigOption(done, 'abortTransactionOnError');
+  })
+})
+
