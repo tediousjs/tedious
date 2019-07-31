@@ -1,7 +1,7 @@
 const Connection = require('../../src/tedious').Connection;
 const ISOLATION_LEVEL = require('../../src/tedious').ISOLATION_LEVEL;
 const TYPES = require('../../src/tedious').TYPES;
-var assert = require('chai').assert;
+const assert = require('chai').assert;
 
 describe('tedious-test', function() {
 
@@ -20,7 +20,7 @@ describe('tedious-test', function() {
   });
 
   it('connectionDoesNotModifyPassedConfig', () => {
-    var config = {
+    let config = {
       server: 'localhost',
       userName: 'sa',
       password: 'sapwd',
@@ -33,7 +33,7 @@ describe('tedious-test', function() {
       }
     };
 
-    var connection = new Connection(config);
+    let connection = new Connection(config);
 
     assert.notStrictEqual(connection.config, config);
     assert.notStrictEqual(connection.config.options, config.options);

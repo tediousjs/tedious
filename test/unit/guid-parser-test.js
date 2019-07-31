@@ -1,5 +1,5 @@
 const guidParser = require('../../src/guid-parser');
-var assert = require('chai').assert;
+const assert = require('chai').assert;
 
 const lowerGuids = [
   'e062ae34-6de5-47f3-8ba3-29d25f77e71a',

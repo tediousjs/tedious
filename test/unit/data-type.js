@@ -1,36 +1,36 @@
-var TYPES = require('../../src/data-type');
-var WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
-var assert = require('chai').assert;
+const TYPES = require('../../src/data-type');
+const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
+const assert = require('chai').assert;
 
 describe('Data Types', function() {
   // Test date calculation for non utc date during daylight savings period
   it('smallDateTimeDaylightSaving', (done) => {
-    var type = TYPES.typeByName.SmallDateTime;
-    for (var testSet of [
+    let type = TYPES.typeByName.SmallDateTime;
+    for (let testSet of [
       [new Date(2015, 5, 18, 23, 59, 59), 42171],
       [new Date(2015, 5, 19, 0, 0, 0), 42172],
       [new Date(2015, 5, 19, 23, 59, 59), 42172],
       [new Date(2015, 5, 20, 0, 0, 0), 42173]
     ]) {
-      var buffer = new WritableTrackingBuffer(8);
-      var parameter = { value: testSet[0] };
-      var expectedNoOfDays = testSet[1];
+      let buffer = new WritableTrackingBuffer(8);
+      let parameter = { value: testSet[0] };
+      let expectedNoOfDays = testSet[1];
       type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
       assert.strictEqual(buffer.buffer.readUInt16LE(1), expectedNoOfDays);
     }
     done();
   });
   it('dateTimeDaylightSaving', (done) => {
-    var type = TYPES.typeByName.DateTime;
-    for (var testSet of [
+    let type = TYPES.typeByName.DateTime;
+    for (let testSet of [
       [new Date(2015, 5, 18, 23, 59, 59), 42171],
       [new Date(2015, 5, 19, 0, 0, 0), 42172],
       [new Date(2015, 5, 19, 23, 59, 59), 42172],
       [new Date(2015, 5, 20, 0, 0, 0), 42173]
     ]) {
-      var buffer = new WritableTrackingBuffer(16);
-      var parameter = { value: testSet[0] };
-      var expectedNoOfDays = testSet[1];
+      let buffer = new WritableTrackingBuffer(16);
+      let parameter = { value: testSet[0] };
+      let expectedNoOfDays = testSet[1];
       type.writeParameterData(buffer, parameter, { useUTC: false }, () => {});
       assert.strictEqual(buffer.buffer.readInt32LE(1), expectedNoOfDays);
     }
@@ -38,14 +38,14 @@ describe('Data Types', function() {
   });
 
   it('dateTime2DaylightSaving', (done) => {
-    var type = TYPES.typeByName.DateTime2;
+    let type = TYPES.typeByName.DateTime2;
     for (const [value, expectedBuffer] of [
       [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('067f5101163a0b', 'hex')],
       [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('06000000173a0b', 'hex')],
       [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('067f5101173a0b', 'hex')],
       [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('06000000183a0b', 'hex')]
     ]) {
-      var buffer = new WritableTrackingBuffer(16);
+      let buffer = new WritableTrackingBuffer(16);
       type.writeParameterData(buffer, { value: value, scale: 0 }, { useUTC: false }, () => {});
       assert.deepEqual(buffer.data, expectedBuffer);
     }
@@ -53,16 +53,15 @@ describe('Data Types', function() {
   });
 
   it('dateDaylightSaving', (done) => {
-    var type = TYPES.typeByName.Date;
+    let type = TYPES.typeByName.Date;
     for (const [value, expectedBuffer] of [
       [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('03163a0b', 'hex')],
       [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('03173a0b', 'hex')],
       [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('03173a0b', 'hex')],
       [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('03183a0b', 'hex')]
     ]) {
-      var buffer = new WritableTrackingBuffer(16);
+      let buffer = new WritableTrackingBuffer(16);
       type.writeParameterData(buffer, { value: value }, { useUTC: false }, () => {});
-
       assert.deepEqual(buffer.data, expectedBuffer);
     }
     done();

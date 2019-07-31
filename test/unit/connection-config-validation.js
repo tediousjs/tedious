@@ -1,5 +1,5 @@
 const Connection = require('../../src/tedious').Connection;
-var assert = require('chai').assert;
+const assert = require('chai').assert;
 
 function ensureConnectionIsClosed(connection, callback) {
   if (connection.closed) {
@@ -13,7 +13,7 @@ function ensureConnectionIsClosed(connection, callback) {
 
 describe('Connection configuration validation', function() {
 
-  var config;
+  let config;
 
   beforeEach(function(done) {
     config = {};

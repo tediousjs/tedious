@@ -2,12 +2,12 @@ const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const sinon = require('sinon');
 const dns = require('dns');
 const punycode = require('punycode');
-var assert = require('chai').assert;
-var expect = require('chai').expect;
+const assert = require('chai').assert;
+const expect = require('chai').expect;
 
 describe('instanceLookup invalid args', function() {
 
-  var instanceLookup;
+  let instanceLookup;
 
   beforeEach(function(done) {
     instanceLookup = new InstanceLookup().instanceLookup;
@@ -93,17 +93,17 @@ describe('instanceLookup invalid args', function() {
 
 describe('instanceLookup functional unit tests', function() {
 
-  var options;
-  var anyPort;
-  var anyRequest;
-  var anyMessage;
-  var anyError;
-  var anySqlPort;
-  var instanceLookup;
-  var testSender;
-  var createSenderStub;
-  var senderExecuteStub;
-  var parseStub;
+  let options;
+  let anyPort;
+  let anyRequest;
+  let anyMessage;
+  let anyError;
+  let anySqlPort;
+  let instanceLookup;
+  let testSender;
+  let createSenderStub;
+  let senderExecuteStub;
+  let parseStub;
 
 
   beforeEach(function(done) {
@@ -306,7 +306,7 @@ describe('instanceLookup functional unit tests', function() {
 
 describe('parseBrowserResponse', function() {
 
-  var parse;
+  let parse;
 
   beforeEach(function(done) {
     parse = new InstanceLookup().parseBrowserResponse;
@@ -351,7 +351,7 @@ describe('parseBrowserResponse', function() {
 
 describe('parseBrowserResponse', function() {
 
-  var spy;
+  let spy;
 
   beforeEach(function(done) {
     spy = sinon.spy(dns, 'lookup');

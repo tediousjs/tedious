@@ -1,11 +1,11 @@
 const TransientErrorLookup = require('../../src/transient-error-lookup').TransientErrorLookup;
-var assert = require('chai').assert;
+const assert = require('chai').assert;
 
 // This test is simply a set of assertions to ensure any additions to or deletions
 // from the list of transient errors is intentional.
 
 describe('Connection configuration validation', (done) => {
-  var config;
+  let config;
 
   beforeEach(function(done) {
     config = {};

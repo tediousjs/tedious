@@ -1,9 +1,9 @@
-var TYPE = require('../../src/data-type').typeByName;
-var assert = require('chai').assert;
+const TYPE = require('../../src/data-type').typeByName;
+const assert = require('chai').assert;
 
 describe('Validations', function() {
   it('Bit', () => {
-    var value = TYPE.Bit.validate(null);
+    let value = TYPE.Bit.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Bit.validate(true);
@@ -24,7 +24,7 @@ describe('Validations', function() {
   });
 
   it('TinyInt', () => {
-    var value = TYPE.TinyInt.validate(null);
+    let value = TYPE.TinyInt.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.TinyInt.validate(15);
@@ -38,7 +38,7 @@ describe('Validations', function() {
   });
 
   it('SmallInt', () => {
-    var value = TYPE.SmallInt.validate(null);
+    let value = TYPE.SmallInt.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.SmallInt.validate(-32768);
@@ -49,7 +49,7 @@ describe('Validations', function() {
   });
 
   it('Int', () => {
-    var value = TYPE.Int.validate(null);
+    let value = TYPE.Int.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Int.validate(2147483647);
@@ -60,7 +60,7 @@ describe('Validations', function() {
   });
 
   it('BigInt', () => {
-    var value = TYPE.BigInt.validate(null);
+    let value = TYPE.BigInt.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.BigInt.validate(2147483647);
@@ -80,10 +80,10 @@ describe('Validations', function() {
   });
 
   it('SmallDateTime', () => {
-    var value = TYPE.SmallDateTime.validate(null);
+    let value = TYPE.SmallDateTime.validate(null);
     assert.strictEqual(value, null);
 
-    var date = new Date();
+    let date = new Date();
     value = TYPE.SmallDateTime.validate(date);
     assert.strictEqual(+value, +date);
 
@@ -95,10 +95,10 @@ describe('Validations', function() {
   });
 
   it('DateTime', () => {
-    var value = TYPE.DateTime.validate(null);
+    let value = TYPE.DateTime.validate(null);
     assert.strictEqual(value, null);
 
-    var date = new Date();
+    let date = new Date();
     value = TYPE.DateTime.validate(date);
     assert.strictEqual(+value, +date);
 
@@ -110,10 +110,10 @@ describe('Validations', function() {
   });
 
   it('DateTime2', () => {
-    var value = TYPE.DateTime2.validate(null);
+    let value = TYPE.DateTime2.validate(null);
     assert.strictEqual(value, null);
 
-    var date = new Date();
+    let date = new Date();
     value = TYPE.DateTime2.validate(date);
     assert.strictEqual(+value, +date);
 
@@ -125,10 +125,10 @@ describe('Validations', function() {
   });
 
   it('Time', () => {
-    var value = TYPE.Time.validate(null);
+    let value = TYPE.Time.validate(null);
     assert.strictEqual(value, null);
 
-    var date = new Date();
+    let date = new Date();
     value = TYPE.Time.validate(date);
     assert.strictEqual(+value, +date);
 
@@ -140,10 +140,10 @@ describe('Validations', function() {
   });
 
   it('DateTimeOffset', () => {
-    var value = TYPE.DateTimeOffset.validate(null);
+    let value = TYPE.DateTimeOffset.validate(null);
     assert.strictEqual(value, null);
 
-    var date = new Date();
+    let date = new Date();
     value = TYPE.DateTimeOffset.validate(date);
     assert.strictEqual(+value, +date);
 
@@ -155,7 +155,7 @@ describe('Validations', function() {
   });
 
   it('Real', () => {
-    var value = TYPE.Real.validate(null);
+    let value = TYPE.Real.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Real.validate(1516.61556);
@@ -169,7 +169,7 @@ describe('Validations', function() {
   });
 
   it('Float', () => {
-    var value = TYPE.Float.validate(null);
+    let value = TYPE.Float.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Float.validate(1516.61556);
@@ -183,7 +183,7 @@ describe('Validations', function() {
   });
 
   it('Decimal', () => {
-    var value = TYPE.Decimal.validate(null);
+    let value = TYPE.Decimal.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Decimal.validate(1516.61556);
@@ -197,7 +197,7 @@ describe('Validations', function() {
   });
 
   it('Numeric', () => {
-    var value = TYPE.Numeric.validate(null);
+    let value = TYPE.Numeric.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Numeric.validate(1516.61556);
@@ -211,7 +211,7 @@ describe('Validations', function() {
   });
 
   it('Money', () => {
-    var value = TYPE.Money.validate(null);
+    let value = TYPE.Money.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Money.validate(1516.61556);
@@ -225,7 +225,7 @@ describe('Validations', function() {
   });
 
   it('SmallMoney', () => {
-    var value = TYPE.SmallMoney.validate(null);
+    let value = TYPE.SmallMoney.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.SmallMoney.validate(214748.3647);
@@ -236,10 +236,10 @@ describe('Validations', function() {
   });
 
   it('Image', () => {
-    var value = TYPE.Image.validate(null);
+    let value = TYPE.Image.validate(null);
     assert.strictEqual(value, null);
 
-    var buffer = Buffer.from([0x00, 0x01]);
+    let buffer = Buffer.from([0x00, 0x01]);
     value = TYPE.Image.validate(buffer);
     assert.strictEqual(value, buffer);
 
@@ -248,10 +248,10 @@ describe('Validations', function() {
   });
 
   it('Binary', () => {
-    var value = TYPE.Binary.validate(null);
+    let value = TYPE.Binary.validate(null);
     assert.strictEqual(value, null);
 
-    var buffer = Buffer.from([0x00, 0x01]);
+    let buffer = Buffer.from([0x00, 0x01]);
     value = TYPE.Binary.validate(buffer);
     assert.strictEqual(value, buffer);
 
@@ -260,10 +260,10 @@ describe('Validations', function() {
   });
 
   it('VarBinary', () => {
-    var value = TYPE.VarBinary.validate(null);
+    let value = TYPE.VarBinary.validate(null);
     assert.strictEqual(value, null);
 
-    var buffer = Buffer.from([0x00, 0x01]);
+    let buffer = Buffer.from([0x00, 0x01]);
     value = TYPE.VarBinary.validate(buffer);
     assert.strictEqual(value, buffer);
 
@@ -272,7 +272,7 @@ describe('Validations', function() {
   });
 
   it('Text', () => {
-    var value = TYPE.Text.validate(null);
+    let value = TYPE.Text.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Text.validate('asdf');
@@ -286,7 +286,7 @@ describe('Validations', function() {
   });
 
   it('VarChar', () => {
-    var value = TYPE.VarChar.validate(null);
+    let value = TYPE.VarChar.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.VarChar.validate('asdf');
@@ -300,7 +300,7 @@ describe('Validations', function() {
   });
 
   it('NVarChar', () => {
-    var value = TYPE.NVarChar.validate(null);
+    let value = TYPE.NVarChar.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.NVarChar.validate('asdf');
@@ -314,7 +314,7 @@ describe('Validations', function() {
   });
 
   it('Char', () => {
-    var value = TYPE.Char.validate(null);
+    let value = TYPE.Char.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.Char.validate('asdf');
@@ -328,7 +328,7 @@ describe('Validations', function() {
   });
 
   it('NChar', () => {
-    var value = TYPE.NChar.validate(null);
+    let value = TYPE.NChar.validate(null);
     assert.strictEqual(value, null);
 
     value = TYPE.NChar.validate('asdf');
@@ -342,10 +342,10 @@ describe('Validations', function() {
   });
 
   it('TVP', () => {
-    var value = TYPE.TVP.validate(null);
+    let value = TYPE.TVP.validate(null);
     assert.strictEqual(value, null);
 
-    var table = { columns: [], rows: [] };
+    let table = { columns: [], rows: [] };
     value = TYPE.TVP.validate(table);
     assert.strictEqual(value, table);
 
