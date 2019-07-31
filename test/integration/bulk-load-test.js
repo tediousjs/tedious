@@ -27,7 +27,8 @@ function getConfig() {
   return config;
 }
 
-describe('Bulk Load Tests', () => {
+describe('Bulk Load Tests', function() {
+  this.timeout(60000)
   const glob = {};
 
   beforeEach((done) => {
