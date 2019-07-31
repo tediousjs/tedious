@@ -1,10 +1,22 @@
-const dgram = require('dgram');
-const dns = require('dns');
-const net = require('net');
-const punycode = require('punycode');
+import * as dgram from 'dgram';
+import * as dns from 'dns';
+import * as net from 'net';
+import * as punycode from 'punycode';
 
-class ParallelSendStrategy {
-  constructor(addresses, port, request) {
+type Callback = (err: Error | null, message?: Buffer) => void;
+
+export class ParallelSendStrategy {
+  addresses: dns.LookupAddress[];
+  port: number;
+  request: Buffer;
+
+  socketV4: dgram.Socket | null;
+  socketV6: dgram.Socket | null;
+
+  onError: ((err: Error) => void) | null;
+  onMessage: ((data: Buffer) => void) | null;
+
+  constructor(addresses: dns.LookupAddress[], port: number, request: Buffer) {
     this.addresses = addresses;
     this.port = port;
     this.request = request;
@@ -16,27 +28,27 @@ class ParallelSendStrategy {
   }
 
   clearSockets() {
-    const clearSocket = (socket, onError, onMessage) => {
+    const clearSocket = (socket: dgram.Socket, onError: (err: Error) => void, onMessage: (data: Buffer) => void) => {
       socket.removeListener('error', onError);
       socket.removeListener('message', onMessage);
       socket.close();
     };
 
     if (this.socketV4) {
-      clearSocket(this.socketV4, this.onError, this.onMessage);
+      clearSocket(this.socketV4, this.onError!, this.onMessage!);
       this.socketV4 = null;
     }
 
     if (this.socketV6) {
-      clearSocket(this.socketV6, this.onError, this.onMessage);
+      clearSocket(this.socketV6, this.onError!, this.onMessage!);
       this.socketV6 = null;
     }
   }
 
-  send(cb) {
+  send(cb: Callback) {
     let errorCount = 0;
 
-    const onError = (err) => {
+    const onError = (err: Error) => {
       errorCount++;
 
       if (errorCount === this.addresses.length) {
@@ -45,12 +57,12 @@ class ParallelSendStrategy {
       }
     };
 
-    const onMessage = (message) => {
+    const onMessage = (message: Buffer) => {
       this.clearSockets();
       cb(null, message);
     };
 
-    const createDgramSocket = (udpType, onError, onMessage) => {
+    const createDgramSocket = (udpType: 'udp4' | 'udp6', onError: (err: Error) => void, onMessage: (message: Buffer) => void) => {
       const socket = dgram.createSocket(udpType);
 
       socket.on('error', onError);
@@ -91,8 +103,14 @@ class ParallelSendStrategy {
   }
 }
 
-class Sender {
-  constructor(host, port, request) {
+export class Sender {
+  host: string;
+  port: number;
+  request: Buffer;
+
+  parallelSendStrategy: ParallelSendStrategy | null;
+
+  constructor(host: string, port: number, request: Buffer) {
     this.host = host;
     this.port = port;
     this.request = request;
@@ -100,7 +118,7 @@ class Sender {
     this.parallelSendStrategy = null;
   }
 
-  execute(cb) {
+  execute(cb: Callback) {
     if (net.isIP(this.host)) {
       this.executeForIP(cb);
     } else {
@@ -108,16 +126,16 @@ class Sender {
     }
   }
 
-  executeForIP(cb) {
-    this.executeForAddresses([{ address: this.host }], cb);
+  executeForIP(cb: Callback) {
+    this.executeForAddresses([{ address: this.host } as dns.LookupAddress], cb);
   }
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
-  invokeLookupAll(host, cb) {
+  invokeLookupAll(host: string, cb: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) {
     dns.lookup(punycode.toASCII(host), { all: true }, cb);
   }
 
-  executeForHostname(cb) {
+  executeForHostname(cb: Callback) {
     this.invokeLookupAll(this.host, (err, addresses) => {
       if (err) {
         return cb(err);
@@ -129,11 +147,11 @@ class Sender {
 
   // Wrapper for stubbing creation of Strategy object. Sinon support for constructors
   // seems limited.
-  createParallelSendStrategy(addresses, port, request) {
+  createParallelSendStrategy(addresses: dns.LookupAddress[], port: number, request: Buffer) {
     return new ParallelSendStrategy(addresses, port, request);
   }
 
-  executeForAddresses(addresses, cb) {
+  executeForAddresses(addresses: dns.LookupAddress[], cb: Callback) {
     this.parallelSendStrategy =
       this.createParallelSendStrategy(addresses, this.port, this.request);
     this.parallelSendStrategy.send(cb);
@@ -145,6 +163,3 @@ class Sender {
     }
   }
 }
-
-module.exports.Sender = Sender;
-module.exports.ParallelSendStrategy = ParallelSendStrategy;

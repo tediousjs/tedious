@@ -1,11 +1,11 @@
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
-const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { writeToTrackingBuffer } from './all-headers';
 
 /*
   s2.2.6.8
  */
 
-const OPERATION_TYPE = module.exports.OPERATION_TYPE = {
+export const OPERATION_TYPE = {
   TM_GET_DTC_ADDRESS: 0x00,
   TM_PROPAGATE_XACT: 0x01,
   TM_BEGIN_XACT: 0x05,
@@ -15,7 +15,7 @@ const OPERATION_TYPE = module.exports.OPERATION_TYPE = {
   TM_SAVE_XACT: 0x09
 };
 
-const ISOLATION_LEVEL = module.exports.ISOLATION_LEVEL = {
+export const ISOLATION_LEVEL : { [key: string]: number } = {
   NO_CHANGE: 0x00,
   READ_UNCOMMITTED: 0x01,
   READ_COMMITTED: 0x02,
@@ -24,38 +24,42 @@ const ISOLATION_LEVEL = module.exports.ISOLATION_LEVEL = {
   SNAPSHOT: 0x05
 };
 
-const isolationLevelByValue = {};
+const isolationLevelByValue: { [key: number]: string } = {};
 for (const name in ISOLATION_LEVEL) {
   const value = ISOLATION_LEVEL[name];
   isolationLevelByValue[value] = name;
 }
 
-class Transaction {
-  constructor(name, isolationLevel) {
+export class Transaction {
+  name: string;
+  isolationLevel: number;
+  outstandingRequestCount: number
+
+  constructor(name: string, isolationLevel?: number) {
     this.name = name;
-    this.isolationLevel = isolationLevel;
+    this.isolationLevel = isolationLevel || ISOLATION_LEVEL.NO_CHANGE;
     this.outstandingRequestCount = 1;
   }
 
-  beginPayload(txnDescriptor) {
+  beginPayload(txnDescriptor: Buffer) {
     const buffer = new WritableTrackingBuffer(100, 'ucs2');
-    writeAllHeaders(buffer, txnDescriptor, this.outstandingRequestCount);
+    writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_BEGIN_XACT);
     buffer.writeUInt8(this.isolationLevel);
     buffer.writeUInt8(this.name.length * 2);
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb) => { cb(buffer.data); },
+      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
       toString: () => {
         return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
       }
     };
   }
 
-  commitPayload(txnDescriptor) {
+  commitPayload(txnDescriptor: Buffer) {
     const buffer = new WritableTrackingBuffer(100, 'ascii');
-    writeAllHeaders(buffer, txnDescriptor, this.outstandingRequestCount);
+    writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_COMMIT_XACT);
     buffer.writeUInt8(this.name.length * 2);
     buffer.writeString(this.name, 'ucs2');
@@ -63,7 +67,7 @@ class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb) => { cb(buffer.data); },
+      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
       data: buffer.data,
       toString: () => {
         return 'Commit Transaction: name=' + this.name;
@@ -71,9 +75,9 @@ class Transaction {
     };
   }
 
-  rollbackPayload(txnDescriptor) {
+  rollbackPayload(txnDescriptor: Buffer) {
     const buffer = new WritableTrackingBuffer(100, 'ascii');
-    writeAllHeaders(buffer, txnDescriptor, this.outstandingRequestCount);
+    writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_ROLLBACK_XACT);
     buffer.writeUInt8(this.name.length * 2);
     buffer.writeString(this.name, 'ucs2');
@@ -81,22 +85,22 @@ class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb) => { cb(buffer.data); },
+      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
       toString: () => {
         return 'Rollback Transaction: name=' + this.name;
       }
     };
   }
 
-  savePayload(txnDescriptor) {
+  savePayload(txnDescriptor: Buffer) {
     const buffer = new WritableTrackingBuffer(100, 'ascii');
-    writeAllHeaders(buffer, txnDescriptor, this.outstandingRequestCount);
+    writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_SAVE_XACT);
     buffer.writeUInt8(this.name.length * 2);
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb) => { cb(buffer.data); },
+      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
       toString: () => {
         return 'Save Transaction: name=' + this.name;
       }
@@ -119,4 +123,3 @@ class Transaction {
     return '';
   }
 }
-module.exports.Transaction = Transaction;

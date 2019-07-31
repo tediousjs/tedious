@@ -1,4 +1,4 @@
-const Sender = require('./sender').Sender;
+import { Sender } from './sender';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -7,13 +7,13 @@ const RETRIES = 3;
 const MYSTERY_HEADER_LENGTH = 3;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
-class InstanceLookup {
+export class InstanceLookup {
   // Wrapper allows for stubbing Sender when unit testing instance-lookup.
-  createSender(host, port, request) {
+  createSender(host: string, port: number, request: Buffer) {
     return new Sender(host, port, request);
   }
 
-  instanceLookup(options, callback) {
+  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number }, callback: (message: string | null | undefined, port?: number) => void) {
     const server = options.server;
     if (typeof server !== 'string') {
       throw new TypeError('Invalid arguments: "server" must be a string');
@@ -38,7 +38,7 @@ class InstanceLookup {
       throw new TypeError('Invalid arguments: "callback" must be a function');
     }
 
-    let sender, timer;
+    let sender: Sender, timer: NodeJS.Timeout;
     let retriesLeft = retries;
 
     const onTimeout = () => {
@@ -56,10 +56,9 @@ class InstanceLookup {
           clearTimeout(timer);
           if (err) {
             callback('Failed to lookup instance on ' + server + ' - ' + err.message);
-
           } else {
-            message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
-            const port = this.parseBrowserResponse(message, instanceName);
+            let response = message!.toString('ascii', MYSTERY_HEADER_LENGTH);
+            const port = this.parseBrowserResponse(response, instanceName);
 
             if (port) {
               callback(undefined, port);
@@ -78,7 +77,7 @@ class InstanceLookup {
     makeAttempt();
   }
 
-  parseBrowserResponse(response, instanceName) {
+  parseBrowserResponse(response: string, instanceName: string) {
     let getPort;
 
     const instances = response.split(';;');
@@ -106,5 +105,3 @@ class InstanceLookup {
     }
   }
 }
-
-module.exports.InstanceLookup = InstanceLookup;

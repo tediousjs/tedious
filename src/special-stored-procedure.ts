@@ -1,4 +1,4 @@
-module.exports = {
+export default module.exports = {
   Sp_Cursor: 1,
   Sp_CursorOpen: 2,
   Sp_CursorPrepare: 3,
@@ -14,4 +14,4 @@ module.exports = {
   Sp_PrepExec: 13,
   Sp_PrepExecRpc: 14,
   Sp_Unprepare: 15
-};
+}

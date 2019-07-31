@@ -1,19 +1,28 @@
-const net = require('net');
-const dns = require('dns');
-const punycode = require('punycode');
+import * as net from 'net';
+import * as dns from 'dns';
+import * as punycode from 'punycode';
 
-class ParallelConnectionStrategy {
-  constructor(addresses, options) {
+type Options = {
+  host: string,
+  port: number,
+  localAddress?: string
+}
+
+export class ParallelConnectionStrategy {
+  addresses: dns.LookupAddress[];
+  options: Options;
+
+  constructor(addresses: dns.LookupAddress[], options: Options) {
     this.addresses = addresses;
     this.options = options;
   }
 
-  connect(callback) {
+  connect(callback: (err: Error | null, socket?: net.Socket) => void) {
     const addresses = this.addresses;
     const sockets = new Array(addresses.length);
 
     let errorCount = 0;
-    function onError(err) {
+    function onError(this: net.Socket) {
       errorCount += 1;
 
       this.removeListener('error', onError);
@@ -24,7 +33,7 @@ class ParallelConnectionStrategy {
       }
     }
 
-    function onConnect() {
+    function onConnect(this: net.Socket) {
       for (let j = 0; j < sockets.length; j++) {
         const socket = sockets[j];
 
@@ -51,13 +60,16 @@ class ParallelConnectionStrategy {
   }
 }
 
-class SequentialConnectionStrategy {
-  constructor(addresses, options) {
+export class SequentialConnectionStrategy {
+  addresses: dns.LookupAddress[];
+  options: Options;
+
+  constructor(addresses: dns.LookupAddress[], options: Options) {
     this.addresses = addresses;
     this.options = options;
   }
 
-  connect(callback) {
+  connect(callback: (err: Error | null, socket?: net.Socket) => void) {
     const addresses = this.addresses;
 
     if (!addresses.length) {
@@ -65,13 +77,13 @@ class SequentialConnectionStrategy {
       return;
     }
 
-    const next = addresses.shift();
+    const next = addresses.shift() as dns.LookupAddress;
 
     const socket = net.connect(Object.create(this.options, {
       host: { value: next.address }
     }));
 
-    const onError = (err) => {
+    const onError = () => {
       socket.removeListener('error', onError);
       socket.removeListener('connect', onConnect);
 
@@ -92,13 +104,17 @@ class SequentialConnectionStrategy {
   }
 }
 
-class Connector {
-  constructor(options, multiSubnetFailover) {
+export class Connector {
+  multiSubnetFailover: boolean;
+
+  options: Options;
+
+  constructor(options: Options, multiSubnetFailover: boolean) {
     this.options = options;
     this.multiSubnetFailover = multiSubnetFailover;
   }
 
-  execute(cb) {
+  execute(cb: (err: Error | null, socket?: net.Socket) => void) {
     if (net.isIP(this.options.host)) {
       this.executeForIP(cb);
     } else {
@@ -106,10 +122,10 @@ class Connector {
     }
   }
 
-  executeForIP(cb) {
+  executeForIP(cb: (err: Error | null, socket?: net.Socket) => void) {
     const socket = net.connect(this.options);
 
-    const onError = (err) => {
+    const onError = (err: Error) => {
       socket.removeListener('error', onError);
       socket.removeListener('connect', onConnect);
 
@@ -129,7 +145,7 @@ class Connector {
     socket.on('connect', onConnect);
   }
 
-  executeForHostname(cb) {
+  executeForHostname(cb: (err: Error | null, socket?: net.Socket) => void) {
     dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
       if (err) {
         return cb(err);
@@ -143,7 +159,3 @@ class Connector {
     });
   }
 }
-
-module.exports.Connector = Connector;
-module.exports.ParallelConnectionStrategy = ParallelConnectionStrategy;
-module.exports.SequentialConnectionStrategy = SequentialConnectionStrategy;

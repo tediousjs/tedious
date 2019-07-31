@@ -61,6 +61,7 @@
     "@commitlint/cli": "^8.0.0",
     "@commitlint/config-conventional": "^8.0.0",
     "@commitlint/travis-cli": "^8.0.0",
+    "@types/node": "^12.6.8",
     "async": "^2.6.1",
     "babel-eslint": "^10.0.2",
     "benchmark": "^2.1.0",
@@ -99,10 +100,9 @@
     "overrides": [
       {
         "test": [
-          "*.ts"
+          "./src/**/*.ts"
         ],
         "presets": [
-          "@babel/preset-typescript",
           [
             "@babel/preset-env",
             {
@@ -110,7 +110,8 @@
                 "node": 6
               }
             }
-          ]
+          ],
+          "@babel/preset-typescript"
         ]
       }
     ]

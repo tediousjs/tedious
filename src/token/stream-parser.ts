@@ -1,8 +1,14 @@
-const Transform = require('readable-stream').Transform;
+import { Transform } from 'readable-stream';
+
 const TYPE = require('./token').TYPE;
 
-const tokenParsers = {};
-tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser');
+import Debug from '../debug';
+import { InternalConnectionOptions } from '../connection';
+
+type TokenParser<T> = (parser: Parser, colMetadata: any, options: InternalConnectionOptions, doneParsing: (token: T) => void) => void;
+
+const tokenParsers: { [key: string]: TokenParser<Token> } = {};
+tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser') as TokenParser<ColMetadataToken>;
 tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser;
 tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
 tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;
@@ -19,8 +25,162 @@ tokenParsers[TYPE.ROW] = require('./row-token-parser');
 tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser');
 tokenParsers[TYPE.SSPI] = require('./sspi-token-parser');
 
-module.exports = class Parser extends Transform {
-  constructor(debug, colMetadata, options) {
+export type Column = {
+  userType: number,
+  flags: number,
+  type: any,
+  colName: string,
+  collation?: any,
+  precision?: number,
+  scale?: number,
+  udtInfo?: any,
+  dataLength: number,
+  tableName: string | string[]
+}
+
+export type ColMetadataToken = {
+  name: 'COLMETADATA',
+  event: 'columnMetadata',
+  columns: Column[]
+};
+
+export type DoneToken = {
+  name: 'DONE',
+  event: 'done',
+  more: boolean,
+  sqlError: boolean,
+  attention: boolean,
+  serverError: boolean,
+  rowCount?: number,
+  curCmd: number
+};
+
+export type DoneInProcToken = {
+  name: 'DONEINPROC',
+  event: 'doneInProc',
+  more: boolean,
+  sqlError: boolean,
+  attention: boolean,
+  serverError: boolean,
+  rowCount?: number,
+  curCmd: number
+};
+
+export type DoneProcToken = {
+  name: 'DONEPROC',
+  event: 'doneProc',
+  more: boolean,
+  sqlError: boolean,
+  attention: boolean,
+  serverError: boolean,
+  rowCount?: number,
+  curCmd: number
+};
+
+export type InfoToken = {
+  name: 'INFO',
+  event: 'infoMessage'
+};
+
+export type ErrorToken = {
+  name: 'ERROR',
+  event: 'errorMessage'
+};
+
+export type EnvChangeToken = {
+  name: 'ENVCHANGE',
+  type: string,
+  event: string,
+  oldValue?: any,
+  newValue?: any
+};
+
+export type FeatureExtAckToken = {
+  name: 'FEATUREEXTACK',
+  event: 'featureExtAck',
+  fedAuth?: Buffer
+};
+
+export type FedAuthInfoToken = {
+  name: 'FEDAUTHINFO',
+  event: 'fedAuthInfo',
+  spn?: string,
+  stsurl?: string
+};
+
+export type LoginAckToken = {
+  name: 'LOGINACK',
+  event: 'loginack',
+  interface: string,
+  tdsVersion: string,
+  progName: string,
+  progVersion: {
+    major: number,
+    minor: number,
+    buildNumHi: number,
+    buildNumLow: number
+  }
+};
+
+export type NBCRowToken = {
+  name: 'NBCROW',
+  event: 'row',
+  columns: unknown[] | { [key: string]: unknown }
+};
+
+export type OrderToken = {
+  name: 'ORDER',
+  event: 'order',
+  orderColumns: any
+};
+
+export type ReturnStatusToken = {
+  name: 'RETURNSTATUS',
+  event: 'returnStatus',
+  value: number
+};
+
+export type ReturnValueToken = {
+  name: 'RETURNVALUE',
+  event: 'returnValue',
+  paramOrdinal: number,
+  paramName: string,
+  metadata: any,
+  value: unknown
+};
+
+export type RowToken = {
+  name: 'ROW',
+  event: 'row',
+  columns: unknown[] | { [key: string]: unknown }
+};
+
+export type SSPIToken = {
+  name: 'SSPICHALLENGE',
+  event: 'sspichallenge',
+  ntlmpacket: any,
+  ntlmpacketBuffer: Buffer
+}
+
+export type EOMToken = {
+  name: 'EOM',
+  event: 'endOfMessage'
+};
+
+export type Token = ColMetadataToken | DoneToken | DoneInProcToken | DoneProcToken | InfoToken | ErrorToken | EnvChangeToken | FeatureExtAckToken | FedAuthInfoToken | LoginAckToken | NBCRowToken | OrderToken | ReturnStatusToken | ReturnValueToken | RowToken | SSPIToken | EOMToken;
+
+class Parser extends Transform {
+  debug: Debug;
+  colMetadata?: Column[];
+  options: InternalConnectionOptions;
+  endOfMessageMarker: {};
+
+  buffer: Buffer;
+  position: number;
+  suspended: boolean;
+  next?: () => void;
+
+  constructor(debug: Debug, colMetadata: Column[] | undefined, options: InternalConnectionOptions) {
     super({ objectMode: true });
 
     this.debug = debug;
@@ -34,14 +194,15 @@ module.exports = class Parser extends Transform {
     this.next = undefined;
   }
 
-  _transform(input, encoding, done) {
-    if (input === this.endOfMessageMarker) {
+  _transform(input: Buffer | {}, _encoding: string, done: (err?: Error | null, token?: Token) => void) {
+    if (!(input instanceof Buffer)) {
       done(null, { // generate endOfMessage pseudo token
         name: 'EOM',
         event: 'endOfMessage'
       });
       return;
     }
+
     if (this.position === this.buffer.length) {
       this.buffer = input;
     } else {
@@ -52,7 +213,7 @@ module.exports = class Parser extends Transform {
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
       this.suspended = false;
-      this.next.call(null);
+      this.next!.call(null);
     }
 
     // If we're no longer suspended, parse new tokens
@@ -65,7 +226,7 @@ module.exports = class Parser extends Transform {
   }
 
   parseTokens() {
-    const doneParsing = (token) => {
+    const doneParsing = (token: Token) => {
       if (token) {
         switch (token.name) {
           case 'COLMETADATA':
@@ -89,12 +250,12 @@ module.exports = class Parser extends Transform {
     }
   }
 
-  suspend(next) {
+  suspend(next: () => void) {
     this.suspended = true;
     this.next = next;
   }
 
-  awaitData(length, callback) {
+  awaitData(length: number, callback: () => void) {
     if (this.position + length <= this.buffer.length) {
       callback();
     } else {
@@ -104,7 +265,7 @@ module.exports = class Parser extends Transform {
     }
   }
 
-  readInt8(callback) {
+  readInt8(callback: (data: number) => void) {
     this.awaitData(1, () => {
       const data = this.buffer.readInt8(this.position);
       this.position += 1;
@@ -112,7 +273,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt8(callback) {
+  readUInt8(callback: (data: number) => void) {
     this.awaitData(1, () => {
       const data = this.buffer.readUInt8(this.position);
       this.position += 1;
@@ -120,7 +281,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt16LE(callback) {
+  readInt16LE(callback: (data: number) => void) {
     this.awaitData(2, () => {
       const data = this.buffer.readInt16LE(this.position);
       this.position += 2;
@@ -128,7 +289,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt16BE(callback) {
+  readInt16BE(callback: (data: number) => void) {
     this.awaitData(2, () => {
       const data = this.buffer.readInt16BE(this.position);
       this.position += 2;
@@ -136,7 +297,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt16LE(callback) {
+  readUInt16LE(callback: (data: number) => void) {
     this.awaitData(2, () => {
       const data = this.buffer.readUInt16LE(this.position);
       this.position += 2;
@@ -144,7 +305,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt16BE(callback) {
+  readUInt16BE(callback: (data: number) => void) {
     this.awaitData(2, () => {
       const data = this.buffer.readUInt16BE(this.position);
       this.position += 2;
@@ -152,7 +313,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt32LE(callback) {
+  readInt32LE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readInt32LE(this.position);
       this.position += 4;
@@ -160,7 +321,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt32BE(callback) {
+  readInt32BE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readInt32BE(this.position);
       this.position += 4;
@@ -168,7 +329,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt32LE(callback) {
+  readUInt32LE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readUInt32LE(this.position);
       this.position += 4;
@@ -176,7 +337,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt32BE(callback) {
+  readUInt32BE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readUInt32BE(this.position);
       this.position += 4;
@@ -184,7 +345,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt64LE(callback) {
+  readInt64LE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
       this.position += 8;
@@ -192,7 +353,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readInt64BE(callback) {
+  readInt64BE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
       this.position += 8;
@@ -200,7 +361,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt64LE(callback) {
+  readUInt64LE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = Math.pow(2, 32) * this.buffer.readUInt32LE(this.position + 4) + this.buffer.readUInt32LE(this.position);
       this.position += 8;
@@ -208,7 +369,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt64BE(callback) {
+  readUInt64BE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = Math.pow(2, 32) * this.buffer.readUInt32BE(this.position) + this.buffer.readUInt32BE(this.position + 4);
       this.position += 8;
@@ -216,7 +377,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readFloatLE(callback) {
+  readFloatLE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readFloatLE(this.position);
       this.position += 4;
@@ -224,7 +385,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readFloatBE(callback) {
+  readFloatBE(callback: (data: number) => void) {
     this.awaitData(4, () => {
       const data = this.buffer.readFloatBE(this.position);
       this.position += 4;
@@ -232,7 +393,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readDoubleLE(callback) {
+  readDoubleLE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = this.buffer.readDoubleLE(this.position);
       this.position += 8;
@@ -240,7 +401,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readDoubleBE(callback) {
+  readDoubleBE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = this.buffer.readDoubleBE(this.position);
       this.position += 8;
@@ -248,7 +409,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt24LE(callback) {
+  readUInt24LE(callback: (data: number) => void) {
     this.awaitData(3, () => {
       const low = this.buffer.readUInt16LE(this.position);
       const high = this.buffer.readUInt8(this.position + 2);
@@ -259,7 +420,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUInt40LE(callback) {
+  readUInt40LE(callback: (data: number) => void) {
     this.awaitData(5, () => {
       const low = this.buffer.readUInt32LE(this.position);
       const high = this.buffer.readUInt8(this.position + 4);
@@ -270,7 +431,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUNumeric64LE(callback) {
+  readUNumeric64LE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const low = this.buffer.readUInt32LE(this.position);
       const high = this.buffer.readUInt32LE(this.position + 4);
@@ -281,7 +442,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUNumeric96LE(callback) {
+  readUNumeric96LE(callback: (data: number) => void) {
     this.awaitData(12, () => {
       const dword1 = this.buffer.readUInt32LE(this.position);
       const dword2 = this.buffer.readUInt32LE(this.position + 4);
@@ -293,7 +454,7 @@ module.exports = class Parser extends Transform {
     });
   }
 
-  readUNumeric128LE(callback) {
+  readUNumeric128LE(callback: (data: number) => void) {
     this.awaitData(16, () => {
       const dword1 = this.buffer.readUInt32LE(this.position);
       const dword2 = this.buffer.readUInt32LE(this.position + 4);
@@ -308,7 +469,7 @@ module.exports = class Parser extends Transform {
 
   // Variable length data
 
-  readBuffer(length, callback) {
+  readBuffer(length: number, callback: (data: Buffer) => void) {
     this.awaitData(length, () => {
       const data = this.buffer.slice(this.position, this.position + length);
       this.position += length;
@@ -317,7 +478,7 @@ module.exports = class Parser extends Transform {
   }
 
   // Read a Unicode String (BVARCHAR)
-  readBVarChar(callback) {
+  readBVarChar(callback: (data: string) => void) {
     this.readUInt8((length) => {
       this.readBuffer(length * 2, (data) => {
         callback(data.toString('ucs2'));
@@ -326,7 +487,7 @@ module.exports = class Parser extends Transform {
   }
 
   // Read a Unicode String (USVARCHAR)
-  readUsVarChar(callback) {
+  readUsVarChar(callback: (data: string) => void) {
     this.readUInt16LE((length) => {
       this.readBuffer(length * 2, (data) => {
         callback(data.toString('ucs2'));
@@ -335,16 +496,19 @@ module.exports = class Parser extends Transform {
   }
 
   // Read binary data (BVARBYTE)
-  readBVarByte(callback) {
+  readBVarByte(callback: (data: Buffer) => void) {
     this.readUInt8((length) => {
       this.readBuffer(length, callback);
     });
   }
 
   // Read binary data (USVARBYTE)
-  readUsVarByte(callback) {
+  readUsVarByte(callback: (data: Buffer) => void) {
     this.readUInt16LE((length) => {
       this.readBuffer(length, callback);
     });
   }
-};
+}
+
+export default Parser;
+module.exports = Parser;

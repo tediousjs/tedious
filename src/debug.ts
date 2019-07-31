@@ -1,9 +1,7 @@
-// @flow
+import { Packet } from './packet';
 
-import type { Packet } from './packet';
-
-const EventEmitter = require('events').EventEmitter;
-const util = require('util');
+import { EventEmitter } from 'events';
+import * as util from 'util';
 
 class Debug extends EventEmitter {
   options: {
@@ -62,4 +60,5 @@ class Debug extends EventEmitter {
   }
 }
 
+export default Debug;
 module.exports = Debug;

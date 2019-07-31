@@ -1,5 +1,3 @@
-// @flow
-
 const bigint = require('./bigint');
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
@@ -15,7 +13,7 @@ export type Encoding = 'utf8' | 'ucs2' | 'ascii';
   As values are written, the position advances by the size of the written data.
   When writing, automatically allocates new buffers if there's not enough space.
  */
-module.exports = class WritableTrackingBuffer {
+class WritableTrackingBuffer {
   initialSize: number;
   encoding: Encoding;
   doubleSizeGrowth: boolean;
@@ -25,7 +23,7 @@ module.exports = class WritableTrackingBuffer {
 
   position: number;
 
-  constructor(initialSize: number, encoding: ?Encoding, doubleSizeGrowth: ?boolean) {
+  constructor(initialSize: number, encoding?: Encoding | null, doubleSizeGrowth?: boolean) {
     this.initialSize = initialSize;
     this.encoding = encoding || 'ucs2';
     this.doubleSizeGrowth = doubleSizeGrowth || false;
@@ -181,7 +179,7 @@ module.exports = class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeString(value: string, encoding: ?Encoding) {
+  writeString(value: string, encoding?: Encoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
@@ -194,18 +192,18 @@ module.exports = class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeBVarchar(value: string, encoding: ?Encoding) {
+  writeBVarchar(value: string, encoding?: Encoding | null) {
     this.writeUInt8(value.length);
     this.writeString(value, encoding);
   }
 
-  writeUsVarchar(value: string, encoding: ?Encoding) {
+  writeUsVarchar(value: string, encoding?: Encoding | null) {
     this.writeUInt16LE(value.length);
     this.writeString(value, encoding);
   }
 
   // TODO: Figure out what types are passed in other than `Buffer`
-  writeUsVarbyte(value: any, encoding: ?Encoding) {
+  writeUsVarbyte(value: any, encoding?: Encoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
@@ -229,7 +227,7 @@ module.exports = class WritableTrackingBuffer {
     }
   }
 
-  writePLPBody(value: any, encoding: ?Encoding) {
+  writePLPBody(value: any, encoding?: Encoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
@@ -277,3 +275,6 @@ module.exports = class WritableTrackingBuffer {
     this.writeInt32LE(value & -1);
   }
 };
+
+export default WritableTrackingBuffer;
+module.exports = WritableTrackingBuffer;

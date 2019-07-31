@@ -1,12 +1,10 @@
-// @flow
+import BufferList from 'bl';
+import { Transform } from 'readable-stream';
 
-const BufferList = require('bl');
-const { Transform } = require('readable-stream');
+import Message from './message';
+import { Packet, HEADER_LENGTH } from './packet';
 
-const Message = require('./message');
-const { Packet, HEADER_LENGTH } = require('./packet');
-
-import type Debug from './debug';
+import Debug from './debug';
 
 /**
   IncomingMessageStream
@@ -15,7 +13,7 @@ import type Debug from './debug';
 class IncomingMessageStream extends Transform {
   debug: Debug;
   bl: BufferList;
-  currentMessage: Message | typeof undefined;
+  currentMessage: Message | undefined;
 
   constructor(debug: Debug) {
     super({ readableObjectMode: true });
@@ -26,20 +24,24 @@ class IncomingMessageStream extends Transform {
     this.bl = new BufferList();
   }
 
-  pause() {
+  pause() : this {
     super.pause();
 
     if (this.currentMessage) {
       this.currentMessage.pause();
     }
+
+    return this;
   }
 
-  resume() {
+  resume() : this {
     super.resume();
 
     if (this.currentMessage) {
       this.currentMessage.resume();
     }
+
+    return this;
   }
 
   processBufferedData(callback: () => void) {
@@ -90,10 +92,11 @@ class IncomingMessageStream extends Transform {
     callback();
   }
 
-  _transform(chunk: Buffer, encoding: void, callback: () => void) {
+  _transform(chunk: Buffer, _encoding: string, callback: () => void) {
     this.bl.append(chunk);
     this.processBufferedData(callback);
   }
 }
 
+export default IncomingMessageStream;
 module.exports = IncomingMessageStream;

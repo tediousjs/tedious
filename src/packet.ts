@@ -1,12 +1,8 @@
-// @flow
+import { sprintf } from 'sprintf-js';
 
-/* globals $Values */
+export const HEADER_LENGTH = 8;
 
-const { sprintf } = require('sprintf-js');
-
-const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
-
-const TYPE = module.exports.TYPE = {
+export const TYPE: { [key: string]: number } = {
   SQL_BATCH: 0x01,
   RPC_REQUEST: 0x03,
   TABULAR_RESULT: 0x04,
@@ -17,23 +13,22 @@ const TYPE = module.exports.TYPE = {
   NTLMAUTH_PKT: 0x11,
   PRELOGIN: 0x12,
   FEDAUTH_TOKEN: 0x08
-};
+}
 
-const typeByValue = {};
-
+const typeByValue: { [key: number]: string } = {};
 for (const name in TYPE) {
   typeByValue[TYPE[name]] = name;
 }
 
-const STATUS = {
+export const STATUS: { [key: string]: number } = {
   NORMAL: 0x00,
   EOM: 0x01,
   IGNORE: 0x02,
   RESETCONNECTION: 0x08,
   RESETCONNECTIONSKIPTRAN: 0x10
-};
+}
 
-const OFFSET = module.exports.OFFSET = {
+export const OFFSET: { [key: string]: number } = {
   Type: 0,
   Status: 1,
   Length: 2,
@@ -50,10 +45,10 @@ const DEFAULT_WINDOW = 0;
 
 const NL = '\n';
 
-class Packet {
+export class Packet {
   buffer: Buffer;
 
-  constructor(typeOrBuffer: Buffer | $Values<typeof TYPE>) {
+  constructor(typeOrBuffer: Buffer | typeof TYPE[keyof typeof TYPE]) {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
     } else {
@@ -152,7 +147,7 @@ class Packet {
   }
 
   headerToString(indent: string = '') {
-    const text = sprintf('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X', this.buffer.readUInt8(OFFSET.Type), typeByValue[this.buffer.readUInt8(OFFSET.Type)], this.buffer.readUInt8(OFFSET.Status), this.statusAsString(), this.buffer.readUInt16BE(OFFSET.Length), this.buffer.readUInt16BE(OFFSET.SPID), this.buffer.readUInt8(OFFSET.PacketID), this.buffer.readUInt8(OFFSET.Window));
+    const text = sprintf<[number, string, number, string, number, number, number, number]>('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X', this.buffer.readUInt8(OFFSET.Type), typeByValue[this.buffer.readUInt8(OFFSET.Type)], this.buffer.readUInt8(OFFSET.Status), this.statusAsString(), this.buffer.readUInt16BE(OFFSET.Length), this.buffer.readUInt16BE(OFFSET.SPID), this.buffer.readUInt8(OFFSET.PacketID), this.buffer.readUInt8(OFFSET.Window));
     return indent + text;
   }
 
@@ -182,7 +177,7 @@ class Packet {
       }
 
       if (data[offset] != null) {
-        dataDump += sprintf('%02X', data[offset]);
+        dataDump += sprintf<[number]>('%02X', data[offset]);
       }
 
       if (((offset + 1) % BYTES_PER_GROUP === 0) && !((offset + 1) % BYTES_PER_LINE === 0)) {
@@ -213,10 +208,8 @@ class Packet {
     return '';
   }
 }
-module.exports.Packet = Packet;
 
-module.exports.isPacketComplete = isPacketComplete;
-function isPacketComplete(potentialPacketBuffer: Buffer) {
+export function isPacketComplete(potentialPacketBuffer: Buffer) {
   if (potentialPacketBuffer.length < HEADER_LENGTH) {
     return false;
   } else {
@@ -224,7 +217,6 @@ function isPacketComplete(potentialPacketBuffer: Buffer) {
   }
 }
 
-module.exports.packetLength = packetLength;
-function packetLength(potentialPacketBuffer: Buffer) {
+export function packetLength(potentialPacketBuffer: Buffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 }
