@@ -19,11 +19,15 @@ module.exports = class RpcRequestPayload {
   constructor(request, txnDescriptor, options) {
     this.request = request;
     this.procedure = this.request.sqlTextOrProcedure;
+    this.options = options;
+    this.txnDescriptor = txnDescriptor;
+  }
 
+  getData(cb) {
     const buffer = new WritableTrackingBuffer(500);
-    if (options.tdsVersion >= '7_2') {
+    if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
-      writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount);
+      writeAllHeaders(buffer, this.txnDescriptor, outstandingRequestCount);
     }
 
     if (typeof this.procedure === 'string') {
@@ -37,55 +41,68 @@ module.exports = class RpcRequestPayload {
     buffer.writeUInt16LE(optionFlags);
 
     const parameters = this.request.parameters;
-    for (let i = 0, len = parameters.length; i < len; i++) {
-      const parameter = parameters[i];
-      buffer.writeBVarchar('@' + parameter.name);
-
-      let statusFlags = 0;
-      if (parameter.output) {
-        statusFlags |= STATUS.BY_REF_VALUE;
-      }
-      buffer.writeUInt8(statusFlags);
-
-      const param = {
-        value: parameter.value
-      };
-
-      const type = parameter.type;
-
-      if ((type.id & 0x30) === 0x20) {
-        if (parameter.length) {
-          param.length = parameter.length;
-        } else if (type.resolveLength) {
-          param.length = type.resolveLength(parameter);
-        }
+    const writeNext = (i) => {
+      if (i >= parameters.length) {
+        cb(buffer.data);
+        return;
       }
 
-      if (type.hasPrecision) {
-        if (parameter.precision) {
-          param.precision = parameter.precision;
-        } else if (type.resolvePrecision) {
-          param.precision = type.resolvePrecision(parameter);
-        }
-      }
-
-      if (type.hasScale) {
-        if (parameter.scale) {
-          param.scale = parameter.scale;
-        } else if (type.resolveScale) {
-          param.scale = type.resolveScale(parameter);
-        }
-      }
-
-      type.writeTypeInfo(buffer, param, options);
-      type.writeParameterData(buffer, param, options);
-    }
-
-    this.data = buffer.data;
+      this._writeParameterData(parameters[i], buffer, () => {
+        setImmediate(() => {
+          writeNext(i + 1);
+        });
+      });
+    };
+    writeNext(0);
   }
 
   toString(indent) {
     indent || (indent = '');
     return indent + ('RPC Request - ' + this.procedure);
+  }
+
+  _writeParameterData(parameter, buffer, cb) {
+    buffer.writeBVarchar('@' + parameter.name);
+
+    let statusFlags = 0;
+    if (parameter.output) {
+      statusFlags |= STATUS.BY_REF_VALUE;
+    }
+    buffer.writeUInt8(statusFlags);
+
+    const param = {
+      value: parameter.value
+    };
+
+    const type = parameter.type;
+
+    if ((type.id & 0x30) === 0x20) {
+      if (parameter.length) {
+        param.length = parameter.length;
+      } else if (type.resolveLength) {
+        param.length = type.resolveLength(parameter);
+      }
+    }
+
+    if (type.hasPrecision) {
+      if (parameter.precision) {
+        param.precision = parameter.precision;
+      } else if (type.resolvePrecision) {
+        param.precision = type.resolvePrecision(parameter);
+      }
+    }
+
+    if (type.hasScale) {
+      if (parameter.scale) {
+        param.scale = parameter.scale;
+      } else if (type.resolveScale) {
+        param.scale = type.resolveScale(parameter);
+      }
+    }
+
+    type.writeTypeInfo(buffer, param, this.options);
+    type.writeParameterData(buffer, param, this.options, () => {
+      cb();
+    });
   }
 };

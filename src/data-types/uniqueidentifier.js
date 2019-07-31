@@ -19,13 +19,14 @@ module.exports = {
     buffer.writeUInt8(0x10);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(0x10);
       buffer.writeBuffer(Buffer.from(guidParser.guidToArray(parameter.value)));
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {

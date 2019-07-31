@@ -4,7 +4,10 @@ node_js:
   - "6"
   - "8"
   - "10"
-  - "11"
+  - "12"
+
+cache:
+  npm: false
 
 stages:
   - name: test
@@ -58,7 +61,7 @@ script:
 jobs:
   include:
     - stage: lint
-      node_js: 6
+      node_js: 8
       before_install: skip
       before_script: skip
       script:
