@@ -60,8 +60,7 @@ const FEDAUTH_OPTIONS = {
   FEDAUTH_YES_ECHO: 0x01,
   FEDAUTH_NO_ECHO: 0x00,
   ADAL_WORKFLOW_USER_PASS: 0x01,
-  ADAL_WORKFLOW_INTEGRATED: 0x02,
-  ADAL_WORKFLOW_MSI: 0x03
+  ADAL_WORKFLOW_INTEGRATED: 0x02
 };
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
@@ -393,17 +392,7 @@ class Login7Payload {
           buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, 0);
           buffer.writeUInt32LE(2, 1);
           buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
-
-          switch (fedAuth.workflow) {
-            case 'integrated':
-              buffer.writeUInt8(FEDAUTH_OPTIONS.ADAL_WORKFLOW_INTEGRATED, 6);
-              break;
-
-            case 'default':
-              buffer.writeUInt8(FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
-              break;
-          }
-
+          buffer.writeUInt8(fedAuth.workflow === 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
           buffers.push(buffer);
           break;
 
