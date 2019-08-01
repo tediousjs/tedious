@@ -73,7 +73,7 @@ function execSql(done, sql, expectedValue, tdsVersion) {
 }
 
 describe('Datatypes in results test', function() {
-  this.timeout(60000)
+  this.timeout(60000);
 
   it('should test dbnull', (done) => {
     execSql(done, 'select null', null);

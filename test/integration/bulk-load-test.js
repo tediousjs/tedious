@@ -28,7 +28,7 @@ function getConfig() {
 }
 
 describe('Bulk Load Tests', function() {
-  this.timeout(60000)
+  this.timeout(60000);
   const glob = {};
 
   beforeEach((done) => {
