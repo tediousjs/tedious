@@ -3,8 +3,8 @@ const Packet = require('../../lib/packet').Packet;
 const TYPE = require('../../lib/packet').TYPE;
 const isPacketComplete = require('../../lib/packet').isPacketComplete;
 
-describe('packet type tests', () => {
-  it('should create Empty', (done) => {
+describe('packet type tests', function() {
+  it('should create Empty', function(done) {
     const packet = new Packet(TYPE.PRELOGIN);
 
     assert.isOk(packet);
@@ -15,7 +15,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should be last', (done) => {
+  it('should be last', function(done) {
     let packet = new Packet(TYPE.PRELOGIN);
     assert.isOk(!packet.isLast());
 
@@ -27,7 +27,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should have correct packet id', (done) => {
+  it('should have correct packet id', function(done) {
     const packet = new Packet(TYPE.PRELOGIN);
     assert.strictEqual(packet.packetId(), 1);
 
@@ -37,7 +37,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should add data', (done) => {
+  it('should add data', function(done) {
     const data1 = Buffer.from([0x01, 0x02, 0x03]);
     const data2 = Buffer.from([0xff, 0xfe]);
     const allData = Buffer.concat([data1, data2]);
@@ -57,7 +57,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should create from buffer', (done) => {
+  it('should create from buffer', function(done) {
     const buffer = Buffer.from([
       TYPE.PRELOGIN,
       0x01,
@@ -79,7 +79,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should convert header to string', (done) => {
+  it('should convert header to string', function(done) {
     const buffer = Buffer.from([
       TYPE.PRELOGIN,
       0x03,
@@ -101,7 +101,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should convert data to string short', (done) => {
+  it('should convert data to string short', function(done) {
     const data = Buffer.from([0x01, 0x02, 0x03]);
 
     const packet = new Packet(TYPE.PRELOGIN);
@@ -113,7 +113,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should data with exact lines worth', (done) => {
+  it('should data with exact lines worth', function(done) {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -135,7 +135,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should convert data to strings in mulitple lines', (done) => {
+  it('should convert data to strings in mulitple lines', function(done) {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -165,14 +165,14 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should packet complete shorter than header', (done) => {
+  it('should packet complete shorter than header', function(done) {
     const buffer = Buffer.alloc(7);
     assert.isOk(!isPacketComplete(buffer));
 
     done();
   });
 
-  it('should packet complete with just header', (done) => {
+  it('should packet complete with just header', function(done) {
     const buffer = new Packet(TYPE.PRELOGIN).buffer;
 
     assert.isOk(isPacketComplete(buffer));
@@ -180,7 +180,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should not packet complete too short', (done) => {
+  it('should not packet complete too short', function(done) {
     const buffer = Buffer.from([
       0x00,
       0x00,
@@ -199,7 +199,7 @@ describe('packet type tests', () => {
     done();
   });
 
-  it('should packet complete long enough', (done) => {
+  it('should packet complete long enough', function(done) {
     const buffer = Buffer.from([
       0x00,
       0x00,

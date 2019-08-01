@@ -66,23 +66,23 @@ function sendToIpCommonTestValidation(ipAddress) {
 
 // TODO: Refactor functions above ^^^^^^^
 
-describe('Sender send to IP address', () => {
+describe('Sender send to IP address', function() {
   const glob = {};
 
-  it('should tear down', (done) => {
+  it('should tear down', function(done) {
     sinon.restore();
     done();
   });
 
-  describe('Send', () => {
+  describe('Send', function() {
 
-    afterEach(() => {
+    afterEach(function() {
       glob.socketSendStub.restore();
       glob.socketCloseSpy.restore();
       glob.createSocketStub.restore();
     });
 
-    it('should send to IPv4', (done) => {
+    it('should send to IPv4', function(done) {
 
       sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultSuccess);
 
@@ -97,7 +97,7 @@ describe('Sender send to IP address', () => {
       sendToIpCommonTestValidation.call(glob, anyIpv4);
     });
 
-    it('should sent to IPv6', (done) => {
+    it('should sent to IPv6', function(done) {
       sendToIpCommonTestSetup.call(glob, anyIpv6, udpIpv6, sendResultSuccess);
 
       glob.sender.execute((error, message) => {
@@ -111,7 +111,7 @@ describe('Sender send to IP address', () => {
       sendToIpCommonTestValidation.call(glob, anyIpv6);
     });
 
-    it('should send fails', (done) => {
+    it('should send fails', function(done) {
       sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultError);
 
       glob.sender.execute((error, message) => {
@@ -125,7 +125,7 @@ describe('Sender send to IP address', () => {
       sendToIpCommonTestValidation.call(glob, anyIpv4);
     });
 
-    it('should send cancel', (done) => {
+    it('should send cancel', function(done) {
       sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultCancel);
 
       glob.sender.execute((error, message) => {
@@ -176,9 +176,9 @@ function sendToHostCommonTestSetup(lookupError) {
   this.sender.execute(callback);
 }
 
-describe('Sender send to hostnam', () => {
+describe('Sender send to hostnam', function() {
   const glob = {};
-  it('should setUp', (done) => {
+  it('should setUp', function(done) {
     // Set of IP addresses to be returned by stubbed out lookupAll method.
     glob.addresses = [
       { address: '127.0.0.2' },
@@ -189,20 +189,20 @@ describe('Sender send to hostnam', () => {
     done();
   });
 
-  it('should tearDown', (done) => {
+  it('should tearDown', function(done) {
     sinon.restore();
     done();
   });
 
-  describe('Send', () => {
-    afterEach(() => {
+  describe('Send', function() {
+    afterEach(function() {
       glob.strategySendStub.restore();
       glob.strategyCancelStub.restore();
       glob.lookupAllStub.restore();
       glob.createStrategyStub.restore();
     });
 
-    it('should send basic', (done) => {
+    it('should send basic', function(done) {
       const lookupError = null;
       sendToHostCommonTestSetup.call(glob, lookupError);
 
@@ -217,7 +217,7 @@ describe('Sender send to hostnam', () => {
       process.nextTick(validate);
     });
 
-    it('should send cancel', (done) => {
+    it('should send cancel', function(done) {
       const lookupError = null;
       sendToHostCommonTestSetup.call(glob, lookupError);
 
@@ -235,7 +235,7 @@ describe('Sender send to hostnam', () => {
       process.nextTick(validate);
     });
 
-    it('should look up error', (done) => {
+    it('should look up error', function(done) {
       const lookupError = new Error('some error.');
 
       sendToHostCommonTestSetup.call(glob, lookupError);
@@ -252,7 +252,7 @@ describe('Sender send to hostnam', () => {
       process.nextTick(validate);
     });
 
-    it('should send cancel on lookup error', (done) => {
+    it('should send cancel on lookup error', function(done) {
       const lookupError = new Error('some error.');
 
       sendToHostCommonTestSetup.call(glob, lookupError);
@@ -328,26 +328,26 @@ function commonStrategyTestValidation(done) {
   done();
 }
 
-describe('Parallel Send Strategy', () => {
+describe('Parallel Send Strategy', function() {
   let glob;
-  it('should setUp', (done) => {
+  it('should setUp', function(done) {
     glob = {};
     commonStrategyTestSetup.call(glob);
     done();
   });
 
-  it('should tearDown', (done) => {
+  it('should tearDown', function(done) {
     sinon.restore();
     done();
   });
 
-  describe('Send', () => {
-    beforeEach(() => {
+  describe('Send', function() {
+    beforeEach(function() {
       glob = {};
       commonStrategyTestSetup.call(glob);
     });
 
-    afterEach(() => {
+    afterEach(function() {
       for (const key in glob.testSockets) {
         glob.testSockets[key].socketSendStub.restore();
         glob.testSockets[key].socketCloseSpy.restore();
@@ -355,7 +355,7 @@ describe('Parallel Send Strategy', () => {
       }
     });
 
-    it('should send all IPs success', (done) => {
+    it('should send all IPs success', function(done) {
       glob.parallelSendStrategy.send((error, message) => {
         assert.strictEqual(error, null);
 
@@ -366,7 +366,7 @@ describe('Parallel Send Strategy', () => {
       });
     });
 
-    it('should send IPv4 fail', (done) => {
+    it('should send IPv4 fail', function(done) {
       // Setup sends to fail on Ipv4 socket.
       glob.testSockets[udpIpv4].sendResult = sendResultError;
 
@@ -383,7 +383,7 @@ describe('Parallel Send Strategy', () => {
       });
     });
 
-    it('should send IPV6 fail', (done) => {
+    it('should send IPV6 fail', function(done) {
       // Setup sends to fail on Ipv6 socket.
       glob.testSockets[udpIpv6].sendResult = sendResultError;
 
@@ -400,7 +400,7 @@ describe('Parallel Send Strategy', () => {
       });
     });
 
-    it('should send all IPs fail', (done) => {
+    it('should send all IPs fail', function(done) {
       // Setup IPv4 and IPv6 sockets to fail on socket send.
       glob.testSockets[udpIpv4].sendResult = sendResultError;
       glob.testSockets[udpIpv6].sendResult = sendResultError;
@@ -418,7 +418,7 @@ describe('Parallel Send Strategy', () => {
       });
     });
 
-    it('should send cancel', (done) => {
+    it('should send cancel', function(done) {
       glob.parallelSendStrategy.send((error, message) => {
         // We should not get a callback as the send got cancelled.
         assert.isOk(false, 'Should never get here.');

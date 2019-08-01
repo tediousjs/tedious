@@ -138,7 +138,7 @@ function execSqlOutput(done, type, value, expectedValue) {
   });
 }
 
-describe('Parameterised Statements Test', () => {
+describe('Parameterised Statements Test', function() {
   it('should test bit True', function(done) {
     execSql(done, TYPES.Bit, true);
   });

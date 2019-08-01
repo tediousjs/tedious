@@ -34,34 +34,34 @@ function connectToIpTestImpl(hostIp, localIp, mitm, done) {
   });
 }
 
-describe('connector tests', () => {
-  describe('Connector with MultiSubnetFailover', () => {
+describe('connector tests', function() {
+  describe('Connector with MultiSubnetFailover', function() {
     const mitm = new Mitm();
 
-    beforeEach(() => {
+    beforeEach(function() {
       mitm.enable();
     });
 
 
-    it('should setUp', (done) => {
+    it('should setUp', function(done) {
       mitm.enable();
       done();
     });
 
-    it('should tearDown', (done) => {
+    it('should tearDown', function(done) {
       mitm.disable();
       done();
     });
 
-    it('should connects directly if given an IP v4 address', (done) => {
+    it('should connects directly if given an IP v4 address', function(done) {
       connectToIpTestImpl('127.0.0.1', '192.168.0.1', mitm, done);
     });
 
-    it('should connects directly if given an IP v6 address', (done) => {
+    it('should connects directly if given an IP v6 address', function(done) {
       connectToIpTestImpl('::1', '2002:20:0:0:0:0:1:2', mitm, done);
     });
 
-    it('should uses a parallel connection strategy', (done) => {
+    it('should uses a parallel connection strategy', function(done) {
       const connector = new Connector({ host: 'localhost', port: 12345 }, true);
 
       const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
@@ -76,28 +76,28 @@ describe('connector tests', () => {
     });
   });
 
-  describe('Connector without MultiSubnetFailover', () => {
+  describe('Connector without MultiSubnetFailover', function() {
     const mitm = new Mitm();
 
-    beforeEach(() => {
+    beforeEach(function() {
       mitm.enable();
     });
 
 
-    it('should setUp', (done) => {
+    it('should setUp', function(done) {
       mitm.enable();
 
       done();
     });
 
-    it('should tearDown', (done) => {
+    it('should tearDown', function(done) {
       mitm.disable();
       sinon.restore();
 
       done();
     });
 
-    it('should connect directly if given an IP address', (done) => {
+    it('should connect directly if given an IP address', function(done) {
       const connectionOptions = {
         host: '127.0.0.1',
         port: 12345,
@@ -121,7 +121,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should uses a sequential connection strategy', (done) => {
+    it('should uses a sequential connection strategy', function(done) {
       const connector = new Connector({ host: 'localhost', port: 12345 }, false);
 
       const spy = sinon.spy(
@@ -139,27 +139,27 @@ describe('connector tests', () => {
     });
   });
 
-  describe('SequentialConnectionStrategy', () => {
+  describe('SequentialConnectionStrategy', function() {
     let mitm;
 
-    beforeEach(() => {
+    beforeEach(function() {
       mitm = new Mitm();
       mitm.enable();
     });
 
-    it('should setUp', (done) => {
+    it('should setUp', function(done) {
       mitm.enable();
 
       done();
     });
 
-    it('should tearDown', (done) => {
+    it('should tearDown', function(done) {
       mitm.disable();
 
       done();
     });
 
-    it('should tries to connect to all addresses in sequence', (done) => {
+    it('should tries to connect to all addresses in sequence', function(done) {
       const strategy = new SequentialConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -212,7 +212,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should passes the first succesfully connected socket to the callback', (done) => {
+    it('should passes the first succesfully connected socket to the callback', function(done) {
       const strategy = new SequentialConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -240,7 +240,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should only attempts new connections until the first successful connection', (done) => {
+    it('should only attempts new connections until the first successful connection', function(done) {
       const strategy = new SequentialConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -269,7 +269,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should fails if all sequential connections fail', (done) => {
+    it('should fails if all sequential connections fail', function(done) {
       const strategy = new SequentialConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -292,7 +292,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should destroys all sockets except for the first succesfully connected socket', (done) => {
+    it('should destroys all sockets except for the first succesfully connected socket', function(done) {
       const strategy = new SequentialConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -326,27 +326,27 @@ describe('connector tests', () => {
     });
   });
 
-  describe('ParallelConnectionStrategy', () => {
+  describe('ParallelConnectionStrategy', function() {
     let mitm;
 
-    beforeEach(() => {
+    beforeEach(function() {
       mitm = new Mitm();
       mitm.enable();
     });
 
-    it('should setUp', (done) => {
+    it('should setUp', function(done) {
       mitm.enable();
 
       done();
     });
 
-    it('should tearDown', (done) => {
+    it('should tearDown', function(done) {
       mitm.disable();
 
       done();
     });
 
-    it('should tries to connect to all addresses in parallel', (done) => {
+    it('should tries to connect to all addresses in parallel', function(done) {
       const strategy = new ParallelConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -385,7 +385,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should fails if all parallel connections fail', (done) => {
+    it('should fails if all parallel connections fail', function(done) {
       const strategy = new ParallelConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -408,7 +408,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should passes the first succesfully connected socket to the callback', (done) => {
+    it('should passes the first succesfully connected socket to the callback', function(done) {
       const strategy = new ParallelConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -436,7 +436,7 @@ describe('connector tests', () => {
       });
     });
 
-    it('should destroys all sockets except for the first succesfully connected socket', (done) => {
+    it('should destroys all sockets except for the first succesfully connected socket', function(done) {
       const strategy = new ParallelConnectionStrategy(
         [
           { address: '127.0.0.2' },
@@ -464,21 +464,21 @@ describe('connector tests', () => {
     });
   });
 
-  describe('Test unicode SQL Server name', () => {
-    it('should setUp', (done) => {
+  describe('Test unicode SQL Server name', function() {
+    it('should setUp', function(done) {
       // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
       const spy = sinon.spy(dns, 'lookup');
       assert.isOk(spy);
       done();
     });
 
-    it('should tearDown', (done) => {
+    it('should tearDown', function(done) {
       sinon.restore();
 
       done();
     });
 
-    it('should test IDN Server name', (done) => {
+    it('should test IDN Server name', function(done) {
       const spy = sinon.spy(dns, 'lookup');
       const server = '本地主机.ad';
       const connector = new Connector({ host: server, port: 12345 }, true);
@@ -490,7 +490,7 @@ describe('connector tests', () => {
       done();
     });
 
-    it('should test ASCII Server name', (done) => {
+    it('should test ASCII Server name', function(done) {
       const spy = sinon.spy(dns, 'lookup');
       const server = 'localhost';
       const connector = new Connector({ host: server, port: 12345 }, true);

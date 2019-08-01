@@ -23,7 +23,7 @@ function getConfig() {
 }
 
 describe('Instance Lookup Test', function() {
-  it('should test good instance', (done) => {
+  it('should test good instance', function(done) {
     var config = getConfig();
 
     if (!config.instanceName) {
@@ -41,7 +41,7 @@ describe('Instance Lookup Test', function() {
     });
   });
 
-  it('should test bad Instance', (done) => {
+  it('should test bad Instance', function(done) {
     var config = getConfig();
 
     new InstanceLookup().instanceLookup({
@@ -57,7 +57,7 @@ describe('Instance Lookup Test', function() {
     });
   });
 
-  it('should test bad Server', (done) => {
+  it('should test bad Server', function(done) {
     new InstanceLookup().instanceLookup({
       server: RESERVED_IP_ADDRESS,
       instanceName: 'badInstanceName',

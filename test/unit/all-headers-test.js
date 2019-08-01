@@ -2,8 +2,8 @@ const assert = require('chai').assert;
 const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 const writeAllHeaders = require('../../src/all-headers').writeToTrackingBuffer;
 
-describe('all headers test', () => {
-  it('should write headers', (done) => {
+describe('all headers test', function() {
+  it('should write headers', function(done) {
     const expected = Buffer.from([
       0x16,
       0x00,

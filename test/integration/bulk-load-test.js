@@ -31,7 +31,7 @@ describe('Bulk Load Tests', function() {
   this.timeout(60000);
   const glob = {};
 
-  beforeEach((done) => {
+  beforeEach(function(done) {
     const connection = new Connection(getConfig());
     connection.on('connect', (err) => {
       if (err) {
@@ -54,7 +54,7 @@ describe('Bulk Load Tests', function() {
     }
   });
 
-  afterEach((done) => {
+  afterEach(function(done) {
     const connection = glob.connection;
     if (!connection) {
       return;
@@ -66,7 +66,7 @@ describe('Bulk Load Tests', function() {
     connection.close();
   });
 
-  it('should bulk load', (done) => {
+  it('should bulk load', function(done) {
     const connection = glob.connection;
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', function(
       err,
@@ -110,7 +110,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkLoadError', (done) => {
+  it('should bulkLoadError', function(done) {
     const connection = glob.connection;
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(
       err,
@@ -142,7 +142,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload verify constraints', (done) => {
+  it('should bulkload verify constraints', function(done) {
     const connection = glob.connection;
     const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, function(err, rowCount) {
       assert.ok(
@@ -166,7 +166,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload verify trigger', (done) => {
+  it('should bulkload verify trigger', function(done) {
     const connection = glob.connection;
     const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, function(err, rowCount) {
       assert.ifError(err);
@@ -215,7 +215,7 @@ describe('Bulk Load Tests', function() {
     connection.execSql(request_table);
   });
 
-  it('should bulkload verify null value', (done) => {
+  it('should bulkload verify null value', function(done) {
     const connection = glob.connection;
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(
       err,
@@ -246,7 +246,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload cancel after request send does nothing', (done) => {
+  it('should bulkload cancel after request send does nothing', function(done) {
     const connection = glob.connection;
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
@@ -282,7 +282,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload cancel after request completed', (done) => {
+  it('should bulkload cancel after request completed', function(done) {
     const connection = glob.connection;
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {

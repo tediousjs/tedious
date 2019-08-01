@@ -75,75 +75,75 @@ function execSql(done, sql, expectedValue, tdsVersion) {
 describe('Datatypes in results test', function() {
   this.timeout(60000);
 
-  it('should test dbnull', (done) => {
+  it('should test dbnull', function(done) {
     execSql(done, 'select null', null);
   });
 
-  it('should test tiny int', (done) => {
+  it('should test tiny int', function(done) {
     execSql(done, 'select cast(8 as tinyint)', 8);
   });
 
-  it('should test tiny int large', (done) => {
+  it('should test tiny int large', function(done) {
     execSql(done, 'select cast(252 as tinyint)', 252);
   });
 
-  it('should test tiny int null', (done) => {
+  it('should test tiny int null', function(done) {
     execSql(done, 'select cast(null as tinyint)', null);
   });
 
-  it('should test small int', (done) => {
+  it('should test small int', function(done) {
     execSql(done, 'select cast(8 as smallint)', 8);
   });
 
-  it('should test small int null', (done) => {
+  it('should test small int null', function(done) {
     execSql(done, 'select cast(null as smallint)', null);
   });
 
-  it('should test int', (done) => {
+  it('should test int', function(done) {
     execSql(done, 'select cast(8 as int)', 8);
   });
 
-  it('should test int null', (done) => {
+  it('should test int null', function(done) {
     execSql(done, 'select cast(null as int)', null);
   });
 
-  it('should test real', (done) => {
+  it('should test real', function(done) {
     execSql(done, 'select cast(9.5 as real)', 9.5);
   });
 
-  it('should test real null', (done) => {
+  it('should test real null', function(done) {
     execSql(done, 'select cast(null as real)', null);
   });
 
-  it('should test float', (done) => {
+  it('should test float', function(done) {
     execSql(done, 'select cast(9.5 as float)', 9.5);
   });
 
-  it('should test float null', (done) => {
+  it('should test float null', function(done) {
     execSql(done, 'select cast(null as float)', null);
   });
 
-  it('should test big int', (done) => {
+  it('should test big int', function(done) {
     execSql(done, 'select cast(8 as bigint)', '8');
   });
 
-  it('should test big int null', (done) => {
+  it('should test big int null', function(done) {
     execSql(done, 'select cast(null as bigint)', null);
   });
 
-  it('should test bit false', (done) => {
+  it('should test bit false', function(done) {
     execSql(done, "select cast('false' as bit)", false);
   });
 
-  it('should test bit true', (done) => {
+  it('should test bit true', function(done) {
     execSql(done, "select cast('true' as bit)", true);
   });
 
-  it('should test bit null', (done) => {
+  it('should test bit null', function(done) {
     execSql(done, 'select cast(null as bit)', null);
   });
 
-  it('should test date time', (done) => {
+  it('should test date time', function(done) {
     execSql(
       done,
       "select cast('2011-12-4 10:04:23' as datetime)",
@@ -151,7 +151,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time null', (done) => {
+  it('should test date time null', function(done) {
     execSql(done, 'select cast(null as datetime)', null);
   });
 
@@ -159,7 +159,7 @@ describe('Datatypes in results test', function() {
   // The tests below validates DateTime precision as described in the section
   // "Rounding of datetime Fractional Second Precision" from
   // https://msdn.microsoft.com/en-us/library/ms187819.aspx
-  it('should test date time precision_0', (done) => {
+  it('should test date time precision_0', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.990' as datetime)",
@@ -167,7 +167,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_1', (done) => {
+  it('should test date time precision_1', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.991' as datetime)",
@@ -175,7 +175,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_2', (done) => {
+  it('should test date time precision_2', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.992' as datetime)",
@@ -183,7 +183,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_3', (done) => {
+  it('should test date time precision_3', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.993' as datetime)",
@@ -191,7 +191,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_4', (done) => {
+  it('should test date time precision_4', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.994' as datetime)",
@@ -199,7 +199,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_5', (done) => {
+  it('should test date time precision_5', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.995' as datetime)",
@@ -208,7 +208,7 @@ describe('Datatypes in results test', function() {
   });
 
 
-  it('should test date time precision_6', (done) => {
+  it('should test date time precision_6', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.996' as datetime)",
@@ -216,7 +216,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_7', (done) => {
+  it('should test date time precision_7', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.997' as datetime)",
@@ -224,7 +224,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_8', (done) => {
+  it('should test date time precision_8', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.998' as datetime)",
@@ -232,7 +232,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time precision_9', (done) => {
+  it('should test date time precision_9', function(done) {
     execSql(
       done,
       "select cast('1998-1-1 23:59:59.999' as datetime)",
@@ -240,7 +240,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test small date time', (done) => {
+  it('should test small date time', function(done) {
     execSql(
       done,
       "select cast('2011-12-4 10:04:23' as smalldatetime)",
@@ -248,11 +248,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test small date time null', (done) => {
+  it('should test small date time null', function(done) {
     execSql(done, 'select cast(null as smalldatetime)', null);
   });
 
-  it('should test datetime 2', (done) => {
+  it('should test datetime 2', function(done) {
     execSql(
       done,
       "select cast('2011-12-4 10:04:23' as datetime2)",
@@ -261,11 +261,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time 2 null', (done) => {
+  it('should test date time 2 null', function(done) {
     execSql(done, 'select cast(null as datetime2)', null, '7_3_A');
   });
 
-  it('should test time', (done) => {
+  it('should test time', function(done) {
     execSql(
       done,
       "select cast('10:04:23' as time)",
@@ -274,11 +274,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test time null', (done) => {
+  it('should test time null', function(done) {
     execSql(done, 'select cast(null as time)', null, '7_3_A');
   });
 
-  it('should test date', (done) => {
+  it('should test date', function(done) {
     execSql(
       done,
       "select cast('2014-03-08' as date)",
@@ -287,11 +287,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date null', (done) => {
+  it('should test date null', function(done) {
     execSql(done, 'select cast(null as date)', null, '7_3_A');
   });
 
-  it('should test date time offset', (done) => {
+  it('should test date time offset', function(done) {
     execSql(
       done,
       "select cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset)",
@@ -300,20 +300,20 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test date time off set null', (done) => {
+  it('should test date time off set null', function(done) {
     execSql(done, 'select cast(null as datetimeoffset)', null);
   });
 
-  it('should test numeric small value', (done) => {
+  it('should test numeric small value', function(done) {
     execSql(done, 'select cast(9.3 as numeric(3,2))', 9.3);
   });
 
 
-  it('should test numeric large value', (done) => {
+  it('should test numeric large value', function(done) {
     execSql(done, 'select cast(9876543.3456 as numeric(12,5))', 9876543.3456);
   });
 
-  it('should test numeric very large value', (done) => {
+  it('should test numeric very large value', function(done) {
     execSql(
       done,
       'select cast(9876543219876543.3456 as numeric(25,5))',
@@ -321,7 +321,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test numeric extremely large value', (done) => {
+  it('should test numeric extremely large value', function(done) {
     execSql(
       done,
       'select cast(98765432198765432198765432.3456 as numeric(35,5))',
@@ -329,35 +329,35 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test numeric null', (done) => {
+  it('should test numeric null', function(done) {
     execSql(done, 'select cast(null as numeric(3,2))', null);
   });
 
-  it('should test small money', (done) => {
+  it('should test small money', function(done) {
     execSql(done, 'select cast(1.22229 as smallmoney)', 1.2223);
   });
 
-  it('should test small money negative', (done) => {
+  it('should test small money negative', function(done) {
     execSql(done, 'select cast(-1.22229 as smallmoney)', -1.2223);
   });
 
-  it('should test small money null', (done) => {
+  it('should test small money null', function(done) {
     execSql(done, 'select cast(null as smallmoney)', null);
   });
 
-  it('should test money', (done) => {
+  it('should test money', function(done) {
     execSql(done, 'select cast(1.22229 as money)', 1.2223);
   });
 
-  it('should test money negative', (done) => {
+  it('should test money negative', function(done) {
     execSql(done, 'select cast(-1.22229 as money)', -1.2223);
   });
 
-  it('should test money large', (done) => {
+  it('should test money large', function(done) {
     execSql(done, 'select cast(123456789012345.11 as money)', 123456789012345.11);
   });
 
-  it('should test money large negative', (done) => {
+  it('should test money large negative', function(done) {
     execSql(
       done,
       'select cast(-123456789012345.11 as money)',
@@ -365,23 +365,23 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test money null', (done) => {
+  it('should test money null', function(done) {
     execSql(done, 'select cast(null as money)', null);
   });
 
-  it('should test varchar', (done) => {
+  it('should test varchar', function(done) {
     execSql(done, "select cast('abcde' as varchar(10))", 'abcde');
   });
 
-  it('should test varchar empty', (done) => {
+  it('should test varchar empty', function(done) {
     execSql(done, "select cast('' as varchar(10))", '');
   });
 
-  it('should test varchar null', (done) => {
+  it('should test varchar null', function(done) {
     execSql(done, 'select cast(null as varchar(10))', null);
   });
 
-  it('should test varchar collation', (done) => {
+  it('should test varchar collation', function(done) {
     // The codepage used is WINDOWS-1251.
     const sql = `\
     create table #tab1 (col1 nvarchar(10) collate Cyrillic_General_CS_AS);
@@ -391,15 +391,15 @@ describe('Datatypes in results test', function() {
     execSql(done, sql, 'abcdШ');
   });
 
-  it('should test varchar max', (done) => {
+  it('should test varchar max', function(done) {
     execSql(done, "select cast('abc' as varchar(max))", 'abc', '7_2');
   });
 
-  it('should test varchar max null', (done) => {
+  it('should test varchar max null', function(done) {
     execSql(done, 'select cast(null as varchar(max))', null, '7_2');
   });
 
-  it('should test var char max long as text size', (done) => {
+  it('should test var char max long as text size', function(done) {
     let longString = '';
     for (
       let i = 1, end = config.options.textsize, asc = 1 <= end;
@@ -417,7 +417,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test var char max larger than text sieze', (done) => {
+  it('should test var char max larger than text sieze', function(done) {
     let longString = '';
     for (
       let i = 1, end = config.options.textsize + 10, asc = 1 <= end;
@@ -435,23 +435,23 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test nvarchar', (done) => {
+  it('should test nvarchar', function(done) {
     execSql(done, "select cast('abc' as nvarchar(10))", 'abc');
   });
 
-  it('should test nvarchar null', (done) => {
+  it('should test nvarchar null', function(done) {
     execSql(done, 'select cast(null as nvarchar(10))', null);
   });
 
-  it('should test nvarchar max', (done) => {
+  it('should test nvarchar max', function(done) {
     execSql(done, "select cast('abc' as nvarchar(max))", 'abc', '7_2');
   });
 
-  it('should test nvarchar max null', (done) => {
+  it('should test nvarchar max null', function(done) {
     execSql(done, 'select cast(null as nvarchar(max))', null, '7_2');
   });
 
-  it('should test varbinary', (done) => {
+  it('should test varbinary', function(done) {
     execSql(
       done,
       'select cast(0x1234 as varbinary(4))',
@@ -459,11 +459,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test varbinary null', (done) => {
+  it('should test varbinary null', function(done) {
     execSql(done, 'select cast(null as varbinary(10))', null);
   });
 
-  it('should test binary', (done) => {
+  it('should test binary', function(done) {
     execSql(
       done,
       'select cast(0x1234 as binary(4))',
@@ -471,11 +471,11 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test binary null', (done) => {
+  it('should test binary null', function(done) {
     execSql(done, 'select cast(null as binary(10))', null);
   });
 
-  it('should test varbinary max', (done) => {
+  it('should test varbinary max', function(done) {
     execSql(
       done,
       'select cast(0x1234 as varbinary(max))',
@@ -484,59 +484,59 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test varbinary max null', (done) => {
+  it('should test varbinary max null', function(done) {
     execSql(done, 'select cast(null as varbinary(max))', null, '7_2');
   });
 
-  it('should test char', (done) => {
+  it('should test char', function(done) {
     execSql(done, "select cast('abc' as char(5))", 'abc  ');
   });
 
-  it('should test char null', (done) => {
+  it('should test char null', function(done) {
     execSql(done, 'select cast(null as char(5))', null);
   });
 
-  it('should test nchar', (done) => {
+  it('should test nchar', function(done) {
     execSql(done, "select cast('abc' as nchar(5))", 'abc  ');
   });
 
-  it('should test nchar null', (done) => {
+  it('should test nchar null', function(done) {
     execSql(done, 'select cast(null as nchar(5))', null);
   });
 
-  it('should test text', (done) => {
+  it('should test text', function(done) {
     execSql(done, "select cast('abc' as text) as text", 'abc');
   });
 
-  it('should test text emtpy', (done) => {
+  it('should test text emtpy', function(done) {
     execSql(done, "select cast('' as text) as text", '');
   });
 
-  it('should test text null', (done) => {
+  it('should test text null', function(done) {
     execSql(done, 'select cast(null as text) as text', null);
   });
 
-  it('should test ntext', (done) => {
+  it('should test ntext', function(done) {
     execSql(done, "select cast('abc' as ntext) as text", 'abc');
   });
 
-  it('should test ntext empty', (done) => {
+  it('should test ntext empty', function(done) {
     execSql(done, "select cast('' as ntext) as text", '');
   });
 
-  it('should test ntext null', (done) => {
+  it('should test ntext null', function(done) {
     execSql(done, 'select cast(null as ntext) as text', null);
   });
 
-  it('should test image', (done) => {
+  it('should test image', function(done) {
     execSql(done, 'select cast(0x1234 as image)', Buffer.from([0x12, 0x34]));
   });
 
-  it('should test image null', (done) => {
+  it('should test image null', function(done) {
     execSql(done, 'select cast(null as image)', null);
   });
 
-  it('should test guid', (done) => {
+  it('should test guid', function(done) {
     execSql(
       done,
       "select cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier)",
@@ -544,27 +544,27 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test guid null', (done) => {
+  it('should test guid null', function(done) {
     execSql(done, 'select cast(null as uniqueidentifier)', null);
   });
 
-  it('should test variant int', (done) => {
+  it('should test variant int', function(done) {
     execSql(done, 'select cast(11 as sql_variant)', 11, '7_2');
   });
 
-  it('should test variant numeric', (done) => {
+  it('should test variant numeric', function(done) {
     execSql(done, 'select cast(11.16 as sql_variant)', 11.16, '7_2');
   });
 
-  it('should test variant var char', (done) => {
+  it('should test variant var char', function(done) {
     execSql(done, "select cast('abc' as sql_variant)", 'abc', '7_2');
   });
 
-  it('should test variant var char 2', (done) => {
+  it('should test variant var char 2', function(done) {
     execSql(done, "select SERVERPROPERTY('LicenseType') as LicenseType", 'DISABLED', '7_2');
   });
 
-  it('should test variant var bin', (done) => {
+  it('should test variant var bin', function(done) {
     execSql(
       done,
       'select cast(0x1234 as sql_variant)',
@@ -572,7 +572,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test variant date time off set', (done) => {
+  it('should test variant date time off set', function(done) {
     execSql(
       done,
       "select cast(cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset) as sql_variant)",
@@ -581,7 +581,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should test variant multiple data types', (done) => {
+  it('should test variant multiple data types', function(done) {
     const sql = `\
       create table #tab1 (
       [c0] [int] IDENTITY(1,1),
@@ -607,20 +607,20 @@ describe('Datatypes in results test', function() {
     execSql(done, sql, expectedValues);
   });
 
-  it('should test variant null', (done) => {
+  it('should test variant null', function(done) {
     execSql(done, 'select cast(null as sql_variant)', null, '7_2');
   });
 
-  it('should test xml', (done) => {
+  it('should test xml', function(done) {
     const xml = '<root><child attr="attr-value"/></root>';
     execSql(done, `select cast('${xml}' as xml)`, xml, '7_2');
   });
 
-  it('should test xml null', (done) => {
+  it('should test xml null', function(done) {
     execSql(done, 'select cast(null as xml)', null, '7_2');
   });
 
-  it('should test xml with schema', (done) => {
+  it('should test xml with schema', function(done) {
     // Cannot use temp tables, as schema collections as not available to them.
     // Schema must be created manually in database in order to make this done work properly (sql 2012)
 
@@ -662,7 +662,7 @@ describe('Datatypes in results test', function() {
     execSql(done, sql, xml, '7_2');
   });
 
-  it('should done udt', (done) => {
+  it('should done udt', function(done) {
     execSql(
       done,
       "select geography::STGeomFromText('LINESTRING(-122.360 47.656, -122.343 47.656 )', 4326) as geo",
@@ -710,7 +710,7 @@ describe('Datatypes in results test', function() {
     );
   });
 
-  it('should done udtNull', (done) => {
+  it('should done udtNull', function(done) {
     execSql(done, 'select cast(null as geography)', null, '7_2');
 
   });

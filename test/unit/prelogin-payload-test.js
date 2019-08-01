@@ -15,20 +15,20 @@ function assertPayload(payload, encryptionString) {
   assert.strictEqual(payload.fedAuthRequired, 1);
 }
 
-describe('prelogin-payload-assert', () => {
-  it('should not encrypt', (done) => {
+describe('prelogin-payload-assert', function() {
+  it('should not encrypt', function(done) {
     const payload = new PreloginPayload();
     assertPayload(payload, 'NOT_SUP');
     done();
   });
 
-  it('should encrypt', (done) => {
+  it('should encrypt', function(done) {
     const payload = new PreloginPayload({ encrypt: true });
     assertPayload(payload, 'ON');
     done();
   });
 
-  it('should create from buffer', (done) => {
+  it('should create from buffer', function(done) {
     const payload = new PreloginPayload();
     new PreloginPayload(payload.data);
     assertPayload(payload, 'NOT_SUP');

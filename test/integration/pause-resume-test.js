@@ -15,12 +15,12 @@ describe('Pause-Resume Test', function() {
   this.timeout(10000);
   let connection;
 
-  beforeEach((done) => {
+  beforeEach(function(done) {
     connection = new Connection(getConfig());
     connection.on('connect', done);
   });
 
-  afterEach((done) => {
+  afterEach(function(done) {
     if (connection.closed) {
       done();
     } else {

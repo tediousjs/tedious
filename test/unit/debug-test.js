@@ -12,8 +12,8 @@ class Packet {
   }
 }
 
-describe('Packet Tests', () => {
-  it('Create new packet', (done) => {
+describe('Packet Tests', function() {
+  it('Create new packet', function(done) {
     let emitCount = 0;
 
     const debug = new Debug({ packet: true });
@@ -35,7 +35,7 @@ describe('Packet Tests', () => {
     return debug.packet('dir', new Packet());
   });
 
-  it('should enable payload', (done) => {
+  it('should enable payload', function(done) {
     const debug = new Debug({ payload: true });
     debug.on('debug', function(text) {
       assert.strictEqual(text, payload);
@@ -48,7 +48,7 @@ describe('Packet Tests', () => {
     });
   });
 
-  it('should not enable payload', (done) => {
+  it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function(text) {
       assert.isOk(false);
@@ -59,7 +59,7 @@ describe('Packet Tests', () => {
     done();
   });
 
-  it('should enable data', (done) => {
+  it('should enable data', function(done) {
     const debug = new Debug({ data: true });
     debug.on('debug', function(text) {
       assert.strictEqual(text, 'data');
@@ -70,7 +70,7 @@ describe('Packet Tests', () => {
     debug.data(new Packet());
   });
 
-  it('should not enable data', (done) => {
+  it('should not enable data', function(done) {
     const debug = new Debug();
     debug.on('debug', function(text) {
       assert.isOk(false);
@@ -81,7 +81,7 @@ describe('Packet Tests', () => {
     done();
   });
 
-  it('should enable token', (done) => {
+  it('should enable token', function(done) {
     const debug = new Debug({ token: true });
     debug.on('debug', function(token) {
       assert.isOk(token.indexOf('test') !== 0);
@@ -92,7 +92,7 @@ describe('Packet Tests', () => {
     debug.token({ name: 'test' });
   });
 
-  it('should not enable payload', (done) => {
+  it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function(token) {
       assert.isOk(false);

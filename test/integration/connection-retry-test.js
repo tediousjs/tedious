@@ -17,20 +17,20 @@ function getConfig() {
   return config;
 }
 
-describe('Connection Retry Test', () => {
+describe('Connection Retry Test', function() {
   let invalidLoginError;
 
-  beforeEach((done) => {
+  beforeEach(function(done) {
     invalidLoginError = 18456;
     done();
   });
 
-  afterEach((done) => {
+  afterEach(function(done) {
     sinon.restore();
     done();
   });
 
-  it('should retry specified number of times on transient errors', (done) => {
+  it('should retry specified number of times on transient errors', function(done) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
@@ -56,7 +56,7 @@ describe('Connection Retry Test', () => {
     });
   });
 
-  it('should no retries on non-transient errors', (done) => {
+  it('should no retries on non-transient errors', function(done) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
@@ -82,7 +82,7 @@ describe('Connection Retry Test', () => {
     });
   });
 
-  it('should no retries if connection timeout fires', (done) => {
+  it('should no retries if connection timeout fires', function(done) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type === 'azure-active-directory-password') {

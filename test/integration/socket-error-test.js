@@ -25,11 +25,11 @@ function getConfig() {
 describe('A `error` on the network socket', function() {
   let connection;
 
-  beforeEach(() => {
+  beforeEach(function() {
     connection = new Connection(getConfig());
   });
 
-  afterEach(() => {
+  afterEach(function() {
     connection.close();
   });
 

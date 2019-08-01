@@ -61,7 +61,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should be bad port', (done) => {
+  it('should be bad port', function(done) {
     const config = getConfig();
     config.options.port = -1;
     config.options.connectTimeout = 200;
@@ -73,7 +73,7 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
-  it('should be bad credentials', (done) => {
+  it('should be bad credentials', function(done) {
     const config = getConfig();
 
     config.authentication.options.userName = 'bad-user';
@@ -107,7 +107,7 @@ describe('Initiate Connect Test', function() {
     );
   });
 
-  it('should connect by port', (done) => {
+  it('should connect by port', function(done) {
     const config = getConfig();
 
     if ((config.options != null ? config.options.port : undefined) == null) {
@@ -142,7 +142,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should connect by instance name', (done) => {
+  it('should connect by instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
       console.log('Skipping connectByInstanceName test');
@@ -179,7 +179,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should connect by invalid instance name', (done) => {
+  it('should connect by invalid instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
       console.log('Skipping connectByInvalidInstanceName test');
@@ -212,7 +212,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should potentially throw an error on invalid crypto credential details', (done) => {
+  it('should potentially throw an error on invalid crypto credential details', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
 
@@ -233,7 +233,7 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
-  it('should fail if no cipher can be negotiated', (done) => {
+  it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
 
@@ -267,7 +267,7 @@ describe('Initiate Connect Test', function() {
 });
 
 
-describe('Ntlm Test', () => {
+describe('Ntlm Test', function() {
   const DomainCaseEnum = {
     AsIs: 0,
     Lower: 1,
@@ -316,21 +316,21 @@ describe('Ntlm Test', () => {
     });
   }
 
-  it('should ntlm', (done) => {
+  it('should ntlm', function(done) {
     runNtlmTest(done, DomainCaseEnum.AsIs);
   });
 
-  it('should ntlm lower', (done) => {
+  it('should ntlm lower', function(done) {
     runNtlmTest(done, DomainCaseEnum.Lower);
   });
 
-  it('should ntlm upper', (done) => {
+  it('should ntlm upper', function(done) {
     runNtlmTest(done, DomainCaseEnum.Upper);
   });
 });
 
-describe('Encrypt Test', () => {
-  it('should encrypt', (done) => {
+describe('Encrypt Test', function() {
+  it('should encrypt', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
 
@@ -369,7 +369,7 @@ describe('Encrypt Test', () => {
 describe('Insertion Tests', function() {
   this.timeout(30000);
 
-  it('should execSql', (done) => {
+  it('should execSql', function(done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
@@ -412,7 +412,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should numeric column name', (done) => {
+  it('should numeric column name', function(done) {
     const config = getConfig();
     config.options.useColumnNames = true;
 
@@ -451,7 +451,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should duplicate column name', (done) => {
+  it('should duplicate column name', function(done) {
     const config = getConfig();
     config.options.useColumnNames = true;
 
@@ -495,7 +495,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should exec Sql multiple times', (done) => {
+  it('should exec Sql multiple times', function(done) {
     const timesToExec = 5;
     let sqlExecCount = 0;
     const config = getConfig();
@@ -550,7 +550,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should exec sql with order', (done) => {
+  it('should exec sql with order', function(done) {
     const config = getConfig();
 
     const sql =
@@ -604,7 +604,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should exec Bad Sql', (done) => {
+  it('should exec Bad Sql', function(done) {
     const config = getConfig();
 
     const request = new Request('bad syntax here', function(err) {
@@ -633,7 +633,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should close connection request pending', (done) => {
+  it('should close connection request pending', function(done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
@@ -668,7 +668,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should sql with multiple result sets', (done) => {
+  it('should sql with multiple result sets', function(done) {
     const config = getConfig();
     let row = 0;
 
@@ -710,7 +710,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should row count for update', (done) => {
+  it('should row count for update', function(done) {
     const config = getConfig();
 
     const setupSql = `\
@@ -746,7 +746,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should row collection on request completion', (done) => {
+  it('should row collection on request completion', function(done) {
     const config = getConfig();
     config.options.rowCollectionOnRequestCompletion = true;
 
@@ -784,7 +784,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should row collection on Done', (done) => {
+  it('should row collection on Done', function(done) {
     const config = getConfig();
     config.options.rowCollectionOnDone = true;
 
@@ -832,7 +832,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should exec proc as sql', (done) => {
+  it('should exec proc as sql', function(done) {
     const config = getConfig();
 
     const request = new Request('exec sp_help int', function(err, rowCount) {
@@ -874,7 +874,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should reset Connection', (done) => {
+  it('should reset Connection', function(done) {
     const config = getConfig();
 
     function testAnsiNullsOptionOn(callback) {
@@ -948,7 +948,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should cancel request', (done) => {
+  it('should cancel request', function(done) {
     const config = getConfig();
 
     const request = new Request(
@@ -1000,7 +1000,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should request timeout', (done) => {
+  it('should request timeout', function(done) {
     const config = getConfig();
     config.options.requestTimeout = 1000;
 
@@ -1053,7 +1053,7 @@ describe('Insertion Tests', function() {
   });
 });
 
-describe('Advanced Input Test', () => {
+describe('Advanced Input Test', function() {
   function runSqlBatch(done, config, sql, requestCallback) {
     const connection = new Connection(config);
 
@@ -1074,7 +1074,7 @@ describe('Advanced Input Test', () => {
 
   // Test that the default behavior allows adding null values to a
   // temporary table where the nullability is not explicitly declared.
-  it('should test AnsiNullDefault', (done) => {
+  it('should test AnsiNullDefault', function(done) {
     const sql =
       'create table #testAnsiNullDefault (id int);\n' +
       'insert #testAnsiNullDefault values (null);\n' +
@@ -1087,7 +1087,7 @@ describe('Advanced Input Test', () => {
 
   // Test that the default behavior can be overridden (so that temporary
   // table columns are non-nullable by default).
-  it('should disable ansi null default', (done) => {
+  it('should disable ansi null default', function(done) {
     const sql =
       'create table #testAnsiNullDefaults (id int);\n' +
       'insert #testAnsiNullDefaults values (null);\n' +
@@ -1103,7 +1103,7 @@ describe('Advanced Input Test', () => {
   });
 });
 
-describe('Date Insert Test', () => {
+describe('Date Insert Test', function() {
   const testDateFirstImpl = (done, datefirst) => {
     datefirst = datefirst || 7;
     const config = getConfig();
@@ -1132,17 +1132,17 @@ describe('Date Insert Test', () => {
   };
 
   // Test that the default setting for DATEFIRST is 7
-  it('should test date first default', (done) => {
+  it('should test date first default', function(done) {
     testDateFirstImpl(done, undefined);
   });
 
   // Test that the DATEFIRST setting can be changed via an optional configuration
-  it('should test date first custom', (done) => {
+  it('should test date first custom', function(done) {
     testDateFirstImpl(done, 3);
   });
 
   // Test that an invalid DATEFIRST setting throws
-  it('should test bad date first', (done) => {
+  it('should test bad date first', function(done) {
     const config = getConfig();
     config.options.datefirst = -1;
 
@@ -1154,7 +1154,7 @@ describe('Date Insert Test', () => {
   });
 });
 
-describe('Language Insert Test', () => {
+describe('Language Insert Test', function() {
   function testLanguage(done, language) {
     language = language || 'us_english';
     const config = getConfig();
@@ -1182,17 +1182,17 @@ describe('Language Insert Test', () => {
     });
   }
   // Test that the default setting for LANGUAGE is us_english
-  it('should test language default', (done) => {
+  it('should test language default', function(done) {
     testLanguage(done, undefined);
   });
 
   // Test that the LANGUAGE setting can be changed via an optional configuration
-  it('should test language custom', (done) => {
+  it('should test language custom', function(done) {
     testLanguage(done, 'Deutsch');
   });
 });
 
-describe('should test date format', () => {
+describe('should test date format', function() {
   function testDateFormat(done, dateFormat) {
     dateFormat = dateFormat || 'mdy';
     const config = getConfig();
@@ -1223,17 +1223,17 @@ describe('should test date format', () => {
     });
   }
   // Test that the default setting for DATEFORMAT is mdy
-  it('should test date format default', (done) => {
+  it('should test date format default', function(done) {
     testDateFormat(done, undefined);
   });
 
   // Test that the DATEFORMAT setting can be changed via an optional configuration
-  it('should test custom dateformat', (done) => {
+  it('should test custom dateformat', function(done) {
     testDateFormat(done, 'dmy');
   });
 });
 
-describe('Boolean Config Options Test', () => {
+describe('Boolean Config Options Test', function() {
   function testBooleanConfigOption(done, optionName, optionValue, optionFlag, defaultOn) {
     const config = getConfig();
     config.options[optionName] = optionValue;
@@ -1289,179 +1289,179 @@ describe('Boolean Config Options Test', () => {
     done();
   }
 
-  it('should test ansi null default', (done) => {
+  it('should test ansi null default', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNull', undefined, 32, true);
   });
 
-  it('should test ansi null on', (done) => {
+  it('should test ansi null on', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNull', true, 32, true);
   });
 
-  it('should test ansi null off', (done) => {
+  it('should test ansi null off', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNull', false, 32, true);
   });
 
-  it('should test bad ansi null', (done) => {
+  it('should test bad ansi null', function(done) {
     testBadBooleanConfigOption(done, 'enableAnsiNull');
   });
 
-  it('should test ansi null default default', (done) => {
+  it('should test ansi null default default', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', undefined, 1024, true);
   });
 
-  it('should test ansi null default on', (done) => {
+  it('should test ansi null default on', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', true, 1024, true);
   });
 
-  it('should test ansi null default off', (done) => {
+  it('should test ansi null default off', function(done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', false, 1024, true);
   });
 
-  it('should test bad ansi null default', (done) => {
+  it('should test bad ansi null default', function(done) {
     testBadBooleanConfigOption(done, 'enableAnsiNullDefault');
   });
 
-  it('should test ansi padding default', (done) => {
+  it('should test ansi padding default', function(done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', undefined, 16, true);
   });
 
-  it('should test ansi padding on', (done) => {
+  it('should test ansi padding on', function(done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', true, 16, true);
   });
 
-  it('should test ansi padding off', (done) => {
+  it('should test ansi padding off', function(done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', false, 16, true);
   });
 
-  it('should test bad ansi padding', (done) => {
+  it('should test bad ansi padding', function(done) {
     testBadBooleanConfigOption(done, 'enableAnsiPadding');
   });
 
-  it('should test ansi warnings default', (done) => {
+  it('should test ansi warnings default', function(done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', undefined, 8, true);
   });
 
-  it('should test ansi warnings on', (done) => {
+  it('should test ansi warnings on', function(done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', true, 8, true);
   });
 
-  it('should test ansi warnings off', (done) => {
+  it('should test ansi warnings off', function(done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', false, 8, true);
   });
 
-  it('should test bad ansi warnings', (done) => {
+  it('should test bad ansi warnings', function(done) {
     testBadBooleanConfigOption(done, 'enableAnsiWarnings');
   });
 
-  it('should test arith abort default', (done) => {
+  it('should test arith abort default', function(done) {
     testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, false);
   });
 
-  it('should test arith abort on', (done) => {
+  it('should test arith abort on', function(done) {
     testBooleanConfigOption(done, 'enableArithAbort', true, 64, false);
   });
 
-  it('should test arith abort off', (done) => {
+  it('should test arith abort off', function(done) {
     testBooleanConfigOption(done, 'enableArithAbort', false, 64, false);
   });
 
-  it('should test bad arith abort', (done) => {
+  it('should test bad arith abort', function(done) {
     testBadBooleanConfigOption(done, 'enableArithAbort');
   });
 
-  it('should test concat null yield null default', (done) => {
+  it('should test concat null yield null default', function(done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', undefined, 4096, true);
   });
 
-  it('should test concat null yields null on', (done) => {
+  it('should test concat null yields null on', function(done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', true, 4096, true);
   });
 
-  it('should test ocncat null yields null off', (done) => {
+  it('should test ocncat null yields null off', function(done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', false, 4096, true);
   });
 
-  it('should test bad concat null yields null', (done) => {
+  it('should test bad concat null yields null', function(done) {
     testBadBooleanConfigOption(done, 'enableConcatNullYieldsNull');
   });
 
-  it('should test cursor close on commit default', (done) => {
+  it('should test cursor close on commit default', function(done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', undefined, 4, false);
   });
 
-  it('should test cursor close on commit on', (done) => {
+  it('should test cursor close on commit on', function(done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', true, 4, false);
   });
 
-  it('should test cursor close on commit off', (done) => {
+  it('should test cursor close on commit off', function(done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', false, 4, false);
   });
 
-  it('should test bad cursor close on commit', (done) => {
+  it('should test bad cursor close on commit', function(done) {
     testBadBooleanConfigOption(done, 'enableCursorCloseOnCommit');
   });
 
-  it('should test implicit transactions default', (done) => {
+  it('should test implicit transactions default', function(done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', undefined, 2, false);
   });
 
-  it('should test implicit transactions on', (done) => {
+  it('should test implicit transactions on', function(done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', true, 2, false);
   });
 
-  it('should test implicit transactions off', (done) => {
+  it('should test implicit transactions off', function(done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', false, 2, false);
   });
 
-  it('should test bad implicit transactions', (done) => {
+  it('should test bad implicit transactions', function(done) {
     testBadBooleanConfigOption(done, 'enableImplicitTransactions');
   });
 
-  it('should test numeric round abort default', (done) => {
+  it('should test numeric round abort default', function(done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', undefined, 8192, false);
   });
 
-  it('should test numeric round abort on', (done) => {
+  it('should test numeric round abort on', function(done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', true, 8192, false);
   });
 
-  it('should test numeric round abort off', (done) => {
+  it('should test numeric round abort off', function(done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', false, 8192, false);
   });
 
-  it('should test bad numeric round abort', (done) => {
+  it('should test bad numeric round abort', function(done) {
     testBadBooleanConfigOption(done, 'enableNumericRoundabort');
   });
 
-  it('should test quoted identifier default', (done) => {
+  it('should test quoted identifier default', function(done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', undefined, 256, true);
   });
 
-  it('should test quoted identifier on', (done) => {
+  it('should test quoted identifier on', function(done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', true, 256, true);
   });
 
-  it('should test quoted identifier off', (done) => {
+  it('should test quoted identifier off', function(done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', false, 256, true);
   });
 
-  it('should test bad quoted identifier', (done) => {
+  it('should test bad quoted identifier', function(done) {
     testBadBooleanConfigOption(done, 'enableQuotedIdentifier');
   });
 
-  it('should test abort transaction on error default', (done) => {
+  it('should test abort transaction on error default', function(done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', undefined, 16384, false);
   });
 
-  it('should test abort transaction on error on', (done) => {
+  it('should test abort transaction on error on', function(done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', true, 16384, false);
   });
 
-  it('should test abort transaction on error off', (done) => {
+  it('should test abort transaction on error off', function(done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', false, 16384, false);
   });
 
-  it('should test bad abort transaction on error', (done) => {
+  it('should test bad abort transaction on error', function(done) {
     testBadBooleanConfigOption(done, 'abortTransactionOnError');
   });
 });

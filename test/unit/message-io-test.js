@@ -18,8 +18,8 @@ class Connection extends Duplex {
 const packetType = 2;
 const packetSize = 8 + 4;
 
-describe('Message IO', () => {
-  it('should send smaller than one packet', (done) => {
+describe('Message IO', function() {
+  it('should send smaller than one packet', function(done) {
     const payload = Buffer.from([1, 2, 3]);
 
     const connection = new Connection();
@@ -35,7 +35,7 @@ describe('Message IO', () => {
     io.sendMessage(packetType, payload);
   });
 
-  it('should send exact packet', (done) => {
+  it('should send exact packet', function(done) {
     const payload = Buffer.from([1, 2, 3, 4]);
 
     const connection = new Connection();
@@ -51,7 +51,7 @@ describe('Message IO', () => {
     io.sendMessage(packetType, payload);
   });
 
-  it('should send one longer than packet', (done) => {
+  it('should send one longer than packet', function(done) {
     const payload = Buffer.from([1, 2, 3, 4, 5]);
     let packetNumber = 0;
 
@@ -80,7 +80,7 @@ describe('Message IO', () => {
     io.sendMessage(packetType, payload);
   });
 
-  it('should recieve one packet', (done) => {
+  it('should recieve one packet', function(done) {
     const payload = Buffer.from([1, 2, 3]);
     const connection = new Connection();
 
@@ -98,7 +98,7 @@ describe('Message IO', () => {
     connection.push(packet.buffer);
   });
 
-  it('should recieve one packet in two chunks', (done) => {
+  it('should recieve one packet in two chunks', function(done) {
     const payload = Buffer.from([1, 2, 3]);
     const connection = new Connection();
 
@@ -117,7 +117,7 @@ describe('Message IO', () => {
     connection.push(packet.buffer.slice(4));
   });
 
-  it('should recieve two packets', (done) => {
+  it('should recieve two packets', function(done) {
     const payload = Buffer.from([1, 2, 3]);
     const payload1 = payload.slice(0, 2);
     const payload2 = payload.slice(2, 3);
@@ -152,7 +152,7 @@ describe('Message IO', () => {
     connection.push(packet.buffer);
   });
 
-  it('should recieve two packets with chunk spanning packets', (done) => {
+  it('should recieve two packets with chunk spanning packets', function(done) {
     const payload = Buffer.from([1, 2, 3, 4]);
     const payload1 = payload.slice(0, 2);
     const payload2 = payload.slice(2, 4);
@@ -191,7 +191,7 @@ describe('Message IO', () => {
     connection.push(packet2.buffer.slice(4));
   });
 
-  it('should recieve multiple packets with more than one packet from one chunk', (done) => {
+  it('should recieve multiple packets with more than one packet from one chunk', function(done) {
     const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
     const connection = new Connection();
     let receivedData = Buffer.alloc(0);

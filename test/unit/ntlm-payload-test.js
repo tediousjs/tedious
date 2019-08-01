@@ -1,8 +1,8 @@
 const NTLMPayload = require('../../src/ntlm-payload');
 const assert = require('chai').assert;
 
-describe('ntlm payload test', () => {
-  it('should respond to challenge', (done) => {
+describe('ntlm payload test', function() {
+  it('should respond to challenge', function(done) {
     const challenge = {
       domain: 'domain',
       userName: 'username',
