@@ -4,35 +4,35 @@ const TYPES = require('tedious').TYPES;
 
 const config = {
   server: '192.168.1.212',
-  authentication:{
-      type:'default',
-      options:{
-          userName: 'test',
-          password: 'test'
-      }
+  authentication: {
+    type: 'default',
+    options: {
+      userName: 'test',
+      password: 'test'
+    }
   },
   options: {
-      port: 1433 //Default Port
+    port: 1433 // Default Port
   }
-}
+};
 
 const connection = new Connection(config);
 
 const storedProcedure = '[dbo].[test_sp_tvp]';
 const table = '[dbo].[test_tvp]';
-const table_type = 'TableType'
+const table_type = 'TableType';
 
 
 connection.on('connect', (err) => {
   if (err) {
-    console.log('connection err')
-    throw err
+    console.log('connection err');
+    throw err;
   } else {
     createTable();
   }
-})
+});
 
-//Creating new table called [dbo].[test_proced]
+// Creating new table called [dbo].[test_proced]
 //--------------------------------------------------------------------------------
 function createTable() {
   const sql =
@@ -46,18 +46,18 @@ function createTable() {
     if (err) {
       throw err;
     } else {
-      console.log(`'${table}' created!`)
+      console.log(`'${table}' created!`);
     }
-  })
+  });
 
   request.on('requestCompleted', () => {
     createTableType();
-  })
+  });
 
   connection.execSql(request);
 }
 
-//Creating user-defined table type called 'TableType'
+// Creating user-defined table type called 'TableType'
 //--------------------------------------------------------------------------------
 function createTableType() {
   /* Create a table type */
@@ -74,17 +74,17 @@ function createTableType() {
       console.log('creating table err');
       throw err;
     }
-  })
+  });
 
   request.on('requestCompleted', () => {
-    console.log(`created table type ${table_type}`)
+    console.log(`created table type ${table_type}`);
     createStoredProcedure();
-  })
+  });
 
   connection.execSql(request);
 }
 
-//Creating new stored procedure called [dbo].[test_sp_tvp]
+// Creating new stored procedure called [dbo].[test_sp_tvp]
 //--------------------------------------------------------------------------------
 function createStoredProcedure() {
   const define_proc =
@@ -105,18 +105,18 @@ function createStoredProcedure() {
       console.log('defining tables and types err!');
       throw err;
     }
-  })
+  });
 
   request.on('requestCompleted', () => {
-    console.log(`created stored procedure ${storedProcedure}`)
+    console.log(`created stored procedure ${storedProcedure}`);
     passingTableValue();
-  })
+  });
 
   connection.execSqlBatch(request);
 
 }
 
-//Using table valued parameters
+// Using table valued parameters
 //--------------------------------------------------------------------------------
 function passingTableValue() {
   /* Setting table value */
@@ -132,7 +132,7 @@ function passingTableValue() {
     ]
   };
 
-  const request = new Request(`${storedProcedure}`, function (err) {
+  const request = new Request(`${storedProcedure}`, function(err) {
     if (err) {
       throw err;
     }
@@ -144,8 +144,8 @@ function passingTableValue() {
   connection.callProcedure(request);
 
   request.on('requestCompleted', () => {
-    console.log('successfully passed in table value')
+    console.log('successfully passed in table value');
     console.log('DONE!');
     connection.close();
-  })
+  });
 }
