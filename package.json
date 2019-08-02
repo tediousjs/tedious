@@ -85,6 +85,9 @@
     "semantic-release": "semantic-release"
   },
   "babel": {
+    "ignore": [
+      "./src/**/*.d.ts"
+    ],
     "presets": [
       [
         "@babel/preset-env",
