@@ -1,12 +1,9 @@
-// @flow
-
 const BufferList = require('bl');
 const { Transform } = require('readable-stream');
 
-const Message = require('./message');
-const { Packet, HEADER_LENGTH } = require('./packet');
-
-import type Debug from './debug';
+import Debug from './debug';
+import Message from './message';
+import { Packet, HEADER_LENGTH } from './packet';
 
 /**
   IncomingMessageStream
@@ -14,8 +11,8 @@ import type Debug from './debug';
 */
 class IncomingMessageStream extends Transform {
   debug: Debug;
-  bl: BufferList;
-  currentMessage: Message | typeof undefined;
+  bl: any;
+  currentMessage: Message | undefined;
 
   constructor(debug: Debug) {
     super({ readableObjectMode: true });
@@ -90,10 +87,11 @@ class IncomingMessageStream extends Transform {
     callback();
   }
 
-  _transform(chunk: Buffer, encoding: void, callback: () => void) {
+  _transform(chunk: Buffer, _encoding: string, callback: () => void) {
     this.bl.append(chunk);
     this.processBufferedData(callback);
   }
 }
 
+export default IncomingMessageStream;
 module.exports = IncomingMessageStream;

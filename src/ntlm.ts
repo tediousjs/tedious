@@ -1,5 +1,3 @@
-// @flow
-
 const NTLMFlags = {
   NTLM_NegotiateUnicode: 0x00000001,
   NTLM_NegotiateOEM: 0x00000002,
@@ -35,7 +33,7 @@ const NTLMFlags = {
   NTLM_Negotiate56: 0x80000000
 };
 
-function createNTLMRequest(options: { domain: string, workstation?: string }) {
+export function createNTLMRequest(options: { domain: string, workstation?: string }) {
   const domain = escape(options.domain.toUpperCase());
   const workstation = options.workstation ? escape(options.workstation.toUpperCase()) : '';
 
@@ -71,5 +69,3 @@ function createNTLMRequest(options: { domain: string, workstation?: string }) {
 
   return Buffer.concat(buffers);
 }
-
-module.exports.createNTLMRequest = createNTLMRequest;
