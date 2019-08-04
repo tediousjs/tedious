@@ -56,7 +56,6 @@
     "@babel/core": "^7.5.5",
     "@babel/node": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
-    "@babel/preset-flow": "^7.0.0",
     "@babel/preset-typescript": "^7.3.3",
     "@babel/register": "^7.5.5",
     "@commitlint/cli": "^8.0.0",
@@ -67,7 +66,6 @@
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
     "eslint": "^5.16.0",
-    "flow-bin": "^0.100.0",
     "mitm": "^1.7.0",
     "mocha": "^6.1.4",
     "nodeunit": "^0.11.3",
@@ -77,7 +75,7 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "lint": "eslint src test --ext .js,.ts && tsc && flow",
+    "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
@@ -98,8 +96,7 @@
           }
         }
       ],
-      "@babel/preset-typescript",
-      "@babel/flow"
+      "@babel/preset-typescript"
     ]
   },
   "commitlint": {
