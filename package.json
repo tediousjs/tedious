@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@azure/ms-rest-nodeauth": "^2.0.2",
+    "@types/node": "^12.6.9",
     "big-number": "1.0.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
