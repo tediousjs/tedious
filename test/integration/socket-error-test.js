@@ -1,6 +1,5 @@
 const fs = require('fs');
 const { assert } = require('chai');
-
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 
