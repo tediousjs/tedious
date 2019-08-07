@@ -40,6 +40,7 @@
     "tag": "next"
   },
   "dependencies": {
+    "@azure/identity": "^1.0.0-preview.2",
     "@azure/ms-rest-nodeauth": "^2.0.2",
     "big-number": "1.0.0",
     "bl": "^3.0.0",
