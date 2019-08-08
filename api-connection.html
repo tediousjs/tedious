@@ -52,13 +52,28 @@ title: API - Connection
 <h2 id="function_newConnection">new Connection(config)</h2>
 {% highlight javascript %}
 var Connection = require('tedious').Connection;
-var config = {...};
+var config = {
+  "authentication": {
+    ...,
+    "options": {...}
+  },
+
+  "options": {
+    ...
+  }
+};
 var connection = new Connection(config);
 {% endhighlight %}
 
 <div class="argument">
   <div class="name">config</div>
   <div class="description">
+
+    <p>Note: be aware of the different options field: <br>
+        <dd>1) config.authentication.options</dd>
+        <dd>2) config.options</dd> 
+    </p>
+
     <dl>
       <dt>
         <code>server</code>
@@ -66,19 +81,20 @@ var connection = new Connection(config);
       <dd>
         Hostname to connect to.
       </dd>
-	  
+
       <dt>
         <code>authentication.type</code>
       </dt>
       <dd>
-          Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>, <code>azure-active-directory-password</code>
+        Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>,
+        <code>azure-active-directory-password</code>
       </dd>
-      
-	  <dt>
+
+      <dt>
         <code>authentication.options.userName</code>
       </dt>
       <dd>
-          User name to use for authentication.
+        User name to use for authentication.
       </dd>
 
       <dt>
@@ -96,115 +112,21 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
-        <code>options.port</code>
-      </dt>
-      <dd>
-        Port to connect to (default: <code>1433</code>).
-        <br/>
-        Mutually exclusive with <code>options.instanceName</code>.
-      </dd>
-
-      <dt>
-        <code>options.instanceName</code>
-      </dt>
-      <dd>
-        The instance name to connect to.
-        The SQL Server Browser service must be running on the database server,
-        and UDP port 1434 on the database server must be reachable.
-        <br/>
-        (no default)
-        <br/>
-        Mutually exclusive with <code>options.port</code>.
-      </dd>
-
-      <dt>
-        <code>options.database</code>
-      </dt>
-      <dd>
-        Database to connect to (default: dependent on server configuration).
-      </dd>
-
-      <dt>
-        <code>options.fallbackToDefaultDb</code>
-      </dt>
-      <dd>
-        By default, if the database requested by <code>options.database</code> cannot be accessed,
-        the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
-        set to <code>true</code>, then the user's default database will be used instead
-        (Default: <code>false</code>).
-      </dd>
-
-      <dt>
-        <code>options.enableAnsiNullDefault</code>
-      </dt>
-      <dd>
-        If true, <code>SET ANSI_NULL_DFLT_ON ON</code> will be set in the initial sql. This means new columns will be nullable by default. See the <a href="https://msdn.microsoft.com/en-us/library/ms187375.aspx">T-SQL documentation</a> for more details.
-        (Default: <code>true</code>).
-      </dd>
-
-      <dt>
-        <code>options.connectTimeout</code>
-      </dt>
-      <dd>
-        The number of milliseconds before the attempt to connect is considered failed
-        (default: <code>15000</code>).
-      </dd>
-
-      <dt>
-        <code>options.requestTimeout</code>
-      </dt>
-      <dd>
-        The number of milliseconds before a request is considered failed, or <code>0</code> for no timeout
-        (default: <code>15000</code>).
-      </dd>
-
-      <dt>
-        <code>options.cancelTimeout</code>
-      </dt>
-      <dd>
-        The number of milliseconds before the cancel (abort) of a request is considered failed
-        (default: <code>5000</code>).
-      </dd>
-
-      <dt>
-        <code>options.packetSize</code>
-      </dt>
-      <dd>
-        The size of TDS packets (subject to negotiation with the server).
-        Should be a power of 2.
-        (default: <code>4096</code>).
-      </dd>
-
-      <dt>
-        <code>options.useUTC</code>
-      </dt>
-      <dd>
-        A boolean determining whether to pass time values in UTC or local time.
-        (default: <code>true</code>).
-      </dd>
-
-      <dt>
         <code>options.abortTransactionOnError</code>
       </dt>
       <dd>
         A boolean determining whether to rollback a transaction automatically if any error is encountered
         during the given transaction's execution. This sets the value for <code>SET XACT_ABORT</code> during the
-        initial SQL phase of a connection (<a href="http://msdn.microsoft.com/en-us/library/ms188792.aspx" target="_blank">documentation</a>).
+        initial SQL phase of a connection (<a href="http://msdn.microsoft.com/en-us/library/ms188792.aspx"
+          target="_blank">documentation</a>).
       </dd>
 
       <dt>
-        <code>options.localAddress</code>
+        <code>options.appName </code>
       </dt>
       <dd>
-        A string indicating which network interface (ip address) to use when connecting to SQL Server.
-      </dd>
-
-      <dt>
-        <code>options.useColumnNames</code>
-      </dt>
-      <dd>
-        A boolean determining whether to return rows as arrays or key-value collections.
-        (default: <code>false</code>).
+        Application name used for identifying a specific application in profiling, logging or tracing tools of SQL
+        Server. (default: <code>Tedious</code>)
       </dd>
 
       <dt>
@@ -217,61 +139,37 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
+        <code>options.cancelTimeout</code>
+      </dt>
+      <dd>
+        The number of milliseconds before the cancel (abort) of a request is considered failed
+        (default: <code>5000</code>).
+      </dd>
+      
+      <dt>
         <code>options.columnNameReplacer</code>
       </dt>
       <dd>
-        A function with parameters <code>(columnName, index, columnMetaData)</code> and returning a string. If provided, 
-        this will be called once per column per result-set. The returned value will be used instead of the SQL-provided 
+        A function with parameters <code>(columnName, index, columnMetaData)</code> and returning a string. If provided,
+        this will be called once per column per result-set. The returned value will be used instead of the SQL-provided
         column name on row and meta data objects. This allows you to dynamically convert between naming conventions.
         (default: <code>null</code>).
       </dd>
 
       <dt>
-        <code>options.debug.packet</code>
+        <code>options.connectionRetryInterval</code>
       </dt>
       <dd>
-        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet details
-        (default: <code>false</code>).
+        Number of milliseconds before retrying to establish connection, in case of transient failure. (default:
+        <code>500</code>)
       </dd>
-
+      
       <dt>
-        <code>options.debug.data</code>
+        <code>options.connectTimeout</code>
       </dt>
       <dd>
-        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet data details
-        (default: <code>false</code>).
-      </dd>
-
-      <dt>
-        <code>options.debug.payload</code>
-      </dt>
-      <dd>
-        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet payload details
-        (default: <code>false</code>).
-      </dd>
-
-      <dt>
-        <code>options.debug.token</code>
-      </dt>
-      <dd>
-        A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream tokens
-        (default: <code>false</code>).
-      </dd>
-
-      <dt>
-        <code>options.isolationLevel</code>
-      </dt>
-      <dd>
-        The default isolation level that transactions will be run with.
-        The isolation levels are available from <code>require('tedious').ISOLATION_LEVEL</code> .
-        <ul>
-          <li><code>READ_UNCOMMITTED</code></li>
-          <li><code>READ_COMMITTED</code></li>
-          <li><code>REPEATABLE_READ</code></li>
-          <li><code>SERIALIZABLE</code></li>
-          <li><code>SNAPSHOT</code></li>
-        </ul>
-        (default: <code>READ_COMMITED</code>).
+        The number of milliseconds before the attempt to connect is considered failed
+        (default: <code>15000</code>).
       </dd>
 
       <dt>
@@ -291,59 +189,302 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
-        <code>options.readOnlyIntent</code>
-      </dt>
-      <dd>
-        A boolean, determining whether the connection will request read only access from a SQL Server Availability Group. For more information, see <a href="http://msdn.microsoft.com/en-us/library/hh710054.aspx" title="Microsoft: Configure Read-Only Routing for an Availability Group (SQL Server)">here</a>.
-        (default: <code>false</code>).
-      </dd>
-
-      <dt>
-        <code>options.encrypt</code>
-      </dt>
-      <dd>
-        A boolean determining whether or not the connection will be encrypted. Set to <code>true</code> if you're on Windows Azure.
-        (default: <code>false</code>).
-      </dd>
-
-      <dt>
         <code>options.cryptoCredentialsDetails</code>
       </dt>
       <dd>
         When encryption is used, an object may be supplied that will be used
         for the first argument when calling
-        <a href="http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized">tls.createSecurePair</a>
+        <a
+          href="http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized">tls.createSecurePair</a>
         (default: <code>{}</code>).
       </dd>
 
-        <dt>
-            <code>options.rowCollectionOnDone</code>
-        </dt>
-        <dd>
-            A boolean, that when true will expose received rows in Requests' <code>done*</code> events.
-            See <a href="api-request.html#event_done">done</a>,
-            <a href="api-request.html#event_doneInProc">doneInProc</a>
-            and <a href="api-request.html#event_doneProc">doneProc</a>.
-            (default: <code>false</code>)
-
-            <p>
-                Caution: If many row are received, enabling this option could result in
-                excessive memory usage.
-            </p>
-        </dd>
-
       <dt>
-          <code>options.rowCollectionOnRequestCompletion</code>
+        <code>options.database</code>
       </dt>
       <dd>
-          A boolean, that when true will expose received rows in Requests' completion callback.
-          See <a href="api-request.html#function_newRequest">new Request</a>.
-          (default: <code>false</code>)
+        Database to connect to (default: dependent on server configuration).
+      </dd>
 
-          <p>
-              Caution: If many row are received, enabling this option could result in
-              excessive memory usage.
-          </p>
+      <dt>
+        <code>options.datefirst</code>
+      </dt>
+      <dd>
+        Sets the first day of the week to a number from 1 through 7.
+      </dd>
+
+      <dt>
+        <code>options.dateFormat</code>
+      </dt>
+      <dd>
+        A string representing position of month, day and year in temporal datatypes. (default: <code>mdy</code>)
+      </dd>
+
+      <dt>
+        <code>options.debug.packet</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet details
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.debug.data</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet data
+        details
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.debug.payload</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing packet payload
+        details
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.debug.token</code>
+      </dt>
+      <dd>
+        A boolean, controlling whether <code>debug</code> events will be emitted with text describing token stream
+        tokens
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.enableAnsiNull</code>
+      </dt>
+      <dd>
+        A boolean, controls the way null values should be used during comparison operation. (default: <code>true</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableAnsiNullDefault</code>
+      </dt>
+      <dd>
+        If true, <code>SET ANSI_NULL_DFLT_ON ON</code> will be set in the initial sql. This means new columns will be
+        nullable by default. See the <a href="https://msdn.microsoft.com/en-us/library/ms187375.aspx">T-SQL
+          documentation</a> for more details.
+        (Default: <code>true</code>).
+      </dd>
+
+      
+      <dt>
+        <code>options.enableAnsiPadding</code>
+      </dt>
+      <dd>
+        A boolean, controls if padding should be applied for values shorter than the size of defined column. (default:
+        <code>true</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableAnsiWarnings</code>
+      </dt>
+      <dd>
+        If true, SQL Server will follow ISO standard behavior during various error conditions. For details, see <a
+          href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-ansi-warnings-transact-sql">documentation</a>.
+        (default: <code>true</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableArithAbort</code>
+      </dt>
+      <dd>
+        Ends a query when an overflow or divide-by-zero error occurs during query execution. 
+        See <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017">documentation</a>
+        for more details.
+        (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableConcatNullYieldsNull</code>
+      </dt>
+      <dd>
+        A boolean, determines if concatenation with NULL should result in NULL or empty string value, more details in <a
+          href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql">documentation</a>.
+        (default: <code>true</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableCursorCloseOnCommit</code>
+      </dt>
+      <dd>
+        A boolean, controls whether cursor should be closed, if the transaction opening it gets committed or rolled
+        back. (default: <code>null</code>)
+      </dd>
+
+      <dt>
+        <code>options.enableImplicitTransactions</code>
+      </dt>
+      <dd>
+        A boolean, sets the connection to either implicit or autocommit transaction mode. (default: <code>false</code>)
+      </dd>
+
+      
+      <dt>
+        <code>options.enableNumericRoundabort</code>
+      </dt>
+      <dd>
+        If false, error is not generated during loss of precession. (default: <code>false</code>)
+      </dd>
+
+      
+      <dt>
+        <code>options.enableQuotedIdentifier </code>
+      </dt>
+      <dd>
+        If true, characters enclosed in single quotes are treated as literals and those enclosed double quotes are
+        treated as identifiers. (default: <code>true</code>)
+      </dd>
+
+      
+      <dt>
+        <code>options.encrypt</code>
+      </dt>
+      <dd>
+        A boolean determining whether or not the connection will be encrypted. Set to <code>true</code> if you're on
+        Windows Azure.
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.fallbackToDefaultDb</code>
+      </dt>
+      <dd>
+        By default, if the database requested by <code>options.database</code> cannot be accessed,
+        the connection will fail with an error. However, if <code>options.fallbackToDefaultDb</code> is
+        set to <code>true</code>, then the user's default database will be used instead
+        (Default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.instanceName</code>
+      </dt>
+      <dd>
+        The instance name to connect to.
+        The SQL Server Browser service must be running on the database server,
+        and UDP port 1434 on the database server must be reachable.
+        <br />
+        (no default)
+        <br />
+        Mutually exclusive with <code>options.port</code>.
+      </dd>
+      
+      <dt>
+        <code>options.isolationLevel</code>
+      </dt>
+      <dd>
+        The default isolation level that transactions will be run with.
+        The isolation levels are available from <code>require('tedious').ISOLATION_LEVEL</code> .
+        <ul>
+          <li><code>READ_UNCOMMITTED</code></li>
+          <li><code>READ_COMMITTED</code></li>
+          <li><code>REPEATABLE_READ</code></li>
+          <li><code>SERIALIZABLE</code></li>
+          <li><code>SNAPSHOT</code></li>
+        </ul>
+        (default: <code>READ_COMMITED</code>).
+      </dd>
+         
+      <dt>
+        <code>options.language</code>
+      </dt>
+      <dd>
+        Specifies the language environment for the session. The session language determines the datetime formats and system messages.
+        (default: <code>us_english</code>).
+      </dd>
+
+      <dt>
+        <code>options.localAddress</code>
+      </dt>
+      <dd>
+        A string indicating which network interface (ip address) to use when connecting to SQL Server.
+      </dd>
+      
+      <dt>
+        <code>options.maxRetriesOnTransientErrors</code>
+      </dt>
+      <dd>
+        The maximum number of connection retries for transient errors. 
+        (default: <code>3</code>).
+      </dd>
+
+      <dt>
+        <code>options.multiSubnetFailover</code>
+      </dt>
+      <dd>
+        Sets the MultiSubnetFailover = True parameter, which can help minimize the client recovery latency when failovers occur.
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.packetSize</code>
+      </dt>
+      <dd>
+        The size of TDS packets (subject to negotiation with the server).
+        Should be a power of 2.
+        (default: <code>4096</code>).
+      </dd>  
+      
+      <dt>
+        <code>options.port</code>
+      </dt>
+      <dd>
+        Port to connect to (default: <code>1433</code>).
+        <br />
+        Mutually exclusive with <code>options.instanceName</code>.
+      </dd>
+
+      <dt>
+        <code>options.readOnlyIntent</code>
+      </dt>
+      <dd>
+        A boolean, determining whether the connection will request read only access from a SQL Server Availability
+        Group. For more information, see <a href="http://msdn.microsoft.com/en-us/library/hh710054.aspx"
+          title="Microsoft: Configure Read-Only Routing for an Availability Group (SQL Server)">here</a>.
+        (default: <code>false</code>).
+      </dd>
+
+      <dt>
+        <code>options.requestTimeout</code>
+      </dt>
+      <dd>
+        The number of milliseconds before a request is considered failed, or <code>0</code> for no timeout
+        (default: <code>15000</code>).
+      </dd>
+
+      <dt>
+        <code>options.rowCollectionOnDone</code>
+      </dt>
+      <dd>
+        A boolean, that when true will expose received rows in Requests' <code>done*</code> events.
+        See <a href="api-request.html#event_done">done</a>,
+        <a href="api-request.html#event_doneInProc">doneInProc</a>
+        and <a href="api-request.html#event_doneProc">doneProc</a>.
+        (default: <code>false</code>)
+
+        <p>
+          Caution: If many row are received, enabling this option could result in
+          excessive memory usage.
+        </p>
+      </dd>
+
+      <dt>
+        <code>options.rowCollectionOnRequestCompletion</code>
+      </dt>
+      <dd>
+        A boolean, that when true will expose received rows in Requests' completion callback.
+        See <a href="api-request.html#function_newRequest">new Request</a>.
+        (default: <code>false</code>)
+
+        <p>
+          Caution: If many row are received, enabling this option could result in
+          excessive memory usage.
+        </p>
       </dd>
 
       <dt>
@@ -363,80 +504,40 @@ var connection = new Connection(config);
       </dd>
 
       <dt>
-          <code>options.connectionRetryInterval</code>
+        <code>options.textsize</code>
       </dt>
       <dd>
-          Number of milliseconds before retrying to establish connection, in case of transient failure. (default: <code>500</code>)
+        Specifies the size of varchar(max), nvarchar(max), varbinary(max), text, ntext, and image data returned by a SELECT statement.
+        (default: <code>2147483647</code>).
       </dd>
 
       <dt>
-          <code>options.dateFormat</code>
+        <code>options.trustServerCertificate</code>
       </dt>
       <dd>
-          A string representing position of month, day and year in temporal datatypes. (default: <code>mdy</code>)
+        If "true", the SQL Server SSL certificate is automatically trusted when the communication layer is encrypted using SSL.
+
+        If "false", the SQL Server validates the server SSL certificate. If the server certificate validation fails, 
+        the driver raises an error and terminate the connection. The default value is "false". Make sure the value passed to serverName exactly 
+        matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed. 
+        For more information, see <a href="https://docs.microsoft.com/en-us/sql/connect/jdbc/understanding-ssl-support?view=sql-server-2017">Understanding SSL Support.</a>
+        (default: <code>false</code>).
       </dd>
 
       <dt>
-          <code>options.enableAnsiNull</code>
+        <code>options.useColumnNames</code>
       </dt>
       <dd>
-          A boolean, controls the way null values should be used during comparison operation. (default: <code>true</code>)
+        A boolean determining whether to return rows as arrays or key-value collections.
+        (default: <code>false</code>).
       </dd>
 
       <dt>
-          <code>options.enableAnsiPadding</code>
+        <code>options.useUTC</code>
       </dt>
       <dd>
-          A boolean, controls if padding should be applied for values shorter than the size of defined column. (default: <code>true</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableAnsiWarnings</code>
-      </dt>
-      <dd>
-          If true, SQL Server will follow ISO standard behavior during various error conditions. For details, see <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-ansi-warnings-transact-sql">documentation</a>. (default: <code>true</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableConcatNullYieldsNull</code>
-      </dt>
-      <dd>
-          A boolean, determines if concatenation with NULL should result in NULL or empty string value, more details in <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql">documentation</a>. (default: <code>true</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableCursorCloseOnCommit</code>
-      </dt>
-      <dd>
-          A boolean, controls whether cursor should be closed, if the transaction opening it gets committed or rolled back. (default: <code>false</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableImplicitTransactions</code>
-      </dt>
-      <dd>
-          A boolean, sets the connection to either implicit or autocommit transaction mode. (default: <code>false</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableNumericRoundabort</code>
-      </dt>
-      <dd>
-          If false, error is not generated during loss of precession. (default: <code>false</code>)
-      </dd>
-
-      <dt>
-          <code>options.enableQuotedIdentifier </code>
-      </dt>
-      <dd>
-          If true, characters enclosed in single quotes are treated as literals and those enclosed double quotes are treated as identifiers. (default: <code>true</code>)
-      </dd>
-
-      <dt>
-          <code>options.appName </code>
-      </dt>
-      <dd>
-          Application name used for identifying a specific application in profiling, logging or tracing tools of SQL Server. (default: <code>Tedious</code>)
+        A boolean determining whether to pass time values in UTC or local time.
+        (default: <code>true</code>).
       </dd>
 
     </dl>
@@ -464,7 +565,8 @@ var connection = new Connection(config);
 <span class="function">function () { }</span>
 <p>
   The connection has ended.
-  This may be as a result of the client calling <code>close()</code>, the server closing the connection, or a network error.
+  This may be as a result of the client calling <code>close()</code>, the server closing the connection, or a network
+  error.
 </p>
 
 <h2 id="event_error">Event: 'error'</h2>
@@ -604,7 +706,8 @@ var connection = new Connection(config);
       </a>
       stream of a tls SecurePair.
       The <a href="http://nodejs.org/docs/latest/api/tls.html#tls_cleartextstream_getcipher">cipher</a>
-      and <a href="http://nodejs.org/docs/latest/api/tls.html#tls_cleartextstream_getpeercertificate">peer certificate</a>
+      and <a href="http://nodejs.org/docs/latest/api/tls.html#tls_cleartextstream_getpeercertificate">peer
+        certificate</a>
       (server certificate) may be inspected if desired.
     </p>
   </div>
@@ -701,12 +804,12 @@ var connection = new Connection(config);
   Execute the SQL represented by <code>request</code>.
 </p>
 <p>
-  As <code>sp_executesql</code> is used to execute the SQL, if the same SQL is executed multiples times 
-  using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates 
-  for the first execution.  This may also result in SQL server treating the request like a stored procedure 
-  which can result in the <a href="api-request.html#event_doneInProc"><code>doneInProc</code></a> or 
-  <a href="api-request.html#event_doneProc"><code>doneProc</code></a> events being emitted instead of the 
-  <a href="api-request.html#event_done"><code>done</code></a> event you might expect.  Using 
+  As <code>sp_executesql</code> is used to execute the SQL, if the same SQL is executed multiples times
+  using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+  for the first execution. This may also result in SQL server treating the request like a stored procedure
+  which can result in the <a href="api-request.html#event_doneInProc"><code>doneInProc</code></a> or
+  <a href="api-request.html#event_doneProc"><code>doneProc</code></a> events being emitted instead of the
+  <a href="api-request.html#event_done"><code>done</code></a> event you might expect. Using
   <code>execSqlBatch</code> will prevent this from occurring but may have a negative performance impact.
 </p>
 <p>
@@ -806,51 +909,51 @@ var connection = new Connection(config);
 
 <h2 id="function_prepare">connection.prepare(request)</h2>
 <p>
-    Prepare the SQL represented by the request.
-    The request can then be used in subsequent calls to
-    <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
+  Prepare the SQL represented by the request.
+  The request can then be used in subsequent calls to
+  <a href="#function_execute">execute</a> and <a href="#function_unprepare">unprepare</a>
 </p>
 <div class="argument">
-    <div class="name">request</div>
-    <div class="description">
-        <p>
-            A <a href="api-request.html"><code>Request</code></a>
-            object representing the request.
-        </p>
-        <p>
-            Parameters only require a name and type.
-            Parameter values are ignored.
-        </p>
-    </div>
+  <div class="name">request</div>
+  <div class="description">
+    <p>
+      A <a href="api-request.html"><code>Request</code></a>
+      object representing the request.
+    </p>
+    <p>
+      Parameters only require a name and type.
+      Parameter values are ignored.
+    </p>
+  </div>
 </div>
 
 <h2 id="function_reset">connection.reset(callback)</h2>
 <p>
-    Reset the connection to its initial state.
-    Can be useful for connection pool implementations.
+  Reset the connection to its initial state.
+  Can be useful for connection pool implementations.
 </p>
 <div class="argument">
-    <div class="name">callback</div>
-    <div class="description">
-        <span class="function">function (err) { }</span>
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the connection reset has completed,
+      either successfully or with an error.
+      If an error occurred then <code>err</code> will describe the error.
+    </p>
+    <p>
+      As only one request at a time may be executed on a connection, another request should not
+      be initiated until this callback is called.
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
         <p>
-            The callback is called when the connection reset has completed,
-            either successfully or with an error.
-            If an error occurred then <code>err</code> will describe the error.
+          If an error occurred, a string with details of the error.
         </p>
-        <p>
-            As only one request at a time may be executed on a connection, another request should not
-            be initiated until this callback is called.
-        </p>
-        <div class="argument">
-            <div class="name">err</div>
-            <div class="description">
-                <p>
-                    If an error occurred, a string with details of the error.
-                </p>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <h2 id="function_rollbackTransaction">connection.rollbackTransaction(callback)</h2>
@@ -971,7 +1074,8 @@ var connection = new Connection(config);
       A string representing a name to associate with the transaction.
     </p>
     <p>
-      Optional, and defaults to an empty string. In case of a nested transaction, naming the transaction name has no effect.
+      Optional, and defaults to an empty string. In case of a nested transaction, naming the transaction name has no
+      effect.
     </p>
   </div>
 </div>
@@ -1007,7 +1111,7 @@ var connection = new Connection(config);
     </p>
   </div>
 </div>
-        
+
 <h2 id="function_newBulkLoad">connection.newBulkLoad(tableName, callback)</h2>
 <p>
   Creates a new <a href="bulk-load.html">BulkLoad</a> instance.
@@ -1025,7 +1129,7 @@ var connection = new Connection(config);
   <div class="description">
     <span class="function">function (err, rowCount) { }</span>
     <p>
-      A function which will be called after the BulkLoad finishes executing. <code>rowCount</code> will equal the 
+      A function which will be called after the BulkLoad finishes executing. <code>rowCount</code> will equal the
       number of rows inserted.
     </p>
   </div>
