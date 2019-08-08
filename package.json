@@ -40,12 +40,13 @@
     "tag": "next"
   },
   "dependencies": {
-    "@azure/ms-rest-nodeauth": "^2.0.2",
+    "@azure/ms-rest-nodeauth": "^2.0.4",
     "big-number": "1.0.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
     "iconv-lite": "^0.4.23",
     "native-duplexpair": "^1.0.0",
+    "nyc": "^14.1.1",
     "punycode": "^2.1.0",
     "readable-stream": "^3.4.0",
     "sprintf-js": "^1.1.2"
@@ -68,16 +69,17 @@
     "flow-bin": "^0.100.0",
     "mitm": "^1.7.0",
     "mocha": "^6.1.4",
-    "nodeunit": "^0.11.3",
     "rimraf": "^2.6.3",
     "semantic-release": "^15.13.12",
     "sinon": "^7.3.2"
   },
   "scripts": {
     "lint": "eslint src test && flow",
-    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer",
+    "test-integration": "mocha test/integration",
+    "test-unit": "mocha test/unit/**/*.js",
+    "test-all": "mocha test/integration test/unit/**/*.js --exit",
+    "test-code-coverage": "nyc mocha test/integration test/unit/**/*.js --exit",
     "build": "rimraf lib && babel src --out-dir lib",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
