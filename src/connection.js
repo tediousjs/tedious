@@ -4,7 +4,8 @@ const os = require('os');
 const constants = require('constants');
 const { createSecureContext } = require('tls');
 
-const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
+const { UsernamePasswordCredential } = require('@azure/identity');
+const { loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -2072,6 +2073,10 @@ Connection.prototype.STATE = {
       message: function() {
         if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
           const { authentication } = this.config;
+          const { stsurl, spn } = this.fedAuthInfoToken;
+
+          const authHost = stsurl.substring(0, stsurl.lastIndexOf('/'));
+          const tenantId = stsurl.substring(stsurl.lastIndexOf('/') + 1);
 
           const getToken = (callback) => {
             const getTokenFromCredentials = (err, credentials) => {
@@ -2085,10 +2090,12 @@ Connection.prototype.STATE = {
             };
 
             if (authentication.type === 'azure-active-directory-password') {
-              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
-                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                tokenAudience: this.fedAuthInfoToken.spn
-              }, getTokenFromCredentials);
+              const cred = new UsernamePasswordCredential(tenantId, '7f98cb04-cd1e-40df-9140-3bf7e2cea4db', authentication.options.userName, authentication.options.password, { host: authHost });
+              cred.getToken(`${spn}/.default`).then((tokenResponse) => {
+                callback(null, tokenResponse.token);
+              }, (err) => {
+                callback(err);
+              });
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
                 clientId: authentication.options.clientId,
