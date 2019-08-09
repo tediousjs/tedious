@@ -1,17 +1,16 @@
-// @flow
-
 const BufferList = require('bl');
 const { Duplex } = require('readable-stream');
 
-const { Packet, HEADER_LENGTH } = require('./packet');
-
-import type Debug from './debug';
-import type Message from './message';
+import Debug from './debug';
+import Message from './message';
+import { Packet, HEADER_LENGTH } from './packet';
 
 class OutgoingMessageStream extends Duplex {
   packetSize: number;
   debug: Debug;
-  bl: BufferList;
+  bl: any;
+
+  currentMessage: Message | undefined;
 
   constructor(debug: Debug, { packetSize } : { packetSize: number }) {
     super({ writableObjectMode: true });
@@ -27,13 +26,13 @@ class OutgoingMessageStream extends Duplex {
     });
   }
 
-  _write(message: Message, encoding: void, callback: (?Error) => void) {
+  _write(message: Message, _encoding: string, callback: (err?: Error | null) => void) {
     const length = this.packetSize - HEADER_LENGTH;
     let packetNumber = 0;
 
     this.currentMessage = message;
-    this.currentMessage.on('data', (data) => {
-      if (this.currentMessage.ignore) {
+    this.currentMessage.on('data', (data: Buffer) => {
+      if (message.ignore) {
         return;
       }
 
@@ -53,7 +52,7 @@ class OutgoingMessageStream extends Duplex {
         this.debug.data(packet);
 
         if (this.push(packet.buffer) === false) {
-          this.currentMessage.pause();
+          message.pause();
         }
       }
     });
@@ -81,7 +80,7 @@ class OutgoingMessageStream extends Duplex {
     });
   }
 
-  _read(size: number) {
+  _read(_size: number) {
     // If we do have a message, resume it and get data flowing.
     // Otherwise, there is nothing to do.
     if (this.currentMessage) {
@@ -90,4 +89,5 @@ class OutgoingMessageStream extends Duplex {
   }
 }
 
+export default OutgoingMessageStream;
 module.exports = OutgoingMessageStream;

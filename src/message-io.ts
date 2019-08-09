@@ -1,21 +1,17 @@
-// @flow
-
-/* globals $Values */
-
-import type Debug from './debug';
-import type { Duplex } from 'stream';
-import type { TLSSocket } from 'tls';
-import type { Socket } from 'net';
-
-const tls = require('tls');
 const DuplexPair = require('native-duplexpair');
-const { EventEmitter } = require('events');
 
-const { TYPE } = require('./packet');
+import { Duplex } from 'stream';
+import * as tls from 'tls';
+import { Socket } from 'net';
+import { EventEmitter } from 'events';
 
-const Message = require('./message');
-const IncomingMessageStream = require('./incoming-message-stream');
-const OutgoingMessageStream = require('./outgoing-message-stream');
+import Debug from './debug';
+
+import Message from './message';
+import { TYPE } from './packet';
+
+import IncomingMessageStream from './incoming-message-stream';
+import OutgoingMessageStream from './outgoing-message-stream';
 
 module.exports = class MessageIO extends EventEmitter {
   socket: Socket;
@@ -26,8 +22,8 @@ module.exports = class MessageIO extends EventEmitter {
   incomingMessageStream: IncomingMessageStream;
   outgoingMessageStream: OutgoingMessageStream;
 
-  securePair: {
-    cleartext: TLSSocket,
+  securePair?: {
+    cleartext: tls.TLSSocket,
     encrypted: Duplex
   }
 
@@ -40,14 +36,14 @@ module.exports = class MessageIO extends EventEmitter {
     this.tlsNegotiationComplete = false;
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageStream.on('data', (message) => {
-      message.on('data', (chunk) => { this.emit('data', chunk); });
+    this.incomingMessageStream.on('data', (message: Message) => {
+      message.on('data', (chunk: Buffer) => { this.emit('data', chunk); });
       message.on('end', () => { this.emit('message'); });
     });
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
-    this.socket.pipe(this.incomingMessageStream);
+    this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
     this.outgoingMessageStream.pipe(this.socket);
   }
 
@@ -65,11 +61,11 @@ module.exports = class MessageIO extends EventEmitter {
     return this.outgoingMessageStream.packetSize;
   }
 
-  startTls(secureContext: Object, hostname: string, trustServerCertificate: boolean) {
+  startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
     const duplexpair = new DuplexPair();
     const securePair = this.securePair = {
       cleartext: tls.connect({
-        socket: duplexpair.socket1,
+        socket: duplexpair.socket1 as Socket,
         servername: hostname,
         secureContext: secureContext,
         rejectUnauthorized: !trustServerCertificate
@@ -79,7 +75,7 @@ module.exports = class MessageIO extends EventEmitter {
 
     // If an error happens in the TLS layer, there is nothing we can do about it.
     // Forward the error to the socket so the connection gets properly cleaned up.
-    securePair.cleartext.on('error', (err) => {
+    securePair.cleartext.on('error', (err?: Error) => {
       // Streams in node.js versions before 8.0.0 don't support `.destroy`
       if (typeof securePair.encrypted.destroy === 'function') {
         securePair.encrypted.destroy();
@@ -96,34 +92,38 @@ module.exports = class MessageIO extends EventEmitter {
       this.encryptAllFutureTraffic();
     });
 
-    securePair.encrypted.on('data', (data) => {
+    securePair.encrypted.on('data', (data: Buffer) => {
       this.sendMessage(TYPE.PRELOGIN, data, false);
     });
   }
 
   encryptAllFutureTraffic() {
-    this.securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
-    this.securePair.encrypted.removeAllListeners('data');
+    const securePair = this.securePair!;
+
+    securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+    securePair.encrypted.removeAllListeners('data');
 
     this.outgoingMessageStream.unpipe(this.socket);
-    this.socket.unpipe(this.incomingMessageStream);
+    this.socket.unpipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
 
-    this.socket.pipe(this.securePair.encrypted);
-    this.securePair.encrypted.pipe(this.socket);
+    this.socket.pipe(securePair.encrypted);
+    securePair.encrypted.pipe(this.socket);
 
-    this.securePair.cleartext.pipe(this.incomingMessageStream);
-    this.outgoingMessageStream.pipe(this.securePair.cleartext);
+    securePair.cleartext.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
+    this.outgoingMessageStream.pipe(securePair.cleartext);
 
     this.tlsNegotiationComplete = true;
   }
 
   tlsHandshakeData(data: Buffer) {
-    this.securePair.encrypted.write(data);
+    const securePair = this.securePair!;
+
+    securePair.encrypted.write(data);
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
   // TODO implement incomplete request cancelation (2.2.1.6)
-  sendMessage(packetType: $Values<typeof TYPE>, data: Buffer, resetConnection: boolean) {
+  sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
     this.outgoingMessageStream.write(message);

@@ -146,3 +146,11 @@ rules:
   unicode-bom: "error"
   use-isnan: "error"
   valid-typeof: "error"
+
+overrides:
+  - files:
+      - '*.ts'
+    rules:
+      no-undef: off
+      no-unused-vars: off
+      no-use-before-define: off

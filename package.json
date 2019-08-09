@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@azure/ms-rest-nodeauth": "^2.0.2",
+    "@types/node": "^12.6.9",
     "big-number": "1.0.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
@@ -56,35 +57,38 @@
     "@babel/core": "^7.5.5",
     "@babel/node": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
-    "@babel/preset-flow": "^7.0.0",
+    "@babel/preset-typescript": "^7.3.3",
     "@babel/register": "^7.5.5",
     "@commitlint/cli": "^8.0.0",
     "@commitlint/config-conventional": "^8.0.0",
     "@commitlint/travis-cli": "^8.0.0",
     "async": "^2.6.1",
-    "babel-eslint": "^10.0.2",
+    "babel-eslint": "^11.0.0-beta.0",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
     "eslint": "^5.16.0",
-    "flow-bin": "^0.100.0",
     "mitm": "^1.7.0",
     "mocha": "^6.1.4",
     "rimraf": "^2.6.3",
     "semantic-release": "^15.13.12",
-    "sinon": "^7.3.2"
+    "sinon": "^7.3.2",
+    "typescript": "^3.5.3"
   },
   "scripts": {
-    "lint": "eslint src test && flow",
+    "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer",
     "test-integration": "mocha test/integration",
     "test-unit": "mocha test/unit/**/*.js",
     "test-all": "mocha test/integration test/unit/**/*.js --exit",
     "test-code-coverage": "nyc mocha test/integration test/unit/**/*.js --exit",
-    "build": "rimraf lib && babel src --out-dir lib",
+    "build": "rimraf lib && babel src --out-dir lib --extensions '.js,.ts'",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
   },
   "babel": {
+    "ignore": [
+      "./src/**/*.d.ts"
+    ],
     "presets": [
       [
         "@babel/preset-env",
@@ -94,7 +98,7 @@
           }
         }
       ],
-      "@babel/flow"
+      "@babel/preset-typescript"
     ]
   },
   "commitlint": {
