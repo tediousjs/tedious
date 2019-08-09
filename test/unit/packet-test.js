@@ -1,7 +1,7 @@
 const assert = require('chai').assert;
-const Packet = require('../../lib/packet').Packet;
-const TYPE = require('../../lib/packet').TYPE;
-const isPacketComplete = require('../../lib/packet').isPacketComplete;
+const Packet = require('../../src/packet').Packet;
+const TYPE = require('../../src/packet').TYPE;
+const isPacketComplete = require('../../src/packet').isPacketComplete;
 
 describe('packet type tests', function() {
   it('should create Empty', function(done) {
