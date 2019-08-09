@@ -1,21 +1,21 @@
-// @flow
-
-const EventEmitter = require('events').EventEmitter;
+import { EventEmitter } from 'events';
 const TYPES = require('./data-type').typeByName;
 const RequestError = require('./errors').RequestError;
 
-// TODO: Figure out how to type the `rows` parameter here.
-type CompletionCallback = (error: ?Error, rowCount: ?number, rows: any) => void;
+import Connection from './connection';
 
-type Parameter = {
+// TODO: Figure out how to type the `rows` parameter here.
+type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
+
+export type Parameter = {
   // TODO: `type` must be a valid TDS value type
   type: any,
   name: string,
-  value: mixed,
+  value: unknown,
   output: boolean,
-  length: ?number,
-  precision: ?number,
-  scale: ?number
+  length: number | undefined,
+  precision: number | undefined,
+  scale: number | undefined
 };
 
 type ParameterOptions = {
@@ -26,22 +26,26 @@ type ParameterOptions = {
 }
 
 class Request extends EventEmitter {
-  sqlTextOrProcedure: string | typeof undefined;
+  sqlTextOrProcedure?: string;
   parameters: Parameter[];
-  parametersByName: { [string]: Parameter };
+  parametersByName: { [key: string]: Parameter };
   originalParameters: Parameter[];
   preparing: boolean;
   canceled: boolean;
   paused: boolean;
   userCallback: CompletionCallback;
-  handle: number | typeof undefined;
-  error: ?Error;
-  connection: ?any; // TODO: This should be `Connection`, not `any`.
-  timeout: number | typeof undefined;
+  handle?: number;
+  error?: Error;
+  connection?: Connection;
+  timeout?: number;
 
-  callback: (?Error) => void;
+  rows?: Array<any>;
+  rst?: Array<any>;
+  rowCount?: number;
 
-  constructor(sqlTextOrProcedure?: string, callback: CompletionCallback) {
+  callback: CompletionCallback;
+
+  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -56,7 +60,7 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
-    this.callback = function(err: ?Error) {
+    this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       if (this.preparing) {
         this.preparing = false;
         if (err) {
@@ -65,33 +69,35 @@ class Request extends EventEmitter {
           this.emit('prepared');
         }
       } else {
-        this.userCallback.apply(this, arguments);
+        this.userCallback(err, rowCount, rows);
         this.emit('requestCompleted');
       }
     };
   }
 
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
+  addParameter(name: string, type: any, value: unknown, options?: ParameterOptions) {
     if (options == null) {
       options = {};
     }
+
+    const { output = false, length, precision, scale } = options;
 
     const parameter: Parameter = {
       type: type,
       name: name,
       value: value,
-      output: options.output || (options.output = false),
-      length: options.length,
-      precision: options.precision,
-      scale: options.scale
+      output: output,
+      length: length,
+      precision: precision,
+      scale: scale
     };
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;
   }
 
   // TODO: `type` must be a valid TDS value type
-  addOutputParameter(name: string, type: any, value: mixed, options: ?ParameterOptions) {
+  addOutputParameter(name: string, type: any, value: unknown, options?: ParameterOptions) {
     if (options == null) {
       options = {};
     }
@@ -137,12 +143,12 @@ class Request extends EventEmitter {
   transformIntoPrepareRpc() {
     this.originalParameters = this.parameters;
     this.parameters = [];
-    this.addOutputParameter('handle', TYPES.Int);
+    this.addOutputParameter('handle', TYPES.Int, undefined);
     this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
     this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
     this.sqlTextOrProcedure = 'sp_prepare';
     this.preparing = true;
-    this.on('returnValue', (name, value) => {
+    this.on('returnValue', (name: string, value: any) => {
       if (name === 'handle') {
         this.handle = value;
       } else {
@@ -157,7 +163,7 @@ class Request extends EventEmitter {
     this.sqlTextOrProcedure = 'sp_unprepare';
   }
 
-  transformIntoExecuteRpc(parameters: { [string]: mixed }) {
+  transformIntoExecuteRpc(parameters: { [key: string]: unknown }) {
     this.parameters = [];
     this.addParameter('handle', TYPES.Int, this.handle);
 
@@ -218,9 +224,10 @@ class Request extends EventEmitter {
     this.emit('cancel');
   }
 
-  setTimeout(timeout: number | typeof undefined) {
+  setTimeout(timeout?: number) {
     this.timeout = timeout;
   }
 }
 
+export default Request;
 module.exports = Request;

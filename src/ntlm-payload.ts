@@ -1,7 +1,6 @@
-// @flow
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import * as crypto from 'crypto';
 
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
-const crypto = require('crypto');
 const BigInteger = require('big-number');
 
 const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
@@ -34,7 +33,7 @@ class NTLMResponsePayload {
     const domain = challenge.domain;
     const username = challenge.userName;
     const password = challenge.password;
-    let ntlmData = challenge.ntlmpacket;
+    const ntlmData = challenge.ntlmpacket;
     const server_data = ntlmData.target;
     const server_nonce = ntlmData.nonce;
     const bufferLength = 64 + (domain.length * 2) + (username.length * 2) + lmv2len + ntlmv2len + 8 + 8 + 8 + 4 + server_data.length + 4;
@@ -72,8 +71,8 @@ class NTLMResponsePayload {
     const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
     data.copyFrom(lmv2Data);
     const genTime = new Date().getTime();
-    ntlmData = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
-    data.copyFrom(ntlmData);
+    const ntlmDataBuffer = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
+    data.copyFrom(ntlmDataBuffer);
     data.writeUInt32LE(0x0101);
     data.writeUInt32LE(0x0000);
     const timestamp = this.createTimestamp(genTime);
@@ -180,4 +179,5 @@ class NTLMResponsePayload {
   }
 }
 
+export default NTLMResponsePayload;
 module.exports = NTLMResponsePayload;

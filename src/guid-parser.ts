@@ -1,5 +1,3 @@
-// @flow
-
 const MAP = [
   '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0A', '0B', '0C', '0D', '0E', '0F',
   '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '1A', '1B', '1C', '1D', '1E', '1F',
@@ -19,8 +17,7 @@ const MAP = [
   'F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'FA', 'FB', 'FC', 'FD', 'FE', 'FF'
 ];
 
-module.exports.arrayToGuid = arrayToGuid;
-function arrayToGuid(array: Array<number>) {
+export function arrayToGuid(array: Array<number>) {
   return (
     MAP[array[3]] +
     MAP[array[2]] +
@@ -45,7 +42,7 @@ function arrayToGuid(array: Array<number>) {
   );
 }
 
-const CHARCODEMAP = {};
+const CHARCODEMAP: { [key: number]: { [key: number]: number } } = {};
 
 const hexDigits = [
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -54,7 +51,7 @@ const hexDigits = [
 ].map((d) => d.charCodeAt(0));
 
 for (let i = 0; i < hexDigits.length; i++) {
-  const map = CHARCODEMAP[hexDigits[i]] = {};
+  const map: { [key: number]: number } = CHARCODEMAP[hexDigits[i]] = {};
   for (let j = 0; j < hexDigits.length; j++) {
     const hex = String.fromCharCode(hexDigits[i], hexDigits[j]);
     const value = parseInt(hex, 16);
@@ -62,8 +59,7 @@ for (let i = 0; i < hexDigits.length; i++) {
   }
 }
 
-module.exports.guidToArray = guidToArray;
-function guidToArray(guid: string) {
+export function guidToArray(guid: string) {
   return [
     CHARCODEMAP[guid.charCodeAt(6)][guid.charCodeAt(7)],
     CHARCODEMAP[guid.charCodeAt(4)][guid.charCodeAt(5)],
