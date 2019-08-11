@@ -112,9 +112,7 @@ describe('Initiate Connect Test', function() {
 
     if ((config.options != null ? config.options.port : undefined) == null) {
       // Config says don't do this test (probably because ports are dynamic).
-      console.log('Skipping connectByPort test');
-      done();
-      return;
+      return this.skip();
     }
 
     const connection = new Connection(config);
@@ -145,9 +143,7 @@ describe('Initiate Connect Test', function() {
   it('should connect by instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
-      console.log('Skipping connectByInstanceName test');
-      done();
-      return;
+      return this.skip();
     }
 
     const config = getConfig();
@@ -182,9 +178,7 @@ describe('Initiate Connect Test', function() {
   it('should connect by invalid instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
-      console.log('Skipping connectByInvalidInstanceName test');
-      done();
-      return;
+      return this.skip();
     }
 
     const config = getConfig();
