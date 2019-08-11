@@ -302,7 +302,6 @@ describe('Bulk Load Tests', function() {
 
   it('should test stream bulk load', function(done) {
     this.timeout(50000);
-    setTimeout(done, 50000);
 
     const totalRows = 500000;
     const tableName = '#streamingBulkLoadTest';
@@ -377,7 +376,6 @@ describe('Bulk Load Tests', function() {
 
   it('should test streaming bulk load with cancel', function(done) {
     this.timeout(50000);
-    setTimeout(done, 50000);
 
     const totalRows = 500000;
 
