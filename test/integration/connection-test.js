@@ -276,10 +276,9 @@ describe('Ntlm Test', function() {
 
   function runNtlmTest(done, domainCase) {
     const ntlmConfig = getNtlmConfig();
+
     if (!ntlmConfig) {
-      console.log('Skipping ntlm test');
-      done();
-      return;
+      return this.skip();
     }
 
     switch (domainCase) {
@@ -317,15 +316,15 @@ describe('Ntlm Test', function() {
   }
 
   it('should ntlm', function(done) {
-    runNtlmTest(done, DomainCaseEnum.AsIs);
+    runNtlmTest.call(this, done, DomainCaseEnum.AsIs);
   });
 
   it('should ntlm lower', function(done) {
-    runNtlmTest(done, DomainCaseEnum.Lower);
+    runNtlmTest.call(this, done, DomainCaseEnum.Lower);
   });
 
   it('should ntlm upper', function(done) {
-    runNtlmTest(done, DomainCaseEnum.Upper);
+    runNtlmTest.call(this, done, DomainCaseEnum.Upper);
   });
 });
 
