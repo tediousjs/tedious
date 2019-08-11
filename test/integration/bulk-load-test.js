@@ -60,10 +60,15 @@ describe('Bulk Load Tests', function() {
       err,
       rowCount
     ) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       assert.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
+
       done();
     });
+
     bulkLoad.addColumn('nnn', TYPES.Int, {
       nullable: false
     });
@@ -75,7 +80,10 @@ describe('Bulk Load Tests', function() {
       nullable: false
     });
     const request = new Request(bulkLoad.getTableCreationSql(), function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       bulkLoad.addRow({
         nnn: 201,
         sss: 'one zero one',
@@ -107,6 +115,7 @@ describe('Bulk Load Tests', function() {
         err,
         'An error should have been thrown to indicate the incorrect table format.'
       );
+
       done();
     });
     bulkLoad.addColumn('x', TYPES.Int, {
@@ -118,7 +127,10 @@ describe('Bulk Load Tests', function() {
     const request = new Request(
       'CREATE TABLE #tmpTestTable2 ([id] int not null)',
       function(err) {
-        assert.ifError(err);
+        if (err) {
+          return done(err);
+        }
+
         bulkLoad.addRow({
           x: 1,
           y: 1
@@ -143,7 +155,10 @@ describe('Bulk Load Tests', function() {
     const request = new Request(`
     CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))
   `, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       bulkLoad.addRow({
         id: 555
       });
@@ -154,7 +169,10 @@ describe('Bulk Load Tests', function() {
 
   it('should bulkload verify trigger', function(done) {
     const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, function(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       connection.execSql(request_verify);
     });
     bulkLoad.addColumn('id', TYPES.Int, {
@@ -171,12 +189,18 @@ describe('Bulk Load Tests', function() {
     const dropTable = 'DROP TABLE testTable4';
 
     const request_table = new Request(createTable, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       connection.execSql(request_trigger);
     });
 
     const request_trigger = new Request(createTrigger, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       bulkLoad.addRow({
         id: 555
       });
@@ -184,12 +208,18 @@ describe('Bulk Load Tests', function() {
     });
 
     const request_verify = new Request(verifyTrigger, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       connection.execSql(request_dropTable);
     });
 
     const request_dropTable = new Request(dropTable, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       done();
     });
 
@@ -205,7 +235,10 @@ describe('Bulk Load Tests', function() {
       err,
       rowCount
     ) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       connection.execSqlBatch(request_verifyBulkLoad);
     });
     bulkLoad.addColumn('id', TYPES.Int, {
@@ -214,14 +247,20 @@ describe('Bulk Load Tests', function() {
     const request = new Request(`
       CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)
     `, function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       bulkLoad.addRow({
         id: null
       });
       connection.execBulkLoad(bulkLoad);
     });
     const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       done();
     });
     request_verifyBulkLoad.on('row', function(columns) {
@@ -244,14 +283,18 @@ describe('Bulk Load Tests', function() {
     });
 
     const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
       bulkLoad.addRow({ id: 1234 });
       connection.execBulkLoad(bulkLoad);
       bulkLoad.cancel();
     });
 
     const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
 
       assert.strictEqual(rowCount, 0);
 
@@ -268,7 +311,9 @@ describe('Bulk Load Tests', function() {
   it('should bulkload cancel after request completed', function(done) {
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
 
       bulkLoad.cancel();
 
@@ -280,13 +325,18 @@ describe('Bulk Load Tests', function() {
     });
 
     const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       bulkLoad.addRow({ id: 1234 });
       connection.execBulkLoad(bulkLoad);
     });
 
     const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
 
       assert.strictEqual(rowCount, 1);
 
@@ -306,9 +356,7 @@ describe('Bulk Load Tests', function() {
     const totalRows = 500000;
     const tableName = '#streamingBulkLoadTest';
 
-    connection.on('error', function(err) {
-      assert.ifError(err);
-    });
+    connection.on('error', done);
     startCreateTable();
 
     function startCreateTable() {
@@ -318,7 +366,10 @@ describe('Bulk Load Tests', function() {
     }
 
     function completeCreateTable(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       startBulkLoad();
     }
 
@@ -350,7 +401,10 @@ describe('Bulk Load Tests', function() {
     }
 
     function completeBulkLoad(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       assert.equal(rowCount, totalRows);
       startVerifyTableContent();
     }
@@ -368,7 +422,10 @@ describe('Bulk Load Tests', function() {
     }
 
     function completeVerifyTableContent(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       assert.equal(rowCount, 1);
       done();
     }
@@ -388,7 +445,10 @@ describe('Bulk Load Tests', function() {
     }
 
     function completeCreateTable(err) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       startBulkLoad();
     }
 
@@ -452,8 +512,12 @@ describe('Bulk Load Tests', function() {
     }
 
     function completeVerifyTableContent(err, rowCount) {
-      assert.ifError(err);
+      if (err) {
+        return done(err);
+      }
+
       assert.equal(rowCount, 1);
+
       done();
     }
   });
