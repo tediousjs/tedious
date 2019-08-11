@@ -81,7 +81,7 @@
     "test-unit": "mocha test/unit/**/*.js",
     "test-all": "mocha test/integration test/unit/**/*.js --exit",
     "test-code-coverage": "nyc mocha test/integration test/unit/**/*.js --exit",
-    "build": "rimraf lib && babel src --out-dir lib --extensions '.js,.ts'",
+    "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
   },
