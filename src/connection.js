@@ -4,7 +4,7 @@ const os = require('os');
 const constants = require('constants');
 const { createSecureContext } = require('tls');
 
-const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI, loginWithServicePrincipalSecret } = require('@azure/ms-rest-nodeauth');
+const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI, loginWithServicePrincipalSecret, interactiveLogin } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -70,6 +70,7 @@ class Connection extends EventEmitter {
       'azure-active-directory-msi-vm',
       'azure-active-directory-msi-app-service',
       'azure-active-directory-service-principal-secret',
+      'azure-active-directory-interactive',
     ];
 
     if (config.authentication !== undefined) {
@@ -196,6 +197,37 @@ class Connection extends EventEmitter {
             clientId: options.clientId,
             secret: options.secret,
             domain: options.domain
+          }
+        };
+      } else if (type === 'azure-active-directory-interactive') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.domain !== undefined && typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+        }
+
+        if (options.environment !== undefined && typeof options.environment !== 'string') {
+          throw new TypeError('The "config.authentication.options.environment" property must be of type string.');
+        }
+
+        if (options.language !== undefined && typeof options.language !== 'string') {
+          throw new TypeError('The "config.authentication.options.language" property must be of type string.');
+        }
+
+        if (options.userCodeResponseLogger !== undefined && typeof options.userCodeResponseLogger !== 'function') {
+          throw new TypeError('The "config.authentication.options.userCodeResponseLogger" property must be of type function.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-interactive',
+          options: {
+            clientId: options.clientId,
+            domain: options.domain,
+            environment: options.environment,
+            language: options.language || 'en-us',
+            userCodeResponseLogger: options.userCodeResponseLogger,
           }
         };
       } else {
@@ -1305,6 +1337,7 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-msi-vm':
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
+      case 'azure-active-directory-interactive':
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -1973,7 +2006,8 @@ Connection.prototype.STATE = {
           if (authentication.type === 'azure-active-directory-password' ||
             authentication.type === 'azure-active-directory-msi-vm' ||
             authentication.type === 'azure-active-directory-msi-app-service' ||
-            authentication.type === 'azure-active-directory-service-principal-secret'
+            authentication.type === 'azure-active-directory-service-principal-secret' ||
+            authentication.type === 'azure-active-directory-interactive'
           ) {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
           } else if (authentication.type === 'ntlm') {
@@ -2006,7 +2040,8 @@ Connection.prototype.STATE = {
           authentication.type === 'azure-active-directory-access-token' ||
           authentication.type === 'azure-active-directory-msi-vm' ||
           authentication.type === 'azure-active-directory-msi-app-service' ||
-          authentication.type === 'azure-active-directory-service-principal-secret'
+          authentication.type === 'azure-active-directory-service-principal-secret' ||
+          authentication.type === 'azure-active-directory-interactive'
         ) {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
@@ -2149,6 +2184,15 @@ Connection.prototype.STATE = {
               const domain = authentication.options.domain;
 
               loginWithServicePrincipalSecret(clientId, secret, domain, {
+                tokenAudience: this.fedAuthInfoToken.spn,
+              }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-interactive') {
+              interactiveLogin({
+                clientId: authentication.options.clientId,
+                domain: authentication.options.domain,
+                environment: authentication.options.environment,
+                language: authentication.options.language,
+                userCodeResponseLogger: authentication.options.userCodeResponseLogger,
                 tokenAudience: this.fedAuthInfoToken.spn,
               }, getTokenFromCredentials);
             }
