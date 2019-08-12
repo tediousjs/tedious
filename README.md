@@ -41,7 +41,7 @@ More documentation and code samples are available at [tediousjs.github.io/tediou
 
 <a name="name"></a>
 ## Name
-_Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S. 
+_Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.
 
 ## Developer Survey
 
@@ -54,7 +54,7 @@ We'd like to learn more about how you use tedious:
 We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
 
 <a name="license"></a>
-## Licence
+## License
 
 Copyright (c) 2010-2018 Mike D Pilsbury
 
