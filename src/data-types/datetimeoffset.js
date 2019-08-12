@@ -37,7 +37,7 @@ module.exports = {
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
       time.setUTCFullYear(1970);
@@ -72,6 +72,7 @@ module.exports = {
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
   validate: function(value) {
     if (value == null) {

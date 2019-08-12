@@ -40,48 +40,53 @@
     "tag": "next"
   },
   "dependencies": {
-    "adal-node": "^0.1.22",
+    "@azure/ms-rest-nodeauth": "^2.0.2",
+    "@types/node": "^12.6.9",
     "big-number": "1.0.0",
-    "bl": "^2.2.0",
-    "depd": "^1.1.2",
+    "bl": "^3.0.0",
+    "depd": "^2.0.0",
     "iconv-lite": "^0.4.23",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
-    "readable-stream": "^3.1.1",
+    "readable-stream": "^3.4.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.2.3",
-    "@babel/core": "^7.2.2",
-    "@babel/preset-env": "^7.3.1",
-    "@babel/preset-flow": "^7.0.0",
-    "@babel/register": "^7.0.0",
-    "@commitlint/cli": "^7.5.0",
-    "@commitlint/config-conventional": "^7.5.0",
-    "@commitlint/travis-cli": "^7.5.0",
+    "@babel/cli": "^7.5.5",
+    "@babel/core": "^7.5.5",
+    "@babel/node": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "@babel/preset-typescript": "^7.3.3",
+    "@babel/register": "^7.5.5",
+    "@commitlint/cli": "^8.0.0",
+    "@commitlint/config-conventional": "^8.0.0",
+    "@commitlint/travis-cli": "^8.0.0",
     "async": "^2.6.1",
-    "babel-eslint": "^10.0.1",
+    "babel-eslint": "^11.0.0-beta.0",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
-    "eslint": "^5.13.0",
-    "flow-bin": "^0.92.1",
+    "eslint": "^5.16.0",
     "mitm": "^1.7.0",
-    "mocha": "^5.2.0",
+    "mocha": "^6.1.4",
     "nodeunit": "^0.11.3",
     "rimraf": "^2.6.3",
-    "semantic-release": "^15.13.3",
-    "sinon": "^6.3.5"
+    "semantic-release": "^15.13.12",
+    "sinon": "^7.3.2",
+    "typescript": "^3.5.3"
   },
   "scripts": {
-    "lint": "eslint src test && flow",
+    "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
     "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "build": "rimraf lib && babel src --out-dir lib",
+    "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
   },
   "babel": {
+    "ignore": [
+      "./src/**/*.d.ts"
+    ],
     "presets": [
       [
         "@babel/preset-env",
@@ -91,7 +96,7 @@
           }
         }
       ],
-      "@babel/flow"
+      "@babel/preset-typescript"
     ]
   },
   "commitlint": {

@@ -15,7 +15,7 @@ module.exports = {
     buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value == null) {
       buffer.writeUInt16LE(0xFFFF);
       buffer.writeUInt8(0x00);
@@ -37,8 +37,13 @@ module.exports = {
     buffer.writeUInt8(0x00);
 
     const ref1 = parameter.value.rows;
-    for (let j = 0, len1 = ref1.length; j < len1; j++) {
-      const row = ref1[j];
+    const writeNext = (i) => {
+      if (i >= ref1.length) {
+        buffer.writeUInt8(0x00);
+        cb();
+        return;
+      }
+      const row = ref1[i];
 
       buffer.writeUInt8(0x01);
 
@@ -50,11 +55,15 @@ module.exports = {
           scale: parameter.value.columns[k].scale,
           precision: parameter.value.columns[k].precision
         };
-        parameter.value.columns[k].type.writeParameterData(buffer, param, options);
+        parameter.value.columns[k].type.writeParameterData(buffer, param, options, () => {});
       }
-    }
 
-    buffer.writeUInt8(0x00);
+      setImmediate(() => {
+        writeNext(i + 1);
+      });
+    };
+
+    writeNext(0);
   },
   validate: function(value) {
     if (value == null) {

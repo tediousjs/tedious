@@ -47,12 +47,13 @@ module.exports = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUsVarbyte(parameter.value, 'ucs2');
     } else {
       buffer.writeUInt16LE(NULL);
     }
+    cb();
   },
 
   validate: function(value) {

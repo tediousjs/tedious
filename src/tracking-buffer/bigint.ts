@@ -1,4 +1,4 @@
-function isZero(array) {
+function isZero(array: number[]) {
   for (let j = 0, len = array.length; j < len; j++) {
     const byte = array[j];
     if (byte !== 0) {
@@ -8,7 +8,7 @@ function isZero(array) {
   return true;
 }
 
-function getNextRemainder(array) {
+function getNextRemainder(array: number[]) {
   let remainder = 0;
 
   for (let i = array.length - 1; i >= 0; i--) {
@@ -20,7 +20,7 @@ function getNextRemainder(array) {
   return remainder;
 }
 
-function invert(array) {
+function invert(array: number[]) {
   // Invert bits
   const len = array.length;
 
@@ -39,8 +39,7 @@ function invert(array) {
   }
 }
 
-module.exports.convertLEBytesToString = convertLEBytesToString;
-function convertLEBytesToString(buffer) {
+export function convertLEBytesToString(buffer: Buffer) {
   const array = Array.prototype.slice.call(buffer, 0, buffer.length);
   if (isZero(array)) {
     return '0';
@@ -61,8 +60,7 @@ function convertLEBytesToString(buffer) {
   }
 }
 
-module.exports.numberToInt64LE = numberToInt64LE;
-function numberToInt64LE(num) {
+export function numberToInt64LE(num: number) {
   // adapted from https://github.com/broofa/node-int64
   const negate = num < 0;
   let hi = Math.abs(num);

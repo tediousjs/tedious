@@ -1,12 +1,8 @@
-// @flow
-
-/* globals $Values */
-
 const { sprintf } = require('sprintf-js');
 
-const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
+export const HEADER_LENGTH = 8;
 
-const TYPE = module.exports.TYPE = {
+export const TYPE: { [key: string]: number } = {
   SQL_BATCH: 0x01,
   RPC_REQUEST: 0x03,
   TABULAR_RESULT: 0x04,
@@ -19,13 +15,13 @@ const TYPE = module.exports.TYPE = {
   FEDAUTH_TOKEN: 0x08
 };
 
-const typeByValue = {};
+const typeByValue: { [key: number]: string } = {};
 
 for (const name in TYPE) {
   typeByValue[TYPE[name]] = name;
 }
 
-const STATUS = {
+const STATUS: { [key: string]: number } = {
   NORMAL: 0x00,
   EOM: 0x01,
   IGNORE: 0x02,
@@ -33,7 +29,7 @@ const STATUS = {
   RESETCONNECTIONSKIPTRAN: 0x10
 };
 
-const OFFSET = module.exports.OFFSET = {
+export const OFFSET = {
   Type: 0,
   Status: 1,
   Length: 2,
@@ -50,10 +46,10 @@ const DEFAULT_WINDOW = 0;
 
 const NL = '\n';
 
-class Packet {
+export class Packet {
   buffer: Buffer;
 
-  constructor(typeOrBuffer: Buffer | $Values<typeof TYPE>) {
+  constructor(typeOrBuffer: Buffer | number) {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
     } else {
@@ -213,10 +209,8 @@ class Packet {
     return '';
   }
 }
-module.exports.Packet = Packet;
 
-module.exports.isPacketComplete = isPacketComplete;
-function isPacketComplete(potentialPacketBuffer: Buffer) {
+export function isPacketComplete(potentialPacketBuffer: Buffer) {
   if (potentialPacketBuffer.length < HEADER_LENGTH) {
     return false;
   } else {
@@ -224,7 +218,6 @@ function isPacketComplete(potentialPacketBuffer: Buffer) {
   }
 }
 
-module.exports.packetLength = packetLength;
-function packetLength(potentialPacketBuffer: Buffer) {
+export function packetLength(potentialPacketBuffer: Buffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 }

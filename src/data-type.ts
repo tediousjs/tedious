@@ -1,5 +1,3 @@
-// @flow
-
 const Null = require('./data-types/null');
 const TinyInt = require('./data-types/tinyint');
 const Bit = require('./data-types/bit');
@@ -40,7 +38,7 @@ const UDT = require('./data-types/udt');
 const TVP = require('./data-types/tvp');
 const Variant = require('./data-types/sql-variant');
 
-module.exports.TYPE = {
+export const TYPE = {
   [Null.id]: Null,
   [TinyInt.id]: TinyInt,
   [Bit.id]: Bit,
@@ -82,7 +80,7 @@ module.exports.TYPE = {
   [Variant.id]: Variant,
 };
 
-module.exports.typeByName = {
+export const typeByName = {
   TinyInt,
   Bit,
   SmallInt,
