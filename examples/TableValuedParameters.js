@@ -14,7 +14,7 @@ const config = {
   options: {
     port: 1433 // Default Port
   }
-};
+}; 
 
 const connection = new Connection(config);
 
@@ -47,11 +47,8 @@ function createTable() {
       throw err;
     } else {
       console.log(`'${table}' created!`);
+      createTableType();
     }
-  });
-
-  request.on('requestCompleted', () => {
-    createTableType();
   });
 
   connection.execSql(request);
@@ -73,12 +70,10 @@ function createTableType() {
     if (err) {
       console.log('creating table err');
       throw err;
+    } else {
+      console.log(`created table type ${table_type}`);
+      createStoredProcedure();
     }
-  });
-
-  request.on('requestCompleted', () => {
-    console.log(`created table type ${table_type}`);
-    createStoredProcedure();
   });
 
   connection.execSql(request);
@@ -104,12 +99,10 @@ function createStoredProcedure() {
     if (err) {
       console.log('defining tables and types err!');
       throw err;
+    } else {
+      console.log(`created stored procedure ${storedProcedure}`);
+      passingTableValue();
     }
-  });
-
-  request.on('requestCompleted', () => {
-    console.log(`created stored procedure ${storedProcedure}`);
-    passingTableValue();
   });
 
   connection.execSqlBatch(request);
@@ -135,6 +128,10 @@ function passingTableValue() {
   const request = new Request(`${storedProcedure}`, function(err) {
     if (err) {
       throw err;
+    } else {
+      console.log('successfully passed in table value');
+      console.log('DONE!');
+      connection.close();
     }
   });
 
@@ -142,10 +139,4 @@ function passingTableValue() {
   request.addParameter('tvp', TYPES.TVP, table);
 
   connection.callProcedure(request);
-
-  request.on('requestCompleted', () => {
-    console.log('successfully passed in table value');
-    console.log('DONE!');
-    connection.close();
-  });
 }

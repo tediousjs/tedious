@@ -14,7 +14,7 @@ const config = {
   options: {
     port: 1433 // Default Port
   }
-};
+}; 
 
 const connection = new Connection(config);
 
@@ -36,12 +36,9 @@ function createTable() {
       throw err;
     } else {
       console.log('Table Created with ', rowCount, ' rows');
+      console.log(`${table} created!.`);
+      inputParameters();
     }
-  });
-
-  request.on('requestCompleted', () => {
-    console.log(`${table} created!.`);
-    inputParameters();
   });
 
   connection.execSql(request);
@@ -58,6 +55,8 @@ function inputParameters() {
       throw err;
     } else {
       console.log('rowCount: ', rowCount);
+      console.log('input parameters success!');
+      outputParameters();
     }
   });
 
@@ -65,11 +64,6 @@ function inputParameters() {
   request.addParameter('uniqueIdVal', TYPES.UniqueIdentifier, 'ba46b824-487b-4e7d-8fb9-703acdf954e5');
   request.addParameter('intVal', TYPES.Int, 435);
   request.addParameter('nVarCharVal', TYPES.NVarChar, 'hello world');
-
-  request.on('requestCompleted', () => {
-    console.log('input parameters success!');
-    outputParameters();
-  });
 
   connection.execSql(request);
 }
@@ -81,6 +75,10 @@ function outputParameters() {
   const request = new Request(sql, (err, rowCount) => {
     if (err) {
       throw err;
+    } else {
+      console.log('output parameters success!');
+      console.log('DONE!');
+      connection.close();
     }
   });
 
@@ -92,13 +90,6 @@ function outputParameters() {
 
   request.on('returnValue', (paramName, value, metadata) => {
     console.log(paramName + '=', value);
-  });
-
-  request.on('requestCompleted', () => {
-    // Below can also be called in the callback of the Request(...) object!
-    console.log('output parameters success!');
-    console.log('DONE!');
-    connection.close();
   });
 
   connection.execSql(request);
