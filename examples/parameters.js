@@ -14,7 +14,7 @@ const config = {
   options: {
     port: 1433 // Default Port
   }
-}; 
+};
 
 const connection = new Connection(config);
 
