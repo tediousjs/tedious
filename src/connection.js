@@ -62,6 +62,15 @@ class Connection extends EventEmitter {
     this.fedAuthInfoToken = undefined;
 
     let authentication;
+    const supportedAuthenticationTypes = [
+      'default',
+      'ntlm',
+      'azure-active-directory-password',
+      'azure-active-directory-access-token',
+      'azure-active-directory-msi-vm',
+      'azure-active-directory-msi-app-service',
+    ];
+
     if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
         throw new TypeError('The "config.authentication" property must be of type Object.');
@@ -74,8 +83,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service".');
+      if (supportedAuthenticationTypes.indexOf(type) < 0) {
+        throw new TypeError('The "type" property must one of: "' + supportedAuthenticationTypes.join('", "') + '".');
       }
 
       if (typeof options !== 'object' || options === null) {
