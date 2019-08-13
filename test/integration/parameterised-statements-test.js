@@ -1,10 +1,11 @@
-var Connection = require('../../src/connection');
-var Request = require('../../src/request');
-var fs = require('fs');
-var TYPES = require('../../src/data-type').typeByName;
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
+const TYPES = require('../../src/data-type').typeByName;
+const assert = require('chai').assert;
 
 function getConfig() {
-  var config = JSON.parse(
+  const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
@@ -21,742 +22,855 @@ function getConfig() {
   return config;
 }
 
-exports.bitTrue = function(test) {
-  execSql(test, TYPES.Bit, true);
-};
 
-exports.bitFalse = function(test) {
-  execSql(test, TYPES.Bit, false);
-};
-
-exports.bitNull = function(test) {
-  execSql(test, TYPES.Bit, null);
-};
-
-exports.tinyInt = function(test) {
-  execSql(test, TYPES.TinyInt, 8);
-};
-
-exports.tinyIntZero = function(test) {
-  execSql(test, TYPES.TinyInt, 0);
-};
-
-exports.tinyIntLarge = function(test) {
-  execSql(test, TYPES.TinyInt, 252);
-};
-
-exports.tinyIntNull = function(test) {
-  execSql(test, TYPES.TinyInt, null);
-};
-
-exports.smallInt = function(test) {
-  execSql(test, TYPES.SmallInt, 8);
-};
-
-exports.smallIntZero = function(test) {
-  execSql(test, TYPES.SmallInt, 0);
-};
-
-exports.smallIntNull = function(test) {
-  execSql(test, TYPES.SmallInt, null);
-};
-
-exports.int = function(test) {
-  execSql(test, TYPES.Int, 8);
-};
-
-exports.bigint = function(test) {
-  execSql(test, TYPES.BigInt, 9007199254740991);
-};
-
-exports.bigint1 = function(test) {
-  execSql(test, TYPES.BigInt, 1);
-};
-
-exports.bigintsmall = function(test) {
-  execSql(test, TYPES.BigInt, -9007199254740991);
-};
-
-exports.bigintsmall1 = function(test) {
-  execSql(test, TYPES.BigInt, -1);
-};
-
-exports.real = function(test) {
-  execSql(test, TYPES.Real, 9654.2529296875);
-};
-
-exports.float = function(test) {
-  execSql(test, TYPES.Float, 9654.2546456567565767644);
-};
-
-exports.numeric = function(test) {
-  execSql(test, TYPES.Numeric, 5555);
-};
-
-exports.numericLargeValue = function(test) {
-  execSql(test, TYPES.Numeric, 5.555555555555553333, null, {
-    precision: 19,
-    scale: 18,
-  });
-};
-
-exports.numericNegative = function(test) {
-  execSql(test, TYPES.Numeric, -5555.55, null, {
-    precision: 6,
-    scale: 2,
-  });
-};
-
-exports.decimal = function(test) {
-  execSql(test, TYPES.Decimal, 5555);
-};
-
-exports.decimalLargeValue = function(test) {
-  execSql(test, TYPES.Decimal, 5.555555555555553333, null, {
-    precision: 19,
-    scale: 18,
-  });
-};
-
-exports.decimalNegative = function(test) {
-  execSql(test, TYPES.Decimal, -5555.55, null, {
-    precision: 6,
-    scale: 2,
-  });
-};
-
-exports.smallMoney = function(test) {
-  execSql(test, TYPES.SmallMoney, 9842.4566);
-};
-
-exports.money = function(test) {
-  execSql(test, TYPES.Money, 956455842.4566);
-};
-
-exports.uniqueIdentifier = function(test) {
-  execSql(
-    test,
-    TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
-  );
-};
-
-exports.intZero = function(test) {
-  execSql(test, TYPES.Int, 0);
-};
-
-exports.intNull = function(test) {
-  execSql(test, TYPES.Int, null);
-};
-
-exports.varChar = function(test) {
-  execSql(test, TYPES.VarChar, 'qaz');
-};
-
-/* Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and beyond. */
-exports.varCharN = function(test) {
-  execSql(test, TYPES.VarChar, 'qaz', null, { length: 8000 });
-};
-
-exports.varCharN_7_2_AndLater = function(test) {
-  execSql(test, TYPES.VarChar, 'qaz', '7_2', { length: 8001 });
-};
-
-exports.varCharEmptyString = function(test) {
-  execSql(test, TYPES.VarChar, '');
-};
-
-exports.varCharNull = function(test) {
-  execSql(test, TYPES.VarChar, null);
-};
-
-exports.varCharMax = function(test) {
-  var longString = '';
-  for (
-    var i = 1, end = 10 * 1000, asc = 1 <= end;
-    asc ? i <= end : i >= end;
-    asc ? i++ : i--
-  ) {
-    longString += 'x';
-  }
-
-  execSql(test, TYPES.VarChar, longString, '7_2');
-};
-
-exports.varCharMaxEmptyString = function(test) {
-  execSql(test, TYPES.VarChar, '', null, { length: 8000 });
-};
-
-exports.varCharMaxEmptyString_7_2_AndLater = function(test) {
-  execSql(test, TYPES.VarChar, '', '7_2', { length: 8001 });
-};
-
-exports.nVarChar = function(test) {
-  execSql(test, TYPES.NVarChar, 'qaz');
-};
-
-/*
-Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and
-beyond. Since NVarChar is unicode, that'd be 4000. More explict in:
-https://msdn.microsoft.com/en-us/library/ms186939.aspx
-*/
-exports.nVarCharN = function(test) {
-  execSql(test, TYPES.NVarChar, 'qaz', null, { length: 4000 });
-};
-
-exports.nVarCharN_7_2_AndLater = function(test) {
-  execSql(test, TYPES.NVarChar, 'qaz', '7_2', { length: 4001 });
-};
-
-exports.nVarCharEmptyString = function(test) {
-  execSql(test, TYPES.NVarChar, '');
-};
-
-exports.nVarCharNull = function(test) {
-  execSql(test, TYPES.NVarChar, null);
-};
-
-exports.nVarCharMax = function(test) {
-  var longString = '';
-  for (
-    var i = 1, end = 10 * 1000, asc = 1 <= end;
-    asc ? i <= end : i >= end;
-    asc ? i++ : i--
-  ) {
-    longString += 'x';
-  }
-
-  execSql(test, TYPES.NVarChar, longString, '7_2');
-};
-
-exports.nVarCharMaxEmptyString = function(test) {
-  execSql(test, TYPES.NVarChar, '', null, { length: 4000 });
-};
-
-exports.nVarCharMaxEmptyString_7_2_AndLater = function(test) {
-  execSql(test, TYPES.NVarChar, '', '7_2', { length: 4001 });
-};
-
-exports.Char = function(test) {
-  execSql(test, TYPES.Char, 'qaz');
-};
-
-exports.CharN = function(test) {
-  execSql(test, TYPES.Char, 'qaz', null, { length: 3 });
-};
-
-exports.CharNull = function(test) {
-  execSql(test, TYPES.Char, null);
-};
-
-exports.NChar = function(test) {
-  execSql(test, TYPES.NChar, 'qaz');
-};
-
-exports.NCharN = function(test) {
-  execSql(test, TYPES.NChar, 'qaz', null, { length: 3 });
-};
-
-exports.NCharNull = function(test) {
-  execSql(test, TYPES.NChar, null);
-};
-
-exports.textNull = function(test) {
-  execSql(test, TYPES.Text, null);
-};
-
-exports.textEmpty = function(test) {
-  execSql(test, TYPES.Text, '');
-};
-
-exports.textSmall = function(test) {
-  execSql(test, TYPES.Text, 'small');
-};
-
-exports.textLarge = function(test) {
-  var dBuf = Buffer.alloc(500000);
-  dBuf.fill('x');
-  execSql(test, TYPES.Text, dBuf.toString());
-};
-
-var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
-
-exports.time = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
-};
-
-exports.time1 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
-};
-
-exports.time2 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
-};
-
-exports.time3 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
-};
-
-exports.time4 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
-};
-
-exports.time5 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
-};
-
-exports.time6 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
-};
-
-exports.time7 = function(test) {
-  execSql(test, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
-};
-
-exports.smallDateTime = function(test) {
-  execSql(
-    test,
-    TYPES.SmallDateTime,
-    new Date('December 4, 2011 10:04:00')
-  );
-};
-
-exports.smallDateTimeNull = function(test) {
-  execSql(test, TYPES.SmallDateTime, null);
-};
-
-exports.dateTime = function(test) {
-  execSql(test, TYPES.DateTime, new Date('December 4, 2011 10:04:23'));
-};
-
-exports.dateTimeNull = function(test) {
-  execSql(test, TYPES.DateTime, null);
-};
-
-// The tests below validate DateTime precision on the input side, as described in
-//  the section "Rounding of datetime Fractional Second Precision" from
-// https://msdn.microsoft.com/en-us/library/ms187819.aspx
-
-exports.dateTimePrecision_0 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.990'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.990')
-  );
-};
-
-exports.dateTimePrecision_1 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.991'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.990')
-  );
-};
-
-exports.dateTimePrecision_2 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.992'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.dateTimePrecision_3 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.993'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.dateTimePrecision_4 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.994'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.dateTimePrecision_5 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.995'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.dateTimePrecision_6 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.996'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.dateTimePrecision_7 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.997'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.dateTimePrecision_8 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.998'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.dateTimePrecision_9_sec_flip = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:58.999'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:59.000')
-  );
-};
-
-exports.dateTimePrecision_9_min_flip = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:58:59.999'),
-    null,
-    null,
-    new Date('January 1, 1998 23:59:00.000')
-  );
-};
-
-exports.dateTimePrecision_9_hr_flip = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 22:59:59.999'),
-    null,
-    null,
-    new Date('January 1, 1998 23:00:00.000')
-  );
-};
-
-// This test fails on the version of SQL Server in AppVeyor.
-// exports.dateTimePrecision_9_day_flip = (test) ->
-//  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
-
-exports.dateTime2 = function(test) {
-  execSql(
-    test,
-    TYPES.DateTime2,
-    new Date('December 4, 2011 10:04:23'),
-    '7_3_A'
-  );
-};
-
-exports.dateTime2Null = function(test) {
-  execSql(test, TYPES.DateTime2, null, '7_3_A');
-};
-
-exports.outputBitTrue = function(test) {
-  execSqlOutput(test, TYPES.Bit, true);
-};
-
-exports.outputBitFalse = function(test) {
-  execSqlOutput(test, TYPES.Bit, false);
-};
-
-exports.outputBitNull = function(test) {
-  execSqlOutput(test, TYPES.Bit, null);
-};
-
-exports.outputTinyInt = function(test) {
-  execSqlOutput(test, TYPES.TinyInt, 3);
-};
-
-exports.outputTinyIntLarge = function(test) {
-  execSqlOutput(test, TYPES.TinyInt, 252);
-};
-
-exports.outputTinyIntNull = function(test) {
-  execSqlOutput(test, TYPES.TinyInt, null);
-};
-
-exports.outputSmallInt = function(test) {
-  execSqlOutput(test, TYPES.SmallInt, 3);
-};
-
-exports.outputSmallIntNull = function(test) {
-  execSqlOutput(test, TYPES.SmallInt, null);
-};
-
-exports.outputInt = function(test) {
-  execSqlOutput(test, TYPES.Int, 3);
-};
-
-exports.outputBigInt = function(test) {
-  execSqlOutput(test, TYPES.BigInt, 9007199254740991);
-};
-
-exports.outputBigInt1 = function(test) {
-  execSqlOutput(test, TYPES.BigInt, 1);
-};
-
-exports.outputBigIntSmall = function(test) {
-  execSqlOutput(test, TYPES.BigInt, -9007199254740991);
-};
-
-exports.outputBigIntSmall1 = function(test) {
-  execSqlOutput(test, TYPES.BigInt, -1);
-};
-
-exports.outputFloat = function(test) {
-  execSqlOutput(test, TYPES.Float, 9654.2546456567565767644);
-};
-
-exports.outputUniqueIdentifier = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.UniqueIdentifier,
-    '01234567-89AB-CDEF-0123-456789ABCDEF'
-  );
-};
-
-exports.outputIntNull = function(test) {
-  execSqlOutput(test, TYPES.Int, null);
-};
-
-exports.outputVarChar = function(test) {
-  execSqlOutput(test, TYPES.VarChar, 'qwerty');
-};
-
-exports.outputVarCharNull = function(test) {
-  execSqlOutput(test, TYPES.VarChar, null);
-};
-
-exports.outputNVarChar = function(test) {
-  execSqlOutput(test, TYPES.NVarChar, 'qwerty');
-};
-
-exports.outputNVarCharNull = function(test) {
-  execSqlOutput(test, TYPES.NVarChar, null);
-};
-
-exports.outputSmallDateTime = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.SmallDateTime,
-    new Date('December 4, 2011 10:04:00')
-  );
-};
-
-exports.outputSmallDateTimeNull = function(test) {
-  execSqlOutput(test, TYPES.SmallDateTime, null);
-};
-
-exports.outputDateTime = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('December 4, 2011 10:04:23')
-  );
-};
-
-exports.outputDateTimeNull = function(test) {
-  execSqlOutput(test, TYPES.DateTime, null);
-};
-
-// The tests below validate DateTime precision on the output side, as described in
-//  the section "Rounding of datetime Fractional Second Precision" from
-// https://msdn.microsoft.com/en-us/library/ms187819.aspx
-
-exports.outputDatePrecision_0 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.990'),
-    new Date('January 1, 1998 23:59:59.990')
-  );
-};
-
-exports.outputDatePrecision_1 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.991'),
-    new Date('January 1, 1998 23:59:59.990')
-  );
-};
-
-exports.outputDatePrecision_2 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.992'),
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.outputDatePrecision_3 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.993'),
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.outputDatePrecision_4 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.994'),
-    new Date('January 1, 1998 23:59:59.993')
-  );
-};
-
-exports.outputDatePrecision_5 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.995'),
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.outputDatePrecision_6 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.996'),
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.outputDatePrecision_7 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.997'),
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.outputDatePrecision_8 = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:59.998'),
-    new Date('January 1, 1998 23:59:59.997')
-  );
-};
-
-exports.outputDatePrecision_9_sec_flip = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:59:58.999'),
-    new Date('January 1, 1998 23:59:59.000')
-  );
-};
-
-exports.outputDatePrecision_9_min_flip = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 23:58:59.999'),
-    new Date('January 1, 1998 23:59:00.000')
-  );
-};
-
-exports.outputDatePrecision_9_hr_flip = function(test) {
-  execSqlOutput(
-    test,
-    TYPES.DateTime,
-    new Date('January 1, 1998 22:59:59.999'),
-    new Date('January 1, 1998 23:00:00.000')
-  );
-};
-
-// This test fails on the version of SQL Server in AppVeyor.
-// exports.outputDatePrecision_9_day_flip = (test) ->
-//  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
-
-exports.multipleParameters = function(test) {
-  test.expect(7);
-
+function execSql(done, type, value, tdsVersion, options, expectedValue, cast) {
   var config = getConfig();
+  // config.options.packetSize = 32768
 
-  var request = new Request('select @param1, @param2', function(err) {
-    test.ifError(err);
+  if (tdsVersion && tdsVersion > config.options.tdsVersion) {
+    done();
+    return;
+  }
+
+  var request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
+    assert.ifError(err);
 
     connection.close();
   });
 
-  request.addParameter('param1', TYPES.Int, 3);
-  request.addParameter('param2', TYPES.VarChar, 'qwerty');
+  request.addParameter('param', type, value, options);
 
   request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-    test.strictEqual(rowCount, 1);
+    assert.ok(more);
+    assert.strictEqual(rowCount, 1);
   });
 
   request.on('row', function(columns) {
-    test.strictEqual(columns.length, 2);
-    test.strictEqual(columns[0].value, 3);
-    test.strictEqual(columns[1].value, 'qwerty');
+    assert.strictEqual(columns.length, 1);
+
+    if (!expectedValue) {
+      expectedValue = value;
+    }
+
+    if (cast) {
+      assert.strictEqual(columns[0].value, expectedValue);
+    } else if (value instanceof Date) {
+      assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
+    } else if (type === TYPES.BigInt) {
+      assert.strictEqual(columns[0].value, expectedValue.toString());
+    } else if (type === TYPES.UniqueIdentifier) {
+      assert.deepEqual(columns[0].value, expectedValue);
+    } else {
+      assert.strictEqual(columns[0].value, expectedValue);
+    }
   });
 
   var connection = new Connection(config);
 
   connection.on('connect', function(err) {
-    test.ifError(err);
+    assert.ifError(err);
     connection.execSql(request);
   });
 
   connection.on('end', function(info) {
-    test.done();
+    done();
+  });
+
+  connection.on('errorMessage', function(error) {
+    console.log(`${error.number} : ${error.message}`);
   });
 
   connection.on('debug', function(text) {
     // console.log(text)
   });
-};
+}
 
-exports.callProcedureWithParameters = function(test) {
-  test.expect(13);
-
+function execSqlOutput(done, type, value, expectedValue) {
   var config = getConfig();
 
-  var setupSql = `\
+  var request = new Request('set @paramOut = @paramIn', function(err) {
+    assert.ifError(err);
+
+    connection.close();
+  });
+
+  request.addParameter('paramIn', type, value);
+  request.addOutputParameter('paramOut', type);
+
+  request.on('doneInProc', function(rowCount, more) {
+    assert.ok(more);
+    assert.strictEqual(rowCount, 1);
+  });
+
+  request.on('returnValue', function(name, returnValue, metadata) {
+    assert.strictEqual(name, 'paramOut');
+
+    if (!expectedValue) {
+      expectedValue = value;
+    }
+
+    if (value instanceof Date) {
+      assert.strictEqual(returnValue.getTime(), expectedValue.getTime());
+    } else if (type === TYPES.BigInt) {
+      assert.strictEqual(returnValue, expectedValue.toString());
+    } else if (type === TYPES.UniqueIdentifier) {
+      assert.deepEqual(returnValue, expectedValue);
+    } else {
+      assert.strictEqual(returnValue, expectedValue);
+    }
+
+    assert.ok(metadata);
+  });
+
+  var connection = new Connection(config);
+
+  connection.on('connect', function(err) {
+    assert.ifError(err);
+    connection.execSql(request);
+  });
+
+  connection.on('end', function(info) {
+    done();
+  });
+
+  connection.on('debug', function(text) {
+    // console.log(text)
+  });
+}
+
+describe('Parameterised Statements Test', function() {
+  this.timeout(60000);
+
+  it('should test bit True', function(done) {
+    execSql(done, TYPES.Bit, true);
+  });
+
+  it('should test bit False', function(done) {
+    execSql(done, TYPES.Bit, false);
+  });
+
+  it('should test bit null', function(done) {
+    execSql(done, TYPES.Bit, null);
+  });
+
+  it('should test tiny int', function(done) {
+    execSql(done, TYPES.TinyInt, 8);
+  });
+
+  it('should test tiny int zero', function(done) {
+    execSql(done, TYPES.TinyInt, 0);
+  });
+
+  it('should test tiny int large', function(done) {
+    execSql(done, TYPES.TinyInt, 252);
+  });
+
+  it('should test tiny int null', function(done) {
+    execSql(done, TYPES.TinyInt, null);
+  });
+
+  it('should test small int', function(done) {
+    execSql(done, TYPES.SmallInt, 8);
+  });
+
+  it('should test small int zero', function(done) {
+    execSql(done, TYPES.SmallInt, 0);
+  });
+
+  it('should test small int null', function(done) {
+    execSql(done, TYPES.SmallInt, null);
+  });
+
+  it('should test in', function(done) {
+    execSql(done, TYPES.Int, 8);
+  });
+
+  it('should test big int', function(done) {
+    execSql(done, TYPES.BigInt, 9007199254740991);
+  });
+
+  it('should test biging1', function(done) {
+    execSql(done, TYPES.BigInt, 1);
+  });
+
+  it('should test big int small', function(done) {
+    execSql(done, TYPES.BigInt, -9007199254740991);
+  });
+
+  it('should test big int small1', function(done) {
+    execSql(done, TYPES.BigInt, -1);
+  });
+
+  it('should test real', function(done) {
+    execSql(done, TYPES.Real, 9654.2529296875);
+  });
+
+  it('should test float', function(done) {
+    execSql(done, TYPES.Float, 9654.2546456567565767644);
+  });
+
+  it('should test numeric', function(done) {
+    execSql(done, TYPES.Numeric, 5555);
+  });
+
+  it('should test numeric large value', function(done) {
+    execSql(done, TYPES.Numeric, 5.555555555555553333, null, {
+      precision: 19,
+      scale: 18,
+    });
+  });
+
+  it('should test numeric negative', function(done) {
+    execSql(done, TYPES.Numeric, -5555.55, null, {
+      precision: 6,
+      scale: 2,
+    });
+  });
+
+  it('should test decimal', function(done) {
+    execSql(done, TYPES.Decimal, 5555);
+  });
+
+  it('should test decimal large value', function(done) {
+    execSql(done, TYPES.Decimal, 5.555555555555553333, null, {
+      precision: 19,
+      scale: 18,
+    });
+  });
+
+  it('should test decimal negative', function(done) {
+    execSql(done, TYPES.Decimal, -5555.55, null, {
+      precision: 6,
+      scale: 2,
+    });
+  });
+
+  it('should test small money', function(done) {
+    execSql(done, TYPES.SmallMoney, 9842.4566);
+  });
+
+  it('should test money', function(done) {
+    execSql(done, TYPES.Money, 956455842.4566);
+  });
+
+  it('should test unique identifier', function(done) {
+    execSql(
+      done,
+      TYPES.UniqueIdentifier,
+      '01234567-89AB-CDEF-0123-456789ABCDEF'
+    );
+  });
+
+  it('should test int zero', function(done) {
+    execSql(done, TYPES.Int, 0);
+  });
+
+  it('should test int null', function(done) {
+    execSql(done, TYPES.Int, null);
+  });
+
+  it('should test var char', function(done) {
+    execSql(done, TYPES.VarChar, 'qaz');
+  });
+
+  /* Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and beyond. */
+  it('should test var char N', function(done) {
+    execSql(done, TYPES.VarChar, 'qaz', null, { length: 8000 });
+  });
+
+  it('should test var char N_7_2 and later', function(done) {
+    execSql(done, TYPES.VarChar, 'qaz', '7_2', { length: 8001 });
+  });
+
+  it('should test var char empty string', function(done) {
+    execSql(done, TYPES.VarChar, '');
+  });
+
+  it('should test var char null', function(done) {
+    execSql(done, TYPES.VarChar, null);
+  });
+
+  it('should test varchar max', function(done) {
+    var longString = '';
+    for (
+      var i = 1, end = 10 * 1000, asc = 1 <= end;
+      asc ? i <= end : i >= end;
+      asc ? i++ : i--
+    ) {
+      longString += 'x';
+    }
+
+    execSql(done, TYPES.VarChar, longString, '7_2');
+  });
+
+  it('should test varchar max empty string', function(done) {
+    execSql(done, TYPES.VarChar, '', null, { length: 8000 });
+  });
+
+  it('should test varchar max empty string 7_2 and later', function(done) {
+    execSql(done, TYPES.VarChar, '', '7_2', { length: 8001 });
+  });
+
+  it('should test nvarchar', function(done) {
+    execSql(done, TYPES.NVarChar, 'qaz');
+  });
+
+  /*
+  Per 2.2.5.4.3, lengths greater than 8000 only supported version 7.2 and
+  beyond. Since NVarChar is unicode, that'd be 4000. More explict in:
+  https://msdn.microsoft.com/en-us/library/ms186939.aspx
+  */
+  it('should test nvarcharN', function(done) {
+    execSql(done, TYPES.NVarChar, 'qaz', null, { length: 4000 });
+  });
+
+  it('should test nvarcharN 7_2 and later', function(done) {
+    execSql(done, TYPES.NVarChar, 'qaz', '7_2', { length: 4001 });
+  });
+
+  it('should test nvarchar empty string', function(done) {
+    execSql(done, TYPES.NVarChar, '');
+  });
+
+  it('should test nvarchar null', function(done) {
+    execSql(done, TYPES.NVarChar, null);
+  });
+
+  it('should test nvarchar max', function(done) {
+    var longString = '';
+    for (
+      var i = 1, end = 10 * 1000, asc = 1 <= end;
+      asc ? i <= end : i >= end;
+      asc ? i++ : i--
+    ) {
+      longString += 'x';
+    }
+
+    execSql(done, TYPES.NVarChar, longString, '7_2');
+  });
+
+  it('should test nvarchar max emtpy string', function(done) {
+    execSql(done, TYPES.NVarChar, '', null, { length: 4000 });
+  });
+
+  it('should test nvarchar max empty string 7_2 and later', function(done) {
+    execSql(done, TYPES.NVarChar, '', '7_2', { length: 4001 });
+  });
+
+  it('should test char', function(done) {
+    execSql(done, TYPES.Char, 'qaz');
+  });
+
+  it('should test charN', function(done) {
+    execSql(done, TYPES.Char, 'qaz', null, { length: 3 });
+  });
+
+  it('should test charNull', function(done) {
+    execSql(done, TYPES.Char, null);
+  });
+
+  it('should test NChar', function(done) {
+    execSql(done, TYPES.NChar, 'qaz');
+  });
+
+  it('should test NCharN', function(done) {
+    execSql(done, TYPES.NChar, 'qaz', null, { length: 3 });
+  });
+
+  it('should test NCharNull', function(done) {
+    execSql(done, TYPES.NChar, null);
+  });
+
+  it('should test textNull', function(done) {
+    execSql(done, TYPES.Text, null);
+  });
+
+  it('should test textEmtpy', function(done) {
+    execSql(done, TYPES.Text, '');
+  });
+
+  it('should test text small', function(done) {
+    execSql(done, TYPES.Text, 'small');
+  });
+
+  it('should test text large', function(done) {
+    var dBuf = Buffer.alloc(500000);
+    dBuf.fill('x');
+    execSql(done, TYPES.Text, dBuf.toString());
+  });
+
+  var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
+
+  it('should test time', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+  });
+
+  it('should test time1', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
+  });
+
+  it('should test time2', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
+  });
+
+  it('should test time3', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
+  });
+
+  it('should test time4', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
+  });
+
+  it('should test time5', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
+  });
+
+  it('should test time 6', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
+  });
+
+  it('should test time7', function(done) {
+    execSql(done, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
+  });
+
+  it('should test small date time', function(done) {
+    execSql(
+      done,
+      TYPES.SmallDateTime,
+      new Date('December 4, 2011 10:04:00')
+    );
+  });
+
+  it('should test small date time null', function(done) {
+    execSql(done, TYPES.SmallDateTime, null);
+  });
+
+  it('should test date time', function(done) {
+    execSql(done, TYPES.DateTime, new Date('December 4, 2011 10:04:23'));
+  });
+
+  it('should test date time null', function(done) {
+    execSql(done, TYPES.DateTime, null);
+  });
+
+  // The tests below validate DateTime precision on the input side, as described in
+  //  the section "Rounding of datetime Fractional Second Precision" from
+  // https://msdn.microsoft.com/en-us/library/ms187819.aspx
+  it('should test date time precision_0', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.990'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.990')
+    );
+  });
+
+  it('should test date time precision_1', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.991'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.990')
+    );
+  });
+
+  it('should test date time precision_2', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.992'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should test date time precision_3', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.993'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should test date time precision_4', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.994'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should test date time precision_5', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.995'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should test date time precision_6', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.996'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should test date time precision_7', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.997'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should test date time precison_8', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.998'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should test date time precision_9 sec flip', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:58.999'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:59.000')
+    );
+  });
+
+  it('should test date time precision_9 min flip', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:58:59.999'),
+      null,
+      null,
+      new Date('January 1, 1998 23:59:00.000')
+    );
+  });
+
+  it('should test date time precision_9 hr flip', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 22:59:59.999'),
+      null,
+      null,
+      new Date('January 1, 1998 23:00:00.000')
+    );
+  });
+
+  // This test fails on the version of SQL Server in AppVeyor.
+  // exports.dateTimePrecision_9_day_flip = (test) ->
+  //  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
+
+  it('should test date time 2', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime2,
+      new Date('December 4, 2011 10:04:23'),
+      '7_3_A'
+    );
+  });
+
+  it('should test date time 2 null', function(done) {
+    execSql(done, TYPES.DateTime2, null, '7_3_A');
+  });
+
+  it('should test output bit true', function(done) {
+    execSqlOutput(done, TYPES.Bit, true);
+  });
+
+  it('should test output bit false', function(done) {
+    execSqlOutput(done, TYPES.Bit, false);
+  });
+
+  it('should test ouput bit null', function(done) {
+    execSqlOutput(done, TYPES.Bit, null);
+  });
+
+  it('should test output tiny int', function(done) {
+    execSqlOutput(done, TYPES.TinyInt, 3);
+  });
+
+  it('should test output tiny int large', function(done) {
+    execSqlOutput(done, TYPES.TinyInt, 252);
+  });
+
+  it('should test output tiny int null', function(done) {
+    execSqlOutput(done, TYPES.TinyInt, null);
+  });
+
+  it('should test output small int', function(done) {
+    execSqlOutput(done, TYPES.SmallInt, 3);
+  });
+
+  it('should test output small int null', function(done) {
+    execSqlOutput(done, TYPES.SmallInt, null);
+  });
+
+  it('should test output int', function(done) {
+    execSqlOutput(done, TYPES.Int, 3);
+  });
+
+  it('should test output big int', function(done) {
+    execSqlOutput(done, TYPES.BigInt, 9007199254740991);
+  });
+
+  it('should test output big int 1', function(done) {
+    execSqlOutput(done, TYPES.BigInt, 1);
+  });
+
+  it('should test output big int small', function(done) {
+    execSqlOutput(done, TYPES.BigInt, -9007199254740991);
+  });
+
+  it('should test output big int small 1', function(done) {
+    execSqlOutput(done, TYPES.BigInt, -1);
+  });
+
+
+  it('should test output float', function(done) {
+    execSqlOutput(done, TYPES.Float, 9654.2546456567565767644);
+  });
+
+  it('should test output unique identifier', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.UniqueIdentifier,
+      '01234567-89AB-CDEF-0123-456789ABCDEF'
+    );
+  });
+
+  it('should output int null', function(done) {
+    execSqlOutput(done, TYPES.Int, null);
+  });
+
+  it('should output varchar', function(done) {
+    execSqlOutput(done, TYPES.VarChar, 'qwerty');
+  });
+
+  it('should output var char null', function(done) {
+    execSqlOutput(done, TYPES.VarChar, null);
+  });
+
+  it('should output NVarChar', function(done) {
+    execSqlOutput(done, TYPES.NVarChar, 'qwerty');
+  });
+
+  it('should output NVarChar null', function(done) {
+    execSqlOutput(done, TYPES.NVarChar, null);
+  });
+
+  it('should output small date time', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.SmallDateTime,
+      new Date('December 4, 2011 10:04:00')
+    );
+  });
+
+  it('should output small date time null', function(done) {
+    execSqlOutput(done, TYPES.SmallDateTime, null);
+  });
+
+  it('should output date time', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('December 4, 2011 10:04:23')
+    );
+  });
+
+  it('should output date time null', function(done) {
+    execSqlOutput(done, TYPES.DateTime, null);
+  });
+
+  // The tests below validate DateTime precision on the output side, as described in
+  //  the section "Rounding of datetime Fractional Second Precision" from
+  // https://msdn.microsoft.com/en-us/library/ms187819.aspx
+  it('should output date precision_0', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.990'),
+      new Date('January 1, 1998 23:59:59.990')
+    );
+  });
+
+  it('should output date precision_1', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.991'),
+      new Date('January 1, 1998 23:59:59.990')
+    );
+  });
+
+  it('should output date precision_2', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.992'),
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should output date precision_3', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.993'),
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should output date precision_4', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.994'),
+      new Date('January 1, 1998 23:59:59.993')
+    );
+  });
+
+  it('should output date precision_5', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.995'),
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should output date precision_6', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.996'),
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should output date precision_7', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.997'),
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should test output date precision_8', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.998'),
+      new Date('January 1, 1998 23:59:59.997')
+    );
+  });
+
+  it('should output date precision_9_sec_flip', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:58.999'),
+      new Date('January 1, 1998 23:59:59.000')
+    );
+  });
+
+  it('should output date precision_9_min_flip', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:58:59.999'),
+      new Date('January 1, 1998 23:59:00.000')
+    );
+  });
+
+  it('should output date precision_9_hr_flip', function(done) {
+    execSqlOutput(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 22:59:59.999'),
+      new Date('January 1, 1998 23:00:00.000')
+    );
+  });
+
+  // This test fails on the version of SQL Server in AppVeyor.
+  // exports.outputDatePrecision_9_day_flip = (test) ->
+  //  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
+  it('should test multiple parameters', function(done) {
+    var config = getConfig();
+
+    var request = new Request('select @param1, @param2', function(err) {
+      assert.ifError(err);
+
+      connection.close();
+    });
+
+    request.addParameter('param1', TYPES.Int, 3);
+    request.addParameter('param2', TYPES.VarChar, 'qwerty');
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.ok(more);
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 2);
+      assert.strictEqual(columns[0].value, 3);
+      assert.strictEqual(columns[1].value, 'qwerty');
+    });
+
+    var connection = new Connection(config);
+
+    connection.on('connect', function(err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
+
+    connection.on('end', function(info) {
+      done();
+    });
+
+    connection.on('debug', function(text) {
+      // console.log(text)
+    });
+  });
+
+  it('should call procedure with parameters', function(done) {
+    var config = getConfig();
+
+    var setupSql = `\
 exec('create procedure #__test5
   @in BINARY(4),
   @in2 BINARY(4) = NULL,
@@ -781,176 +895,59 @@ begin
 end')\
 `;
 
-  var request = new Request(setupSql, function(err) {
-    test.ifError(err);
+    var request = new Request(setupSql, function(err) {
+      assert.ifError(err);
 
-    request = new Request('#__test5', function(err) {
-      test.ifError(err);
+      request = new Request('#__test5', function(err) {
+        assert.ifError(err);
 
-      connection.close();
+        connection.close();
+      });
+
+      var sample = Buffer.from([0x00, 0x01, 0xe2, 0x40]);
+
+      request.addParameter('in', TYPES.Binary, sample);
+      request.addParameter('in2', TYPES.Binary, null);
+      request.addParameter('in3', TYPES.VarBinary, sample);
+      request.addParameter('in4', TYPES.VarBinary, null);
+      request.addParameter('in5', TYPES.Image, sample);
+      request.addParameter('in6', TYPES.Image, null);
+      request.addOutputParameter('out', TYPES.Binary, null, { length: 4 });
+      request.addOutputParameter('out2', TYPES.VarBinary);
+
+      request.on('doneInProc', function(rowCount, more) {
+        assert.strictEqual(rowCount, undefined);
+        assert.ok(more);
+      });
+
+      request.on('row', function(columns) {
+        assert.strictEqual(columns.length, 7);
+        assert.deepEqual(columns[0].value, sample);
+        assert.deepEqual(columns[1].value, sample);
+        assert.strictEqual(columns[2].value, null);
+        assert.deepEqual(columns[3].value, sample);
+        assert.strictEqual(columns[4].value, null);
+        assert.deepEqual(columns[5].value, sample);
+        assert.strictEqual(columns[6].value, null);
+      });
+
+      connection.callProcedure(request);
     });
 
-    var sample = Buffer.from([0x00, 0x01, 0xe2, 0x40]);
+    var connection = new Connection(config);
 
-    request.addParameter('in', TYPES.Binary, sample);
-    request.addParameter('in2', TYPES.Binary, null);
-    request.addParameter('in3', TYPES.VarBinary, sample);
-    request.addParameter('in4', TYPES.VarBinary, null);
-    request.addParameter('in5', TYPES.Image, sample);
-    request.addParameter('in6', TYPES.Image, null);
-    request.addOutputParameter('out', TYPES.Binary, null, { length: 4 });
-    request.addOutputParameter('out2', TYPES.VarBinary);
-
-    request.on('doneInProc', function(rowCount, more) {
-      test.strictEqual(rowCount, undefined);
-      test.ok(more);
+    connection.on('connect', function(err) {
+      assert.ifError(err);
+      connection.execSqlBatch(request);
     });
 
-    request.on('row', function(columns) {
-      test.strictEqual(columns.length, 7);
-      test.deepEqual(columns[0].value, sample);
-      test.deepEqual(columns[1].value, sample);
-      test.strictEqual(columns[2].value, null);
-      test.deepEqual(columns[3].value, sample);
-      test.strictEqual(columns[4].value, null);
-      test.deepEqual(columns[5].value, sample);
-      test.strictEqual(columns[6].value, null);
+    connection.on('end', function(info) {
+      done();
     });
 
-    connection.callProcedure(request);
+    connection.on('debug', function(text) {
+      // console.log(text)
+    });
   });
 
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSqlBatch(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-};
-
-function execSql(test, type, value, tdsVersion, options, expectedValue, cast) {
-  var config = getConfig();
-  // config.options.packetSize = 32768
-
-  if (tdsVersion && tdsVersion > config.options.tdsVersion) {
-    test.done();
-    return;
-  }
-
-  test.expect(6);
-
-  var request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  request.addParameter('param', type, value, options);
-
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-    test.strictEqual(rowCount, 1);
-  });
-
-  request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-
-    if (!expectedValue) {
-      expectedValue = value;
-    }
-
-    if (cast) {
-      test.strictEqual(columns[0].value, expectedValue);
-    } else if (value instanceof Date) {
-      test.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
-    } else if (type === TYPES.BigInt) {
-      test.strictEqual(columns[0].value, expectedValue.toString());
-    } else if (type === TYPES.UniqueIdentifier) {
-      test.deepEqual(columns[0].value, expectedValue);
-    } else {
-      test.strictEqual(columns[0].value, expectedValue);
-    }
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('errorMessage', function(error) {
-    console.log(`${error.number} : ${error.message}`);
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-}
-
-function execSqlOutput(test, type, value, expectedValue) {
-  test.expect(7);
-
-  var config = getConfig();
-
-  var request = new Request('set @paramOut = @paramIn', function(err) {
-    test.ifError(err);
-
-    connection.close();
-  });
-
-  request.addParameter('paramIn', type, value);
-  request.addOutputParameter('paramOut', type);
-
-  request.on('doneInProc', function(rowCount, more) {
-    test.ok(more);
-    test.strictEqual(rowCount, 1);
-  });
-
-  request.on('returnValue', function(name, returnValue, metadata) {
-    test.strictEqual(name, 'paramOut');
-
-    if (!expectedValue) {
-      expectedValue = value;
-    }
-
-    if (value instanceof Date) {
-      test.strictEqual(returnValue.getTime(), expectedValue.getTime());
-    } else if (type === TYPES.BigInt) {
-      test.strictEqual(returnValue, expectedValue.toString());
-    } else if (type === TYPES.UniqueIdentifier) {
-      test.deepEqual(returnValue, expectedValue);
-    } else {
-      test.strictEqual(returnValue, expectedValue);
-    }
-
-    test.ok(metadata);
-  });
-
-  var connection = new Connection(config);
-
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.execSql(request);
-  });
-
-  connection.on('end', function(info) {
-    test.done();
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-}
+});
