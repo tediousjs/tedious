@@ -59,17 +59,17 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
   it('returns the same data', function(done) {
     async.series([
-      (done) => {
-        const sql = 'BEGIN TRY DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
-        connection.execSqlBatch(new Request(sql, done));
+      (next) => {
+        const sql = 'USE tempdb; BEGIN TRY DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
+        connection.execSqlBatch(new Request(sql, next));
       },
-      (done) => {
-        const sql = 'CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime);';
-        connection.execSqlBatch(new Request(sql, done));
+      (next) => {
+        const sql = 'USE tempdb; CREATE TYPE TediousTestType AS TABLE (a bit, b tinyint, c smallint, d int, e bigint, f real, g float, h varchar (100), i nvarchar (100), j datetime)';
+        connection.execSqlBatch(new Request(sql, next));
       },
-      (done) => {
-        const sql = 'CREATE PROCEDURE #__tediousTvpTest (@tvp TediousTestType readonly) AS BEGIN select * from @tvp END';
-        connection.execSqlBatch(new Request(sql, done));
+      (next) => {
+        const sql = 'CREATE PROCEDURE #__tediousTvpTest @tvp TediousTestType readonly AS BEGIN select * from @tvp END';
+        connection.execSqlBatch(new Request(sql, next));
       }
     ], (err) => {
       if (err) {

@@ -68,7 +68,6 @@
     "eslint": "^5.16.0",
     "mitm": "^1.7.0",
     "mocha": "^6.1.4",
-    "nodeunit": "^0.11.3",
     "rimraf": "^2.6.3",
     "semantic-release": "^15.13.12",
     "sinon": "^7.3.2",
@@ -76,9 +75,9 @@
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
+    "test-integration": "mocha test/integration/",
+    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"

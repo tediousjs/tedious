@@ -1,6 +1,6 @@
-var Debug = require('../../src/debug');
-
-var payload = 'payload';
+const Debug = require('../../src/debug');
+const payload = 'payload';
+const assert = require('chai').assert;
 
 class Packet {
   headerToString() {
@@ -12,92 +12,94 @@ class Packet {
   }
 }
 
-exports.packet = function(test) {
-  var emitCount = 0;
+describe('Packet Tests', function() {
+  it('Create new packet', function(done) {
+    let emitCount = 0;
 
-  var debug = new Debug({ packet: true });
+    const debug = new Debug({ packet: true });
 
-  debug.on('debug', function(text) {
-    emitCount++;
+    debug.on('debug', function(text) {
+      emitCount++;
 
-    switch (emitCount) {
-      case 2:
-        test.ok(/dir/.test(text));
-        break;
-      case 3:
-        test.ok(/header/.test(text));
-        test.done();
-        break;
-    }
+      switch (emitCount) {
+        case 2:
+          assert.isOk(/dir/.test(text));
+          break;
+        case 3:
+          assert.isOk(/header/.test(text));
+          done();
+          break;
+      }
+    });
+
+    return debug.packet('dir', new Packet());
   });
 
-  return debug.packet('dir', new Packet());
-};
+  it('should enable payload', function(done) {
+    const debug = new Debug({ payload: true });
+    debug.on('debug', function(text) {
+      assert.strictEqual(text, payload);
 
-exports.payloadEnabled = function(test) {
-  var debug = new Debug({ payload: true });
-  debug.on('debug', function(text) {
-    test.strictEqual(text, payload);
+      done();
+    });
 
-    test.done();
+    return debug.payload(function() {
+      return payload;
+    });
   });
 
-  return debug.payload(function() {
-    return payload;
-  });
-};
+  it('should not enable payload', function(done) {
+    const debug = new Debug();
+    debug.on('debug', function(text) {
+      assert.isOk(false);
+    });
 
-exports.payloadNotEnabled = function(test) {
-  var debug = new Debug();
-  debug.on('debug', function(text) {
-    test.ok(false);
-  });
+    debug.payload(payload);
 
-  debug.payload(payload);
-
-  test.done();
-};
-
-exports.dataEnable = function(test) {
-  var debug = new Debug({ data: true });
-  debug.on('debug', function(text) {
-    test.strictEqual(text, 'data');
-
-    test.done();
+    done();
   });
 
-  debug.data(new Packet());
-};
+  it('should enable data', function(done) {
+    const debug = new Debug({ data: true });
+    debug.on('debug', function(text) {
+      assert.strictEqual(text, 'data');
 
-exports.dataNotEnabled = function(test) {
-  var debug = new Debug();
-  debug.on('debug', function(text) {
-    test.ok(false);
+      done();
+    });
+
+    debug.data(new Packet());
   });
 
-  debug.data(new Packet());
+  it('should not enable data', function(done) {
+    const debug = new Debug();
+    debug.on('debug', function(text) {
+      assert.isOk(false);
+    });
 
-  test.done();
-};
+    debug.data(new Packet());
 
-exports.tokenEnabled = function(test) {
-  var debug = new Debug({ token: true });
-  debug.on('debug', function(token) {
-    test.ok(token.indexOf('test') !== 0);
-
-    test.done();
+    done();
   });
 
-  debug.token({ name: 'test' });
-};
+  it('should enable token', function(done) {
+    const debug = new Debug({ token: true });
+    debug.on('debug', function(token) {
+      assert.isOk(token.indexOf('test') !== 0);
 
-exports.payloadNotEnabledTest = function(test) {
-  var debug = new Debug();
-  debug.on('debug', function(token) {
-    test.ok(false);
+      done();
+    });
+
+    debug.token({ name: 'test' });
   });
 
-  debug.token({ name: 'test' });
+  it('should not enable payload', function(done) {
+    const debug = new Debug();
+    debug.on('debug', function(token) {
+      assert.isOk(false);
+    });
 
-  test.done();
-};
+    debug.token({ name: 'test' });
+
+    done();
+  });
+});
