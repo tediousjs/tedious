@@ -1,5 +1,6 @@
-var Parser = require('../../../src/token/stream-parser');
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+const Parser = require('../../../src/token/stream-parser');
+const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+const assert = require('chai').assert;
 
 function parse(status, curCmd, doneRowCount) {
   var doneRowCountLow = doneRowCount % 0x100000000;
@@ -13,49 +14,45 @@ function parse(status, curCmd, doneRowCount) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  var parser = new Parser({ token() {} }, {}, { tdsVersion: '7_2' });
+  var parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
   return parser.read();
 }
 
-module.exports.done = function(test) {
-  var status = 0x0000;
-  var curCmd = 1;
-  var doneRowCount = 2;
+describe('Done Token Parser', () => {
+  it('should done', () => {
+    const status = 0x0000;
+    const curCmd = 1;
+    const doneRowCount = 2;
 
-  var token = parse(status, curCmd, doneRowCount);
+    const token = parse(status, curCmd, doneRowCount);
 
-  test.ok(!token.more);
-  test.strictEqual(token.curCmd, curCmd);
-  test.ok(!token.rowCount);
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
+  });
 
-  test.done();
-};
+  it('should more', () => {
+    const status = 0x0001;
+    const curCmd = 1;
+    const doneRowCount = 2;
 
-module.exports.more = function(test) {
-  var status = 0x0001;
-  var curCmd = 1;
-  var doneRowCount = 2;
+    const token = parse(status, curCmd, doneRowCount);
 
-  var token = parse(status, curCmd, doneRowCount);
+    assert.isOk(token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
+  });
 
-  test.ok(token.more);
-  test.strictEqual(token.curCmd, curCmd);
-  test.ok(!token.rowCount);
+  it('should done row count', () => {
+    const status = 0x0010;
+    const curCmd = 1;
+    const doneRowCount = 0x1200000034;
 
-  test.done();
-};
+    const token = parse(status, curCmd, doneRowCount);
 
-module.exports.doneRowCount = function(test) {
-  var status = 0x0010;
-  var curCmd = 1;
-  var doneRowCount = 0x1200000034;
-
-  var token = parse(status, curCmd, doneRowCount);
-
-  test.ok(!token.more);
-  test.strictEqual(token.curCmd, 1);
-  test.strictEqual(token.rowCount, doneRowCount);
-
-  test.done();
-};
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, 1);
+    assert.strictEqual(token.rowCount, doneRowCount);
+  });
+});
