@@ -76,9 +76,9 @@
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer && mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "nodeunit --reporter minimal test/setup.js test/integration/ && mocha test/integration/",
-    "test-all": "nodeunit --reporter minimal test/setup.js test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/ && mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
+    "test-integration": "mocha test/integration/",
+    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
