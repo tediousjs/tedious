@@ -105,5 +105,10 @@
     "extends": [
       "@commitlint/config-conventional"
     ]
+  },
+  "nyc": {
+    "sourceMap": false,
+    "instrument": false,
+    "extension": [ ".ts" ]
   }
 }
