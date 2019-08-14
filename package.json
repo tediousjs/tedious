@@ -63,6 +63,7 @@
     "@commitlint/travis-cli": "^8.0.0",
     "async": "^2.6.1",
     "babel-eslint": "^11.0.0-beta.0",
+    "babel-plugin-istanbul": "^5.2.0",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
     "codecov": "^3.5.0",
