@@ -4,7 +4,7 @@ const assert = require('chai').assert;
 // This test is simply a set of assertions to ensure any additions to or deletions
 // from the list of transient errors is intentional.
 
-describe('Connection configuration validation', (done) => {
+describe('Connection configuration validation', () => {
   it('transient errors', () => {
     const transientErrorLookup = new TransientErrorLookup();
     assert.ok(transientErrorLookup.isTransientError(4060));
