@@ -1243,13 +1243,13 @@ class Connection extends EventEmitter {
 
       case 'ntlm':
         payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
-        sendPayload();
+        sendPayload(payload);
         break;
 
       default:
         payload.userName = authentication.options.userName;
         payload.password = authentication.options.password;
-        sendPayload();
+        sendPayload(payload);
     }
   }
 
