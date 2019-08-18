@@ -15,7 +15,7 @@ export abstract class State {
     this.connection = connection;
   }
 
-  enter() { }
+  enter(_previousState?: State, ..._args: any[]) { }
   exit(_nextState: State) { }
 }
 

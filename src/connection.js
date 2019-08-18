@@ -1155,7 +1155,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  transitionTo(newState) {
+  transitionTo(newState, ...args) {
     if (this.state === newState) {
       this.debug.log('State is already ' + newState.name);
       return;
@@ -1166,9 +1166,11 @@ class Connection extends EventEmitter {
     }
 
     this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
+
+    const previousState = this.state;
     this.state = newState;
 
-    this.state.enter();
+    this.state.enter(previousState, ...args);
   }
 
   dispatchEvent(eventName, ...args) {

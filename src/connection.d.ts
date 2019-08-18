@@ -109,7 +109,9 @@ declare class Connection {
   sendFedAuthTokenMessage(token: any): void;
   pauseRequest(request: Request | BulkLoad): void;
   resumeRequest(request: Request | BulkLoad): void;
-  transitionTo(state: State): void;
+
+  transitionTo(state: State, ...args: any[]): void;
+
   sendDataToTokenStreamParser(data: Buffer): boolean;
   createRetryTimer(): void;
   processedInitialSql(): void;
