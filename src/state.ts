@@ -499,12 +499,34 @@ export class SentClientRequestState extends State {
 }
 
 export class SentAttentionState extends State {
+  attentionReceived: boolean;
+
+  timer?: NodeJS.Timeout;
+
   constructor(connection: Connection) {
     super('SentAttention', connection);
+
+    this.attentionReceived = false;
   }
 
   enter() {
-    this.connection.attentionReceived = false;
+    const timeout = this.connection.config.options.cancelTimeout;
+    if (timeout > 0) {
+      this.timer = setTimeout(() => {
+        const message = `Failed to cancel request in ${timeout}ms`;
+        this.connection.debug.log(message);
+        this.connection.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
+      }, timeout);
+    }
+  }
+
+  exit() {
+    this.attentionReceived = false;
+
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
   }
 
   socketError(err: Error) {
@@ -521,15 +543,13 @@ export class SentAttentionState extends State {
   }
 
   attention() {
-    this.connection.attentionReceived = true;
+    this.attentionReceived = true;
   }
 
   message() {
     // 3.2.5.7 Sent Attention State
     // Discard any data contained in the response, until we receive the attention response
-    if (this.connection.attentionReceived) {
-      this.connection.clearCancelTimer();
-
+    if (this.attentionReceived) {
       const sqlRequest = this.connection.request!;
       this.connection.request = undefined;
       this.connection.transitionTo(this.connection.STATE.LOGGED_IN);

@@ -983,13 +983,10 @@ class Connection extends EventEmitter {
       if (request) {
         if (token.attention) {
           this.dispatchEvent('attention');
-        }
-
-        if (request.canceled) {
+        } else if (request.canceled) {
           // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
           // We assume this is the indication that an in-flight request was canceled.
           if (token.sqlError && !request.error) {
-            this.clearCancelTimer();
             request.error = RequestError('Canceled.', 'ECANCEL');
           }
         } else {
@@ -1099,16 +1096,6 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
   }
 
-  createCancelTimer() {
-    this.clearCancelTimer();
-    const timeout = this.config.options.cancelTimeout;
-    if (timeout > 0) {
-      this.cancelTimer = setTimeout(() => {
-        this.cancelTimeout();
-      }, timeout);
-    }
-  }
-
   createRetryTimer() {
     this.clearRetryTimer();
     this.retryTimer = setTimeout(() => {
@@ -1124,12 +1111,6 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
-  cancelTimeout() {
-    const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
-    this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
-  }
-
   retryTimeout() {
     this.retryTimer = undefined;
     this.emit('retry');
@@ -1139,12 +1120,6 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
-    }
-  }
-
-  clearCancelTimer() {
-    if (this.cancelTimer) {
-      clearTimeout(this.cancelTimer);
     }
   }
 
@@ -1720,8 +1695,6 @@ class Connection extends EventEmitter {
           this.messageIo.sendMessage(TYPE.ATTENTION);
           this.transitionTo(this.STATE.SENT_ATTENTION);
         }
-
-        this.createCancelTimer();
       });
 
       if (request instanceof BulkLoad) {

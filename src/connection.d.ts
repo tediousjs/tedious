@@ -29,7 +29,8 @@ export type ConnectionOptions = {
   encrypt: boolean,
   trustServerCertificate: boolean,
   database?: string,
-  requestTimeout: number
+  requestTimeout: number,
+  cancelTimeout: number
 };
 
 type InternalConfig = {
@@ -90,11 +91,12 @@ declare class Connection {
   loginError?: ConnectionError;
   inTransaction: boolean;
   isSqlBatch: boolean;
-  attentionReceived: boolean;
   fedAuthInfoToken: {
     spn: string,
     stsurl: string
   };
+
+  dispatchEvent(event: string, ...args: any[]): void;
 
   config: InternalConfig;
   ntlmpacket?: any;
@@ -115,7 +117,6 @@ declare class Connection {
   sendDataToTokenStreamParser(data: Buffer): boolean;
   createRetryTimer(): void;
   processedInitialSql(): void;
-  clearCancelTimer(): void;
   cleanupConnection(cleanupType: number): void;
 
   cleanupTypeEnum: {
