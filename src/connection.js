@@ -725,7 +725,6 @@ class Connection extends EventEmitter {
   cleanupConnection(cleanupTypeEnum) {
     if (!this.closed) {
       this.clearConnectTimer();
-      this.clearRequestTimer();
       this.clearRetryTimer();
       this.closeConnection();
       if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
@@ -1110,17 +1109,6 @@ class Connection extends EventEmitter {
     }
   }
 
-  createRequestTimer() {
-    this.clearRequestTimer(); // release old timer, just to be safe
-    const request = this.request;
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    if (timeout) {
-      this.requestTimer = setTimeout(() => {
-        this.requestTimeout();
-      }, timeout);
-    }
-  }
-
   createRetryTimer() {
     this.clearRetryTimer();
     this.retryTimer = setTimeout(() => {
@@ -1142,15 +1130,6 @@ class Connection extends EventEmitter {
     this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
   }
 
-  requestTimeout() {
-    this.requestTimer = undefined;
-    const request = this.request;
-    request.cancel();
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = RequestError(message, 'ETIMEOUT');
-  }
-
   retryTimeout() {
     this.retryTimer = undefined;
     this.emit('retry');
@@ -1166,13 +1145,6 @@ class Connection extends EventEmitter {
   clearCancelTimer() {
     if (this.cancelTimer) {
       clearTimeout(this.cancelTimer);
-    }
-  }
-
-  clearRequestTimer() {
-    if (this.requestTimer) {
-      clearTimeout(this.requestTimer);
-      this.requestTimer = undefined;
     }
   }
 
@@ -1747,7 +1719,6 @@ class Connection extends EventEmitter {
           this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
-        this.clearRequestTimer();
         this.createCancelTimer();
       });
 
@@ -1769,8 +1740,6 @@ class Connection extends EventEmitter {
           this.pauseRequest(request);
         }
       } else {
-        this.createRequestTimer();
-
         // Transition to an intermediate state to ensure that no new requests
         // are made on the connection while the buffer is being populated.
         this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);

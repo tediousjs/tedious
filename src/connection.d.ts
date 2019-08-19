@@ -28,7 +28,8 @@ export type ConnectionOptions = {
   tdsVersion: string,
   encrypt: boolean,
   trustServerCertificate: boolean,
-  database?: string
+  database?: string,
+  requestTimeout: number
 };
 
 type InternalConfig = {
@@ -112,7 +113,6 @@ declare class Connection {
   sendDataToTokenStreamParser(data: Buffer): boolean;
   createRetryTimer(): void;
   processedInitialSql(): void;
-  clearRequestTimer(): void;
   clearCancelTimer(): void;
   cleanupConnection(cleanupType: number): void;
 

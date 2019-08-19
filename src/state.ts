@@ -425,12 +425,32 @@ export class BuildingClientRequestState extends State {
 }
 
 export class SentClientRequestState extends State {
+  timer?: NodeJS.Timeout;
+
   constructor(connection: Connection) {
     super('SentClientRequest', connection);
+
+    this.timer = undefined;
+  }
+
+  enter() {
+    const request = this.connection.request!;
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.connection.config.options.requestTimeout;
+
+    if (timeout) {
+      this.timer = setTimeout(() => {
+        request.cancel();
+        const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+        request.error = new RequestError(message, 'ETIMEOUT');
+      }, timeout);
+    }
   }
 
   exit(nextState: State) {
-    this.connection.clearRequestTimer();
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
 
     if (nextState !== this.connection.STATE.FINAL) {
       this.connection.tokenStreamParser.resume();
@@ -446,7 +466,12 @@ export class SentClientRequestState extends State {
   }
 
   data(data: Buffer) {
-    this.connection.clearRequestTimer(); // request timer is stopped on first data package
+    if (this.timer) {
+      // request timer is stopped on first data package
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+
     const ret = this.connection.sendDataToTokenStreamParser(data);
     if (ret === false) {
       // Bridge backpressure from the token stream parser transform to the
