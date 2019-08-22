@@ -68,7 +68,7 @@ function readColumn(parser, options, index, callback) {
   });
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
+exports.colMetaDataParser = function(parser, colMetadata, options, callback) {
   parser.readUInt16LE((columnCount) => {
     const columns = [];
 
@@ -95,3 +95,20 @@ module.exports = function(parser, colMetadata, options, callback) {
     });
   });
 };
+
+exports.specifyDataType = function (column) {
+  const dataLength = column.dataLength;
+  const originalType = column.type;
+  let type;
+
+  if(originalType.hasOwnProperty('getDataType')) {
+    type = originalType.getDataType(dataLength);
+  } else {
+    type = originalType;
+  }
+
+  return {
+    ...column,
+    type
+  }
+}

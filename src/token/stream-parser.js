@@ -2,7 +2,7 @@ const Transform = require('readable-stream').Transform;
 const TYPE = require('./token').TYPE;
 
 const tokenParsers = {};
-tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser');
+tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser').colMetaDataParser;
 tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser;
 tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
 tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;

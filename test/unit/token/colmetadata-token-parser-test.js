@@ -1,10 +1,11 @@
+const colmetadataTokenParser = require('../../../lib/token/colmetadata-token-parser');
 const dataTypeByName = require('../../../src/data-type').typeByName;
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const TokenStreamParser = require('../../../src/token/stream-parser');
 const assert = require('chai').assert;
 
-describe('Colmetadata Token Parser', () => {
-  it('should int', () => {
+describe('Colmetadata Token Parser', function() {
+  it('should int', function() {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -33,7 +34,7 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].colName, 'name');
   });
 
-  it('should varchar', () => {
+  it('should varchar', function() {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -71,4 +72,8 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].colName, 'name');
     assert.strictEqual(token.columns[0].dataLength, length);
   });
+
+  it('should specify data type', function(){
+    
+  })
 });

@@ -76,9 +76,9 @@ describe('Bulk Load Tests', function() {
       length: 50,
       nullable: true
     });
-    bulkLoad.addColumn('ddd', TYPES.DateTime, {
+  /*   bulkLoad.addColumn('ddd', TYPES.DateTime, {
       nullable: false
-    });
+    }); */
     const request = new Request(bulkLoad.getTableCreationSql(), function(err) {
       if (err) {
         return done(err);
@@ -87,19 +87,19 @@ describe('Bulk Load Tests', function() {
       bulkLoad.addRow({
         nnn: 201,
         sss: 'one zero one',
-        ddd: new Date(1986, 6, 20)
+        /* ddd: new Date(1986, 6, 20) */
       });
-      bulkLoad.addRow([202, 'one zero two', new Date()]);
-      bulkLoad.addRow(203, 'one zero three', new Date(2013, 7, 12));
+      bulkLoad.addRow([202, 'one zero two'/* , new Date() */]);
+      bulkLoad.addRow(203, 'one zero three'/* , new Date(2013, 7, 12) */);
       bulkLoad.addRow({
         nnn: 204,
         sss: 'one zero four',
-        ddd: new Date()
+       /*  ddd: new Date() */
       });
       bulkLoad.addRow({
         nnn: 205,
         sss: 'one zero five',
-        ddd: new Date()
+        /* ddd: new Date() */
       });
       connection.execBulkLoad(bulkLoad);
     });
