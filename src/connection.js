@@ -1114,10 +1114,10 @@ class Connection extends EventEmitter {
   requestTimeout() {
     this.requestTimer = undefined;
     const request = this.request;
-    request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
     request.error = RequestError(message, 'ETIMEOUT');
+	request.cancel();
   }
 
   retryTimeout() {
