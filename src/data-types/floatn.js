@@ -4,7 +4,7 @@ module.exports = {
   name: 'FloatN',
   dataLengthLength: 1,
 
-  getDataType: function (dataLength) {
+  getDataType: function(dataLength) {
     const float = require('./float');
 
     return (dataLength === 4 || dataLength === 8) ? float : this;

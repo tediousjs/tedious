@@ -4,10 +4,10 @@ module.exports = {
   name: 'MoneyN',
   dataLengthLength: 1,
 
-  getDataType: function (dataLength) {
+  getDataType: function(dataLength) {
     const smallmoney = require('./smallmoney');
     const money = require('./money');
-    
+
     switch (dataLength) {
       case 4:
         return smallmoney;

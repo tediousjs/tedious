@@ -76,7 +76,7 @@ describe('Bulk Load Tests', function() {
       length: 50,
       nullable: true
     });
-  /*   bulkLoad.addColumn('ddd', TYPES.DateTime, {
+    /*   bulkLoad.addColumn('ddd', TYPES.DateTime, {
       nullable: false
     }); */
     const request = new Request(bulkLoad.getTableCreationSql(), function(err) {
@@ -94,7 +94,7 @@ describe('Bulk Load Tests', function() {
       bulkLoad.addRow({
         nnn: 204,
         sss: 'one zero four',
-       /*  ddd: new Date() */
+        /*  ddd: new Date() */
       });
       bulkLoad.addRow({
         nnn: 205,

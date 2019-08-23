@@ -2,7 +2,7 @@ const TYPES = require('../../src/data-type');
 const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
-describe('Data Types', function () {
+describe('Data Types', function() {
   // Test date calculation for non utc date during daylight savings period
   it('smallDateTimeDaylightSaving', () => {
     const type = TYPES.typeByName.SmallDateTime;

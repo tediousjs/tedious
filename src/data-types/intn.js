@@ -4,7 +4,7 @@ module.exports = {
   name: 'IntN',
   dataLengthLength: 1,
 
-  getDataType: function (dataLength) {
+  getDataType: function(dataLength) {
     const tinyInt = require('./tinyint');
     const smallInt = require('./smallint');
     const int = require('./int');

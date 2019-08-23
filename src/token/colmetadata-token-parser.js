@@ -96,12 +96,12 @@ exports.colMetaDataParser = function(parser, colMetadata, options, callback) {
   });
 };
 
-exports.specifyDataType = function (column) {
+exports.specifyDataType = function(column) {
   const dataLength = column.dataLength;
   const originalType = column.type;
   let type;
 
-  if(originalType.hasOwnProperty('getDataType')) {
+  if (originalType.hasOwnProperty('getDataType')) {
     type = originalType.getDataType(dataLength);
   } else {
     type = originalType;
@@ -110,5 +110,5 @@ exports.specifyDataType = function (column) {
   return {
     ...column,
     type
-  }
-}
+  };
+};

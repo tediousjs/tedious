@@ -4,18 +4,18 @@ module.exports = {
   name: 'DateTimeN',
   dataLengthLength: 1,
 
-  getDataType: function(dataLength){
+  getDataType: function(dataLength) {
     const smalldatetime = require('./smalldatetime');
     const datetime = require('./datetime');
 
-    switch(dataLength){
-      case 4: 
+    switch (dataLength) {
+      case 4:
         return smalldatetime;
-        
-      case 8: 
-        return datetime;  
 
-      default: return this;  
+      case 8:
+        return datetime;
+
+      default: return this;
     }
   }
 };

@@ -859,14 +859,21 @@ class Connection extends EventEmitter {
           } else {
             columns = token.columns;
           }
-          
-         /*  //Replace variable length data-type to specific data-type (e.g., type intN -> type smallint etc...)
+
+          // Replace variable length data-type to specific data-type (e.g., type intN -> type smallint etc...)
           const emittedColumns = [];
-          columns.forEach((column) => {
-            emittedColumns.push(colMetaDatParser.specifyDataType(column))
-          })
-          request.emit('columnMetadata', emittedColumns); */
-          request.emit('columnMetadata', columns);
+          if (Array.isArray(columns)) {
+            columns.forEach((column) => {
+              emittedColumns.push(colMetaDatParser.specifyDataType(column));
+            });
+          } else {
+            Object.keys(columns).forEach((colName) => {
+              const tempCol = columns[colName];
+              emittedColumns.push(colMetaDatParser.specifyDataType(tempCol));
+            });
+          }
+
+          request.emit('columnMetadata', emittedColumns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
@@ -1897,7 +1904,7 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1916,7 +1923,7 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
