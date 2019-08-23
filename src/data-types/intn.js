@@ -9,6 +9,7 @@ module.exports = {
     const smallInt = require('./smallint');
     const int = require('./int');
     const bigInt = require('./bigint');
+
     switch (dataLength) {
       case 1:
         return tinyInt;

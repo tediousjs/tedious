@@ -4,8 +4,14 @@ const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tr
 const TokenStreamParser = require('../../../src/token/stream-parser');
 const assert = require('chai').assert;
 
-describe('Colmetadata Token Parser', function() {
-  it('should int', function() {
+const intN = require('../../../lib/data-types/intn');
+const moneyN = require('../../../lib/data-types/moneyn');
+const dateTimeN = require('../../../lib/data-types/datetimen');
+const floatN = require('../../../lib/data-types/floatn');
+const bitN = require('../../../lib/data-types/bitn');
+
+describe('Colmetadata Token Parser', function () {
+  it('should int', function () {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -34,7 +40,7 @@ describe('Colmetadata Token Parser', function() {
     assert.strictEqual(token.columns[0].colName, 'name');
   });
 
-  it('should varchar', function() {
+  it('should varchar', function () {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -73,7 +79,60 @@ describe('Colmetadata Token Parser', function() {
     assert.strictEqual(token.columns[0].dataLength, length);
   });
 
-  it('should specify data type', function(){
-    
+  describe('should specify data type', function () {
+    it('should return correct intN type', function () {
+      const intNCol1 = { type: intN, dataLength: 1 };
+      const intCol1 = colmetadataTokenParser.specifyDataType(intNCol1)
+      assert.strictEqual(intCol1.type.id, 48);
+
+      const intNCol2 = { type: intN, dataLength: 2 };
+      const intCol2 = colmetadataTokenParser.specifyDataType(intNCol2)
+      assert.strictEqual(intCol2.type.id, 52);
+
+      const intNCol4 = { type: intN, dataLength: 4 };
+      const intCol4 = colmetadataTokenParser.specifyDataType(intNCol4)
+      assert.strictEqual(intCol4.type.id, 56);
+
+      const intNCol8 = { type: intN, dataLength: 8 };
+      const intCol8 = colmetadataTokenParser.specifyDataType(intNCol8)
+      assert.strictEqual(intCol8.type.id, 127);
+    })
+
+    it('should return correct moneyN data type', function(){
+      const moneyNCol4 = { type: moneyN, dataLength: 4 };
+      const moneyCol4 = colmetadataTokenParser.specifyDataType(moneyNCol4)
+      assert.strictEqual(moneyCol4.type.id, 122);
+
+      const moneyNCol8 = { type: moneyN, dataLength: 8 };
+      const moneyCol8 = colmetadataTokenParser.specifyDataType(moneyNCol8)
+      assert.strictEqual(moneyCol8.type.id, 60);
+    })
+
+    it('should return correct dateTimeN data type', function() {
+      const dateTimeNCol4 = { type: dateTimeN, dataLength: 4 };
+      const dateTimeCol4 = colmetadataTokenParser.specifyDataType(dateTimeNCol4)
+      assert.strictEqual(dateTimeCol4.type.id, 58);
+
+      const dateTimeNCol8 = { type: dateTimeN, dataLength: 8 };
+      const dateTimeCol8 = colmetadataTokenParser.specifyDataType(dateTimeNCol8)
+      assert.strictEqual(dateTimeCol8.type.id, 61);
+    })
+
+    it('should return correct floatN data type', function(){
+      const floatNCol4 = { type: floatN, dataLength: 4 };
+      const floatCol4 = colmetadataTokenParser.specifyDataType(floatNCol4)
+      assert.strictEqual(floatCol4.type.id, 62);
+
+      const floatNCol8 = { type: floatN, dataLength: 8 };
+      const floatCol8 = colmetadataTokenParser.specifyDataType(floatNCol8)
+      assert.strictEqual(floatCol8.type.id, 62);
+    })
+
+    it('should return correct BitN data type', function() {
+      const bitNCol4 = { type: bitN, dataLength: 1 };
+      const bitCol4 = colmetadataTokenParser.specifyDataType(bitNCol4)
+      assert.strictEqual(bitCol4.type.id, 50);
+    })
+
   })
 });

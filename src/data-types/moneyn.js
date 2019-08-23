@@ -7,6 +7,7 @@ module.exports = {
   getDataType: function (dataLength) {
     const smallmoney = require('./smallmoney');
     const money = require('./money');
+    
     switch (dataLength) {
       case 4:
         return smallmoney;
