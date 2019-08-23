@@ -4,5 +4,11 @@ module.exports = {
   name: 'DecimalN',
   dataLengthLength: 1,
   hasPrecision: true,
-  hasScale: true
+  hasScale: true,
+
+  getDataType: function(dataLength) {
+    const decimal = require('./decimal');
+
+    return (dataLength === 17) ? decimal : this;
+  }
 };

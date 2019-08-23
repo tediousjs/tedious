@@ -9,6 +9,8 @@ const moneyN = require('../../../lib/data-types/moneyn');
 const dateTimeN = require('../../../lib/data-types/datetimen');
 const floatN = require('../../../lib/data-types/floatn');
 const bitN = require('../../../lib/data-types/bitn');
+const numericN = require('../../../lib/data-types/numericn');
+const decimalN = require('../../../lib/data-types/decimaln');
 
 describe('Colmetadata Token Parser', function() {
   it('should int', function() {
@@ -134,5 +136,16 @@ describe('Colmetadata Token Parser', function() {
       assert.strictEqual(bitCol4.type.id, 50);
     });
 
+    it('should return correct NumericN data type', function() {
+      const numericNCol1 = { type: numericN, dataLength: 17 };
+      const numericCol1 = colmetadataTokenParser.specifyDataType(numericNCol1);
+      assert.strictEqual(numericCol1.type.id, 63);
+    });
+
+    it('should return correct DecimalN data type', function() {
+      const decimalNCol1 = { type: decimalN, dataLength: 17 };
+      const decimalCol1 = colmetadataTokenParser.specifyDataType(decimalNCol1);
+      assert.strictEqual(decimalCol1.type.id, 55);
+    });
   });
 });
