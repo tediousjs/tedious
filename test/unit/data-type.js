@@ -36,8 +36,7 @@ describe('Data Types', function() {
     }
   });
 
-  // This test needs fixing (tedious github issue #767 (https://github.com/tediousjs/tedious/issues/767))
-  it.skip('dateTime2DaylightSaving', () => {
+  it('dateTime2DaylightSaving', () => {
     const type = TYPES.typeByName.DateTime2;
     for (const [value, expectedBuffer] of [
       [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('067f5101163a0b', 'hex')],
@@ -51,8 +50,7 @@ describe('Data Types', function() {
     }
   });
 
-  // This test needs fixing (tedious github issue #767 (https://github.com/tediousjs/tedious/issues/767))
-  it.skip('dateDaylightSaving', () => {
+  it('dateDaylightSaving', () => {
     const type = TYPES.typeByName.Date;
     for (const [value, expectedBuffer] of [
       [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('03163a0b', 'hex')],
