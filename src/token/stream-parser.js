@@ -8,6 +8,8 @@ tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
 tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;
 tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser');
 tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser;
+tokenParsers[TYPE.FEDAUTHINFO] = require('./fedauth-info-parser');
+tokenParsers[TYPE.FEATUREEXTACK] = require('./feature-ext-ack-parser');
 tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser;
 tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser');
 tokenParsers[TYPE.ORDER] = require('./order-token-parser');
@@ -29,7 +31,6 @@ module.exports = class Parser extends Transform {
     this.buffer = Buffer.alloc(0);
     this.position = 0;
     this.suspended = false;
-    this.await = undefined;
     this.next = undefined;
   }
 
@@ -48,10 +49,6 @@ module.exports = class Parser extends Transform {
     }
     this.position = 0;
 
-    // This will be called once we need to wait for more data to
-    // become available
-    this.await = done;
-
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
       this.suspended = false;
@@ -63,6 +60,8 @@ module.exports = class Parser extends Transform {
       // Start the parser
       this.parseTokens();
     }
+
+    done();
   }
 
   parseTokens() {
@@ -88,17 +87,11 @@ module.exports = class Parser extends Transform {
         this.emit('error', new Error('Unknown type: ' + type));
       }
     }
-
-    if (!this.suspended && this.position === this.buffer.length) {
-      // If we reached the end of the buffer, we can stop parsing now.
-      return this.await.call(null);
-    }
   }
 
   suspend(next) {
     this.suspended = true;
     this.next = next;
-    this.await.call(null);
   }
 
   awaitData(length, callback) {
@@ -193,7 +186,7 @@ module.exports = class Parser extends Transform {
 
   readInt64LE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + (this.buffer[this.position + 4] & 0x80 === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
+      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
       this.position += 8;
       callback(data);
     });
@@ -201,7 +194,7 @@ module.exports = class Parser extends Transform {
 
   readInt64BE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + (this.buffer[this.position] & 0x80 === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
+      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
       this.position += 8;
       callback(data);
     });

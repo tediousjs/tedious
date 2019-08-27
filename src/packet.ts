@@ -1,12 +1,8 @@
-// @flow
-
-/* globals $Values */
-
 const { sprintf } = require('sprintf-js');
 
-const HEADER_LENGTH = module.exports.HEADER_LENGTH = 8;
+export const HEADER_LENGTH = 8;
 
-const TYPE = module.exports.TYPE = {
+export const TYPE: { [key: string]: number } = {
   SQL_BATCH: 0x01,
   RPC_REQUEST: 0x03,
   TABULAR_RESULT: 0x04,
@@ -15,16 +11,17 @@ const TYPE = module.exports.TYPE = {
   TRANSACTION_MANAGER: 0x0E,
   LOGIN7: 0x10,
   NTLMAUTH_PKT: 0x11,
-  PRELOGIN: 0x12
+  PRELOGIN: 0x12,
+  FEDAUTH_TOKEN: 0x08
 };
 
-const typeByValue = {};
+const typeByValue: { [key: number]: string } = {};
 
 for (const name in TYPE) {
   typeByValue[TYPE[name]] = name;
 }
 
-const STATUS = {
+const STATUS: { [key: string]: number } = {
   NORMAL: 0x00,
   EOM: 0x01,
   IGNORE: 0x02,
@@ -32,7 +29,7 @@ const STATUS = {
   RESETCONNECTIONSKIPTRAN: 0x10
 };
 
-const OFFSET = module.exports.OFFSET = {
+export const OFFSET = {
   Type: 0,
   Status: 1,
   Length: 2,
@@ -49,10 +46,10 @@ const DEFAULT_WINDOW = 0;
 
 const NL = '\n';
 
-class Packet {
+export class Packet {
   buffer: Buffer;
 
-  constructor(typeOrBuffer: Buffer | $Values<typeof TYPE>) {
+  constructor(typeOrBuffer: Buffer | number) {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
     } else {
@@ -75,7 +72,7 @@ class Packet {
     return this.buffer.readUInt16BE(OFFSET.Length);
   }
 
-  resetConnection(reset?: boolean) {
+  resetConnection(reset: boolean) {
     let status = this.buffer.readUInt8(OFFSET.Status);
     if (reset) {
       status |= STATUS.RESETCONNECTION;
@@ -96,6 +93,16 @@ class Packet {
       this.buffer.writeUInt8(status, OFFSET.Status);
     }
     return this.isLast();
+  }
+
+  ignore(last: boolean) {
+    let status = this.buffer.readUInt8(OFFSET.Status);
+    if (last) {
+      status |= STATUS.IGNORE;
+    } else {
+      status &= 0xFF - STATUS.IGNORE;
+    }
+    this.buffer.writeUInt8(status, OFFSET.Status);
   }
 
   isLast() {
@@ -202,10 +209,8 @@ class Packet {
     return '';
   }
 }
-module.exports.Packet = Packet;
 
-module.exports.isPacketComplete = isPacketComplete;
-function isPacketComplete(potentialPacketBuffer: Buffer) {
+export function isPacketComplete(potentialPacketBuffer: Buffer) {
   if (potentialPacketBuffer.length < HEADER_LENGTH) {
     return false;
   } else {
@@ -213,7 +218,6 @@ function isPacketComplete(potentialPacketBuffer: Buffer) {
   }
 }
 
-module.exports.packetLength = packetLength;
-function packetLength(potentialPacketBuffer: Buffer) {
+export function packetLength(potentialPacketBuffer: Buffer) {
   return potentialPacketBuffer.readUInt16BE(OFFSET.Length);
 }

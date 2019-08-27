@@ -1,6 +1,4 @@
-// @flow
-
-const sprintf = require('sprintf-js').sprintf;
+const { sprintf } = require('sprintf-js');
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -49,8 +47,21 @@ const FLAGS_3 = {
   CHANGE_PASSWORD_YES: 0x01,
   BINARY_XML: 0x02,
   SPAWN_USER_INSTANCE: 0x04,
-  UNKNOWN_COLLATION_HANDLING: 0x08
+  UNKNOWN_COLLATION_HANDLING: 0x08,
+  EXTENSION_USED: 0x10
 };
+
+const FEDAUTH_OPTIONS = {
+  FEATURE_ID: 0x02,
+  LIBRARY_SECURITYTOKEN: 0x01,
+  LIBRARY_ADAL: 0x02,
+  FEDAUTH_YES_ECHO: 0x01,
+  FEDAUTH_NO_ECHO: 0x00,
+  ADAL_WORKFLOW_USER_PASS: 0x01,
+  ADAL_WORKFLOW_INTEGRATED: 0x02
+};
+
+const FEATURE_EXT_TERMINATOR = 0xFF;
 
 type Options = {
   tdsVersion: number,
@@ -65,7 +76,7 @@ type Options = {
 /*
   s2.2.6.3
  */
-module.exports = class Login7Payload {
+class Login7Payload {
   tdsVersion: number;
   packetSize: number;
   clientProgVer: number;
@@ -77,18 +88,20 @@ module.exports = class Login7Payload {
   readOnlyIntent: boolean;
   initDbFatal: boolean;
 
-  userName: string | typeof undefined;
-  password: string | typeof undefined;
-  serverName: string | typeof undefined;
-  appName: string | typeof undefined;
-  hostname: string | typeof undefined;
-  libraryName: string | typeof undefined;
-  language: string | typeof undefined;
-  database: string | typeof undefined;
-  clientId: Buffer | typeof undefined;
-  sspi: Buffer | typeof undefined;
-  attachDbFile: string | typeof undefined;
-  changePassword: string | typeof undefined;
+  userName: string | undefined;
+  password: string | undefined;
+  serverName: string | undefined;
+  appName: string | undefined;
+  hostname: string | undefined;
+  libraryName: string | undefined;
+  language: string | undefined;
+  database: string | undefined;
+  clientId: Buffer | undefined;
+  sspi: Buffer | undefined;
+  attachDbFile: string | undefined;
+  changePassword: string | undefined;
+
+  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
@@ -101,6 +114,8 @@ module.exports = class Login7Payload {
 
     this.readOnlyIntent = false;
     this.initDbFatal = false;
+
+    this.fedAuth = undefined;
 
     this.userName = undefined;
     this.password = undefined;
@@ -120,7 +135,8 @@ module.exports = class Login7Payload {
     const fixedData = Buffer.alloc(94);
     const buffers = [fixedData];
 
-    let offset = 0, dataOffset = fixedData.length;
+    let offset = 0;
+    let dataOffset = fixedData.length;
 
     // Length: 4-byte
     offset = fixedData.writeUInt32LE(0, offset);
@@ -237,7 +253,12 @@ module.exports = class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
-    offset = fixedData.writeUInt16LE(0, offset);
+    const extensions = this.buildFeatureExt();
+    offset = fixedData.writeUInt16LE(4, offset);
+    const extensionOffset = Buffer.alloc(4);
+    extensionOffset.writeUInt32LE(dataOffset += 4, 0);
+    dataOffset += extensions.length;
+    buffers.push(extensionOffset, extensions);
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
@@ -358,6 +379,43 @@ module.exports = class Login7Payload {
     return flags1;
   }
 
+  buildFeatureExt() {
+    const buffers = [];
+
+    const fedAuth = this.fedAuth;
+    if (fedAuth) {
+      switch (fedAuth.type) {
+        case 'ADAL':
+          const buffer = Buffer.alloc(7);
+          buffer.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, 0);
+          buffer.writeUInt32LE(2, 1);
+          buffer.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_ADAL << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), 5);
+          buffer.writeUInt8(fedAuth.workflow === 'integrated' ? 0x02 : FEDAUTH_OPTIONS.ADAL_WORKFLOW_USER_PASS, 6);
+          buffers.push(buffer);
+          break;
+
+        case 'SECURITYTOKEN':
+          const token = Buffer.from(fedAuth.fedAuthToken, 'ucs2');
+          const buf = Buffer.alloc(10);
+
+          let offset = 0;
+          offset = buf.writeUInt8(FEDAUTH_OPTIONS.FEATURE_ID, offset);
+          offset = buf.writeUInt32LE(token.length + 4 + 1, offset);
+          offset = buf.writeUInt8((FEDAUTH_OPTIONS.LIBRARY_SECURITYTOKEN << 1) | (fedAuth.echo ? FEDAUTH_OPTIONS.FEDAUTH_YES_ECHO : FEDAUTH_OPTIONS.FEDAUTH_NO_ECHO), offset);
+          buf.writeInt32LE(token.length, offset);
+
+          buffers.push(buf);
+          buffers.push(token);
+
+          break;
+      }
+    }
+
+    buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
+
+    return Buffer.concat(buffers);
+  }
+
   buildOptionFlags2() {
     let flags2 = FLAGS_2.INIT_LANG_WARN | FLAGS_2.ODBC_OFF | FLAGS_2.USER_NORMAL;
     if (this.sspi) {
@@ -379,7 +437,7 @@ module.exports = class Login7Payload {
   }
 
   buildOptionFlags3() {
-    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING;
+    return FLAGS_3.CHANGE_PASSWORD_NO | FLAGS_3.UNKNOWN_COLLATION_HANDLING | FLAGS_3.EXTENSION_USED;
   }
 
   scramblePassword(password: Buffer) {
@@ -394,19 +452,22 @@ module.exports = class Login7Payload {
     return password;
   }
 
-  toString(indent?: string = '') {
+  toString(indent: string = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
-        this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
+              this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
       ) + '\n' + indent + '         ' +
       sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
-        this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
+              this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
       ) + '\n' + indent + '         ' +
       sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
-        this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
+              this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
       ) + '\n' + indent + '         ' +
       sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
-        this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
+              this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
       );
   }
-};
+}
+
+export default Login7Payload;
+module.exports = Login7Payload;

@@ -1,12 +1,9 @@
-// @flow
-
 const BufferList = require('bl');
 const { Transform } = require('readable-stream');
 
-const Message = require('./message');
-const { Packet, HEADER_LENGTH } = require('./packet');
-
-import type Debug from './debug';
+import Debug from './debug';
+import Message from './message';
+import { Packet, HEADER_LENGTH } from './packet';
 
 /**
   IncomingMessageStream
@@ -14,8 +11,8 @@ import type Debug from './debug';
 */
 class IncomingMessageStream extends Transform {
   debug: Debug;
-  bl: BufferList;
-  currentMessage: Message | typeof undefined;
+  bl: any;
+  currentMessage: Message | undefined;
 
   constructor(debug: Debug) {
     super({ readableObjectMode: true });
@@ -24,6 +21,22 @@ class IncomingMessageStream extends Transform {
 
     this.currentMessage = undefined;
     this.bl = new BufferList();
+  }
+
+  pause() {
+    super.pause();
+
+    if (this.currentMessage) {
+      this.currentMessage.pause();
+    }
+  }
+
+  resume() {
+    super.resume();
+
+    if (this.currentMessage) {
+      this.currentMessage.resume();
+    }
   }
 
   processBufferedData(callback: () => void) {
@@ -43,29 +56,26 @@ class IncomingMessageStream extends Transform {
 
         let message = this.currentMessage;
         if (message === undefined) {
-          message = new Message({ type: packet.type(), resetConnection: false });
+          this.currentMessage = message = new Message({ type: packet.type(), resetConnection: false });
           this.push(message);
         }
 
         if (packet.isLast()) {
-          this.currentMessage = undefined;
           // Wait until the current message was fully processed before we
           // continue processing any remaining messages.
           message.once('end', () => {
+            this.currentMessage = undefined;
             this.processBufferedData(callback);
           });
           message.end(packet.data());
           return;
-        } else {
-          this.currentMessage = message;
+        } else if (!message.write(packet.data())) {
           // If too much data is buffering up in the
           // current message, wait for it to drain.
-          if (!message.write(packet.data())) {
-            message.once('drain', () => {
-              this.processBufferedData(callback);
-            });
-            return;
-          }
+          message.once('drain', () => {
+            this.processBufferedData(callback);
+          });
+          return;
         }
       } else {
         break;
@@ -77,10 +87,11 @@ class IncomingMessageStream extends Transform {
     callback();
   }
 
-  _transform(chunk: Buffer, encoding: void, callback: () => void) {
+  _transform(chunk: Buffer, _encoding: string, callback: () => void) {
     this.bl.append(chunk);
     this.processBufferedData(callback);
   }
 }
 
+export default IncomingMessageStream;
 module.exports = IncomingMessageStream;

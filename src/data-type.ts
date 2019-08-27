@@ -1,7 +1,3 @@
-// @flow
-
-const deprecate = require('depd')('tedious');
-
 const Null = require('./data-types/null');
 const TinyInt = require('./data-types/tinyint');
 const Bit = require('./data-types/bit');
@@ -42,7 +38,7 @@ const UDT = require('./data-types/udt');
 const TVP = require('./data-types/tvp');
 const Variant = require('./data-types/sql-variant');
 
-module.exports.TYPE = {
+export const TYPE = {
   [Null.id]: Null,
   [TinyInt.id]: TinyInt,
   [Bit.id]: Bit,
@@ -84,7 +80,7 @@ module.exports.TYPE = {
   [Variant.id]: Variant,
 };
 
-const typeByName = module.exports.typeByName = {
+export const typeByName = {
   TinyInt,
   Bit,
   SmallInt,
@@ -115,36 +111,5 @@ const typeByName = module.exports.typeByName = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant,
-
-  // These are all internal and should not be used directly.
-  Null,
-  IntN,
-  BitN,
-  FloatN,
-  MoneyN,
-  DateTimeN,
-  DecimalN,
-  NumericN,
-
-  // These are all deprecated aliases.
-  DateN: Date,
-  DateTimeOffsetN: DateTimeOffset,
-  DateTime2N: DateTime2,
-  TimeN: Time,
-  UniqueIdentifierN: UniqueIdentifier,
+  Variant
 };
-
-[
-  ['DateN', 'Date'],
-  ['DateTimeOffsetN', 'DateTimeOffset'],
-  ['DateTime2N', 'DateTime2'],
-  ['TimeN', 'Time'],
-  ['UniqueIdentifierN', 'UniqueIdentifier']
-].forEach(function([alias, name]) {
-  deprecate.property(typeByName, alias, 'The `' + alias + '` data type alias is deprecated, please use `' + name + '` instead.');
-});
-
-['IntN', 'BitN', 'FloatN', 'MoneyN', 'DateTimeN', 'DecimalN', 'NumericN', 'Null'].forEach(function(name) {
-  deprecate.property(typeByName, name, 'The `' + name + '` data type is internal and will be removed.');
-});

@@ -173,6 +173,8 @@ function valueParse(parser, metaData, options, callback) {
               return parser.readUInt8((value) => {
                 callback(!!value);
               });
+            default:
+              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for BitN'));
           }
 
         case 'VarChar':
@@ -238,6 +240,8 @@ function valueParse(parser, metaData, options, callback) {
               return readSmallDateTime(parser, options.useUTC, callback);
             case 8:
               return readDateTime(parser, options.useUTC, callback);
+            default:
+              return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN'));
           }
 
         case 'Time':
@@ -322,7 +326,7 @@ function valueParse(parser, metaData, options, callback) {
           }
 
           const valueMetaData = metaData.valueMetaData = {};
-          Object.defineProperty(valueMetaData, 'isVariantValue', {value: true});
+          Object.defineProperty(valueMetaData, 'isVariantValue', { value: true });
           return parser.readUInt8((baseType) => {
             return parser.readUInt8((propBytes) => {
               valueMetaData.dataLength = dataLength - propBytes - 2;

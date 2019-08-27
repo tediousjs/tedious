@@ -1,7 +1,10 @@
-const deprecate = require('depd')('tedious');
-
 const crypto = require('crypto');
 const os = require('os');
+// $FlowFixMe
+const constants = require('constants');
+const { createSecureContext } = require('tls');
+
+const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -43,68 +46,157 @@ const DEFAULT_TDS_VERSION = '7_4';
 const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
 
-function deprecateNonBooleanConfigValue(optionName, value) {
-  if (typeof value !== 'boolean') {
-    deprecate(`Passing non-boolean values for ${optionName} is deprecated and will be removed. Please specify \`true\` or \`false\` instead.`);
-  }
-}
-
-function deprecateNullConfigValue(optionName, value) {
-  if (value === null) {
-    deprecate(`Passing \`null\` for ${optionName} is deprecated and will be removed. Please pass an explicit value or \`undefined\` instead.`);
-  }
-}
-
-function deprecateNullFallbackToDefaultConfigValue(optionName, value) {
-  if (value === null) {
-    deprecate(`Passing \`null\` for ${optionName} will not fallback to a default value in future tedious versions. Please set a value explicitly if you require a different value from the one configured for your target SQL Server.`);
-  }
-}
-
-function deprecateNonStringConfigValue(optionName, value) {
-  if (typeof value !== 'string') {
-    deprecate(`Passing non-string values for ${optionName} will throw an error in future tedious versions. Please pass a string instead.`);
-  }
-}
-
-function deprecateNonNumberConfigValue(optionName, value) {
-  if (typeof value !== 'number') {
-    deprecate(`Passing non-number values for ${optionName} will throw an error in future tedious versions. Please pass a number instead.`);
-  }
-}
-
 class Connection extends EventEmitter {
   constructor(config) {
     super();
 
-    if (!config) {
-      throw new TypeError('No connection configuration given');
+    if (typeof config !== 'object' || config === null) {
+      throw new TypeError('The "config" argument is required and must be of type Object.');
     }
 
     if (typeof config.server !== 'string') {
-      throw new TypeError('Invalid server: ' + config.server);
+      throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
-    if (config.domain != undefined) {
-      deprecateNonStringConfigValue('domain', config.domain);
-    }
-    deprecateNullConfigValue('domain', config.domain);
+    this.fedAuthRequired = false;
+    this.fedAuthInfoToken = undefined;
 
-    if (config.userName != undefined) {
-      deprecateNonStringConfigValue('userName', config.userName);
-    }
-    deprecateNullConfigValue('userName', config.userName);
+    let authentication;
+    if (config.authentication !== undefined) {
+      if (typeof config.authentication !== 'object' || config.authentication === null) {
+        throw new TypeError('The "config.authentication" property must be of type Object.');
+      }
 
-    if (config.password != undefined) {
-      deprecateNonStringConfigValue('password', config.password);
+      const type = config.authentication.type;
+      const options = config.authentication.options === undefined ? {} : config.authentication.options;
+
+      if (typeof type !== 'string') {
+        throw new TypeError('The "config.authentication.type" property must be of type string.');
+      }
+
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service".');
+      }
+
+      if (typeof options !== 'object' || options === null) {
+        throw new TypeError('The "config.authentication.options" property must be of type object.');
+      }
+
+      if (type === 'ntlm') {
+        if (typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+        }
+
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'ntlm',
+          options: {
+            userName: options.userName,
+            password: options.password,
+            domain: options.domain && options.domain.toUpperCase()
+          }
+        };
+      } else if (type === 'azure-active-directory-password') {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-password',
+          options: {
+            userName: options.userName,
+            password: options.password,
+          }
+        };
+      } else if (type === 'azure-active-directory-access-token') {
+        if (typeof options.token !== 'string') {
+          throw new TypeError('The "config.authentication.options.token" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-access-token',
+          options: {
+            token: options.token
+          }
+        };
+      } else if (type === 'azure-active-directory-msi-vm') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi-vm',
+          options: {
+            clientId: options.clientId,
+            msiEndpoint: options.msiEndpoint
+          }
+        };
+      } else if (type === 'azure-active-directory-msi-app-service') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
+        }
+
+        if (options.msiSecret !== undefined && typeof options.msiSecret !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiSecret" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi-app-service',
+          options: {
+            clientId: options.clientId,
+            msiEndpoint: options.msiEndpoint,
+            msiSecret: options.msiSecret
+          }
+        };
+      } else {
+        if (options.userName !== undefined && typeof options.userName !== 'string') {
+          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
+        }
+
+        if (options.password !== undefined && typeof options.password !== 'string') {
+          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'default',
+          options: {
+            userName: options.userName,
+            password: options.password
+          }
+        };
+      }
+    } else {
+      authentication = {
+        type: 'default',
+        options: {
+          userName: undefined,
+          password: undefined
+        }
+      };
     }
-    deprecateNullConfigValue('password', config.password);
 
     this.config = {
       server: config.server,
-      userName: config.userName,
-      password: config.password,
-      domain: config.domain && config.domain.toUpperCase(),
+      authentication: authentication,
       options: {
         abortTransactionOnError: false,
         appName: undefined,
@@ -130,7 +222,7 @@ class Connection extends EventEmitter {
         enableAnsiWarnings: true,
         enableArithAbort: false,
         enableConcatNullYieldsNull: true,
-        enableCursorCloseOnCommit: undefined,
+        enableCursorCloseOnCommit: null,
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
@@ -161,334 +253,408 @@ class Connection extends EventEmitter {
         throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
       }
 
-      if (config.options.abortTransactionOnError != undefined) {
-        if (typeof config.options.abortTransactionOnError !== 'boolean') {
-          throw new TypeError('options.abortTransactionOnError must be a boolean (true or false).');
+      if (config.options.abortTransactionOnError !== undefined) {
+        if (typeof config.options.abortTransactionOnError !== 'boolean' && config.options.abortTransactionOnError !== null) {
+          throw new TypeError('The "config.options.abortTransactionOnError" property must be of type string or null.');
         }
 
         this.config.options.abortTransactionOnError = config.options.abortTransactionOnError;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.abortTransactionOnError', config.options.abortTransactionOnError);
 
-      if (config.options.appName != undefined) {
-        deprecateNonStringConfigValue('options.appName', config.options.appName);
+      if (config.options.appName !== undefined) {
+        if (typeof config.options.appName !== 'string') {
+          throw new TypeError('The "config.options.appName" property must be of type string.');
+        }
+
         this.config.options.appName = config.options.appName;
       }
-      deprecateNullConfigValue('options.appName', config.options.appName);
 
-      if (config.options.camelCaseColumns != undefined) {
-        deprecateNonBooleanConfigValue('options.camelCaseColumns', config.options.camelCaseColumns);
+      if (config.options.camelCaseColumns !== undefined) {
+        if (typeof config.options.camelCaseColumns !== 'boolean') {
+          throw new TypeError('The "config.options.camelCaseColumns" property must be of type boolean.');
+        }
+
         this.config.options.camelCaseColumns = config.options.camelCaseColumns;
       }
-      deprecateNullConfigValue('options.camelCaseColumns', config.options.camelCaseColumns);
 
-      if (config.options.cancelTimeout != undefined) {
+      if (config.options.cancelTimeout !== undefined) {
+        if (typeof config.options.cancelTimeout !== 'number') {
+          throw new TypeError('The "config.options.cancelTimeout" property must be of type number.');
+        }
+
         this.config.options.cancelTimeout = config.options.cancelTimeout;
       }
-      deprecateNullConfigValue('options.cancelTimeout', config.options.cancelTimeout);
 
       if (config.options.columnNameReplacer) {
         if (typeof config.options.columnNameReplacer !== 'function') {
-          throw new TypeError('options.columnNameReplacer must be a function or null.');
+          throw new TypeError('The "config.options.cancelTimeout" property must be of type function.');
         }
 
         this.config.options.columnNameReplacer = config.options.columnNameReplacer;
       }
-      deprecateNullConfigValue('options.columnNameReplacer', config.options.columnNameReplacer);
 
-      if (config.options.connectTimeout) {
-        this.config.options.connectTimeout = config.options.connectTimeout;
-      }
-      deprecateNullConfigValue('options.connectTimeout', config.options.connectTimeout);
-
-      if (config.options.connectionIsolationLevel) {
-        this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
-      }
-      deprecateNullFallbackToDefaultConfigValue('options.connectionIsolationLevel', config.options.connectionIsolationLevel);
-
-      if (config.options.cryptoCredentialsDetails) {
-        this.config.options.cryptoCredentialsDetails = config.options.cryptoCredentialsDetails;
-      }
-      deprecateNullConfigValue('options.cryptoCredentialsDetails', config.options.cryptoCredentialsDetails);
-
-      if (config.options.database != undefined) {
-        deprecateNonStringConfigValue('options.database', config.options.database);
-        this.config.options.database = config.options.database;
-      }
-      deprecateNullConfigValue('options.database', config.options.database);
-
-      if (config.options.datefirst) {
-        if (config.options.datefirst < 1 || config.options.datefirst > 7) {
-          throw new RangeError('DateFirst should be >= 1 and <= 7');
+      if (config.options.connectTimeout !== undefined) {
+        if (typeof config.options.connectTimeout !== 'number') {
+          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
         }
 
-        deprecateNonNumberConfigValue('options.datefirst', config.options.datefirst);
+        this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.connectionIsolationLevel !== undefined) {
+        this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
+      }
+
+      if (config.options.connectTimeout !== undefined) {
+        if (typeof config.options.connectTimeout !== 'number') {
+          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
+        }
+
+        this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.cryptoCredentialsDetails !== undefined) {
+        if (typeof config.options.cryptoCredentialsDetails !== 'object' || config.options.cryptoCredentialsDetails === null) {
+          throw new TypeError('The "config.options.cryptoCredentialsDetails" property must be of type Object.');
+        }
+
+        this.config.options.cryptoCredentialsDetails = config.options.cryptoCredentialsDetails;
+      }
+
+      if (config.options.database !== undefined) {
+        if (typeof config.options.database !== 'string') {
+          throw new TypeError('The "config.options.database" property must be of type string.');
+        }
+
+        this.config.options.database = config.options.database;
+      }
+
+      if (config.options.datefirst !== undefined) {
+        if (typeof config.options.datefirst !== 'number' && config.options.datefirst !== null) {
+          throw new TypeError('The "config.options.datefirst" property must be of type number.');
+        }
+
+        if (config.options.datefirst !== null && (config.options.datefirst < 1 || config.options.datefirst > 7)) {
+          throw new RangeError('The "config.options.datefirst" property must be >= 1 and <= 7');
+        }
 
         this.config.options.datefirst = config.options.datefirst;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.datefirst', config.options.datefirst);
 
-      if (config.options.dateFormat != undefined) {
-        deprecateNonStringConfigValue('options.dateFormat', config.options.dateFormat);
+      if (config.options.dateFormat !== undefined) {
+        if (typeof config.options.dateFormat !== 'string' && config.options.dateFormat !== null) {
+          throw new TypeError('The "config.options.dateFormat" property must be of type string or null.');
+        }
 
         this.config.options.dateFormat = config.options.dateFormat;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.dateFormat', config.options.dateFormat);
 
       if (config.options.debug) {
-        if (config.options.debug.data != undefined) {
-          deprecateNonBooleanConfigValue('options.debug.data', config.options.debug.data);
+        if (config.options.debug.data !== undefined) {
+          if (typeof config.options.debug.data !== 'boolean') {
+            throw new TypeError('The "config.options.debug.data" property must be of type boolean.');
+          }
+
           this.config.options.debug.data = config.options.debug.data;
         }
-        deprecateNullConfigValue('options.debug.data', config.options.debug.data);
 
-        if (config.options.debug.packet != undefined) {
-          deprecateNonBooleanConfigValue('options.debug.packet', config.options.debug.packet);
+        if (config.options.debug.packet !== undefined) {
+          if (typeof config.options.debug.packet !== 'boolean') {
+            throw new TypeError('The "config.options.debug.packet" property must be of type boolean.');
+          }
+
           this.config.options.debug.packet = config.options.debug.packet;
         }
-        deprecateNullConfigValue('options.debug.packet', config.options.debug.packet);
 
-        if (config.options.debug.payload != undefined) {
-          deprecateNonBooleanConfigValue('options.debug.payload', config.options.debug.payload);
+        if (config.options.debug.payload !== undefined) {
+          if (typeof config.options.debug.payload !== 'boolean') {
+            throw new TypeError('The "config.options.debug.payload" property must be of type boolean.');
+          }
+
           this.config.options.debug.payload = config.options.debug.payload;
         }
-        deprecateNullConfigValue('options.debug.payload', config.options.debug.payload);
 
-        if (config.options.debug.token != undefined) {
-          deprecateNonBooleanConfigValue('options.debug.token', config.options.debug.token);
+        if (config.options.debug.token !== undefined) {
+          if (typeof config.options.debug.token !== 'boolean') {
+            throw new TypeError('The "config.options.debug.token" property must be of type boolean.');
+          }
+
           this.config.options.debug.token = config.options.debug.token;
         }
-        deprecateNullConfigValue('options.debug.token', config.options.debug.token);
       }
 
-      if (config.options.enableAnsiNull != undefined) {
-        if (typeof config.options.enableAnsiNull !== 'boolean') {
-          throw new TypeError('options.enableAnsiNull must be a boolean (true or false).');
+      if (config.options.enableAnsiNull !== undefined) {
+        if (typeof config.options.enableAnsiNull !== 'boolean' && config.options.enableAnsiNull !== null) {
+          throw new TypeError('The "config.options.enableAnsiNull" property must be of type boolean or null.');
         }
 
         this.config.options.enableAnsiNull = config.options.enableAnsiNull;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableAnsiNull', config.options.enableAnsiNull);
 
-      if (config.options.enableAnsiNullDefault != undefined) {
-        if (typeof config.options.enableAnsiNullDefault !== 'boolean') {
-          throw new TypeError('options.enableAnsiNullDefault must be a boolean (true or false).');
+      if (config.options.enableAnsiNullDefault !== undefined) {
+        if (typeof config.options.enableAnsiNullDefault !== 'boolean' && config.options.enableAnsiNullDefault !== null) {
+          throw new TypeError('The "config.options.enableAnsiNullDefault" property must be of type boolean or null.');
         }
 
         this.config.options.enableAnsiNullDefault = config.options.enableAnsiNullDefault;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableAnsiNullDefault', config.options.enableAnsiNullDefault);
 
-      if (config.options.enableAnsiPadding != undefined) {
-        if (typeof config.options.enableAnsiPadding !== 'boolean') {
-          throw new TypeError('options.enableAnsiPadding must be a boolean (true or false).');
+      if (config.options.enableAnsiPadding !== undefined) {
+        if (typeof config.options.enableAnsiPadding !== 'boolean' && config.options.enableAnsiPadding !== null) {
+          throw new TypeError('The "config.options.enableAnsiPadding" property must be of type boolean or null.');
         }
 
         this.config.options.enableAnsiPadding = config.options.enableAnsiPadding;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableAnsiPadding', config.options.enableAnsiPadding);
 
-      if (config.options.enableAnsiWarnings != undefined) {
-        if (typeof config.options.enableAnsiWarnings !== 'boolean') {
-          throw new TypeError('options.enableAnsiWarnings must be a boolean (true or false).');
+      if (config.options.enableAnsiWarnings !== undefined) {
+        if (typeof config.options.enableAnsiWarnings !== 'boolean' && config.options.enableAnsiWarnings !== null) {
+          throw new TypeError('The "config.options.enableAnsiWarnings" property must be of type boolean or null.');
         }
 
         this.config.options.enableAnsiWarnings = config.options.enableAnsiWarnings;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableAnsiWarnings', config.options.enableAnsiWarnings);
 
       if (config.options.enableArithAbort !== undefined) {
-        if (typeof config.options.enableArithAbort !== 'boolean') {
-          throw new TypeError('options.enableArithAbort must be a boolean (true or false).');
+        if (typeof config.options.enableArithAbort !== 'boolean' && config.options.enableArithAbort !== null) {
+          throw new TypeError('The "config.options.enableArithAbort" property must be of type boolean or null.');
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableArithAbort', config.options.enableArithAbort);
 
-      if (config.options.enableConcatNullYieldsNull != undefined) {
-        if (typeof config.options.enableConcatNullYieldsNull !== 'boolean') {
-          throw new TypeError('options.enableConcatNullYieldsNull must be a boolean (true or false).');
+      if (config.options.enableConcatNullYieldsNull !== undefined) {
+        if (typeof config.options.enableConcatNullYieldsNull !== 'boolean' && config.options.enableConcatNullYieldsNull !== null) {
+          throw new TypeError('The "config.options.enableConcatNullYieldsNull" property must be of type boolean or null.');
         }
 
         this.config.options.enableConcatNullYieldsNull = config.options.enableConcatNullYieldsNull;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableConcatNullYieldsNull', config.options.enableConcatNullYieldsNull);
 
-      if (config.options.enableCursorCloseOnCommit != undefined) {
-        if (typeof config.options.enableCursorCloseOnCommit !== 'boolean') {
-          throw new TypeError('options.enableCursorCloseOnCommit must be a boolean (true or false).');
+      if (config.options.enableCursorCloseOnCommit !== undefined) {
+        if (typeof config.options.enableCursorCloseOnCommit !== 'boolean' && config.options.enableCursorCloseOnCommit !== null) {
+          throw new TypeError('The "config.options.enableCursorCloseOnCommit" property must be of type boolean or null.');
         }
 
         this.config.options.enableCursorCloseOnCommit = config.options.enableCursorCloseOnCommit;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableCursorCloseOnCommit', config.options.enableCursorCloseOnCommit);
 
-      if (config.options.enableImplicitTransactions != undefined) {
-        if (typeof config.options.enableImplicitTransactions !== 'boolean') {
-          throw new TypeError('options.enableImplicitTransactions must be a boolean (true or false).');
+      if (config.options.enableImplicitTransactions !== undefined) {
+        if (typeof config.options.enableImplicitTransactions !== 'boolean' && config.options.enableImplicitTransactions !== null) {
+          throw new TypeError('The "config.options.enableImplicitTransactions" property must be of type boolean or null.');
         }
 
         this.config.options.enableImplicitTransactions = config.options.enableImplicitTransactions;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableImplicitTransactions', config.options.enableImplicitTransactions);
 
-      if (config.options.enableNumericRoundabort != undefined) {
-        if (typeof config.options.enableNumericRoundabort !== 'boolean') {
-          throw new TypeError('options.enableNumericRoundabort must be a boolean (true or false).');
+      if (config.options.enableNumericRoundabort !== undefined) {
+        if (typeof config.options.enableNumericRoundabort !== 'boolean' && config.options.enableNumericRoundabort !== null) {
+          throw new TypeError('The "config.options.enableNumericRoundabort" property must be of type boolean or null.');
         }
 
         this.config.options.enableNumericRoundabort = config.options.enableNumericRoundabort;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableNumericRoundabort', config.options.enableNumericRoundabort);
 
       if (config.options.enableQuotedIdentifier !== undefined) {
-        if (typeof config.options.enableQuotedIdentifier !== 'boolean') {
-          throw new TypeError('options.enableQuotedIdentifier must be a boolean (true or false).');
+        if (typeof config.options.enableQuotedIdentifier !== 'boolean' && config.options.enableQuotedIdentifier !== null) {
+          throw new TypeError('The "config.options.enableQuotedIdentifier" property must be of type boolean or null.');
         }
 
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.enableQuotedIdentifier', config.options.enableQuotedIdentifier);
 
-      if (config.options.encrypt != undefined) {
-        deprecateNonBooleanConfigValue('options.encrypt', config.options.encrypt);
+      if (config.options.encrypt !== undefined) {
+        if (typeof config.options.encrypt !== 'boolean') {
+          throw new TypeError('The "config.options.encrypt" property must be of type boolean.');
+        }
+
         this.config.options.encrypt = config.options.encrypt;
       } else {
-        deprecate('The default value for `options.encrypt` will change from `false` to `true`. Please pass `false` explicitly if you want to retain current behaviour.');
+        this.config.options.encrypt = true;
       }
-      deprecateNullConfigValue('options.encrypt', config.options.encrypt);
 
-      if (config.options.fallbackToDefaultDb != undefined) {
-        deprecateNonBooleanConfigValue('options.fallbackToDefaultDb', config.options.fallbackToDefaultDb);
+      if (config.options.fallbackToDefaultDb !== undefined) {
+        if (typeof config.options.fallbackToDefaultDb !== 'boolean') {
+          throw new TypeError('The "config.options.fallbackToDefaultDb" property must be of type boolean.');
+        }
+
         this.config.options.fallbackToDefaultDb = config.options.fallbackToDefaultDb;
       }
-      deprecateNullConfigValue('options.fallbackToDefaultDb', config.options.fallbackToDefaultDb);
 
-      if (config.options.instanceName != undefined) {
-        deprecateNonStringConfigValue('options.instanceName', config.options.instanceName);
+      if (config.options.instanceName !== undefined) {
+        if (typeof config.options.instanceName !== 'string') {
+          throw new TypeError('The "config.options.instanceName" property must be of type string.');
+        }
 
         this.config.options.instanceName = config.options.instanceName;
         this.config.options.port = undefined;
       }
-      deprecateNullConfigValue('options.instanceName', config.options.instanceName);
 
-      if (config.options.isolationLevel) {
+      if (config.options.isolationLevel !== undefined) {
+        if (typeof config.options.isolationLevel !== 'number') {
+          throw new TypeError('The "config.options.language" property must be of type numer.');
+        }
+
         this.config.options.isolationLevel = config.options.isolationLevel;
       }
-      deprecateNullConfigValue('options.isolationLevel', config.options.isolationLevel);
 
-      if (config.options.language != undefined) {
-        deprecateNonStringConfigValue('options.language', config.options.language);
+      if (config.options.language !== undefined) {
+        if (typeof config.options.language !== 'string' && config.options.language !== null) {
+          throw new TypeError('The "config.options.language" property must be of type string or null.');
+        }
 
         this.config.options.language = config.options.language;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.language', config.options.language);
 
-      if (config.options.localAddress != undefined) {
+      if (config.options.localAddress !== undefined) {
+        if (typeof config.options.localAddress !== 'string') {
+          throw new TypeError('The "config.options.localAddress" property must be of type string.');
+        }
+
         this.config.options.localAddress = config.options.localAddress;
       }
-      deprecateNullConfigValue('options.localAddress', config.options.localAddress);
 
-      if (config.options.multiSubnetFailover != undefined) {
-        deprecateNonBooleanConfigValue('options.multiSubnetFailover', config.options.multiSubnetFailover);
+      if (config.options.multiSubnetFailover !== undefined) {
+        if (typeof config.options.multiSubnetFailover !== 'boolean') {
+          throw new TypeError('The "config.options.multiSubnetFailover" property must be of type boolean.');
+        }
 
-        this.config.options.multiSubnetFailover = !!config.options.multiSubnetFailover;
+        this.config.options.multiSubnetFailover = config.options.multiSubnetFailover;
       }
-      deprecateNullConfigValue('options.multiSubnetFailover', config.options.multiSubnetFailover);
 
-      if (config.options.packetSize) {
-        deprecateNonNumberConfigValue('options.packetSize', config.options.packetSize);
+      if (config.options.packetSize !== undefined) {
+        if (typeof config.options.packetSize !== 'number') {
+          throw new TypeError('The "config.options.packetSize" property must be of type number.');
+        }
 
         this.config.options.packetSize = config.options.packetSize;
       }
-      deprecateNullConfigValue('options.packetSize', config.options.packetSize);
 
-      if (config.options.port) {
-        if (config.options.port <= 0 || config.options.port >= 65536) {
-          throw new RangeError('Port must be > 0 and < 65536');
+      if (config.options.port !== undefined) {
+        if (typeof config.options.port !== 'number') {
+          throw new TypeError('The "config.options.port" property must be of type number.');
         }
 
-        deprecateNonNumberConfigValue('options.port', config.options.port);
+        if (config.options.port <= 0 || config.options.port >= 65536) {
+          throw new RangeError('The "config.options.port" property must be > 0 and < 65536');
+        }
 
         this.config.options.port = config.options.port;
         this.config.options.instanceName = undefined;
       }
-      deprecateNullConfigValue('options.port', config.options.port);
 
-      if (config.options.readOnlyIntent != undefined) {
-        deprecateNonBooleanConfigValue('options.readOnlyIntent', config.options.readOnlyIntent);
+      if (config.options.readOnlyIntent !== undefined) {
+        if (typeof config.options.readOnlyIntent !== 'boolean') {
+          throw new TypeError('The "config.options.readOnlyIntent" property must be of type boolean.');
+        }
+
         this.config.options.readOnlyIntent = config.options.readOnlyIntent;
       }
-      deprecateNullConfigValue('options.readOnlyIntent', config.options.readOnlyIntent);
 
-      if (config.options.requestTimeout != undefined) {
-        deprecateNonNumberConfigValue('options.requestTimeout', config.options.requestTimeout);
+      if (config.options.requestTimeout !== undefined) {
+        if (typeof config.options.requestTimeout !== 'number') {
+          throw new TypeError('The "config.options.requestTimeout" property must be of type number.');
+        }
 
         this.config.options.requestTimeout = config.options.requestTimeout;
       }
-      deprecateNullConfigValue('options.requestTimeout', config.options.requestTimeout);
 
-      if (config.options.maxRetriesOnTransientErrors != undefined) {
-        if (!Number.isInteger(config.options.maxRetriesOnTransientErrors) || config.options.maxRetriesOnTransientErrors < 0) {
-          throw new RangeError('options.maxRetriesOnTransientErrors must be a non-negative integer.');
+      if (config.options.maxRetriesOnTransientErrors !== undefined) {
+        if (typeof config.options.maxRetriesOnTransientErrors !== 'number') {
+          throw new TypeError('The "config.options.maxRetriesOnTransientErrors" property must be of type number.');
+        }
+
+        if (config.options.maxRetriesOnTransientErrors < 0) {
+          throw new TypeError('The "config.options.maxRetriesOnTransientErrors" property must be equal or greater than 0.');
         }
 
         this.config.options.maxRetriesOnTransientErrors = config.options.maxRetriesOnTransientErrors;
       }
-      deprecateNullConfigValue('options.maxRetriesOnTransientErrors', config.options.maxRetriesOnTransientErrors);
 
-      if (config.options.connectionRetryInterval != undefined) {
-        if (!Number.isInteger(config.options.connectionRetryInterval) || config.options.connectionRetryInterval <= 0) {
-          throw new TypeError('options.connectionRetryInterval must be a non-zero positive integer.');
+      if (config.options.connectionRetryInterval !== undefined) {
+        if (typeof config.options.connectionRetryInterval !== 'number') {
+          throw new TypeError('The "config.options.connectionRetryInterval" property must be of type number.');
+        }
+
+        if (config.options.connectionRetryInterval <= 0) {
+          throw new TypeError('The "config.options.connectionRetryInterval" property must be greater than 0.');
         }
 
         this.config.options.connectionRetryInterval = config.options.connectionRetryInterval;
       }
-      deprecateNullConfigValue('options.connectionRetryInterval', config.options.connectionRetryInterval);
 
-      if (config.options.rowCollectionOnDone != undefined) {
-        deprecateNonBooleanConfigValue('options.rowCollectionOnDone', config.options.rowCollectionOnDone);
+      if (config.options.rowCollectionOnDone !== undefined) {
+        if (typeof config.options.rowCollectionOnDone !== 'boolean') {
+          throw new TypeError('The "config.options.rowCollectionOnDone" property must be of type boolean.');
+        }
+
         this.config.options.rowCollectionOnDone = config.options.rowCollectionOnDone;
       }
-      deprecateNullConfigValue('options.rowCollectionOnDone', config.options.rowCollectionOnDone);
 
-      if (config.options.rowCollectionOnRequestCompletion != undefined) {
-        deprecateNonBooleanConfigValue('options.rowCollectionOnRequestCompletion', config.options.rowCollectionOnRequestCompletion);
+      if (config.options.rowCollectionOnRequestCompletion !== undefined) {
+        if (typeof config.options.rowCollectionOnRequestCompletion !== 'boolean') {
+          throw new TypeError('The "config.options.rowCollectionOnRequestCompletion" property must be of type boolean.');
+        }
+
         this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
       }
-      deprecateNullConfigValue('options.rowCollectionOnRequestCompletion', config.options.rowCollectionOnRequestCompletion);
 
-      if (config.options.tdsVersion) {
-        deprecateNonStringConfigValue('options.tdsVersion', config.options.tdsVersion);
+      if (config.options.tdsVersion !== undefined) {
+        if (typeof config.options.tdsVersion !== 'string') {
+          throw new TypeError('The "config.options.tdsVersion" property must be of type string.');
+        }
+
         this.config.options.tdsVersion = config.options.tdsVersion;
       }
-      deprecateNullConfigValue('options.tdsVersion', config.options.tdsVersion);
 
-      if (config.options.textsize) {
-        deprecateNonNumberConfigValue('options.textsize', config.options.textsize);
+      if (config.options.textsize !== undefined) {
+        if (typeof config.options.textsize !== 'number' && config.options.textsize !== null) {
+          throw new TypeError('The "config.options.textsize" property must be of type number or null.');
+        }
+
         this.config.options.textsize = config.options.textsize;
       }
-      deprecateNullFallbackToDefaultConfigValue('options.textsize', config.options.textsize);
 
-      if (config.options.trustServerCertificate != undefined) {
-        deprecateNonBooleanConfigValue('options.trustServerCertificate', config.options.trustServerCertificate);
+      if (config.options.trustServerCertificate !== undefined) {
+        if (typeof config.options.trustServerCertificate !== 'boolean') {
+          throw new TypeError('The "config.options.trustServerCertificate" property must be of type boolean.');
+        }
+
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
       }
-      deprecateNullConfigValue('options.trustServerCertificate', config.options.trustServerCertificate);
 
-      if (config.options.useColumnNames != undefined) {
-        deprecateNonBooleanConfigValue('options.useColumnNames', config.options.useColumnNames);
+      if (config.options.useColumnNames !== undefined) {
+        if (typeof config.options.useColumnNames !== 'boolean') {
+          throw new TypeError('The "config.options.useColumnNames" property must be of type boolean.');
+        }
+
         this.config.options.useColumnNames = config.options.useColumnNames;
       }
-      deprecateNullConfigValue('options.useColumnNames', config.options.useColumnNames);
 
-      if (config.options.useUTC != undefined) {
-        deprecateNonBooleanConfigValue('options.useUTC', config.options.useUTC);
+      if (config.options.useUTC !== undefined) {
+        if (typeof config.options.useUTC !== 'boolean') {
+          throw new TypeError('The "config.options.useUTC" property must be of type boolean.');
+        }
+
         this.config.options.useUTC = config.options.useUTC;
       }
-      deprecateNullConfigValue('options.useUTC', config.options.useUTC);
     }
+
+    let credentialsDetails = this.config.options.cryptoCredentialsDetails;
+    if (credentialsDetails.secureOptions === undefined) {
+      // If the caller has not specified their own `secureOptions`,
+      // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
+      // Older SQL Server instances running on older Windows versions have
+      // trouble with the BEAST workaround in OpenSSL.
+      // As BEAST is a browser specific exploit, we can just disable this option here.
+      credentialsDetails = Object.create(credentialsDetails, {
+        secureOptions: {
+          value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
+        }
+      });
+    }
+
+    this.secureContext = createSecureContext(credentialsDetails);
 
     this.createDebug();
     this.createTokenStreamParser();
@@ -534,16 +700,21 @@ class Connection extends EventEmitter {
       if (cleanupTypeEnum === this.cleanupTypeEnum.REDIRECT) {
         this.emit('rerouting');
       } else if (cleanupTypeEnum !== this.cleanupTypeEnum.RETRY) {
-        this.emit('end');
+        process.nextTick(() => {
+          this.emit('end');
+        });
       }
-      if (this.request) {
+
+      const request = this.request;
+      if (request) {
         const err = RequestError('Connection closed before request completed.', 'ECLOSE');
-        this.request.callback(err);
+        request.callback(err);
         this.request = undefined;
       }
+
       this.closed = true;
       this.loggedIn = false;
-      this.loginError = null;
+      this.loginError = undefined;
     }
   }
 
@@ -573,23 +744,28 @@ class Connection extends EventEmitter {
     this.tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
       if (this.loggedIn) {
-        if (this.request) {
-          this.request.error = RequestError(token.message, 'EREQUEST');
-          this.request.error.number = token.number;
-          this.request.error.state = token.state;
-          this.request.error['class'] = token['class'];
-          this.request.error.serverName = token.serverName;
-          this.request.error.procName = token.procName;
-          this.request.error.lineNumber = token.lineNumber;
+        const request = this.request;
+        if (request) {
+          if (!request.canceled) {
+            const error = new RequestError(token.message, 'EREQUEST');
+            error.number = token.number;
+            error.state = token.state;
+            error.class = token.class;
+            error.serverName = token.serverName;
+            error.procName = token.procName;
+            error.lineNumber = token.lineNumber;
+            request.error = error;
+          }
         }
       } else {
+        const error = ConnectionError(token.message, 'ELOGIN');
+
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          this.debug.log('Initiating retry on transient error = ', token.number);
-          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        } else {
-          this.loginError = ConnectionError(token.message, 'ELOGIN');
+          error.isTransient = true;
         }
+
+        this.loginError = error;
       }
     });
 
@@ -605,6 +781,14 @@ class Connection extends EventEmitter {
       this.emit('charsetChange', token.newValue);
     });
 
+    this.tokenStreamParser.on('fedAuthInfo', (token) => {
+      this.dispatchEvent('fedAuthInfo', token);
+    });
+
+    this.tokenStreamParser.on('featureExtAck', (token) => {
+      this.dispatchEvent('featureExtAck', token);
+    });
+
     this.tokenStreamParser.on('loginack', (token) => {
       if (!token.tdsVersion) {
         // unsupported TDS version
@@ -613,7 +797,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      if (!token['interface']) {
+      if (!token.interface) {
         // unsupported interface
         this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
         this.loggedIn = false;
@@ -659,20 +843,23 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('columnMetadata', (token) => {
-      if (this.request) {
-        let columns;
-        if (this.config.options.useColumnNames) {
-          columns = {};
-          for (let j = 0, len = token.columns.length; j < len; j++) {
-            const col = token.columns[j];
-            if (columns[col.colName] == null) {
-              columns[col.colName] = col;
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          let columns;
+          if (this.config.options.useColumnNames) {
+            columns = {};
+            for (let j = 0, len = token.columns.length; j < len; j++) {
+              const col = token.columns[j];
+              if (columns[col.colName] == null) {
+                columns[col.colName] = col;
+              }
             }
+          } else {
+            columns = token.columns;
           }
-        } else {
-          columns = token.columns;
+          request.emit('columnMetadata', columns);
         }
-        this.request.emit('columnMetadata', columns);
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
         this.close();
@@ -680,8 +867,11 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('order', (token) => {
-      if (this.request) {
-        this.request.emit('order', token.orderColumns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('order', token.orderColumns);
+        }
       } else {
         this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
         this.close();
@@ -689,15 +879,18 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('row', (token) => {
-      if (this.request) {
-        if (this.config.options.rowCollectionOnRequestCompletion) {
-          this.request.rows.push(token.columns);
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst.push(token.columns);
-        }
-        if (!(this.state === this.STATE.SENT_ATTENTION && this.request.paused)) {
-          this.request.emit('row', token.columns);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          if (this.config.options.rowCollectionOnRequestCompletion) {
+            request.rows.push(token.columns);
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst.push(token.columns);
+          }
+          if (!(this.state === this.STATE.SENT_ATTENTION && request.paused)) {
+            request.emit('row', token.columns);
+          }
         }
       } else {
         this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
@@ -706,58 +899,81 @@ class Connection extends EventEmitter {
     });
 
     this.tokenStreamParser.on('returnStatus', (token) => {
-      if (this.request) {
-        // Keep value for passing in 'doneProc' event.
-        this.procReturnStatusValue = token.value;
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          // Keep value for passing in 'doneProc' event.
+          this.procReturnStatusValue = token.value;
+        }
       }
     });
 
     this.tokenStreamParser.on('returnValue', (token) => {
-      if (this.request) {
-        this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          this.request.emit('returnValue', token.paramName, token.value, token.metadata);
+        }
       }
     });
 
     this.tokenStreamParser.on('doneProc', (token) => {
-      if (this.request) {
-        this.request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, this.request.rst);
-        this.procReturnStatusValue = undefined;
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
+          this.procReturnStatusValue = undefined;
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('doneInProc', (token) => {
-      if (this.request) {
-        this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+      const request = this.request;
+      if (request) {
+        if (!request.canceled) {
+          request.emit('doneInProc', token.rowCount, token.more, request.rst);
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
 
     this.tokenStreamParser.on('done', (token) => {
-      if (this.request) {
+      const request = this.request;
+      if (request) {
         if (token.attention) {
           this.dispatchEvent('attention');
         }
-        if (token.sqlError && !this.request.error) {
-          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-          this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-        }
-        this.request.emit('done', token.rowCount, token.more, this.request.rst);
-        if (token.rowCount !== undefined) {
-          this.request.rowCount += token.rowCount;
-        }
-        if (this.config.options.rowCollectionOnDone) {
-          this.request.rst = [];
+
+        if (request.canceled) {
+          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
+          // We assume this is the indication that an in-flight request was canceled.
+          if (token.sqlError && !request.error) {
+            this.clearCancelTimer();
+            request.error = RequestError('Canceled.', 'ECANCEL');
+          }
+        } else {
+          if (token.sqlError && !request.error) {
+            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+          }
+          request.emit('done', token.rowCount, token.more, request.rst);
+          if (token.rowCount !== undefined) {
+            request.rowCount += token.rowCount;
+          }
+          if (this.config.options.rowCollectionOnDone) {
+            request.rst = [];
+          }
         }
       }
     });
@@ -853,9 +1069,20 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
   }
 
+  createCancelTimer() {
+    this.clearCancelTimer();
+    const timeout = this.config.options.cancelTimeout;
+    if (timeout > 0) {
+      this.cancelTimer = setTimeout(() => {
+        this.cancelTimeout();
+      }, timeout);
+    }
+  }
+
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
-    const timeout = (this.request.timeout !== undefined) ? this.request.timeout : this.config.options.requestTimeout;
+    const request = this.request;
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     if (timeout) {
       this.requestTimer = setTimeout(() => {
         this.requestTimeout();
@@ -878,10 +1105,19 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
+  cancelTimeout() {
+    const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
+    this.debug.log(message);
+    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+  }
+
   requestTimeout() {
     this.requestTimer = undefined;
-    this.messageIo.sendMessage(TYPE.ATTENTION);
-    this.transitionTo(this.STATE.SENT_ATTENTION);
+    const request = this.request;
+    request.cancel();
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
+    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+    request.error = RequestError(message, 'ETIMEOUT');
   }
 
   retryTimeout() {
@@ -893,6 +1129,12 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
+    }
+  }
+
+  clearCancelTimer() {
+    if (this.cancelTimer) {
+      clearTimeout(this.cancelTimer);
     }
   }
 
@@ -920,7 +1162,7 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
-    this.debug.log('State change: ' + (this.state ? this.state.name : undefined) + ' -> ' + newState.name);
+    this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
     if (this.state.enter) {
@@ -1000,25 +1242,7 @@ class Connection extends EventEmitter {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
-  processPreLoginResponse() {
-    const preloginPayload = new PreloginPayload(this.messageBuffer);
-    this.debug.payload(function() {
-      return preloginPayload.toString('  ');
-    });
-
-    if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-      if (!this.config.options.encrypt) {
-        this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
-      }
-
-      this.dispatchEvent('tls');
-    } else {
-      this.dispatchEvent('noTls');
-    }
-  }
-
-  sendLogin7Packet(cb) {
+  sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -1029,11 +1253,40 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    if (this.config.domain) {
-      payload.sspi = createNTLMRequest({ domain: this.config.domain });
-    } else {
-      payload.userName = this.config.userName;
-      payload.password = this.config.password;
+    const { authentication } = this.config;
+    switch (authentication.type) {
+      case 'azure-active-directory-password':
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: this.fedAuthRequired,
+          workflow: 'default'
+        };
+        break;
+
+      case 'azure-active-directory-access-token':
+        payload.fedAuth = {
+          type: 'SECURITYTOKEN',
+          echo: this.fedAuthRequired,
+          fedAuthToken: authentication.options.token
+        };
+        break;
+
+      case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-msi-app-service':
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: this.fedAuthRequired,
+          workflow: 'integrated'
+        };
+        break;
+
+      case 'ntlm':
+        payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
+        break;
+
+      default:
+        payload.userName = authentication.options.userName;
+        payload.password = authentication.options.password;
     }
 
     payload.hostname = os.hostname();
@@ -1053,31 +1306,18 @@ class Connection extends EventEmitter {
     this.debug.payload(function() {
       return payload.toString('  ');
     });
-
-    process.nextTick(cb);
   }
 
-  sendNTLMResponsePacket() {
-    const payload = new NTLMResponsePayload({
-      domain: this.config.domain,
-      userName: this.config.userName,
-      password: this.config.password,
-      database: this.config.options.database,
-      appName: this.config.options.appName,
-      packetSize: this.config.options.packetSize,
-      tdsVersion: this.config.options.tdsVersion,
-      ntlmpacket: this.ntlmpacket,
-      additional: this.additional
-    });
-
-    this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-    this.debug.payload(function() {
-      return payload.toString('  ');
-    });
-
-    process.nextTick(() => {
-      this.transitionTo(this.STATE.SENT_NTLM_RESPONSE);
-    });
+  sendFedAuthTokenMessage(token) {
+    const accessTokenLen = Buffer.byteLength(token, 'ucs2');
+    const data = Buffer.alloc(8 + accessTokenLen);
+    let offset = 0;
+    offset = data.writeUInt32LE(accessTokenLen + 4, offset);
+    offset = data.writeUInt32LE(accessTokenLen, offset);
+    data.write(token, offset, 'ucs2');
+    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
+    // sent the fedAuth token message, the rest is similar to standard login 7
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   // Returns false to apply backpressure.
@@ -1109,85 +1349,97 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    return this.messageIo.sendMessage(TYPE.SQL_BATCH, payload.data);
+    payload.getData((data) => {
+      return this.messageIo.sendMessage(TYPE.SQL_BATCH, data);
+    });
   }
 
   getInitialSql() {
     const options = [];
 
-    if (this.config.options.enableAnsiNull) {
+    if (this.config.options.enableAnsiNull === true) {
       options.push('set ansi_nulls on');
-    } else {
+    } else if (this.config.options.enableAnsiNull === false) {
       options.push('set ansi_nulls off');
     }
 
-    if (this.config.options.enableAnsiNullDefault) {
+    if (this.config.options.enableAnsiNullDefault === true) {
       options.push('set ansi_null_dflt_on on');
-    } else {
+    } else if (this.config.options.enableAnsiNullDefault === false) {
       options.push('set ansi_null_dflt_on off');
     }
 
-    if (this.config.options.enableAnsiPadding) {
+    if (this.config.options.enableAnsiPadding === true) {
       options.push('set ansi_padding on');
-    } else {
+    } else if (this.config.options.enableAnsiPadding === false) {
       options.push('set ansi_padding off');
     }
 
-    if (this.config.options.enableAnsiWarnings) {
+    if (this.config.options.enableAnsiWarnings === true) {
       options.push('set ansi_warnings on');
-    } else {
+    } else if (this.config.options.enableAnsiWarnings === false) {
       options.push('set ansi_warnings off');
     }
 
-    if (this.config.options.enableArithAbort) {
+    if (this.config.options.enableArithAbort === true) {
       options.push('set arithabort on');
-    } else {
+    } else if (this.config.options.enableArithAbort === false) {
       options.push('set arithabort off');
     }
 
-    if (this.config.options.enableConcatNullYieldsNull) {
+    if (this.config.options.enableConcatNullYieldsNull === true) {
       options.push('set concat_null_yields_null on');
-    } else {
+    } else if (this.config.options.enableArithAbort === false) {
       options.push('set concat_null_yields_null off');
     }
 
-    if (this.config.options.enableCursorCloseOnCommit !== undefined) {
-      if (this.config.options.enableCursorCloseOnCommit) {
-        options.push('set cursor_close_on_commit on');
-      } else {
-        options.push('set cursor_close_on_commit off');
-      }
+    if (this.config.options.enableCursorCloseOnCommit === true) {
+      options.push('set cursor_close_on_commit on');
+    } else if (this.config.options.enableCursorCloseOnCommit === false) {
+      options.push('set cursor_close_on_commit off');
     }
 
-    options.push(`set datefirst ${this.config.options.datefirst}`);
-    options.push(`set dateformat ${this.config.options.dateFormat}`);
+    if (this.config.options.datefirst !== null) {
+      options.push(`set datefirst ${this.config.options.datefirst}`);
+    }
 
-    if (this.config.options.enableImplicitTransactions) {
+    if (this.config.options.dateFormat !== null) {
+      options.push(`set dateformat ${this.config.options.dateFormat}`);
+    }
+
+    if (this.config.options.enableImplicitTransactions === true) {
       options.push('set implicit_transactions on');
-    } else {
+    } else if (this.config.options.enableImplicitTransactions === false) {
       options.push('set implicit_transactions off');
     }
 
-    options.push(`set language ${this.config.options.language}`);
+    if (this.config.options.language !== null) {
+      options.push(`set language ${this.config.options.language}`);
+    }
 
-    if (this.config.options.enableNumericRoundabort) {
+    if (this.config.options.enableNumericRoundabort === true) {
       options.push('set numeric_roundabort on');
-    } else {
+    } else if (this.config.options.enableNumericRoundabort === false) {
       options.push('set numeric_roundabort off');
     }
 
-    if (this.config.options.enableQuotedIdentifier) {
+    if (this.config.options.enableQuotedIdentifier === true) {
       options.push('set quoted_identifier on');
-    } else {
+    } else if (this.config.options.enableQuotedIdentifier === false) {
       options.push('set quoted_identifier off');
     }
 
-    options.push(`set textsize ${this.config.options.textsize}`);
-    options.push(`set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}`);
+    if (this.config.options.textsize !== null) {
+      options.push(`set textsize ${this.config.options.textsize}`);
+    }
 
-    if (this.config.options.abortTransactionOnError) {
+    if (this.config.options.connectionIsolationLevel !== null) {
+      options.push(`set transaction isolation level ${this.getIsolationLevelText(this.config.options.connectionIsolationLevel)}`);
+    }
+
+    if (this.config.options.abortTransactionOnError === true) {
       options.push('set xact_abort on');
-    } else {
+    } else if (this.config.options.abortTransactionOnError === false) {
       options.push('set xact_abort off');
     }
 
@@ -1199,45 +1451,6 @@ class Connection extends EventEmitter {
     this.emit('connect');
   }
 
-  processLogin7Response() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMResponse() {
-    if (this.ntlmpacket) {
-      this.dispatchEvent('receivedChallenge');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
-  processLogin7NTLMAck() {
-    if (this.loggedIn) {
-      this.dispatchEvent('loggedIn');
-    } else {
-      if (this.loginError) {
-        this.emit('connect', this.loginError);
-      } else {
-        this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-      }
-      this.dispatchEvent('loginFailed');
-    }
-  }
-
   execSqlBatch(request) {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure, this.currentTransactionDescriptor(), this.config.options));
   }
@@ -1245,10 +1458,11 @@ class Connection extends EventEmitter {
   execSql(request) {
     request.transformIntoExecuteSqlRpc();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1278,6 +1492,7 @@ class Connection extends EventEmitter {
   }
 
   execBulkLoad(bulkLoad) {
+    bulkLoad.executionStarted = true;
     const request = new Request(bulkLoad.getBulkInsertSql(), (error) => {
       if (error) {
         if (error.code === 'UNKNOWN') {
@@ -1285,9 +1500,14 @@ class Connection extends EventEmitter {
         }
         bulkLoad.error = error;
         bulkLoad.callback(error);
-      } else {
-        this.makeRequest(bulkLoad, TYPE.BULK_LOAD, bulkLoad.getPayload());
+        return;
       }
+
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, undefined);
+    });
+
+    bulkLoad.once('cancel', () => {
+      request.cancel();
     });
 
     this.execSqlBatch(request);
@@ -1306,10 +1526,11 @@ class Connection extends EventEmitter {
   execute(request, parameters) {
     request.transformIntoExecuteRpc(parameters);
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
 
       return;
@@ -1321,10 +1542,11 @@ class Connection extends EventEmitter {
   callProcedure(request) {
     request.validateParameters();
 
-    if (request.error != null) {
+    const error = request.error;
+    if (error != null) {
       process.nextTick(() => {
-        this.debug.log(request.error.message);
-        request.callback(request.error);
+        this.debug.log(error.message);
+        request.callback(error);
       });
       return;
     }
@@ -1403,27 +1625,21 @@ class Connection extends EventEmitter {
     const txDone = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
-          return this.rollbackTransaction((txErr) => {
+          this.rollbackTransaction((txErr) => {
             done(txErr || err, ...args);
           }, name);
         } else {
-          return process.nextTick(() => {
-            done(err, ...args);
-          });
+          done(err, ...args);
         }
+      } else if (useSavepoint) {
+        if (this.config.options.tdsVersion < '7_2') {
+          this.transactionDepth--;
+        }
+        done(null, ...args);
       } else {
-        if (useSavepoint) {
-          return process.nextTick(() => {
-            if (this.config.options.tdsVersion < '7_2') {
-              this.transactionDepth--;
-            }
-            done(null, ...args);
-          });
-        } else {
-          return this.commitTransaction((txErr) => {
-            done(txErr, ...args);
-          }, name);
-        }
+        this.commitTransaction((txErr) => {
+          done(txErr, ...args);
+        }, name);
       }
     };
 
@@ -1457,6 +1673,10 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(RequestError(message, 'EINVALIDSTATE'));
+    } else if (request.canceled) {
+      process.nextTick(() => {
+        request.callback(RequestError('Canceled.', 'ECANCEL'));
+      });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
@@ -1469,30 +1689,100 @@ class Connection extends EventEmitter {
       this.request.rowCount = 0;
       this.request.rows = [];
       this.request.rst = [];
-      this.createRequestTimer();
-      this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
-      this.resetConnectionOnNextRequest = false;
-      this.debug.payload(function() {
-        return payload.toString('  ');
+
+      let message;
+
+      this.request.once('cancel', () => {
+        if (!this.isRequestActive(request)) {
+          // Cancel was called on a request that is no longer active on this connection
+          return;
+        }
+
+        // There's three ways to handle request cancelation:
+        if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
+          // The request was cancelled before buffering finished
+          const sqlRequest = this.request;
+          this.request = undefined;
+          sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+        } else if (message.writable) {
+          // - if the message is still writable, we'll set the ignore bit
+          //   and end the message.
+          message.ignore = true;
+          message.end();
+        } else {
+          // - but if the message has been ended (and thus has been fully sent off),
+          //   we need to send an `ATTENTION` message to the server
+          this.messageIo.sendMessage(TYPE.ATTENTION);
+          this.transitionTo(this.STATE.SENT_ATTENTION);
+        }
+
+        this.clearRequestTimer();
+        this.createCancelTimer();
       });
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      if (request.paused) { // Request.pause() has been called before the request was started
-        this.pauseRequest(request);
+
+      if (request instanceof BulkLoad) {
+        message = request.getMessageStream();
+
+        // If the bulkload was not put into streaming mode by the user,
+        // we end the rowToPacketTransform here for them.
+        //
+        // If it was put into streaming mode, it's the user's responsibility
+        // to end the stream.
+        if (!request.streamingMode) {
+          request.rowToPacketTransform.end();
+        }
+        this.messageIo.outgoingMessageStream.write(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+        if (request.paused) { // Request.pause() has been called before the request was started
+          this.pauseRequest(request);
+        }
+      } else {
+        this.createRequestTimer();
+
+        // Transition to an intermediate state to ensure that no new requests
+        // are made on the connection while the buffer is being populated.
+        this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);
+
+        payload.getData((data) => {
+          if (this.state !== this.STATE.BUILDING_CLIENT_REQUEST) {
+            // Something else has happened on the connection since starting to
+            // build the request. That state change should have invoked the
+            // request handler so there is nothing to do at this point.
+            return;
+          }
+
+          message = this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
+
+          this.resetConnectionOnNextRequest = false;
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+          if (request.paused) { // Request.pause() has been called before the request was started
+            this.pauseRequest(request);
+          }
+        });
       }
+
     }
   }
 
   cancel() {
-    if (this.state !== this.STATE.SENT_CLIENT_REQUEST) {
-      const message = 'Requests can only be canceled in the ' + this.STATE.SENT_CLIENT_REQUEST.name + ' state, not the ' + this.state.name + ' state';
-      this.debug.log(message);
+    if (!this.request) {
       return false;
-    } else {
-      this.request.canceled = true;
-      this.messageIo.sendMessage(TYPE.ATTENTION);
-      this.transitionTo(this.STATE.SENT_ATTENTION);
-      return true;
     }
+
+    if (this.request.canceled) {
+      return false;
+    }
+
+    this.request.cancel();
+    return true;
   }
 
   reset(callback) {
@@ -1503,7 +1793,7 @@ class Connection extends EventEmitter {
       callback(err);
     });
     this.resetConnectionOnNextRequest = true;
-    return this.execSqlBatch(request);
+    this.execSqlBatch(request);
   }
 
   currentTransactionDescriptor() {
@@ -1563,20 +1853,33 @@ Connection.prototype.STATE = {
         this.addToMessageBuffer(data);
       },
       message: function() {
-        this.processPreLoginResponse();
-      },
-      noTls: function() {
-        this.sendLogin7Packet(() => {
-          if (this.config.domain) {
+        const preloginPayload = new PreloginPayload(this.messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
+          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        } else {
+          this.sendLogin7Packet();
+
+          const { authentication } = this.config;
+          if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
           } else {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
-        });
-      },
-      tls: function() {
-        this.messageIo.startTls(this.config.options.cryptoCredentialsDetails, this.config.server, this.config.options.trustServerCertificate);
-        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        }
       }
     }
   },
@@ -1631,13 +1934,17 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet(() => {
-            if (this.config.domain) {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          });
+          this.sendLogin7Packet();
+
+          const { authentication } = this.config;
+
+          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+          } else if (authentication.type === 'ntlm') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
         }
       }
     }
@@ -1654,17 +1961,42 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
       },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
+      featureExtAck: function(token) {
+        const { authentication } = this.config;
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
+          if (token.fedAuth === undefined) {
+            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+            this.loggedIn = false;
+          } else if (token.fedAuth.length !== 0) {
+            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+            this.loggedIn = false;
+          }
+        } else if (token.fedAuth === undefined) {
+          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
+          this.loggedIn = false;
+        } else {
+          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+          this.loggedIn = false;
+        }
       },
       message: function() {
-        this.processLogin7Response();
+        if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
       }
     }
   },
@@ -1680,19 +2012,47 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      receivedChallenge: function() {
-        this.sendNTLMResponsePacket();
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       message: function() {
-        this.processLogin7NTLMResponse();
+        if (this.ntlmpacket) {
+          const { authentication } = this.config;
+
+          const payload = new NTLMResponsePayload({
+            domain: authentication.options.domain,
+            userName: authentication.options.userName,
+            password: authentication.options.password,
+            database: this.config.options.database,
+            appName: this.config.options.appName,
+            packetSize: this.config.options.packetSize,
+            tdsVersion: this.config.options.tdsVersion,
+            ntlmpacket: this.ntlmpacket,
+            additional: this.additional
+          });
+
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.ntlmpacket = undefined;
+        } else if (this.loggedIn) {
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
       }
     }
   },
-  SENT_NTLM_RESPONSE: {
-    name: 'SentNTLMResponse',
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -1703,17 +2063,70 @@ Connection.prototype.STATE = {
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
       },
-      loggedIn: function() {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      },
-      loginFailed: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
       routingChange: function() {
         this.transitionTo(this.STATE.REROUTING);
       },
+      fedAuthInfo: function(token) {
+        this.fedAuthInfoToken = token;
+      },
       message: function() {
-        this.processLogin7NTLMAck();
+        if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
+          const { authentication } = this.config;
+
+          const getToken = (callback) => {
+            const getTokenFromCredentials = (err, credentials) => {
+              if (err) {
+                return callback(err);
+              }
+
+              credentials.getToken().then((tokenResponse) => {
+                callback(null, tokenResponse.accessToken);
+              }, callback);
+            };
+
+            if (authentication.type === 'azure-active-directory-password') {
+              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
+                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                tokenAudience: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-msi-vm') {
+              loginWithVmMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                resource: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-msi-app-service') {
+              loginWithAppServiceMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                msiSecret: authentication.options.msiSecret,
+                resource: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            }
+          };
+
+          getToken((err, token) => {
+            if (err) {
+              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+              return;
+            }
+
+            this.sendFedAuthTokenMessage(token);
+          });
+        } else if (this.loginError) {
+          if (this.loginError.isTransient) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
       }
     }
   },
@@ -1723,6 +2136,9 @@ Connection.prototype.STATE = {
       this.sendInitialSql();
     },
     events: {
+      socketError: function socketError() {
+        this.transitionTo(this.STATE.FINAL);
+      },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1743,11 +2159,22 @@ Connection.prototype.STATE = {
       }
     }
   },
+  BUILDING_CLIENT_REQUEST: {
+    name: 'BuildingClientRequest',
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
+      }
+    }
+  },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     exit: function(nextState) {
       this.clearRequestTimer();
-
       if (nextState !== this.STATE.FINAL) {
         this.tokenStreamParser.resume();
       }
@@ -1756,8 +2183,9 @@ Connection.prototype.STATE = {
       socketError: function(err) {
         const sqlRequest = this.request;
         this.request = undefined;
-        sqlRequest.callback(err);
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.clearRequestTimer(); // request timer is stopped on first data package
@@ -1791,8 +2219,13 @@ Connection.prototype.STATE = {
       this.attentionReceived = false;
     },
     events: {
-      socketError: function() {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+
         this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       },
       data: function(data) {
         this.sendDataToTokenStreamParser(data);
@@ -1804,15 +2237,16 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
+          this.clearCancelTimer();
+
           const sqlRequest = this.request;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
-          if (sqlRequest.canceled) {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
           } else {
-            const timeout = (sqlRequest.timeout !== undefined) ? sqlRequest.timeout : this.config.options.requestTimeout;
-            const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-            sqlRequest.callback(RequestError(message, 'ETIMEOUT'));
+            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
       }
