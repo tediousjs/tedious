@@ -1,0 +1,39 @@
+---
+layout: default
+title: Tests
+---
+
+<h1>Running Tests</h1>
+
+<p>To run the tests locally, you would need to have a ~/.tedious/test-connection.json file in your home directory</p>
+<p>E.g., </p>
+<p>
+        {% highlight javascript %}
+        {
+            "config": {
+                "server": "localhost",
+                "authentication": {
+                    "type": "default",
+                    "options": {
+                        "userName": "your_username",
+                        "password": "your_password"
+                    }
+                },
+                "options": {
+                    "port": 1433,
+                    "database": "master"
+                }
+            }
+        }
+      {% endhighlight %}
+</p>
+
+<p>
+    Note: Two tests are known to fail locally under Data-Types test: <br>
+        <dd>dateTime2DaylightSaving</dd>
+        <dd>dateDaylightSaving</dd>  
+</p>
+
+<p>
+        A fix is soon to come...  
+</p>
