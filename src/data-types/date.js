@@ -16,7 +16,7 @@ module.exports = {
     buffer.writeUInt8(this.id);
   },
 
-  writeParameterData: function(buffer, parameter, options) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(3);
       if (options.useUTC) {
@@ -28,6 +28,7 @@ module.exports = {
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {

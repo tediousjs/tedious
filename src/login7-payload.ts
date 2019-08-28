@@ -1,6 +1,4 @@
-// @flow
-
-const sprintf = require('sprintf-js').sprintf;
+const { sprintf } = require('sprintf-js');
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -90,20 +88,20 @@ class Login7Payload {
   readOnlyIntent: boolean;
   initDbFatal: boolean;
 
-  userName: string | typeof undefined;
-  password: string | typeof undefined;
-  serverName: string | typeof undefined;
-  appName: string | typeof undefined;
-  hostname: string | typeof undefined;
-  libraryName: string | typeof undefined;
-  language: string | typeof undefined;
-  database: string | typeof undefined;
-  clientId: Buffer | typeof undefined;
-  sspi: Buffer | typeof undefined;
-  attachDbFile: string | typeof undefined;
-  changePassword: string | typeof undefined;
+  userName: string | undefined;
+  password: string | undefined;
+  serverName: string | undefined;
+  appName: string | undefined;
+  hostname: string | undefined;
+  libraryName: string | undefined;
+  language: string | undefined;
+  database: string | undefined;
+  clientId: Buffer | undefined;
+  sspi: Buffer | undefined;
+  attachDbFile: string | undefined;
+  changePassword: string | undefined;
 
-  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | typeof undefined;
+  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
@@ -454,7 +452,7 @@ class Login7Payload {
     return password;
   }
 
-  toString(indent?: string = '') {
+  toString(indent: string = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
               this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
@@ -471,4 +469,5 @@ class Login7Payload {
   }
 }
 
+export default Login7Payload;
 module.exports = Login7Payload;

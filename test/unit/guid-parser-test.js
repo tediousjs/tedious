@@ -1,4 +1,5 @@
 const guidParser = require('../../src/guid-parser');
+const assert = require('chai').assert;
 
 const lowerGuids = [
   'e062ae34-6de5-47f3-8ba3-29d25f77e71a',
@@ -148,39 +149,35 @@ const arrays = [
   ]
 ];
 
-exports.guidToArray = (test) => {
-  for (let i = 0; i < lowerGuids.length; i++) {
-    const guid = lowerGuids[i];
-    test.deepEqual(guidParser.guidToArray(guid), arrays[i]);
-  }
+describe('Guid Parser Test', function() {
+  it('guidToArray', () => {
+    for (let i = 0; i < lowerGuids.length; i++) {
+      const guid = lowerGuids[i];
+      assert.deepEqual(guidParser.guidToArray(guid), arrays[i]);
+    }
 
-  for (let i = 0; i < upperGuids.length; i++) {
-    const guid = upperGuids[i];
-    test.deepEqual(guidParser.guidToArray(guid), arrays[i]);
-  }
+    for (let i = 0; i < upperGuids.length; i++) {
+      const guid = upperGuids[i];
+      assert.deepEqual(guidParser.guidToArray(guid), arrays[i]);
+    }
 
-  for (let i = 0; i < mixedGuids.length; i++) {
-    const guid = mixedGuids[i];
-    test.deepEqual(guidParser.guidToArray(guid), arrays[i]);
-  }
+    for (let i = 0; i < mixedGuids.length; i++) {
+      const guid = mixedGuids[i];
+      assert.deepEqual(guidParser.guidToArray(guid), arrays[i]);
+    }
+  });
 
-  test.done();
-};
+  it('arrayToLowerCaseGuid', () => {
+    for (let i = 0; i < arrays.length; i++) {
+      const array = arrays[i];
+      assert.strictEqual(guidParser.arrayToLowerCaseGuid(array), lowerGuids[i]);
+    }
+  });
 
-exports.arrayToLowerCaseGuid = (test) => {
-  for (let i = 0; i < arrays.length; i++) {
-    const array = arrays[i];
-    test.strictEqual(guidParser.arrayToLowerCaseGuid(array), lowerGuids[i]);
-  }
-
-  test.done();
-};
-
-exports.arrayToUpperCaseGuid = (test) => {
-  for (let i = 0; i < arrays.length; i++) {
-    const array = arrays[i];
-    test.strictEqual(guidParser.arrayToUpperCaseGuid(array), upperGuids[i]);
-  }
-
-  test.done();
-};
+  it('arrayToUpperCaseGuid', () => {
+    for (let i = 0; i < arrays.length; i++) {
+      const array = arrays[i];
+      assert.strictEqual(guidParser.arrayToUpperCaseGuid(array), upperGuids[i]);
+    }
+  });
+});

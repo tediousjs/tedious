@@ -1,5 +1,3 @@
-// @flow
-
 const { PassThrough } = require('readable-stream');
 
 class Message extends PassThrough {
@@ -16,4 +14,5 @@ class Message extends PassThrough {
   }
 }
 
+export default Message;
 module.exports = Message;
