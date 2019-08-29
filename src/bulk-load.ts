@@ -51,6 +51,7 @@ type DataType = {
   declaration: (column: Column) => string,
   writeTypeInfo: (buf: any, column: Column, options: ConnectionOptions) => void,
   writeParameterData: (buf: any, data: { length?: number, scale?: number, precision?: number, value: unknown }, options: ConnectionOptions, callback: () => void) => void,
+  validate: (value: any) => any,
 
   hasPrecision?: Boolean,
   hasScale?: Boolean,
