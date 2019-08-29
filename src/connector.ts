@@ -64,14 +64,10 @@ export class SequentialConnectionStrategy {
   }
 
   connect(callback: (err: Error | null, socket?: net.Socket) => void) {
-    const addresses = this.addresses;
-
-    if (!addresses.length) {
-      callback(new Error('Could not connect (sequence)'));
-      return;
+    const next = this.addresses.shift();
+    if (!next) {
+      return callback(new Error('Could not connect (sequence)'));
     }
-
-    const next = addresses.shift()!;
 
     const socket = net.connect(Object.create(this.options, {
       host: { value: next.address }
