@@ -1,0 +1,108 @@
+---
+layout: default
+title: F.E.Q.
+---
+
+<h1>Frequently Encountered Problems (F.E.Q.)</h1>
+
+<dl>
+    <dt>
+        <h2>Any Problem</h2>
+    </dt>
+
+    <dd>
+        <p>First step to debug any problems is to ensure that 
+            <a href="https://github.com/tediousjs/tedious/releases">tedious is up to date.</a></p>
+        <p>If you're using tediousjs/mssql, make sure it's up to date, as well as its tedious dependency in
+            package.json.
+            <br>
+            Note: tediousjs/mssql is <strong>no longer being actively maintained</strong>
+        </p>
+    </dd>
+    <br />
+    <dt>
+        <h2>Setting up config</h2>
+    </dt>
+    <dd>
+        <p>To set up a configuration object for a Connection to SQL server, see <a href="api-connection.html">connection
+                page.</a></p>
+        <p>To set up configuration for running tests locally, see <a href="tests.html">tests page.</a></p>
+    </dd>
+    <br />
+    <dt>
+        <h2>Connection to local SQL Server</h2>
+    </dt>
+    <dd>
+        <h3>SQL Server Configurations</h3>
+        <ol>
+            <li>Ensure SQL Server Browser and <a
+                    href="https://stackoverflow.com/questions/11632849/how-to-check-if-sql-server-agent-is-running">SQL
+                    Server Agent is running</a> (Agent can only run on SQL Server Developer/Enterprise, NOT SQL Server
+                Express).</li>
+            <li><a
+                    href="https://www.habaneroconsulting.com/stories/insights/2015/tcpip-is-disabled-by-default-in-microsoft-sql-server-2014">Enable
+                    TCP/IP port</a> via SQL Configuration Manager
+                (<code>C:\Windows\SysWOW64\SQLServerManager14.msc</code> for windows).</li>
+            <li>Ensure user is enabled: SQL Server Management Studio -> Security -> logins -> enable user (that matches
+                the userName in the '<a href="getting-started.html">config</a>' object in Tedious).</li>
+        </ol>
+
+        <h3>Tedious Configurations</h3>
+        <ol>
+            <li>
+                Ensure <a
+                    href="https://sqlandme.com/2013/05/01/sql-server-finding-tcp-port-number-sql-instance-is-listening-on/">port
+                    number of the server</a>
+                matches the port number in the 'config' object, and ensure the port number is in the options field of
+                the config object itself, and NOT the Authentication options.
+            </li>
+            <p>E.g.,</p>
+            {% highlight javascript %}
+            var config = {
+                server: 'localhost',
+                authentication: {
+                  type: 'default',
+                  options: {
+                    userName: 'sa', //Username 'sa' was added to server 'users'
+                    password: 'Password_123', //Password set up during addition of 'sa' user. 
+                  }
+                },
+                options: {		
+                  port: 60543, //This port was specific to my local server. Yours might be different. 
+                }
+              };
+            {% endhighlight %}
+        </ol>
+    </dd>
+    <br />
+    <dt><h2>Remote Azure Connection</h2></dt>
+    <dd>
+        <p>Tedious version 6.3.0 and above is required for MSI Authentication.</p>
+        <p>Check configuration in Active Directory's Firewall.</p>
+    </dd>
+    <br />
+    <dt><h2>"Requests can only be made in the LoggedIn state, not the SentClientRequest state"</h2></dt>
+    <dd>
+        <p>Only one query can be executed on a connection at a time. You need to wait until the request callback is executed, either with an error or with the result before making another request.
+            <br>
+            (Refer to the <a href="https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/ce1cef02-f43c-4e37-a190-aaa444b96360">TDS protocol state diagram </a> 
+            [bottom-half of the diagram] for a high level understanding of the TDS lifecycle).
+        </p>
+    </dd>
+    <br />
+    <dt><h2>tediousjs > tedious-connection-pool and node-mssql</h2></dt>
+    <dd>
+        <p>Both of these repositories are not being actively maintained, however, still valid to some extent.</p>
+        <p>If using either of these, ensure that you're using the latest versions and that their package.json has the <a href="https://github.com/tediousjs/tedious/releases">latest tedious version</a> as its dependency</p>
+    </dd>
+    <br />
+    <dt><h2>JavaScript number type limitation</h2></dt>
+    <dd><p>If the number you're trying to insert is not in  -9007199254740991 and 9007199254740991 (inclusive), use VarChar type instead.</p></dd>
+    <br />
+    <dt><h2>Other</h2></dt>
+    <dd>
+        <p>For more complex issues, please raise an issue on the <a href="https://github.com/tediousjs/tedious/issues">github page!</a></p>
+        <p>If you've found a solution to what you think may be a common problem, please make a <a href="https://github.com/tediousjs/tedious/tree/gh-pages">pull request on gh-pages branch</a> with the problem and solution,
+             or <a href="https://github.com/tediousjs/tedious/issues">raise an issue </a>.</p>
+    </dd>
+</dl>
