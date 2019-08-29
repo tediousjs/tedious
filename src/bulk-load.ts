@@ -1,10 +1,8 @@
-// @flow
+import { EventEmitter } from 'events';
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { ConnectionOptions } from './connection';
 
-/* globals $PropertyType */
-
-const EventEmitter = require('events').EventEmitter;
 const Transform = require('readable-stream').Transform;
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
 const TOKEN_TYPE = require('./token/token').TYPE;
 const Message = require('./message');
 const PACKET_TYPE = require('./packet').TYPE;
@@ -42,14 +40,27 @@ type InternalOptions = {
 };
 
 type Options = {
-  checkConstraints?: $PropertyType<InternalOptions, 'checkConstraints'>,
-  fireTriggers?: $PropertyType<InternalOptions, 'fireTriggers'>,
-  keepNulls?: $PropertyType<InternalOptions, 'keepNulls'>,
-  lockTable?: $PropertyType<InternalOptions, 'lockTable'>,
+  checkConstraints?: InternalOptions['checkConstraints'],
+  fireTriggers?: InternalOptions['fireTriggers'],
+  keepNulls?: InternalOptions['keepNulls'],
+  lockTable?: InternalOptions['lockTable'],
+};
+
+type DataType = {
+  id: number,
+  declaration: (column: Column) => string,
+  writeTypeInfo: (buf: any, column: Column, options: ConnectionOptions) => void,
+  writeParameterData: (buf: any, data: { length?: number, scale?: number, precision?: number, value: unknown }, options: ConnectionOptions, callback: () => void) => void,
+
+  hasPrecision?: Boolean,
+  hasScale?: Boolean,
+  resolveLength?: (column: Column) => number,
+  resolvePrecision?: (column: Column) => number,
+  resolveScale?: (column: Column) => number
 };
 
 type Column = {
-  type: Object,
+  type: DataType,
   name: string,
   value: null,
   output: boolean,
@@ -57,7 +68,7 @@ type Column = {
   precision?: number,
   scale?: number,
   objName: string,
-  nullable: boolean
+  nullable?: boolean
 };
 
 type ColumnOptions = {
@@ -70,30 +81,30 @@ type ColumnOptions = {
 };
 
 class BulkLoad extends EventEmitter {
-  error: Error | typeof undefined;
+  error?: Error;
   canceled: boolean;
   executionStarted: boolean;
   streamingMode: boolean;
   table: string;
-  timeout: number | typeof undefined
+  timeout?: number
 
-  options: Object;
-  callback: (err: ?Error, rowCount: number) => void;
+  options: ConnectionOptions;
+  callback: (err: Error | undefined | null, rowCount: number) => void;
 
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
 
   firstRowWritten: boolean;
-  rowToPacketTransform: RowTransform; // eslint-disable-line no-use-before-define
+  rowToPacketTransform: RowTransform;
 
   bulkOptions: InternalOptions;
 
-  constructor(table: string, connectionOptions: Object, {
+  constructor(table: string, connectionOptions: ConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, callback: (err: ?Error, rowCount: number) => void) {
+  }: Options, callback: (err: Error | undefined | null, rowCount: number) => void) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }
@@ -129,7 +140,7 @@ class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name: string, type: Object, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
+  addColumn(name: string, type: any, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -172,10 +183,10 @@ class BulkLoad extends EventEmitter {
     this.columnsByName[name] = column;
   }
 
-  addRow(...input: [ { [string]: any } ] | Array<any>) {
+  addRow(...input: [ { [key: string]: any } ] | Array<any>) {
     this.firstRowWritten = true;
 
-    let row;
+    let row: any;
     if (input.length > 1 || !input[0] || typeof input[0] !== 'object') {
       row = input;
     } else {
@@ -284,7 +295,7 @@ class BulkLoad extends EventEmitter {
     return tBuf.data;
   }
 
-  setTimeout(timeout: number | typeof undefined) {
+  setTimeout(timeout?: number) {
     this.timeout = timeout;
   }
 
@@ -344,14 +355,15 @@ class BulkLoad extends EventEmitter {
   }
 }
 
+export default BulkLoad;
 module.exports = BulkLoad;
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
   columnMetadataWritten: boolean;
   bulkLoad: BulkLoad;
-  mainOptions: $PropertyType<BulkLoad, 'options'>;
-  columns: $PropertyType<BulkLoad, 'columns'>;
+  mainOptions: BulkLoad['options'];
+  columns: BulkLoad['columns'];
 
   constructor(bulkLoad: BulkLoad) {
     super({ writableObjectMode: true });
@@ -363,7 +375,7 @@ class RowTransform extends Transform {
     this.columnMetadataWritten = false;
   }
 
-  _transform(row: Array<any>, encoding: void, callback: () => void) {
+  _transform(row: Array<any>, _encoding: string, callback: () => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;

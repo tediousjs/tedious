@@ -1,7 +1,6 @@
-// @flow
-
 const { sprintf } = require('sprintf-js');
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
+
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 
 const optionBufferSize = 20;
 
@@ -19,26 +18,26 @@ const TOKEN = {
   TERMINATOR: 0xFF
 };
 
-const ENCRYPT = {
+const ENCRYPT: { [key: string]: number } = {
   OFF: 0x00,
   ON: 0x01,
   NOT_SUP: 0x02,
   REQ: 0x03
 };
 
-const encryptByValue = {};
+const encryptByValue: { [key: number]: string } = {};
 
 for (const name in ENCRYPT) {
   const value = ENCRYPT[name];
   encryptByValue[value] = name;
 }
 
-const MARS = {
+const MARS: { [key: string]: number } = {
   OFF: 0x00,
   ON: 0x01
 };
 
-const marsByValue = {};
+const marsByValue: { [key: number]: string } = {};
 
 for (const name in MARS) {
   const value = MARS[name];
@@ -53,11 +52,11 @@ type Options = {
 /*
   s2.2.6.4
  */
-module.exports = class PreloginPayload {
-  data: Buffer;
+class PreloginPayload {
+  data!: Buffer;
   options: Options;
 
-  version: {
+  version!: {
     major: number,
     minor: number,
     patch: number,
@@ -65,20 +64,21 @@ module.exports = class PreloginPayload {
     subbuild: number
   };
 
-  encryption: number;
-  encryptionString: string;
+  encryption!: number;
+  encryptionString!: string;
 
-  instance: number;
+  instance!: number;
 
-  threadId: number;
+  threadId!: number;
 
-  mars: number;
-  marsString: string;
-  fedAuthRequired: number;
+  mars!: number;
+  marsString!: string;
+  fedAuthRequired!: number;
 
   constructor(bufferOrOptions: Buffer | Options = { encrypt: false }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
+      this.options = { encrypt: false };
     } else {
       this.options = bufferOrOptions;
       this.createOptions();
@@ -243,6 +243,18 @@ module.exports = class PreloginPayload {
   }
 
   toString(indent: string = '') {
-    return indent + 'PreLogin - ' + sprintf('version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)', this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild, this.encryption ? this.encryption : 0, this.encryptionString ? this.encryptionString : 0, this.instance ? this.instance : 0, this.threadId ? this.threadId : 0, this.mars ? this.mars : 0, this.marsString ? this.marsString : 0, this.fedAuthRequired ? this.fedAuthRequired : 0);
+    return indent + 'PreLogin - ' + sprintf(
+      'version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
+      this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild,
+      this.encryption ? this.encryption : 0,
+      this.encryptionString ? this.encryptionString : '',
+      this.instance ? this.instance : 0,
+      this.threadId ? this.threadId : 0,
+      this.mars ? this.mars : 0,
+      this.marsString ? this.marsString : ''
+    );
   }
-};
+}
+
+export default PreloginPayload;
+module.exports = PreloginPayload;

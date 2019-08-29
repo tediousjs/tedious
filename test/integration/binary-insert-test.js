@@ -20,7 +20,7 @@ config.options.debug = {
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('inserting binary data', function() {
-  this.timeout(5000);
+  this.timeout(60000);
 
   beforeEach(function(done) {
     this.connection = new Connection(config);
