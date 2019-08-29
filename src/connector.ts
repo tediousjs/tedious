@@ -1,5 +1,6 @@
-import * as net from 'net';
-import * as dns from 'dns';
+import net from 'net';
+import dns from 'dns';
+
 import * as punycode from 'punycode';
 
 export class ParallelConnectionStrategy {
