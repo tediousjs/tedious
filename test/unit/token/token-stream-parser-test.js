@@ -2,43 +2,9 @@ var Debug = require('../../../src/debug');
 var Parser = require('../../../src/token/token-stream-parser').Parser;
 var TYPE = require('../../../src/token/token').TYPE;
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+const assert = require('chai').assert;
 
 var debug = new Debug({ token: true });
-
-module.exports.envChange = function(test) {
-  test.expect(2);
-
-  var buffer = createDbChangeBuffer();
-
-  var parser = new Parser(debug);
-  parser.on('databaseChange', function(event) {
-    test.ok(event);
-  });
-
-  parser.addBuffer(buffer);
-
-  test.ok(parser.isEnd());
-
-  test.done();
-};
-
-module.exports.tokenSplitAcrossBuffers = function(test) {
-  test.expect(2);
-
-  var buffer = createDbChangeBuffer();
-
-  var parser = new Parser(debug);
-  parser.on('databaseChange', function(event) {
-    test.ok(event);
-  });
-
-  parser.addBuffer(buffer.slice(0, 6));
-  parser.addBuffer(buffer.slice(6));
-
-  test.ok(parser.isEnd());
-
-  test.done();
-};
 
 function createDbChangeBuffer() {
   var oldDb = 'old';
@@ -58,3 +24,36 @@ function createDbChangeBuffer() {
 
   return buffer.data;
 }
+
+describe('Token Stream Parser', () => {
+  it('should envChange', (done) => {
+    var buffer = createDbChangeBuffer();
+
+    var parser = new Parser(debug);
+    parser.on('databaseChange', function(event) {
+      assert.isOk(event);
+    });
+
+    parser.addBuffer(buffer);
+
+    assert.isOk(parser.isEnd());
+
+    done();
+  });
+
+  it('should split token across buffers', (done) => {
+    var buffer = createDbChangeBuffer();
+
+    var parser = new Parser(debug);
+    parser.on('databaseChange', function(event) {
+      assert.isOk(event);
+    });
+
+    parser.addBuffer(buffer.slice(0, 6));
+    parser.addBuffer(buffer.slice(6));
+
+    assert.isOk(parser.isEnd());
+
+    done();
+  });
+});

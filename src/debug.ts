@@ -1,9 +1,6 @@
-// @flow
-
-import type { Packet } from './packet';
-
-const EventEmitter = require('events').EventEmitter;
-const util = require('util');
+import { EventEmitter } from 'events';
+import * as util from 'util';
+import { Packet } from './packet';
 
 class Debug extends EventEmitter {
   options: {
@@ -20,14 +17,14 @@ class Debug extends EventEmitter {
                 data    - dump of packet data
                 payload - details of decoded payload
   */
-  constructor({ data = false, payload = false, packet = false, token = false }: { data?: boolean, payload?: boolean, packet?: boolean, token?: boolean } = {}) {
+  constructor({ data = false, payload = false, packet = false, token = false } = {}) {
     super();
 
     this.options = { data, payload, packet, token };
     this.indent = '  ';
   }
 
-  packet(direction: string, packet: Packet) {
+  packet(direction: 'Received' | 'Sent', packet: Packet) {
     if (this.haveListeners() && this.options.packet) {
       this.log('');
       this.log(direction);
@@ -62,4 +59,5 @@ class Debug extends EventEmitter {
   }
 }
 
+export default Debug;
 module.exports = Debug;

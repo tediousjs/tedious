@@ -14,13 +14,14 @@ module.exports = {
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(1);
       buffer.writeUInt8(parseInt(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
+    cb();
   },
 
   validate: function(value) {

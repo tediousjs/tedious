@@ -1,6 +1,7 @@
-var fs = require('fs');
-var InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
+const fs = require('fs');
+const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const homedir = require('os').homedir();
+const assert = require('chai').assert;
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
@@ -21,50 +22,53 @@ function getConfig() {
   };
 }
 
-exports.goodInstance = function(test) {
-  var config = getConfig();
+describe('Instance Lookup Test', function() {
+  it('should test good instance', function(done) {
+    var config = getConfig();
 
-  if (!config.instanceName) {
-    // Config says don't do this test (probably because SQL Server Browser is not available).
-    console.log('Skipping goodInstance test');
-    test.done();
-    return;
-  }
+    if (!config.instanceName) {
+      // Config says don't do this test (probably because SQL Server Browser is not available).
+      return this.skip();
+    }
 
-  new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function(err, port) {
-    test.ifError(err);
-    test.ok(port);
+    new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function(err, port) {
+      if (err) {
+        return done(err);
+      }
 
-    test.done();
+      assert.ok(port);
+
+      done();
+    });
   });
-};
 
-exports.badInstance = function(test) {
-  var config = getConfig();
+  it('should test bad Instance', function(done) {
+    var config = getConfig();
 
-  new InstanceLookup().instanceLookup({
-    server: config.server,
-    instanceName: 'badInstanceName',
-    timeout: 100,
-    retries: 1
-  }, function(err, port) {
-    test.ok(err);
-    test.ok(!port);
+    new InstanceLookup().instanceLookup({
+      server: config.server,
+      instanceName: 'badInstanceName',
+      timeout: 100,
+      retries: 1
+    }, function(err, port) {
+      assert.ok(err);
+      assert.ok(!port);
 
-    test.done();
+      done();
+    });
   });
-};
 
-exports.badServer = function(test) {
-  new InstanceLookup().instanceLookup({
-    server: RESERVED_IP_ADDRESS,
-    instanceName: 'badInstanceName',
-    timeout: 100,
-    retries: 1
-  }, function(err, port) {
-    test.ok(err);
-    test.ok(!port);
+  it('should test bad Server', function(done) {
+    new InstanceLookup().instanceLookup({
+      server: RESERVED_IP_ADDRESS,
+      instanceName: 'badInstanceName',
+      timeout: 100,
+      retries: 1
+    }, function(err, port) {
+      assert.ok(err);
+      assert.ok(!port);
 
-    test.done();
+      done();
+    });
   });
-};
+});

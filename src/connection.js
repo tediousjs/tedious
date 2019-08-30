@@ -4,7 +4,7 @@ const os = require('os');
 const constants = require('constants');
 const { createSecureContext } = require('tls');
 
-const { AuthenticationContext } = require('adal-node');
+const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -74,8 +74,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password" or "azure-active-directory-access-token".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -128,6 +128,43 @@ class Connection extends EventEmitter {
           type: 'azure-active-directory-access-token',
           options: {
             token: options.token
+          }
+        };
+      } else if (type === 'azure-active-directory-msi-vm') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi-vm',
+          options: {
+            clientId: options.clientId,
+            msiEndpoint: options.msiEndpoint
+          }
+        };
+      } else if (type === 'azure-active-directory-msi-app-service') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
+        }
+
+        if (options.msiSecret !== undefined && typeof options.msiSecret !== 'string') {
+          throw new TypeError('The "config.authentication.options.msiSecret" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-msi-app-service',
+          options: {
+            clientId: options.clientId,
+            msiEndpoint: options.msiEndpoint,
+            msiSecret: options.msiSecret
           }
         };
       } else {
@@ -1234,6 +1271,15 @@ class Connection extends EventEmitter {
         };
         break;
 
+      case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-msi-app-service':
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: this.fedAuthRequired,
+          workflow: 'integrated'
+        };
+        break;
+
       case 'ntlm':
         payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
         break;
@@ -1262,13 +1308,13 @@ class Connection extends EventEmitter {
     });
   }
 
-  sendFedAuthResponsePacket(tokenResponse) {
-    const accessTokenLen = Buffer.byteLength(tokenResponse.accessToken, 'ucs2');
+  sendFedAuthTokenMessage(token) {
+    const accessTokenLen = Buffer.byteLength(token, 'ucs2');
     const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
-    data.write(tokenResponse.accessToken, offset, 'ucs2');
+    data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -1303,7 +1349,9 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    return this.messageIo.sendMessage(TYPE.SQL_BATCH, payload.data);
+    payload.getData((data) => {
+      return this.messageIo.sendMessage(TYPE.SQL_BATCH, data);
+    });
   }
 
   getInitialSql() {
@@ -1650,8 +1698,15 @@ class Connection extends EventEmitter {
           return;
         }
 
-        // There's two ways to handle request cancelation:
-        if (message.writable) {
+        // There's three ways to handle request cancelation:
+        if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
+          // The request was cancelled before buffering finished
+          const sqlRequest = this.request;
+          this.request = undefined;
+          sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+        } else if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
           //   and end the message.
           message.ignore = true;
@@ -1679,22 +1734,41 @@ class Connection extends EventEmitter {
           request.rowToPacketTransform.end();
         }
         this.messageIo.outgoingMessageStream.write(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+        if (request.paused) { // Request.pause() has been called before the request was started
+          this.pauseRequest(request);
+        }
       } else {
         this.createRequestTimer();
 
-        message = this.messageIo.sendMessage(packetType, payload.data, this.resetConnectionOnNextRequest);
+        // Transition to an intermediate state to ensure that no new requests
+        // are made on the connection while the buffer is being populated.
+        this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);
 
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload.toString('  ');
+        payload.getData((data) => {
+          if (this.state !== this.STATE.BUILDING_CLIENT_REQUEST) {
+            // Something else has happened on the connection since starting to
+            // build the request. That state change should have invoked the
+            // request handler so there is nothing to do at this point.
+            return;
+          }
+
+          message = this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
+
+          this.resetConnectionOnNextRequest = false;
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+          if (request.paused) { // Request.pause() has been called before the request was started
+            this.pauseRequest(request);
+          }
         });
       }
 
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-      if (request.paused) { // Request.pause() has been called before the request was started
-        this.pauseRequest(request);
-      }
     }
   }
 
@@ -1864,7 +1938,7 @@ Connection.prototype.STATE = {
 
           const { authentication } = this.config;
 
-          if (authentication.type === 'azure-active-directory-password') {
+          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
           } else if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -1892,7 +1966,7 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token') {
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
@@ -1997,11 +2071,41 @@ Connection.prototype.STATE = {
       },
       message: function() {
         if (this.fedAuthInfoToken && this.fedAuthInfoToken.stsurl && this.fedAuthInfoToken.spn) {
-          const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
-          const context = new AuthenticationContext(this.fedAuthInfoToken.stsurl);
-          const authentication = this.config.authentication;
+          const { authentication } = this.config;
 
-          context.acquireTokenWithUsernamePassword(this.fedAuthInfoToken.spn, authentication.options.userName, authentication.options.password, clientId, (err, tokenResponse) => {
+          const getToken = (callback) => {
+            const getTokenFromCredentials = (err, credentials) => {
+              if (err) {
+                return callback(err);
+              }
+
+              credentials.getToken().then((tokenResponse) => {
+                callback(null, tokenResponse.accessToken);
+              }, callback);
+            };
+
+            if (authentication.type === 'azure-active-directory-password') {
+              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
+                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                tokenAudience: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-msi-vm') {
+              loginWithVmMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                resource: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-msi-app-service') {
+              loginWithAppServiceMSI({
+                clientId: authentication.options.clientId,
+                msiEndpoint: authentication.options.msiEndpoint,
+                msiSecret: authentication.options.msiSecret,
+                resource: this.fedAuthInfoToken.spn
+              }, getTokenFromCredentials);
+            }
+          };
+
+          getToken((err, token) => {
             if (err) {
               this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
               this.emit('connect', this.loginError);
@@ -2009,7 +2113,7 @@ Connection.prototype.STATE = {
               return;
             }
 
-            this.sendFedAuthResponsePacket(tokenResponse);
+            this.sendFedAuthTokenMessage(token);
           });
         } else if (this.loginError) {
           if (this.loginError.isTransient) {
@@ -2052,6 +2156,18 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+      }
+    }
+  },
+  BUILDING_CLIENT_REQUEST: {
+    name: 'BuildingClientRequest',
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       }
     }
   },

@@ -1,25 +1,28 @@
-// @flow
-
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
-const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { writeToTrackingBuffer } from './all-headers';
 
 /*
   s2.2.6.6
  */
 class SqlBatchPayload {
   sqlText: string;
-  data: Buffer;
+  txnDescriptor: Buffer;
+  options: { tdsVersion: string };
 
   constructor(sqlText: string, txnDescriptor: Buffer, options: { tdsVersion: string }) {
     this.sqlText = sqlText;
+    this.txnDescriptor = txnDescriptor;
+    this.options = options;
+  }
 
+  getData(cb: (data: Buffer) => void) {
     const buffer = new WritableTrackingBuffer(100 + 2 * this.sqlText.length, 'ucs2');
-    if (options.tdsVersion >= '7_2') {
+    if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
-      writeAllHeaders(buffer, txnDescriptor, outstandingRequestCount);
+      writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
     }
     buffer.writeString(this.sqlText, 'ucs2');
-    this.data = buffer.data;
+    cb(buffer.data);
   }
 
   toString(indent: string = '') {
@@ -27,4 +30,5 @@ class SqlBatchPayload {
   }
 }
 
+export default SqlBatchPayload;
 module.exports = SqlBatchPayload;
