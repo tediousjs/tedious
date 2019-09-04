@@ -102,8 +102,8 @@ jobs:
             "authentication": {
               "type": "azure-active-directory-password",
               "options": {
-                "userName": "'${AZURE_AD_USER}'",
-                "password": "'${AZURE_AD_PASS}'"
+                "userName": "'${AAD_USER}'",
+                "password": "'${AAD_PASS}'"
               }
             },
             "options": {
