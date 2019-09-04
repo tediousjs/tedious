@@ -98,7 +98,7 @@ jobs:
       - >
         echo '{
           "config": {
-            "server": "'${AZURE_SERVER}'",
+            "server": "'${AAD_SERVER}'",
             "authentication": {
               "type": "azure-active-directory-password",
               "options": {
