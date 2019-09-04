@@ -1,8 +1,3 @@
-// @flow
-
-// Get rid of the file is not a module error related to --isolatedModules
-export {};
-
 const UPPER_CASE_MAP = [
   '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0A', '0B', '0C', '0D', '0E', '0F',
   '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '1A', '1B', '1C', '1D', '1E', '1F',
@@ -41,8 +36,7 @@ const LOWER_CASE_MAP = [
   'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff'
 ];
 
-module.exports.arrayToUpperCaseGuid = arrayToUpperCaseGuid;
-function arrayToUpperCaseGuid(array: Array<number>) {
+export function arrayToUpperCaseGuid(array: Array<number>) {
   return (
     UPPER_CASE_MAP[array[3]] +
     UPPER_CASE_MAP[array[2]] +
@@ -67,8 +61,7 @@ function arrayToUpperCaseGuid(array: Array<number>) {
   );
 }
 
-module.exports.arrayToLowerCaseGuid = arrayToLowerCaseGuid;
-function arrayToLowerCaseGuid(array: Array<number>) {
+export function arrayToLowerCaseGuid(array: Array<number>) {
   return (
     LOWER_CASE_MAP[array[3]] +
     LOWER_CASE_MAP[array[2]] +
@@ -110,8 +103,7 @@ for (let i = 0; i < hexDigits.length; i++) {
   }
 }
 
-module.exports.guidToArray = guidToArray;
-function guidToArray(guid: string) {
+export function guidToArray(guid: string) {
   return [
     CHARCODEMAP[guid.charCodeAt(6)][guid.charCodeAt(7)],
     CHARCODEMAP[guid.charCodeAt(4)][guid.charCodeAt(5)],
