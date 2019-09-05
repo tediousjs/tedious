@@ -74,7 +74,7 @@
     "rimraf": "^2.6.3",
     "semantic-release": "^15.13.12",
     "sinon": "^7.3.2",
-    "typescript": "^3.5.3"
+    "typescript": "^3.6.2"
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
@@ -109,6 +109,8 @@
   "nyc": {
     "sourceMap": false,
     "instrument": false,
-    "extension": [ ".ts" ]
+    "extension": [
+      ".ts"
+    ]
   }
 }
