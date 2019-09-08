@@ -124,7 +124,7 @@ export class Sender {
   }
 
   executeForIP(cb: (error: Error | null, message?: Buffer) => void) {
-    this.executeForAddresses([{ address: this.host }], cb);
+    this.executeForAddresses([{ address: this.host, family: net.isIPv6(this.host) ? 6 : 4 }], cb);
   }
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
