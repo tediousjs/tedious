@@ -72,7 +72,7 @@ export class ParallelSendStrategy {
       const udpTypeV4 = 'udp4';
       const udpTypeV6 = 'udp6';
 
-      const udpType = net.isIPv4(this.addresses[j].address) ? udpTypeV4 : udpTypeV6;
+      const udpType = this.addresses[j].family === 6 ? udpTypeV6 : udpTypeV4;
       let socket;
 
       if (udpType === udpTypeV4) {
