@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 const TYPES = require('./data-type').typeByName;
-const RequestError = require('./errors').RequestError;
+import { RequestError } from './errors';
 
 import Connection from './connection';
 
