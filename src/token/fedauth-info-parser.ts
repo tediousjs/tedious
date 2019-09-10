@@ -1,16 +1,21 @@
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
+import { Token } from './token';
+
 const FEDAUTHINFOID = {
   STSURL: 0x01,
   SPN: 0x02
 };
 
-module.exports = function fedAuthInfoParser(parser, colMetadata, options, callback) {
+function fedAuthInfoParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: Token) => void) {
   parser.readUInt32LE((tokenLength) => {
     parser.readBuffer(tokenLength, (data) => {
-      const token = {
-        'name': 'FEDAUTHINFO',
-        'event': 'fedAuthInfo',
-        'spn': undefined,
-        'stsurl': undefined
+      const token: Token = {
+        name: 'FEDAUTHINFO',
+        event: 'fedAuthInfo',
+        spn: undefined,
+        stsurl: undefined
       };
 
       let offset = 0;
@@ -46,4 +51,7 @@ module.exports = function fedAuthInfoParser(parser, colMetadata, options, callba
       callback(token);
     });
   });
-};
+}
+
+export default fedAuthInfoParser;
+module.exports = fedAuthInfoParser;
