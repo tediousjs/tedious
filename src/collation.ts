@@ -1,5 +1,5 @@
 // http://technet.microsoft.com/en-us/library/aa176553(v=sql.80).aspx
-export const codepageByLcid = {
+export const codepageByLcid: { [key: number]: string | undefined } = {
   [0x436]: 'CP1252',
   [0x401]: 'CP1256',
   [0x801]: 'CP1256',
@@ -107,7 +107,7 @@ export const codepageByLcid = {
   [0x42A]: 'CP1258'
 };
 
-export const codepageBySortId = {
+export const codepageBySortId: { [key: number]: string | undefined } = {
   [30]: 'CP437', // SQL_Latin1_General_CP437_BIN
   [31]: 'CP437', // SQL_Latin1_General_CP437_CS_AS
   [32]: 'CP437', // SQL_Latin1_General_CP437_CI_AS
