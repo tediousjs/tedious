@@ -310,7 +310,7 @@ function valueParse(parser, metaData, options, callback) {
               return callback(null);
             case 0x10:
               return parser.readBuffer(0x10, (data) => {
-                callback(guidParser.arrayToGuid(data));
+                callback(options.lowerCaseGuids ? guidParser.arrayToLowerCaseGuid(data) : guidParser.arrayToUpperCaseGuid(data));
               });
 
             default:
