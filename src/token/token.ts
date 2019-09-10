@@ -23,9 +23,9 @@ export const TYPE = {
 };
 
 export type Token = { name: 'COLMETADATA', event: 'columnMetadata', columns: any[] }
-                  | { name: 'DONE', event: 'done' }
-                  | { name: 'DONEINPROC', event: 'doneInProc' }
-                  | { name: 'DONEPROC', event: 'doneProc' }
+                  | { name: 'DONE', event: 'done', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
+                  | { name: 'DONEINPROC', event: 'doneInProc', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
+                  | { name: 'DONEPROC', event: 'doneProc', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
                   | { name: 'ENVCHANGE', type: 'DATABASE', event: 'databaseChange', oldValue: string, newValue: string }
                   | { name: 'ENVCHANGE', type: 'LANGUAGE', event: 'languageChange', oldValue: string, newValue: string }
                   | { name: 'ENVCHANGE', type: 'CHARSET', event: 'charsetChange', oldValue: string, newValue: string }
