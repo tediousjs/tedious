@@ -1,3 +1,6 @@
+import { Metadata } from '../metadata-parser';
+import { ColumnMetadata } from './colmetadata-token-parser';
+
 export const TYPE = {
   ALTMETADATA: 0x88,
   ALTROW: 0xD3,
@@ -22,7 +25,7 @@ export const TYPE = {
   TABNAME: 0xA4
 };
 
-export type Token = { name: 'COLMETADATA', event: 'columnMetadata', columns: any[] }
+export type Token = { name: 'COLMETADATA', event: 'columnMetadata', columns: ColumnMetadata[] }
                   | { name: 'DONE', event: 'done', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
                   | { name: 'DONEINPROC', event: 'doneInProc', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
                   | { name: 'DONEPROC', event: 'doneProc', more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }
@@ -44,7 +47,7 @@ export type Token = { name: 'COLMETADATA', event: 'columnMetadata', columns: any
                   | { name: 'NBCROW', event: 'row', columns: any[] }
                   | { name: 'ORDER', event: 'order', orderColumns: number[] }
                   | { name: 'RETURNSTATUS', event: 'returnStatus', value: number }
-                  | { name: 'RETURNVALUE', event: 'returnValue', paramOrdinal: number, paramName: string, metadata: any, value: unknown }
+                  | { name: 'RETURNVALUE', event: 'returnValue', paramOrdinal: number, paramName: string, metadata: Metadata, value: unknown }
                   | { name: 'ROW', event: 'row', columns: any }
                   | { name: 'SSPICHALLENGE', event: 'sspichallenge', ntlmpacket: any, ntlmpacketBuffer: Buffer }
                   | { name: 'EOM', event: 'endOfMessage' };
