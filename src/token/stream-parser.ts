@@ -1,11 +1,12 @@
 import Debug from '../debug';
 import { ConnectionOptions } from '../connection';
+import { ColumnMetadata } from './colmetadata-token-parser';
 
 const Transform = require('readable-stream').Transform;
 import { TYPE, Token } from './token';
 
 const tokenParsers: {
-  [token: number]: (parser: Parser, colMetadata: any, options: ConnectionOptions, done: (token: Token) => void) => void
+  [token: number]: (parser: Parser, colMetadata: ColumnMetadata[], options: ConnectionOptions, done: (token: Token) => void) => void
 } = {};
 tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser');
 tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser;
@@ -28,7 +29,7 @@ class EndOfMessageMarker {}
 
 class Parser extends Transform {
   debug: Debug;
-  colMetadata: any;
+  colMetadata: ColumnMetadata[];
   options: ConnectionOptions;
   endOfMessageMarker: EndOfMessageMarker;
 
@@ -37,7 +38,7 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, colMetadata: any, options: ConnectionOptions) {
+  constructor(debug: Debug, colMetadata: ColumnMetadata[], options: ConnectionOptions) {
     super({ objectMode: true });
 
     this.debug = debug;
