@@ -1,13 +1,22 @@
-const metadataParse = require('../metadata-parser');
+import metadataParse, { Metadata } from '../metadata-parser';
 
-function readTableName(parser, options, metadata, callback) {
+import Parser from './stream-parser';
+import { ConnectionOptions } from '../connection';
+import { Token } from './token';
+
+export type ColumnMetadata = Metadata & {
+  colName: string,
+  tableName?: string | string[]
+};
+
+function readTableName(parser: Parser, options: ConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
     if (options.tdsVersion >= '7_2') {
       parser.readUInt8((numberOfTableNameParts) => {
-        const tableName = [];
+        const tableName: string[] = [];
 
         let i = 0;
-        function next(done) {
+        function next(done: () => void) {
           if (numberOfTableNameParts === i) {
             return done();
           }
@@ -33,7 +42,7 @@ function readTableName(parser, options, metadata, callback) {
   }
 }
 
-function readColumnName(parser, options, index, metadata, callback) {
+function readColumnName(parser: Parser, options: ConnectionOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
   parser.readBVarChar((colName) => {
     if (options.columnNameReplacer) {
       callback(options.columnNameReplacer(colName, index, metadata));
@@ -47,7 +56,7 @@ function readColumnName(parser, options, index, metadata, callback) {
   });
 }
 
-function readColumn(parser, options, index, callback) {
+function readColumn(parser: Parser, options: ConnectionOptions, index: number, callback: (column: ColumnMetadata) => void) {
   metadataParse(parser, options, (metadata) => {
     readTableName(parser, options, metadata, (tableName) => {
       readColumnName(parser, options, index, metadata, (colName) => {
@@ -55,12 +64,12 @@ function readColumn(parser, options, index, callback) {
           userType: metadata.userType,
           flags: metadata.flags,
           type: metadata.type,
-          colName: colName,
           collation: metadata.collation,
           precision: metadata.precision,
           scale: metadata.scale,
           udtInfo: metadata.udtInfo,
           dataLength: metadata.dataLength,
+          colName: colName,
           tableName: tableName
         });
       });
@@ -68,12 +77,12 @@ function readColumn(parser, options, index, callback) {
   });
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
+function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: Token) => void) {
   parser.readUInt16LE((columnCount) => {
-    const columns = [];
+    const columns: ColumnMetadata[] = [];
 
     let i = 0;
-    function next(done) {
+    function next(done: () => void) {
       if (i === columnCount) {
         return done();
       }
@@ -94,4 +103,7 @@ module.exports = function(parser, colMetadata, options, callback) {
       });
     });
   });
-};
+}
+
+export default readColmetadataToken;
+module.exports = readColmetadataToken;
