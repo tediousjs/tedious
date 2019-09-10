@@ -42,7 +42,7 @@ type UdtInfo = {
   assemblyName: string
 };
 
-type Metadata = {
+export type Metadata = {
   userType: number,
   flags: number,
   type: DataType,
