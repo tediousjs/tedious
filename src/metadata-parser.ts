@@ -12,6 +12,7 @@ type DataType = {
   fixedDataLength?: number,
   dataLengthLength?: number,
 
+  hasTableName?: boolean,
   hasPrecision?: boolean,
   hasScale?: boolean,
   hasCollation?: boolean,
