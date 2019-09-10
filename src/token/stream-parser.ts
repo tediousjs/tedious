@@ -26,7 +26,7 @@ tokenParsers[TYPE.SSPI] = require('./sspi-token-parser');
 
 class EndOfMessageMarker {}
 
-export default class Parser extends Transform {
+class Parser extends Transform {
   debug: Debug;
   colMetadata: any;
   options: ConnectionOptions;
@@ -367,3 +367,6 @@ export default class Parser extends Transform {
     });
   }
 }
+
+export default Parser;
+module.exports = Parser;
