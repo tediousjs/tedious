@@ -244,7 +244,8 @@ class Connection extends EventEmitter {
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
         useColumnNames: false,
-        useUTC: true
+        useUTC: true,
+        lowerCaseGuids: false
       }
     };
 
@@ -637,6 +638,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.useUTC = config.options.useUTC;
+      }
+
+      if (config.options.lowerCaseGuids !== undefined) {
+        if (typeof config.options.lowerCaseGuids !== 'boolean') {
+          throw new TypeError('The "config.options.lowerCaseGuids" property must be of type boolean.');
+        }
+
+        this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
     }
 

@@ -23,7 +23,7 @@ function getConfig() {
 }
 
 
-function execSql(done, type, value, tdsVersion, options, expectedValue, cast) {
+function execSql(done, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
   var config = getConfig();
   // config.options.packetSize = 32768
 
@@ -65,7 +65,8 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast) {
     }
   });
 
-  var connection = new Connection(config);
+  const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
+  var connection = new Connection(connectionConfig);
 
   connection.on('connect', function(err) {
     assert.ifError(err);
@@ -85,7 +86,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast) {
   });
 }
 
-function execSqlOutput(done, type, value, expectedValue) {
+function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
   var config = getConfig();
 
   var request = new Request('set @paramOut = @paramIn', function(err) {
@@ -122,7 +123,8 @@ function execSqlOutput(done, type, value, expectedValue) {
     assert.ok(metadata);
   });
 
-  var connection = new Connection(config);
+  const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
+  var connection = new Connection(connectionConfig);
 
   connection.on('connect', function(err) {
     assert.ifError(err);
@@ -253,11 +255,29 @@ describe('Parameterised Statements Test', function() {
     execSql(done, TYPES.Money, 956455842.4566);
   });
 
-  it('should test unique identifier', function(done) {
+  it('UniqueIdentifier when `lowerCaseGuids` option is `false`', function(done) {
     execSql(
       done,
       TYPES.UniqueIdentifier,
-      '01234567-89AB-CDEF-0123-456789ABCDEF'
+      '01234567-89AB-CDEF-0123-456789ABCDEF',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { lowerCaseGuids: false }
+    );
+  });
+
+  it('UniqueIdentifier when `lowerCaseGuids` option is `true`', function(done) {
+    execSql(
+      done,
+      TYPES.UniqueIdentifier,
+      '01234567-89ab-cdef-0123-456789abcdef',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { lowerCaseGuids: true }
     );
   });
 
@@ -662,12 +682,12 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(done, TYPES.Float, 9654.2546456567565767644);
   });
 
-  it('should test output unique identifier', function(done) {
-    execSqlOutput(
-      done,
-      TYPES.UniqueIdentifier,
-      '01234567-89AB-CDEF-0123-456789ABCDEF'
-    );
+  it('UniqueIdentifier as output parameter when `lowerCaseGuids` option is `false`', function(done) {
+    execSqlOutput(done, TYPES.UniqueIdentifier, '01234567-89AB-CDEF-0123-456789ABCDEF', undefined, { lowerCaseGuids: false });
+  });
+
+  it('UniqueIdentifier as output parameter when `lowerCaseGuids` option is `true`', function(done) {
+    execSqlOutput(done, TYPES.UniqueIdentifier, '01234567-89ab-cdef-0123-456789abcdef', undefined, { lowerCaseGuids: true });
   });
 
   it('should output int null', function(done) {
