@@ -1,3 +1,8 @@
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
+import { Token } from './token';
+
 // s2.2.7.5/6/7
 
 const STATUS = {
@@ -10,7 +15,7 @@ const STATUS = {
   SRVERROR: 0x0100
 };
 
-function parseToken(parser, options, callback) {
+function parseToken(parser: Parser, options: ConnectionOptions, callback: (token: Token) => void) {
   parser.readUInt16LE((status) => {
     const more = !!(status & STATUS.MORE);
     const sqlError = !!(status & STATUS.ERROR);
@@ -35,8 +40,7 @@ function parseToken(parser, options, callback) {
   });
 }
 
-module.exports.doneParser = doneParser;
-function doneParser(parser, colMetadata, options, callback) {
+export function doneParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: Token) => void) {
   parseToken(parser, options, (token) => {
     token.name = 'DONE';
     token.event = 'done';
@@ -44,8 +48,7 @@ function doneParser(parser, colMetadata, options, callback) {
   });
 }
 
-module.exports.doneInProcParser = doneInProcParser;
-function doneInProcParser(parser, colMetadata, options, callback) {
+export function doneInProcParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: Token) => void) {
   parseToken(parser, options, (token) => {
     token.name = 'DONEINPROC';
     token.event = 'doneInProc';
@@ -53,8 +56,7 @@ function doneInProcParser(parser, colMetadata, options, callback) {
   });
 }
 
-module.exports.doneProcParser = doneProcParser;
-function doneProcParser(parser, colMetadata, options, callback) {
+export function doneProcParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: Token) => void) {
   parseToken(parser, options, (token) => {
     token.name = 'DONEPROC';
     token.event = 'doneProc';
