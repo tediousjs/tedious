@@ -3,7 +3,7 @@ import { ConnectionOptions } from '../connection';
 import { ColumnMetadata } from './colmetadata-token-parser';
 
 const Transform = require('readable-stream').Transform;
-import { TYPE, Token, EndOfMessageToken } from './token';
+import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
 
 const tokenParsers: {
   [token: number]: (parser: Parser, colMetadata: ColumnMetadata[], options: ConnectionOptions, done: (token: Token) => void) => void
@@ -82,9 +82,8 @@ class Parser extends Transform {
   parseTokens() {
     const doneParsing = (token: Token) => {
       if (token) {
-        switch (token.name) {
-          case 'COLMETADATA':
-            this.colMetadata = token.columns;
+        if (token instanceof ColMetadataToken) {
+          this.colMetadata = token.columns;
         }
 
         this.push(token);
