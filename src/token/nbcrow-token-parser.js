@@ -1,5 +1,7 @@
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
+const { NBCRowToken } = require('./token');
+
 const valueParse = require('../value-parser');
 
 function nullHandler(parser, columnMetaData, options, callback) {
@@ -49,11 +51,7 @@ module.exports = function(parser, columnsMetaData, options, callback) {
     }
 
     next(() => {
-      callback({
-        name: 'NBCROW',
-        event: 'row',
-        columns: columns
-      });
+      callback(new NBCRowToken(columns));
     });
   });
 };

@@ -1,22 +1,17 @@
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser'
 import { ConnectionOptions } from '../connection';
-import { Token } from './token';
+import { FedAuthInfoToken } from './token';
 
 const FEDAUTHINFOID = {
   STSURL: 0x01,
   SPN: 0x02
 };
 
-function fedAuthInfoParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: Token) => void) {
+function fedAuthInfoParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: FedAuthInfoToken) => void) {
   parser.readUInt32LE((tokenLength) => {
     parser.readBuffer(tokenLength, (data) => {
-      const token: Token = {
-        name: 'FEDAUTHINFO',
-        event: 'fedAuthInfo',
-        spn: undefined,
-        stsurl: undefined
-      };
+      let spn: string | undefined, stsurl: string | undefined;
 
       let offset = 0;
 
@@ -35,11 +30,11 @@ function fedAuthInfoParser(parser: Parser, _colMetadata: ColumnMetadata[], _opti
 
         switch (fedauthInfoID) {
           case FEDAUTHINFOID.SPN:
-            token.spn = data.toString('ucs2', fedAuthInfoDataOffset, fedAuthInfoDataOffset + fedAuthInfoDataLen);
+            spn = data.toString('ucs2', fedAuthInfoDataOffset, fedAuthInfoDataOffset + fedAuthInfoDataLen);
             break;
 
           case FEDAUTHINFOID.STSURL:
-            token.stsurl = data.toString('ucs2', fedAuthInfoDataOffset, fedAuthInfoDataOffset + fedAuthInfoDataLen);
+            stsurl = data.toString('ucs2', fedAuthInfoDataOffset, fedAuthInfoDataOffset + fedAuthInfoDataLen);
             break;
 
           // ignoring unknown fedauthinfo options
@@ -48,7 +43,7 @@ function fedAuthInfoParser(parser: Parser, _colMetadata: ColumnMetadata[], _opti
         }
       }
 
-      callback(token);
+      callback(new FedAuthInfoToken(spn, stsurl));
     });
   });
 }

@@ -1,5 +1,6 @@
 // s2.2.7.17
 
+const { RowToken } = require('./token');
 const valueParse = require('../value-parser');
 
 module.exports = function(parser, colMetadata, options, callback) {
@@ -36,10 +37,6 @@ module.exports = function(parser, colMetadata, options, callback) {
   }
 
   next(() => {
-    callback({
-      name: 'ROW',
-      event: 'row',
-      columns: columns
-    });
+    callback(new RowToken(columns));
   });
 };

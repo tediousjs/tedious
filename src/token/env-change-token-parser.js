@@ -1,3 +1,17 @@
+const {
+  DatabaseEnvChangeToken,
+  LanguageEnvChangeToken,
+  CharsetEnvChangeToken,
+  PacketSizeEnvChangeToken,
+  BeginTransactionEnvChangeToken,
+  CommitTransactionEnvChangeToken,
+  RollbackTransactionEnvChangeToken,
+  DatabaseMirroringPartnerEnvChangeToken,
+  ResetConnectionEnvChangeToken,
+  RoutingEnvChangeToken,
+  CollationChangeToken
+} = require('./token');
+
 const types = {
   1: {
     name: 'DATABASE',
@@ -57,10 +71,21 @@ function readNewAndOldValue(parser, length, type, callback) {
     case 'DATABASE_MIRRORING_PARTNER':
       return parser.readBVarChar((newValue) => {
         parser.readBVarChar((oldValue) => {
-          if (type.name === 'PACKET_SIZE') {
-            callback(parseInt(newValue), parseInt(oldValue));
-          } else {
-            callback(newValue, oldValue);
+          switch (type.name) {
+            case 'PACKET_SIZE':
+              return callback(new PacketSizeEnvChangeToken(parseInt(newValue), parseInt(oldValue)));
+
+            case 'DATABASE':
+              return callback(new DatabaseEnvChangeToken(newValue, oldValue));
+
+            case 'LANGUAGE':
+              return callback(new LanguageEnvChangeToken(newValue, oldValue));
+
+            case 'CHARSET':
+              return callback(new CharsetEnvChangeToken(newValue, oldValue));
+
+            case 'DATABASE_MIRRORING_PARTNER':
+              return callback(new DatabaseMirroringPartnerEnvChangeToken(newValue, oldValue));
           }
         });
       });
@@ -72,12 +97,27 @@ function readNewAndOldValue(parser, length, type, callback) {
     case 'RESET_CONNECTION':
       return parser.readBVarByte((newValue) => {
         parser.readBVarByte((oldValue) => {
-          callback(newValue, oldValue);
+          switch (type.name) {
+            case 'SQL_COLLATION':
+              return callback(new CollationChangeToken(newValue, oldValue));
+
+            case 'BEGIN_TXN':
+              return callback(new BeginTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'COMMIT_TXN':
+              return callback(new CommitTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'ROLLBACK_TXN':
+              return callback(new RollbackTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'RESET_CONNECTION':
+              return callback(new ResetConnectionEnvChangeToken(newValue, oldValue));
+          }
         });
       });
 
     case 'ROUTING_CHANGE':
-      parser.readUInt16LE((valueLength) => {
+      return parser.readUInt16LE((valueLength) => {
         // Routing Change:
         // Byte 1: Protocol (must be 0)
         // Bytes 2-3 (USHORT): Port number
@@ -103,19 +143,10 @@ function readNewAndOldValue(parser, length, type, callback) {
 
           parser.readUInt16LE((oldValueLength) => {
             parser.readBuffer(oldValueLength, (oldValue) => {
-              callback(newValue, oldValue);
+              callback(new RoutingEnvChangeToken(newValue, oldValue));
             });
           });
         });
-      });
-
-      break;
-
-    default:
-      console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
-      // skip unknown bytes
-      parser.readBuffer(length - 1, () => {
-        callback(undefined, undefined);
       });
   }
 }
@@ -133,14 +164,8 @@ module.exports = function(parser, colMetadata, options, callback) {
         });
       }
 
-      readNewAndOldValue(parser, length, type, (newValue, oldValue) => {
-        callback({
-          name: 'ENVCHANGE',
-          type: type.name,
-          event: type.event,
-          oldValue: oldValue,
-          newValue: newValue
-        });
+      readNewAndOldValue(parser, length, type, (token) => {
+        callback(token);
       });
     });
   });

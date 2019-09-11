@@ -2,7 +2,7 @@ import metadataParse, { Metadata } from '../metadata-parser';
 
 import Parser from './stream-parser';
 import { ConnectionOptions } from '../connection';
-import { Token } from './token';
+import { ColMetadataToken } from './token';
 
 export type ColumnMetadata = Metadata & {
   colName: string,
@@ -77,7 +77,7 @@ function readColumn(parser: Parser, options: ConnectionOptions, index: number, c
   });
 }
 
-function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: Token) => void) {
+function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
@@ -96,11 +96,7 @@ function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], op
     }
 
     next(() => {
-      callback({
-        name: 'COLMETADATA',
-        event: 'columnMetadata',
-        columns: columns
-      });
+      callback(new ColMetadataToken(columns));
     });
   });
 }

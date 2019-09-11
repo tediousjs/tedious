@@ -1,3 +1,5 @@
+const { FeatureExtAckToken } = require('./token');
+
 const FEATURE_ID = {
   SESSIONRECOVERY: 0x01,
   FEDAUTH: 0x02,
@@ -8,29 +10,25 @@ const FEATURE_ID = {
 };
 
 module.exports = function featureExtAckParser(parser, colMetadata, options, callback) {
-  const token = {
-    'name': 'FEATUREEXTACK',
-    'event': 'featureExtAck',
-    'fedAuth': undefined
-  };
+  let fedAuth;
 
-  function next(done) {
+  function next() {
     parser.readUInt8((featureId) => {
       if (featureId === FEATURE_ID.TERMINATOR) {
-        return done();
+        return callback(new FeatureExtAckToken(fedAuth));
       }
 
       parser.readUInt32LE((featureAckDataLen) => {
         parser.readBuffer(featureAckDataLen, (featureData) => {
           if (featureId === FEATURE_ID.FEDAUTH) {
-            token.fedAuth = featureData;
+            fedAuth = featureData;
           }
 
-          next(done);
+          next();
         });
       });
     });
   }
 
-  next(() => { callback(token); });
+  next();
 };

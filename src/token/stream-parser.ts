@@ -3,7 +3,7 @@ import { ConnectionOptions } from '../connection';
 import { ColumnMetadata } from './colmetadata-token-parser';
 
 const Transform = require('readable-stream').Transform;
-import { TYPE, Token } from './token';
+import { TYPE, Token, EndOfMessageToken } from './token';
 
 const tokenParsers: {
   [token: number]: (parser: Parser, colMetadata: ColumnMetadata[], options: ConnectionOptions, done: (token: Token) => void) => void
@@ -54,12 +54,7 @@ class Parser extends Transform {
 
   _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | null, token?: Token) => void) {
     if (input instanceof EndOfMessageMarker) {
-      done(null, { // generate endOfMessage pseudo token
-        name: 'EOM',
-        event: 'endOfMessage'
-      });
-
-      return;
+      return done(null, new EndOfMessageToken());
     }
 
     if (this.position === this.buffer.length) {

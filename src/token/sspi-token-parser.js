@@ -1,3 +1,5 @@
+const { SSPIToken } = require('./token');
+
 function parseChallenge(buffer) {
   const challenge = {};
 
@@ -21,11 +23,6 @@ function parseChallenge(buffer) {
 
 module.exports = function(parser, colMetadata, options, callback) {
   parser.readUsVarByte((buffer) => {
-    callback({
-      name: 'SSPICHALLENGE',
-      event: 'sspichallenge',
-      ntlmpacket: parseChallenge(buffer),
-      ntlmpacketBuffer: buffer
-    });
+    callback(new SSPIToken(parseChallenge(buffer), buffer));
   });
 };

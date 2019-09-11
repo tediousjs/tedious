@@ -1,3 +1,5 @@
+const { InfoMessageToken, ErrorMessageToken } = require('./token');
+
 function parseToken(parser, options, callback) {
   // length
   parser.readUInt16LE(() => {
@@ -29,18 +31,14 @@ function parseToken(parser, options, callback) {
 
 module.exports.infoParser = infoParser;
 function infoParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'INFO';
-    token.event = 'infoMessage';
-    callback(token);
+  parseToken(parser, options, (data) => {
+    callback(new InfoMessageToken(data));
   });
 }
 
 module.exports.errorParser = errorParser;
 function errorParser(parser, colMetadata, options, callback) {
-  parseToken(parser, options, (token) => {
-    token.name = 'ERROR';
-    token.event = 'errorMessage';
-    callback(token);
+  parseToken(parser, options, (data) => {
+    callback(new ErrorMessageToken(data));
   });
 }

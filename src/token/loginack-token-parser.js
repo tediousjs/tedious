@@ -1,3 +1,5 @@
+const { LoginAckToken } = require('./token');
+
 const versions = require('../tds-versions').versionsByValue;
 
 const interfaceTypes = {
@@ -17,19 +19,17 @@ module.exports = function(parser, colMetadata, options, callback) {
             parser.readUInt8((minor) => {
               parser.readUInt8((buildNumHi) => {
                 parser.readUInt8((buildNumLow) => {
-                  callback({
-                    'name': 'LOGINACK',
-                    'event': 'loginack',
-                    'interface': interfaceType,
-                    'tdsVersion': tdsVersion,
-                    'progName': progName,
-                    'progVersion': {
+                  callback(new LoginAckToken({
+                    interface: interfaceType,
+                    tdsVersion: tdsVersion,
+                    progName: progName,
+                    progVersion: {
                       major: major,
                       minor: minor,
                       buildNumHi: buildNumHi,
                       buildNumLow: buildNumLow
                     }
-                  });
+                  }));
                 });
               });
             });
