@@ -175,7 +175,7 @@ function readNewAndOldValue(parser: Parser, length: number, type: { name: string
   }
 }
 
-function parseEnvChangeToken(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
+function envChangeParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
@@ -195,5 +195,5 @@ function parseEnvChangeToken(parser: Parser, _colMetadata: ColumnMetadata[], _op
   });
 }
 
-export default parseEnvChangeToken;
-module.exports = parseEnvChangeToken;
+export default envChangeParser;
+module.exports = envChangeParser;

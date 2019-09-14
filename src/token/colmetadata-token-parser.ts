@@ -77,7 +77,7 @@ function readColumn(parser: Parser, options: ConnectionOptions, index: number, c
   });
 }
 
-function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
@@ -101,5 +101,5 @@ function readColmetadataToken(parser: Parser, _colMetadata: ColumnMetadata[], op
   });
 }
 
-export default readColmetadataToken;
-module.exports = readColmetadataToken;
+export default colMetadataParser;
+module.exports = colMetadataParser;

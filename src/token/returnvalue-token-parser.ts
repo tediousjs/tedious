@@ -9,7 +9,7 @@ import { ReturnValueToken } from './token';
 import metadataParse from '../metadata-parser';
 import valueParse from '../value-parser';
 
-function returnTokenParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ReturnValueToken) => void) {
+function returnParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ReturnValueToken) => void) {
   parser.readUInt16LE((paramOrdinal) => {
     parser.readBVarChar((paramName) => {
       if (paramName.charAt(0) === '@') {
@@ -33,5 +33,5 @@ function returnTokenParser(parser: Parser, _colMetadata: ColumnMetadata[], optio
   });
 }
 
-export default returnTokenParser;
-module.exports = returnTokenParser;
+export default returnParser;
+module.exports = returnParser;
