@@ -1,13 +1,17 @@
-const { LoginAckToken } = require('./token');
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
+
+import { LoginAckToken } from './token';
 
 const versions = require('../tds-versions').versionsByValue;
 
-const interfaceTypes = {
+const interfaceTypes: { [key: number]: string } = {
   0: 'SQL_DFLT',
   1: 'SQL_TSQL'
 };
 
-module.exports = function(parser, colMetadata, options, callback) {
+function loginAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: LoginAckToken) => void) {
   // length
   parser.readUInt16LE(() => {
     parser.readUInt8((interfaceNumber) => {
@@ -38,4 +42,7 @@ module.exports = function(parser, colMetadata, options, callback) {
       });
     });
   });
-};
+}
+
+export default loginAckParser;
+module.exports = loginAckParser;

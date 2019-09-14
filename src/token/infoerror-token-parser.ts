@@ -1,6 +1,20 @@
-const { InfoMessageToken, ErrorMessageToken } = require('./token');
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
 
-function parseToken(parser, options, callback) {
+import { InfoMessageToken, ErrorMessageToken } from './token';
+
+type TokenData = {
+  number: number,
+  state: number,
+  class: number,
+  message: string,
+  serverName: string,
+  procName: string,
+  lineNumber: number,
+};
+
+function parseToken(parser: Parser, options: ConnectionOptions, callback: (data: TokenData) => void) {
   // length
   parser.readUInt16LE(() => {
     parser.readUInt32LE((number) => {
@@ -9,7 +23,7 @@ function parseToken(parser, options, callback) {
           parser.readUsVarChar((message) => {
             parser.readBVarChar((serverName) => {
               parser.readBVarChar((procName) => {
-                (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber) => {
+                (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber: number) => {
                   callback({
                     'number': number,
                     'state': state,
@@ -29,15 +43,13 @@ function parseToken(parser, options, callback) {
   });
 }
 
-module.exports.infoParser = infoParser;
-function infoParser(parser, colMetadata, options, callback) {
+export function infoParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: InfoMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new InfoMessageToken(data));
   });
 }
 
-module.exports.errorParser = errorParser;
-function errorParser(parser, colMetadata, options, callback) {
+export function errorParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ErrorMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new ErrorMessageToken(data));
   });

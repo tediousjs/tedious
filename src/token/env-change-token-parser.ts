@@ -1,4 +1,8 @@
-const {
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
+
+import {
   DatabaseEnvChangeToken,
   LanguageEnvChangeToken,
   CharsetEnvChangeToken,
@@ -10,9 +14,22 @@ const {
   ResetConnectionEnvChangeToken,
   RoutingEnvChangeToken,
   CollationChangeToken
-} = require('./token');
+} from './token';
 
-const types = {
+type EnvChangeToken =
+  DatabaseEnvChangeToken |
+  LanguageEnvChangeToken |
+  CharsetEnvChangeToken |
+  PacketSizeEnvChangeToken |
+  BeginTransactionEnvChangeToken |
+  CommitTransactionEnvChangeToken |
+  RollbackTransactionEnvChangeToken |
+  DatabaseMirroringPartnerEnvChangeToken |
+  ResetConnectionEnvChangeToken |
+  RoutingEnvChangeToken |
+  CollationChangeToken;
+
+const types: { [key: number]: { name: string, event?: string }} = {
   1: {
     name: 'DATABASE',
     event: 'databaseChange'
@@ -62,7 +79,7 @@ const types = {
   }
 };
 
-function readNewAndOldValue(parser, length, type, callback) {
+function readNewAndOldValue(parser: Parser, length: number, type: { name: string, event?: string }, callback: (token: EnvChangeToken | undefined) => void) {
   switch (type.name) {
     case 'DATABASE':
     case 'LANGUAGE':
@@ -148,10 +165,17 @@ function readNewAndOldValue(parser, length, type, callback) {
           });
         });
       });
+
+    default:
+      console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
+      // skip unknown bytes
+      parser.readBuffer(length - 1, () => {
+        callback(undefined);
+      });
   }
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
+function parseEnvChangeToken(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
@@ -160,7 +184,7 @@ module.exports = function(parser, colMetadata, options, callback) {
         console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
         // skip unknown bytes
         return parser.readBuffer(length - 1, () => {
-          callback();
+          callback(undefined);
         });
       }
 
@@ -169,4 +193,7 @@ module.exports = function(parser, colMetadata, options, callback) {
       });
     });
   });
-};
+}
+
+export default parseEnvChangeToken;
+module.exports = parseEnvChangeToken;

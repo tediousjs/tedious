@@ -1,7 +1,28 @@
-const { SSPIToken } = require('./token');
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
 
-function parseChallenge(buffer) {
-  const challenge = {};
+import { SSPIToken } from './token';
+
+type Data = {
+  magic: string,
+  type: number,
+  domainLen: number,
+  domainMax: number,
+  domainOffset: number,
+  flags: number,
+  nonce: Buffer,
+  zeroes: Buffer,
+  targetLen: number,
+  targetMax: number,
+  targetOffset: number,
+  oddData: Buffer,
+  domain: string,
+  target: Buffer
+};
+
+function parseChallenge(buffer: Buffer) {
+  const challenge: Partial<Data> = {};
 
   challenge.magic = buffer.slice(0, 8).toString('utf8');
   challenge.type = buffer.readInt32LE(8);
@@ -18,11 +39,14 @@ function parseChallenge(buffer) {
   challenge.domain = buffer.slice(56, 56 + challenge.domainLen).toString('ucs2');
   challenge.target = buffer.slice(56 + challenge.domainLen, 56 + challenge.domainLen + challenge.targetLen);
 
-  return challenge;
+  return challenge as Data;
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
+function sspiParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: SSPIToken) => void) {
   parser.readUsVarByte((buffer) => {
     callback(new SSPIToken(parseChallenge(buffer), buffer));
   });
-};
+}
+
+export default sspiParser;
+module.exports = sspiParser;

@@ -1,4 +1,8 @@
-const { FeatureExtAckToken } = require('./token');
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser'
+import { ConnectionOptions } from '../connection';
+
+import { FeatureExtAckToken } from './token';
 
 const FEATURE_ID = {
   SESSIONRECOVERY: 0x01,
@@ -9,8 +13,8 @@ const FEATURE_ID = {
   TERMINATOR: 0xFF
 };
 
-module.exports = function featureExtAckParser(parser, colMetadata, options, callback) {
-  let fedAuth;
+function featureExtAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: FeatureExtAckToken) => void) {
+  let fedAuth: Buffer | undefined;
 
   function next() {
     parser.readUInt8((featureId) => {
@@ -31,4 +35,7 @@ module.exports = function featureExtAckParser(parser, colMetadata, options, call
   }
 
   next();
-};
+}
+
+export default featureExtAckParser;
+module.exports = featureExtAckParser;
