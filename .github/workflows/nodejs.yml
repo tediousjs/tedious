@@ -1,0 +1,50 @@
+name: Node CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [6.x, 8.x, 10.x, 12.x]
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Start SQLServer
+      run: |
+        docker pull microsoft/mssql-server-linux
+        docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=yourStrong(!)Password' -p 1433:1433 -d microsoft/mssql-server-linux
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Set up CI configuration
+      run: |
+        mkdir ~/.tedious
+        echo '{
+          "config": {
+            "server": "localhost",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "sa",
+                "password": "yourStrong(!)Password"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "master"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: npm install, build, and test
+      run: |
+        npm install
+        npm test
