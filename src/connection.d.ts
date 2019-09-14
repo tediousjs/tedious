@@ -5,6 +5,7 @@ import { Metadata } from './metadata-parser';
 export type ConnectionOptions = {
   tdsVersion: string,
   camelCaseColumns: boolean,
+  useColumnNames: boolean,
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string
 };
 
