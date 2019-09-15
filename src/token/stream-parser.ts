@@ -80,7 +80,7 @@ class Parser extends Transform {
   }
 
   parseTokens() {
-    const doneParsing = (token: Token) => {
+    const doneParsing = (token: Token | undefined) => {
       if (token) {
         if (token instanceof ColMetadataToken) {
           this.colMetadata = token.columns;
