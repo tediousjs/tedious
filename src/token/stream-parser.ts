@@ -5,25 +5,38 @@ import { ColumnMetadata } from './colmetadata-token-parser';
 const Transform = require('readable-stream').Transform;
 import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
 
-const tokenParsers: {
-  [token: number]: (parser: Parser, colMetadata: ColumnMetadata[], options: ConnectionOptions, done: (token: Token) => void) => void
-} = {};
-tokenParsers[TYPE.COLMETADATA] = require('./colmetadata-token-parser');
-tokenParsers[TYPE.DONE] = require('./done-token-parser').doneParser;
-tokenParsers[TYPE.DONEINPROC] = require('./done-token-parser').doneInProcParser;
-tokenParsers[TYPE.DONEPROC] = require('./done-token-parser').doneProcParser;
-tokenParsers[TYPE.ENVCHANGE] = require('./env-change-token-parser');
-tokenParsers[TYPE.ERROR] = require('./infoerror-token-parser').errorParser;
-tokenParsers[TYPE.FEDAUTHINFO] = require('./fedauth-info-parser');
-tokenParsers[TYPE.FEATUREEXTACK] = require('./feature-ext-ack-parser');
-tokenParsers[TYPE.INFO] = require('./infoerror-token-parser').infoParser;
-tokenParsers[TYPE.LOGINACK] = require('./loginack-token-parser');
-tokenParsers[TYPE.ORDER] = require('./order-token-parser');
-tokenParsers[TYPE.RETURNSTATUS] = require('./returnstatus-token-parser');
-tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser');
-tokenParsers[TYPE.ROW] = require('./row-token-parser');
-tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser');
-tokenParsers[TYPE.SSPI] = require('./sspi-token-parser');
+import colMetadataParser from './colmetadata-token-parser';
+import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
+import envChangeParser from './env-change-token-parser';
+import { errorParser, infoParser } from './infoerror-token-parser';
+import fedAuthInfoParser from './fedauth-info-parser';
+import featureExtAckParser from './feature-ext-ack-parser';
+import loginAckParser from './loginack-token-parser';
+import orderParser from './order-token-parser';
+import returnStatusParser from './returnstatus-token-parser';
+import returnValueParser from './returnvalue-token-parser';
+import rowParser from './row-token-parser';
+import nbcRowParser from './nbcrow-token-parser';
+import sspiParser from './sspi-token-parser';
+
+const tokenParsers = {
+  [TYPE.COLMETADATA]: colMetadataParser,
+  [TYPE.DONE]: doneParser,
+  [TYPE.DONEINPROC]: doneInProcParser,
+  [TYPE.DONEPROC]: doneProcParser,
+  [TYPE.ENVCHANGE]: envChangeParser,
+  [TYPE.ERROR]: errorParser,
+  [TYPE.FEDAUTHINFO]: fedAuthInfoParser,
+  [TYPE.FEATUREEXTACK]: featureExtAckParser,
+  [TYPE.INFO]: infoParser,
+  [TYPE.LOGINACK]: loginAckParser,
+  [TYPE.ORDER]: orderParser,
+  [TYPE.RETURNSTATUS]: returnStatusParser,
+  [TYPE.RETURNVALUE]: returnValueParser,
+  [TYPE.ROW]: rowParser,
+  [TYPE.NBCROW]: nbcRowParser,
+  [TYPE.SSPI]: sspiParser
+};
 
 class EndOfMessageMarker {}
 
