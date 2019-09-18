@@ -6,7 +6,8 @@ const Transform = require('readable-stream').Transform;
 const TOKEN_TYPE = require('./token/token').TYPE;
 const Message = require('./message');
 const PACKET_TYPE = require('./packet').TYPE;
-const { RequestError } = require('./errors');
+
+import { RequestError } from './errors';
 
 const FLAGS = {
   nullable: 1 << 0,
