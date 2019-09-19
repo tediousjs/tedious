@@ -51,3 +51,4 @@ const BigInt: DataType = {
 };
 
 export default BigInt;
+module.exports = BigInt;
