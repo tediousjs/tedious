@@ -270,10 +270,10 @@ describe('Parallel Send Strategy', function() {
     function commonStrategyTestSetup() {
       // IP addresses returned by DNS reverse lookup and passed to the Strategy.
       this.testData = [
-        { address: '1.2.3.4', udpVersion: udpIpv4 },
-        { address: '2002:20:0:0:0:0:1:3', udpVersion: udpIpv6 },
-        { address: '2002:30:0:0:0:0:2:4', udpVersion: udpIpv6 },
-        { address: '5.6.7.8', udpVersion: udpIpv4 }
+        { address: '1.2.3.4', udpVersion: udpIpv4, family: 4 },
+        { address: '2002:20:0:0:0:0:1:3', udpVersion: udpIpv6, family: 6 },
+        { address: '2002:30:0:0:0:0:2:4', udpVersion: udpIpv6, family: 6 },
+        { address: '5.6.7.8', udpVersion: udpIpv4, family: 4 }
       ];
 
       // Create sockets for IPv4 and IPv6 with send and close stubbed out to
