@@ -1,5 +1,8 @@
-const WritableTrackingBuffer = require('./tracking-buffer/writable-tracking-buffer');
-const writeAllHeaders = require('./all-headers').writeToTrackingBuffer;
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { writeToTrackingBuffer } from './all-headers';
+import Request from './request';
+import { Parameter, ParameterData } from './data-type';
+import { ConnectionOptions } from './connection';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -15,19 +18,25 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-module.exports = class RpcRequestPayload {
-  constructor(request, txnDescriptor, options) {
+class RpcRequestPayload {
+  request: Request;
+  procedure: string | number;
+
+  options: ConnectionOptions;
+  txnDescriptor: Buffer;
+
+  constructor(request: Request, txnDescriptor: Buffer, options: ConnectionOptions) {
     this.request = request;
-    this.procedure = this.request.sqlTextOrProcedure;
+    this.procedure = this.request.sqlTextOrProcedure!;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
   }
 
-  getData(cb) {
+  getData(cb: (data: Buffer) => void) {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
-      writeAllHeaders(buffer, this.txnDescriptor, outstandingRequestCount);
+      writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
     }
 
     if (typeof this.procedure === 'string') {
@@ -41,7 +50,7 @@ module.exports = class RpcRequestPayload {
     buffer.writeUInt16LE(optionFlags);
 
     const parameters = this.request.parameters;
-    const writeNext = (i) => {
+    const writeNext = (i: number) => {
       if (i >= parameters.length) {
         cb(buffer.data);
         return;
@@ -56,12 +65,11 @@ module.exports = class RpcRequestPayload {
     writeNext(0);
   }
 
-  toString(indent) {
-    indent || (indent = '');
+  toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter, buffer, cb) {
+  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -70,8 +78,10 @@ module.exports = class RpcRequestPayload {
     }
     buffer.writeUInt8(statusFlags);
 
-    const param = {
-      value: parameter.value
+    const param: ParameterData = {
+      value: parameter.value,
+      name: parameter.name,
+      output: parameter.output
     };
 
     const type = parameter.type;
@@ -105,4 +115,7 @@ module.exports = class RpcRequestPayload {
       cb();
     });
   }
-};
+}
+
+export default RpcRequestPayload;
+module.exports = RpcRequestPayload;

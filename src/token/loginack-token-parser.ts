@@ -4,7 +4,7 @@ import { ConnectionOptions } from '../connection';
 
 import { LoginAckToken } from './token';
 
-const versions = require('../tds-versions').versionsByValue;
+import { versionsByValue as versions } from '../tds-versions';
 
 const interfaceTypes: { [key: number]: string } = {
   0: 'SQL_DFLT',

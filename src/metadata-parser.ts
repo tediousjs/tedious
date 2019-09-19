@@ -1,24 +1,9 @@
 import { codepageBySortId, codepageByLcid } from './collation';
 import Parser from './token/stream-parser';
 import { ConnectionOptions } from './connection';
+import { TYPE, DataType } from './data-type';
 
-const TYPE = require('./data-type').TYPE;
 const sprintf = require('sprintf-js').sprintf;
-
-type DataType = {
-  id: number,
-  name: string,
-  dataLengthFromScale?: (scale: number) => number,
-  fixedDataLength?: number,
-  dataLengthLength?: number,
-
-  hasTableName?: boolean,
-  hasPrecision?: boolean,
-  hasScale?: boolean,
-  hasCollation?: boolean,
-  hasSchemaPresent: boolean,
-  hasUDTInfo: boolean
-};
 
 type Collation = {
   lcid: number,

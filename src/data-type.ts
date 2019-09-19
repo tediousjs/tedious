@@ -37,6 +37,55 @@ const DateTimeOffset = require('./data-types/datetimeoffset');
 const UDT = require('./data-types/udt');
 const TVP = require('./data-types/tvp');
 const Variant = require('./data-types/sql-variant');
+import { ConnectionOptions } from './connection';
+
+export type Parameter = {
+  type: DataType,
+  name: string,
+
+  value: unknown,
+
+  output: boolean,
+  length?: number,
+  precision?: number,
+  scale?: number,
+
+  nullable?: boolean
+};
+
+export type ParameterData<T = unknown> = {
+  length?: number,
+  scale?: number,
+  precision?: number,
+
+  value: T
+};
+
+export interface DataType {
+  id: number,
+  type: string,
+  name: string,
+
+  declaration(parameter: Parameter) : string,
+  writeTypeInfo(buf: any, data: ParameterData, options: ConnectionOptions) : void,
+  writeParameterData(buf: any, data: ParameterData, options: ConnectionOptions, callback: () => void) : void,
+  validate(value: unknown) : unknown,
+
+  dataLengthFromScale?: (scale: number) => number,
+  fixedDataLength?: number,
+  dataLengthLength?: number,
+
+  hasTableName?: boolean,
+  hasPrecision?: boolean,
+  hasScale?: boolean,
+  hasCollation?: boolean,
+  hasSchemaPresent?: boolean,
+  hasUDTInfo?: boolean,
+
+  resolveLength?: (parameter: Parameter) => number,
+  resolvePrecision?: (parameter: Parameter) => number,
+  resolveScale?: (parameter: Parameter) => number
+};
 
 export const TYPE = {
   [Null.id]: Null,
