@@ -78,11 +78,7 @@ class RpcRequestPayload {
     }
     buffer.writeUInt8(statusFlags);
 
-    const param: ParameterData = {
-      value: parameter.value,
-      name: parameter.name,
-      output: parameter.output
-    };
+    const param: ParameterData = { value: parameter.value };
 
     const type = parameter.type;
 
