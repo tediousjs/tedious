@@ -17,10 +17,10 @@ const BigInt: DataType = {
   },
 
   writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, _options, cb) {
-    const value = parameter.value as number | null;
+    const value = parameter.value;
 
     if (value != null) {
-      const val = typeof value !== 'number' ? parseInt(value) : value;
+      const val = typeof value !== 'number' ? parseInt(value as string) : value;
       buffer.writeUInt8(8);
       buffer.writeInt64LE(val);
     } else {
