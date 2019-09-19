@@ -1,6 +1,8 @@
+import { DataType, ParameterData } from '../data-type';
+
 const IntN = require('./intn');
 
-module.exports = {
+const BigInt: DataType = {
   id: 0x7F,
   type: 'INT8',
   name: 'BigInt',
@@ -14,25 +16,28 @@ module.exports = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      const val = typeof parameter.value !== 'number' ? parameter.value : parseInt(parameter.value);
+  writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, _options, cb) {
+    const value = parameter.value as number | null;
+
+    if (value != null) {
+      const val = typeof value !== 'number' ? parseInt(value) : value;
       buffer.writeUInt8(8);
       buffer.writeInt64LE(val);
     } else {
       buffer.writeUInt8(0);
     }
+
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value) : null | unknown | TypeError {
     if (value == null) {
       return null;
     }
-    if (isNaN(value)) {
+    if (isNaN(value as number)) {
       return new TypeError('Invalid number.');
     }
-    if (value < -9007199254740991 || value > 9007199254740991) {
+    if (value as number < -9007199254740991 || value as number > 9007199254740991) {
       // Number.MIN_SAFE_INTEGER = -9007199254740991
       // Number.MAX_SAFE_INTEGER = 9007199254740991
       // 9007199254740991 = (2**53) - 1
@@ -44,3 +49,5 @@ module.exports = {
     return value;
   }
 };
+
+export default BigInt;
