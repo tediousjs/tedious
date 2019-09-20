@@ -1,5 +1,5 @@
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser'
+import { ColumnMetadata } from './colmetadata-token-parser';
 import { ConnectionOptions } from '../connection';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';

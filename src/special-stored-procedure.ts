@@ -14,7 +14,7 @@ const procedures = {
   Sp_PrepExec: 13,
   Sp_PrepExecRpc: 14,
   Sp_Unprepare: 15
-}
+};
 
 export default procedures;
 module.exports = procedures;

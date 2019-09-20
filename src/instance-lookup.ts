@@ -38,7 +38,7 @@ export class InstanceLookup {
       throw new TypeError('Invalid arguments: "callback" must be a function');
     }
 
-    let sender: Sender
+    let sender: Sender;
     let timer: NodeJS.Timeout;
     let retriesLeft = retries;
 
