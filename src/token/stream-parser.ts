@@ -79,7 +79,9 @@ class Parser extends Transform {
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
       this.suspended = false;
-      this.next!.call(null);
+      const next = this.next!;
+
+      next();
     }
 
     // If we're no longer suspended, parse new tokens
