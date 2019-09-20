@@ -59,7 +59,7 @@ export class InstanceLookup {
             callback('Failed to lookup instance on ' + server + ' - ' + err.message);
 
           } else {
-            let message = response!.toString('ascii', MYSTERY_HEADER_LENGTH);
+            const message = response!.toString('ascii', MYSTERY_HEADER_LENGTH);
             const port = this.parseBrowserResponse(message, instanceName);
 
             if (port) {

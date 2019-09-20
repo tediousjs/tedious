@@ -99,11 +99,11 @@ function readCollation(parser: Parser, type: DataType, callback: (collation: Col
       flags |= collationData[2] & 0xF0;
 
       // This may not be extracting the correct nibble.
-      let version = collationData[3] & 0x0F;
+      const version = collationData[3] & 0x0F;
 
-      let sortId = collationData[4];
+      const sortId = collationData[4];
 
-      let codepage = codepageBySortId[sortId] || codepageByLcid[lcid] || 'CP1252';
+      const codepage = codepageBySortId[sortId] || codepageByLcid[lcid] || 'CP1252';
 
       callback({ lcid, flags, version, sortId, codepage });
     });
