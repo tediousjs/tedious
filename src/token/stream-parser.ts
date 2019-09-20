@@ -1,11 +1,10 @@
 import Debug from '../debug';
 import { ConnectionOptions } from '../connection';
-import { ColumnMetadata } from './colmetadata-token-parser';
 
 const Transform = require('readable-stream').Transform;
 import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
 
-import colMetadataParser from './colmetadata-token-parser';
+import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
 import envChangeParser from './env-change-token-parser';
 import { errorParser, infoParser } from './infoerror-token-parser';
