@@ -6,7 +6,6 @@ const guidParser = require('./guid-parser');
 const readPrecision = require('./metadata-parser').readPrecision;
 const readScale = require('./metadata-parser').readScale;
 const readCollation = require('./metadata-parser').readCollation;
-const convertLEBytesToString = require('./tracking-buffer/bigint').convertLEBytesToString;
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -87,9 +86,7 @@ function valueParse(parser, metaData, options, callback) {
       return parser.readInt16LE(callback);
 
     case 'BigInt':
-      return parser.readBuffer(8, (buffer) => {
-        callback(convertLEBytesToString(buffer));
-      });
+      return parser.readInt64LE(callback);
 
     case 'IntN':
       return readDataLength(parser, type, metaData, (dataLength) => {
@@ -103,9 +100,7 @@ function valueParse(parser, metaData, options, callback) {
           case 4:
             return parser.readInt32LE(callback);
           case 8:
-            return parser.readBuffer(8, (buffer) => {
-              callback(convertLEBytesToString(buffer));
-            });
+            return parser.readInt64LE(callback);
 
           default:
             return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));

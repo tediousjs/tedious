@@ -1,4 +1,5 @@
 const Transform = require('readable-stream').Transform;
+const convertLEBytesToString = require('../tracking-buffer/bigint').convertLEBytesToString;
 const TYPE = require('./token').TYPE;
 
 const tokenParsers = {};
@@ -18,6 +19,9 @@ tokenParsers[TYPE.RETURNVALUE] = require('./returnvalue-token-parser');
 tokenParsers[TYPE.ROW] = require('./row-token-parser');
 tokenParsers[TYPE.NBCROW] = require('./nbcrow-token-parser');
 tokenParsers[TYPE.SSPI] = require('./sspi-token-parser');
+
+const pow2_32 = Math.pow(2, 32);
+const maxInt64HiVal = Math.pow(2, Math.floor(Math.log2(Number.MAX_SAFE_INTEGER)) - 32);
 
 module.exports = class Parser extends Transform {
   constructor(debug, colMetadata, options) {
@@ -62,6 +66,24 @@ module.exports = class Parser extends Transform {
     }
 
     done();
+  }
+
+  _convertUInt64(hiBits, lowBits) {
+    if (hiBits > maxInt64HiVal) {
+      return convertLEBytesToString(this.buffer.slice(this.position, this.position + 8));
+    }
+
+    return hiBits * pow2_32 + lowBits;
+  }
+
+  _convertInt64(hiBits, lowBits) {
+    const hiVal = hiBits & ~0x80000000;
+    if (hiVal > maxInt64HiVal) {
+      return convertLEBytesToString(this.buffer.slice(this.position, this.position + 8));
+    }
+    const isNegative = hiBits & 0x80000000 ? -1 : 1;
+
+    return (hiVal * pow2_32 + lowBits) * isNegative;
   }
 
   parseTokens() {
@@ -186,7 +208,7 @@ module.exports = class Parser extends Transform {
 
   readInt64LE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
+      const data = this._convertInt64(this.buffer.readUInt32LE(this.position + 4), this.buffer.readUInt32LE(this.position));
       this.position += 8;
       callback(data);
     });
@@ -194,7 +216,7 @@ module.exports = class Parser extends Transform {
 
   readInt64BE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
+      const data = this._convertInt64(this.buffer.readUInt32BE(this.position), this.buffer.readUInt32BE(this.position + 4));
       this.position += 8;
       callback(data);
     });
@@ -202,7 +224,7 @@ module.exports = class Parser extends Transform {
 
   readUInt64LE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readUInt32LE(this.position + 4) + this.buffer.readUInt32LE(this.position);
+      const data = this._convertUInt64(this.buffer.readUInt32LE(this.position + 4), this.buffer.readUInt32LE(this.position));
       this.position += 8;
       callback(data);
     });
@@ -210,7 +232,7 @@ module.exports = class Parser extends Transform {
 
   readUInt64BE(callback) {
     this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readUInt32BE(this.position) + this.buffer.readUInt32BE(this.position + 4);
+      const data = this._convertUInt64(this.buffer.readUInt32BE(this.position), this.buffer.readUInt32BE(this.position + 4));
       this.position += 8;
       callback(data);
     });
