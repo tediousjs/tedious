@@ -6,6 +6,7 @@ export type ConnectionOptions = {
   tdsVersion: string,
   camelCaseColumns: boolean,
   useColumnNames: boolean,
+  useUTC: boolean,
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string
 };
 

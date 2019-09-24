@@ -1,6 +1,7 @@
+import { DataType, ParameterData } from '../data-type';
 const BitN = require('./bitn');
 
-module.exports = {
+const Bit: DataType = {
   id: 0x32,
   type: 'BIT',
   name: 'Bit',
@@ -14,7 +15,7 @@ module.exports = {
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, options, cb) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
       buffer.writeUInt8(0);
     } else {
@@ -24,7 +25,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | boolean {
     if (value == null) {
       return null;
     }
@@ -35,3 +36,6 @@ module.exports = {
     }
   }
 };
+
+export default Bit;
+module.exports = Bit;

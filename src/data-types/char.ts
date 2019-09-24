@@ -1,6 +1,8 @@
+import { DataType, ParameterData, Parameter } from '../data-type';
+
 const NULL = (1 << 16) - 1;
 
-module.exports = {
+const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
   type: 'BIGCHAR',
   name: 'Char',
@@ -8,13 +10,16 @@ module.exports = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function(parameter: Parameter) {
+    //const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; //Temporary solution. Remove 'any' later. 
+
     let length;
     if (parameter.length) {
       length = parameter.length;
-    } else if (parameter.value != null) {
-      length = parameter.value.toString().length || 1;
-    } else if (parameter.value === null && !parameter.output) {
+    } else if (value != null) {
+      length = value.toString().length || 1;
+    } else if (value === null && !parameter.output) {
       length = 1;
     } else {
       length = this.maximumLength;
@@ -27,7 +32,9 @@ module.exports = {
     }
   },
 
-  resolveLength: function(parameter) {
+  //ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be. 
+  resolveLength: function(parameter: ParameterData<any>): number {
+  
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
@@ -41,22 +48,24 @@ module.exports = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function(buffer, parameter: ParameterData<Buffer | null>) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      buffer.writeUsVarbyte(parameter.value, 'ascii');
+  writeParameterData: function(buffer, parameter: ParameterData<Buffer | null>, options, cb) {
+    const value = parameter.value as any; //Temporary solution. Remove 'any' later. 
+
+    if (value != null) {
+      buffer.writeUsVarbyte(value, 'ascii');
     } else {
       buffer.writeUInt16LE(NULL);
     }
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value: any): null | string | TypeError {
     if (value == null) {
       return null;
     }
@@ -69,3 +78,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Char;
+module.exports = Char;
