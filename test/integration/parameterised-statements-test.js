@@ -112,7 +112,7 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
 
     if (value instanceof Date) {
       assert.strictEqual(returnValue.getTime(), expectedValue.getTime());
-    } else if (type === TYPES.BigInt) {
+    } else if (type === TYPES.BigInt && (expectedValue > Number.MAX_SAFE_INTEGER || expectedValue < Number.MIN_SAFE_INTEGER)) {
       assert.strictEqual(returnValue, expectedValue.toString());
     } else if (type === TYPES.UniqueIdentifier) {
       assert.deepEqual(returnValue, expectedValue);

@@ -51,7 +51,7 @@ describe('Row Token Parser', () => {
     // console.log(token)
 
     assert.strictEqual(token.columns.length, 2);
-    assert.strictEqual('1', token.columns[0].value);
+    assert.strictEqual(1, token.columns[0].value);
     assert.strictEqual('9223372036854775807', token.columns[1].value);
   });
 
@@ -588,17 +588,17 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 12);
     assert.strictEqual(token.columns[0].value, null);
-    assert.strictEqual('0', token.columns[1].value);
-    assert.strictEqual('1', token.columns[2].value);
+    assert.strictEqual(0, token.columns[1].value);
+    assert.strictEqual(1, token.columns[2].value);
     assert.strictEqual('-1', token.columns[3].value);
-    assert.strictEqual('2', token.columns[4].value);
-    assert.strictEqual('-2', token.columns[5].value);
+    assert.strictEqual(2, token.columns[4].value);
+    assert.strictEqual(-2, token.columns[5].value);
     assert.strictEqual('9223372036854775807', token.columns[6].value);
     assert.strictEqual('-9223372036854775808', token.columns[7].value);
-    assert.strictEqual('10', token.columns[8].value);
-    assert.strictEqual('100', token.columns[9].value);
-    assert.strictEqual('1000', token.columns[10].value);
-    assert.strictEqual('10000', token.columns[11].value);
+    assert.strictEqual(10, token.columns[8].value);
+    assert.strictEqual(100, token.columns[9].value);
+    assert.strictEqual(1000, token.columns[10].value);
+    assert.strictEqual(10000, token.columns[11].value);
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', () => {
