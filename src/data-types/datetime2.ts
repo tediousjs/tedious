@@ -1,14 +1,16 @@
+import { DataType } from '../data-type';
+
 const YEAR_ONE = new Date(2000, 0, -730118);
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 
-module.exports = {
+const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
   type: 'DATETIME2N',
   name: 'DateTime2',
   hasScale: true,
   dataLengthLength: 1,
 
-  dataLengthFromScale: function(scale) {
+  dataLengthFromScale: function(scale): number | undefined {
     switch (scale) {
       case 0:
       case 1:
@@ -25,7 +27,7 @@ module.exports = {
   },
 
   declaration: function(parameter) {
-    return 'datetime2(' + (this.resolveScale(parameter)) + ')';
+       return 'datetime2(' + (this.resolveScale(parameter)) + ')';
   },
 
   resolveScale: function(parameter) {
@@ -53,9 +55,8 @@ module.exports = {
       } else {
         timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
       }
-
-      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
+      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
       timestamp = Math.round(timestamp);
 
       switch (parameter.scale) {
@@ -80,7 +81,7 @@ module.exports = {
         buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
       } else {
         const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);
@@ -101,3 +102,6 @@ module.exports = {
     return value;
   }
 };
+
+export default DateTime2;
+module.exports = DateTime2;

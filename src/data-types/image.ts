@@ -1,4 +1,6 @@
-module.exports = {
+import { DataType } from "../data-type";
+
+const Image: DataType & { hasTextPointerAndTimestamp: boolean } = {
   id: 0x22,
   type: 'IMAGE',
   name: 'Image',
@@ -12,7 +14,8 @@ module.exports = {
 
   resolveLength: function(parameter) {
     if (parameter.value != null) {
-      return parameter.value.length;
+      const value = parameter.value as any; // TODO: Temporary solution. Replace 'any' more with specific type;
+      return value.length;
     } else {
       return -1;
     }
@@ -33,7 +36,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
@@ -43,3 +46,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Image;
+module.exports = Image;

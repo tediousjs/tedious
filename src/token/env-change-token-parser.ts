@@ -1,6 +1,6 @@
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import {
   DatabaseEnvChangeToken,
@@ -175,7 +175,7 @@ function readNewAndOldValue(parser: Parser, length: number, type: { name: string
   }
 }
 
-function envChangeParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
+function envChangeParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: InternalConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];

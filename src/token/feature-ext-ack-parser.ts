@@ -1,6 +1,6 @@
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import { FeatureExtAckToken } from './token';
 
@@ -13,7 +13,7 @@ const FEATURE_ID = {
   TERMINATOR: 0xFF
 };
 
-function featureExtAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: FeatureExtAckToken) => void) {
+function featureExtAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: InternalConnectionOptions, callback: (token: FeatureExtAckToken) => void) {
   let fedAuth: Buffer | undefined;
 
   function next() {

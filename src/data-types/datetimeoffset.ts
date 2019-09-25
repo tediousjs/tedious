@@ -1,6 +1,8 @@
+import { DataType } from '../data-type';
+
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 
-module.exports = {
+const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
   type: 'DATETIMEOFFSETN',
   name: 'DateTimeOffset',
@@ -44,8 +46,9 @@ module.exports = {
       time.setUTCMonth(0);
       time.setUTCDate(1);
 
-      let timestamp = time * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      let timestamp;
+      timestamp = +time * Math.pow(10, parameter.scale! - 3);
+      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
       timestamp = Math.round(timestamp);
 
       const offset = -parameter.value.getTimezoneOffset();
@@ -87,3 +90,6 @@ module.exports = {
     return value;
   }
 };
+
+export default DateTimeOffset;
+module.exports = DateTimeOffset;

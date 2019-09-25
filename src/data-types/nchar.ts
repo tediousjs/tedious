@@ -1,6 +1,8 @@
+import { DataType } from "../data-type";
+
 const NULL = (1 << 16) - 1;
 
-module.exports = {
+const NChar: DataType & { maximumLength: number } = {
   id: 0xEF,
   type: 'NCHAR',
   name: 'NChar',
@@ -8,12 +10,15 @@ module.exports = {
   dataLengthLength: 2,
   maximumLength: 4000,
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
+    //const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; //Temporary solution. Remove 'any' later.
+
     let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (parameter.value != null) {
-      length = parameter.value.toString().length || 1;
+      length = value.toString().length || 1;
     } else if (parameter.value === null && !parameter.output) {
       length = 1;
     } else {
@@ -27,27 +32,30 @@ module.exports = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function (parameter) {
+    //const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; //Temporary solution. Remove 'any' later.
+
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
       if (Buffer.isBuffer(parameter.value)) {
         return (parameter.value.length / 2) || 1;
       } else {
-        return parameter.value.toString().length || 1;
+        return value.toString().length || 1;
       }
     } else {
       return this.maximumLength;
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
+  writeTypeInfo: function (buffer, parameter) {
     buffer.writeUInt8(this.id);
-    buffer.writeUInt16LE(parameter.length * 2);
+    buffer.writeUInt16LE(parameter.length! * 2);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function (buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUsVarbyte(parameter.value, 'ucs2');
     } else {
@@ -56,7 +64,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function (value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
@@ -69,3 +77,6 @@ module.exports = {
     return value;
   }
 };
+
+export default NChar;
+module.exports = NChar;

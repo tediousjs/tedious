@@ -1,6 +1,8 @@
+import { DataType } from "../data-type";
+
 const IntN = require('./intn');
 
-module.exports = {
+const Int: DataType = {
   id: 0x38,
   type: 'INT4',
   name: 'Int',
@@ -24,7 +26,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
@@ -38,3 +40,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Int;
+module.exports = Int;

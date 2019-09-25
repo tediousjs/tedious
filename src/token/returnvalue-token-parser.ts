@@ -2,14 +2,14 @@
 
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import { ReturnValueToken } from './token';
 
 import metadataParse from '../metadata-parser';
 import valueParse from '../value-parser';
 
-function returnParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ReturnValueToken) => void) {
+function returnParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ReturnValueToken) => void) {
   parser.readUInt16LE((paramOrdinal) => {
     parser.readBVarChar((paramName) => {
       if (paramName.charAt(0) === '@') {

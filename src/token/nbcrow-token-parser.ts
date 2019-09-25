@@ -2,13 +2,13 @@
 
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import { NBCRowToken } from './token';
 
 import valueParse from '../value-parser';
 
-function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: ConnectionOptions, callback: (value: unknown) => void) {
+function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: InternalConnectionOptions, callback: (value: unknown) => void) {
   callback(null);
 }
 
@@ -17,7 +17,7 @@ type Column = {
   metadata: ColumnMetadata
 };
 
-function nbcRowParser(parser: Parser, columnsMetaData: ColumnMetadata[], options: ConnectionOptions, callback: (token: NBCRowToken) => void) {
+function nbcRowParser(parser: Parser, columnsMetaData: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
   const length = Math.ceil(columnsMetaData.length / 8);
   parser.readBuffer(length, (bytes) => {
     const bitmap: boolean[] = [];

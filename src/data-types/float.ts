@@ -1,30 +1,32 @@
-const MoneyN = require('./moneyn');
+import { DataType } from '../data-type';
 
-module.exports = {
-  id: 0x3C,
-  type: 'MONEY',
-  name: 'Money',
+const FloatN = require('./floatn');
+
+const Float: DataType = {
+  id: 0x3E,
+  type: 'FLT8',
+  name: 'Float',
 
   declaration: function() {
-    return 'money';
+    return 'float';
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(MoneyN.id);
+    buffer.writeUInt8(FloatN.id);
     buffer.writeUInt8(8);
   },
 
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(8);
-      buffer.writeMoney(parameter.value * 10000);
+      buffer.writeDoubleLE(parseFloat(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
@@ -35,3 +37,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Float;
+module.exports = Float;
