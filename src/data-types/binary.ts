@@ -26,7 +26,7 @@ const Binary: { maximumLength: number } & DataType = {
     return 'binary(' + length + ')';
   },
 
-  resolveLength: function(parameter): number {
+  resolveLength: function(parameter) {
     const value = parameter.value as Buffer | null;
 
     if (value != null) {

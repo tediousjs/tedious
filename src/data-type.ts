@@ -53,7 +53,7 @@ export type Parameter = {
   nullable?: boolean
 };
 
-export type ParameterData<T = unknown> = {
+export type ParameterData<T = any> = {
   length?: number,
   scale?: number,
   precision?: number,
@@ -69,7 +69,7 @@ export interface DataType {
   declaration(parameter: Parameter) : string,
   writeTypeInfo(buf: any, data: ParameterData, options: ConnectionOptions) : void,
   writeParameterData(buf: any, data: ParameterData, options: ConnectionOptions, callback: () => void) : void,
-  validate(value: unknown) : unknown,
+  validate(value: any) : any, //TODO: Refactor 'any' and replace with more specific type. 
 
   dataLengthFromScale?: (scale: number) => number,
   fixedDataLength?: number,

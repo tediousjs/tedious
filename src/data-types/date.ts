@@ -1,9 +1,6 @@
 import { DataType, ParameterData } from '../data-type';
 
-//This is to gain access to global objects in 'use strict' mode after typescript conversion to javascript. 
-var global = (0, eval)('this');
-
- //globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
+//globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
 const YEAR_ONE = new globalDate(2000, 0, -730118);
 const UTC_YEAR_ONE = globalDate.UTC(2000, 0, -730118);
@@ -31,7 +28,7 @@ const Date : DataType = {
         buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
       } else {
         const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - YEAR_ONE + dstDiff) / 86400000));
+        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
       }
     } else {
       buffer.writeUInt8(0);

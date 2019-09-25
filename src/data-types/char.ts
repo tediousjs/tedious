@@ -10,7 +10,7 @@ const Char: { maximumLength: number } & DataType = {
   dataLengthLength: 2,
   maximumLength: 8000,
 
-  declaration: function(parameter: Parameter) {
+  declaration: function(parameter) {
     //const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; //Temporary solution. Remove 'any' later. 
 
@@ -33,7 +33,7 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   //ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be. 
-  resolveLength: function(parameter: ParameterData<any>): number {
+  resolveLength: function(parameter: ParameterData<any>) {
   
     if (parameter.length != null) {
       return parameter.length;
@@ -48,7 +48,7 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter: ParameterData<Buffer | null>) {
+  writeTypeInfo: function(buffer, parameter: ParameterData<any>) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));

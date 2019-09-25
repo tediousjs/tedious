@@ -15,7 +15,7 @@ const Bit: DataType = {
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, options, cb) {
+  writeParameterData: function(buffer, parameter: ParameterData<any>, options, cb) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
       buffer.writeUInt8(0);
     } else {
