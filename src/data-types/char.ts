@@ -1,4 +1,4 @@
-import { DataType, ParameterData, Parameter } from '../data-type';
+import { DataType, ParameterData } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
