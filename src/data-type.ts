@@ -85,7 +85,7 @@ export interface DataType {
   resolveLength?: (parameter: Parameter) => number,
   resolvePrecision?: (parameter: Parameter) => number,
   resolveScale?: (parameter: Parameter) => number
-};
+}
 
 export const TYPE = {
   [Null.id]: Null,
