@@ -11,8 +11,8 @@ const Char: { maximumLength: number } & DataType = {
   maximumLength: 8000,
 
   declaration: function(parameter) {
-    //const value = parameter.value as null | string | { toString(): string };
-    const value = parameter.value as any; //Temporary solution. Remove 'any' later. 
+    // const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     let length;
     if (parameter.length) {
@@ -32,7 +32,7 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  //ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be. 
+  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   resolveLength: function(parameter: ParameterData<any>) {
   
     if (parameter.length != null) {
@@ -55,7 +55,7 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   writeParameterData: function(buffer, parameter: ParameterData<Buffer | null>, options, cb) {
-    const value = parameter.value as any; //Temporary solution. Remove 'any' later. 
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
       buffer.writeUsVarbyte(value, 'ascii');

@@ -1,6 +1,6 @@
 import { DataType, ParameterData } from '../data-type';
 
-//globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
+// globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
 const YEAR_ONE = new globalDate(2000, 0, -730118);
 const UTC_YEAR_ONE = globalDate.UTC(2000, 0, -730118);
@@ -20,7 +20,7 @@ const Date : DataType = {
     buffer.writeUInt8(this.id);
   },
 
-  //ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be. 
+  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   writeParameterData: function(buffer, parameter: ParameterData<any>, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(3);
@@ -36,7 +36,7 @@ const Date : DataType = {
     cb();
   },
 
-  //TODO: value is techincally of type 'unknown'. 
+  // TODO: value is techincally of type 'unknown'.
   validate: function(value: any) {
     if (value == null) {
       return null;
