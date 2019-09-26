@@ -34,7 +34,6 @@ const Char: { maximumLength: number } & DataType = {
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   resolveLength: function(parameter: ParameterData<any>) {
-  
     if (parameter.length != null) {
       return parameter.length;
     } else if (parameter.value != null) {
