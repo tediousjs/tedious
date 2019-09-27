@@ -18,7 +18,7 @@ const DateTime: DataType = {
     buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(8);
   },
-  //ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
+  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;

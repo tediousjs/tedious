@@ -27,7 +27,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
   },
 
   declaration: function(parameter) {
-       return 'datetime2(' + (this.resolveScale(parameter)) + ')';
+    return 'datetime2(' + (this.resolveScale(parameter)) + ')';
   },
 
   resolveScale: function(parameter) {

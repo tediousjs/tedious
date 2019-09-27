@@ -1,4 +1,4 @@
-import { DataType } from "../data-type";
+import { DataType } from '../data-type';
 
 const Image: DataType & { hasTextPointerAndTimestamp: boolean } = {
   id: 0x22,

@@ -1,4 +1,4 @@
-import { DataType } from "../data-type";
+import { DataType } from '../data-type';
 
 const IntN = require('./intn');
 

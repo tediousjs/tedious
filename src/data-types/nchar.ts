@@ -1,4 +1,4 @@
-import { DataType } from "../data-type";
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
@@ -10,9 +10,9 @@ const NChar: DataType & { maximumLength: number } = {
   dataLengthLength: 2,
   maximumLength: 4000,
 
-  declaration: function (parameter) {
-    //const value = parameter.value as null | string | { toString(): string };
-    const value = parameter.value as any; //Temporary solution. Remove 'any' later.
+  declaration: function(parameter) {
+    // const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     let length;
     if (parameter.length) {
@@ -32,9 +32,9 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  resolveLength: function (parameter) {
-    //const value = parameter.value as null | string | { toString(): string };
-    const value = parameter.value as any; //Temporary solution. Remove 'any' later.
+  resolveLength: function(parameter) {
+    // const value = parameter.value as null | string | { toString(): string };
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (parameter.length != null) {
       return parameter.length;
@@ -49,13 +49,13 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  writeTypeInfo: function (buffer, parameter) {
+  writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length! * 2);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function (buffer, parameter, options, cb) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUsVarbyte(parameter.value, 'ucs2');
     } else {
@@ -64,7 +64,7 @@ const NChar: DataType & { maximumLength: number } = {
     cb();
   },
 
-  validate: function (value): null | TypeError | Buffer {
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
