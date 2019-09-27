@@ -1,11 +1,17 @@
-const versions = require('../tds-versions').versionsByValue;
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser';
+import { ConnectionOptions } from '../connection';
 
-const interfaceTypes = {
+import { LoginAckToken } from './token';
+
+import { versionsByValue as versions } from '../tds-versions';
+
+const interfaceTypes: { [key: number]: string } = {
   0: 'SQL_DFLT',
   1: 'SQL_TSQL'
 };
 
-module.exports = function(parser, colMetadata, options, callback) {
+function loginAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: LoginAckToken) => void) {
   // length
   parser.readUInt16LE(() => {
     parser.readUInt8((interfaceNumber) => {
@@ -17,19 +23,17 @@ module.exports = function(parser, colMetadata, options, callback) {
             parser.readUInt8((minor) => {
               parser.readUInt8((buildNumHi) => {
                 parser.readUInt8((buildNumLow) => {
-                  callback({
-                    'name': 'LOGINACK',
-                    'event': 'loginack',
-                    'interface': interfaceType,
-                    'tdsVersion': tdsVersion,
-                    'progName': progName,
-                    'progVersion': {
+                  callback(new LoginAckToken({
+                    interface: interfaceType,
+                    tdsVersion: tdsVersion,
+                    progName: progName,
+                    progVersion: {
                       major: major,
                       minor: minor,
                       buildNumHi: buildNumHi,
                       buildNumLow: buildNumLow
                     }
-                  });
+                  }));
                 });
               });
             });
@@ -38,4 +42,7 @@ module.exports = function(parser, colMetadata, options, callback) {
       });
     });
   });
-};
+}
+
+export default loginAckParser;
+module.exports = loginAckParser;
