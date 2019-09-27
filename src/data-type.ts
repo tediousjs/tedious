@@ -71,7 +71,7 @@ export interface DataType {
   writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
   validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
 
-  dataLengthFromScale?: (scale: number) => number | undefined,
+  dataLengthFromScale?: (scale: number) => (number | undefined),
   fixedDataLength?: number,
   dataLengthLength?: number,
 

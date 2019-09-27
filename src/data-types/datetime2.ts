@@ -9,8 +9,8 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
   name: 'DateTime2',
   hasScale: true,
   dataLengthLength: 1,
-
-  dataLengthFromScale: function(scale): number | undefined {
+  
+  dataLengthFromScale: function(scale) {
     switch (scale) {
       case 0:
       case 1:
