@@ -1,14 +1,45 @@
-const codepageBySortId = require('./collation').codepageBySortId;
-const codepageByLcid = require('./collation').codepageByLcid;
-const TYPE = require('./data-type').TYPE;
+import { codepageBySortId, codepageByLcid } from './collation';
+import Parser from './token/stream-parser';
+import { ConnectionOptions } from './connection';
+import { TYPE, DataType } from './data-type';
+
 const sprintf = require('sprintf-js').sprintf;
 
-module.exports = metadataParse;
-module.exports.readPrecision = readPrecision;
-module.exports.readScale = readScale;
-module.exports.readCollation = readCollation;
+type Collation = {
+  lcid: number,
+  flags: number,
+  version: number,
+  sortId: number,
+  codepage: string
+};
 
-function readDataLength(parser, type, callback) {
+type XmlSchema = {
+  dbname: string,
+  owningSchema: string,
+  xmlSchemaCollection: string
+};
+
+type UdtInfo = {
+  maxByteSize: number,
+  dbname: string,
+  owningSchema: string,
+  typeName: string,
+  assemblyName: string
+};
+
+export type Metadata = {
+  userType: number,
+  flags: number,
+  type: DataType,
+  collation?: Collation,
+  precision?: number,
+  scale?: number,
+  dataLength: number,
+  schema?: XmlSchema,
+  udtInfo?: UdtInfo
+};
+
+function readDataLength(parser: Parser, type: DataType, callback: (dataLength: number | undefined) => void) {
   if ((type.id & 0x30) === 0x20) {
     // xx10xxxx - s2.2.4.2.1.3
     // Variable length
@@ -39,7 +70,7 @@ function readDataLength(parser, type, callback) {
   }
 }
 
-function readPrecision(parser, type, callback) {
+function readPrecision(parser: Parser, type: DataType, callback: (precision: number | undefined) => void) {
   if (type.hasPrecision) {
     parser.readUInt8(callback);
   } else {
@@ -47,7 +78,7 @@ function readPrecision(parser, type, callback) {
   }
 }
 
-function readScale(parser, type, callback) {
+function readScale(parser: Parser, type: DataType, callback: (scale: number | undefined) => void) {
   if (type.hasScale) {
     parser.readUInt8(callback);
   } else {
@@ -55,35 +86,33 @@ function readScale(parser, type, callback) {
   }
 }
 
-function readCollation(parser, type, callback) {
+function readCollation(parser: Parser, type: DataType, callback: (collation: Collation | undefined) => void) {
   if (type.hasCollation) {
     // s2.2.5.1.2
     parser.readBuffer(5, (collationData) => {
-      const collation = {};
-
-      collation.lcid = (collationData[2] & 0x0F) << 16;
-      collation.lcid |= collationData[1] << 8;
-      collation.lcid |= collationData[0];
+      let lcid = (collationData[2] & 0x0F) << 16;
+      lcid |= collationData[1] << 8;
+      lcid |= collationData[0];
 
       // This may not be extracting the correct nibbles in the correct order.
-      collation.flags = collationData[3] >> 4;
-      collation.flags |= collationData[2] & 0xF0;
+      let flags = collationData[3] >> 4;
+      flags |= collationData[2] & 0xF0;
 
       // This may not be extracting the correct nibble.
-      collation.version = collationData[3] & 0x0F;
+      const version = collationData[3] & 0x0F;
 
-      collation.sortId = collationData[4];
+      const sortId = collationData[4];
 
-      collation.codepage = codepageBySortId[collation.sortId] || codepageByLcid[collation.lcid] || 'CP1252';
+      const codepage = codepageBySortId[sortId] || codepageByLcid[lcid] || 'CP1252';
 
-      callback(collation);
+      callback({ lcid, flags, version, sortId, codepage });
     });
   } else {
     callback(undefined);
   }
 }
 
-function readSchema(parser, type, callback) {
+function readSchema(parser: Parser, type: DataType, callback: (schema: XmlSchema | undefined) => void) {
   if (type.hasSchemaPresent) {
     // s2.2.5.5.3
     parser.readUInt8((schemaPresent) => {
@@ -108,7 +137,7 @@ function readSchema(parser, type, callback) {
   }
 }
 
-function readUDTInfo(parser, type, callback) {
+function readUDTInfo(parser: Parser, type: DataType, callback: (udtInfo: UdtInfo | undefined) => void) {
   if (type.hasUDTInfo) {
     parser.readUInt16LE((maxByteSize) => {
       parser.readBVarChar((dbname) => {
@@ -128,15 +157,15 @@ function readUDTInfo(parser, type, callback) {
       });
     });
   } else {
-    return callback();
+    return callback(undefined);
   }
 }
 
-function metadataParse(parser, options, callback) {
+function metadataParse(parser: Parser, options: ConnectionOptions, callback: (metadata: Metadata) => void) {
   (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {
-        const type = TYPE[typeNumber];
+        const type: DataType = TYPE[typeNumber];
 
         if (!type) {
           return parser.emit(new Error(sprintf('Unrecognised data type 0x%02X', typeNumber)));
@@ -159,7 +188,7 @@ function metadataParse(parser, options, callback) {
                       collation: collation,
                       precision: precision,
                       scale: scale,
-                      dataLength: dataLength,
+                      dataLength: dataLength!,
                       schema: schema,
                       udtInfo: udtInfo
                     });
@@ -173,3 +202,11 @@ function metadataParse(parser, options, callback) {
     });
   });
 }
+
+export default metadataParse;
+export { readPrecision, readScale, readCollation };
+
+module.exports = metadataParse;
+module.exports.readPrecision = readPrecision;
+module.exports.readScale = readScale;
+module.exports.readCollation = readCollation;

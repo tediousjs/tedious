@@ -1,8 +1,13 @@
 import Request from './request';
 import BulkLoad from './bulk-load';
+import { Metadata } from './metadata-parser';
 
 export type ConnectionOptions = {
-  tdsVersion: string
+  tdsVersion: string,
+  camelCaseColumns: boolean,
+  useColumnNames: boolean,
+  useUTC: boolean,
+  columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string
 };
 
 declare class Connection {

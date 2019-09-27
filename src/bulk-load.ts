@@ -4,9 +4,10 @@ import { ConnectionOptions } from './connection';
 
 const Transform = require('readable-stream').Transform;
 const TOKEN_TYPE = require('./token/token').TYPE;
-const Message = require('./message');
-const PACKET_TYPE = require('./packet').TYPE;
+import Message from './message';
+import { TYPE as PACKET_TYPE } from './packet';
 
+import { Parameter } from './data-type';
 import { RequestError } from './errors';
 
 const FLAGS = {
@@ -47,29 +48,8 @@ type Options = {
   lockTable?: InternalOptions['lockTable'],
 };
 
-type DataType = {
-  id: number,
-  declaration: (column: Column) => string,
-  writeTypeInfo: (buf: any, column: Column, options: ConnectionOptions) => void,
-  writeParameterData: (buf: any, data: { length?: number, scale?: number, precision?: number, value: unknown }, options: ConnectionOptions, callback: () => void) => void,
-
-  hasPrecision?: Boolean,
-  hasScale?: Boolean,
-  resolveLength?: (column: Column) => number,
-  resolvePrecision?: (column: Column) => number,
-  resolveScale?: (column: Column) => number
-};
-
-type Column = {
-  type: DataType,
-  name: string,
-  value: null,
-  output: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
+type Column = Parameter & {
   objName: string,
-  nullable?: boolean
 };
 
 type ColumnOptions = {

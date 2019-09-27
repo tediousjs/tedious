@@ -1,4 +1,4 @@
-module.exports = {
+const procedures = {
   Sp_Cursor: 1,
   Sp_CursorOpen: 2,
   Sp_CursorPrepare: 3,
@@ -15,3 +15,6 @@ module.exports = {
   Sp_PrepExecRpc: 14,
   Sp_Unprepare: 15
 };
+
+export default procedures;
+module.exports = procedures;

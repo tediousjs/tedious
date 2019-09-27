@@ -1,5 +1,8 @@
-const EventEmitter = require('events').EventEmitter;
-const StreamParser = require('./stream-parser');
+import { EventEmitter } from 'events';
+import StreamParser from './stream-parser';
+import Debug from '../debug';
+import { ConnectionOptions } from '../connection';
+import { Token } from './token';
 
 /*
   Buffers are thrown at the parser (by calling addBuffer).
@@ -11,16 +14,21 @@ const StreamParser = require('./stream-parser');
   The partial token and the new buffer are concatenated, and the token
   parsing resumes.
  */
-class Parser extends EventEmitter {
-  constructor(debug, colMetadata, options) {
+export class Parser extends EventEmitter {
+  debug: Debug;
+  colMetadata: any;
+  options: ConnectionOptions;
+  parser: StreamParser;
+
+  constructor(debug: Debug, colMetadata: any, options: ConnectionOptions) {
     super();
 
     this.debug = debug;
-    this.colMetadata = this.colMetadata;
+    this.colMetadata = colMetadata;
     this.options = options;
 
     this.parser = new StreamParser(this.debug, this.colMetadata, this.options);
-    this.parser.on('data', (token) => {
+    this.parser.on('data', (token: Token) => {
       if (token.event) {
         this.emit(token.event, token);
       }
@@ -31,7 +39,7 @@ class Parser extends EventEmitter {
   }
 
   // Returns false to apply backpressure.
-  addBuffer(buffer) {
+  addBuffer(buffer: Buffer) {
     return this.parser.write(buffer);
   }
 
@@ -57,4 +65,3 @@ class Parser extends EventEmitter {
     this.parser.resume();
   }
 }
-module.exports.Parser = Parser;

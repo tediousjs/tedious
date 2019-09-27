@@ -1,4 +1,35 @@
-const types = {
+import Parser from './stream-parser';
+import { ColumnMetadata } from './colmetadata-token-parser';
+import { ConnectionOptions } from '../connection';
+
+import {
+  DatabaseEnvChangeToken,
+  LanguageEnvChangeToken,
+  CharsetEnvChangeToken,
+  PacketSizeEnvChangeToken,
+  BeginTransactionEnvChangeToken,
+  CommitTransactionEnvChangeToken,
+  RollbackTransactionEnvChangeToken,
+  DatabaseMirroringPartnerEnvChangeToken,
+  ResetConnectionEnvChangeToken,
+  RoutingEnvChangeToken,
+  CollationChangeToken
+} from './token';
+
+type EnvChangeToken =
+  DatabaseEnvChangeToken |
+  LanguageEnvChangeToken |
+  CharsetEnvChangeToken |
+  PacketSizeEnvChangeToken |
+  BeginTransactionEnvChangeToken |
+  CommitTransactionEnvChangeToken |
+  RollbackTransactionEnvChangeToken |
+  DatabaseMirroringPartnerEnvChangeToken |
+  ResetConnectionEnvChangeToken |
+  RoutingEnvChangeToken |
+  CollationChangeToken;
+
+const types: { [key: number]: { name: string, event?: string }} = {
   1: {
     name: 'DATABASE',
     event: 'databaseChange'
@@ -48,7 +79,7 @@ const types = {
   }
 };
 
-function readNewAndOldValue(parser, length, type, callback) {
+function readNewAndOldValue(parser: Parser, length: number, type: { name: string, event?: string }, callback: (token: EnvChangeToken | undefined) => void) {
   switch (type.name) {
     case 'DATABASE':
     case 'LANGUAGE':
@@ -57,10 +88,21 @@ function readNewAndOldValue(parser, length, type, callback) {
     case 'DATABASE_MIRRORING_PARTNER':
       return parser.readBVarChar((newValue) => {
         parser.readBVarChar((oldValue) => {
-          if (type.name === 'PACKET_SIZE') {
-            callback(parseInt(newValue), parseInt(oldValue));
-          } else {
-            callback(newValue, oldValue);
+          switch (type.name) {
+            case 'PACKET_SIZE':
+              return callback(new PacketSizeEnvChangeToken(parseInt(newValue), parseInt(oldValue)));
+
+            case 'DATABASE':
+              return callback(new DatabaseEnvChangeToken(newValue, oldValue));
+
+            case 'LANGUAGE':
+              return callback(new LanguageEnvChangeToken(newValue, oldValue));
+
+            case 'CHARSET':
+              return callback(new CharsetEnvChangeToken(newValue, oldValue));
+
+            case 'DATABASE_MIRRORING_PARTNER':
+              return callback(new DatabaseMirroringPartnerEnvChangeToken(newValue, oldValue));
           }
         });
       });
@@ -72,12 +114,27 @@ function readNewAndOldValue(parser, length, type, callback) {
     case 'RESET_CONNECTION':
       return parser.readBVarByte((newValue) => {
         parser.readBVarByte((oldValue) => {
-          callback(newValue, oldValue);
+          switch (type.name) {
+            case 'SQL_COLLATION':
+              return callback(new CollationChangeToken(newValue, oldValue));
+
+            case 'BEGIN_TXN':
+              return callback(new BeginTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'COMMIT_TXN':
+              return callback(new CommitTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'ROLLBACK_TXN':
+              return callback(new RollbackTransactionEnvChangeToken(newValue, oldValue));
+
+            case 'RESET_CONNECTION':
+              return callback(new ResetConnectionEnvChangeToken(newValue, oldValue));
+          }
         });
       });
 
     case 'ROUTING_CHANGE':
-      parser.readUInt16LE((valueLength) => {
+      return parser.readUInt16LE((valueLength) => {
         // Routing Change:
         // Byte 1: Protocol (must be 0)
         // Bytes 2-3 (USHORT): Port number
@@ -103,24 +160,22 @@ function readNewAndOldValue(parser, length, type, callback) {
 
           parser.readUInt16LE((oldValueLength) => {
             parser.readBuffer(oldValueLength, (oldValue) => {
-              callback(newValue, oldValue);
+              callback(new RoutingEnvChangeToken(newValue, oldValue));
             });
           });
         });
       });
 
-      break;
-
     default:
       console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
       // skip unknown bytes
       parser.readBuffer(length - 1, () => {
-        callback(undefined, undefined);
+        callback(undefined);
       });
   }
 }
 
-module.exports = function(parser, colMetadata, options, callback) {
+function envChangeParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
@@ -129,19 +184,16 @@ module.exports = function(parser, colMetadata, options, callback) {
         console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
         // skip unknown bytes
         return parser.readBuffer(length - 1, () => {
-          callback();
+          callback(undefined);
         });
       }
 
-      readNewAndOldValue(parser, length, type, (newValue, oldValue) => {
-        callback({
-          name: 'ENVCHANGE',
-          type: type.name,
-          event: type.event,
-          oldValue: oldValue,
-          newValue: newValue
-        });
+      readNewAndOldValue(parser, length, type, (token) => {
+        callback(token);
       });
     });
   });
-};
+}
+
+export default envChangeParser;
+module.exports = envChangeParser;
