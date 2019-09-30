@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const IntN = require('./intn');
+import IntN from './intn';
 
 const Int: DataType = {
   id: 0x38,

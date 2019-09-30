@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import { InternalConnectionOptions } from './connection';
+import Connection, { InternalConnectionOptions } from './connection';
 
-const Transform = require('readable-stream').Transform;
-const TOKEN_TYPE = require('./token/token').TYPE;
+import { Transform } from 'readable-stream';
+import { TYPE as TOKEN_TYPE } from './token/token';
 import Message from './message';
 import { TYPE as PACKET_TYPE } from './packet';
 
@@ -41,12 +41,14 @@ type InternalOptions = {
   lockTable: boolean,
 };
 
-type Options = {
+export interface Options {
   checkConstraints?: InternalOptions['checkConstraints'],
   fireTriggers?: InternalOptions['fireTriggers'],
   keepNulls?: InternalOptions['keepNulls'],
   lockTable?: InternalOptions['lockTable'],
-};
+}
+
+export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
 type Column = Parameter & {
   objName: string,
@@ -67,10 +69,18 @@ class BulkLoad extends EventEmitter {
   executionStarted: boolean;
   streamingMode: boolean;
   table: string;
-  timeout?: number
+
+  connection?: Connection;
+  timeout?: number;
+
+  rows?: Array<any>;
+  rst?: Array<any>;
+  rowCount?: number;
+
+  paused?: boolean;
 
   options: InternalConnectionOptions;
-  callback: (err: Error | undefined | null, rowCount: number) => void;
+  callback: Callback;
 
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
@@ -85,7 +95,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, callback: (err: Error | undefined | null, rowCount: number) => void) {
+  }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }

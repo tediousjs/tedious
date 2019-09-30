@@ -13,7 +13,7 @@ import { TYPE } from './packet';
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
-module.exports = class MessageIO extends EventEmitter {
+class MessageIO extends EventEmitter {
   socket: Socket;
   debug: Debug;
 
@@ -139,4 +139,7 @@ module.exports = class MessageIO extends EventEmitter {
   resume() {
     this.incomingMessageStream.resume();
   }
-};
+}
+
+export default MessageIO;
+module.exports = MessageIO;

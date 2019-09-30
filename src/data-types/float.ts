@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const FloatN = require('./floatn');
+import FloatN from './floatn';
 
 const Float: DataType = {
   id: 0x3E,
