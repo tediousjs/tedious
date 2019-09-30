@@ -2,7 +2,7 @@
 
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import { RowToken } from './token';
 
@@ -13,7 +13,7 @@ type Column = {
   metadata: ColumnMetadata
 };
 
-function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: RowToken) => void) {
+function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: RowToken) => void) {
   const columns: Column[] = [];
 
   const len = colMetadata.length;

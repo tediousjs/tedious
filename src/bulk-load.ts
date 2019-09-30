@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import { ConnectionOptions } from './connection';
+import { InternalConnectionOptions } from './connection';
 
 const Transform = require('readable-stream').Transform;
 const TOKEN_TYPE = require('./token/token').TYPE;
@@ -69,7 +69,7 @@ class BulkLoad extends EventEmitter {
   table: string;
   timeout?: number
 
-  options: ConnectionOptions;
+  options: InternalConnectionOptions;
   callback: (err: Error | undefined | null, rowCount: number) => void;
 
   columns: Array<Column>;
@@ -80,7 +80,7 @@ class BulkLoad extends EventEmitter {
 
   bulkOptions: InternalOptions;
 
-  constructor(table: string, connectionOptions: ConnectionOptions, {
+  constructor(table: string, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,

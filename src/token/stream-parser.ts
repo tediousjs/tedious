@@ -1,5 +1,5 @@
 import Debug from '../debug';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 const Transform = require('readable-stream').Transform;
 import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
@@ -42,7 +42,7 @@ class EndOfMessageMarker {}
 class Parser extends Transform {
   debug: Debug;
   colMetadata: ColumnMetadata[];
-  options: ConnectionOptions;
+  options: InternalConnectionOptions;
   endOfMessageMarker: EndOfMessageMarker;
 
   buffer: Buffer;
@@ -50,7 +50,7 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, colMetadata: ColumnMetadata[], options: ConnectionOptions) {
+  constructor(debug: Debug, colMetadata: ColumnMetadata[], options: InternalConnectionOptions) {
     super({ objectMode: true });
 
     this.debug = debug;

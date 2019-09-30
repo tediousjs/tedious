@@ -1,6 +1,6 @@
 import { codepageBySortId, codepageByLcid } from './collation';
 import Parser from './token/stream-parser';
-import { ConnectionOptions } from './connection';
+import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
 
 const sprintf = require('sprintf-js').sprintf;
@@ -161,7 +161,7 @@ function readUDTInfo(parser: Parser, type: DataType, callback: (udtInfo: UdtInfo
   }
 }
 
-function metadataParse(parser: Parser, options: ConnectionOptions, callback: (metadata: Metadata) => void) {
+function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
   (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {

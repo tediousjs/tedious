@@ -2,7 +2,7 @@ import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
-import { ConnectionOptions } from './connection';
+import { InternalConnectionOptions } from './connection';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -22,10 +22,10 @@ class RpcRequestPayload {
   request: Request;
   procedure: string | number;
 
-  options: ConnectionOptions;
+  options: InternalConnectionOptions;
   txnDescriptor: Buffer;
 
-  constructor(request: Request, txnDescriptor: Buffer, options: ConnectionOptions) {
+  constructor(request: Request, txnDescriptor: Buffer, options: InternalConnectionOptions) {
     this.request = request;
     this.procedure = this.request.sqlTextOrProcedure!;
     this.options = options;

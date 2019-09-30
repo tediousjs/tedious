@@ -37,7 +37,7 @@ const DateTimeOffset = require('./data-types/datetimeoffset');
 const UDT = require('./data-types/udt');
 const TVP = require('./data-types/tvp');
 const Variant = require('./data-types/sql-variant');
-import { ConnectionOptions } from './connection';
+import { InternalConnectionOptions } from './connection';
 
 export type Parameter = {
   type: DataType,
@@ -67,11 +67,11 @@ export interface DataType {
   name: string,
 
   declaration(parameter: Parameter) : string,
-  writeTypeInfo(buf: any, data: ParameterData, options: ConnectionOptions) : void,
-  writeParameterData(buf: any, data: ParameterData, options: ConnectionOptions, callback: () => void) : void,
+  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions) : void,
+  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
   validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
 
-  dataLengthFromScale?: (scale: number) => number,
+  dataLengthFromScale?: (scale: number) => (number | undefined),
   fixedDataLength?: number,
   dataLengthLength?: number,
 
