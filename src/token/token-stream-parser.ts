@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import StreamParser from './stream-parser';
 import Debug from '../debug';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 import { Token } from './token';
 
 /*
@@ -17,10 +17,10 @@ import { Token } from './token';
 export class Parser extends EventEmitter {
   debug: Debug;
   colMetadata: any;
-  options: ConnectionOptions;
+  options: InternalConnectionOptions;
   parser: StreamParser;
 
-  constructor(debug: Debug, colMetadata: any, options: ConnectionOptions) {
+  constructor(debug: Debug, colMetadata: any, options: InternalConnectionOptions) {
     super();
 
     this.debug = debug;

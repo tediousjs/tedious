@@ -1,9 +1,11 @@
+import { DataType } from '../data-type';
+
 const DateTimeN = require('./datetimen');
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-module.exports = {
+const DateTime: DataType = {
   id: 0x3D,
   type: 'DATETIME',
   name: 'DateTime',
@@ -16,7 +18,7 @@ module.exports = {
     buffer.writeUInt8(DateTimeN.id);
     buffer.writeUInt8(8);
   },
-
+  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
@@ -48,7 +50,8 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  // TODO: type 'any' needs to be revisited.
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }
@@ -61,3 +64,6 @@ module.exports = {
     return value;
   }
 };
+
+export default DateTime;
+module.exports = DateTime;

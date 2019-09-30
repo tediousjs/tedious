@@ -1,6 +1,6 @@
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 
 import { SSPIToken } from './token';
 
@@ -42,7 +42,7 @@ function parseChallenge(buffer: Buffer) {
   return challenge as Data;
 }
 
-function sspiParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: ConnectionOptions, callback: (token: SSPIToken) => void) {
+function sspiParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: InternalConnectionOptions, callback: (token: SSPIToken) => void) {
   parser.readUsVarByte((buffer) => {
     callback(new SSPIToken(parseChallenge(buffer), buffer));
   });

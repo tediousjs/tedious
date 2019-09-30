@@ -1,4 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
@@ -21,7 +21,7 @@ const Date : DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, parameter: ParameterData<any>, options, cb) {
+  writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(3);
       if (options.useUTC) {

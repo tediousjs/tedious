@@ -1,4 +1,4 @@
-module.exports = {
+const DecimalN = {
   id: 0x6A,
   type: 'DECIMALN',
   name: 'DecimalN',
@@ -6,3 +6,6 @@ module.exports = {
   hasPrecision: true,
   hasScale: true
 };
+
+export default DecimalN;
+module.exports = DecimalN;

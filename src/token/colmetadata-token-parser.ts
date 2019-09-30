@@ -1,7 +1,7 @@
 import metadataParse, { Metadata } from '../metadata-parser';
 
 import Parser from './stream-parser';
-import { ConnectionOptions } from '../connection';
+import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
 export type ColumnMetadata = Metadata & {
@@ -9,7 +9,7 @@ export type ColumnMetadata = Metadata & {
   tableName?: string | string[]
 };
 
-function readTableName(parser: Parser, options: ConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
+function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
     if (options.tdsVersion >= '7_2') {
       parser.readUInt8((numberOfTableNameParts) => {
@@ -42,7 +42,7 @@ function readTableName(parser: Parser, options: ConnectionOptions, metadata: Met
   }
 }
 
-function readColumnName(parser: Parser, options: ConnectionOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
+function readColumnName(parser: Parser, options: InternalConnectionOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
   parser.readBVarChar((colName) => {
     if (options.columnNameReplacer) {
       callback(options.columnNameReplacer(colName, index, metadata));
@@ -56,7 +56,7 @@ function readColumnName(parser: Parser, options: ConnectionOptions, index: numbe
   });
 }
 
-function readColumn(parser: Parser, options: ConnectionOptions, index: number, callback: (column: ColumnMetadata) => void) {
+function readColumn(parser: Parser, options: InternalConnectionOptions, index: number, callback: (column: ColumnMetadata) => void) {
   metadataParse(parser, options, (metadata) => {
     readTableName(parser, options, metadata, (tableName) => {
       readColumnName(parser, options, index, metadata, (colName) => {
@@ -77,7 +77,7 @@ function readColumn(parser: Parser, options: ConnectionOptions, index: number, c
   });
 }
 
-function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: ConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
