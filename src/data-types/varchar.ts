@@ -1,39 +1,46 @@
+import { DataType } from '../data-type';
+
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 
-module.exports = {
-  id: 0xE7,
-  type: 'NVARCHAR',
-  name: 'NVarChar',
-  maximumLength: 4000,
+const VarChar: { maximumLength: number } & DataType = {
+
+  id: 0xA7,
+  type: 'BIGVARCHR',
+  name: 'VarChar',
+  maximumLength: 8000,
 
   declaration: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
     let length;
     if (parameter.length) {
       length = parameter.length;
-    } else if (parameter.value != null) {
-      length = parameter.value.toString().length || 1;
-    } else if (parameter.value === null && !parameter.output) {
+    } else if (value != null) {
+      length = value!.toString().length || 1;
+    } else if (value === null && !parameter.output) {
       length = 1;
     } else {
       length = this.maximumLength;
     }
 
     if (length <= this.maximumLength) {
-      return 'nvarchar(' + length + ')';
+      return 'varchar(' + length + ')';
     } else {
-      return 'nvarchar(max)';
+      return 'varchar(max)';
     }
   },
 
   resolveLength: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
     if (parameter.length != null) {
       return parameter.length;
-    } else if (parameter.value != null) {
+    } else if (value != null) {
       if (Buffer.isBuffer(parameter.value)) {
-        return (parameter.value.length / 2) || 1;
+        return value.length || 1;
       } else {
-        return parameter.value.toString().length || 1;
+        return value.toString().length || 1;
       }
     } else {
       return this.maximumLength;
@@ -42,8 +49,8 @@ module.exports = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    if (parameter.length <= this.maximumLength) {
-      buffer.writeUInt16LE(parameter.length * 2);
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(this.maximumLength);
     } else {
       buffer.writeUInt16LE(MAX);
     }
@@ -52,12 +59,12 @@ module.exports = {
 
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
-      if (parameter.length <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value, 'ucs2');
+      if (parameter.length! <= this.maximumLength) {
+        buffer.writeUsVarbyte(parameter.value, 'ascii');
       } else {
-        buffer.writePLPBody(parameter.value, 'ucs2');
+        buffer.writePLPBody(parameter.value, 'ascii');
       }
-    } else if (parameter.length <= this.maximumLength) {
+    } else if (parameter.length! <= this.maximumLength) {
       buffer.writeUInt16LE(NULL);
     } else {
       buffer.writeUInt32LE(0xFFFFFFFF);
@@ -66,7 +73,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -79,3 +86,6 @@ module.exports = {
     return value;
   }
 };
+
+export default VarChar;
+module.exports = VarChar;
