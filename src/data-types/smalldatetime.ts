@@ -1,9 +1,11 @@
+import { DataType } from '../data-type';
+
 const DateTimeN = require('./datetimen');
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-module.exports = {
+const SmallDateTime:DataType = {
   id: 0x3A,
   type: 'DATETIM4',
   name: 'SmallDateTime',
@@ -39,7 +41,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | Date| TypeError {
     if (value == null) {
       return null;
     }
@@ -55,3 +57,6 @@ module.exports = {
     return value;
   }
 };
+
+export default SmallDateTime;
+module.exports = SmallDateTime;

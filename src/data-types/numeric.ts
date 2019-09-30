@@ -1,6 +1,7 @@
+import { DataType, ParameterData } from '../data-type';
 const NumericN = require('./numericn');
 
-module.exports = {
+const Numeric:DataType = {
   id: 0x3F,
   type: 'NUMERIC',
   name: 'Numeric',
@@ -8,11 +9,11 @@ module.exports = {
   hasScale: true,
 
   declaration: function(parameter) {
-    return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
+    return 'numeric(' + (this.resolvePrecision!(parameter)) + ', ' + (this.resolveScale!(parameter)) + ')';
   },
 
   resolvePrecision: function(parameter) {
-    if (parameter.precision != null) {
+    if (parameter.precision! != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
       return 1;
@@ -31,11 +32,11 @@ module.exports = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(NumericN.id);
-    if (parameter.precision <= 9) {
+    if (parameter.precision! <= 9) {
       buffer.writeUInt8(5);
-    } else if (parameter.precision <= 19) {
+    } else if (parameter.precision! <= 19) {
       buffer.writeUInt8(9);
-    } else if (parameter.precision <= 28) {
+    } else if (parameter.precision! <= 28) {
       buffer.writeUInt8(13);
     } else {
       buffer.writeUInt8(17);
@@ -47,16 +48,16 @@ module.exports = {
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
-      const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale)));
-      if (parameter.precision <= 9) {
+      const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
+      if (parameter.precision! <= 9) {
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);
         buffer.writeUInt32LE(value);
-      } else if (parameter.precision <= 19) {
+      } else if (parameter.precision! <= 19) {
         buffer.writeUInt8(9);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
-      } else if (parameter.precision <= 28) {
+      } else if (parameter.precision! <= 28) {
         buffer.writeUInt8(13);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
@@ -74,7 +75,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
@@ -85,3 +86,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Numeric;
+module.exports = Numeric;

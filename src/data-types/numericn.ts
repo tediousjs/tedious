@@ -1,4 +1,4 @@
-module.exports = {
+const NumericN = {
   id: 0x6C,
   type: 'NUMERICN',
   name: 'NumericN',
@@ -6,3 +6,6 @@ module.exports = {
   hasPrecision: true,
   hasScale: true
 };
+
+export default NumericN;
+module.exports = NumericN;

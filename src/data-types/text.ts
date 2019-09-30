@@ -1,4 +1,6 @@
-module.exports = {
+import { DataType } from '../data-type';
+
+const Text: { hasTextPointerAndTimestamp:boolean, dataLengthLength: number } & DataType = {
   id: 0x23,
   type: 'TEXT',
   name: 'Text',
@@ -12,8 +14,10 @@ module.exports = {
   },
 
   resolveLength: function(parameter) {
-    if (parameter.value != null) {
-      return parameter.value.length;
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
+    if (value != null) {
+      return value.length;
     } else {
       return -1;
     }
@@ -35,7 +39,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -48,3 +52,7 @@ module.exports = {
     return value;
   }
 };
+
+
+export default Text;
+module.exports = Text;

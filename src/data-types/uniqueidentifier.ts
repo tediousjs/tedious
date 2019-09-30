@@ -1,6 +1,9 @@
+import { DataType } from '../data-type';
+
 const guidParser = require('../guid-parser');
 
-module.exports = {
+const UniqueIdentifier: { dataLengthLength: number } & DataType = {
+
   id: 0x24,
   type: 'GUIDN',
   name: 'UniqueIdentifier',
@@ -29,7 +32,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -42,3 +45,6 @@ module.exports = {
     return value;
   }
 };
+
+export default UniqueIdentifier;
+module.exports = UniqueIdentifier;
