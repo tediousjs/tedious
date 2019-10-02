@@ -61,6 +61,17 @@ export type ParameterData<T = any> = {
   value: T
 };
 
+export interface DataTypeN {
+  id: number,
+  type: string,
+  name: string,
+  dataLengthLength: number,
+  hasPrecision?: boolean,
+  hasScale?: boolean,
+  hasCollation?: boolean,
+  hasTableName?: boolean,
+}
+
 export interface DataType {
   id: number,
   type: string,

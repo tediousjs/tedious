@@ -1,10 +1,11 @@
 import Request from './request';
 import BulkLoad from './bulk-load';
-import { Metadata } from './metadata-parser';
+import { MetaData } from './metadata-parser';
 
 export type InternalConnectionOptions = {
   camelCaseColumns: boolean,
-  columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string,
+  columnNameReplacer?: (colName: string, index: number, metadata: MetaData) => string,
+  lowerCaseGuids?: boolean,
   tdsVersion: string,
   useColumnNames: boolean,
   useUTC: boolean,

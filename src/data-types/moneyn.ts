@@ -1,4 +1,6 @@
-const MoneyN = {
+import { DataTypeN } from "../data-type";
+
+const MoneyN: DataTypeN = {
   id: 0x6E,
   type: 'MONEYN',
   name: 'MoneyN',

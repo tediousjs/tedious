@@ -1,4 +1,6 @@
-const FloatN = {
+import { DataTypeN } from "../data-type";
+
+const FloatN: DataTypeN = {
   id: 0x6D,
   type: 'FLTN',
   name: 'FloatN',

@@ -1,7 +1,7 @@
 import { codepageBySortId, codepageByLcid } from './collation';
 import Parser from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
-import { TYPE, DataType } from './data-type';
+import { TYPE, DataType, DataTypeN } from './data-type';
 
 const sprintf = require('sprintf-js').sprintf;
 
@@ -27,16 +27,27 @@ type UdtInfo = {
   assemblyName: string
 };
 
-export type Metadata = {
+export interface ValueMetaData {
+  dataLength: number,
+  type: DataType | DataTypeN,
+  precision: number | undefined,
+  scale: number | undefined,
+  collation: Collation | undefined,
+  isVariantValue: boolean,
+}
+
+export type MetaData = {
   userType: number,
   flags: number,
-  type: DataType,
-  collation?: Collation,
+  type: DataType | DataTypeN,
+  collation: Collation | undefined,
   precision?: number,
-  scale?: number,
+  scale: number | undefined,
   dataLength: number,
   schema?: XmlSchema,
-  udtInfo?: UdtInfo
+  udtInfo?: UdtInfo,
+  isVariantValue?: boolean,
+  valueMetaData?: ValueMetaData | null,
 };
 
 function readDataLength(parser: Parser, type: DataType, callback: (dataLength: number | undefined) => void) {
@@ -70,7 +81,7 @@ function readDataLength(parser: Parser, type: DataType, callback: (dataLength: n
   }
 }
 
-function readPrecision(parser: Parser, type: DataType, callback: (precision: number | undefined) => void) {
+function readPrecision(parser: Parser, type: DataType | DataTypeN, callback: (precision: number | undefined) => void) {
   if (type.hasPrecision) {
     parser.readUInt8(callback);
   } else {
@@ -78,7 +89,7 @@ function readPrecision(parser: Parser, type: DataType, callback: (precision: num
   }
 }
 
-function readScale(parser: Parser, type: DataType, callback: (scale: number | undefined) => void) {
+function readScale(parser: Parser, type: DataType | DataTypeN, callback: (scale: number | undefined) => void) {
   if (type.hasScale) {
     parser.readUInt8(callback);
   } else {
@@ -86,7 +97,7 @@ function readScale(parser: Parser, type: DataType, callback: (scale: number | un
   }
 }
 
-function readCollation(parser: Parser, type: DataType, callback: (collation: Collation | undefined) => void) {
+function readCollation(parser: Parser, type: DataType | DataTypeN, callback: (collation: Collation | undefined) => void) {
   if (type.hasCollation) {
     // s2.2.5.1.2
     parser.readBuffer(5, (collationData) => {
@@ -161,7 +172,7 @@ function readUDTInfo(parser: Parser, type: DataType, callback: (udtInfo: UdtInfo
   }
 }
 
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
+function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: MetaData) => void) {
   (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {

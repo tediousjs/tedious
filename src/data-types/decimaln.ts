@@ -1,4 +1,6 @@
-const DecimalN = {
+import { DataTypeN } from "../data-type";
+
+const DecimalN: DataTypeN = {
   id: 0x6A,
   type: 'DECIMALN',
   name: 'DecimalN',

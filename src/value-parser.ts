@@ -1,11 +1,12 @@
-const iconv = require('iconv-lite');
+import Parser from './token/stream-parser';
+import { MetaData, ValueMetaData, readPrecision, readScale, readCollation } from './metadata-parser';
+import { InternalConnectionOptions } from './connection';
+import {TYPE, DataType, DataTypeN } from './data-type';
+
+const iconv  = require('iconv-lite');
 const sprintf = require('sprintf-js').sprintf;
-const TYPE = require('./data-type').TYPE;
 const guidParser = require('./guid-parser');
 
-const readPrecision = require('./metadata-parser').readPrecision;
-const readScale = require('./metadata-parser').readScale;
-const readCollation = require('./metadata-parser').readCollation;
 const convertLEBytesToString = require('./tracking-buffer/bigint').convertLEBytesToString;
 
 const NULL = (1 << 16) - 1;
@@ -16,7 +17,7 @@ const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
-function readTextPointerNull(parser, type, callback) {
+function readTextPointerNull(parser: Parser, type: DataType | DataTypeN , callback: (value: boolean) => void) {
   parser.readUInt8((textPointerLength) => {
     if (textPointerLength !== 0) {
       // Appear to be dummy values, so consume and discard them.
@@ -31,7 +32,7 @@ function readTextPointerNull(parser, type, callback) {
   });
 }
 
-function readDataLength(parser, type, metaData, callback) {
+function readDataLength(parser: Parser, type: DataType | DataTypeN, metaData: MetaData, callback: (value: number | undefined) => void) {
   if (metaData.isVariantValue) {
     return callback(metaData.dataLength);
   }
@@ -69,8 +70,7 @@ function readDataLength(parser, type, metaData, callback) {
   }
 }
 
-module.exports = valueParse;
-function valueParse(parser, metaData, options, callback) {
+function valueParse(parser: Parser, metaData: MetaData, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
   const type = metaData.type;
 
   switch (type.name) {
@@ -177,12 +177,12 @@ function valueParse(parser, metaData, options, callback) {
 
     case 'VarChar':
     case 'Char':
-      const codepage = metaData.collation.codepage;
+      const codepage = metaData.collation!.codepage;
       if (metaData.dataLength === MAX) {
         return readMaxChars(parser, codepage, callback);
       } else {
         return readDataLength(parser, type, metaData, (dataLength) => {
-          readChars(parser, dataLength, codepage, NULL, callback);
+          readChars(parser, dataLength!, codepage, NULL, callback);
         });
       }
 
@@ -192,7 +192,7 @@ function valueParse(parser, metaData, options, callback) {
         return readMaxNChars(parser, callback);
       } else {
         return readDataLength(parser, type, metaData, (dataLength) => {
-          readNChars(parser, dataLength, NULL, callback);
+          readNChars(parser, dataLength!, NULL, callback);
         });
       }
 
@@ -202,7 +202,7 @@ function valueParse(parser, metaData, options, callback) {
         return readMaxBinary(parser, callback);
       } else {
         return readDataLength(parser, type, metaData, (dataLength) => {
-          readBinary(parser, dataLength, NULL, callback);
+          readBinary(parser, dataLength!, NULL, callback);
         });
       }
 
@@ -213,7 +213,7 @@ function valueParse(parser, metaData, options, callback) {
         }
 
         readDataLength(parser, type, metaData, (dataLength) => {
-          readChars(parser, dataLength, metaData.collation.codepage, PLP_NULL, callback);
+          readChars(parser, dataLength!, metaData.collation!.codepage, PLP_NULL, callback);
         });
       });
 
@@ -224,7 +224,7 @@ function valueParse(parser, metaData, options, callback) {
         }
 
         readDataLength(parser, type, metaData, (dataLength) => {
-          readNChars(parser, dataLength, PLP_NULL, callback);
+          readNChars(parser, dataLength!, PLP_NULL, callback);
         });
       });
 
@@ -235,7 +235,7 @@ function valueParse(parser, metaData, options, callback) {
         }
 
         readDataLength(parser, type, metaData, (dataLength) => {
-          readBinary(parser, dataLength, PLP_NULL, callback);
+          readBinary(parser, dataLength!, PLP_NULL, callback);
         });
       });
 
@@ -269,7 +269,7 @@ function valueParse(parser, metaData, options, callback) {
         if (dataLength === 0) {
           return callback(null);
         } else {
-          return readTime(parser, dataLength, metaData.scale, options.useUTC, callback);
+          return readTime(parser, dataLength!, metaData.scale!, options.useUTC, callback);
         }
       });
 
@@ -287,7 +287,7 @@ function valueParse(parser, metaData, options, callback) {
         if (dataLength === 0) {
           return callback(null);
         } else {
-          return readDateTime2(parser, dataLength, metaData.scale, options.useUTC, callback);
+          return readDateTime2(parser, dataLength!, metaData.scale!, options.useUTC, callback);
         }
       });
 
@@ -296,7 +296,7 @@ function valueParse(parser, metaData, options, callback) {
         if (dataLength === 0) {
           return callback(null);
         } else {
-          return readDateTimeOffset(parser, dataLength, metaData.scale, callback);
+          return readDateTimeOffset(parser, dataLength!, metaData.scale!, callback);
         }
       });
 
@@ -310,7 +310,7 @@ function valueParse(parser, metaData, options, callback) {
             sign = sign === 1 ? 1 : -1;
 
             let readValue;
-            switch (dataLength - 1) {
+            switch (dataLength! - 1) {
               case 4:
                 readValue = parser.readUInt32LE;
                 break;
@@ -324,11 +324,11 @@ function valueParse(parser, metaData, options, callback) {
                 readValue = parser.readUNumeric128LE;
                 break;
               default:
-                return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength - 1)));
+                return parser.emit('error', new Error(sprintf('Unsupported numeric size %d', dataLength! - 1)));
             }
 
             readValue.call(parser, (value) => {
-              callback((value * sign) / Math.pow(10, metaData.scale));
+              callback((value * sign) / Math.pow(10, metaData.scale!));
             });
           });
         }
@@ -345,7 +345,7 @@ function valueParse(parser, metaData, options, callback) {
             });
 
           default:
-            return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
+            return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength! - 1)));
         }
       });
 
@@ -360,11 +360,12 @@ function valueParse(parser, metaData, options, callback) {
           return callback(null);
         }
 
-        const valueMetaData = metaData.valueMetaData = {};
+        const valueMetaData = metaData.valueMetaData = { } as ValueMetaData;
+
         Object.defineProperty(valueMetaData, 'isVariantValue', { value: true });
         return parser.readUInt8((baseType) => {
           return parser.readUInt8((propBytes) => {
-            valueMetaData.dataLength = dataLength - propBytes - 2;
+            valueMetaData.dataLength = dataLength! - propBytes - 2;
             valueMetaData.type = TYPE[baseType];
             return readPrecision(parser, valueMetaData.type, (precision) => {
               valueMetaData.precision = precision;
@@ -373,13 +374,13 @@ function valueParse(parser, metaData, options, callback) {
                 return readCollation(parser, valueMetaData.type, (collation) => {
                   valueMetaData.collation = collation;
                   if (baseType === 0xA5 || baseType === 0xAD || baseType === 0xA7 || baseType === 0xAF || baseType === 0xE7 || baseType === 0xEF) {
-                    return readDataLength(parser, valueMetaData.type, {}, (maxDataLength) => {
+                    return readDataLength(parser, valueMetaData.type, {} as MetaData, (maxDataLength) => {
                       // skip the 2-byte max length sent for BIGVARCHRTYPE, BIGCHARTYPE, NVARCHARTYPE, NCHARTYPE, BIGVARBINTYPE and BIGBINARYTYPE types
                       // and parse based on the length of actual data
-                      return valueParse(parser, valueMetaData, options, callback);
+                      return valueParse(parser, valueMetaData as MetaData, options, callback);
                     });
                   } else {
-                    return valueParse(parser, valueMetaData, options, callback);
+                    return valueParse(parser, valueMetaData as MetaData, options, callback);
                   }
                 });
               });
@@ -393,7 +394,7 @@ function valueParse(parser, metaData, options, callback) {
   }
 }
 
-function readBinary(parser, dataLength, nullValue, callback) {
+function readBinary(parser: Parser, dataLength: number, nullValue: number | Buffer | undefined, callback: (value: unknown) => void) {
   if (dataLength === nullValue) {
     return callback(null);
   } else {
@@ -401,7 +402,7 @@ function readBinary(parser, dataLength, nullValue, callback) {
   }
 }
 
-function readChars(parser, dataLength, codepage, nullValue, callback) {
+function readChars(parser: Parser, dataLength: number, codepage: string, nullValue: number | Buffer | undefined, callback: (value: unknown) => void) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
@@ -415,7 +416,7 @@ function readChars(parser, dataLength, codepage, nullValue, callback) {
   }
 }
 
-function readNChars(parser, dataLength, nullValue, callback) {
+function readNChars(parser: Parser, dataLength: number, nullValue: number | Buffer | undefined, callback: (value: unknown) => void) {
   if (dataLength === nullValue) {
     return callback(null);
   } else {
@@ -425,11 +426,11 @@ function readNChars(parser, dataLength, nullValue, callback) {
   }
 }
 
-function readMaxBinary(parser, callback) {
+function readMaxBinary(parser: Parser, callback: (value: unknown) => void) {
   return readMax(parser, callback);
 }
 
-function readMaxChars(parser, codepage, callback) {
+function readMaxChars(parser: Parser, codepage: string, callback: (value: unknown) => void) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
@@ -443,7 +444,7 @@ function readMaxChars(parser, codepage, callback) {
   });
 }
 
-function readMaxNChars(parser, callback) {
+function readMaxNChars(parser: Parser, callback: (value: string | null) => void) {
   readMax(parser, (data) => {
     if (data) {
       callback(data.toString('ucs2'));
@@ -453,7 +454,7 @@ function readMaxNChars(parser, callback) {
   });
 }
 
-function readMax(parser, callback) {
+function readMax(parser: Parser, callback: (value: null | Buffer) => void) {
   parser.readBuffer(8, (type) => {
     if (type.equals(PLP_NULL)) {
       return callback(null);
@@ -473,11 +474,11 @@ function readMax(parser, callback) {
   });
 }
 
-function readMaxKnownLength(parser, totalLength, callback) {
+function readMaxKnownLength(parser: Parser, totalLength: number, callback: (value: null | Buffer) => void) {
   const data = Buffer.alloc(totalLength, 0);
 
   let offset = 0;
-  function next(done) {
+  function next(done: any) {
     parser.readUInt32LE((chunkLength) => {
       if (!chunkLength) {
         return done();
@@ -501,11 +502,11 @@ function readMaxKnownLength(parser, totalLength, callback) {
   });
 }
 
-function readMaxUnknownLength(parser, callback) {
-  const chunks = [];
+function readMaxUnknownLength(parser: Parser, callback: (value: null | Buffer) => void) {
+  const chunks: Buffer[] = [];
 
   let length = 0;
-  function next(done) {
+  function next(done: any) {
     parser.readUInt32LE((chunkLength) => {
       if (!chunkLength) {
         return done();
@@ -525,7 +526,7 @@ function readMaxUnknownLength(parser, callback) {
   });
 }
 
-function readSmallDateTime(parser, useUTC, callback) {
+function readSmallDateTime(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readUInt16LE((days) => {
     parser.readUInt16LE((minutes) => {
       let value;
@@ -539,7 +540,7 @@ function readSmallDateTime(parser, useUTC, callback) {
   });
 }
 
-function readDateTime(parser, useUTC, callback) {
+function readDateTime(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readInt32LE((days) => {
     parser.readUInt32LE((threeHundredthsOfSecond) => {
       const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
@@ -556,8 +557,8 @@ function readDateTime(parser, useUTC, callback) {
   });
 }
 
-function readTime(parser, dataLength, scale, useUTC, callback) {
-  let readValue;
+function readTime(parser: Parser, dataLength: number, scale: number, useUTC: boolean, callback: (value: Date) => void) {
+  let readValue: any;
   switch (dataLength) {
     case 3:
       readValue = parser.readUInt24LE;
@@ -569,7 +570,7 @@ function readTime(parser, dataLength, scale, useUTC, callback) {
       readValue = parser.readUInt40LE;
   }
 
-  readValue.call(parser, (value) => {
+  readValue!.call(parser, (value: number) => {
     if (scale < 7) {
       for (let i = scale; i < 7; i++) {
         value *= 10;
@@ -590,7 +591,7 @@ function readTime(parser, dataLength, scale, useUTC, callback) {
   });
 }
 
-function readDate(parser, useUTC, callback) {
+function readDate(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readUInt24LE((days) => {
     if (useUTC) {
       callback(new Date(Date.UTC(2000, 0, days - 730118)));
@@ -600,8 +601,10 @@ function readDate(parser, useUTC, callback) {
   });
 }
 
-function readDateTime2(parser, dataLength, scale, useUTC, callback) {
-  readTime(parser, dataLength - 3, scale, useUTC, (time) => {
+function readDateTime2(parser: Parser, dataLength: number, scale: number, useUTC: boolean, callback: (value: Date) => void) {
+  readTime(parser, dataLength - 3, scale, useUTC, (input) => { //TODO: 'input' is 'time', but TypeScript cannot find "time.nanosecondsDelta";
+    let time = input as any;
+    
     parser.readUInt24LE((days) => {
       let date;
       if (useUTC) {
@@ -618,8 +621,9 @@ function readDateTime2(parser, dataLength, scale, useUTC, callback) {
   });
 }
 
-function readDateTimeOffset(parser, dataLength, scale, callback) {
-  readTime(parser, dataLength - 5, scale, true, (time) => {
+function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, callback: (value: Date) => void) {
+  readTime(parser, dataLength - 5, scale, true, (input) => {//TODO: 'input' is 'time', but TypeScript cannot find "time.nanosecondsDelta";
+    let time = input as any;
     parser.readUInt24LE((days) => {
       // offset
       parser.readInt16LE(() => {
@@ -633,3 +637,6 @@ function readDateTimeOffset(parser, dataLength, scale, callback) {
     });
   });
 }
+
+export default valueParse;
+module.exports = valueParse;

@@ -1,4 +1,6 @@
-const BitN = {
+import { DataTypeN } from "../data-type";
+
+const BitN: DataTypeN = {
   id: 0x68,
   type: 'BITN',
   name: 'BitN',

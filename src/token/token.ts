@@ -1,4 +1,4 @@
-import { Metadata } from '../metadata-parser';
+import { MetaData } from '../metadata-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
 
 export const TYPE = {
@@ -386,10 +386,10 @@ export class ReturnStatusToken extends Token {
 export class ReturnValueToken extends Token {
   paramOrdinal: number;
   paramName: string;
-  metadata: Metadata;
+  metadata: MetaData;
   value: unknown;
 
-  constructor({ paramOrdinal, paramName, metadata, value }: { paramOrdinal: number, paramName: string, metadata: Metadata, value: unknown }) {
+  constructor({ paramOrdinal, paramName, metadata, value }: { paramOrdinal: number, paramName: string, metadata: MetaData, value: unknown }) {
     super('RETURNVALUE', 'returnValue');
 
     this.paramOrdinal = paramOrdinal;
