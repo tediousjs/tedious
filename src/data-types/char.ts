@@ -33,14 +33,15 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  resolveLength: function(parameter: ParameterData<any>) {
+  resolveLength: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
-    } else if (parameter.value != null) {
-      if (Buffer.isBuffer(parameter.value)) {
-        return parameter.value.length || 1;
+    } else if (value != null) {
+      if (Buffer.isBuffer(value)) {
+        return value.length || 1;
       } else {
-        return parameter.value.toString().length || 1;
+        return value.toString().length || 1;
       }
     } else {
       return this.maximumLength;
@@ -64,7 +65,7 @@ const Char: { maximumLength: number } & DataType = {
     cb();
   },
 
-  validate: function(value: any): null | string | TypeError {
+  validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;
     }

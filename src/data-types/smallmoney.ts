@@ -2,7 +2,7 @@ import { DataType } from '../data-type';
 
 const MoneyN = require('./moneyn');
 
-const SmallMoney:DataType = {
+const SmallMoney: DataType = {
   id: 0x7A,
   type: 'MONEY4',
   name: 'SmallMoney',

@@ -5,7 +5,7 @@ const DateTimeN = require('./datetimen');
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-const SmallDateTime:DataType = {
+const SmallDateTime: DataType = {
   id: 0x3A,
   type: 'DATETIM4',
   name: 'SmallDateTime',

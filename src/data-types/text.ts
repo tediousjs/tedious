@@ -1,6 +1,6 @@
 import { DataType } from '../data-type';
 
-const Text: { hasTextPointerAndTimestamp:boolean, dataLengthLength: number } & DataType = {
+const Text: { hasTextPointerAndTimestamp: boolean, dataLengthLength: number } & DataType = {
   id: 0x23,
   type: 'TEXT',
   name: 'Text',
