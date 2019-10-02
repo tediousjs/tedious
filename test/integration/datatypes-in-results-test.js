@@ -127,6 +127,10 @@ describe('Datatypes in results test', function() {
     execSql(done, 'select cast(8 as bigint)', '8');
   });
 
+  it('should test negative big int', function(done) {
+    execSql(done, 'select cast(-8 as bigint)', '-8');
+  });
+
   it('should test big int null', function(done) {
     execSql(done, 'select cast(null as bigint)', null);
   });

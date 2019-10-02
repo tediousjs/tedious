@@ -1,3 +1,5 @@
+import JSBI from 'jsbi';
+
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
 import { InternalConnectionOptions } from '../connection';
@@ -33,7 +35,7 @@ function parseToken(parser: Parser, options: InternalConnectionOptions, callback
     const serverError = !!(status & STATUS.SRVERROR);
 
     parser.readUInt16LE((curCmd) => {
-      (options.tdsVersion < '7_2' ? parser.readUInt32LE : parser.readUInt64LE).call(parser, (rowCount) => {
+      const next = (rowCount: number) => {
         callback({
           more: more,
           sqlError: sqlError,
@@ -42,7 +44,15 @@ function parseToken(parser: Parser, options: InternalConnectionOptions, callback
           rowCount: rowCountValid ? rowCount : undefined,
           curCmd: curCmd
         });
-      });
+      };
+
+      if (options.tdsVersion < '7_2') {
+        parser.readUInt32LE(next);
+      } else {
+        parser.readBigUInt64LE((rowCount) => {
+          next(JSBI.toNumber(rowCount));
+        });
+      }
     });
   });
 }
