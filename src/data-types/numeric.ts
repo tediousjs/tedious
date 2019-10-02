@@ -1,17 +1,17 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 const NumericN = require('./numericn');
 
-const Numeric:DataType = {
+const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>, resolvePrecision: NonNullable<DataType['resolvePrecision']> } = {
   id: 0x3F,
   type: 'NUMERIC',
   name: 'Numeric',
 
   declaration: function(parameter) {
-    return 'numeric(' + (this.resolvePrecision!(parameter)) + ', ' + (this.resolveScale!(parameter)) + ')';
+    return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
   },
 
   resolvePrecision: function(parameter) {
-    if (parameter.precision! != null) {
+    if (parameter.precision != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
       return 1;

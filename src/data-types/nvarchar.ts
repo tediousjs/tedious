@@ -45,7 +45,7 @@ const SmallMoney: { maximumLength: number} & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter:ParameterData<any>) {
+  writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
     if (parameter.length! <= this.maximumLength) {
       buffer.writeUInt16LE(parameter.length! * 2);

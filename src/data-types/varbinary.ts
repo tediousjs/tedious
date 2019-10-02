@@ -29,11 +29,12 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function(parameter: ParameterData<any>) {
+  resolveLength: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
-    } else if (parameter.value != null) {
-      return parameter.value.length;
+    } else if (value != null) {
+      return value.length;
     } else {
       return this.maximumLength;
     }

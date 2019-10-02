@@ -2,7 +2,7 @@ import { DataType } from '../data-type';
 
 const IntN = require('./intn');
 
-const SmallInt: & DataType = {
+const SmallInt: DataType = {
   id: 0x34,
   type: 'INT2',
   name: 'SmallInt',

@@ -2,7 +2,7 @@ import { DataType } from '../data-type';
 
 const FloatN = require('./floatn');
 
-const Real:DataType = {
+const Real: DataType = {
   id: 0x3B,
   type: 'FLT4',
   name: 'Real',
