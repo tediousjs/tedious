@@ -89,7 +89,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

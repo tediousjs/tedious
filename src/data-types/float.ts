@@ -26,7 +26,7 @@ const Float: DataType = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }
