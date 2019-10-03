@@ -278,23 +278,17 @@ class Parser extends Transform {
 
   readUInt24LE(callback: (data: number) => void) {
     this.awaitData(3, () => {
-      const low = this.buffer.readUInt16LE(this.position);
-      const high = this.buffer.readUInt8(this.position + 2);
-
+      const data = this.buffer.readUIntLE(this.position, 3);
       this.position += 3;
-
-      callback(low | (high << 16));
+      callback(data);
     });
   }
 
   readUInt40LE(callback: (data: number) => void) {
     this.awaitData(5, () => {
-      const low = this.buffer.readUInt32LE(this.position);
-      const high = this.buffer.readUInt8(this.position + 4);
-
+      const data = this.buffer.readUIntLE(this.position, 5);
       this.position += 5;
-
-      callback((0x100000000 * high) + low);
+      callback(data);
     });
   }
 
