@@ -6,8 +6,6 @@ const NChar: DataType & { maximumLength: number } = {
   id: 0xEF,
   type: 'NCHAR',
   name: 'NChar',
-  hasCollation: true,
-  dataLengthLength: 2,
   maximumLength: 4000,
 
   declaration: function(parameter) {

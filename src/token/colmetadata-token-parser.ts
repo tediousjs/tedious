@@ -69,6 +69,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
           scale: metadata.scale,
           udtInfo: metadata.udtInfo,
           dataLength: metadata.dataLength,
+          schema: metadata.schema,
           colName: colName,
           tableName: tableName
         });

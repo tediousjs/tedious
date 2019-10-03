@@ -5,8 +5,6 @@ module.exports = {
   id: 0xE7,
   type: 'NVARCHAR',
   name: 'NVarChar',
-  hasCollation: true,
-  dataLengthLength: 2,
   maximumLength: 4000,
 
   declaration: function(parameter) {
