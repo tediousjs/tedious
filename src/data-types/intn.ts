@@ -4,7 +4,7 @@ const IntN = {
   name: 'IntN',
   dataLengthLength: 1,
 
-  getDataType: function(dataLength) {
+  getDataType: function(dataLength: number) {
     const tinyInt = require('./tinyint');
     const smallInt = require('./smallint');
     const int = require('./int');

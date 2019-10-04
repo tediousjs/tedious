@@ -4,7 +4,7 @@ const MoneyN = {
   name: 'MoneyN',
   dataLengthLength: 1,
 
-  getDataType: function(dataLength) {
+  getDataType: function(dataLength: number) {
     const smallmoney = require('./smallmoney');
     const money = require('./money');
 

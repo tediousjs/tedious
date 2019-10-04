@@ -4,7 +4,7 @@ const BitN = {
   name: 'BitN',
   dataLengthLength: 1,
 
-  getDataType: function(dataLength) {
+  getDataType: function(dataLength: number) {
     const bit = require('./bit');
 
     return (dataLength === 1) ? bit : this;

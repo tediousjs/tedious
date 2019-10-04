@@ -4,7 +4,7 @@ const DateTimeN = {
   name: 'DateTimeN',
   dataLengthLength: 1,
 
-  getDataType: function(dataLength) {
+  getDataType: function(dataLength: number) {
     const smalldatetime = require('./smalldatetime');
     const datetime = require('./datetime');
 

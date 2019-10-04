@@ -6,7 +6,7 @@ const DecimalN = {
   hasPrecision: true,
   hasScale: true,
 
-  getDataType: function(dataLength) {
+  getDataType: function(dataLength: number) {
     const decimal = require('./decimal');
 
     return (dataLength === 17) ? decimal : this;
