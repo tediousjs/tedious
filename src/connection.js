@@ -27,6 +27,7 @@ const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 const libraryName = require('./library').name;
 const versions = require('./tds-versions').versions;
+const colMetaDatParser = require('./token/colmetadata-token-parser');
 
 const { createNTLMRequest } = require('./ntlm');
 
@@ -867,7 +868,21 @@ class Connection extends EventEmitter {
           } else {
             columns = token.columns;
           }
-          request.emit('columnMetadata', columns);
+
+          // Replace variable length data-type to specific data-type (e.g., type intN -> type smallint etc...)
+          const emittedColumns = [];
+          if (Array.isArray(columns)) {
+            columns.forEach((column) => {
+              emittedColumns.push(colMetaDatParser.specifyDataType(column));
+            });
+          } else {
+            Object.keys(columns).forEach((colName) => {
+              const tempCol = columns[colName];
+              emittedColumns.push(colMetaDatParser.specifyDataType(tempCol));
+            });
+          }
+
+          request.emit('columnMetadata', emittedColumns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
@@ -1898,7 +1913,7 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1917,7 +1932,7 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
-      message: function() {},
+      message: function() { },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },

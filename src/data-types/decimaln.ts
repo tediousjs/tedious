@@ -4,7 +4,13 @@ const DecimalN = {
   name: 'DecimalN',
   dataLengthLength: 1,
   hasPrecision: true,
-  hasScale: true
+  hasScale: true,
+
+  getDataType: function(dataLength: number) {
+    const decimal = require('./decimal');
+
+    return (dataLength === 17) ? decimal : this;
+  }
 };
 
 export default DecimalN;
