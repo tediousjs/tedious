@@ -77,15 +77,15 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-export function specifyDataType (column: ColumnMetadata) {	
-  const dataLength = column.dataLength;	
-  const originalType = column.type;	
-  let type: any;	
+export function specifyDataType(column: ColumnMetadata) {
+  const dataLength = column.dataLength;
+  const originalType = column.type;
+  let type: any;
 
-  if (originalType.hasOwnProperty('getDataType')) {	
-    type = originalType.getDataType!(dataLength);	
-  } else {	
-    type = originalType;	
+  if (originalType.hasOwnProperty('getDataType')) {
+    type = originalType.getDataType!(dataLength);
+  } else {
+    type = originalType;
   }
 
   return {

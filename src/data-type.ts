@@ -81,7 +81,7 @@ export interface DataType {
   hasCollation?: boolean,
   hasSchemaPresent?: boolean,
   hasUDTInfo?: boolean,
-  
+
   getDataType?: (dataLength: number) => number | object;
   resolveLength?: (parameter: Parameter) => number,
   resolvePrecision?: (parameter: Parameter) => number,
