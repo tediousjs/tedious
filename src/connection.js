@@ -1,3 +1,5 @@
+import { specifyDataType } from './token/colmetadata-token-parser';
+
 const crypto = require('crypto');
 const os = require('os');
 // $FlowFixMe
@@ -27,7 +29,6 @@ const RequestError = require('./errors').RequestError;
 const Connector = require('./connector').Connector;
 const libraryName = require('./library').name;
 const versions = require('./tds-versions').versions;
-const colMetaDatParser = require('./token/colmetadata-token-parser');
 
 const { createNTLMRequest } = require('./ntlm');
 
@@ -869,16 +870,16 @@ class Connection extends EventEmitter {
             columns = token.columns;
           }
 
-          // Replace variable length data-type to specific data-type (e.g., type intN -> type smallint etc...)
+          // Replace variable length data-type to specific data-type (e.g., type intN -> smallint etc...)
           const emittedColumns = [];
           if (Array.isArray(columns)) {
             columns.forEach((column) => {
-              emittedColumns.push(colMetaDatParser.specifyDataType(column));
+              emittedColumns.push(specifyDataType(column));
             });
           } else {
             Object.keys(columns).forEach((colName) => {
               const tempCol = columns[colName];
-              emittedColumns.push(colMetaDatParser.specifyDataType(tempCol));
+              emittedColumns.push(specifyDataType(tempCol));
             });
           }
 
