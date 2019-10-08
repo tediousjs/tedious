@@ -330,12 +330,10 @@ describe('parseBrowserResponse', function() {
       retries: 1
     };
 
-    new InstanceLookup().instanceLookup(options, () => {
-      assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
-      assert.ok(spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpected hostname passed to dns.lookup');
-
-      done();
-    });
+    new InstanceLookup().instanceLookup(options, () => {});
+    assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
+    assert.ok(spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpected hostname passed to dns.lookup');
+    done();
   });
 
   it('test ASCII Server name', (done) => {
@@ -346,11 +344,9 @@ describe('parseBrowserResponse', function() {
       retries: 1
     };
 
-    new InstanceLookup().instanceLookup(options, () => {
-      assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
-      assert.ok(spy.calledWithMatch(options.server), 'Unexpected hostname passed to dns.lookup');
-
-      done();
-    });
+    new InstanceLookup().instanceLookup(options, () => {});
+    assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
+    assert.ok(spy.calledWithMatch(options.server), 'Unexpected hostname passed to dns.lookup');
+    done();
   });
 });

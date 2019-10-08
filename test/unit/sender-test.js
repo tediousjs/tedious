@@ -137,44 +137,44 @@ describe('Sender send to IP address', function() {
   });
 });
 
-function sendToHostCommonTestSetup(lookupError) {
-  // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
-  // method(s) on the ParallelSendStrategy class are/is being invoked. So we stub out
-  // the methods to validate they're invoked correctly.
-  const testStrategy = new ParallelSendStrategy(
-    this.addresses,
-    anyPort,
-    anyRequest
-  );
-  const callback = () => { };
-  this.strategySendStub = sinon.stub(testStrategy, 'send');
-  this.strategySendStub.withArgs(callback);
-  this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
-  this.strategyCancelStub.withArgs();
-
-  this.sender = new Sender(anyHost, anyPort, anyRequest);
-
-  // Stub out the lookupAll method to prevent network activity from doing a DNS
-  // lookup. Succeeds or fails depending on lookupError.
-  this.lookupAllStub = sinon.stub(this.sender, 'invokeLookupAll');
-  this.lookupAllStub.callsArgWithAsync(1, lookupError, this.addresses);
-
-  // Stub the create strategy method for the test to return a strategy object created
-  // exactly like the method would but with a few methods stubbed.
-  this.createStrategyStub = sinon.stub(
-    this.sender,
-    'createParallelSendStrategy'
-  );
-  this.createStrategyStub
-    .withArgs(this.addresses, anyPort, anyRequest)
-    .returns(testStrategy);
-
-  this.sender.execute(callback);
-}
-
-describe('Sender send to hostnam', function() {
+describe('Sender send to hostname', function() {
   describe('Send', function() {
     let glob;
+
+    function sendToHostCommonTestSetup(lookupError) {
+      // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
+      // method(s) on the ParallelSendStrategy class are/is being invoked. So we stub out
+      // the methods to validate they're invoked correctly.
+      const testStrategy = new ParallelSendStrategy(
+        this.addresses,
+        anyPort,
+        anyRequest
+      );
+      const callback = () => { };
+      this.strategySendStub = sinon.stub(testStrategy, 'send');
+      this.strategySendStub.withArgs(callback);
+      this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
+      this.strategyCancelStub.withArgs();
+
+      this.sender = new Sender(anyHost, anyPort, anyRequest);
+
+      // Stub out the lookupAll method to prevent network activity from doing a DNS
+      // lookup. Succeeds or fails depending on lookupError.
+      this.lookupAllStub = sinon.stub(this.sender, 'invokeLookupAll');
+      this.lookupAllStub.callsArgWithAsync(1, lookupError, this.addresses);
+
+      // Stub the create strategy method for the test to return a strategy object created
+      // exactly like the method would but with a few methods stubbed.
+      this.createStrategyStub = sinon.stub(
+        this.sender,
+        'createParallelSendStrategy'
+      );
+      this.createStrategyStub
+        .withArgs(this.addresses, anyPort, anyRequest)
+        .returns(testStrategy);
+
+      this.sender.execute(callback);
+    }
 
     beforeEach(function() {
       // Set of IP addresses to be returned by stubbed out lookupAll method.
