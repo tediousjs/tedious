@@ -76,9 +76,9 @@
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "mocha test/integration/",
-    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "jest test/unit test/unit/token test/unit/tracking-buffer",
+    "test-integration": "jest test/integration/",
+    "test-all": "jest test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
