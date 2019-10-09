@@ -322,7 +322,7 @@ describe('parseBrowserResponse', function() {
     sinon.restore();
   });
 
-  it('test IDN Server name', (done) => {
+  it('test IDN Server name', () => {
     const options = {
       server: '本地主机.ad',
       instanceName: 'instance',
@@ -333,10 +333,9 @@ describe('parseBrowserResponse', function() {
     new InstanceLookup().instanceLookup(options, () => {});
     assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
     assert.ok(spy.calledWithMatch(punycode.toASCII(options.server)), 'Unexpected hostname passed to dns.lookup');
-    done();
   });
 
-  it('test ASCII Server name', (done) => {
+  it('test ASCII Server name', () => {
     const options = {
       server: 'localhost',
       instanceName: 'instance',
@@ -347,6 +346,5 @@ describe('parseBrowserResponse', function() {
     new InstanceLookup().instanceLookup(options, () => {});
     assert.ok(spy.called, 'Failed to call dns.lookup on hostname');
     assert.ok(spy.calledWithMatch(options.server), 'Unexpected hostname passed to dns.lookup');
-    done();
   });
 });
