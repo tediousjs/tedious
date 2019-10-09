@@ -139,8 +139,6 @@ function execSqlOutput(done, type, value, expectedValue) {
 }
 
 describe('Parameterised Statements Test', function() {
-  this.timeout(60000);
-
   it('should test bit True', function(done) {
     execSql(done, TYPES.Bit, true);
   });
@@ -949,5 +947,4 @@ end')\
       // console.log(text)
     });
   });
-
-});
+}, 60000);

@@ -25,16 +25,10 @@ function getConfig() {
 }
 
 describe('calling a procedure that takes and returns a TVP', function() {
-  this.timeout(5000);
-
   let connection;
 
   beforeEach(function(done) {
     const config = getConfig();
-
-    if (config.options.tdsVersion < '7_3_A') {
-      this.skip();
-    }
 
     connection = new Connection(config);
 
@@ -57,7 +51,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
     connection.close();
   });
 
-  it('returns the same data', function(done) {
+  ((process.env.TEDIOUS_TDS_VERSION >= '7_3_A') ? it : it.skip)('returns the same data', function(done) {
     async.series([
       (next) => {
         const sql = 'USE tempdb; BEGIN TRY DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
@@ -163,4 +157,4 @@ describe('calling a procedure that takes and returns a TVP', function() {
       connection.callProcedure(request4);
     });
   });
-});
+}, 5000);
