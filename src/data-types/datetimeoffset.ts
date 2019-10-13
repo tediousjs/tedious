@@ -77,7 +77,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     }
     cb();
   },
-  validate: function(value) {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

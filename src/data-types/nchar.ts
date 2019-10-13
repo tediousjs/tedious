@@ -64,7 +64,7 @@ const NChar: DataType & { maximumLength: number } = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }

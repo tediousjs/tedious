@@ -64,7 +64,7 @@ const Char: { maximumLength: number } & DataType = {
     cb();
   },
 
-  validate: function(value: any): null | string | TypeError {
+  validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;
     }
