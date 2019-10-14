@@ -1,7 +1,25 @@
-const Null = {
+import { DataType } from '../data-type';
+
+const Null: DataType = {
   id: 0x1F,
   type: 'NULL',
-  name: 'Null'
+  name: 'Null',
+
+  declaration() {
+    throw new Error('not implemented');
+  },
+
+  writeTypeInfo() {
+    throw new Error('not implemented');
+  },
+
+  writeParameterData() {
+    throw new Error('not implemented');
+  },
+
+  validate() {
+    throw new Error('not implemented');
+  }
 };
 
 export default Null;
