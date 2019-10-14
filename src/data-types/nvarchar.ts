@@ -1,9 +1,9 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 
-const SmallMoney: { maximumLength: number} & DataType = {
+const NVarChar: { maximumLength: number } & DataType = {
   id: 0xE7,
   type: 'NVARCHAR',
   name: 'NVarChar',
@@ -85,5 +85,5 @@ const SmallMoney: { maximumLength: number} & DataType = {
   }
 };
 
-export default SmallMoney;
-module.exports = SmallMoney;
+export default NVarChar;
+module.exports = NVarChar;
