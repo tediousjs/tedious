@@ -6,8 +6,6 @@ const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
   type: 'BIGCHAR',
   name: 'Char',
-  hasCollation: true,
-  dataLengthLength: 2,
   maximumLength: 8000,
 
   declaration: function(parameter) {

@@ -6,7 +6,6 @@ const Binary: { maximumLength: number } & DataType = {
   id: 0xAD,
   type: 'BIGBinary',
   name: 'Binary',
-  dataLengthLength: 2,
   maximumLength: 8000,
 
   declaration: function(parameter) {

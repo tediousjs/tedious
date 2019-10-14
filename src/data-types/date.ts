@@ -9,8 +9,6 @@ const Date : DataType = {
   id: 0x28,
   type: 'DATEN',
   name: 'Date',
-  dataLengthLength: 1,
-  fixedDataLength: 3,
 
   declaration: function() {
     return 'date';

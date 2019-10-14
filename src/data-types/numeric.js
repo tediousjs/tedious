@@ -4,8 +4,6 @@ module.exports = {
   id: 0x3F,
   type: 'NUMERIC',
   name: 'Numeric',
-  hasPrecision: true,
-  hasScale: true,
 
   declaration: function(parameter) {
     return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';

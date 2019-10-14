@@ -6,8 +6,6 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
   id: 0x37,
   type: 'DECIMAL',
   name: 'Decimal',
-  hasPrecision: true,
-  hasScale: true,
 
   declaration: function(parameter) {
     return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';

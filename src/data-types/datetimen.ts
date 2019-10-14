@@ -1,8 +1,25 @@
-const DateTimeN = {
+import { DataType } from '../data-type';
+
+const DateTimeN: DataType = {
   id: 0x6F,
   type: 'DATETIMN',
   name: 'DateTimeN',
-  dataLengthLength: 1
+
+  declaration() {
+    throw new Error('not implemented');
+  },
+
+  writeTypeInfo() {
+    throw new Error('not implemented');
+  },
+
+  writeParameterData() {
+    throw new Error('not implemented');
+  },
+
+  validate() {
+    throw new Error('not implemented');
+  }
 };
 
 export default DateTimeN;
