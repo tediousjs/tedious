@@ -5,8 +5,6 @@ module.exports = {
   id: 0xA7,
   type: 'BIGVARCHR',
   name: 'VarChar',
-  hasCollation: true,
-  dataLengthLength: 2,
   maximumLength: 8000,
 
   declaration: function(parameter) {

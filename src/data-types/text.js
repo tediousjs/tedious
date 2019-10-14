@@ -2,10 +2,8 @@ module.exports = {
   id: 0x23,
   type: 'TEXT',
   name: 'Text',
-  hasCollation: true,
+
   hasTableName: true,
-  hasTextPointerAndTimestamp: true,
-  dataLengthLength: 4,
 
   declaration: function() {
     return 'text';
