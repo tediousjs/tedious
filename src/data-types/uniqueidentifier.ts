@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const guidParser = require('../guid-parser');
+import { guidToArray } from '../guid-parser';
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -23,7 +22,7 @@ const UniqueIdentifier: DataType = {
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(0x10);
-      buffer.writeBuffer(Buffer.from(guidParser.guidToArray(parameter.value)));
+      buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
     } else {
       buffer.writeUInt8(0);
     }

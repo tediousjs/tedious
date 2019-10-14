@@ -4,7 +4,6 @@ const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 
 const VarChar: { maximumLength: number } & DataType = {
-
   id: 0xA7,
   type: 'BIGVARCHR',
   name: 'VarChar',

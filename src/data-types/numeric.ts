@@ -1,5 +1,5 @@
 import { DataType } from '../data-type';
-const NumericN = require('./numericn');
+import NumericN from './numericn';
 
 const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>, resolvePrecision: NonNullable<DataType['resolvePrecision']> } = {
   id: 0x3F,

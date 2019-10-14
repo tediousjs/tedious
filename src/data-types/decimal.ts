@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const DecimalN = require('./decimaln');
+import DecimalN from './decimaln';
 
 const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePrecision']>, resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x37,
