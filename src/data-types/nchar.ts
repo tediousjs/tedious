@@ -6,8 +6,6 @@ const NChar: DataType & { maximumLength: number } = {
   id: 0xEF,
   type: 'NCHAR',
   name: 'NChar',
-  hasCollation: true,
-  dataLengthLength: 2,
   maximumLength: 4000,
 
   declaration: function(parameter) {
@@ -64,7 +62,7 @@ const NChar: DataType & { maximumLength: number } = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }

@@ -5,6 +5,7 @@ import { Metadata } from './metadata-parser';
 export type InternalConnectionOptions = {
   camelCaseColumns: boolean,
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string,
+  lowerCaseGuids?: boolean,
   tdsVersion: string,
   useColumnNames: boolean,
   useUTC: boolean,

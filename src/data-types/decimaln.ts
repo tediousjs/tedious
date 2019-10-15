@@ -1,10 +1,25 @@
-const DecimalN = {
+import { DataType } from '../data-type';
+
+const DecimalN: DataType = {
   id: 0x6A,
   type: 'DECIMALN',
   name: 'DecimalN',
-  dataLengthLength: 1,
-  hasPrecision: true,
-  hasScale: true
+
+  declaration() {
+    throw new Error('not implemented');
+  },
+
+  writeTypeInfo() {
+    throw new Error('not implemented');
+  },
+
+  writeParameterData() {
+    throw new Error('not implemented');
+  },
+
+  validate() {
+    throw new Error('not implemented');
+  }
 };
 
 export default DecimalN;

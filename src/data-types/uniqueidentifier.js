@@ -4,7 +4,6 @@ module.exports = {
   id: 0x24,
   type: 'GUIDN',
   name: 'UniqueIdentifier',
-  dataLengthLength: 1,
 
   declaration: function() {
     return 'uniqueidentifier';

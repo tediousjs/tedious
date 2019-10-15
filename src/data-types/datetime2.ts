@@ -7,24 +7,6 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
   id: 0x2A,
   type: 'DATETIME2N',
   name: 'DateTime2',
-  hasScale: true,
-  dataLengthLength: 1,
-
-  dataLengthFromScale: function(scale) {
-    switch (scale) {
-      case 0:
-      case 1:
-      case 2:
-        return 3;
-      case 3:
-      case 4:
-        return 4;
-      case 5:
-      case 6:
-      case 7:
-        return 5;
-    }
-  },
 
   declaration: function(parameter) {
     return 'datetime2(' + (this.resolveScale(parameter)) + ')';
@@ -89,7 +71,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

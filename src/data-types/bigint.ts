@@ -30,7 +30,7 @@ const BigInt: DataType = {
     cb();
   },
 
-  validate: function(value) : null | unknown | TypeError {
+  validate: function(value) : null | number | TypeError {
     if (value == null) {
       return null;
     }

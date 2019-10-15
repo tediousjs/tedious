@@ -1,12 +1,10 @@
 import { DataType } from '../data-type';
 
-const Image: DataType & { hasTextPointerAndTimestamp: boolean } = {
+const Image: DataType = {
   id: 0x22,
   type: 'IMAGE',
   name: 'Image',
   hasTableName: true,
-  hasTextPointerAndTimestamp: true,
-  dataLengthLength: 4,
 
   declaration: function() {
     return 'image';

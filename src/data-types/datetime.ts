@@ -51,7 +51,7 @@ const DateTime: DataType = {
   },
 
   // TODO: type 'any' needs to be revisited.
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
