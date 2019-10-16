@@ -4,7 +4,7 @@ const os = require('os');
 const constants = require('constants');
 const { createSecureContext } = require('tls');
 
-const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI } = require('@azure/ms-rest-nodeauth');
+const { loginWithUsernamePassword, loginWithVmMSI, loginWithAppServiceMSI, loginWithServicePrincipalSecret } = require('@azure/ms-rest-nodeauth');
 
 const BulkLoad = require('./bulk-load');
 const Debug = require('./debug');
@@ -74,8 +74,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -165,6 +165,27 @@ class Connection extends EventEmitter {
             clientId: options.clientId,
             msiEndpoint: options.msiEndpoint,
             msiSecret: options.msiSecret
+          }
+        };
+      } else if (type === 'azure-active-directory-service-principal-secret') {
+        if (typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
+        if (typeof options.clientSecret !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientSecret" property must be of type string.');
+        }
+
+        if (typeof options.tenantId !== 'string') {
+          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
+        }
+
+        authentication = {
+          type: 'azure-active-directory-service-principal-secret',
+          options: {
+            clientId: options.clientId,
+            clientSecret: options.clientSecret,
+            tenantId: options.tenantId
           }
         };
       } else {
@@ -1058,9 +1079,15 @@ class Connection extends EventEmitter {
         this.socketEnd();
       });
       this.messageIo = new MessageIO(this.socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
-      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      this.messageIo.on('data', (data) => {
+        this.dispatchEvent('data', data);
+      });
+      this.messageIo.on('message', () => {
+        this.dispatchEvent('message');
+      });
+      this.messageIo.on('secure', (cleartext) => {
+        this.emit('secure', cleartext);
+      });
 
       this.socketConnect();
     });
@@ -1282,6 +1309,7 @@ class Connection extends EventEmitter {
 
       case 'azure-active-directory-msi-vm':
       case 'azure-active-directory-msi-app-service':
+      case 'azure-active-directory-service-principal-secret':
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -1488,7 +1516,7 @@ class Connection extends EventEmitter {
    @param {boolean} [options.keepNulls=false] - Honors null value passed, ignores the default values set on table.
    @param {boolean} [options.tableLock=false] - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
    @param {callback} callback - Function to call after BulkLoad executes.
-  */
+   */
   newBulkLoad(table, options, callback) {
     if (callback === undefined) {
       callback = options;
@@ -1898,7 +1926,8 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.REDIRECT);
     },
     events: {
-      message: function() {},
+      message: function() {
+      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1917,7 +1946,8 @@ Connection.prototype.STATE = {
       this.cleanupConnection(this.cleanupTypeEnum.RETRY);
     },
     events: {
-      message: function() {},
+      message: function() {
+      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
@@ -1947,7 +1977,7 @@ Connection.prototype.STATE = {
 
           const { authentication } = this.config;
 
-          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
+          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
           } else if (authentication.type === 'ntlm') {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -1975,7 +2005,7 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
@@ -2111,6 +2141,13 @@ Connection.prototype.STATE = {
                 msiSecret: authentication.options.msiSecret,
                 resource: this.fedAuthInfoToken.spn
               }, getTokenFromCredentials);
+            } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
+              loginWithServicePrincipalSecret(
+                authentication.options.clientId,
+                authentication.options.clientSecret,
+                authentication.options.tenantId,
+                { tokenAudience: this.fedAuthInfoToken.spn },
+                getTokenFromCredentials);
             }
           };
 
