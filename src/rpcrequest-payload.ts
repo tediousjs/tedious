@@ -90,20 +90,16 @@ class RpcRequestPayload {
       }
     }
 
-    if (type.hasPrecision) {
-      if (parameter.precision) {
-        param.precision = parameter.precision;
-      } else if (type.resolvePrecision) {
-        param.precision = type.resolvePrecision(parameter);
-      }
+    if (parameter.precision) {
+      param.precision = parameter.precision;
+    } else if (type.resolvePrecision) {
+      param.precision = type.resolvePrecision(parameter);
     }
 
-    if (type.hasScale) {
-      if (parameter.scale) {
-        param.scale = parameter.scale;
-      } else if (type.resolveScale) {
-        param.scale = type.resolveScale(parameter);
-      }
+    if (parameter.scale) {
+      param.scale = parameter.scale;
+    } else if (type.resolveScale) {
+      param.scale = type.resolveScale(parameter);
     }
 
     type.writeTypeInfo(buffer, param, this.options);

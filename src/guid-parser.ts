@@ -36,53 +36,53 @@ const LOWER_CASE_MAP = [
   'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff'
 ];
 
-export function arrayToUpperCaseGuid(array: Array<number>) {
+export function bufferToUpperCaseGuid(buffer: Buffer) {
   return (
-    UPPER_CASE_MAP[array[3]] +
-    UPPER_CASE_MAP[array[2]] +
-    UPPER_CASE_MAP[array[1]] +
-    UPPER_CASE_MAP[array[0]] +
+    UPPER_CASE_MAP[buffer[3]] +
+    UPPER_CASE_MAP[buffer[2]] +
+    UPPER_CASE_MAP[buffer[1]] +
+    UPPER_CASE_MAP[buffer[0]] +
     '-' +
-    UPPER_CASE_MAP[array[5]] +
-    UPPER_CASE_MAP[array[4]] +
+    UPPER_CASE_MAP[buffer[5]] +
+    UPPER_CASE_MAP[buffer[4]] +
     '-' +
-    UPPER_CASE_MAP[array[7]] +
-    UPPER_CASE_MAP[array[6]] +
+    UPPER_CASE_MAP[buffer[7]] +
+    UPPER_CASE_MAP[buffer[6]] +
     '-' +
-    UPPER_CASE_MAP[array[8]] +
-    UPPER_CASE_MAP[array[9]] +
+    UPPER_CASE_MAP[buffer[8]] +
+    UPPER_CASE_MAP[buffer[9]] +
     '-' +
-    UPPER_CASE_MAP[array[10]] +
-    UPPER_CASE_MAP[array[11]] +
-    UPPER_CASE_MAP[array[12]] +
-    UPPER_CASE_MAP[array[13]] +
-    UPPER_CASE_MAP[array[14]] +
-    UPPER_CASE_MAP[array[15]]
+    UPPER_CASE_MAP[buffer[10]] +
+    UPPER_CASE_MAP[buffer[11]] +
+    UPPER_CASE_MAP[buffer[12]] +
+    UPPER_CASE_MAP[buffer[13]] +
+    UPPER_CASE_MAP[buffer[14]] +
+    UPPER_CASE_MAP[buffer[15]]
   );
 }
 
-export function arrayToLowerCaseGuid(array: Array<number>) {
+export function bufferToLowerCaseGuid(buffer: Buffer) {
   return (
-    LOWER_CASE_MAP[array[3]] +
-    LOWER_CASE_MAP[array[2]] +
-    LOWER_CASE_MAP[array[1]] +
-    LOWER_CASE_MAP[array[0]] +
+    LOWER_CASE_MAP[buffer[3]] +
+    LOWER_CASE_MAP[buffer[2]] +
+    LOWER_CASE_MAP[buffer[1]] +
+    LOWER_CASE_MAP[buffer[0]] +
     '-' +
-    LOWER_CASE_MAP[array[5]] +
-    LOWER_CASE_MAP[array[4]] +
+    LOWER_CASE_MAP[buffer[5]] +
+    LOWER_CASE_MAP[buffer[4]] +
     '-' +
-    LOWER_CASE_MAP[array[7]] +
-    LOWER_CASE_MAP[array[6]] +
+    LOWER_CASE_MAP[buffer[7]] +
+    LOWER_CASE_MAP[buffer[6]] +
     '-' +
-    LOWER_CASE_MAP[array[8]] +
-    LOWER_CASE_MAP[array[9]] +
+    LOWER_CASE_MAP[buffer[8]] +
+    LOWER_CASE_MAP[buffer[9]] +
     '-' +
-    LOWER_CASE_MAP[array[10]] +
-    LOWER_CASE_MAP[array[11]] +
-    LOWER_CASE_MAP[array[12]] +
-    LOWER_CASE_MAP[array[13]] +
-    LOWER_CASE_MAP[array[14]] +
-    LOWER_CASE_MAP[array[15]]
+    LOWER_CASE_MAP[buffer[10]] +
+    LOWER_CASE_MAP[buffer[11]] +
+    LOWER_CASE_MAP[buffer[12]] +
+    LOWER_CASE_MAP[buffer[13]] +
+    LOWER_CASE_MAP[buffer[14]] +
+    LOWER_CASE_MAP[buffer[15]]
   );
 }
 

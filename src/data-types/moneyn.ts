@@ -1,8 +1,9 @@
-const MoneyN = {
+import { DataType } from '../data-type';
+
+const MoneyN: DataType = {
   id: 0x6E,
   type: 'MONEYN',
   name: 'MoneyN',
-  dataLengthLength: 1,
 
   getDataType: function(dataLength: number) {
     const smallmoney = require('./smallmoney');
@@ -17,6 +18,22 @@ const MoneyN = {
 
       default: return this;
     }
+  },
+
+  declaration() {
+    throw new Error('not implemented');
+  },
+
+  writeTypeInfo() {
+    throw new Error('not implemented');
+  },
+
+  writeParameterData() {
+    throw new Error('not implemented');
+  },
+
+  validate() {
+    throw new Error('not implemented');
   }
 };
 

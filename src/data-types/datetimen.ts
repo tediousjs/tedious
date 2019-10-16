@@ -1,8 +1,9 @@
-const DateTimeN = {
+import { DataType } from '../data-type';
+
+const DateTimeN: DataType = {
   id: 0x6F,
   type: 'DATETIMN',
   name: 'DateTimeN',
-  dataLengthLength: 1,
 
   getDataType: function(dataLength: number) {
     const smalldatetime = require('./smalldatetime');
@@ -16,7 +17,23 @@ const DateTimeN = {
         return datetime;
 
       default: return this;
-    }
+    };
+  },
+    
+  declaration() {
+    throw new Error('not implemented');
+  },
+
+  writeTypeInfo() {
+    throw new Error('not implemented');
+  },
+
+  writeParameterData() {
+    throw new Error('not implemented');
+  },
+
+  validate() {
+    throw new Error('not implemented');
   }
 };
 

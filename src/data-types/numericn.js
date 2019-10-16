@@ -3,8 +3,6 @@ module.exports = {
   type: 'NUMERICN',
   name: 'NumericN',
   dataLengthLength: 1,
-  hasPrecision: true,
-  hasScale: true,
 
   getDataType: function(dataLength) {
     const numeric = require('./numeric');
