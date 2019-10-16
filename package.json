@@ -42,10 +42,10 @@
   "dependencies": {
     "@azure/ms-rest-nodeauth": "2.0.2",
     "@types/node": "^12.7.11",
-    "big-number": "1.0.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
     "iconv-lite": "^0.5.0",
+    "jsbi": "^3.1.1",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
     "readable-stream": "^3.4.0",

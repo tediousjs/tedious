@@ -7,8 +7,6 @@ const iconv = require('iconv-lite');
 const sprintf = require('sprintf-js').sprintf;
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 
-const convertLEBytesToString = require('./tracking-buffer/bigint').convertLEBytesToString;
-
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const THREE_AND_A_THIRD = 3 + (1 / 3);
@@ -30,8 +28,8 @@ function readInt(parser: Parser, callback: (value: unknown) => void) {
 }
 
 function readBigInt(parser: Parser, callback: (value: unknown) => void) {
-  parser.readBuffer(8, (buffer) => {
-    callback(convertLEBytesToString(buffer));
+  parser.readBigInt64LE((value) => {
+    callback(value.toString());
   });
 }
 
