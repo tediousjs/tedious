@@ -84,7 +84,7 @@ export function specifyDataType(column: ColumnMetadata) {
   let type: any;
 
   if (originalType.hasOwnProperty('getDataType')) {
-    type = originalType.getDataType!(dataLength);
+    type = originalType.getDataType!(dataLength!);
   } else {
     type = originalType;
   }
