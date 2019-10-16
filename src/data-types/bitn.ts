@@ -4,7 +4,7 @@ const BitN: DataType = {
   id: 0x68,
   type: 'BITN',
   name: 'BitN',
-  
+
   getDataType: function(dataLength: number) {
     const bit = require('./bit');
 
@@ -26,7 +26,7 @@ const BitN: DataType = {
   validate() {
     throw new Error('not implemented');
   }
-}
+};
 
 export default BitN;
 module.exports = BitN;

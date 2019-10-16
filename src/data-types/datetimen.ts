@@ -17,9 +17,9 @@ const DateTimeN: DataType = {
         return datetime;
 
       default: return this;
-    };
+    }
   },
-    
+
   declaration() {
     throw new Error('not implemented');
   },
