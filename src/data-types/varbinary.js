@@ -5,7 +5,6 @@ module.exports = {
   id: 0xA5,
   type: 'BIGVARBIN',
   name: 'VarBinary',
-  dataLengthLength: 2,
   maximumLength: 8000,
 
   declaration: function(parameter) {

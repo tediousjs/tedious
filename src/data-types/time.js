@@ -2,24 +2,6 @@ module.exports = {
   id: 0x29,
   type: 'TIMEN',
   name: 'Time',
-  hasScale: true,
-  dataLengthLength: 1,
-
-  dataLengthFromScale: function(scale) {
-    switch (scale) {
-      case 0:
-      case 1:
-      case 2:
-        return 3;
-      case 3:
-      case 4:
-        return 4;
-      case 5:
-      case 6:
-      case 7:
-        return 5;
-    }
-  },
 
   declaration: function(parameter) {
     return 'time(' + (this.resolveScale(parameter)) + ')';
