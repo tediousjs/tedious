@@ -201,6 +201,18 @@ describe('RPC test', function() {
     testProc(done, TYPES.SmallInt, 'smallint', null);
   });
 
+  it('should exec proc bigint', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', '3');
+  });
+
+  it('should exec proc negative bigint', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', '-3');
+  });
+
+  it('should exec proc bigint null', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', null);
+  });
+
   it('should exec proc int', function(done) {
     testProc(done, TYPES.Int, 'int', 3);
   });
