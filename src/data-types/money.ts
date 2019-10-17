@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const MoneyN = require('./moneyn');
+import MoneyN from './moneyn';
 
 const Money: DataType = {
   id: 0x3C,

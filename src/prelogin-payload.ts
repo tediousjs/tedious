@@ -1,4 +1,4 @@
-const { sprintf } = require('sprintf-js');
+import { sprintf } from 'sprintf-js';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 

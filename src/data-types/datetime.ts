@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const DateTimeN = require('./datetimen');
+import DateTimeN from './datetimen';
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));

@@ -1,5 +1,5 @@
-const BufferList = require('bl');
-const { Duplex } = require('readable-stream');
+import BufferList from 'bl';
+import { Duplex } from 'readable-stream';
 
 import Debug from './debug';
 import Message from './message';

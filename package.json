@@ -42,6 +42,7 @@
   "dependencies": {
     "@azure/ms-rest-nodeauth": "2.0.2",
     "@types/node": "^12.7.11",
+    "@types/readable-stream": "^2.3.5",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
     "iconv-lite": "^0.5.0",
@@ -61,6 +62,8 @@
     "@commitlint/cli": "^8.2.0",
     "@commitlint/config-conventional": "^8.2.0",
     "@commitlint/travis-cli": "^8.2.0",
+    "@types/bl": "^2.1.0",
+    "@types/sprintf-js": "^1.1.2",
     "async": "^2.6.3",
     "babel-eslint": "^11.0.0-beta.0",
     "babel-plugin-istanbul": "^5.2.0",

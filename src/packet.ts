@@ -1,4 +1,4 @@
-const { sprintf } = require('sprintf-js');
+import { sprintf } from 'sprintf-js';
 
 export const HEADER_LENGTH = 8;
 

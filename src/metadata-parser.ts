@@ -3,7 +3,7 @@ import Parser from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
 
-const sprintf = require('sprintf-js').sprintf;
+import { sprintf } from 'sprintf-js';
 
 type Collation = {
   lcid: number,
@@ -109,7 +109,7 @@ function metadataParse(parser: Parser, options: InternalConnectionOptions, callb
         const type: DataType = TYPE[typeNumber];
 
         if (!type) {
-          return parser.emit(new Error(sprintf('Unrecognised data type 0x%02X', typeNumber)));
+          return parser.emit('error', new Error(sprintf('Unrecognised data type 0x%02X', typeNumber)));
         }
 
         switch (type.name) {
