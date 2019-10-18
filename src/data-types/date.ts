@@ -35,7 +35,7 @@ const Date : DataType = {
   },
 
   // TODO: value is techincally of type 'unknown'.
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | Date | TypeError {
     if (value == null) {
       return null;
     }

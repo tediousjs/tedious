@@ -3,8 +3,8 @@ import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
 
-const iconv = require('iconv-lite');
-const sprintf = require('sprintf-js').sprintf;
+import iconv from 'iconv-lite';
+import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 
 const NULL = (1 << 16) - 1;
@@ -347,7 +347,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
       });
 
     default:
-      return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+      parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
   }
 }
 

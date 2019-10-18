@@ -1,6 +1,7 @@
-const MoneyN = require('./moneyn');
+import { DataType } from '../data-type';
+import MoneyN from './moneyn';
 
-module.exports = {
+const SmallMoney: DataType = {
   id: 0x7A,
   type: 'MONEY4',
   name: 'SmallMoney',
@@ -24,7 +25,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value):null | number | TypeError {
     if (value == null) {
       return null;
     }
@@ -38,3 +39,6 @@ module.exports = {
     return value;
   }
 };
+
+export default SmallMoney;
+module.exports = SmallMoney;

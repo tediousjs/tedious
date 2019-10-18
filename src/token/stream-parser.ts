@@ -2,7 +2,7 @@ import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
-const Transform = require('readable-stream').Transform;
+import { Transform } from 'readable-stream';
 import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
@@ -65,9 +65,9 @@ class Parser extends Transform {
     this.next = undefined;
   }
 
-  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | null, token?: Token) => void) {
+  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
     if (input instanceof EndOfMessageMarker) {
-      return done(null, new EndOfMessageToken());
+      return done(undefined, new EndOfMessageToken());
     }
 
     if (this.position === this.buffer.length) {

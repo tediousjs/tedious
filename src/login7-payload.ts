@@ -1,4 +1,4 @@
-const { sprintf } = require('sprintf-js');
+import { sprintf } from 'sprintf-js';
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,

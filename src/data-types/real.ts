@@ -1,6 +1,7 @@
-const FloatN = require('./floatn');
+import { DataType } from '../data-type';
+import FloatN from './floatn';
 
-module.exports = {
+const Real: DataType = {
   id: 0x3B,
   type: 'FLT4',
   name: 'Real',
@@ -24,7 +25,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null| number |TypeError {
     if (value == null) {
       return null;
     }
@@ -35,3 +36,6 @@ module.exports = {
     return value;
   }
 };
+
+export default Real;
+module.exports = Real;
