@@ -1,6 +1,7 @@
-const IntN = require('./intn');
+import { DataType } from '../data-type';
+import IntN from './intn';
 
-module.exports = {
+const SmallInt: DataType = {
   id: 0x34,
   type: 'INT2',
   name: 'SmallInt',
@@ -24,7 +25,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
@@ -38,3 +39,6 @@ module.exports = {
     return value;
   }
 };
+
+export default SmallInt;
+module.exports = SmallInt;

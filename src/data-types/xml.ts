@@ -1,9 +1,9 @@
 import { DataType } from '../data-type';
 
-const IntN: DataType = {
-  id: 0x26,
-  type: 'INTN',
-  name: 'IntN',
+const XML: DataType = {
+  id: 0xF1,
+  type: 'XML',
+  name: 'Xml',
 
   declaration() {
     throw new Error('not implemented');
@@ -22,5 +22,5 @@ const IntN: DataType = {
   }
 };
 
-export default IntN;
-module.exports = IntN;
+export default XML;
+module.exports = XML;

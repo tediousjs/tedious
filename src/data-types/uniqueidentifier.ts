@@ -1,10 +1,10 @@
-const guidParser = require('../guid-parser');
+import { DataType } from '../data-type';
+import { guidToArray } from '../guid-parser';
 
-module.exports = {
+const UniqueIdentifier: DataType = {
   id: 0x24,
   type: 'GUIDN',
   name: 'UniqueIdentifier',
-  dataLengthLength: 1,
 
   declaration: function() {
     return 'uniqueidentifier';
@@ -22,14 +22,14 @@ module.exports = {
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(0x10);
-      buffer.writeBuffer(Buffer.from(guidParser.guidToArray(parameter.value)));
+      buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
     } else {
       buffer.writeUInt8(0);
     }
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -42,3 +42,6 @@ module.exports = {
     return value;
   }
 };
+
+export default UniqueIdentifier;
+module.exports = UniqueIdentifier;

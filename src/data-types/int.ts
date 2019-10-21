@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const IntN = require('./intn');
+import IntN from './intn';
 
 const Int: DataType = {
   id: 0x38,
@@ -26,7 +25,7 @@ const Int: DataType = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

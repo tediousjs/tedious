@@ -1,5 +1,5 @@
 import { DataType } from '../data-type';
-const BitN = require('./bitn');
+import BitN from './bitn';
 
 const Bit: DataType = {
   id: 0x32,

@@ -1,12 +1,12 @@
 import { DataType } from '../data-type';
 
-const IntN: DataType = {
-  id: 0x26,
-  type: 'INTN',
-  name: 'IntN',
+const Variant: DataType = {
+  id: 0x62,
+  type: 'SSVARIANTTYPE',
+  name: 'Variant',
 
-  declaration() {
-    throw new Error('not implemented');
+  declaration: function() {
+    return 'sql_variant';
   },
 
   writeTypeInfo() {
@@ -22,5 +22,5 @@ const IntN: DataType = {
   }
 };
 
-export default IntN;
-module.exports = IntN;
+export default Variant;
+module.exports = Variant;

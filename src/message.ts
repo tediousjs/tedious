@@ -1,4 +1,4 @@
-const { PassThrough } = require('readable-stream');
+import { PassThrough } from 'readable-stream';
 
 class Message extends PassThrough {
   type: number;

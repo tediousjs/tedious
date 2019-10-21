@@ -1,9 +1,9 @@
 import { DataType } from '../data-type';
 
-const IntN: DataType = {
-  id: 0x26,
-  type: 'INTN',
-  name: 'IntN',
+const NumericN: DataType = {
+  id: 0x6C,
+  type: 'NUMERICN',
+  name: 'NumericN',
 
   declaration() {
     throw new Error('not implemented');
@@ -22,5 +22,5 @@ const IntN: DataType = {
   }
 };
 
-export default IntN;
-module.exports = IntN;
+export default NumericN;
+module.exports = NumericN;

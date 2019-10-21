@@ -1,13 +1,10 @@
 import { DataType } from '../data-type';
-
-const DecimalN = require('./decimaln');
+import DecimalN from './decimaln';
 
 const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePrecision']>, resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x37,
   type: 'DECIMAL',
   name: 'Decimal',
-  hasPrecision: true,
-  hasScale: true,
 
   declaration: function(parameter) {
     return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
@@ -76,7 +73,7 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

@@ -1,10 +1,13 @@
-module.exports = {
+import { DataType } from '../data-type';
+
+const TVP: DataType = {
   id: 0xF3,
   type: 'TVPTYPE',
   name: 'TVP',
 
   declaration: function(parameter) {
-    return parameter.value.name + ' readonly';
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    return value.name + ' readonly';
   },
 
   writeTypeInfo: function(buffer, parameter) {
@@ -37,7 +40,7 @@ module.exports = {
     buffer.writeUInt8(0x00);
 
     const ref1 = parameter.value.rows;
-    const writeNext = (i) => {
+    const writeNext = (i:number) => {
       if (i >= ref1.length) {
         buffer.writeUInt8(0x00);
         cb();
@@ -65,7 +68,7 @@ module.exports = {
 
     writeNext(0);
   },
-  validate: function(value) {
+  validate: function(value): Buffer | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -85,3 +88,6 @@ module.exports = {
     return value;
   }
 };
+
+export default TVP;
+module.exports = TVP;

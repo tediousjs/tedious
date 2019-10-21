@@ -1,9 +1,11 @@
 import { DataType } from '../data-type';
 
-const IntN: DataType = {
-  id: 0x26,
-  type: 'INTN',
-  name: 'IntN',
+const NText: DataType = {
+  id: 0x63,
+  type: 'NTEXT',
+  name: 'NText',
+
+  hasTableName: true,
 
   declaration() {
     throw new Error('not implemented');
@@ -22,5 +24,5 @@ const IntN: DataType = {
   }
 };
 
-export default IntN;
-module.exports = IntN;
+export default NText;
+module.exports = NText;

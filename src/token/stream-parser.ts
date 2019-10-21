@@ -1,7 +1,8 @@
 import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
+import JSBI from 'jsbi';
 
-const Transform = require('readable-stream').Transform;
+import { Transform } from 'readable-stream';
 import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
@@ -64,9 +65,9 @@ class Parser extends Transform {
     this.next = undefined;
   }
 
-  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | null, token?: Token) => void) {
+  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
     if (input instanceof EndOfMessageMarker) {
-      return done(null, new EndOfMessageToken());
+      return done(undefined, new EndOfMessageToken());
     }
 
     if (this.position === this.buffer.length) {
@@ -212,6 +213,32 @@ class Parser extends Transform {
     });
   }
 
+  readBigInt64LE(callback: (data: JSBI) => void) {
+    this.awaitData(8, () => {
+      const result = JSBI.add(
+        JSBI.leftShift(
+          JSBI.BigInt(
+            this.buffer[this.position + 4] +
+            this.buffer[this.position + 5] * 2 ** 8 +
+            this.buffer[this.position + 6] * 2 ** 16 +
+            (this.buffer[this.position + 7] << 24) // Overflow
+          ),
+          JSBI.BigInt(32)
+        ),
+        JSBI.BigInt(
+          this.buffer[this.position] +
+          this.buffer[this.position + 1] * 2 ** 8 +
+          this.buffer[this.position + 2] * 2 ** 16 +
+          this.buffer[this.position + 3] * 2 ** 24
+        )
+      );
+
+      this.position += 8;
+
+      callback(result);
+    });
+  }
+
   readInt64LE(callback: (data: number) => void) {
     this.awaitData(8, () => {
       const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
@@ -225,6 +252,17 @@ class Parser extends Transform {
       const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
       this.position += 8;
       callback(data);
+    });
+  }
+
+  readBigUInt64LE(callback: (data: JSBI) => void) {
+    this.awaitData(8, () => {
+      const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
+      const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
+
+      this.position += 8;
+
+      callback(JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32))));
     });
   }
 

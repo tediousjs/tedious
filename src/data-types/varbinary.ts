@@ -1,20 +1,22 @@
+import { DataType, ParameterData } from '../data-type';
+
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 
-module.exports = {
+const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
   type: 'BIGVARBIN',
   name: 'VarBinary',
-  dataLengthLength: 2,
   maximumLength: 8000,
 
   declaration: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     let length;
     if (parameter.length) {
       length = parameter.length;
-    } else if (parameter.value != null) {
-      length = parameter.value.length || 1;
-    } else if (parameter.value === null && !parameter.output) {
+    } else if (value != null) {
+      length = value.length || 1;
+    } else if (value === null && !parameter.output) {
       length = 1;
     } else {
       length = this.maximumLength;
@@ -28,10 +30,11 @@ module.exports = {
   },
 
   resolveLength: function(parameter) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
-    } else if (parameter.value != null) {
-      return parameter.value.length;
+    } else if (value != null) {
+      return value.length;
     } else {
       return this.maximumLength;
     }
@@ -39,21 +42,21 @@ module.exports = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    if (parameter.length <= this.maximumLength) {
+    if (parameter.length! <= this.maximumLength) {
       buffer.writeUInt16LE(this.maximumLength);
     } else {
       buffer.writeUInt16LE(MAX);
     }
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buffer, parameter: ParameterData<Buffer | null>, options, cb) {
     if (parameter.value != null) {
-      if (parameter.length <= this.maximumLength) {
+      if (parameter.length! <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value);
       } else {
         buffer.writePLPBody(parameter.value);
       }
-    } else if (parameter.length <= this.maximumLength) {
+    } else if (parameter.length! <= this.maximumLength) {
       buffer.writeUInt16LE(NULL);
     } else {
       buffer.writeUInt32LE(0xFFFFFFFF);
@@ -62,7 +65,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): Buffer | null | TypeError {
     if (value == null) {
       return null;
     }
@@ -72,3 +75,6 @@ module.exports = {
     return value;
   }
 };
+
+export default VarBinary;
+module.exports = VarBinary;

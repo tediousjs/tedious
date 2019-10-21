@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const MoneyN = require('./moneyn');
+import MoneyN from './moneyn';
 
 const Money: DataType = {
   id: 0x3C,
@@ -26,7 +25,7 @@ const Money: DataType = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

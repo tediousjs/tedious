@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const FloatN = require('./floatn');
+import FloatN from './floatn';
 
 const Float: DataType = {
   id: 0x3E,
@@ -26,7 +25,7 @@ const Float: DataType = {
     cb();
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

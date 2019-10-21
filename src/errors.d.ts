@@ -1,6 +1,7 @@
 export interface ConnectionError extends Error {
   message: string;
   code?: string;
+  isTransient?: boolean;
 }
 
 export declare var ConnectionError: {
@@ -12,6 +13,13 @@ export declare var ConnectionError: {
 export interface RequestError extends Error {
   message: string;
   code?: string;
+
+  number?: number;
+  state?: number;
+  class?: number;
+  serverName?: string;
+  procName?: string;
+  lineNumber?: number;
 }
 
 export declare var RequestError: {

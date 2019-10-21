@@ -9,8 +9,6 @@ const Date : DataType = {
   id: 0x28,
   type: 'DATEN',
   name: 'Date',
-  dataLengthLength: 1,
-  fixedDataLength: 3,
 
   declaration: function() {
     return 'date';
@@ -37,7 +35,7 @@ const Date : DataType = {
   },
 
   // TODO: value is techincally of type 'unknown'.
-  validate: function(value: any) {
+  validate: function(value): null | Date | TypeError {
     if (value == null) {
       return null;
     }
