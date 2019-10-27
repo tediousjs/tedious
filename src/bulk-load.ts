@@ -1,12 +1,14 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import { ConnectionOptions } from './connection';
+import Connection, { InternalConnectionOptions } from './connection';
 
-const Transform = require('readable-stream').Transform;
-const TOKEN_TYPE = require('./token/token').TYPE;
-const Message = require('./message');
-const PACKET_TYPE = require('./packet').TYPE;
-const { RequestError } = require('./errors');
+import { Transform } from 'readable-stream';
+import { TYPE as TOKEN_TYPE } from './token/token';
+import Message from './message';
+import { TYPE as PACKET_TYPE } from './packet';
+
+import { Parameter } from './data-type';
+import { RequestError } from './errors';
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -39,36 +41,17 @@ type InternalOptions = {
   lockTable: boolean,
 };
 
-type Options = {
+export interface Options {
   checkConstraints?: InternalOptions['checkConstraints'],
   fireTriggers?: InternalOptions['fireTriggers'],
   keepNulls?: InternalOptions['keepNulls'],
   lockTable?: InternalOptions['lockTable'],
-};
+}
 
-type DataType = {
-  id: number,
-  declaration: (column: Column) => string,
-  writeTypeInfo: (buf: any, column: Column, options: ConnectionOptions) => void,
-  writeParameterData: (buf: any, data: { length?: number, scale?: number, precision?: number, value: unknown }, options: ConnectionOptions, callback: () => void) => void,
+export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
-  hasPrecision?: Boolean,
-  hasScale?: Boolean,
-  resolveLength?: (column: Column) => number,
-  resolvePrecision?: (column: Column) => number,
-  resolveScale?: (column: Column) => number
-};
-
-type Column = {
-  type: DataType,
-  name: string,
-  value: null,
-  output: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
+type Column = Parameter & {
   objName: string,
-  nullable?: boolean
 };
 
 type ColumnOptions = {
@@ -86,10 +69,18 @@ class BulkLoad extends EventEmitter {
   executionStarted: boolean;
   streamingMode: boolean;
   table: string;
-  timeout?: number
 
-  options: ConnectionOptions;
-  callback: (err: Error | undefined | null, rowCount: number) => void;
+  connection?: Connection;
+  timeout?: number;
+
+  rows?: Array<any>;
+  rst?: Array<any>;
+  rowCount?: number;
+
+  paused?: boolean;
+
+  options: InternalConnectionOptions;
+  callback: Callback;
 
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
@@ -99,12 +90,12 @@ class BulkLoad extends EventEmitter {
 
   bulkOptions: InternalOptions;
 
-  constructor(table: string, connectionOptions: ConnectionOptions, {
+  constructor(table: string, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, callback: (err: Error | undefined | null, rowCount: number) => void) {
+  }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }

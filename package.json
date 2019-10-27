@@ -40,39 +40,45 @@
     "tag": "next"
   },
   "dependencies": {
-    "@azure/ms-rest-nodeauth": "^2.0.2",
-    "@types/node": "^12.6.9",
-    "big-number": "1.0.0",
+    "@azure/ms-rest-nodeauth": "2.0.2",
+    "@types/node": "^12.7.11",
+    "@types/readable-stream": "^2.3.5",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
-    "iconv-lite": "^0.4.23",
+    "iconv-lite": "^0.5.0",
+    "jsbi": "^3.1.1",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
     "readable-stream": "^3.4.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.5.5",
-    "@babel/core": "^7.5.5",
-    "@babel/node": "^7.5.5",
-    "@babel/preset-env": "^7.5.5",
-    "@babel/preset-typescript": "^7.3.3",
-    "@babel/register": "^7.5.5",
-    "@commitlint/cli": "^8.0.0",
-    "@commitlint/config-conventional": "^8.0.0",
-    "@commitlint/travis-cli": "^8.0.0",
-    "async": "^2.6.1",
+    "@babel/cli": "^7.6.2",
+    "@babel/core": "^7.6.2",
+    "@babel/node": "^7.6.2",
+    "@babel/preset-env": "^7.6.2",
+    "@babel/preset-typescript": "^7.6.0",
+    "@babel/register": "^7.6.2",
+    "@commitlint/cli": "^8.2.0",
+    "@commitlint/config-conventional": "^8.2.0",
+    "@commitlint/travis-cli": "^8.2.0",
+    "@types/bl": "^2.1.0",
+    "@types/sprintf-js": "^1.1.2",
+    "async": "^2.6.3",
     "babel-eslint": "^11.0.0-beta.0",
+    "babel-plugin-istanbul": "^5.2.0",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
+    "codecov": "^3.6.1",
     "eslint": "^5.16.0",
     "jest": "^24.8.0",
     "mitm": "^1.7.0",
-    "mocha": "^6.1.4",
-    "rimraf": "^2.6.3",
-    "semantic-release": "^15.13.12",
-    "sinon": "^7.3.2",
-    "typescript": "^3.5.3"
+    "mocha": "^6.2.1",
+    "nyc": "^14.1.1",
+    "rimraf": "^3.0.0",
+    "semantic-release": "^15.13.24",
+    "sinon": "^7.5.0",
+    "typescript": "^3.6.3"
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
@@ -108,6 +114,13 @@
   "commitlint": {
     "extends": [
       "@commitlint/config-conventional"
+    ]
+  },
+  "nyc": {
+    "sourceMap": false,
+    "instrument": false,
+    "extension": [
+      ".ts"
     ]
   }
 }
