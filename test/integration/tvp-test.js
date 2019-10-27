@@ -157,4 +157,4 @@ describe('calling a procedure that takes and returns a TVP', function() {
       connection.callProcedure(request4);
     });
   });
-}, 5000);
+});
