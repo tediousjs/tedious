@@ -608,9 +608,16 @@ describe('Parameterised Statements Test', function() {
     );
   });
 
-  // This test fails on the version of SQL Server in AppVeyor.
-  // exports.dateTimePrecision_9_day_flip = (test) ->
-  //  execSql(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), null, null, new Date('January 2, 1998 00:00:00.000'))
+  it('should test date time precision_9 hr flip', function(done) {
+    execSql(
+      done,
+      TYPES.DateTime,
+      new Date('January 1, 1998 23:59:59.999'),
+      null,
+      null,
+      new Date('January 2, 1998 00:00:00.000')
+    );
+  });
 
   it('should test date time 2', function(done) {
     execSql(
