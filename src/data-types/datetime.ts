@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
-
-const DateTimeN = require('./datetimen');
+import DateTimeN from './datetimen';
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
@@ -39,6 +38,12 @@ const DateTime: DataType = {
 
       threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
       threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+
+      // 25920000 equals one day
+      if (threeHundredthsOfSecond === 25920000) {
+        days += 1;
+        threeHundredthsOfSecond = 0;
+      }
 
       buffer.writeUInt8(8);
       buffer.writeInt32LE(days);

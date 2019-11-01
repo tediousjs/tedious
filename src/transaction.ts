@@ -35,7 +35,7 @@ export class Transaction {
   isolationLevel: number;
   outstandingRequestCount: number;
 
-  constructor(name: string, isolationLevel: number) {
+  constructor(name: string, isolationLevel = ISOLATION_LEVEL.NO_CHANGE) {
     this.name = name;
     this.isolationLevel = isolationLevel;
     this.outstandingRequestCount = 1;

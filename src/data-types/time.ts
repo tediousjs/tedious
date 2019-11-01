@@ -1,10 +1,12 @@
-module.exports = {
+import { DataType } from '../data-type';
+
+const Time: DataType = {
   id: 0x29,
   type: 'TIMEN',
   name: 'Time',
 
   declaration: function(parameter) {
-    return 'time(' + (this.resolveScale(parameter)) + ')';
+    return 'time(' + (this.resolveScale!(parameter)) + ')';
   },
 
   resolveScale: function(parameter) {
@@ -19,10 +21,11 @@ module.exports = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale);
+    buffer.writeUInt8(parameter.scale!);
   },
 
   writeParameterData: function(buffer, parameter, options, cb) {
+
     if (parameter.value != null) {
       const time = new Date(+parameter.value);
 
@@ -33,8 +36,8 @@ module.exports = {
         timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
       }
 
-      timestamp = timestamp * Math.pow(10, parameter.scale - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale);
+      timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
+      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
       timestamp = Math.round(timestamp);
 
       switch (parameter.scale) {
@@ -61,7 +64,7 @@ module.exports = {
     cb();
   },
 
-  validate: function(value) {
+  validate: function(value): null| number| TypeError | Date {
     if (value == null) {
       return null;
     }
@@ -75,3 +78,7 @@ module.exports = {
     return value;
   }
 };
+
+
+export default Time;
+module.exports = Time;

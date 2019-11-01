@@ -1,5 +1,5 @@
-const BufferList = require('bl');
-const { Transform } = require('readable-stream');
+import BufferList from 'bl';
+import { Transform } from 'readable-stream';
 
 import Debug from './debug';
 import Message from './message';
@@ -29,6 +29,8 @@ class IncomingMessageStream extends Transform {
     if (this.currentMessage) {
       this.currentMessage.pause();
     }
+
+    return this;
   }
 
   resume() {
@@ -37,6 +39,8 @@ class IncomingMessageStream extends Transform {
     if (this.currentMessage) {
       this.currentMessage.resume();
     }
+
+    return this;
   }
 
   processBufferedData(callback: () => void) {
