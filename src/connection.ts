@@ -2003,7 +2003,7 @@ class Connection extends EventEmitter {
 
       let message: Message;
 
-      this.request.once('cancel', () => {
+      request.once('cancel', () => {
         if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
           // The request was cancelled before buffering finished
           this.request = undefined;
