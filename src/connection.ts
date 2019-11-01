@@ -2004,6 +2004,7 @@ class Connection extends EventEmitter {
       let message: Message;
 
       request.once('cancel', () => {
+        // There's three ways to handle request cancelation:
         if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
           // The request was cancelled before buffering finished
           this.request = undefined;
