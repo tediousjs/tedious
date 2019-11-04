@@ -4,7 +4,7 @@ const NumericN: DataType = {
   id: 0x6C,
   type: 'NUMERICN',
   name: 'NumericN',
-  
+
   getDataType: function(dataLength) {
     const numeric = require('./numeric');
 

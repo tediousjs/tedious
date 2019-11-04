@@ -5,7 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { specifyDataType } from './token/colmetadata-token-parser';
+import { specifyDataType, ColumnMetadata } from './token/colmetadata-token-parser';
 
 import {
   loginWithUsernamePassword,
@@ -41,7 +41,6 @@ import Message from './message';
 import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -1140,7 +1139,7 @@ class Connection extends EventEmitter {
       this.emit('rollbackTransaction');
     });
 
-    
+
     tokenStreamParser.on('columnMetadata', (token) => {
       const request = this.request;
       if (request) {
@@ -1167,7 +1166,7 @@ class Connection extends EventEmitter {
             });
           } else {
             Object.keys(columns).forEach((colName) => {
-              //@ts-ignore TODO: Fix TypeScript Error
+              // @ts-ignore TODO: Fix TypeScript Error
               const tempCol = columns[colName];
               emittedColumns.push(specifyDataType(tempCol));
             });
