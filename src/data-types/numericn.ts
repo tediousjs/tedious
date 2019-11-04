@@ -4,6 +4,12 @@ const NumericN: DataType = {
   id: 0x6C,
   type: 'NUMERICN',
   name: 'NumericN',
+  
+  getDataType: function(dataLength) {
+    const numeric = require('./numeric');
+
+    return (dataLength === 17) ? numeric : this;
+  },
 
   declaration() {
     throw new Error('not implemented');
