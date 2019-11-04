@@ -7,7 +7,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 import Message from './message';
 import { TYPE as PACKET_TYPE } from './packet';
 
-import { Parameter } from './data-type';
+import { DataType, Parameter } from './data-type';
 import { RequestError } from './errors';
 
 const FLAGS = {
@@ -131,7 +131,7 @@ class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name: string, type: any, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
+  addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -157,16 +157,12 @@ class BulkLoad extends EventEmitter {
       }
     }
 
-    if (type.hasPrecision) {
-      if (column.precision == null && type.resolvePrecision) {
-        column.precision = type.resolvePrecision(column);
-      }
+    if (type.resolvePrecision && column.precision == null) {
+      column.precision = type.resolvePrecision(column);
     }
 
-    if (type.hasScale) {
-      if (column.scale == null && type.resolveScale) {
-        column.scale = type.resolveScale(column);
-      }
+    if (type.resolveScale && column.scale == null) {
+      column.scale = type.resolveScale(column);
     }
 
     this.columns.push(column);
