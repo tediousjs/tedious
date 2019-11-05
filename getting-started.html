@@ -18,8 +18,7 @@ title: Getting started
 
   var config = {
     server: "192.168.1.210",
-    // If you're on Windows Azure, you will need this:
-    options: {encrypt: true},
+    options: {},
     authentication: {
       type: "default",
       options: {  
@@ -46,6 +45,14 @@ title: Getting started
   <em>host</em>, <em>username</em>, <em>password</em>,
   an <em>options object</em> (empty in this example),
   and a <em>callback function</em>.
+</p>
+
+<p>
+  Tedious will use an encrypted connection by default from v6.0.0 onwards.
+  If you have an earlier version, and require encryption or use Windows Azure,
+  you must set <code>{encrypt: true}</code> within the <em>options object</em>. 
+  Similarly, if you need an unencrypted connection, you must explicitly set
+  <code>{encrypt: false}</code> within the <em>options object</em>.
 </p>
 
 <p>
