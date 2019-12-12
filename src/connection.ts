@@ -516,7 +516,7 @@ class Connection extends EventEmitter {
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
-        encrypt: false,
+        encrypt: true,
         fallbackToDefaultDb: false,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
@@ -760,8 +760,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.encrypt = config.options.encrypt;
-      } else {
-        this.config.options.encrypt = true;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
