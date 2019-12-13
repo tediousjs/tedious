@@ -103,12 +103,25 @@
         }
       ],
       [
-        "@babel/preset-typescript", { "allowDeclareFields": true }
+        "@babel/preset-typescript",
+        {
+          "allowDeclareFields": true
+        }
       ]
     ],
     "plugins": [
-      ["@babel/transform-typescript", { "allowDeclareFields": true }],
-      ["@babel/plugin-proposal-class-properties", { "loose": true }]
+      [
+        "@babel/transform-typescript",
+        {
+          "allowDeclareFields": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-class-properties",
+        {
+          "loose": true
+        }
+      ]
     ]
   },
   "commitlint": {
