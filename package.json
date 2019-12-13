@@ -77,7 +77,7 @@
     "rimraf": "^3.0.0",
     "semantic-release": "^15.13.31",
     "sinon": "^7.5.0",
-    "typescript": "^3.6.3"
+    "typescript": "^3.7.3"
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
