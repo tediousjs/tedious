@@ -75,7 +75,7 @@
     "mocha": "^6.2.2",
     "nyc": "^14.1.1",
     "rimraf": "^3.0.0",
-    "semantic-release": "^15.13.24",
+    "semantic-release": "^15.13.31",
     "sinon": "^7.5.0",
     "typescript": "^3.6.3"
   },
