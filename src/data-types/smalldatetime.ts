@@ -46,7 +46,7 @@ const SmallDateTime: DataType = {
     }
 
     if (!(value instanceof Date)) {
-      value = Date.parse(value);
+      value = new Date(Date.parse(value));
     }
 
     if (isNaN(value)) {

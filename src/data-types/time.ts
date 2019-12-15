@@ -27,7 +27,7 @@ const Time: DataType = {
   writeParameterData: function(buffer, parameter, options, cb) {
 
     if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+      const time = parameter.value;
 
       let timestamp;
       if (options.useUTC) {
@@ -64,17 +64,19 @@ const Time: DataType = {
     cb();
   },
 
-  validate: function(value): null| number| TypeError | Date {
+  validate: function(value): null | number | TypeError | Date {
     if (value == null) {
       return null;
     }
-    if (value instanceof Date) {
-      return value;
+
+    if (!(value instanceof Date)) {
+      value = new Date(Date.parse(value));
     }
-    value = Date.parse(value);
+
     if (isNaN(value)) {
       return new TypeError('Invalid time.');
     }
+
     return value;
   }
 };
