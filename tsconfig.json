@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "moduleResolution": "node",
+    "allowJs": false,
+    "noEmit": true,
+    "strict": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "lib": [ "esnext" ]
+  },
+
+  "include": [
+    "src/**/*.ts", "src/data-types/bitn.js", "src/data-types/bit.js"
+  ]
+}

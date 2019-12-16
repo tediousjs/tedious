@@ -4,8 +4,13 @@ var Connection = require('tedious').Connection,
 
 var connection = new Connection({
 	server: '192.168.1.212',
-	userName: 'test',
-	password: 'test'
+	authentication: {
+    type: 'default',
+    options: {
+      userName: 'test',
+      password: 'test'
+    }
+  }
 });
 
 connection.on('connect', function(err){
