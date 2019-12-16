@@ -299,9 +299,7 @@ class WritableTrackingBuffer {
   }
 
   writeMoney(value: number) {
-    const buf = bigint.numberToInt64LE(value);
-    this.copyFrom(buf.slice(4, 8));
-    this.copyFrom(buf.slice(0, 4));
+    this.writeInt64LE(value);
   }
 }
 
