@@ -15,13 +15,14 @@ const SmallInt: DataType = {
     buffer.writeUInt8(2);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buffer, parameter, _options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(2);
-      buffer.writeInt16LE(parseInt(parameter.value));
+      buffer.writeInt16LE(Number(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
+
     cb();
   },
 
@@ -29,14 +30,20 @@ const SmallInt: DataType = {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+
     if (value < -32768 || value > 32767) {
-      return new TypeError('Value must be between -32768 and 32767.');
+      return new TypeError('Value must be between -32768 and 32767, inclusive.');
     }
-    return value;
+
+    return value | 0;
   }
 };
 
