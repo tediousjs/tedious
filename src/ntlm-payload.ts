@@ -142,28 +142,12 @@ class NTLMResponsePayload {
   }
 
   ntHash(text: string) {
-    const hash = Buffer.alloc(21, 0);
-
     const unicodeString = Buffer.from(text, 'ucs2');
-    const md4 = crypto.createHash('md4').update(unicodeString).digest();
-    if (md4.copy) {
-      md4.copy(hash);
-    } else {
-      Buffer.from(md4).copy(hash);
-    }
-    return hash;
+    return crypto.createHash('md4').update(unicodeString).digest();
   }
 
   hmacMD5(data: Buffer, key: Buffer) {
-    const hmac = crypto.createHmac('MD5', key);
-    hmac.update(data);
-
-    const result = hmac.digest();
-    if (result.copy) {
-      return result;
-    } else {
-      return Buffer.from(result).slice(0, 16);
-    }
+    return crypto.createHmac('MD5', key).update(data).digest();
   }
 }
 
