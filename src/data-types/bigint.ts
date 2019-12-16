@@ -1,4 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 import IntN from './intn';
 
 const BigInt: DataType = {
@@ -15,13 +15,10 @@ const BigInt: DataType = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, _options, cb) {
-    const value = parameter.value;
-
-    if (value != null) {
-      const val = typeof value !== 'number' ? parseInt(value as string) : value;
+  writeParameterData: function(buffer, parameter, _options, cb) {
+    if (parameter.value != null) {
       buffer.writeUInt8(8);
-      buffer.writeInt64LE(val);
+      buffer.writeInt64LE(Number(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
@@ -33,18 +30,19 @@ const BigInt: DataType = {
     if (value == null) {
       return null;
     }
-    if (isNaN(value as number)) {
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
+    if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
-    if (value as number < -9007199254740991 || value as number > 9007199254740991) {
-      // Number.MIN_SAFE_INTEGER = -9007199254740991
-      // Number.MAX_SAFE_INTEGER = 9007199254740991
-      // 9007199254740991 = (2**53) - 1
-      // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
-      // as these constants are not available in node 0.10.
-      return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
-        ' For bigger numbers, use VarChar type.');
+
+    if (value < Number.MIN_SAFE_INTEGER || value > Number.MAX_SAFE_INTEGER) {
+      return new TypeError(`Value must be between ${Number.MIN_SAFE_INTEGER} and ${Number.MAX_SAFE_INTEGER}, inclusive.  For smaller or bigger numbers, use VarChar type.`);
     }
+
     return value;
   }
 };

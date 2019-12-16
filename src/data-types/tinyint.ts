@@ -15,13 +15,14 @@ const TinyInt: DataType = {
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buffer, parameter, _options, cb) {
     if (parameter.value != null) {
       buffer.writeUInt8(1);
-      buffer.writeUInt8(parseInt(parameter.value));
+      buffer.writeUInt8(Number(parameter.value));
     } else {
       buffer.writeUInt8(0);
     }
+
     cb();
   },
 
@@ -29,14 +30,20 @@ const TinyInt: DataType = {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+
     if (value < 0 || value > 255) {
-      return new TypeError('Value must be between 0 and 255.');
+      return new TypeError('Value must be between 0 and 255, inclusive.');
     }
-    return value;
+
+    return value | 0;
   }
 };
 

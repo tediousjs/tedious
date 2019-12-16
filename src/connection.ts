@@ -781,7 +781,7 @@ class Connection extends EventEmitter {
 
       if (config.options.isolationLevel !== undefined) {
         if (typeof config.options.isolationLevel !== 'number') {
-          throw new TypeError('The "config.options.language" property must be of type numer.');
+          throw new TypeError('The "config.options.isolationLevel" property must be of type number.');
         }
 
         this.config.options.isolationLevel = config.options.isolationLevel;
