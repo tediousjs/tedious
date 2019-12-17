@@ -1111,7 +1111,7 @@ var connection = new Connection(config);
   </div>
 </div>
 <p>Here's the actual parameter input of transaction in TypeScript notation:</p>
-<code>transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL])</code>
+<code>transaction &lt;T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters&lt;T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL])</code>
 
 <h2 id="function_unprepare">connection.unprepare(request)</h2>
 <p>
