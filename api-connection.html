@@ -1053,16 +1053,28 @@ var connection = new Connection(config);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occurred, a string with details of the error.
+          Pass null to commit the transaction or not null (an error) when the transaction is to be rolled back.
         </p>
       </div>
 
       <div class="name">done</div>
       <div class="description">
         <p>
-          If no error occurred, a function to be called to commit or rollback
-          the transaction.
+          This is another callback you provide that tedious calls when it has committed the
+          transaction or a rollback transaction. It will call done with one or more parameters, namely:
         </p>
+        <div class="name">err</div>
+        <div class="description">
+          <p>an indication of any problems with the final commit request</p>
+        </div>
+        <div class="name">done</div>
+        <div class="description">
+          <p>Yet another call back with error as first parameter, followed by variable number of arguments as array.</p>
+        </div>
+        <div class="name">other</div>
+        <div class="description">
+          <p>the additional parameters you provided to tedious, which tedious will reflect back to you</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1098,6 +1110,8 @@ var connection = new Connection(config);
     </p>
   </div>
 </div>
+<p>Here's the actual parameter input of transaction in TypeScript notation:</p>
+<code>transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL])</code>
 
 <h2 id="function_unprepare">connection.unprepare(request)</h2>
 <p>
