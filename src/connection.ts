@@ -2468,6 +2468,9 @@ Connection.prototype.STATE = {
   },
   LOGGED_IN: {
     name: 'LoggedIn',
+    enter: function() {
+        this.emit('ready');
+    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
