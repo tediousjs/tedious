@@ -60,12 +60,15 @@ const DateTime: DataType = {
     if (value == null) {
       return null;
     }
+
     if (!(value instanceof Date)) {
-      value = Date.parse(value);
+      value = new Date(Date.parse(value));
     }
+
     if (isNaN(value)) {
       return new TypeError('Invalid date.');
     }
+
     return value;
   }
 };
