@@ -7,67 +7,53 @@ const config = JSON.parse(
 ).config;
 
 
-for (const value of [100, -100, 922337203685477, -922337203685477, 922337203685477 - 1, -922337203685477 + 1])
-{
-  exports[`testMoneyValue${value}`] = function(test)
-  {
+for (const value of [100, -100, 922337203685477, -922337203685477, 922337203685477 - 1, -922337203685477 + 1]) {
+  exports[`testMoneyValue${value}`] = function(test) {
     testMoneyValue(test, value, value);
   };
 }
 
-exports.testMoneyValueError1 = function(test)
-{
+exports.testMoneyValueError1 = function(test) {
   testMoneyValue(test, 922337203685477 + 1, undefined);
 };
-exports.testMoneyValueError2 = function(test)
-{
+exports.testMoneyValueError2 = function(test) {
   testMoneyValue(test, -922337203685477 - 1, undefined);
 };
 
-//if expectValue === undefined, the error is expected.
-function testMoneyValue(test, inputValue, expectValue)
-{
+// if expectValue === undefined, the error is expected.
+function testMoneyValue(test, inputValue, expectValue) {
   const sql = 'select @v1;';
-  var request = new Request(sql, function(err)
-  {
-    if (expectValue === undefined)
-    {
+  var request = new Request(sql, function(err) {
+    if (expectValue === undefined) {
       test.ok(err);
-    }
-    else
-    {
+    } else {
       test.ifError(err);
     }
     connection.close();
   });
   request.addParameter('v1', TYPES.Money, inputValue);
 
-  request.on('row', (data) =>
-  {
+  request.on('row', (data) => {
     if (expectValue !== undefined)
       test.equal(data[0].value, expectValue);
   });
 
   var connection = new Connection(config);
 
-  connection.on('connect', function(err)
-  {
+  connection.on('connect', function(err) {
     test.ifError(err);
     connection.execSql(request);
   });
 
-  connection.on('end', function(info)
-  {
+  connection.on('end', function(info) {
     test.done();
   });
 
-  connection.on('errorMessage', function(error)
-  {
+  connection.on('errorMessage', function(error) {
     console.log(`${error.number} : ${error.message}`);
   });
 
-  connection.on('debug', function(message)
-  {
-    //console.log(message);
+  connection.on('debug', function(message) {
+
   });
 }

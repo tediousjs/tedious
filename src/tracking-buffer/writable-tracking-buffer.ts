@@ -162,7 +162,7 @@ class WritableTrackingBuffer {
     this.writeBigInt64LE(JSBI.BigInt(value));
   }
 
-  writeInt64BE(value:number){
+  writeInt64BE(value:number) {
     this.writeBigU_Int64BE(JSBI.BigInt(value));
   }
 
