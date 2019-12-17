@@ -4,7 +4,6 @@ const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
-const IsolationLevel = require('../../src/transaction').ISOLATION_LEVEL;
 
 function getConfig() {
   const config = JSON.parse(
@@ -360,16 +359,16 @@ describe('Encrypt Test', function() {
   });
 });
 
-describe('BeginTransaction Tests', function(){
+describe('BeginTransaction Tests', function() {
   it('should throw invalid IsolationLevel Error', function() {
     const config = getConfig();
     config.options.isolationLevel = 9;
     const connection = new Connection(config);
     assert.throws(function() {
-      connection.beginTransaction(undefined)
-    }, Error, 'Error: invalid isolationLevel 9')
-  })
-})
+      connection.beginTransaction(undefined);
+    }, Error, 'Error: invalid isolationLevel 9');
+  });
+});
 
 describe('Insertion Tests', function() {
   this.timeout(30000);

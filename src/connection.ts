@@ -1863,8 +1863,8 @@ class Connection extends EventEmitter {
 
   beginTransaction(callback: (err: Error | null | undefined, transactionDescriptor?: Buffer) => void, name = '', isolationLevel = this.config.options.isolationLevel) {
     const isoValues = Object.values(ISOLATION_LEVEL);
-    if(!isoValues.includes(isolationLevel)) {
-      throw new Error(`Error: invalid isolationLevel ${isolationLevel}`)
+    if (!isoValues.includes(isolationLevel)) {
+      throw new Error(`Error: invalid isolationLevel ${isolationLevel}`);
     }
 
     const transaction = new Transaction(name, isolationLevel);
