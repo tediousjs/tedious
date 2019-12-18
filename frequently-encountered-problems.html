@@ -115,6 +115,21 @@ title: F.E.Q.
     </dd>
     <br />
     <dt>
+        <h2>Connecting to SQL Server 2000</h2>
+    </dt>
+    <dd>
+        <p>use TDS version <code>7_1</code> specified in the config: </p>
+        {% highlight javascript %}
+        var config = {
+            options: {		
+                ...,
+                tdsVersion: '7_1'
+            }
+          };
+        {% endhighlight %}
+    </dd>
+    <br />
+    <dt>
         <h2>Other</h2>
     </dt>
     <dd>
