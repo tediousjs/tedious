@@ -55,6 +55,45 @@ const DateTime: DataType = {
     cb();
   },
 
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date;
+
+    if (value != null) {
+      let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
+      } else {
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
+      }
+
+      threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
+      threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+
+      // 25920000 equals one day
+      if (threeHundredthsOfSecond === 25920000) {
+        days += 1;
+        threeHundredthsOfSecond = 0;
+      }
+
+      const result = Buffer.alloc(8);
+      result.writeUInt32LE(days, 0);
+      result.writeUInt32LE(threeHundredthsOfSecond, 4);
+
+      return result;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   // TODO: type 'any' needs to be revisited.
   validate: function(value): null | number | TypeError {
     if (value == null) {

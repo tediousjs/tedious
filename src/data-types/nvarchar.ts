@@ -55,6 +55,17 @@ const NVarChar: { maximumLength: number } & DataType = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'ucs2');
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
+  },
+
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
       if (parameter.length! <= this.maximumLength) {

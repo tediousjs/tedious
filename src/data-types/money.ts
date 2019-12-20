@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import MoneyN from './moneyn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Money: DataType = {
   id: 0x3C,
@@ -23,6 +24,21 @@ const Money: DataType = {
       buffer.writeUInt8(0);
     }
     cb();
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = parseFloat(value as string) * 10000;
+
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeMoney(val);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
 
   validate: function(value): number | null | TypeError {

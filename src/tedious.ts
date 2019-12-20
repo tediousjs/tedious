@@ -1,5 +1,6 @@
 import BulkLoad from './bulk-load';
 import Connection from './connection';
+import { SQLServerColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/SQLServerColumnEncryptionAzureKeyVaultProvider';
 import Request from './request';
 import { name } from './library';
 
@@ -14,6 +15,7 @@ const library = { name: name };
 export {
   BulkLoad,
   Connection,
+  SQLServerColumnEncryptionAzureKeyVaultProvider,
   Request,
   library,
   ConnectionError,

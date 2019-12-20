@@ -1,5 +1,6 @@
 import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
+import ReadableTrackingBuffer from '../tracking-buffer/readable-tracking-buffer';
 import JSBI from 'jsbi';
 
 import { Transform } from 'readable-stream';
@@ -46,9 +47,10 @@ class Parser extends Transform {
   options: InternalConnectionOptions;
   endOfMessageMarker: EndOfMessageMarker;
 
-  buffer: Buffer;
-  position: number;
+  buffers: ReadableTrackingBuffer[];
   suspended: boolean;
+  processingQueue: number;
+  readyToEnd: boolean;
   next?: () => void;
 
   constructor(debug: Debug, colMetadata: ColumnMetadata[], options: InternalConnectionOptions) {
@@ -59,23 +61,55 @@ class Parser extends Transform {
     this.options = options;
     this.endOfMessageMarker = new EndOfMessageMarker();
 
-    this.buffer = Buffer.alloc(0);
-    this.position = 0;
+    this.buffers = [ new ReadableTrackingBuffer(Buffer.alloc(0)) ];
     this.suspended = false;
     this.next = undefined;
+    this.readyToEnd = false;
+    this.processingQueue = 0;
+  }
+
+  streamBuffer() {
+    return this.buffers[0];
+  }
+
+  activeBuffer() {
+    const lastBufferIndex = this.buffers.length - 1;
+    return this.buffers[lastBufferIndex];
+  }
+
+  processingStarted() {
+    this.processingQueue += 1;
+  }
+
+  processingComplete() {
+    this.processingQueue -= 1;
+    this.pushEndOfMessage();
+  }
+
+  pushEndOfMessage() {
+    if (this.processingQueue <= 0 && this.readyToEnd === true && this.activeBuffer().availableLength() === 0) {
+      this.readyToEnd = false;
+      this.push(new EndOfMessageToken());
+    }
+  }
+
+  pushIntermediateBuffer(input: Buffer) {
+    this.buffers.push(new ReadableTrackingBuffer(input));
+  }
+
+  popIntermediateBuffer() {
+    this.buffers.pop();
   }
 
   _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
     if (input instanceof EndOfMessageMarker) {
-      return done(undefined, new EndOfMessageToken());
+      this.readyToEnd = true;
+      this.pushEndOfMessage();
+      done();
+      return;
     }
 
-    if (this.position === this.buffer.length) {
-      this.buffer = input;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), input]);
-    }
-    this.position = 0;
+    this.streamBuffer().concat(input);
 
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
@@ -103,19 +137,30 @@ class Parser extends Transform {
 
         this.push(token);
       }
+      this.processingComplete();
     };
 
-    while (!this.suspended && this.position + 1 <= this.buffer.length) {
-      const type = this.buffer.readUInt8(this.position);
-
-      this.position += 1;
-
-      if (tokenParsers[type]) {
-        tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
-      } else {
-        this.emit('error', new Error('Unknown type: ' + type));
+    const parse = () => {
+      if (this.suspended || this.activeBuffer().availableLength() <= 0) {
+        return;
       }
-    }
+
+      this.processingStarted();
+      this.readUInt8((type) => {
+        if (tokenParsers[type]) {
+          tokenParsers[type](this, this.colMetadata, this.options, (token: Token | undefined) => {
+            doneParsing(token);
+            if (!this.suspended && this.activeBuffer().availableLength() > 0) {
+              parse();
+            }
+          });
+        } else {
+          this.emit('error', new Error('Unknown type: ' + type));
+        }
+      });
+    };
+
+    parse();
   }
 
   suspend(next: () => void) {
@@ -124,7 +169,19 @@ class Parser extends Transform {
   }
 
   awaitData(length: number, callback: () => void) {
-    if (this.position + length <= this.buffer.length) {
+    if (this.buffers.length > 1) {
+      // inside an intermediate buffer
+      // use the readable-buffer await-data to verify enough data exists
+      // if not, this will throw an insufficient-data error
+      try {
+        return this.activeBuffer().awaitData(length, callback);
+      } catch (err) {
+        return this.emit('error', err);
+      }
+    }
+
+    // inside the main buffer, check if enough is available or wait if not
+    if (this.activeBuffer().availableLength() >= length) {
       callback();
     } else {
       this.suspend(() => {
@@ -134,256 +191,114 @@ class Parser extends Transform {
   }
 
   readInt8(callback: (data: number) => void) {
-    this.awaitData(1, () => {
-      const data = this.buffer.readInt8(this.position);
-      this.position += 1;
-      callback(data);
-    });
+    this.awaitData(1, () => this.activeBuffer().readInt8(callback));
   }
 
   readUInt8(callback: (data: number) => void) {
-    this.awaitData(1, () => {
-      const data = this.buffer.readUInt8(this.position);
-      this.position += 1;
-      callback(data);
-    });
+    this.awaitData(1, () => this.activeBuffer().readUInt8(callback));
   }
 
   readInt16LE(callback: (data: number) => void) {
-    this.awaitData(2, () => {
-      const data = this.buffer.readInt16LE(this.position);
-      this.position += 2;
-      callback(data);
-    });
+    this.awaitData(2, () => this.activeBuffer().readInt16LE(callback));
   }
 
   readInt16BE(callback: (data: number) => void) {
-    this.awaitData(2, () => {
-      const data = this.buffer.readInt16BE(this.position);
-      this.position += 2;
-      callback(data);
-    });
+    this.awaitData(2, () => this.activeBuffer().readInt16BE(callback));
   }
 
   readUInt16LE(callback: (data: number) => void) {
-    this.awaitData(2, () => {
-      const data = this.buffer.readUInt16LE(this.position);
-      this.position += 2;
-      callback(data);
-    });
+    this.awaitData(2, () => this.activeBuffer().readUInt16LE(callback));
   }
 
   readUInt16BE(callback: (data: number) => void) {
-    this.awaitData(2, () => {
-      const data = this.buffer.readUInt16BE(this.position);
-      this.position += 2;
-      callback(data);
-    });
+    this.awaitData(2, () => this.activeBuffer().readUInt16BE(callback));
   }
 
   readInt32LE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readInt32LE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readInt32LE(callback));
   }
 
   readInt32BE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readInt32BE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readInt32BE(callback));
   }
 
   readUInt32LE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readUInt32LE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readUInt32LE(callback));
   }
 
   readUInt32BE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readUInt32BE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readUInt32BE(callback));
   }
 
   readBigInt64LE(callback: (data: JSBI) => void) {
-    this.awaitData(8, () => {
-      const result = JSBI.add(
-        JSBI.leftShift(
-          JSBI.BigInt(
-            this.buffer[this.position + 4] +
-            this.buffer[this.position + 5] * 2 ** 8 +
-            this.buffer[this.position + 6] * 2 ** 16 +
-            (this.buffer[this.position + 7] << 24) // Overflow
-          ),
-          JSBI.BigInt(32)
-        ),
-        JSBI.BigInt(
-          this.buffer[this.position] +
-          this.buffer[this.position + 1] * 2 ** 8 +
-          this.buffer[this.position + 2] * 2 ** 16 +
-          this.buffer[this.position + 3] * 2 ** 24
-        )
-      );
-
-      this.position += 8;
-
-      callback(result);
-    });
+    this.awaitData(8, () => this.activeBuffer().readBigInt64LE(callback));
   }
 
   readInt64LE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readInt64LE(callback));
   }
 
   readInt64BE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readInt64BE(callback));
   }
 
   readBigUInt64LE(callback: (data: JSBI) => void) {
-    this.awaitData(8, () => {
-      const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
-      const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
-
-      this.position += 8;
-
-      callback(JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32))));
-    });
+    this.awaitData(8, () => this.activeBuffer().readBigUInt64LE(callback));
   }
 
   readUInt64LE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readUInt32LE(this.position + 4) + this.buffer.readUInt32LE(this.position);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readUInt64LE(callback));
   }
 
   readUInt64BE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = Math.pow(2, 32) * this.buffer.readUInt32BE(this.position) + this.buffer.readUInt32BE(this.position + 4);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readUInt64BE(callback));
   }
 
   readFloatLE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readFloatLE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readFloatLE(callback));
   }
 
   readFloatBE(callback: (data: number) => void) {
-    this.awaitData(4, () => {
-      const data = this.buffer.readFloatBE(this.position);
-      this.position += 4;
-      callback(data);
-    });
+    this.awaitData(4, () => this.activeBuffer().readFloatBE(callback));
   }
 
   readDoubleLE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = this.buffer.readDoubleLE(this.position);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readDoubleLE(callback));
   }
 
   readDoubleBE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const data = this.buffer.readDoubleBE(this.position);
-      this.position += 8;
-      callback(data);
-    });
+    this.awaitData(8, () => this.activeBuffer().readDoubleBE(callback));
   }
 
   readUInt24LE(callback: (data: number) => void) {
-    this.awaitData(3, () => {
-      const low = this.buffer.readUInt16LE(this.position);
-      const high = this.buffer.readUInt8(this.position + 2);
-
-      this.position += 3;
-
-      callback(low | (high << 16));
-    });
+    this.awaitData(3, () => this.activeBuffer().readUInt24LE(callback));
   }
 
   readUInt40LE(callback: (data: number) => void) {
-    this.awaitData(5, () => {
-      const low = this.buffer.readUInt32LE(this.position);
-      const high = this.buffer.readUInt8(this.position + 4);
-
-      this.position += 5;
-
-      callback((0x100000000 * high) + low);
-    });
+    this.awaitData(5, () => this.activeBuffer().readUInt40LE(callback));
   }
 
   readUNumeric64LE(callback: (data: number) => void) {
-    this.awaitData(8, () => {
-      const low = this.buffer.readUInt32LE(this.position);
-      const high = this.buffer.readUInt32LE(this.position + 4);
-
-      this.position += 8;
-
-      callback((0x100000000 * high) + low);
-    });
+    this.awaitData(8, () => this.activeBuffer().readUNumeric64LE(callback));
   }
 
   readUNumeric96LE(callback: (data: number) => void) {
-    this.awaitData(12, () => {
-      const dword1 = this.buffer.readUInt32LE(this.position);
-      const dword2 = this.buffer.readUInt32LE(this.position + 4);
-      const dword3 = this.buffer.readUInt32LE(this.position + 8);
-
-      this.position += 12;
-
-      callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3));
-    });
+    this.awaitData(12, () => this.activeBuffer().readUNumeric96LE(callback));
   }
 
   readUNumeric128LE(callback: (data: number) => void) {
-    this.awaitData(16, () => {
-      const dword1 = this.buffer.readUInt32LE(this.position);
-      const dword2 = this.buffer.readUInt32LE(this.position + 4);
-      const dword3 = this.buffer.readUInt32LE(this.position + 8);
-      const dword4 = this.buffer.readUInt32LE(this.position + 12);
-
-      this.position += 16;
-
-      callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4));
-    });
+    this.awaitData(16, () => this.activeBuffer().readUNumeric128LE(callback));
   }
 
   // Variable length data
 
   readBuffer(length: number, callback: (data: Buffer) => void) {
-    this.awaitData(length, () => {
-      const data = this.buffer.slice(this.position, this.position + length);
-      this.position += length;
-      callback(data);
-    });
+    this.awaitData(length, () => this.activeBuffer().readBuffer(length, callback));
   }
 
   // Read a Unicode String (BVARCHAR)
   readBVarChar(callback: (data: string) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
     this.readUInt8((length) => {
       this.readBuffer(length * 2, (data) => {
         callback(data.toString('ucs2'));
@@ -393,6 +308,7 @@ class Parser extends Transform {
 
   // Read a Unicode String (USVARCHAR)
   readUsVarChar(callback: (data: string) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
     this.readUInt16LE((length) => {
       this.readBuffer(length * 2, (data) => {
         callback(data.toString('ucs2'));
@@ -402,6 +318,7 @@ class Parser extends Transform {
 
   // Read binary data (BVARBYTE)
   readBVarByte(callback: (data: Buffer) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
     this.readUInt8((length) => {
       this.readBuffer(length, callback);
     });
@@ -409,6 +326,7 @@ class Parser extends Transform {
 
   // Read binary data (USVARBYTE)
   readUsVarByte(callback: (data: Buffer) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
     this.readUInt16LE((length) => {
       this.readBuffer(length, callback);
     });

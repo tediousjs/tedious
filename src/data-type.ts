@@ -39,6 +39,7 @@ import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
 
 import { InternalConnectionOptions } from './connection';
+import { CryptoMetadata } from './always-encrypted/types';
 
 export type Parameter = {
   type: DataType,
@@ -50,16 +51,33 @@ export type Parameter = {
   length?: number,
   precision?: number,
   scale?: number,
+  collation?: {
+    lcid: number,
+    flags: number,
+    version: number,
+    sortId: number,
+  },
 
   nullable?: boolean
+
+  forceEncrypt?: boolean,
+  cryptoMetadata?: CryptoMetadata,
 };
 
 export type ParameterData<T = any> = {
   length?: number,
   scale?: number,
   precision?: number,
+  collation?: {
+    lcid: number,
+    flags: number,
+    version: number,
+    sortId: number,
+  },
 
-  value: T
+  value: T,
+
+  cryptoMetadata?: CryptoMetadata,
 };
 
 export interface DataType {
@@ -76,7 +94,9 @@ export interface DataType {
 
   resolveLength?: (parameter: Parameter) => number,
   resolvePrecision?: (parameter: Parameter) => number,
-  resolveScale?: (parameter: Parameter) => number
+  resolveScale?: (parameter: Parameter) => number,
+
+  toBuffer?: (parameter: Parameter, options: InternalConnectionOptions) => Buffer | undefined,
 }
 
 export const TYPE = {

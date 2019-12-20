@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 
@@ -59,6 +60,37 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
       buffer.writeUInt8(0);
     }
     cb();
+  },
+  toBuffer: function(parameter) {
+    const value = parameter.value as Date & { nanosecondDelta?: number | null };
+
+    if (value != null) {
+      const scale = DateTimeOffset.resolveScale(parameter);
+
+      const time = new Date(+value);
+      time.setUTCFullYear(1970);
+      time.setUTCMonth(0);
+      time.setUTCDate(1);
+
+      let timestamp: number;
+      timestamp = +time * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp = Math.round(timestamp);
+
+      const days = Math.floor((+value - UTC_YEAR_ONE) / 86400000)
+      const offset = -value.getTimezoneOffset();
+
+      // data size does not matter for encrypted datetimeoffset
+      // just choose the smallest that maintains full scale (7)
+      const buffer = new WritableTrackingBuffer(10);
+      buffer.writeUInt40LE(timestamp);
+      buffer.writeUInt24LE(days);
+      buffer.writeInt16LE(offset);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
   validate: function(value): null | number | TypeError {
     if (value == null) {

@@ -25,6 +25,20 @@ const Bit: DataType = {
     cb();
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = value as boolean;
+      const result = Buffer.alloc(8);
+      result.writeInt8(val ? 1 : 0, 0);
+
+      return result;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): null | boolean {
     if (value == null) {
       return null;

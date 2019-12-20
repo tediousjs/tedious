@@ -48,12 +48,47 @@ const VarChar: { maximumLength: number } & DataType = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength);
+    if (parameter.length != null && isFinite(parameter.length)) {
+      const length = parameter.length;
+
+      if (length <= this.maximumLength) {
+        buffer.writeUInt16LE(length);
+      } else {
+        buffer.writeUInt16LE(this.maximumLength);
+      }
     } else {
       buffer.writeUInt16LE(MAX);
     }
-    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+
+    const collation = Buffer.alloc(5);
+
+    if (parameter.collation != null) {
+      const { lcid, flags, version, sortId } = parameter.collation;
+      collation.writeUInt8(
+        (lcid) & 0xFF,
+        0,
+      );
+      collation.writeUInt8(
+        (lcid >> 8) & 0xFF,
+        1,
+      );
+      // byte index 2 contains data for both lcid and flags
+      collation.writeUInt8(
+        ( (lcid >> 16) & 0x0F ) | ( ( (flags) & 0x0F ) << 4 ),
+        2,
+      );
+      // byte index 3 contains data for both flags and version
+      collation.writeUInt8(
+        ( (flags) & 0xF0 ) | ( (version) & 0x0F ),
+        3,
+      );
+      collation.writeUInt8(
+        (sortId) & 0xFF,
+        4,
+      );
+    }
+
+    buffer.writeBuffer(collation);
   },
 
   writeParameterData: function(buffer, parameter, options, cb) {
@@ -70,6 +105,17 @@ const VarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt32LE(0xFFFFFFFF);
     }
     cb();
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
   },
 
   validate: function(value): string | null | TypeError {

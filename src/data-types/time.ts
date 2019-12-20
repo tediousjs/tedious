@@ -1,6 +1,7 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const Time: DataType = {
+const Time: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x29,
   type: 'TIMEN',
   name: 'Time',
@@ -64,7 +65,37 @@ const Time: DataType = {
     cb();
   },
 
-  validate: function(value): null | number | TypeError | Date {
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date & { nanosecondDelta?: number | null };
+
+    if (value != null) {
+      const scale = Time.resolveScale(parameter);
+
+      const time = new Date(+value);
+
+      let timestamp: number;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp = Math.round(timestamp);
+
+      // data size does not matter for encrypted time
+      // just choose the smallest that maintains full scale (7)
+      const buffer = new WritableTrackingBuffer(5);
+      buffer.writeUInt40LE(timestamp);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
+  validate: function(value): null| number| TypeError | Date {
     if (value == null) {
       return null;
     }

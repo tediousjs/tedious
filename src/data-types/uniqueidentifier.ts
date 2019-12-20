@@ -29,6 +29,16 @@ const UniqueIdentifier: DataType = {
     cb();
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string;
+
+    if (value != null) {
+      return Buffer.from(guidToArray(value));
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;

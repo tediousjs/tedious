@@ -40,6 +40,12 @@ import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { shouldHonorAE, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './always-encrypted/utils';
+import { SQLServerColumnEncryptionAzureKeyVaultProvider } from "./always-encrypted/SQLServerColumnEncryptionAzureKeyVaultProvider";
+import { CEKTableEntry } from './always-encrypted/CEKTableEntry';
+import { SQLServerEncryptionType, CryptoMetadata } from './always-encrypted/types';
+import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
+import { Parameter } from './data-type';
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -130,6 +136,8 @@ export interface InternalConnectionOptions {
   appName: undefined | string,
   camelCaseColumns: boolean,
   cancelTimeout: number,
+  columnEncryptionKeyCacheTTL: number,
+  columnEncryptionSetting: boolean,
   columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string),
   connectionRetryInterval: number,
   connectTimeout: number,
@@ -156,6 +164,8 @@ export interface InternalConnectionOptions {
   enableQuotedIdentifier: null | boolean,
   encrypt: boolean,
   fallbackToDefaultDb: boolean,
+  globalCustomColumnEncryptionKeyStoreProviders?: KeyStoreProviderMap,
+  globalSystemColumnEncryptionKeyStoreProviders?: KeyStoreProviderMap,
   instanceName: undefined | string,
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL],
   language: string,
@@ -168,12 +178,24 @@ export interface InternalConnectionOptions {
   requestTimeout: number,
   rowCollectionOnDone: boolean,
   rowCollectionOnRequestCompletion: boolean,
+  serverName: undefined | string,
+  serverSupportsColumnEncryption: boolean,
   tdsVersion: string,
   textsize: string,
+  trustedServerNameAE?: string,
   trustServerCertificate: boolean,
   useColumnNames: boolean,
   useUTC: boolean,
   lowerCaseGuids: boolean
+}
+
+interface KeyStoreProvider {
+  key: string;
+  value: SQLServerColumnEncryptionAzureKeyVaultProvider;
+}
+
+interface KeyStoreProviderMap {
+  [key: string]: SQLServerColumnEncryptionAzureKeyVaultProvider;
 }
 
 interface State {
@@ -211,6 +233,8 @@ interface ConnectionOptions {
   appName?: string | undefined,
   camelCaseColumns?: boolean,
   cancelTimeout?: number,
+  columnEncryptionKeyCacheTTL: number,
+  columnEncryptionSetting: boolean,
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string,
   connectionRetryInterval?: number,
   connectTimeout?: number,
@@ -491,6 +515,8 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
@@ -517,6 +543,8 @@ class Connection extends EventEmitter {
         enableQuotedIdentifier: true,
         encrypt: true,
         fallbackToDefaultDb: false,
+        globalCustomColumnEncryptionKeyStoreProviders: undefined,
+        globalSystemColumnEncryptionKeyStoreProviders: undefined,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
@@ -529,8 +557,11 @@ class Connection extends EventEmitter {
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
+        serverName: undefined,
+        serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
+        trustedServerNameAE: undefined,
         trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true,
@@ -927,6 +958,26 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.columnEncryptionSetting !== undefined) {
+        if (typeof config.options.columnEncryptionSetting !== 'boolean') {
+          throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
+        }
+
+        this.config.options.columnEncryptionSetting = config.options.columnEncryptionSetting;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL <= 0) {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be greater than 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+      }
+
       if (config.options.lowerCaseGuids !== undefined) {
         if (typeof config.options.lowerCaseGuids !== 'boolean') {
           throw new TypeError('The "config.options.lowerCaseGuids" property must be of type boolean.');
@@ -934,6 +985,27 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+    }
+
+    let serverName = this.config.server;
+    if (!serverName) {
+      serverName = 'localhost';
+    }
+
+    const px = serverName.indexOf('\\');
+
+    if (px > 0) {
+      serverName = serverName.substring(0, px);
+    }
+
+    this.config.options.trustedServerNameAE = serverName;
+
+    if (this.config.options.instanceName) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.instanceName}`;
+    }
+
+    if (this.config.options.port) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.port}`;
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -1061,6 +1133,10 @@ class Connection extends EventEmitter {
 
         this.loginError = error;
       }
+    });
+
+    tokenStreamParser.parser.on('error', (error) => {
+      this.emit('error', error);
     });
 
     tokenStreamParser.on('databaseChange', (token) => {
@@ -1552,6 +1628,8 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
+    payload.columnEncryption = this.config.options.columnEncryptionSetting;
+
     const { authentication } = this.config;
     switch (authentication.type) {
       case 'azure-active-directory-password':
@@ -1755,7 +1833,7 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  execSql(request: Request) {
+  _execSql(request: Request) {
     request.transformIntoExecuteSqlRpc();
 
     const error = request.error;
@@ -1768,6 +1846,24 @@ class Connection extends EventEmitter {
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+  }
+
+  execSql(request: Request) {
+    request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
+    if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
+      this.getParameterEncryptionMetadata(request, (error?: Error) => {
+        if (error != null) {
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+        this._execSql(request);
+      });
+    } else {
+      this._execSql(request);
+    }
   }
 
   /**
@@ -1818,6 +1914,77 @@ class Connection extends EventEmitter {
     });
 
     this.execSqlBatch(request);
+  }
+
+  getParameterEncryptionMetadata(request: Request, callback: (error?: Error) => void) {
+    if (request.cryptoMetadataLoaded === true) {
+      return callback();
+    }
+
+    const decryptSymmetricKeyPromises: Promise<void>[] = [];
+    const metadataRequest = Request.transformIntoEncryptionMetadataRpc(request, () => {
+      if (paramCount !== request.parameters.length) {
+        return callback(new Error(`Internal error. Metadata for some parameters in statement or procedure "${request.sqlTextOrProcedure}" is missing in the resultset returned by sp_describe_parameter_encryption.`));
+      }
+      return Promise.all(decryptSymmetricKeyPromises).then(() => {
+        request.cryptoMetadataLoaded = true;
+        callback();
+      }).catch(callback);
+    });
+
+    const cekList: CEKTableEntry[] = [];
+    let paramCount = 0;
+    metadataRequest.on('row', (columns: any) => {
+      try {
+        const isFirstRecordSet = columns.some((col: any) => (col && col.metadata && col.metadata.colName) === 'database_id');
+        if (isFirstRecordSet === true) {
+          const currentOrdinal = columns[DescribeParameterEncryptionResultSet1.KeyOrdinal].value;
+          let cekEntry: CEKTableEntry;
+          if (!cekList[currentOrdinal]) {
+            cekEntry = new CEKTableEntry(currentOrdinal);
+            cekList[cekEntry.ordinal] = cekEntry;
+          } else {
+            cekEntry = cekList[currentOrdinal];
+          }
+          cekEntry.add(columns[DescribeParameterEncryptionResultSet1.EncryptedKey].value,
+                       columns[DescribeParameterEncryptionResultSet1.DbId].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyId].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
+                       columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
+        } else {
+          paramCount++;
+          const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
+          const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
+          const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
+          const cekEntry: CEKTableEntry = cekList[cekOrdinal];
+  
+          if (cekEntry && cekList.length < cekOrdinal) {
+            return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
+          }
+  
+          const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
+          if (SQLServerEncryptionType.PlainText !== encType) {
+            request.parameters[paramIndex].cryptoMetadata = {
+              cekTableEntry: cekEntry,
+              ordinal: cekOrdinal,
+              cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
+              encryptionType: encType,
+              normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
+            };
+            decryptSymmetricKeyPromises.push(SQLServerSecurityUtility.decryptSymmetricKey(<CryptoMetadata>request.parameters[paramIndex].cryptoMetadata, this.config.options));
+          } else if (request.parameters[paramIndex].forceEncrypt === true) {
+            return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
+          }
+        }
+      } catch (error) {
+        return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`))
+      }
+    });
+
+    this.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest, this.currentTransactionDescriptor(), this.config.options));
   }
 
   prepare(request: Request) {
@@ -2122,6 +2289,54 @@ class Connection extends EventEmitter {
         return 'read committed';
     }
   }
+
+  registerColumnEncryptionKeyStoreProviders(clientKeyStoreProviders: KeyStoreProvider[]) {
+    if (!clientKeyStoreProviders) {
+      throw new Error('Column encryption key store provider map cannot be null. Expecting a non-null value.');
+    }
+
+    if (this.config.options.globalCustomColumnEncryptionKeyStoreProviders) {
+      throw new Error('Key store providers cannot be set more than once.');
+    }
+
+    for (const entry of clientKeyStoreProviders) {
+      const providerName = entry.key;
+
+      if (!providerName || providerName.length === 0) {
+        throw new Error('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+      }
+
+      if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+        throw new Error(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+      }
+
+      if (!entry.value) {
+        throw new Error(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+      }
+
+      if (!this.config.options.globalCustomColumnEncryptionKeyStoreProviders) {
+        this.config.options.globalCustomColumnEncryptionKeyStoreProviders = {};
+      }
+
+      this.config.options.globalCustomColumnEncryptionKeyStoreProviders[providerName] = entry.value;
+    }
+  }
+
+  getGlobalSystemColumnEncryptionKeyStoreProvider(providerName: string) {
+    return this.config.options.globalSystemColumnEncryptionKeyStoreProviders && this.config.options.globalSystemColumnEncryptionKeyStoreProviders[providerName];
+  }
+
+  setColumnEncryptionKeyCacheTtl(ttl: number) {
+    this.config.options.columnEncryptionKeyCacheTTL = ttl;
+  }
+
+  getColumnEncryptionKeyCacheTtl() {
+    return this.config.options.columnEncryptionKeyCacheTTL;
+  }
+
+  getTrustedServerNameAE() {
+    return this.config.options.trustedServerNameAE;
+  }
 }
 
 export default Connection;
@@ -2276,6 +2491,10 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.REROUTING);
       },
       featureExtAck: function(token) {
+        if (token.columnEncryption) {
+          this.config.options.serverSupportsColumnEncryption = true;
+          return;
+        }
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
           if (token.fedAuth === undefined) {

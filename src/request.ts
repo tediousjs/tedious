@@ -3,6 +3,7 @@ import { typeByName as TYPES, Parameter } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
+import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/utils';
 
 // TODO: Figure out how to type the `rows` parameter here.
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
@@ -11,7 +12,18 @@ type ParameterOptions = {
   output?: boolean,
   length?: number,
   precision?: number,
-  scale?: number
+  scale?: number,
+  collation?: {
+    lcid: number,
+    flags: number,
+    version: number,
+    sortId: number,
+  },
+  forceEncrypt?: boolean,
+}
+
+interface RequestOptions {
+  statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
 
 class Request extends EventEmitter {
@@ -34,7 +46,11 @@ class Request extends EventEmitter {
 
   callback: CompletionCallback;
 
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback) {
+  shouldHonorAE?: boolean;
+  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  cryptoMetadataLoaded: boolean;
+
+  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -49,6 +65,8 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
+    this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       if (this.preparing) {
         this.preparing = false;
@@ -70,7 +88,14 @@ class Request extends EventEmitter {
       options = {};
     }
 
-    const { output = false, length, precision, scale } = options;
+    const {
+      output = false,
+      length,
+      precision,
+      scale,
+      collation,
+      forceEncrypt = false,
+    } = options;
 
     const parameter: Parameter = {
       type: type,
@@ -79,7 +104,9 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      collation: collation,
+      forceEncrypt: forceEncrypt
     };
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;
@@ -108,6 +135,18 @@ class Request extends EventEmitter {
       }
     }
     return paramsParameter;
+  }
+
+  static transformIntoEncryptionMetadataRpc(request: Request, callback: CompletionCallback): Request {
+    const metadataRequest = new Request('sp_describe_parameter_encryption', callback);
+
+    metadataRequest.originalParameters = request.parameters;
+    metadataRequest.addParameter('tsql', TYPES.NVarChar, request.sqlTextOrProcedure);
+    if (metadataRequest.originalParameters && metadataRequest.originalParameters.length) {
+      metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
+    }
+
+    return metadataRequest;
   }
 
   transformIntoExecuteSqlRpc() {

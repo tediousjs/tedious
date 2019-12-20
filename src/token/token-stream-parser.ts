@@ -105,7 +105,7 @@ export class Parser extends EventEmitter {
   }
 
   isEnd() {
-    return this.parser.buffer.length === this.parser.position;
+    return this.parser.activeBuffer().availableLength() === 0;
   }
 
   // Temporarily suspends the token stream parser transform from emitting events.

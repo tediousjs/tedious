@@ -2,10 +2,13 @@ import Parser from './token/stream-parser';
 import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
+import ReadableTrackingBuffer from './tracking-buffer/readable-tracking-buffer';
 
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
+import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
+import { CryptoMetadata } from './always-encrypted/types';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -192,6 +195,10 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
 
     case 'VarBinary':
     case 'Binary':
+      if (metadata.cryptoMetadata) {
+        return readEncryptedBinary(parser, metadata, options, callback);
+      }
+
       if (metadata.dataLength === MAX) {
         return readMaxBinary(parser, callback);
       } else {
@@ -710,6 +717,302 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
       });
     });
   });
+}
+
+function readEncryptedBinary(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
+  const cryptoMetadata = metadata.cryptoMetadata!;
+  const { normalizationRuleVersion, baseTypeInfo: baseMetadata } = cryptoMetadata;
+
+  if (!normalizationRuleVersion.equals(Buffer.from([ 0x01 ]))) {
+    return parser.emit('error', new Error(
+      `Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`,
+    )) as never;
+  }
+
+  const isNullValue = (decryptedValue: Buffer, metadata: Metadata): boolean => {
+    switch (metadata.type.name) {
+      case 'VarChar':
+      case 'Char':
+      case 'NVarChar':
+      case 'NChar':
+      case 'VarBinary':
+      case 'Binary':
+        return (
+          metadata.dataLength === MAX &&
+          decryptedValue.equals(PLP_NULL)
+        );
+    }
+
+    return false;
+  };
+
+  const callbackDecrypted = (decryptedValue: Buffer) => {
+    if (isNullValue(decryptedValue, baseMetadata)) {
+      return callback(null);
+    }
+
+    parser.pushIntermediateBuffer(decryptedValue);
+    let hasProcessedIntermediateBuffer: boolean = false;
+
+    try {
+      return denormalizedValue(parser, decryptedValue.length, baseMetadata, options, (value) => {
+        if (!hasProcessedIntermediateBuffer) {
+          parser.popIntermediateBuffer();
+          hasProcessedIntermediateBuffer = true;
+        }
+
+        return callback(value);
+      });
+    } catch {
+      // should not happen in practice, but here just in case
+      if (!hasProcessedIntermediateBuffer) {
+        parser.popIntermediateBuffer();
+        hasProcessedIntermediateBuffer = true;
+      }
+    }
+  };
+
+  const callbackAE = (encryptedValue: Buffer) =>
+    SQLServerSecurityUtility.decryptWithKey(encryptedValue, cryptoMetadata, options)
+      .then(callbackDecrypted)
+      .catch((error) => parser.emit('error', error));
+
+  // satisfy typing in callbacks:
+  const callbackTyped = callbackAE as (value: unknown) => void;
+
+  if (metadata.dataLength === MAX) {
+    return readMaxBinary(parser, callbackTyped);
+  } else {
+    return parser.readUInt16LE((dataLength) => {
+      if (dataLength === NULL) {
+        return callback(null);
+      }
+
+      readBinary(parser, dataLength, callbackTyped);
+    });
+  }
+}
+
+function denormalizedValue(parser: Parser, valueLength: number, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void) {
+  // there are a few notes to be aware of in this implementation:
+  // 1. for most encrypted blobs, the metadata data-length will not match the
+  //    decrypted value-length, so the parsers here are more lenient for that
+  // 2. null values are assumed to be handled already, so this implementation
+  //    will denormalize values with the assumption that it is non-null
+  // 3. max reads are never applicable to encrypted blobs (except for null
+  //    values, which are not handled here)
+
+  // for types that do not have a data length, default to the value length
+  const dataLength = metadata.dataLength || valueLength;
+
+  switch (metadata.type.name) {
+    case 'Null':
+      return callback(null);
+
+    case 'TinyInt':
+      return readTinyInt(parser, callback);
+
+    case 'SmallInt':
+      return readSmallInt(parser, callback);
+
+    case 'Int':
+      return readInt(parser, callback);
+
+    case 'BigInt':
+      return readBigInt(parser, callback);
+
+    case 'IntN':
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 1:
+          return readTinyInt(parser, callback);
+        case 2:
+          return readSmallInt(parser, callback);
+        case 4:
+          return readInt(parser, callback);
+        case 8:
+          return readBigInt(parser, callback);
+
+        default:
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
+      }
+
+    case 'Real':
+      return readReal(parser, callback);
+
+    case 'Float':
+      return readFloat(parser, callback);
+
+    case 'FloatN':
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 4:
+          return readReal(parser, callback);
+        case 8:
+          return readFloat(parser, callback);
+
+        default:
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
+      }
+
+    case 'SmallMoney':
+      // first 4 bytes on small money are always ignored
+      return parser.readUInt32LE(() => {
+        return readSmallMoney(parser, callback);
+      });
+
+    case 'Money':
+      return readMoney(parser, callback);
+
+    case 'MoneyN':
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 4:
+          // first 4 bytes on small money are always ignored
+          return parser.readUInt32LE(() => {
+            return readSmallMoney(parser, callback);
+          });
+
+        case 8:
+          return readMoney(parser, callback);
+
+        default:
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
+      }
+
+    case 'Bit':
+      return readBit(parser, callback);
+
+    case 'BitN':
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 1:
+          return readBit(parser, callback);
+
+        default:
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for BitN'));
+      }
+
+    case 'VarChar':
+    case 'Char': {
+      const codepage = metadata.collation!.codepage;
+      // null is assumed to be handled already, so just parse available chars
+      return readChars(parser, valueLength, codepage, callback);
+    }
+
+    case 'NVarChar':
+    case 'NChar':
+      // null is assumed to be handled already, so just parse available nchars
+      return readNChars(parser, valueLength, callback);
+
+    case 'VarBinary':
+    case 'Binary':
+      // null is assumed to be handled already, so just parse available binary
+      return readBinary(parser, valueLength, callback);
+
+    case 'SmallDateTime':
+      return readSmallDateTime(parser, options.useUTC, callback);
+
+    case 'DateTime':
+      return readDateTime(parser, options.useUTC, callback);
+
+    case 'DateTimeN':
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 4:
+          return readSmallDateTime(parser, options.useUTC, callback);
+        case 8:
+          return readDateTime(parser, options.useUTC, callback);
+
+        default:
+          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN'));
+      }
+
+    case 'Time':
+      // no padding to worry about for Time, since it has no dataLength
+      if (dataLength === 0) {
+        return callback(null);
+      } else {
+        return readTime(parser, dataLength, metadata.scale!, options.useUTC, callback);
+      }
+
+    case 'Date':
+      // no padding to worry about for Date, since it has no dataLength
+      if (dataLength === 0) {
+        return callback(null);
+      } else {
+        return readDate(parser, options.useUTC, callback);
+      }
+
+    case 'DateTime2':
+      // no padding to worry about for DateTime2, since it has no dataLength
+      if (dataLength === 0) {
+        return callback(null);
+      } else {
+        return readDateTime2(parser, dataLength, metadata.scale!, options.useUTC, callback);
+      }
+
+    case 'DateTimeOffset':
+      // no padding to worry about for DateTimeOffset, since it has no dataLength
+      if (dataLength === 0) {
+        return callback(null);
+      } else {
+        return readDateTimeOffset(parser, dataLength, metadata.scale!, callback);
+      }
+
+    case 'NumericN':
+    case 'DecimalN':
+      if (dataLength === 0) {
+        return callback(null);
+      } else {
+        // encrypted value has variable length, usually fixed in chunks of 8
+        // the denormalize handler needs to handle any arbitrary valueLength
+        const magnitudeSize = valueLength - 1;
+        const scale = metadata.scale!;
+
+        return parser.readUInt8((signByte) => {
+          const sign = signByte === 0x01 ? 1 : -1;
+          return parser.readBuffer(magnitudeSize, (data) => {
+            const value = data.reduceRight((acc, byte) => acc * (1 << 8) + byte);
+            return callback(value * sign / Math.pow(10, scale));
+          });
+        });
+      }
+
+    case 'UniqueIdentifier':
+      // no padding to worry about for UniqueIdentifier, since it has no padding
+      switch (dataLength) {
+        case 0:
+          return callback(null);
+
+        case 0x10:
+          return readUniqueIdentifier(parser, options, callback);
+
+        default:
+          return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
+      }
+
+    case 'Text':
+    case 'NText':
+    case 'Image':
+    case 'Xml':
+    case 'UDT':
+    case 'Variant':
+      return parser.emit('error', new Error(sprintf('Unsupported encrypted type %s', metadata.type.name)));
+
+    default:
+      return parser.emit('error', new Error(sprintf('Unrecognised type %s', metadata.type.name)));
+  }
 }
 
 export default valueParse;

@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
@@ -32,6 +33,28 @@ const Date : DataType = {
       buffer.writeUInt8(0);
     }
     cb();
+  },
+
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date;
+
+    if (value != null) {
+      let val: number;
+
+      if (options.useUTC) {
+        val = Math.floor((+value - UTC_YEAR_ONE) / 86400000);
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
+        val = Math.floor((+value - +YEAR_ONE + dstDiff) / 86400000);
+      }
+
+      const buffer = new WritableTrackingBuffer(3);
+      buffer.writeUInt24LE(val);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
 
   // TODO: value is techincally of type 'unknown'.

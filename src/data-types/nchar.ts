@@ -62,6 +62,17 @@ const NChar: DataType & { maximumLength: number } = {
     cb();
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'ucs2');
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
+  },
+
   validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;

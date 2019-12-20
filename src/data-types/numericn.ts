@@ -17,6 +17,10 @@ const NumericN: DataType = {
     throw new Error('not implemented');
   },
 
+  toBuffer() {
+    throw new Error('not implemented');
+  },
+
   validate() {
     throw new Error('not implemented');
   }

@@ -2,6 +2,7 @@ import { codepageBySortId, codepageByLcid } from './collation';
 import Parser from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
+import { CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
 
@@ -27,7 +28,7 @@ type UdtInfo = {
   assemblyName: string
 };
 
-export type Metadata = {
+export type BaseMetadata = {
   userType: number,
   flags: number,
   type: DataType,
@@ -36,8 +37,12 @@ export type Metadata = {
   scale: number | undefined,
   dataLength: number | undefined,
   schema: XmlSchema | undefined,
-  udtInfo: UdtInfo | undefined
+  udtInfo: UdtInfo | undefined,
 };
+
+export type Metadata = {
+  cryptoMetadata?: CryptoMetadata;
+} & BaseMetadata;
 
 function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
   // s2.2.5.1.2
@@ -102,9 +107,19 @@ function readUDTInfo(parser: Parser, callback: (udtInfo: UdtInfo | undefined) =>
   });
 }
 
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
-  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+function readFlags(parser: Parser, shouldReadFlags: boolean, callback: (flags: number) => void) {
+  if (shouldReadFlags === false) {
+    callback(0);
+  } else {
     parser.readUInt16LE((flags) => {
+      callback(flags);
+    });
+  }
+}
+
+function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void, shouldReadFlags: boolean) {
+  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+    readFlags(parser, shouldReadFlags, (flags) => {
       parser.readUInt8((typeNumber) => {
         const type: DataType = TYPE[typeNumber];
 

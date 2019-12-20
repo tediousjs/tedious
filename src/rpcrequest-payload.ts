@@ -3,6 +3,9 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
+import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
+import VarBinary from './data-types/varbinary';
+import { CryptoMetadata } from './always-encrypted/types';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -12,7 +15,8 @@ import { InternalConnectionOptions } from './connection';
 
 const STATUS = {
   BY_REF_VALUE: 0x01,
-  DEFAULT_VALUE: 0x02
+  DEFAULT_VALUE: 0x02,
+  ENCRYPTED_VALUE: 0x08,
 };
 
 /*
@@ -56,7 +60,7 @@ class RpcRequestPayload {
         return;
       }
 
-      this._writeParameterData(parameters[i], buffer, () => {
+      this._writeParameter(parameters[i], buffer, () => {
         setImmediate(() => {
           writeNext(i + 1);
         });
@@ -69,16 +73,30 @@ class RpcRequestPayload {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  _writeParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
+    if (parameter.cryptoMetadata) {
+      statusFlags |= STATUS.ENCRYPTED_VALUE;
+    }
     buffer.writeUInt8(statusFlags);
 
-    const param: ParameterData = { value: parameter.value };
+    if (parameter.cryptoMetadata) {
+      this._writeEncryptedParameter(parameter, buffer, cb);
+    } else {
+      this._writeParameterData(parameter, buffer, true, cb);
+    }
+  }
+
+  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, writeValue: boolean, cb: () => void) {
+    const param: ParameterData = {
+      value: parameter.value,
+      cryptoMetadata: parameter.cryptoMetadata
+    };
 
     const type = parameter.type;
 
@@ -102,10 +120,73 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
+    if (parameter.collation) {
+      param.collation = parameter.collation;
+    }
+
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
+    if (writeValue) {
+      type.writeParameterData(buffer, param, this.options, () => {
+        cb();
+      });
+    } else {
       cb();
+    }
+  }
+
+  _writeEncryptedParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+    this._encryptData(parameter, (encryptedValue?: Buffer) => {
+      const encryptedParam = {
+        value: encryptedValue,
+        type: VarBinary,
+        output: parameter.output,
+        name: parameter.name,
+        forceEncrypt: parameter.forceEncrypt
+      };
+
+      this._writeParameterData(encryptedParam, buffer, true, () => {
+        this._writeParameterData(parameter, buffer, false, () => {
+          this._writeEncryptionMetadata(parameter.cryptoMetadata, buffer, () => {
+            cb();
+          });
+        });
+      });
     });
+  }
+
+  _encryptData(parameter: Parameter, callback: (encryptedValue?: Buffer) => void) {
+    const type = parameter.type;
+    if (parameter.value && parameter.cryptoMetadata) {
+      if (!type.toBuffer) {
+        throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
+      }
+      const plainTextBuffer = type.toBuffer(parameter, this.options);
+      if (!plainTextBuffer) {
+        return callback();
+      }
+      return SQLServerSecurityUtility.encryptWithKey(plainTextBuffer, parameter.cryptoMetadata, this.options).then(callback);
+    } else {
+      return callback();
+    }
+  }
+
+  _writeEncryptionMetadata(cryptoMetadata: CryptoMetadata | undefined, buffer: WritableTrackingBuffer, cb: () => void) {
+    if (!cryptoMetadata || !cryptoMetadata.cekTableEntry || !cryptoMetadata.cekTableEntry.columnEncryptionKeyValues || cryptoMetadata.cekTableEntry.columnEncryptionKeyValues.length <= 0) {
+      throw new Error('Invalid Crypto Metadata in _writeEncryptionMetadata');
+    }
+
+    buffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
+    if (cryptoMetadata.cipherAlgorithmId === 0) {
+      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName);
+    }
+
+    buffer.writeUInt8(cryptoMetadata.encryptionType);
+    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].dbId);
+    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].keyId);
+    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].keyVersion);
+    buffer.writeBuffer(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].mdVersion);
+    buffer.writeUInt8(cryptoMetadata.normalizationRuleVersion[0]);
+    cb();
   }
 }
 
