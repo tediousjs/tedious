@@ -10,10 +10,123 @@ const NumericN = require('../../../src/data-types/numericn');
 const Parser = require('../../../src/token/stream-parser');
 const dataTypeByName = require('../../../src/data-type').typeByName;
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+
+const {
+  deriveEncryptionKey,
+  deriveIVKey,
+  deriveMACKey,
+  generateEncryptedVarBinary,
+} = require('../always-encrypted/crypto-util');
+
 const options = {
   useUTC: false,
   tdsVersion: '7_2'
 };
+
+const alwaysEncryptedAlgorithmName = 'AEAD_AES_256_CBC_HMAC_SHA256';
+const alwaysEncryptedCEK = Buffer.from([
+  // decrypted column key must be 32 bytes long for AES256
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+]);
+const alwaysEncryptedIV = Buffer.from([
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+]);
+// pre-calculated constants, mostly for debugging purposes
+const alwaysEncryptedConstants = {
+  // root key is the decrypted column encryption key
+  // it is arbitrary, but must be 32 bytes long for AES256
+  // rootKey: 0000000000000000000000000000000000000000000000000000000000000000
+  rootKey: Buffer.from([ ...alwaysEncryptedCEK ]),
+
+  // iv is the initialization vector used when encrypting plaintext
+  // it is arbitrary, but must be 16 bytes long for AES256
+  // iv: 11111111111111111111111111111111
+  iv: Buffer.from([ ...alwaysEncryptedIV ]),
+
+  // derived keys must use the root key above, and the appropriate key salt
+  // format as the input data
+  // e.g. to get the MAC key, run something like this:
+  // echo -n \
+  //     "Microsoft SQL Server cell MAC key with encryption" \
+  //     "algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256" | \
+  //   iconv -f 'UTF-8' -t 'UTF-16LE' | \
+  //   openssl dgst \
+  //     -sha256 -mac HMAC \
+  //     -macopt hexkey:'0000000000000000000000000000000000000000000000000000000000000000'
+  // # 9d1f2295e509519ed0f1bff77659713280a3651fa2d7a7023abd1ba519012573
+
+  // encryptionKey: 02c735a87529f1d1eb3853852c2a45cf667331dda269c18feac9aec29675b349
+  // encryptionKey: Buffer.from([
+  //   0x02, 0xC7, 0x35, 0xA8, 0x75, 0x29, 0xF1, 0xD1,
+  //   0xEB, 0x38, 0x53, 0x85, 0x2C, 0x2A, 0x45, 0xCF,
+  //   0x66, 0x73, 0x31, 0xDD, 0xA2, 0x69, 0xC1, 0x8F,
+  //   0xEA, 0xC9, 0xAE, 0xC2, 0x96, 0x75, 0xB3, 0x49,
+  // ]),
+  encryptionKey: deriveEncryptionKey(alwaysEncryptedCEK),
+
+  // macKey: 9d1f2295e509519ed0f1bff77659713280a3651fa2d7a7023abd1ba519012573
+  // macKey: Buffer.from([
+  //   0x9D, 0x1F, 0x22, 0x95, 0xE5, 0x09, 0x51, 0x9E,
+  //   0xD0, 0xF1, 0xBF, 0xF7, 0x76, 0x59, 0x71, 0x32,
+  //   0x80, 0xA3, 0x65, 0x1F, 0xA2, 0xD7, 0xA7, 0x02,
+  //   0x3A, 0xBD, 0x1B, 0xA5, 0x19, 0x01, 0x25, 0x73,
+  // ]),
+  macKey: deriveMACKey(alwaysEncryptedCEK),
+
+  // ivKey: e45dfdea81075d68ef80e4eee4cee69f55b5dd96c8d1d9afbcc895f0c17e2bcb
+  // ivKey: Buffer.from([
+  //   0xE4, 0x5D, 0xFD, 0xEA, 0x81, 0x07, 0x5D, 0x68,
+  //   0xEF, 0x80, 0xE4, 0xEE, 0xE4, 0xCE, 0xE6, 0x9F,
+  //   0x55, 0xB5, 0xDD, 0x96, 0xC8, 0xD1, 0xD9, 0xAF,
+  //   0xBC, 0xC8, 0x95, 0xF0, 0xC1, 0x7E, 0x2B, 0xCB,
+  // ]),
+  ivKey: deriveIVKey(alwaysEncryptedCEK),
+};
+
+const alwaysEncryptedOptions = {
+  ...options,
+  serverSupportsColumnEncryption: true,
+  trustedServerNameAE: 'localhost',
+  globalCustomColumnEncryptionKeyStoreProviders: {
+    'TEST_KEYSTORE': {
+      decryptColumnEncryptionKey: () => Promise.resolve(alwaysEncryptedCEK),
+    },
+  },
+};
+const cryptoMetadata = {
+  cekTableEntry: {
+    ordinal: 0x01,
+    databaseId: 0x00,
+    cekId: 0x00,
+    cekVersion: 0x00,
+    cekMdVersion: 0x00,
+    columnEncryptionKeyValues: [{
+      encryptedKey: Buffer.from([ 0x00 ]),
+      dbId: 0x05,
+      keyId: 0x31,
+      keyVersion: 0x01,
+      mdVersion: Buffer.from([
+        0xF1, 0x08, 0x60, 0x01, 0xE8, 0xAA, 0x00, 0x00,
+      ]),
+      keyPath: 'test',
+      keyStoreName: 'TEST_KEYSTORE',
+      algorithmName: 'RSA_OAEP',
+    }],
+  },
+  cipherAlgorithmId: 0x02,
+  encryptionType: 0x01,
+  normalizationRuleVersion: Buffer.from([ 0x01 ]),
+};
+
+const readTokenAsync = (parser) => new Promise((resolve, reject) => {
+  parser.on('data', resolve);
+  parser.on('close', reject);
+  parser.on('error', reject);
+});
 
 describe('Row Token Parser', () => {
   it('should write int', () => {
@@ -31,6 +144,41 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted int', () => {
+    const baseTypeInfo = { type: dataTypeByName.Int };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      0x03, 0x00, 0x00, 0x00,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, 0x03);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write bigint', () => {
@@ -55,6 +203,60 @@ describe('Row Token Parser', () => {
     assert.strictEqual('9223372036854775807', token.columns[1].value);
   });
 
+  it('should write encrypted bigint', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.BigInt,
+    };
+    const colMetaDataEntry = {
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    };
+    const colMetaData = [colMetaDataEntry, colMetaDataEntry];
+
+    const value1 = Buffer.from([
+      // 1
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
+    const value2 = Buffer.from([
+      // 9223372036854775807
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value1,
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value2,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 2);
+        assert.strictEqual(token.columns[0].value, '1');
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[1].value, '9223372036854775807');
+        assert.strictEqual(token.columns[1].metadata, colMetaData[1]);
+      });
+  });
+
   it('should write real', () => {
     const colMetaData = [{ type: dataTypeByName.Real }];
     const value = 9.5;
@@ -71,6 +273,45 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted real', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.Real,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      // 9.5
+      0x00, 0x00, 0x18, 0x41,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, 9.5);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write float', () => {
@@ -91,6 +332,45 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted float', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.Float,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      // 9.5
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xd1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, 9.5);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write Money', () => {
@@ -134,6 +414,94 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[5].value, valueLarge);
   });
 
+  it('should write encrypted money variants', () => {
+    const baseTypeInfo = [
+      { type: SmallMoney },
+      { type: Money },
+      { type: MoneyN, dataLength: 0x00 },
+      { type: MoneyN, dataLength: 0x04 },
+      { type: MoneyN, dataLength: 0x08 },
+      { type: MoneyN, dataLength: 0x08 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const value = 123.456;
+    const valueLarge = 123456789012345.11;
+    const expectedValues = [
+      value,
+      value,
+      null,
+      value,
+      value,
+      valueLarge,
+    ];
+
+    const buffer = new WritableTrackingBuffer(0);
+    buffer.writeUInt8(0xD1);
+    // despite having a dataLength, all decrypted money types are 8 bytes long
+    // (they also do not contain the leading dataLength byte)
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x80, 0xD6, 0x12, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x80, 0xD6, 0x12, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x80, 0xD6, 0x12, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x80, 0xD6, 0x12, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0xF4, 0x10, 0x22, 0x11, 0xDC, 0x6A, 0xE9, 0x7D ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
+  });
+
   it('should write varchar without code page', () => {
     const colMetaData = [
       {
@@ -158,6 +526,78 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted varchar without code page', () => {
+    const baseTypeInfo = {
+      userType: 0x00,
+      flags: 0x080B,
+      type: dataTypeByName.VarChar,
+      collation: { codepage: undefined },
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = 'hello world';
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      // encrypted blob must be formatted correctly
+      Buffer.from([
+        // algorithm version (1 byte)
+        0x01,
+
+        // authentication tag (32 bytes)
+        // calculated with macKey (above), iv, and cipher-text (below)
+        // e.g. to calculate the expected HMAC
+        // ( echo -n '01' ; \
+        //     echo -n '11111111111111111111111111111111' ; \
+        //     echo -n 'd7cb90a5663df56da49220c09c08f3b9' ; \
+        //     echo -n '01' ) | \
+        //   xxd -r -ps | \
+        //   openssl dgst \
+        //     -sha256 -mac HMAC \
+        //     -macopt hexkey:'9d1f2295e509519ed0f1bff77659713280a3651fa2d7a7023abd1ba519012573'
+        // # af43a7120629065cfbdd00f25462a4f3f2b63091ce312a0bff5c2ca064e555db
+        0xAF, 0x43, 0xA7, 0x12, 0x06, 0x29, 0x06, 0x5C,
+        0xFB, 0xDD, 0x00, 0xF2, 0x54, 0x62, 0xA4, 0xF3,
+        0xF2, 0xB6, 0x30, 0x91, 0xCE, 0x31, 0x2A, 0x0B,
+        0xFF, 0x5C, 0x2C, 0xA0, 0x64, 0xE5, 0x55, 0xDB,
+
+        // iv (16 bytes)
+        // arbitrary, but must be the one used in the authentication tag above
+        ...alwaysEncryptedIV,
+
+        // cipher text
+        // calculated with encryptionKey, and plain-text (above)
+        // e.g. to generate the desired cipher text
+        // echo -n hello world | \
+        //   openssl enc -e -aes-256-cbc -md sha256 \
+        //     -K '02c735a87529f1d1eb3853852c2a45cf667331dda269c18feac9aec29675b349' \
+        //     -iv '11111111111111111111111111111111' | \
+        //   xxd -ps
+        // # d7cb90a5663df56da49220c09c08f3b9
+        0xD7, 0xCB, 0x90, 0xA5, 0x66, 0x3D, 0xF5, 0x6D,
+        0xA4, 0x92, 0x20, 0xC0, 0x9C, 0x08, 0xF3, 0xB9,
+      ]),
+    );
+    // console.log(buffer.data);
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, value);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varchar with code page', () => {
@@ -186,6 +626,44 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
   });
 
+  it('should write encrypted varchar with code page', () => {
+    const baseTypeInfo = {
+      userType: 0x00,
+      type: dataTypeByName.VarChar,
+      collation: { codepage: 'WINDOWS-1252' },
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = 'abcdé';
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from(value, 'ascii'),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, value);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
+  });
+
   it('should write nvarchar', () => {
     const colMetaData = [{ type: dataTypeByName.NVarChar }];
     const value = 'abc';
@@ -204,6 +682,43 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted nvarchar', () => {
+    const baseTypeInfo = {
+      userType: 0x00,
+      type: dataTypeByName.NVarChar,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = 'abc';
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xd1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from(value, 'utf16le'),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, value);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varBinary', () => {
@@ -226,6 +741,42 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
   });
 
+  it('should write encrypted varBinary', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.VarBinary,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([ 0x12, 0x34 ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.deepEqual(token.columns[0].value, value);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
+  });
+
   it('should write binary', () => {
     const colMetaData = [{ type: dataTypeByName.Binary }];
     const value = Buffer.from([0x12, 0x34]);
@@ -244,6 +795,40 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.deepEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted binary', () => {
+    const baseTypeInfo = { type: dataTypeByName.Binary };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([0x12, 0x34]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.deepEqual(token.columns[0].value, value);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varcharMaxNull', () => {
@@ -272,6 +857,46 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted varcharMaxNull', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.VarChar,
+      dataLength: 65535,
+      collation: { codepage: undefined },
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, null);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varcharMaxUnkownLength', () => {
@@ -308,6 +933,8 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
   });
 
+  // encrypted varcharMaxUnknownLength is unsupported
+
   it('should write varcharMaxKnownLength', () => {
     const colMetaData = [
       {
@@ -338,6 +965,48 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted varcharMaxKnownLength', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.VarChar,
+      dataLength: 65535,
+      collation: { codepage: undefined },
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      // no PLP known length prefix, only PLP_NULL needs to be explicitly specified
+      // 'abcdef'
+      0x61, 0x62, 0x63, 0x64, 0x65, 0x66,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, 'abcdef');
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varcharmaxWithCodePage', () => {
@@ -372,6 +1041,47 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
   });
 
+  it('should write encrypted varcharmaxWithCodePage', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.VarChar,
+      dataLength: 65535,
+      collation: { codepage: 'WINDOWS-1252' },
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      // chunk 1: 'abcdéf'
+      0x61, 0x62, 0x63, 0x64, 0xE9, 0x66,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, 'abcdéf');
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
+  });
+
   it('should write varcharMaxKnownLengthWrong', () => {
     const colMetaData = [
       {
@@ -401,6 +1111,10 @@ describe('Row Token Parser', () => {
     }
   });
 
+  // encrypted varcharMaxKnownLengthWrong is not an error-case
+  // it happens in standard practice with the JDBC driver, where the data
+  // length is typically greater than the stream length (i.e. no data padding)
+
   it('should write varBinaryMaxNull', () => {
     const colMetaData = [
       {
@@ -424,6 +1138,45 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+  });
+
+  it('should write encrypted varBinaryMaxNull', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.VarBinary,
+      dataLength: 65535,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+    const value = Buffer.from([
+      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(token.columns[0].value, null);
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
   });
 
   it('should write varBinaryMaxUnknownLength', () => {
@@ -456,6 +1209,8 @@ describe('Row Token Parser', () => {
     assert.deepEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
   });
+
+  // encrypted varBinaryMaxUnknownLength is unsupported
 
   it('should write intN', () => {
     const colMetaData = [
@@ -601,6 +1356,188 @@ describe('Row Token Parser', () => {
     assert.strictEqual('10000', token.columns[11].value);
   });
 
+  it('should write encrypted intN variants', () => {
+    const baseTypeInfo = [
+      { type: IntN, dataLength: 0x00 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x08 },
+      { type: IntN, dataLength: 0x01 },
+      { type: IntN, dataLength: 0x02 },
+      { type: IntN, dataLength: 0x04 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      null,
+      // 8-length intN is treated as bigint, so they will be strings
+      '0',
+      '1',
+      '-1',
+      '2',
+      '-2',
+      '9223372036854775807',
+      '-9223372036854775808',
+      '10',
+      '100',
+      '1000',
+      '10000',
+      // 1-length, 2-length, and 4-length will end up as numbers
+      3,
+      4,
+      5,
+    ];
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // null
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 0
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 1
+        Buffer.from([ 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // -1
+        Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 2
+        Buffer.from([ 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // -2
+        Buffer.from([ 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 9223372036854775807
+        Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // -9223372036854775808
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 10
+        Buffer.from([ 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 100
+        Buffer.from([ 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 1000
+        Buffer.from([ 0xE8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 10000
+        Buffer.from([ 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 3
+        Buffer.from([ 0x03 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 4
+        Buffer.from([ 0x04, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 5
+        Buffer.from([ 0x05, 0x00, 0x00, 0x00 ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
+  });
+
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', () => {
     const colMetaData = [
       { type: dataTypeByName.UniqueIdentifier },
@@ -644,6 +1581,63 @@ describe('Row Token Parser', () => {
       '67452301-AB89-EFCD-0123-456789ABCDEF',
       token.columns[1].value
     );
+  });
+
+  it('should write encrypted UniqueIdentifier when `lowerCaseGuids` option is `false`', () => {
+    const baseTypeInfo = [
+      { type: dataTypeByName.UniqueIdentifier, dataLength: 0x00 },
+      { type: dataTypeByName.UniqueIdentifier, dataLength: 0x10 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      null,
+      '67452301-AB89-EFCD-0123-456789ABCDEF',
+    ];
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // null
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 67452301-AB89-EFCD-0123-456789ABCDEF
+        Buffer.from([
+          0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+          0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+        ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parserOptions = {
+      ...alwaysEncryptedOptions,
+      lowerCaseGuids: false,
+    };
+    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', () => {
@@ -690,6 +1684,63 @@ describe('Row Token Parser', () => {
     );
   });
 
+  it('should write encrypted UniqueIdentifier when `lowerCaseGuids` option is `false`', () => {
+    const baseTypeInfo = [
+      { type: dataTypeByName.UniqueIdentifier, dataLength: 0x00 },
+      { type: dataTypeByName.UniqueIdentifier, dataLength: 0x10 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      null,
+      '67452301-ab89-efcd-0123-456789abcdef',
+    ];
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // null
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 67452301-ab89-efcd-0123-456789abcdef
+        Buffer.from([
+          0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+          0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+        ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parserOptions = {
+      ...alwaysEncryptedOptions,
+      lowerCaseGuids: true,
+    };
+    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
+  });
+
   it('should write floatN', () => {
     const colMetaData = [
       { type: FloatN },
@@ -731,6 +1782,67 @@ describe('Row Token Parser', () => {
     assert.strictEqual(9.5, token.columns[2].value);
   });
 
+  it('should write encrypted floatN variants', () => {
+    const baseTypeInfo = [
+      { type: FloatN, dataLength: 0x00 },
+      { type: FloatN, dataLength: 0x04 },
+      { type: FloatN, dataLength: 0x08 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      null,
+      9.5,
+      9.5,
+    ];
+
+    const buffer = new WritableTrackingBuffer(0);
+    buffer.writeUInt8(0xD1);
+    // despite having a dataLength, all decrypted float types are 8 bytes long
+    // (they also do not contain the leading dataLength byte)
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 9.5
+        Buffer.from([ 0x00, 0x00, 0x18, 0x41 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        // 9.5
+        Buffer.from([ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40 ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
+  });
+
   it('should write datetime', () => {
     const colMetaData = [{ type: dataTypeByName.DateTime }];
 
@@ -767,6 +1879,106 @@ describe('Row Token Parser', () => {
     );
   });
 
+  it('should write encrypted datetime when `useUTC` option is `false`', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.DateTime,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+
+    const value = Buffer.from([
+      // January 3, 1900 00:00:45
+      // 3rd January 1900
+      0x02, 0x00, 0x00, 0x00,
+      // 45 seconds
+      0xBC, 0x34, 0x00, 0x00
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parserOptions = {
+      ...alwaysEncryptedOptions,
+      useUTC: false,
+    };
+    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(
+          token.columns[0].value.getTime(),
+          new Date('January 3, 1900 00:00:45').getTime(),
+        );
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
+  });
+
+  it('should write encrypted datetime when `useUTC` option is `true`', () => {
+    const baseTypeInfo = {
+      type: dataTypeByName.DateTime,
+    };
+    const colMetaData = [{
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }];
+
+    const value = Buffer.from([
+      // January 3, 1900 00:00:45
+      // 3rd January 1900
+      0x02, 0x00, 0x00, 0x00,
+      // 45 seconds
+      0xBC, 0x34, 0x00, 0x00
+    ]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        value,
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parserOptions = {
+      ...alwaysEncryptedOptions,
+      useUTC: true,
+    };
+    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, 1);
+        assert.strictEqual(
+          token.columns[0].value.getTime(),
+          new Date('January 3, 1900 00:00:45 GMT').getTime(),
+        );
+        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+      });
+  });
+
   it('should write datetimeN', () => {
     const colMetaData = [{ type: DateTimeN }];
 
@@ -783,6 +1995,69 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
+  });
+
+  it('should write encrypted datetimeN variants', () => {
+    const baseTypeInfo = [
+      { type: DateTimeN, dataLength: 0x00 },
+      { type: DateTimeN, dataLength: 0x04 },
+      { type: DateTimeN, dataLength: 0x08 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      null,
+      new Date('January 3, 1900 00:45:00').getTime(),
+      new Date('January 3, 1900 00:00:45').getTime(),
+    ];
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x02, 0x00, 0x2D, 0x00 ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([ 0x02, 0x00, 0x00, 0x00, 0xBC, 0x34, 0x00, 0x00 ]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parserOptions = {
+      ...alwaysEncryptedOptions,
+      useUTC: false,
+    };
+    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(
+          ({ value }) => value === null ? value : value.getTime(),
+        );
+        assert.deepEqual(actualValues, expectedValues);
+      });
   });
 
   it('should write numeric4Bytes', () => {
@@ -958,5 +2233,111 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
+  });
+
+  it('should write encrypted numericN variants', () => {
+    const baseTypeInfo = [
+      { type: NumericN, precision: 3, scale: 1, dataLength: 5 },
+      { type: NumericN, precision: 3, scale: 1, dataLength: 5 },
+      { type: NumericN, precision: 13, scale: 1, dataLength: 9 },
+      { type: NumericN, precision: 23, scale: 1, dataLength: 13 },
+      { type: NumericN, precision: 33, scale: 1, dataLength: 17 },
+      { type: NumericN, precision: 3, scale: 1, dataLength: 0 },
+    ];
+    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+      type: dataTypeByName.VarBinary,
+      cryptoMetadata: {
+        ...cryptoMetadata,
+        baseTypeInfo,
+      },
+    }));
+
+    const expectedValues = [
+      9.3,
+      -9.3,
+      (0x100000000 + 93) / 10,
+      (0x100000000 * 0x100000000 + 0x200000000 + 93) / 10,
+      ( 0x100000000 * 0x100000000 * 0x100000000 +
+        0x200000000 * 0x100000000 +
+        0x300000000 +
+        93 ) / 10,
+      null,
+    ];
+
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xD1);
+    // despite having a dataLength, all decrypted numeric types have multiples of 8 byte length
+    // (they also do not contain the leading dataLength byte, but do contain the sign byte)
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([
+          // 9.3
+          0x01, 0x5D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([
+          // -9.3
+          0x00, 0x5D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([
+          // 429496738.9
+          0x01, 0x5D, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+        ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([
+          // 1844674408229948700
+          0x01, 0x5D, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+          0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([
+          // 7.922816255115783e+27
+          0x01, 0x5D, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+          0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+        ]),
+      ),
+    );
+    buffer.writeUsVarbyte(
+      generateEncryptedVarBinary(
+        alwaysEncryptedCEK,
+        alwaysEncryptedIV,
+        Buffer.from([]),
+      ),
+    );
+    // console.log(buffer.data)
+
+    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    parser.write(buffer.data);
+
+    return readTokenAsync(parser)
+      .then((token) => {
+        // console.log(token);
+        assert.strictEqual(token.columns.length, expectedValues.length);
+        const actualValues = token.columns.map(({ value }) => value);
+        assert.deepEqual(actualValues, expectedValues);
+      });
   });
 });
