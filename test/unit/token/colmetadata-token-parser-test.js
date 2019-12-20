@@ -337,7 +337,7 @@ describe('Colmetadata Token Parser', () => {
     assert.deepEqual(
       columnEncryptionKeyValue.mdVersion,
       Buffer.from([ 0xF1, 0x08, 0x60, 0x01, 0xE8, 0xAA, 0x00, 0x00 ]),
-    );
+    )
     assert.strictEqual(columnEncryptionKeyValue.keyPath, 'test');
     assert.strictEqual(columnEncryptionKeyValue.keyStoreName, 'MSSQL_JAVA_KEYSTORE');
     assert.strictEqual(columnEncryptionKeyValue.algorithmName, 'RSA_OAEP');

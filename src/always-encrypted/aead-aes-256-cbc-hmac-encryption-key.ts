@@ -1,5 +1,5 @@
-import { createHmac } from 'crypto';
-import SQLServerSymmetricKey from './SQLServerSymmetricKey';
+import { createHmac } from "crypto";
+import SymmetricKey from "./symmetric-key";
 
 export const keySize = 256;
 const keySizeInBytes = keySize / 8;
@@ -19,14 +19,14 @@ export const generateKeySalt = (
   `Microsoft SQL Server cell ${keyType} key ` +
   `with encryption algorithm:${algorithmName} and key length:${keySize}`;
 
-export class SQLServerAeadAes256CbcHmac256EncryptionKey extends SQLServerSymmetricKey {
+export class AeadAes256CbcHmac256EncryptionKey extends SymmetricKey {
   private readonly algorithmName: string;
   private encryptionKeySaltFormat: string;
   private macKeySaltFormat: string;
   private ivKeySaltFormat: string;
-  private encryptionKey: SQLServerSymmetricKey;
-  private macKey: SQLServerSymmetricKey;
-  private ivKey: SQLServerSymmetricKey;
+  private encryptionKey: SymmetricKey;
+  private macKey: SymmetricKey;
+  private ivKey: SymmetricKey;
 
   constructor(rootKey: Buffer, algorithmName: string) {
     super(rootKey);
@@ -36,22 +36,22 @@ export class SQLServerAeadAes256CbcHmac256EncryptionKey extends SQLServerSymmetr
     this.ivKeySaltFormat = generateKeySalt('IV', this.algorithmName, keySize);
 
     if (rootKey.length !== keySizeInBytes) {
-      throw new Error(`The column encryption key has been successfully decrypted but its length: ${rootKey.length} does not match the length: ${keySizeInBytes} for algorithm "${this.algorithmName}". Verify the encrypted value of the column encryption key in the database.`);
+      throw new Error(`The column encryption key has been successfully decrypted but it's length: ${rootKey.length} does not match the length: ${keySizeInBytes} for algorithm "${this.algorithmName}". Verify the encrypted value of the column encryption key in the database.`);
     }
 
     try {
       const encKeyBuff = deriveKey(rootKey, this.encryptionKeySaltFormat);
 
-      this.encryptionKey = new SQLServerSymmetricKey(encKeyBuff);
+      this.encryptionKey = new SymmetricKey(encKeyBuff);
 
       const macKeyBuff = deriveKey(rootKey, this.macKeySaltFormat);
 
-      this.macKey = new SQLServerSymmetricKey(macKeyBuff);
+      this.macKey = new SymmetricKey(macKeyBuff);
 
       const ivKeyBuff = deriveKey(rootKey, this.ivKeySaltFormat);
 
-      this.ivKey = new SQLServerSymmetricKey(ivKeyBuff);
-    } catch (error) {
+      this.ivKey = new SymmetricKey(ivKeyBuff);
+    } catch(error) {
       throw new Error(`Key extraction failed : ${error.message}.`);
     }
   }

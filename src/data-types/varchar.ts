@@ -74,12 +74,12 @@ const VarChar: { maximumLength: number } & DataType = {
       );
       // byte index 2 contains data for both lcid and flags
       collation.writeUInt8(
-        ((lcid >> 16) & 0x0F) | (((flags) & 0x0F) << 4),
+        ( (lcid >> 16) & 0x0F ) | ( ( (flags) & 0x0F ) << 4 ),
         2,
       );
       // byte index 3 contains data for both flags and version
       collation.writeUInt8(
-        ((flags) & 0xF0) | ((version) & 0x0F),
+        ( (flags) & 0xF0 ) | ( (version) & 0x0F ),
         3,
       );
       collation.writeUInt8(

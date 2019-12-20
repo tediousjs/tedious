@@ -1,11 +1,11 @@
-import { SQLServerEncryptionAlgorithm, SQLServerEncryptionType } from './types';
-import { createHmac, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { SQLServerAeadAes256CbcHmac256EncryptionKey, keySize } from './SQLServerAeadAes256CbcHmac256EncryptionKey';
+import { EncryptionAlgorithm, SQLServerEncryptionType } from "./types";
+import { createHmac, randomBytes, createCipheriv, createDecipheriv } from "crypto";
+import { AeadAes256CbcHmac256EncryptionKey, keySize } from "./aead-aes-256-cbc-hmac-encryption-key";
 
-export const algorithmName = 'AEAD_AES_256_CBC_HMAC_SHA256';
+export const algorithmName = "AEAD_AES_256_CBC_HMAC_SHA256";
 
-export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncryptionAlgorithm {
-  private columnEncryptionkey: SQLServerAeadAes256CbcHmac256EncryptionKey;
+export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
+  private columnEncryptionkey: AeadAes256CbcHmac256EncryptionKey;
   private algorithmVersion: Buffer;
   private isDeterministic: boolean;
   private blockSizeInBytes: number;
@@ -15,7 +15,7 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
   private minimumCipherTextLengthInBytesNoAuthenticationTag: number;
   private minimumCipherTextLengthInBytesWithAuthenticationTag: number;
 
-  constructor(columnEncryptionKey: SQLServerAeadAes256CbcHmac256EncryptionKey, encryptionType: SQLServerEncryptionType) {
+  constructor(columnEncryptionKey: AeadAes256CbcHmac256EncryptionKey, encryptionType: SQLServerEncryptionType) {
     this.isDeterministic = false;
     this.blockSizeInBytes = 16;
     this.keySizeInBytes = keySize / 8;
@@ -38,10 +38,10 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
 
     if (this.isDeterministic === true) {
       try {
-        const hmacIv = createHmac('sha256', this.columnEncryptionkey.getIvKey());
+        const hmacIv = createHmac("sha256", this.columnEncryptionkey.getIvKey());
         hmacIv.update(plaintText);
-        iv = hmacIv.digest().slice(0, this.blockSizeInBytes);
-      } catch (error) {
+        iv = hmacIv.digest().slice(0, this.blockSizeInBytes);;
+      } catch(error) {
         throw new Error(`Internal error while encryption: ${error.message}`);
       }
     } else {
@@ -56,14 +56,14 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
     const cipherStartIndex = ivStartIndex + this.blockSizeInBytes;
 
     const outputBuffSize = 1 + authenticationTagLen + iv.length + (numBlocks * this.blockSizeInBytes);
-    const outBuffer: Buffer = Buffer.alloc(outputBuffSize);
-
+    let outBuffer: Buffer = Buffer.alloc(outputBuffSize);
+    
     outBuffer.fill(this.algorithmVersion, 0, 1);
 
     iv.copy(outBuffer, ivStartIndex, 0, iv.length);
 
     try {
-      const encryptCipher = createCipheriv('aes-256-cbc', this.columnEncryptionkey.getEncryptionKey(), iv);
+      const encryptCipher = createCipheriv("aes-256-cbc", this.columnEncryptionkey.getEncryptionKey(), iv);
       let count = 0;
       let cipherIndex = cipherStartIndex;
 
@@ -81,7 +81,7 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
 
       buffTmp.copy(outBuffer, cipherIndex, 0, buffTmp.length);
       if (hasAuthenticationTag) {
-        const hmac = createHmac('sha256', this.columnEncryptionkey.getMacKey());
+        const hmac = createHmac("sha256", this.columnEncryptionkey.getMacKey());
         hmac.update(this.version);
         hmac.update(iv);
         hmac.update(outBuffer.slice(cipherStartIndex, (numBlocks * this.blockSizeInBytes) + cipherStartIndex));
@@ -90,7 +90,7 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
 
         hash.copy(outBuffer, hmacStartIndex, 0, authenticationTagLen);
       }
-    } catch (error) {
+    } catch(error) {
       throw new Error(`Internal error while encryption: ${error.message}`);
     }
 
@@ -99,7 +99,7 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
 
   decryptData(cipherText: Buffer): Buffer {
     const hasAuthenticationTag = true;
-    const iv: Buffer = Buffer.alloc(this.blockSizeInBytes);
+    let iv: Buffer = Buffer.alloc(this.blockSizeInBytes);
 
     const minimumCiperTextLength: number = hasAuthenticationTag ? this.minimumCipherTextLengthInBytesWithAuthenticationTag : this.minimumCipherTextLengthInBytesNoAuthenticationTag;
 
@@ -109,7 +109,7 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
 
     let startIndex = 0;
     if (cipherText[0] !== this.algorithmVersion[0]) {
-      throw new Error(`The specified ciphertext's encryption algorithm version ${Buffer.from([cipherText[0]]).toString('hex')} does not match the expected encryption algorithm version ${this.algorithmVersion.toString('hex')}.`);
+      throw new Error(`The specified ciphertext's encryption algorithm version ${Buffer.from([cipherText[0]]).toString("hex")} does not match the expected encryption algorithm version ${this.algorithmVersion.toString("hex")}.`);
     }
 
     startIndex += 1;
@@ -123,8 +123,8 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
     cipherText.copy(iv, 0, startIndex, startIndex + iv.length);
     startIndex += iv.length;
 
-    const cipherTextOffset = startIndex;
-    const cipherTextCount = cipherText.length - startIndex;
+    let cipherTextOffset = startIndex;
+    let cipherTextCount = cipherText.length - startIndex;
 
     if (hasAuthenticationTag === true) {
       let authenticationTag: Buffer;
@@ -135,13 +135,13 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
       }
 
       if (0 !== authenticationTag.compare(cipherText, authenticationTagOffset, Math.min(authenticationTagOffset + cipherTextCount, authenticationTagOffset + authenticationTag.length), 0, Math.min(cipherTextCount, authenticationTag.length))) {
-        throw new Error('Specified ciphertext has an invalid authentication tag.');
+        throw new Error("Specified ciphertext has an invalid authentication tag.");
       }
     }
 
     let plainText: Buffer;
 
-    const decipher = createDecipheriv('aes-256-cbc', this.columnEncryptionkey.getEncryptionKey(), iv);
+    const decipher = createDecipheriv("aes-256-cbc", this.columnEncryptionkey.getEncryptionKey(), iv);
     try {
       plainText = decipher.update(cipherText.slice(cipherTextOffset, cipherTextOffset + cipherTextCount));
       plainText = Buffer.concat([plainText, decipher.final()]);
@@ -153,10 +153,10 @@ export class SQLServerAeadAes256CbcHmac256Algorithm implements SQLServerEncrypti
   }
 
   _prepareAuthenticationTag(iv: Buffer, cipherText: Buffer, offset: number, length: number): Buffer {
-    const authenticationTag: Buffer = Buffer.alloc(this.keySizeInBytes);
-
-    const hmac = createHmac('sha256', this.columnEncryptionkey.getMacKey());
-
+    let authenticationTag: Buffer = Buffer.alloc(this.keySizeInBytes);
+    
+    const hmac = createHmac("sha256", this.columnEncryptionkey.getMacKey());
+    
     hmac.update(this.version);
     hmac.update(iv);
     hmac.update(cipherText.slice(offset, offset + length));

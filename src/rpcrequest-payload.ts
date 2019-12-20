@@ -3,7 +3,7 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
+import { encryptWithKey } from './always-encrypted/key-crypto';
 import VarBinary from './data-types/varbinary';
 import { CryptoMetadata } from './always-encrypted/types';
 
@@ -53,20 +53,21 @@ class RpcRequestPayload {
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
 
-    const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        cb(buffer.data);
-        return;
-      }
+    this._encryptParameters(this.request.parameters, (parameters: Parameter[]) => {
+      const writeNext = (i: number) => {
+        if (i >= parameters.length) {
+          cb(buffer.data);
+          return;
+        }
 
-      this._writeParameter(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
+        this._writeParameter(parameters[i], buffer, () => {
+          setImmediate(() => {
+            writeNext(i + 1);
+          });
         });
-      });
-    };
-    writeNext(0);
+      };
+      writeNext(0);
+    });
   }
 
   toString(indent = '') {
@@ -135,38 +136,45 @@ class RpcRequestPayload {
   }
 
   _writeEncryptedParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
-    this._encryptData(parameter, (encryptedValue?: Buffer) => {
-      const encryptedParam = {
-        value: encryptedValue,
-        type: VarBinary,
-        output: parameter.output,
-        name: parameter.name,
-        forceEncrypt: parameter.forceEncrypt
-      };
+    const encryptedParam = {
+      value: parameter.encryptedVal,
+      type: VarBinary,
+      output: parameter.output,
+      name: parameter.name,
+      forceEncrypt: parameter.forceEncrypt
+    };
 
-      this._writeParameterData(encryptedParam, buffer, true, () => {
-        this._writeParameterData(parameter, buffer, false, () => {
-          this._writeEncryptionMetadata(parameter.cryptoMetadata, buffer, () => {
-            cb();
-          });
+    this._writeParameterData(encryptedParam, buffer, true, () => {
+      this._writeParameterData(parameter, buffer, false, () => {
+        this._writeEncryptionMetadata(parameter.cryptoMetadata, buffer, () => {
+          cb();
         });
       });
     });
   }
 
-  _encryptData(parameter: Parameter, callback: (encryptedValue?: Buffer) => void) {
-    const type = parameter.type;
-    if (parameter.value && parameter.cryptoMetadata) {
-      if (!type.toBuffer) {
-        throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
+  _encryptParameters(parameters: Parameter[], callback: (parameters: Parameter[]) => void) {
+    if (this.options.serverSupportsColumnEncryption === true) {
+      const promises: Promise<void>[] = [];
+
+      for (let i = 0, len = parameters.length; i < len; i++) {
+        const type = parameters[i].type;
+        if (parameters[i].cryptoMetadata && parameters[i].value) {
+          if (!type.toBuffer) {
+            throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
+          }
+          const plainTextBuffer = type.toBuffer(parameters[i], this.options);
+          if (plainTextBuffer) {
+            promises.push(encryptWithKey(plainTextBuffer, <CryptoMetadata>parameters[i].cryptoMetadata, this.options).then((encryptedValue: Buffer) => {
+              parameters[i].encryptedVal = encryptedValue;
+            }));
+          }
+        }
       }
-      const plainTextBuffer = type.toBuffer(parameter, this.options);
-      if (!plainTextBuffer) {
-        return callback();
-      }
-      return SQLServerSecurityUtility.encryptWithKey(plainTextBuffer, parameter.cryptoMetadata, this.options).then(callback);
+
+      Promise.all(promises).then(() => callback(parameters));
     } else {
-      return callback();
+      callback(parameters);
     }
   }
 
@@ -177,7 +185,7 @@ class RpcRequestPayload {
 
     buffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
     if (cryptoMetadata.cipherAlgorithmId === 0) {
-      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName);
+      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName || "");
     }
 
     buffer.writeUInt8(cryptoMetadata.encryptionType);

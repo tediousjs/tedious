@@ -1,6 +1,5 @@
 import metadataParse, { Metadata } from '../metadata-parser';
-import { CEKTable } from '../always-encrypted/CEKTable';
-import { CEKTableEntry } from '../always-encrypted/CEKTableEntry';
+import { CEKTable, CEKTableEntry } from '../always-encrypted/cek-table';
 import { CryptoMetadata } from '../always-encrypted/types';
 
 import Parser from './stream-parser';
@@ -113,7 +112,7 @@ function readCustomEncryptionMetadata(parser: Parser, algorithmId: number, callb
       });
     });
   } else {
-    callback('');
+    callback("");
   }
 }
 
@@ -121,7 +120,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   metadataParse(parser, options, (metadata) => {
     readTableName(parser, options, metadata, (tableName) => {
       readCryptoMetadata(parser, metadata, cekTable, options, (cryptoMetadata) => {
-        if (cryptoMetadata) {
+        if (cryptoMetadata && cryptoMetadata.baseTypeInfo) {
           cryptoMetadata.baseTypeInfo.flags = metadata.flags;
           metadata.collation = cryptoMetadata.baseTypeInfo.collation;
         }
@@ -144,7 +143,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
         });
       });
     });
-  });
+  }, true);
 }
 
 function readCEKTable(parser: Parser, options: InternalConnectionOptions, callback: (cekTable?: CEKTable) => void) {

@@ -62,6 +62,7 @@ export type Parameter = {
 
   forceEncrypt?: boolean,
   cryptoMetadata?: CryptoMetadata,
+  encryptedVal?: Buffer;
 };
 
 export type ParameterData<T = any> = {

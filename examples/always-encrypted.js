@@ -1,5 +1,5 @@
 var Connection = require('../lib/tedious').Connection;
-var SQLServerColumnEncryptionAzureKeyVaultProvider = require('../lib/tedious').SQLServerColumnEncryptionAzureKeyVaultProvider;
+var ColumnEncryptionAzureKeyVaultProvider = require('../lib/tedious').ColumnEncryptionAzureKeyVaultProvider;
 var Request = require('../lib/tedious').Request;
 var fs = require('fs');
 
@@ -15,15 +15,14 @@ config.options.debug = {
 }
 config.options.columnEncryptionSetting = true;
 
-var connection = new Connection(config);
+var akvProvider = new ColumnEncryptionAzureKeyVaultProvider(servicePrinicpal.clientId, servicePrinicpal.clientKey, servicePrinicpal.tenantId, servicePrinicpal.domain);
 
-var akvProvider = new SQLServerColumnEncryptionAzureKeyVaultProvider(servicePrinicpal.clientId, servicePrinicpal.clientKey, servicePrinicpal.tenantId, servicePrinicpal.domain);
-const keyStoreList = [{
+config.options.encryptionKeyStoreProviders = [{
   key: akvProvider.name,
   value: akvProvider
-}];
+}]
 
-connection.registerColumnEncryptionKeyStoreProviders(keyStoreList);
+var connection = new Connection(config);
 
 connection.on('connect', connected);
 connection.on('infoMessage', infoError);

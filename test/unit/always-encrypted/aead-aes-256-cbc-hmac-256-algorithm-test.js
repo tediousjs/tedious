@@ -1,18 +1,18 @@
 const assert = require('chai').assert;
 const sinon = require('sinon');
-const { SQLServerAeadAes256CbcHmac256Algorithm } = require('../../../src/always-encrypted/SQLServerAeadAes256CbcHmac256Algorithm');
-const { SQLServerAeadAes256CbcHmac256EncryptionKey } = require('../../../src/always-encrypted/SQLServerAeadAes256CbcHmac256EncryptionKey');
+const { AeadAes256CbcHmac256Algorithm } = require('../../../src/always-encrypted/aead-aes-256-cbc-hmac-algorithm');
+const { AeadAes256CbcHmac256EncryptionKey } = require('../../../src/always-encrypted/aead-aes-256-cbc-hmac-encryption-key');
 const { SQLServerEncryptionType } = require('../../../src/always-encrypted/types');
 const crypto = require('crypto');
 const { algorithmName } = require('./crypto-util');
 
-describe('SQLServerAeadAes256CbcHmac256Algorithm', () => {
+describe('aead-aes-256-cbc-hmac-algorithm', () => {
   const sampleRootKey = Buffer.from('ED6FBC93EECDE0BFC6494FFB2EDB7998B7E94EF71FEDE584741A855238F0155E', 'hex');
   const iv = Buffer.from('EA7774AA98A2057C89941A7DD60E5272', 'hex');
 
   it('constructs class', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
-    const algorithm = new SQLServerAeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     assert.strictEqual(algorithm.isDeterministic, true);
     assert.deepEqual(algorithm.columnEncryptionkey, encryptionKey);
@@ -26,8 +26,8 @@ describe('SQLServerAeadAes256CbcHmac256Algorithm', () => {
   });
 
   it('encrypts data with deterministic initialization vector', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
-    const algorithm = new SQLServerAeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     const plaintext = Buffer.from('760061006C005F00640065007400650072006D005F003100', 'hex');
     const cipherText = algorithm.encryptData(plaintext);
@@ -36,8 +36,8 @@ describe('SQLServerAeadAes256CbcHmac256Algorithm', () => {
   });
 
   it('encrypts data with randomized initialization vector', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
-    const algorithm = new SQLServerAeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
     const plaintext = Buffer.from('760061006C005F00720061006E0064005F003200', 'hex');
     const stub = sinon.stub(crypto, 'randomBytes').returns(iv);
@@ -47,8 +47,8 @@ describe('SQLServerAeadAes256CbcHmac256Algorithm', () => {
   });
 
   it('encrypts data then decrypts it with deterministic initialization vector', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
-    const algorithm = new SQLServerAeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     const plaintext = crypto.randomBytes(20);
     const cipherText = algorithm.encryptData(plaintext);
@@ -58,8 +58,8 @@ describe('SQLServerAeadAes256CbcHmac256Algorithm', () => {
   });
 
   it('encrypts data then decrypts it with randomized initialization vector', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
-    const algorithm = new SQLServerAeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
     const plaintext = crypto.randomBytes(20);
     const stub = sinon.stub(crypto, 'randomBytes').returns(iv);

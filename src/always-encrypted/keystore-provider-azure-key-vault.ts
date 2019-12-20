@@ -1,7 +1,7 @@
-import { ClientSecretCredential } from '@azure/identity';
-import { CryptographyClient, KeyWrapAlgorithm, KeyClient, KeyVaultKey } from '@azure/keyvault-keys';
-import { createHash } from 'crypto';
-import { parse } from 'url';
+import { ClientSecretCredential } from "@azure/identity";
+import { CryptographyClient, KeyWrapAlgorithm, KeyClient, KeyVaultKey } from "@azure/keyvault-keys";
+import { createHash } from "crypto";
+import { parse } from "url";
 
 interface ParsedKeyPath {
   vaultUrl: string;
@@ -9,7 +9,7 @@ interface ParsedKeyPath {
   version?: string;
 }
 
-export class SQLServerColumnEncryptionAzureKeyVaultProvider {
+export class ColumnEncryptionAzureKeyVaultProvider {
   public readonly name: string;
   private url: undefined | string;
   private readonly rsaEncryptionAlgorithmWithOAEPForAKV: string;
@@ -19,20 +19,20 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
   private keyClient: undefined | KeyClient;
 
   constructor(clientId: string, clientKey: string, tenantId: string) {
-    this.name = 'AZURE_KEY_VAULT';
-    this.azureKeyVaultDomainName = 'vault.azure.net';
-    this.rsaEncryptionAlgorithmWithOAEPForAKV = 'RSA-OAEP';
+    this.name = "AZURE_KEY_VAULT";
+    this.azureKeyVaultDomainName = "vault.azure.net";
+    this.rsaEncryptionAlgorithmWithOAEPForAKV = "RSA-OAEP";
     this.firstVersion = Buffer.from([0x01]);
     this.credentials = new ClientSecretCredential(tenantId, clientId, clientKey);
   }
 
   async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> {
     if (!encryptedColumnEncryptionKey) {
-      throw new Error('Internal error. Encrypted column encryption key cannot be null.');
+      throw new Error("Internal error. Encrypted column encryption key cannot be null.");
     }
 
     if (encryptedColumnEncryptionKey.length === 0) {
-      throw new Error('Internal error. Empty encrypted column encryption key specified.');
+      throw new Error("Internal error. Empty encrypted column encryption key specified.");
     }
 
     encryptionAlgorithm = this.validateEncryptionAlgorithm(encryptionAlgorithm);
@@ -44,7 +44,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     const cryptoClient = this.createCryptoClient(masterKey);
 
     if (encryptedColumnEncryptionKey[0] !== this.firstVersion[0]) {
-      throw new Error(`Specified encrypted column encryption key contains an invalid encryption algorithm version ${Buffer.from([encryptedColumnEncryptionKey[0]]).toString('hex')}. Expected version is ${Buffer.from([this.firstVersion[0]]).toString('hex')}.`);
+      throw new Error(`Specified encrypted column encryption key contains an invalid encryption algorithm version ${Buffer.from([encryptedColumnEncryptionKey[0]]).toString("hex")}. Expected version is ${Buffer.from([this.firstVersion[0]]).toString("hex")}.`);
     }
 
     let currentIndex = this.firstVersion.length;
@@ -65,7 +65,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     const signatureLength: number = encryptedColumnEncryptionKey.length - currentIndex - cipherTextLength;
 
     if (signatureLength !== keySizeInBytes) {
-      throw new Error('The specified encrypted column encryption key\'s signature length: {0} does not match the signature length: {1} when using column master key (Azure Key Vault key) in {2}. The encrypted column encryption key may be corrupt, or the specified Azure Key Vault key path may be incorrect.');
+      throw new Error(`The specified encrypted column encryption key's signature length: {0} does not match the signature length: {1} when using column master key (Azure Key Vault key) in {2}. The encrypted column encryption key may be corrupt, or the specified Azure Key Vault key path may be incorrect.`);
     }
 
     const cipherText = Buffer.alloc(cipherTextLength);
@@ -78,16 +78,16 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     const hash = Buffer.alloc(encryptedColumnEncryptionKey.length - signature.length);
     encryptedColumnEncryptionKey.copy(hash, 0, 0, encryptedColumnEncryptionKey.length - signature.length);
 
-    const messageDigest = createHash('sha256');
+    const messageDigest = createHash("sha256");
     messageDigest.update(hash);
 
     const dataToVerify: Buffer = messageDigest.digest();
 
     if (!dataToVerify) {
-      throw new Error('Hash should not be null while decrypting encrypted column encryption key.');
+      throw new Error("Hash should not be null while decrypting encrypted column encryption key.");
     }
 
-    const verifyKey = await cryptoClient.verify('RS256', dataToVerify, signature);
+    const verifyKey = await cryptoClient.verify("RS256", dataToVerify, signature);
     if (!verifyKey.result) {
       throw new Error(`The specified encrypted column encryption key signature does not match the signature computed with the column master key (Asymmetric key in Azure Key Vault) in ${masterKeyPath}. The encrypted column encryption key may be corrupt, or the specified path may be incorrect.`);
     }
@@ -99,11 +99,11 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
   async encryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, columnEncryptionKey: Buffer): Promise<Buffer> {
     if (!columnEncryptionKey) {
-      throw new Error('Column encryption key cannot be null.');
+      throw new Error("Column encryption key cannot be null.");
     }
 
     if (columnEncryptionKey.length === 0) {
-      throw new Error('Empty column encryption key specified.');
+      throw new Error("Empty column encryption key specified.");
     }
 
     encryptionAlgorithm = this.validateEncryptionAlgorithm(encryptionAlgorithm);
@@ -116,7 +116,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
     const version = Buffer.from([this.firstVersion[0]]);
 
-    const masterKeyPathBytes: Buffer = Buffer.from(masterKeyPath.toLowerCase(), 'utf8');
+    const masterKeyPathBytes: Buffer = Buffer.from(masterKeyPath.toLowerCase(), "utf8");
 
     const keyPathLength: Buffer = Buffer.alloc(2);
 
@@ -131,7 +131,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     cipherTextLength[1] = cipherText.length >> 8 & 0xff;
 
     if (cipherText.length !== keySizeInBytes) {
-      throw new Error('CipherText length does not match the RSA key size.');
+      throw new Error("CipherText length does not match the RSA key size.");
     }
 
     const dataToHash: Buffer = Buffer.alloc(version.length + keyPathLength.length + cipherTextLength.length + masterKeyPathBytes.length + cipherText.length);
@@ -149,7 +149,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
     cipherText.copy(dataToHash, destinationPosition, 0, cipherText.length);
 
-    const messageDigest = createHash('sha256');
+    const messageDigest = createHash("sha256");
 
     messageDigest.update(dataToHash);
 
@@ -157,17 +157,17 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
     const signedHash: Buffer = await this.azureKeyVaultSignedHashedData(cryptoClient, dataToSign);
 
-    if (signedHash.length !== keySizeInBytes) {
-      throw new Error('Signed hash length does not match the RSA key size.');
+    if (signedHash.length != keySizeInBytes) {
+      throw new Error("Signed hash length does not match the RSA key size.");
     }
 
-    const verifyKey = await cryptoClient.verify('RS256', dataToSign, signedHash);
+    const verifyKey = await cryptoClient.verify("RS256", dataToSign, signedHash);
 
     if (!verifyKey.result) {
-      throw new Error('Invalid signature of the encrypted column encryption key computed.');
+      throw new Error("Invalid signature of the encrypted column encryption key computed.");
     }
 
-    const encryptedColumnEncryptionKeyLength: number = version.length + cipherTextLength.length + keyPathLength.length + cipherText.length + masterKeyPathBytes.length + signedHash.length;
+    let encryptedColumnEncryptionKeyLength: number = version.length + cipherTextLength.length + keyPathLength.length + cipherText.length + masterKeyPathBytes.length + signedHash.length;
     const encryptedColumnEncryptionKey: Buffer = Buffer.alloc(encryptedColumnEncryptionKeyLength);
 
     let currentIndex = 0;
@@ -191,12 +191,12 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     return encryptedColumnEncryptionKey;
   }
 
-  private getMasterKey(masterKeyPath: string): Promise<KeyVaultKey> {
+  private async getMasterKey(masterKeyPath: string): Promise<KeyVaultKey> {
     const keyParts = this.parsePath(masterKeyPath);
 
     this.createKeyClient(keyParts.vaultUrl);
 
-    return (<KeyClient> this.keyClient).getKey(keyParts.name, { version: keyParts.version });
+    return await (<KeyClient>this.keyClient).getKey(keyParts.name, { version: keyParts.version });
   }
 
   private createKeyClient(keyVaultUrl: string): void {
@@ -211,8 +211,8 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
   }
 
   private parsePath(masterKeyPath: string): ParsedKeyPath {
-    if (!masterKeyPath || masterKeyPath.trim() === '') {
-      throw new Error('Azure Key Vault key path cannot be null.');
+    if (!masterKeyPath || masterKeyPath.trim() === "") {
+      throw new Error("Azure Key Vault key path cannot be null.");
     }
 
     let baseUri;
@@ -227,14 +227,14 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     }
 
     // Path is of the form '/collection/name[/version]'
-    const segments = (baseUri.pathname || '').split('/');
+    let segments = (baseUri.pathname || "").split("/");
     if (segments.length !== 3 && segments.length !== 4) {
       throw new Error(
         `Invalid keys identifier: ${masterKeyPath}. Bad number of segments: ${segments.length}`
       );
     }
 
-    if ('keys' !== segments[1]) {
+    if ("keys" !== segments[1]) {
       throw new Error(
         `Invalid keys identifier: ${masterKeyPath}. segment [1] should be "keys", found "${segments[1]}"`
       );
@@ -252,21 +252,21 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
   private async azureKeyVaultSignedHashedData(cryptoClient: CryptographyClient, dataToSign: Buffer): Promise<Buffer> {
     if (!cryptoClient) {
-      throw new Error('Azure KVS Crypto Client is not defined.');
+      throw new Error("Azure KVS Crypto Client is not defined.");
     }
 
-    const signedData = await cryptoClient.sign('RS256', dataToSign);
+    const signedData = await cryptoClient.sign("RS256", dataToSign);
 
     return Buffer.from(signedData.result);
   }
 
   private async azureKeyVaultWrap(cryptoClient: CryptographyClient, encryptionAlgorithm: string, columnEncryptionKey: Buffer): Promise<Buffer> {
     if (!cryptoClient) {
-      throw new Error('Azure KVS Crypto Client is not defined.');
+      throw new Error("Azure KVS Crypto Client is not defined.");
     }
 
     if (columnEncryptionKey) {
-      throw new Error('Column encryption key cannot be null.');
+      throw new Error("Column encryption key cannot be null.");
     }
 
     const wrappedKey = await cryptoClient.wrapKey(<KeyWrapAlgorithm>encryptionAlgorithm, columnEncryptionKey);
@@ -276,15 +276,15 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
   private async azureKeyVaultUnWrap(cryptoClient: CryptographyClient, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> {
     if (!cryptoClient) {
-      throw new Error('Azure KVS Crypto Client is not defined.');
+      throw new Error("Azure KVS Crypto Client is not defined.");
     }
-
+    
     if (!encryptedColumnEncryptionKey) {
-      throw new Error('Encrypted column encryption key cannot be null.');
+      throw new Error("Encrypted column encryption key cannot be null.");
     }
 
     if (encryptedColumnEncryptionKey.length === 0) {
-      throw new Error('Encrypted Column Encryption Key length should not be zero.');
+      throw new Error("Encrypted Column Encryption Key length should not be zero.");
     }
 
     const unwrappedKey = await cryptoClient.unwrapKey(<KeyWrapAlgorithm>encryptionAlgorithm, encryptedColumnEncryptionKey);
@@ -301,7 +301,7 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
 
     const kty: string | undefined = key && key.kty && key.kty.toString().toUpperCase();
 
-    if (!kty || 'RSA'.localeCompare(kty, 'en') !== 0) {
+    if (!kty || "RSA".localeCompare(kty, "en") !== 0) {
       throw new Error(`Cannot use a non-RSA key: ${kty}.`);
     }
 
@@ -310,16 +310,16 @@ export class SQLServerColumnEncryptionAzureKeyVaultProvider {
     return keyLength || 0;
   }
 
-  private validateEncryptionAlgorithm(encryptionAlgorithm: string): string {
+  private validateEncryptionAlgorithm(encryptionAlgorithm: string): string{
     if (!encryptionAlgorithm) {
-      throw new Error('Key encryption algorithm cannot be null.');
+      throw new Error("Key encryption algorithm cannot be null.");
     }
 
-    if ('RSA_OAEP'.localeCompare(encryptionAlgorithm.toUpperCase(), 'en') === 0) {
-      encryptionAlgorithm = 'RSA-OAEP';
+    if ("RSA_OAEP".localeCompare(encryptionAlgorithm.toUpperCase(), "en") === 0) {
+      encryptionAlgorithm = "RSA-OAEP";
     }
 
-    if (this.rsaEncryptionAlgorithmWithOAEPForAKV.localeCompare(encryptionAlgorithm.trim().toUpperCase(), 'en') !== 0) {
+    if (this.rsaEncryptionAlgorithmWithOAEPForAKV.localeCompare(encryptionAlgorithm.trim().toUpperCase(), "en") !== 0) {
       throw new Error(`Invalid key encryption algorithm specified: ${encryptionAlgorithm}. Expected value: ${this.rsaEncryptionAlgorithmWithOAEPForAKV}.`);
     }
 

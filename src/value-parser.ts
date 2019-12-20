@@ -2,12 +2,11 @@ import Parser from './token/stream-parser';
 import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
-import ReadableTrackingBuffer from './tracking-buffer/readable-tracking-buffer';
 
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
-import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
+import { decryptWithKey } from './always-encrypted/key-crypto';
 import { CryptoMetadata } from './always-encrypted/types';
 
 const NULL = (1 << 16) - 1;
@@ -720,8 +719,9 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
 }
 
 function readEncryptedBinary(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
-  const cryptoMetadata = metadata.cryptoMetadata!;
-  const { normalizationRuleVersion, baseTypeInfo: baseMetadata } = cryptoMetadata;
+  const cryptoMetadata: CryptoMetadata = metadata.cryptoMetadata!;
+  const { normalizationRuleVersion } = cryptoMetadata
+  const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
   if (!normalizationRuleVersion.equals(Buffer.from([ 0x01 ]))) {
     return parser.emit('error', new Error(
@@ -773,7 +773,7 @@ function readEncryptedBinary(parser: Parser, metadata: Metadata, options: Intern
   };
 
   const callbackAE = (encryptedValue: Buffer) =>
-    SQLServerSecurityUtility.decryptWithKey(encryptedValue, cryptoMetadata, options)
+    decryptWithKey(encryptedValue, cryptoMetadata, options)
       .then(callbackDecrypted)
       .catch((error) => parser.emit('error', error));
 

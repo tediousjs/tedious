@@ -1,11 +1,11 @@
-export default class SQLServerSymmetricKey {
+export class SymmetricKey {
   rootKey: Buffer;
 
   constructor(rootKey: Buffer) {
     if (!rootKey) {
-      throw new Error('Column encryption key cannot be null.');
+      throw new Error("Column encryption key cannot be null.");
     } else if (0 === rootKey.length) {
-      throw new Error('Empty column encryption key specified.');
+      throw new Error("Empty column encryption key specified.");
     }
     this.rootKey = rootKey;
   }
@@ -14,3 +14,4 @@ export default class SQLServerSymmetricKey {
     this.rootKey = Buffer.alloc(this.rootKey.length);
   }
 }
+export default SymmetricKey;

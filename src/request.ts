@@ -3,7 +3,7 @@ import { typeByName as TYPES, Parameter } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
-import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/utils';
+import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 
 // TODO: Figure out how to type the `rows` parameter here.
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
@@ -135,18 +135,6 @@ class Request extends EventEmitter {
       }
     }
     return paramsParameter;
-  }
-
-  static transformIntoEncryptionMetadataRpc(request: Request, callback: CompletionCallback): Request {
-    const metadataRequest = new Request('sp_describe_parameter_encryption', callback);
-
-    metadataRequest.originalParameters = request.parameters;
-    metadataRequest.addParameter('tsql', TYPES.NVarChar, request.sqlTextOrProcedure);
-    if (metadataRequest.originalParameters && metadataRequest.originalParameters.length) {
-      metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
-    }
-
-    return metadataRequest;
   }
 
   transformIntoExecuteSqlRpc() {

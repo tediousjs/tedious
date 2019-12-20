@@ -40,12 +40,9 @@ import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
-import { shouldHonorAE, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './always-encrypted/utils';
-import { SQLServerColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/SQLServerColumnEncryptionAzureKeyVaultProvider';
-import { CEKTableEntry } from './always-encrypted/CEKTableEntry';
-import { SQLServerEncryptionType, CryptoMetadata } from './always-encrypted/types';
-import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
-import { Parameter } from './data-type';
+import { shouldHonorAE } from './always-encrypted/utils';
+import { ColumnEncryptionAzureKeyVaultProvider } from "./always-encrypted/keystore-provider-azure-key-vault";
+import { getParameterEncryptionMetadata } from "./always-encrypted/get-parameter-encryption-metadata";
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -163,9 +160,8 @@ export interface InternalConnectionOptions {
   enableNumericRoundabort: null | boolean,
   enableQuotedIdentifier: null | boolean,
   encrypt: boolean,
+  encryptionKeyStoreProviders?: KeyStoreProviderMap,
   fallbackToDefaultDb: boolean,
-  globalCustomColumnEncryptionKeyStoreProviders?: KeyStoreProviderMap,
-  globalSystemColumnEncryptionKeyStoreProviders?: KeyStoreProviderMap,
   instanceName: undefined | string,
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL],
   language: string,
@@ -191,11 +187,11 @@ export interface InternalConnectionOptions {
 
 interface KeyStoreProvider {
   key: string;
-  value: SQLServerColumnEncryptionAzureKeyVaultProvider;
+  value: ColumnEncryptionAzureKeyVaultProvider;
 }
 
 interface KeyStoreProviderMap {
-  [key: string]: SQLServerColumnEncryptionAzureKeyVaultProvider;
+  [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
 interface State {
@@ -260,6 +256,7 @@ interface ConnectionOptions {
   enableNumericRoundabort?: boolean,
   enableQuotedIdentifier?: boolean,
   encrypt?: boolean,
+  encryptionKeyStoreProviders?: KeyStoreProvider[],
   fallbackToDefaultDb?: boolean,
   instanceName?: string | undefined,
   isolationLevel?: number,
@@ -543,8 +540,7 @@ class Connection extends EventEmitter {
         enableQuotedIdentifier: true,
         encrypt: true,
         fallbackToDefaultDb: false,
-        globalCustomColumnEncryptionKeyStoreProviders: undefined,
-        globalSystemColumnEncryptionKeyStoreProviders: undefined,
+        encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
@@ -984,6 +980,30 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
+      }
+  
+      if (config.options.encryptionKeyStoreProviders) {
+        for (const entry of config.options.encryptionKeyStoreProviders) {
+          const providerName = entry.key;
+    
+          if (!providerName || providerName.length === 0) {
+            throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+          }
+    
+          if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+            throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+          }
+    
+          if (!entry.value) {
+            throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+          }
+    
+          if (!this.config.options.encryptionKeyStoreProviders) {
+            this.config.options.encryptionKeyStoreProviders = {};
+          }
+    
+          this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
+        }
       }
     }
 
@@ -1851,7 +1871,7 @@ class Connection extends EventEmitter {
   execSql(request: Request) {
     request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
     if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
-      this.getParameterEncryptionMetadata(request, (error?: Error) => {
+      getParameterEncryptionMetadata(this, request, (error?: Error) => {
         if (error != null) {
           process.nextTick(() => {
             this.debug.log(error.message);
@@ -1914,77 +1934,6 @@ class Connection extends EventEmitter {
     });
 
     this.execSqlBatch(request);
-  }
-
-  getParameterEncryptionMetadata(request: Request, callback: (error?: Error) => void) {
-    if (request.cryptoMetadataLoaded === true) {
-      return callback();
-    }
-
-    const decryptSymmetricKeyPromises: Promise<void>[] = [];
-    const metadataRequest = Request.transformIntoEncryptionMetadataRpc(request, () => {
-      if (paramCount !== request.parameters.length) {
-        return callback(new Error(`Internal error. Metadata for some parameters in statement or procedure "${request.sqlTextOrProcedure}" is missing in the resultset returned by sp_describe_parameter_encryption.`));
-      }
-      return Promise.all(decryptSymmetricKeyPromises).then(() => {
-        request.cryptoMetadataLoaded = true;
-        callback();
-      }).catch(callback);
-    });
-
-    const cekList: CEKTableEntry[] = [];
-    let paramCount = 0;
-    metadataRequest.on('row', (columns: any) => {
-      try {
-        const isFirstRecordSet = columns.some((col: any) => (col && col.metadata && col.metadata.colName) === 'database_id');
-        if (isFirstRecordSet === true) {
-          const currentOrdinal = columns[DescribeParameterEncryptionResultSet1.KeyOrdinal].value;
-          let cekEntry: CEKTableEntry;
-          if (!cekList[currentOrdinal]) {
-            cekEntry = new CEKTableEntry(currentOrdinal);
-            cekList[cekEntry.ordinal] = cekEntry;
-          } else {
-            cekEntry = cekList[currentOrdinal];
-          }
-          cekEntry.add(columns[DescribeParameterEncryptionResultSet1.EncryptedKey].value,
-                       columns[DescribeParameterEncryptionResultSet1.DbId].value,
-                       columns[DescribeParameterEncryptionResultSet1.KeyId].value,
-                       columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
-                       columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
-                       columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
-                       columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
-                       columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
-        } else {
-          paramCount++;
-          const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
-          const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
-          const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
-          const cekEntry: CEKTableEntry = cekList[cekOrdinal];
-
-          if (cekEntry && cekList.length < cekOrdinal) {
-            return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
-          }
-
-          const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
-          if (SQLServerEncryptionType.PlainText !== encType) {
-            request.parameters[paramIndex].cryptoMetadata = {
-              cekTableEntry: cekEntry,
-              ordinal: cekOrdinal,
-              cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
-              encryptionType: encType,
-              normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
-            };
-            decryptSymmetricKeyPromises.push(SQLServerSecurityUtility.decryptSymmetricKey(<CryptoMetadata>request.parameters[paramIndex].cryptoMetadata, this.config.options));
-          } else if (request.parameters[paramIndex].forceEncrypt === true) {
-            return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
-          }
-        }
-      } catch (error) {
-        return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
-      }
-    });
-
-    this.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest, this.currentTransactionDescriptor(), this.config.options));
   }
 
   prepare(request: Request) {
@@ -2288,54 +2237,6 @@ class Connection extends EventEmitter {
       default:
         return 'read committed';
     }
-  }
-
-  registerColumnEncryptionKeyStoreProviders(clientKeyStoreProviders: KeyStoreProvider[]) {
-    if (!clientKeyStoreProviders) {
-      throw new Error('Column encryption key store provider map cannot be null. Expecting a non-null value.');
-    }
-
-    if (this.config.options.globalCustomColumnEncryptionKeyStoreProviders) {
-      throw new Error('Key store providers cannot be set more than once.');
-    }
-
-    for (const entry of clientKeyStoreProviders) {
-      const providerName = entry.key;
-
-      if (!providerName || providerName.length === 0) {
-        throw new Error('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
-      }
-
-      if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
-        throw new Error(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
-      }
-
-      if (!entry.value) {
-        throw new Error(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
-      }
-
-      if (!this.config.options.globalCustomColumnEncryptionKeyStoreProviders) {
-        this.config.options.globalCustomColumnEncryptionKeyStoreProviders = {};
-      }
-
-      this.config.options.globalCustomColumnEncryptionKeyStoreProviders[providerName] = entry.value;
-    }
-  }
-
-  getGlobalSystemColumnEncryptionKeyStoreProvider(providerName: string) {
-    return this.config.options.globalSystemColumnEncryptionKeyStoreProviders && this.config.options.globalSystemColumnEncryptionKeyStoreProviders[providerName];
-  }
-
-  setColumnEncryptionKeyCacheTtl(ttl: number) {
-    this.config.options.columnEncryptionKeyCacheTTL = ttl;
-  }
-
-  getColumnEncryptionKeyCacheTtl() {
-    return this.config.options.columnEncryptionKeyCacheTTL;
-  }
-
-  getTrustedServerNameAE() {
-    return this.config.options.trustedServerNameAE;
   }
 }
 

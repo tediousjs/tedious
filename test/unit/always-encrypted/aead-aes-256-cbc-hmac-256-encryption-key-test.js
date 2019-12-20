@@ -1,12 +1,12 @@
 const assert = require('chai').assert;
-const { SQLServerAeadAes256CbcHmac256EncryptionKey } = require('../../../src/always-encrypted/SQLServerAeadAes256CbcHmac256EncryptionKey');
+const { AeadAes256CbcHmac256EncryptionKey } = require('../../../src/always-encrypted/aead-aes-256-cbc-hmac-encryption-key');
 const { algorithmName } = require('./crypto-util');
 
-describe('SQLServerAeadAes256CbcHmac256EncryptionKey', () => {
+describe('aead-aes-256-cbc-hmac-encryption-key', () => {
   const sampleRootKey = Buffer.from('ED6FBC93EECDE0BFC6494FFB2EDB7998B7E94EF71FEDE584741A855238F0155E', 'hex');
 
   it('constructs', () => {
-    const encryptionKey = new SQLServerAeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
+    const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
 
     assert.deepEqual(encryptionKey.rootKey, sampleRootKey);
     assert.deepEqual(encryptionKey.getEncryptionKey(), Buffer.from('561776D3B78B732A6AE06021FD262E41083F4767B16033E11448A552A44B6A27', 'hex'));
