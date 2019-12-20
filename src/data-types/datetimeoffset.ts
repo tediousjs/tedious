@@ -77,7 +77,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
       timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
-      const days = Math.floor((+value - UTC_YEAR_ONE) / 86400000)
+      const days = Math.floor((+value - UTC_YEAR_ONE) / 86400000);
       const offset = -value.getTimezoneOffset();
 
       // data size does not matter for encrypted datetimeoffset

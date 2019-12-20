@@ -1,5 +1,5 @@
-import { CEKTableEntry } from "./CEKTableEntry";
-import { BaseMetadata } from "../metadata-parser";
+import { CEKTableEntry } from './CEKTableEntry';
+import { BaseMetadata } from '../metadata-parser';
 
 export interface EncryptionKeyInfo {
   encryptedKey: Buffer;
@@ -38,4 +38,3 @@ export interface CryptoMetadata {
 export interface HashMap<T> {
   [hash: string]: T
 }
-

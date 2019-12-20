@@ -41,7 +41,7 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { shouldHonorAE, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './always-encrypted/utils';
-import { SQLServerColumnEncryptionAzureKeyVaultProvider } from "./always-encrypted/SQLServerColumnEncryptionAzureKeyVaultProvider";
+import { SQLServerColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/SQLServerColumnEncryptionAzureKeyVaultProvider';
 import { CEKTableEntry } from './always-encrypted/CEKTableEntry';
 import { SQLServerEncryptionType, CryptoMetadata } from './always-encrypted/types';
 import { SQLServerSecurityUtility } from './always-encrypted/SQLServerSecurityUtility';
@@ -1960,11 +1960,11 @@ class Connection extends EventEmitter {
           const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
           const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
           const cekEntry: CEKTableEntry = cekList[cekOrdinal];
-  
+
           if (cekEntry && cekList.length < cekOrdinal) {
             return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
           }
-  
+
           const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
           if (SQLServerEncryptionType.PlainText !== encType) {
             request.parameters[paramIndex].cryptoMetadata = {
@@ -1980,7 +1980,7 @@ class Connection extends EventEmitter {
           }
         }
       } catch (error) {
-        return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`))
+        return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
       }
     });
 

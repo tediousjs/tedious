@@ -1,7 +1,7 @@
-import { EncryptionKeyInfo } from "./types";
-import SQLServerSymmetricKey from "./SQLServerSymmetricKey";
-import { InternalConnectionOptions as ConnectionOptions } from "../connection";
-import LRU from "lru-cache";
+import { EncryptionKeyInfo } from './types';
+import SQLServerSymmetricKey from './SQLServerSymmetricKey';
+import { InternalConnectionOptions as ConnectionOptions } from '../connection';
+import LRU from 'lru-cache';
 
 const cache = new LRU<string, SQLServerSymmetricKey>(0);
 
@@ -9,13 +9,13 @@ export default class SQLServerSymmetricKeyCache {
 
   static async getKey(keyInfo: EncryptionKeyInfo, options: ConnectionOptions): Promise<SQLServerSymmetricKey> {
     if (!options.trustedServerNameAE) {
-      throw new Error("Server name should not be null in getKey");
+      throw new Error('Server name should not be null in getKey');
     }
 
     const serverName: string = options.trustedServerNameAE;
 
-    const keyLookupValue: string = `${serverName}:${Buffer.from(keyInfo.encryptedKey).toString("base64")}:${keyInfo.keyStoreName}`;
-    
+    const keyLookupValue: string = `${serverName}:${Buffer.from(keyInfo.encryptedKey).toString('base64')}:${keyInfo.keyStoreName}`;
+
     if (cache.has(keyLookupValue)) {
       return <SQLServerSymmetricKey>cache.get(keyLookupValue);
     } else {

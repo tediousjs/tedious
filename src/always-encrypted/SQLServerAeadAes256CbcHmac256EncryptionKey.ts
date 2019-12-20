@@ -1,5 +1,5 @@
-import { createHmac } from "crypto";
-import SQLServerSymmetricKey from "./SQLServerSymmetricKey";
+import { createHmac } from 'crypto';
+import SQLServerSymmetricKey from './SQLServerSymmetricKey';
 
 export const keySize = 256;
 const keySizeInBytes = keySize / 8;
@@ -51,7 +51,7 @@ export class SQLServerAeadAes256CbcHmac256EncryptionKey extends SQLServerSymmetr
       const ivKeyBuff = deriveKey(rootKey, this.ivKeySaltFormat);
 
       this.ivKey = new SQLServerSymmetricKey(ivKeyBuff);
-    } catch(error) {
+    } catch (error) {
       throw new Error(`Key extraction failed : ${error.message}.`);
     }
   }

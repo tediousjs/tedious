@@ -1,4 +1,4 @@
-import { CEKTableEntry } from "./CEKTableEntry";
+import { CEKTableEntry } from './CEKTableEntry';
 
 export class CEKTable {
   keyList: CEKTableEntry[];

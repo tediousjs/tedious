@@ -28,7 +28,7 @@ export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementCol
     default:
       return columnEncryptionSetting;
   }
-}
+};
 
 // Fields in the first resultset of "sp_describe_parameter_encryption"
 // We expect the server to return the fields in the resultset in the same order as mentioned below.

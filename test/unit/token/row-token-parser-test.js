@@ -12,9 +12,6 @@ const dataTypeByName = require('../../../src/data-type').typeByName;
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 
 const {
-  deriveEncryptionKey,
-  deriveIVKey,
-  deriveMACKey,
   generateEncryptedVarBinary,
 } = require('../always-encrypted/crypto-util');
 
@@ -23,7 +20,7 @@ const options = {
   tdsVersion: '7_2'
 };
 
-const alwaysEncryptedAlgorithmName = 'AEAD_AES_256_CBC_HMAC_SHA256';
+// const alwaysEncryptedAlgorithmName = 'AEAD_AES_256_CBC_HMAC_SHA256';
 const alwaysEncryptedCEK = Buffer.from([
   // decrypted column key must be 32 bytes long for AES256
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -36,7 +33,7 @@ const alwaysEncryptedIV = Buffer.from([
   0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
 ]);
 // pre-calculated constants, mostly for debugging purposes
-const alwaysEncryptedConstants = {
+/* const alwaysEncryptedConstants = {
   // root key is the decrypted column encryption key
   // it is arbitrary, but must be 32 bytes long for AES256
   // rootKey: 0000000000000000000000000000000000000000000000000000000000000000
@@ -85,7 +82,7 @@ const alwaysEncryptedConstants = {
   //   0xBC, 0xC8, 0x95, 0xF0, 0xC1, 0x7E, 0x2B, 0xCB,
   // ]),
   ivKey: deriveIVKey(alwaysEncryptedCEK),
-};
+}; */
 
 const alwaysEncryptedOptions = {
   ...options,
@@ -2054,7 +2051,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, expectedValues.length);
         const actualValues = token.columns.map(
-          ({ value }) => value === null ? value : value.getTime(),
+          ({ value }) => { return value === null ? value : value.getTime(); },
         );
         assert.deepEqual(actualValues, expectedValues);
       });
@@ -2257,10 +2254,10 @@ describe('Row Token Parser', () => {
       -9.3,
       (0x100000000 + 93) / 10,
       (0x100000000 * 0x100000000 + 0x200000000 + 93) / 10,
-      ( 0x100000000 * 0x100000000 * 0x100000000 +
+      (0x100000000 * 0x100000000 * 0x100000000 +
         0x200000000 * 0x100000000 +
         0x300000000 +
-        93 ) / 10,
+        93) / 10,
       null,
     ];
 
