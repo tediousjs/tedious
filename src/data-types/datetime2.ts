@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
 
-const YEAR_ONE = new Date(2000, 0, -730118);
 const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
 
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
@@ -59,12 +58,9 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
           buffer.writeUInt8(8);
           buffer.writeUInt40LE(timestamp);
       }
-      if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
-      } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
-      }
+
+      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+
     } else {
       buffer.writeUInt8(0);
     }

@@ -1,7 +1,6 @@
 import { DataType } from '../data-type';
 import DateTimeN from './datetimen';
 
-const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
 const DateTime: DataType = {
@@ -20,16 +19,14 @@ const DateTime: DataType = {
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
-      let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+      let milliseconds, seconds, threeHundredthsOfSecond;
+      let days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
         seconds = parameter.value.getUTCHours() * 60 * 60;
         seconds += parameter.value.getUTCMinutes() * 60;
         seconds += parameter.value.getUTCSeconds();
         milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
         seconds = parameter.value.getHours() * 60 * 60;
         seconds += parameter.value.getMinutes() * 60;
         seconds += parameter.value.getSeconds();
