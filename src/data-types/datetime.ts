@@ -19,14 +19,15 @@ const DateTime: DataType = {
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   writeParameterData: function(buffer, parameter, options, cb) {
     if (parameter.value != null) {
-      let milliseconds, seconds, threeHundredthsOfSecond;
-      let days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+      let days, milliseconds, seconds, threeHundredthsOfSecond;
       if (options.useUTC) {
+        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
         seconds = parameter.value.getUTCHours() * 60 * 60;
         seconds += parameter.value.getUTCMinutes() * 60;
         seconds += parameter.value.getUTCSeconds();
         milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
       } else {
+        days = Math.floor((Date.UTC(parameter.value.getFullYear(), parameter.value.getMonth(), parameter.value.getDate()) - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
         seconds = parameter.value.getHours() * 60 * 60;
         seconds += parameter.value.getMinutes() * 60;
         seconds += parameter.value.getSeconds();

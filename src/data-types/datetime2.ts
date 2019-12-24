@@ -59,7 +59,12 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
           buffer.writeUInt40LE(timestamp);
       }
 
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      if (options.useUTC) {
+        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+      } else {
+        const days = Math.floor((Date.UTC(parameter.value.getFullYear(), parameter.value.getMonth(), parameter.value.getDate()) - UTC_YEAR_ONE) / 86400000);
+        buffer.writeUInt24LE(days);
+      }
 
     } else {
       buffer.writeUInt8(0);
