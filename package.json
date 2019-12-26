@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@azure/ms-rest-nodeauth": "2.0.2",
+    "@js-joda/core": "^1.12.0",
     "@types/node": "^12.12.17",
     "@types/readable-stream": "^2.3.5",
     "bl": "^3.0.0",
