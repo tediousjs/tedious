@@ -27,7 +27,7 @@ function getConfig() {
   return config;
 }
 
-describe.only('Bulk Load Tests', function() {
+describe('Bulk Load Tests', function() {
   this.timeout(60000);
   let connection;
 

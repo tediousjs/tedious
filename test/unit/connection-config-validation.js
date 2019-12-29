@@ -20,13 +20,13 @@ describe('Connection configuration validation', function() {
     config.server = 'localhost';
   });
 
-  it.skip('default transient retry interval', () => {
+  it('default transient retry interval', () => {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it.skip('good transient retry interval', () => {
+  it('good transient retry interval', () => {
     const goodRetryInterval = 75;
     config.options.connectionRetryInterval = goodRetryInterval;
     const connection = new Connection(config);
@@ -34,7 +34,7 @@ describe('Connection configuration validation', function() {
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it.skip('bad transient retry interval', () => {
+  it('bad transient retry interval', () => {
     const zeroRetryInterval = 0;
     config.options.connectionRetryInterval = zeroRetryInterval;
     assert.throws(() => {
@@ -48,13 +48,13 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it.skip('default max transient retries', () => {
+  it('default max transient retries', () => {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it.skip('good max transient retries', () => {
+  it('good max transient retries', () => {
     const zeroMaxRetries = 0;
     config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
     const firstConnection = new Connection(config);

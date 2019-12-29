@@ -48,14 +48,8 @@ const VarChar: { maximumLength: number } & DataType = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    if (parameter.length != null && isFinite(parameter.length)) {
-      const length = parameter.length;
-
-      if (length <= this.maximumLength) {
-        buffer.writeUInt16LE(length);
-      } else {
-        buffer.writeUInt16LE(this.maximumLength);
-      }
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(this.maximumLength);
     } else {
       buffer.writeUInt16LE(MAX);
     }
