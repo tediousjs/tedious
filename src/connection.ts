@@ -1689,7 +1689,7 @@ class Connection extends EventEmitter {
 
     if (this.config.options.enableConcatNullYieldsNull === true) {
       options.push('set concat_null_yields_null on');
-    } else if (this.config.options.enableArithAbort === false) {
+    } else if (this.config.options.enableConcatNullYieldsNull === false) {
       options.push('set concat_null_yields_null off');
     }
 
