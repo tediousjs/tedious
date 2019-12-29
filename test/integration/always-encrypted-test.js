@@ -34,30 +34,59 @@ config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('always encrypted', function() {
   this.timeout(100000);
+  let connection;
+
+  const dropKeys = (cb) => {
+    const request = new Request(`IF OBJECT_ID('dbo.test_always_encrypted', 'U') IS NOT NULL DROP TABLE dbo.test_always_encrypted;`, (err) => {
+      if (err) {
+        console.log("err", err);
+      }
+
+      const request = new Request('DROP COLUMN ENCRYPTION KEY [CEK2];', (err) => {
+        if (err) {
+          console.log("err", err);
+        }
+  
+        const request = new Request('DROP COLUMN MASTER KEY [CMK2];', (err) => {
+          if (err) {
+            console.log("err", err);
+            return cb(err);
+          }
+  
+          cb();
+        });
+        connection.execSql(request);
+      });
+      connection.execSql(request);
+    });
+    connection.execSql(request);
+  };
 
   beforeEach(function(done) {
-    this.connection = new Connection(config);
-    this.connection.on('connect', done);
+    connection = new Connection(config);
+    connection.on('connect', done);
   });
 
   afterEach(function(done) {
-    if (!this.connection.closed) {
-      this.connection.on('end', done);
-      this.connection.close();
+    if (!connection.closed) {
+      dropKeys(() => {
+        connection.on('end', done);
+        connection.close();
+      });
     } else {
       done();
     }
   });
 
   it('should correctly insert/select the encrypted data', function(done) {
-    const request = new Request(`CREATE COLUMN MASTER KEY CMK1 WITH (
+    const request = new Request(`CREATE COLUMN MASTER KEY CMK2 WITH (
       KEY_STORE_PROVIDER_NAME = 'TEST_KEYSTORE',
       KEY_PATH = 'some-arbitrary-keypath'
     );`, (err) => {
       if (err) {
         return done(err);
       }
-      const request = new Request(`CREATE COLUMN ENCRYPTION KEY [CEK1] WITH VALUES (
+      const request = new Request(`CREATE COLUMN ENCRYPTION KEY [CEK2] WITH VALUES (
         COLUMN_MASTER_KEY = [CMK1],
         ALGORITHM = 'RSA_OAEP',
         ENCRYPTED_VALUE = 0xDEADBEEF
@@ -71,19 +100,19 @@ describe('always encrypted', function() {
           ENCRYPTED WITH (
             ENCRYPTION_TYPE = DETERMINISTIC,
             ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK1]
+            COLUMN_ENCRYPTION_KEY = [CEK2]
           ),
           [nvarchar_rand_test] nvarchar(50) COLLATE Latin1_General_BIN2 
           ENCRYPTED WITH (
             ENCRYPTION_TYPE = RANDOMIZED,
             ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK1]
+            COLUMN_ENCRYPTION_KEY = [CEK2]
           ),
           [int_test] int 
           ENCRYPTED WITH (
             ENCRYPTION_TYPE = DETERMINISTIC,
             ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK1]
+            COLUMN_ENCRYPTION_KEY = [CEK2]
           )
         );`, (err) => {
           if (err) {
@@ -103,6 +132,7 @@ describe('always encrypted', function() {
                 return done(err);
               }
               assert.deepEqual(values, [p1, p2, p3, p4]);
+
               return done();
             });
 
@@ -110,19 +140,19 @@ describe('always encrypted', function() {
               values = columns.map((col) => col.value);
             });
 
-            this.connection.execSql(request);
+            connection.execSql(request);
           });
 
           request.addParameter('p1', TYPES.NVarChar, p1);
           request.addParameter('p2', TYPES.NVarChar, p2);
           request.addParameter('p3', TYPES.Int, p3);
           request.addParameter('p4', TYPES.NVarChar, p4);
-          this.connection.execSql(request);
+          connection.execSql(request);
         });
-        this.connection.execSql(request);
+        connection.execSql(request);
       });
-      this.connection.execSql(request);
+      connection.execSql(request);
     });
-    this.connection.execSql(request);
+    connection.execSql(request);
   });
 });
