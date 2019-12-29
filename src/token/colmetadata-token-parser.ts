@@ -112,7 +112,7 @@ function readCustomEncryptionMetadata(parser: Parser, algorithmId: number, callb
       });
     });
   } else {
-    callback("");
+    callback('');
   }
 }
 

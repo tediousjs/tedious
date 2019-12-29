@@ -8,7 +8,7 @@ const {
 const algorithmName = 'AEAD_AES_256_CBC_HMAC_SHA256';
 const keySize = 256;
 
-const blockSizeInBytes = 16;
+// const blockSizeInBytes = 16;
 const algorithmVersion = 0x01;
 const algorithmVersionSize = 0x01;
 

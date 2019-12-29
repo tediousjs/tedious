@@ -1,4 +1,4 @@
-import { SQLServerStatementColumnEncryptionSetting } from "./types";
+import { SQLServerStatementColumnEncryptionSetting } from './types';
 
 export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting, columnEncryptionSetting: boolean): boolean => {
   switch (stmtColumnEncryptionSetting) {

@@ -1,5 +1,5 @@
-import { CEKTableEntry } from "./cek-table";
-import { BaseMetadata } from "../metadata-parser";
+import { CEKTableEntry } from './cek-table';
+import { BaseMetadata } from '../metadata-parser';
 
 export interface EncryptionKeyInfo {
   encryptedKey: Buffer;

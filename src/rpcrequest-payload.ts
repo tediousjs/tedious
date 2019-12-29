@@ -185,7 +185,7 @@ class RpcRequestPayload {
 
     buffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
     if (cryptoMetadata.cipherAlgorithmId === 0) {
-      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName || "");
+      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName || '');
     }
 
     buffer.writeUInt8(cryptoMetadata.encryptionType);

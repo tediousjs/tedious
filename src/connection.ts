@@ -41,8 +41,8 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { shouldHonorAE } from './always-encrypted/utils';
-import { ColumnEncryptionAzureKeyVaultProvider } from "./always-encrypted/keystore-provider-azure-key-vault";
-import { getParameterEncryptionMetadata } from "./always-encrypted/get-parameter-encryption-metadata";
+import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
@@ -981,27 +981,27 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
-  
+
       if (config.options.encryptionKeyStoreProviders) {
         for (const entry of config.options.encryptionKeyStoreProviders) {
           const providerName = entry.key;
-    
+
           if (!providerName || providerName.length === 0) {
             throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
           }
-    
+
           if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
             throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
           }
-    
+
           if (!entry.value) {
             throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
           }
-    
+
           if (!this.config.options.encryptionKeyStoreProviders) {
             this.config.options.encryptionKeyStoreProviders = {};
           }
-    
+
           this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
         }
       }

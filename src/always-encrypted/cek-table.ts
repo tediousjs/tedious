@@ -1,4 +1,4 @@
-import { EncryptionKeyInfo } from "./types";
+import { EncryptionKeyInfo } from './types';
 
 export class CEKTable {
   keyList: CEKTableEntry[];
@@ -56,7 +56,7 @@ export class CEKTableEntry {
       this.cekVersion = keyVersion;
       this.cekMdVersion = mdVersion;
     } else if ((this.databaseId !== dbId) || (this.cekId !== keyId) || (this.cekVersion !== keyVersion) || !this.cekMdVersion || !mdVersion || this.cekMdVersion.length !== mdVersion.length) {
-      throw new Error("Invalid databaseId, cekId, cekVersion or cekMdVersion.");
+      throw new Error('Invalid databaseId, cekId, cekVersion or cekMdVersion.');
     }
   }
 }

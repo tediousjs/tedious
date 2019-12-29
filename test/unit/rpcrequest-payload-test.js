@@ -1,11 +1,11 @@
 const { assert } = require('chai');
 
 const RpcRequestPayload = require('../../src/rpcrequest-payload');
-const Request = require("../../src/request");
-const { typeByName } = require("../../src/data-type");
+const Request = require('../../src/request');
+const { typeByName } = require('../../src/data-type');
 const {
   alwaysEncryptedOptions
-} = require("./always-encrypted/crypto-util");
+} = require('./always-encrypted/crypto-util');
 
 const options = {
   useUTC: false,
@@ -38,8 +38,8 @@ const sampleCryptoMetadata = {
 };
 
 describe('RpcRequestPayload', () => {
-  it("get data", () => {
-    const req = new Request("SELECT 1", () => {});
+  it('get data', () => {
+    const req = new Request('SELECT 1', () => {});
     const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
 
     const expectedData = Buffer.from([
@@ -53,7 +53,7 @@ describe('RpcRequestPayload', () => {
 
       // sql query length
       0x08, 0x00,
-      
+
       // sql query
       0x53, 0x00, 0x45, 0x00,
       0x4C, 0x00, 0x45, 0x00,
@@ -69,10 +69,10 @@ describe('RpcRequestPayload', () => {
     });
   });
 
-  it("get data with param", () => {
-    const req = new Request("SELECT @param", () => {});
+  it('get data with param', () => {
+    const req = new Request('SELECT @param', () => {});
 
-    req.addParameter("param", typeByName.Int, 1);
+    req.addParameter('param', typeByName.Int, 1);
 
     const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
 
@@ -87,7 +87,7 @@ describe('RpcRequestPayload', () => {
 
       // sql query length
       0x0D, 0x00,
-      
+
       // sql query
       0x53, 0x00, 0x45, 0x00,
       0x4c, 0x00, 0x45, 0x00,
@@ -117,12 +117,12 @@ describe('RpcRequestPayload', () => {
     });
   });
 
-  it("get data with encrypted param", () => {
-    const req = new Request("SELECT @param", () => {});
+  it('get data with encrypted param', () => {
+    const req = new Request('SELECT @param', () => {});
 
-    req.addParameter("param", typeByName.Int, 1);
+    req.addParameter('param', typeByName.Int, 1);
 
-    req.parameters[0]["cryptoMetadata"] = {
+    req.parameters[0].cryptoMetadata = {
       ...sampleCryptoMetadata,
       baseTypeInfo: { type: typeByName.Int },
     };
@@ -140,7 +140,7 @@ describe('RpcRequestPayload', () => {
 
       // sql query length
       0x0D, 0x00,
-      
+
       // sql query
       0x53, 0x00, 0x45, 0x00,
       0x4c, 0x00, 0x45, 0x00,
@@ -182,18 +182,18 @@ describe('RpcRequestPayload', () => {
     });
   });
 
-  it("get data with 2 encrypted param", () => {
-    const req = new Request("SELECT @param1, @param2", () => {});
+  it('get data with 2 encrypted param', () => {
+    const req = new Request('SELECT @param1, @param2', () => {});
 
-    req.addParameter("param1", typeByName.Int, 1);
-    req.addParameter("param2", typeByName.Int, 2);
+    req.addParameter('param1', typeByName.Int, 1);
+    req.addParameter('param2', typeByName.Int, 2);
 
-    req.parameters[0]["cryptoMetadata"] = {
+    req.parameters[0].cryptoMetadata = {
       ...sampleCryptoMetadata,
       baseTypeInfo: { type: typeByName.Int },
     };
 
-    req.parameters[1]["cryptoMetadata"] = {
+    req.parameters[1].cryptoMetadata = {
       ...sampleCryptoMetadata,
       baseTypeInfo: { type: typeByName.Int },
     };
@@ -211,7 +211,7 @@ describe('RpcRequestPayload', () => {
 
       // sql query length
       0x17, 0x00,
-      
+
       // sql query
       0x53, 0x00, 0x45, 0x00,
       0x4c, 0x00, 0x45, 0x00,
@@ -262,7 +262,7 @@ describe('RpcRequestPayload', () => {
       0xA5, 0x41, 0x00,
 
       // encrypted parameter 2 value
-      ...Buffer.from("41000150087ab978e0443ad69a05a405aaaef57e9e23507ead6c4608947fa7c1b3d333af760ae3df6d2b2a54ca57f181ae43b28eddc56e88934dc898c4e197e86993b6", "hex"),
+      ...Buffer.from('41000150087ab978e0443ad69a05a405aaaef57e9e23507ead6c4608947fa7c1b3d333af760ae3df6d2b2a54ca57f181ae43b28eddc56e88934dc898c4e197e86993b6', 'hex'),
 
       // base type parameter 2 metadata
       0x26, 0x04,

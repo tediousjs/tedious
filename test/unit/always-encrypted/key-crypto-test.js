@@ -5,11 +5,11 @@ const {
   alwaysEncryptedOptions,
   cryptoMetadata,
   alwaysEncryptedConstants,
-} = require("./crypto-util");
+} = require('./crypto-util');
 
-describe("key-crypto", () => {
-  describe("decryptSymmetricKey", () => {
-    it("get symmetric key (no cache)", async () => {
+describe('key-crypto', () => {
+  describe('decryptSymmetricKey', () => {
+    it('get symmetric key (no cache)', async () => {
       const metadata = {
         ...cryptoMetadata,
       };
@@ -21,7 +21,7 @@ describe("key-crypto", () => {
       assert.deepEqual(metadata.encryptionKeyInfo, cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0]);
     });
 
-    it("get symmetric key (with cache)", async () => {
+    it('get symmetric key (with cache)', async () => {
       const metadata = {
         ...cryptoMetadata,
       };
@@ -33,7 +33,7 @@ describe("key-crypto", () => {
       assert.deepEqual(metadata.encryptionKeyInfo, cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0]);
     });
 
-    it("key not found", async () => {
+    it('key not found', async () => {
       const metadata = {
         ...cryptoMetadata,
         cekTableEntry: {
@@ -46,7 +46,7 @@ describe("key-crypto", () => {
         await keyCrypto.decryptSymmetricKey(metadata, alwaysEncryptedOptions);
 
         assert.isTrue(false);
-      } catch (error) {
+      } catch {
         assert.isTrue(true);
       }
     });

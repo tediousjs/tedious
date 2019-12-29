@@ -720,7 +720,7 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
 
 function readEncryptedBinary(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
   const cryptoMetadata: CryptoMetadata = metadata.cryptoMetadata!;
-  const { normalizationRuleVersion } = cryptoMetadata
+  const { normalizationRuleVersion } = cryptoMetadata;
   const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
   if (!normalizationRuleVersion.equals(Buffer.from([ 0x01 ]))) {

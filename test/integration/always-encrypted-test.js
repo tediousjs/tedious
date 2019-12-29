@@ -25,7 +25,7 @@ const alwaysEncryptedCEK = Buffer.from([
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ]);
 config.options.encryptionKeyStoreProviders = [{
-  key: "TEST_KEYSTORE",
+  key: 'TEST_KEYSTORE',
   value: {
     decryptColumnEncryptionKey: () => Promise.resolve(alwaysEncryptedCEK),
   },
@@ -89,10 +89,10 @@ describe('always encrypted', function() {
           if (err) {
             return done(err);
           }
-          const p1 = "nvarchar_determ_test_val123";
-          const p2 = "nvarchar_rand_test_val123";
+          const p1 = 'nvarchar_determ_test_val123';
+          const p2 = 'nvarchar_rand_test_val123';
           const p3 = 123;
-          const p4 = "plaintext_val123";
+          const p4 = 'plaintext_val123';
           const request = new Request('INSERT INTO test_always_encrypted ([nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext]) VALUES (@p1, @p2, @p3, @p4)', (err) => {
             if (err) {
               return done(err);
@@ -105,14 +105,14 @@ describe('always encrypted', function() {
               assert.deepEqual(values, [p1, p2, p3, p4]);
               return done();
             });
-    
+
             request.on('row', function(columns) {
               values = columns.map((col) => col.value);
             });
-    
+
             this.connection.execSql(request);
           });
-    
+
           request.addParameter('p1', TYPES.NVarChar, p1);
           request.addParameter('p2', TYPES.NVarChar, p2);
           request.addParameter('p3', TYPES.Int, p3);

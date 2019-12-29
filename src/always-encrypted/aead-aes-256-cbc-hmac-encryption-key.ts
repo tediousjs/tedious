@@ -1,5 +1,5 @@
-import { createHmac } from "crypto";
-import SymmetricKey from "./symmetric-key";
+import { createHmac } from 'crypto';
+import SymmetricKey from './symmetric-key';
 
 export const keySize = 256;
 const keySizeInBytes = keySize / 8;
@@ -51,7 +51,7 @@ export class AeadAes256CbcHmac256EncryptionKey extends SymmetricKey {
       const ivKeyBuff = deriveKey(rootKey, this.ivKeySaltFormat);
 
       this.ivKey = new SymmetricKey(ivKeyBuff);
-    } catch(error) {
+    } catch (error) {
       throw new Error(`Key extraction failed : ${error.message}.`);
     }
   }

@@ -1,10 +1,9 @@
-import { DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
-import { SQLServerEncryptionType, CryptoMetadata } from './types';
+import { SQLServerEncryptionType, CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
 import { CEKTableEntry } from './cek-table';
 import { decryptSymmetricKey } from './key-crypto';
 import { typeByName as TYPES, Parameter } from '../data-type';
-import Request from "../request";
-import Connection from "../connection";
+import Request from '../request';
+import Connection from '../connection';
 import RpcRequestPayload from '../rpcrequest-payload';
 import { TYPE } from '../packet';
 
@@ -81,7 +80,7 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
         }
       }
     } catch (error) {
-      return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`))
+      return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
     }
   });
 

@@ -1956,7 +1956,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, expectedValues.length);
         const actualValues = token.columns.map(
-          ({ value }) => value === null ? value : value.getTime(),
+          ({ value }) => { return value === null ? value : value.getTime(); },
         );
         assert.deepEqual(actualValues, expectedValues);
       });
@@ -2159,10 +2159,10 @@ describe('Row Token Parser', () => {
       -9.3,
       (0x100000000 + 93) / 10,
       (0x100000000 * 0x100000000 + 0x200000000 + 93) / 10,
-      ( 0x100000000 * 0x100000000 * 0x100000000 +
+      (0x100000000 * 0x100000000 * 0x100000000 +
         0x200000000 * 0x100000000 +
         0x300000000 +
-        93 ) / 10,
+        93) / 10,
       null,
     ];
 
