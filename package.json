@@ -64,6 +64,7 @@
     "@commitlint/config-conventional": "^8.2.0",
     "@commitlint/travis-cli": "^8.2.0",
     "@types/bl": "^2.1.0",
+    "@types/depd": "^1.1.32",
     "@types/sprintf-js": "^1.1.2",
     "async": "^2.6.3",
     "babel-eslint": "^11.0.0-beta.2",

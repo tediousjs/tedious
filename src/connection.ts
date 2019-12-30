@@ -41,6 +41,9 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
+import depd from 'depd';
+const deprecate = depd('tedious');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -711,6 +714,8 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
+      } else {
+        deprecate('The default value for `config.options.enableArithAbort` will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.enableConcatNullYieldsNull !== undefined) {
