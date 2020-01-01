@@ -41,6 +41,9 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
+import depd from 'depd';
+const deprecate = depd('tedious');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -515,7 +518,7 @@ class Connection extends EventEmitter {
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
-        encrypt: false,
+        encrypt: true,
         fallbackToDefaultDb: false,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
@@ -711,6 +714,8 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
+      } else {
+        deprecate('The default value for `config.options.enableArithAbort` will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.enableConcatNullYieldsNull !== undefined) {
@@ -759,8 +764,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.encrypt = config.options.encrypt;
-      } else {
-        this.config.options.encrypt = true;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
@@ -782,7 +785,7 @@ class Connection extends EventEmitter {
 
       if (config.options.isolationLevel !== undefined) {
         if (typeof config.options.isolationLevel !== 'number') {
-          throw new TypeError('The "config.options.language" property must be of type numer.');
+          throw new TypeError('The "config.options.isolationLevel" property must be of type number.');
         }
 
         this.config.options.isolationLevel = config.options.isolationLevel;
@@ -1691,7 +1694,7 @@ class Connection extends EventEmitter {
 
     if (this.config.options.enableConcatNullYieldsNull === true) {
       options.push('set concat_null_yields_null on');
-    } else if (this.config.options.enableArithAbort === false) {
+    } else if (this.config.options.enableConcatNullYieldsNull === false) {
       options.push('set concat_null_yields_null off');
     }
 

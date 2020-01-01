@@ -36,6 +36,9 @@ export abstract class Token {
 }
 
 export class ColMetadataToken extends Token {
+  declare name: 'COLMETADATA';
+  declare event: 'columnMetadata';
+
   columns: ColumnMetadata[]
 
   constructor(columns: ColumnMetadata[]) {
@@ -46,8 +49,8 @@ export class ColMetadataToken extends Token {
 }
 
 export class DoneToken extends Token {
-  name!: 'DONE';
-  event!: 'done';
+  declare name: 'DONE';
+  declare event: 'done';
 
   more: boolean;
   sqlError: boolean;
@@ -69,6 +72,9 @@ export class DoneToken extends Token {
 }
 
 export class DoneInProcToken extends Token {
+  declare name: 'DONEINPROC';
+  declare event: 'doneInProc';
+
   more: boolean;
   sqlError: boolean;
   attention: boolean;
@@ -89,6 +95,9 @@ export class DoneInProcToken extends Token {
 }
 
 export class DoneProcToken extends Token {
+  declare name: 'DONEPROC';
+  declare event: 'doneProc';
+
   more: boolean;
   sqlError: boolean;
   attention: boolean;
@@ -109,6 +118,9 @@ export class DoneProcToken extends Token {
 }
 
 export class DatabaseEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'databaseChange';
+
   type: 'DATABASE';
   newValue: string;
   oldValue: string;
@@ -123,6 +135,9 @@ export class DatabaseEnvChangeToken extends Token {
 }
 
 export class LanguageEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'languageChange';
+
   type: 'LANGUAGE';
   newValue: string;
   oldValue: string;
@@ -137,6 +152,9 @@ export class LanguageEnvChangeToken extends Token {
 }
 
 export class CharsetEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'charsetChange';
+
   type: 'CHARSET';
   newValue: string;
   oldValue: string;
@@ -151,6 +169,9 @@ export class CharsetEnvChangeToken extends Token {
 }
 
 export class PacketSizeEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'packetSizeChange';
+
   type: 'PACKET_SIZE';
   newValue: number;
   oldValue: number;
@@ -165,6 +186,9 @@ export class PacketSizeEnvChangeToken extends Token {
 }
 
 export class BeginTransactionEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'beginTransaction';
+
   type: 'BEGIN_TXN';
   newValue: Buffer;
   oldValue: Buffer;
@@ -182,6 +206,9 @@ export class BeginTransactionEnvChangeToken extends Token {
 }
 
 export class CommitTransactionEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'commitTransaction';
+
   type: 'COMMIT_TXN';
   newValue: Buffer;
   oldValue: Buffer;
@@ -196,6 +223,9 @@ export class CommitTransactionEnvChangeToken extends Token {
 }
 
 export class RollbackTransactionEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'rollbackTransaction';
+
   type: 'ROLLBACK_TXN';
   oldValue: Buffer;
   newValue: Buffer;
@@ -210,6 +240,9 @@ export class RollbackTransactionEnvChangeToken extends Token {
 }
 
 export class DatabaseMirroringPartnerEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'partnerNode';
+
   type: 'DATABASE_MIRRORING_PARTNER';
   oldValue: string;
   newValue: string;
@@ -227,15 +260,15 @@ export class DatabaseMirroringPartnerEnvChangeToken extends Token {
 }
 
 export class ResetConnectionEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'resetConnection';
+
   type: 'RESET_CONNECTION';
   oldValue: Buffer;
   newValue: Buffer;
 
   constructor(newValue: Buffer, oldValue: Buffer) {
     super('ENVCHANGE', 'resetConnection');
-
-    this.name = 'ENVCHANGE';
-    this.event = 'resetConnection';
 
     this.type = 'RESET_CONNECTION';
     this.newValue = newValue;
@@ -244,6 +277,9 @@ export class ResetConnectionEnvChangeToken extends Token {
 }
 
 export class CollationChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'sqlCollationChange';
+
   type: 'SQL_COLLATION';
   oldValue: Buffer;
   newValue: Buffer;
@@ -258,6 +294,9 @@ export class CollationChangeToken extends Token {
 }
 
 export class RoutingEnvChangeToken extends Token {
+  declare name: 'ENVCHANGE';
+  declare event: 'routingChange';
+
   type: 'ROUTING_CHANGE';
   newValue: { protocol: number, port: number, server: string };
   oldValue: Buffer;
@@ -272,6 +311,9 @@ export class RoutingEnvChangeToken extends Token {
 }
 
 export class FeatureExtAckToken extends Token {
+  declare name: 'FEATUREEXTACK';
+  declare event: 'featureExtAck';
+
   fedAuth: Buffer | undefined;
 
   constructor(fedAuth: Buffer | undefined) {
@@ -282,6 +324,9 @@ export class FeatureExtAckToken extends Token {
 }
 
 export class FedAuthInfoToken extends Token {
+  declare name: 'FEDAUTHINFO';
+  declare event: 'fedAuthInfo';
+
   spn: string | undefined;
   stsurl: string | undefined;
 
@@ -294,6 +339,9 @@ export class FedAuthInfoToken extends Token {
 }
 
 export class InfoMessageToken extends Token {
+  declare name: 'INFO';
+  declare event: 'infoMessage';
+
   number: number;
   state: number;
   class: number;
@@ -316,6 +364,9 @@ export class InfoMessageToken extends Token {
 }
 
 export class ErrorMessageToken extends Token {
+  declare name: 'ERROR';
+  declare event: 'errorMessage';
+
   number: number;
   state: number;
   class: number;
@@ -338,6 +389,9 @@ export class ErrorMessageToken extends Token {
 }
 
 export class LoginAckToken extends Token {
+  declare name: 'LOGINACK';
+  declare event: 'loginack';
+
   interface: string;
   tdsVersion: string;
   progName: string;
@@ -354,6 +408,9 @@ export class LoginAckToken extends Token {
 }
 
 export class NBCRowToken extends Token {
+  declare name: 'NBCROW';
+  declare event: 'row';
+
   columns: any;
 
   constructor(columns: any) {
@@ -364,6 +421,9 @@ export class NBCRowToken extends Token {
 }
 
 export class OrderToken extends Token {
+  declare name: 'ORDER';
+  declare event: 'order';
+
   orderColumns: number[];
 
   constructor(orderColumns: number[]) {
@@ -374,6 +434,9 @@ export class OrderToken extends Token {
 }
 
 export class ReturnStatusToken extends Token {
+  declare name: 'RETURNSTATUS';
+  declare event: 'returnStatus';
+
   value: number;
 
   constructor(value: number) {
@@ -384,6 +447,9 @@ export class ReturnStatusToken extends Token {
 }
 
 export class ReturnValueToken extends Token {
+  declare name: 'RETURNVALUE';
+  declare event: 'returnValue';
+
   paramOrdinal: number;
   paramName: string;
   metadata: Metadata;
@@ -400,6 +466,9 @@ export class ReturnValueToken extends Token {
 }
 
 export class RowToken extends Token {
+  declare name: 'ROW';
+  declare event: 'row';
+
   columns: any;
 
   constructor(columns: any) {
@@ -410,6 +479,9 @@ export class RowToken extends Token {
 }
 
 export class SSPIToken extends Token {
+  declare name: 'SSPICHALLENGE';
+  declare event: 'sspichallenge';
+
   ntlmpacket: any;
   ntlmpacketBuffer: Buffer;
 
@@ -422,6 +494,9 @@ export class SSPIToken extends Token {
 }
 
 export class EndOfMessageToken extends Token {
+  declare name: 'EOM';
+  declare event: 'endOfMessage';
+
   constructor() {
     super('EOM', 'endOfMessage');
   }
