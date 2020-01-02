@@ -1,7 +1,7 @@
 import { DataType } from '../data-type';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
-const YEAR_ONE = new Date(2000, 0, -730118);
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
@@ -27,21 +27,21 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
+  writeParameterData: function(buffer, { value, scale }, options, cb) {
+    if (value != null) {
+      scale = scale!;
 
       let timestamp;
       if (options.useUTC) {
-        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+        timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
       } else {
-        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+        timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
       }
-      timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
-      switch (parameter.scale) {
+      switch (scale) {
         case 0:
         case 1:
         case 2:
@@ -59,12 +59,16 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
           buffer.writeUInt8(8);
           buffer.writeUInt40LE(timestamp);
       }
+
+      let date;
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
       }
+
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      buffer.writeUInt24LE(days);
     } else {
       buffer.writeUInt8(0);
     }
