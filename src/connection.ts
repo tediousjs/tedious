@@ -41,6 +41,9 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
+import depd from 'depd';
+const deprecate = depd('tedious');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -509,7 +512,7 @@ class Connection extends EventEmitter {
         enableAnsiNullDefault: true,
         enableAnsiPadding: true,
         enableAnsiWarnings: true,
-        enableArithAbort: false,
+        enableArithAbort: true,
         enableConcatNullYieldsNull: true,
         enableCursorCloseOnCommit: null,
         enableImplicitTransactions: false,
@@ -1689,7 +1692,7 @@ class Connection extends EventEmitter {
 
     if (this.config.options.enableConcatNullYieldsNull === true) {
       options.push('set concat_null_yields_null on');
-    } else if (this.config.options.enableArithAbort === false) {
+    } else if (this.config.options.enableConcatNullYieldsNull === false) {
       options.push('set concat_null_yields_null off');
     }
 
