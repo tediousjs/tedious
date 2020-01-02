@@ -512,7 +512,7 @@ class Connection extends EventEmitter {
         enableAnsiNullDefault: true,
         enableAnsiPadding: true,
         enableAnsiWarnings: true,
-        enableArithAbort: false,
+        enableArithAbort: true,
         enableConcatNullYieldsNull: true,
         enableCursorCloseOnCommit: null,
         enableImplicitTransactions: false,
@@ -714,8 +714,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableArithAbort = config.options.enableArithAbort;
-      } else {
-        deprecate('The default value for `config.options.enableArithAbort` will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.enableConcatNullYieldsNull !== undefined) {
