@@ -122,4 +122,8 @@ export class Transaction {
     }
     return '';
   }
+
+  validateIsolationLevel(isolationLevel: number) {
+    return isolationLevel >=0 && isolationLevel <= 5
+  }
 }
