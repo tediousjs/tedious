@@ -366,9 +366,12 @@ describe('BeginTransaction Tests', function() {
     const connection = new Connection(config);
     connection.on('connect', function(err) {
        assert.throws(function() {
-      connection.beginTransaction(undefined);
+      connection.beginTransaction();
     }, Error, 'Error: invalid isolationLevel 9');
+
+    connection.close();
     })
+
   });
 });
 
