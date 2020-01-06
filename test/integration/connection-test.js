@@ -370,7 +370,7 @@ describe('BeginTransaction Tests', function() {
     }, Error, 'Error: invalid isolationLevel 9');
 
     connection.close();
-    })
+    });
 
   });
 });
