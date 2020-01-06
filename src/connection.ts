@@ -1866,6 +1866,11 @@ class Connection extends EventEmitter {
 
   beginTransaction(callback: (err: Error | null | undefined, transactionDescriptor?: Buffer) => void, name = '', isolationLevel = this.config.options.isolationLevel) {
     const transaction = new Transaction(name, isolationLevel);
+
+    if (!transaction.validateIsolationLevel(isolationLevel)) {
+      throw new Error(`Error: invalid isolationLevel ${isolationLevel}`);
+    }
+
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
         this.transactionDepth++;

@@ -359,6 +359,22 @@ describe('Encrypt Test', function() {
   });
 });
 
+describe('BeginTransaction Tests', function() {
+  it('should throw invalid IsolationLevel Error', function() {
+    const config = getConfig();
+    config.options.isolationLevel = 9;
+    const connection = new Connection(config);
+    connection.on('connect', function(err) {
+       assert.throws(function() {
+      connection.beginTransaction();
+    }, Error, 'Error: invalid isolationLevel 9');
+
+    connection.close();
+    });
+
+  });
+});
+
 describe('Insertion Tests', function() {
   this.timeout(30000);
 
