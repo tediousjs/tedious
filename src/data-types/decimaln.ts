@@ -5,6 +5,12 @@ const DecimalN: DataType = {
   type: 'DECIMALN',
   name: 'DecimalN',
 
+  getDataType: function(dataLength: number) {
+    const decimal = require('./decimal');
+
+    return (dataLength === 17) ? decimal : this;
+  },
+
   declaration() {
     throw new Error('not implemented');
   },

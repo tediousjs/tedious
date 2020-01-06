@@ -5,6 +5,21 @@ const DateTimeN: DataType = {
   type: 'DATETIMN',
   name: 'DateTimeN',
 
+  getDataType: function(dataLength: number) {
+    const smalldatetime = require('./smalldatetime');
+    const datetime = require('./datetime');
+
+    switch (dataLength) {
+      case 4:
+        return smalldatetime;
+
+      case 8:
+        return datetime;
+
+      default: return this;
+    }
+  },
+
   declaration() {
     throw new Error('not implemented');
   },

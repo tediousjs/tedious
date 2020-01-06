@@ -5,6 +5,12 @@ const FloatN: DataType = {
   type: 'FLTN',
   name: 'FloatN',
 
+  getDataType: function(dataLength: number) {
+    const float = require('./float');
+
+    return (dataLength === 4 || dataLength === 8) ? float : this;
+  },
+
   declaration() {
     throw new Error('not implemented');
   },

@@ -78,7 +78,24 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+export function specifyDataType(column: ColumnMetadata) {
+  const dataLength = column.dataLength;
+  const originalType = column.type;
+  let type: any;
+
+  if (originalType.hasOwnProperty('getDataType')) {
+    type = originalType.getDataType!(dataLength!);
+  } else {
+    type = originalType;
+  }
+
+  return {
+    ...column,
+    type
+  };
+}
+
+export default function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
@@ -101,6 +118,3 @@ function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], optio
     });
   });
 }
-
-export default colMetadataParser;
-module.exports = colMetadataParser;

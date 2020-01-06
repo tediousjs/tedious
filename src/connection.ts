@@ -5,6 +5,8 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
+import { specifyDataType, ColumnMetadata } from './token/colmetadata-token-parser';
+
 import {
   loginWithUsernamePassword,
   loginWithVmMSI,
@@ -39,7 +41,6 @@ import Message from './message';
 import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 import depd from 'depd';
 const deprecate = depd('tedious');
@@ -1139,12 +1140,14 @@ class Connection extends EventEmitter {
       this.emit('rollbackTransaction');
     });
 
+
     tokenStreamParser.on('columnMetadata', (token) => {
       const request = this.request;
       if (request) {
         if (!request.canceled) {
+          let columns: { [key: string]: ColumnMetadata } | ColumnMetadata[];
           if (this.config.options.useColumnNames) {
-            const columns: { [key: string]: ColumnMetadata } = {};
+            columns = {};
 
             for (let j = 0, len = token.columns.length; j < len; j++) {
               const col = token.columns[j];
@@ -1152,11 +1155,25 @@ class Connection extends EventEmitter {
                 columns[col.colName] = col;
               }
             }
-
-            request.emit('columnMetadata', columns);
           } else {
-            request.emit('columnMetadata', token.columns);
+            columns = token.columns;
           }
+
+          // Replace variable length data-type to specific data-type (e.g., type intN -> smallint etc...)
+          const emittedColumns: any = [];
+          if (Array.isArray(columns)) {
+            columns.forEach((column) => {
+              emittedColumns.push(specifyDataType(column));
+            });
+          } else {
+            Object.keys(columns).forEach((colName) => {
+              // @ts-ignore TODO: Fix TypeScript Error
+              const tempCol = columns[colName];
+              emittedColumns.push(specifyDataType(tempCol));
+            });
+          }
+
+          request.emit('columnMetadata', emittedColumns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));

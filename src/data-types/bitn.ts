@@ -5,6 +5,12 @@ const BitN: DataType = {
   type: 'BITN',
   name: 'BitN',
 
+  getDataType: function(dataLength: number) {
+    const bit = require('./bit');
+
+    return (dataLength === 1) ? bit : this;
+  },
+
   declaration() {
     throw new Error('not implemented');
   },
