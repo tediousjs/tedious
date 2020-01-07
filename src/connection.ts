@@ -2012,18 +2012,15 @@ class Connection extends EventEmitter {
       let message: Message;
 
       request.once('cancel', () => {
-        if (!this.isRequestActive(request)) {
-          // Cancel was called on a request that is no longer active on this connection
-          return;
-        }
-
         // There's three ways to handle request cancelation:
         if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
           // The request was cancelled before buffering finished
           this.request = undefined;
           request.callback(RequestError('Canceled.', 'ECANCEL'));
           this.transitionTo(this.STATE.LOGGED_IN);
-
+        } else if (!this.isRequestActive(request)) {
+          // Cancel was called on a request that is no longer active on this connection
+          return;
         } else if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
           //   and end the message.
