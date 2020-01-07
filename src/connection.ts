@@ -595,7 +595,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.connectionIsolationLevel !== undefined) {
-        assertValidIsolationLevel(config.options.connectionIsolationLevel, "config.options.connectionIsolationLevel");
+        assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
 
         this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
       }
@@ -784,7 +784,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.isolationLevel !== undefined) {
-        assertValidIsolationLevel(config.options.isolationLevel, "config.options.isolationLevel");
+        assertValidIsolationLevel(config.options.isolationLevel, 'config.options.isolationLevel');
 
         this.config.options.isolationLevel = config.options.isolationLevel;
       }
@@ -1865,7 +1865,7 @@ class Connection extends EventEmitter {
   }
 
   beginTransaction(callback: (err: Error | null | undefined, transactionDescriptor?: Buffer) => void, name = '', isolationLevel = this.config.options.isolationLevel) {
-    assertValidIsolationLevel(isolationLevel, "isolationLevel");
+    assertValidIsolationLevel(isolationLevel, 'isolationLevel');
 
     const transaction = new Transaction(name, isolationLevel);
 
@@ -1930,7 +1930,7 @@ class Connection extends EventEmitter {
 
   transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
     if (isolationLevel) {
-      assertValidIsolationLevel(isolationLevel, "isolationLevel");
+      assertValidIsolationLevel(isolationLevel, 'isolationLevel');
     }
 
     if (typeof cb !== 'function') {
