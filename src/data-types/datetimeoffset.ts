@@ -1,7 +1,8 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
 const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
@@ -23,20 +24,17 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
-      time.setUTCFullYear(1970);
-      time.setUTCMonth(0);
-      time.setUTCDate(1);
+  writeParameterData: function(buffer, { value, scale }, _options, cb) {
+    if (value != null) {
+      scale = scale!;
 
       let timestamp;
-      timestamp = +time * Math.pow(10, parameter.scale! - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
+      timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
-      const offset = -parameter.value.getTimezoneOffset();
-      switch (parameter.scale) {
+      switch (scale) {
         case 0:
         case 1:
         case 2:
@@ -54,7 +52,12 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
           buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+
+      const date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      buffer.writeUInt24LE(days);
+
+      const offset = -value.getTimezoneOffset();
       buffer.writeInt16LE(offset);
     } else {
       buffer.writeUInt8(0);
@@ -65,19 +68,17 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     const value = parameter.value as Date & { nanosecondDelta?: number | null };
 
     if (value != null) {
-      const scale = DateTimeOffset.resolveScale(parameter);
+      const scale = this.resolveScale(parameter);
 
-      const time = new Date(+value);
-      time.setUTCFullYear(1970);
-      time.setUTCMonth(0);
-      time.setUTCDate(1);
-
-      let timestamp: number;
-      timestamp = +time * Math.pow(10, scale - 3);
+      let timestamp;
+      timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
+      timestamp = timestamp * Math.pow(10, scale - 3);
       timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
-      const days = Math.floor((+value - UTC_YEAR_ONE) / 86400000);
+      const date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+
       const offset = -value.getTimezoneOffset();
 
       // data size does not matter for encrypted datetimeoffset

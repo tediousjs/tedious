@@ -1,10 +1,10 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
-const YEAR_ONE = new globalDate(2000, 0, -730118);
-const UTC_YEAR_ONE = globalDate.UTC(2000, 0, -730118);
+const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
 const Date : DataType = {
   id: 0x28,
@@ -20,15 +20,19 @@ const Date : DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
+  writeParameterData: function(buffer, { value }, options, cb) {
+    if (value != null) {
       buffer.writeUInt8(3);
+
+      let date;
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
       }
+
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      buffer.writeUInt24LE(days);
     } else {
       buffer.writeUInt8(0);
     }
@@ -39,17 +43,16 @@ const Date : DataType = {
     const value = parameter.value as Date;
 
     if (value != null) {
-      let val: number;
-
+      let date;
       if (options.useUTC) {
-        val = Math.floor((+value - UTC_YEAR_ONE) / 86400000);
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
       } else {
-        const dstDiff = -(value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        val = Math.floor((+value - +YEAR_ONE + dstDiff) / 86400000);
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
       }
 
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
       const buffer = new WritableTrackingBuffer(3);
-      buffer.writeUInt24LE(val);
+      buffer.writeUInt24LE(days);
 
       return buffer.data;
     } else {

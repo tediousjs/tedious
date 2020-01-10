@@ -44,6 +44,9 @@ import { shouldHonorAE } from './always-encrypted/utils';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
+import depd from 'depd';
+const deprecate = depd('tedious');
+
 // A rather basic state machine for managing a connection.
 // Implements something approximating s3.2.1.
 
@@ -532,7 +535,7 @@ class Connection extends EventEmitter {
         enableAnsiNullDefault: true,
         enableAnsiPadding: true,
         enableAnsiWarnings: true,
-        enableArithAbort: false,
+        enableArithAbort: true,
         enableConcatNullYieldsNull: true,
         enableCursorCloseOnCommit: null,
         enableImplicitTransactions: false,
@@ -1787,7 +1790,7 @@ class Connection extends EventEmitter {
 
     if (this.config.options.enableConcatNullYieldsNull === true) {
       options.push('set concat_null_yields_null on');
-    } else if (this.config.options.enableArithAbort === false) {
+    } else if (this.config.options.enableConcatNullYieldsNull === false) {
       options.push('set concat_null_yields_null off');
     }
 
@@ -2118,18 +2121,15 @@ class Connection extends EventEmitter {
       let message: Message;
 
       request.once('cancel', () => {
-        if (!this.isRequestActive(request)) {
-          // Cancel was called on a request that is no longer active on this connection
-          return;
-        }
-
         // There's three ways to handle request cancelation:
         if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
           // The request was cancelled before buffering finished
           this.request = undefined;
           request.callback(RequestError('Canceled.', 'ECANCEL'));
           this.transitionTo(this.STATE.LOGGED_IN);
-
+        } else if (!this.isRequestActive(request)) {
+          // Cancel was called on a request that is no longer active on this connection
+          return;
         } else if (message.writable) {
           // - if the message is still writable, we'll set the ignore bit
           //   and end the message.

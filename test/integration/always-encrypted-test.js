@@ -36,18 +36,41 @@ describe('always encrypted', function() {
   this.timeout(100000);
   let connection;
 
+  const createKeys = (cb) => {
+    const request = new Request(`CREATE COLUMN MASTER KEY CMK1 WITH (
+      KEY_STORE_PROVIDER_NAME = 'TEST_KEYSTORE',
+      KEY_PATH = 'some-arbitrary-keypath'
+    );`, (err) => {
+      if (err) {
+        return cb(err);
+      }
+      const request = new Request(`CREATE COLUMN ENCRYPTION KEY [CEK1] WITH VALUES (
+        COLUMN_MASTER_KEY = [CMK1],
+        ALGORITHM = 'RSA_OAEP',
+        ENCRYPTED_VALUE = 0xDEADBEEF
+      );`, (err) => {
+        if (err) {
+          return cb(err);
+        }
+        return cb();
+      });
+      connection.execSql(request);
+    });
+    connection.execSql(request);
+  };
+
   const dropKeys = (cb) => {
     const request = new Request(`IF OBJECT_ID('dbo.test_always_encrypted', 'U') IS NOT NULL DROP TABLE dbo.test_always_encrypted;`, (err) => {
       if (err) {
         console.log("err", err);
       }
 
-      const request = new Request('DROP COLUMN ENCRYPTION KEY [CEK2];', (err) => {
+      const request = new Request('DROP COLUMN ENCRYPTION KEY [CEK1];', (err) => {
         if (err) {
           console.log("err", err);
         }
   
-        const request = new Request('DROP COLUMN MASTER KEY [CMK2];', (err) => {
+        const request = new Request('DROP COLUMN MASTER KEY [CMK1];', (err) => {
           if (err) {
             console.log("err", err);
             return cb(err);
@@ -64,7 +87,12 @@ describe('always encrypted', function() {
 
   beforeEach(function(done) {
     connection = new Connection(config);
-    connection.on('connect', done);
+    // connection.on('debug', (msg) => console.log(msg));
+    connection.on('connect', () => {
+      dropKeys(() => {
+        createKeys(done);
+      });
+    });
   });
 
   afterEach(function(done) {
@@ -79,78 +107,96 @@ describe('always encrypted', function() {
   });
 
   it('should correctly insert/select the encrypted data', function(done) {
-    const request = new Request(`CREATE COLUMN MASTER KEY CMK2 WITH (
-      KEY_STORE_PROVIDER_NAME = 'TEST_KEYSTORE',
-      KEY_PATH = 'some-arbitrary-keypath'
+    const request = new Request(`CREATE TABLE test_always_encrypted (
+      [plaintext]  nvarchar(50),
+      [nvarchar_determ_test] nvarchar(50) COLLATE Latin1_General_BIN2 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [nvarchar_rand_test] nvarchar(50) COLLATE Latin1_General_BIN2 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = RANDOMIZED,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [int_test] int 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [date_test] date 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [datetime_test] datetime 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [datetime2_test] datetime2 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [datetimeoffset_test] datetimeoffset 
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      )
     );`, (err) => {
       if (err) {
         return done(err);
       }
-      const request = new Request(`CREATE COLUMN ENCRYPTION KEY [CEK2] WITH VALUES (
-        COLUMN_MASTER_KEY = [CMK1],
-        ALGORITHM = 'RSA_OAEP',
-        ENCRYPTED_VALUE = 0xDEADBEEF
-      );`, (err) => {
+      const p1 = 'nvarchar_determ_test_val123';
+      const p2 = 'nvarchar_rand_test_val123';
+      const p3 = 123;
+      const p4 = 'plaintext_val123';
+      const p5 = new Date(Date.UTC(2020, 0, 1, 0, 0, 0, 0));
+      const p6 = new Date(Date.UTC(2020, 0, 1, 1, 1, 1, 0));
+      const p7 = new Date(Date.UTC(2020, 0, 1, 1, 1, 1, 1));
+      const p8 = new Date(Date.UTC(2020, 0, 1, 1, 1, 1, 1));
+      const request = new Request('INSERT INTO test_always_encrypted ([nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext], [date_test], [datetime_test], [datetime2_test], [datetimeoffset_test]) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)', (err) => {
         if (err) {
           return done(err);
         }
-        const request = new Request(`CREATE TABLE test_always_encrypted (
-          [plaintext]  nvarchar(50),
-          [nvarchar_determ_test] nvarchar(50) COLLATE Latin1_General_BIN2 
-          ENCRYPTED WITH (
-            ENCRYPTION_TYPE = DETERMINISTIC,
-            ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK2]
-          ),
-          [nvarchar_rand_test] nvarchar(50) COLLATE Latin1_General_BIN2 
-          ENCRYPTED WITH (
-            ENCRYPTION_TYPE = RANDOMIZED,
-            ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK2]
-          ),
-          [int_test] int 
-          ENCRYPTED WITH (
-            ENCRYPTION_TYPE = DETERMINISTIC,
-            ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
-            COLUMN_ENCRYPTION_KEY = [CEK2]
-          )
-        );`, (err) => {
+        let values = [];
+        const request = new Request('SELECT TOP 1 [nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext], [date_test], [datetime_test], [datetime2_test], [datetimeoffset_test] FROM test_always_encrypted', (err) => {
           if (err) {
             return done(err);
           }
-          const p1 = 'nvarchar_determ_test_val123';
-          const p2 = 'nvarchar_rand_test_val123';
-          const p3 = 123;
-          const p4 = 'plaintext_val123';
-          const request = new Request('INSERT INTO test_always_encrypted ([nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext]) VALUES (@p1, @p2, @p3, @p4)', (err) => {
-            if (err) {
-              return done(err);
-            }
-            let values = [];
-            const request = new Request('SELECT [nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext] FROM test_always_encrypted', (err) => {
-              if (err) {
-                return done(err);
-              }
-              assert.deepEqual(values, [p1, p2, p3, p4]);
 
-              return done();
-            });
+          try {
+            assert.deepEqual(values, [p1, p2, p3, p4, p5, p6, p7, p8]);
+          } catch (error) {
+            return done(error);
+          }
 
-            request.on('row', function(columns) {
-              values = columns.map((col) => col.value);
-            });
-
-            connection.execSql(request);
-          });
-
-          request.addParameter('p1', TYPES.NVarChar, p1);
-          request.addParameter('p2', TYPES.NVarChar, p2);
-          request.addParameter('p3', TYPES.Int, p3);
-          request.addParameter('p4', TYPES.NVarChar, p4);
-          connection.execSql(request);
+          return done();
         });
+
+        request.on('row', function(columns) {
+          values = columns.map((col) => col.value);
+        });
+
         connection.execSql(request);
       });
+
+      request.addParameter('p1', TYPES.NVarChar, p1);
+      request.addParameter('p2', TYPES.NVarChar, p2);
+      request.addParameter('p3', TYPES.Int, p3);
+      request.addParameter('p4', TYPES.NVarChar, p4);
+      request.addParameter('p5', TYPES.Date, p5);
+      request.addParameter('p6', TYPES.DateTime, p6);
+      request.addParameter('p7', TYPES.DateTime2, p7);
+      request.addParameter('p8', TYPES.DateTimeOffset, p8);
       connection.execSql(request);
     });
     connection.execSql(request);
