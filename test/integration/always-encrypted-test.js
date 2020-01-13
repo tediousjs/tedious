@@ -36,6 +36,12 @@ describe('always encrypted', function() {
   this.timeout(100000);
   let connection;
 
+  before(function() {
+    if (config.options.tdsVersion < '7_4') {
+      this.skip();
+    }
+  });
+
   const createKeys = (cb) => {
     const request = new Request(`CREATE COLUMN MASTER KEY [CMK1] WITH (
       KEY_STORE_PROVIDER_NAME = 'TEST_KEYSTORE',
