@@ -30,70 +30,29 @@ export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
   }
 
   encryptData(plaintText: Buffer): Buffer {
-    const hasAuthenticationTag = true;
     let iv: Buffer;
 
     if (this.isDeterministic === true) {
-      try {
-        const hmacIv = createHmac('sha256', this.columnEncryptionkey.getIvKey());
-        hmacIv.update(plaintText);
-        iv = hmacIv.digest().slice(0, blockSizeInBytes);
-      } catch (error) {
-        throw new Error(`Internal error while encryption: ${error.message}`);
-      }
+      const hmacIv = createHmac('sha256', this.columnEncryptionkey.getIvKey());
+      hmacIv.update(plaintText);
+      iv = hmacIv.digest().slice(0, blockSizeInBytes);
     } else {
       iv = randomBytes(blockSizeInBytes);
     }
 
-    const numBlocks = Math.floor(plaintText.length / blockSizeInBytes) + 1;
+    const encryptCipher = createCipheriv('aes-256-cbc', this.columnEncryptionkey.getEncryptionKey(), iv);
 
-    const hmacStartIndex = 1;
-    const authenticationTagLen = hasAuthenticationTag ? this.keySizeInBytes : 0;
-    const ivStartIndex = hmacStartIndex + authenticationTagLen;
-    const cipherStartIndex = ivStartIndex + blockSizeInBytes;
+    const encryptedBuffer = Buffer.concat([encryptCipher.update(plaintText), encryptCipher.final()]);
 
-    const outputBuffSize = 1 + authenticationTagLen + iv.length + (numBlocks * blockSizeInBytes);
-    const outBuffer: Buffer = Buffer.alloc(outputBuffSize);
+    const authenticationTag: Buffer = this._prepareAuthenticationTag(iv, encryptedBuffer, 0, encryptedBuffer.length);
 
-    outBuffer.fill(algorithmVersion, 0, 1);
-
-    iv.copy(outBuffer, ivStartIndex, 0, iv.length);
-
-    try {
-      const encryptCipher = createCipheriv('aes-256-cbc', this.columnEncryptionkey.getEncryptionKey(), iv);
-      let count = 0;
-      let cipherIndex = cipherStartIndex;
-
-      if (numBlocks > 1) {
-        count = (numBlocks - 1) * blockSizeInBytes;
-
-        encryptCipher.update(plaintText.slice(0, count)).copy(outBuffer, cipherIndex, 0, count);
-
-        cipherIndex += count;
-      }
-
-      let buffTmp = encryptCipher.update(plaintText.slice(count, plaintText.length));
-
-      buffTmp = Buffer.concat([buffTmp, encryptCipher.final()]);
-
-      buffTmp.copy(outBuffer, cipherIndex, 0, buffTmp.length);
-      if (hasAuthenticationTag) {
-        const authenticationTag: Buffer = this._prepareAuthenticationTag(iv, outBuffer, cipherStartIndex, (numBlocks * blockSizeInBytes));
-
-        authenticationTag.copy(outBuffer, hmacStartIndex, 0, authenticationTagLen);
-      }
-    } catch (error) {
-      throw new Error(`Internal error while encryption: ${error.message}`);
-    }
-
-    return outBuffer;
+    return Buffer.concat([Buffer.from([algorithmVersion]), authenticationTag, iv, encryptedBuffer]);
   }
 
   decryptData(cipherText: Buffer): Buffer {
-    const hasAuthenticationTag = true;
     const iv: Buffer = Buffer.alloc(blockSizeInBytes);
 
-    const minimumCiperTextLength: number = hasAuthenticationTag ? this.minimumCipherTextLengthInBytesWithAuthenticationTag : this.minimumCipherTextLengthInBytesNoAuthenticationTag;
+    const minimumCiperTextLength: number = this.minimumCipherTextLengthInBytesWithAuthenticationTag;
 
     if (cipherText.length < minimumCiperTextLength) {
       throw new Error(`Specified ciphertext has an invalid size of ${cipherText.length} bytes, which is below the minimum ${minimumCiperTextLength} bytes required for decryption.`);
@@ -107,10 +66,8 @@ export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
     startIndex += 1;
     let authenticationTagOffset = 0;
 
-    if (hasAuthenticationTag === true) {
-      authenticationTagOffset = startIndex;
-      startIndex += this.keySizeInBytes;
-    }
+    authenticationTagOffset = startIndex;
+    startIndex += this.keySizeInBytes;
 
     cipherText.copy(iv, 0, startIndex, startIndex + iv.length);
     startIndex += iv.length;
@@ -118,17 +75,10 @@ export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
     const cipherTextOffset = startIndex;
     const cipherTextCount = cipherText.length - startIndex;
 
-    if (hasAuthenticationTag === true) {
-      let authenticationTag: Buffer;
-      try {
-        authenticationTag = this._prepareAuthenticationTag(iv, cipherText, cipherTextOffset, cipherTextCount);
-      } catch (error) {
-        throw new Error(`Internal error while decryption: ${error.message}`);
-      }
+    const authenticationTag: Buffer = this._prepareAuthenticationTag(iv, cipherText, cipherTextOffset, cipherTextCount);
 
-      if (0 !== authenticationTag.compare(cipherText, authenticationTagOffset, Math.min(authenticationTagOffset + cipherTextCount, authenticationTagOffset + authenticationTag.length), 0, Math.min(cipherTextCount, authenticationTag.length))) {
-        throw new Error('Specified ciphertext has an invalid authentication tag.');
-      }
+    if (0 !== authenticationTag.compare(cipherText, authenticationTagOffset, Math.min(authenticationTagOffset + cipherTextCount, authenticationTagOffset + authenticationTag.length), 0, Math.min(cipherTextCount, authenticationTag.length))) {
+      throw new Error('Specified ciphertext has an invalid authentication tag.');
     }
 
     let plainText: Buffer;
