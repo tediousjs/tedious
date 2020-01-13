@@ -37,7 +37,7 @@ describe('always encrypted', function() {
   let connection;
 
   const createKeys = (cb) => {
-    const request = new Request(`CREATE COLUMN MASTER KEY CMK1 WITH (
+    const request = new Request(`CREATE COLUMN MASTER KEY [CMK1] WITH (
       KEY_STORE_PROVIDER_NAME = 'TEST_KEYSTORE',
       KEY_PATH = 'some-arbitrary-keypath'
     );`, (err) => {
@@ -62,17 +62,16 @@ describe('always encrypted', function() {
   const dropKeys = (cb) => {
     const request = new Request(`IF OBJECT_ID('dbo.test_always_encrypted', 'U') IS NOT NULL DROP TABLE dbo.test_always_encrypted;`, (err) => {
       if (err) {
-        console.log("err", err);
+        return cb(err);
       }
 
-      const request = new Request('DROP COLUMN ENCRYPTION KEY [CEK1];', (err) => {
+      const request = new Request('IF (SELECT COUNT(*) FROM sys.column_encryption_keys WHERE name=\'CEK1\') > 0 DROP COLUMN ENCRYPTION KEY [CEK1];', (err) => {
         if (err) {
-          console.log("err", err);
+          return cb(err);
         }
-  
-        const request = new Request('DROP COLUMN MASTER KEY [CMK1];', (err) => {
+        
+        const request = new Request('IF (SELECT COUNT(*) FROM sys.column_master_keys WHERE name=\'CMK1\') > 0 DROP COLUMN MASTER KEY [CMK1];', (err) => {
           if (err) {
-            console.log("err", err);
             return cb(err);
           }
   
@@ -89,7 +88,10 @@ describe('always encrypted', function() {
     connection = new Connection(config);
     // connection.on('debug', (msg) => console.log(msg));
     connection.on('connect', () => {
-      dropKeys(() => {
+      dropKeys((err) => {
+        if (err) {
+          return done(err);
+        }
         createKeys(done);
       });
     });
