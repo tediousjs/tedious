@@ -8,7 +8,7 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [ "esnext" ]
+    "lib": [ "esnext", "DOM" ]
   },
 
   "include": [
