@@ -139,7 +139,7 @@ const alwaysEncryptedOptions = {
   },
 };
 const cryptoMetadata = {
-  cekTableEntry: {
+  cekEntry: {
     ordinal: 0x01,
     databaseId: 0x00,
     cekId: 0x00,

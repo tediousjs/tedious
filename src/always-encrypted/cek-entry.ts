@@ -1,25 +1,9 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { EncryptionKeyInfo } from './types';
 
-export class CEKTable {
-  keyList: CEKTableEntry[];
-
-  constructor(tableSize: number) {
-    this.keyList = [];
-    for (let i = 0; i < tableSize; i++) {
-      this.keyList.push(new CEKTableEntry(i));
-    }
-  }
-
-  getCEKTableEntry(index: number) {
-    return this.keyList[index];
-  }
-
-  setCEKTableEntry(index: number, entry: CEKTableEntry) {
-    this.keyList[index] = entry;
-  }
-}
-
-export class CEKTableEntry {
+export class CEKEntry {
   columnEncryptionKeyValues: EncryptionKeyInfo[];
   ordinal: number;
   databaseId: number;

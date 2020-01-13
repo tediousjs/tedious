@@ -16,13 +16,11 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
 
     assert.strictEqual(algorithm.isDeterministic, true);
     assert.deepEqual(algorithm.columnEncryptionkey, encryptionKey);
-    assert.strictEqual(algorithm.blockSizeInBytes, 16);
     assert.strictEqual(algorithm.keySizeInBytes, 32);
     assert.deepEqual(algorithm.version, Buffer.from([0x01]));
     assert.deepEqual(algorithm.versionSize, Buffer.from([1]));
     assert.strictEqual(algorithm.minimumCipherTextLengthInBytesNoAuthenticationTag, 33);
     assert.strictEqual(algorithm.minimumCipherTextLengthInBytesWithAuthenticationTag, 65);
-    assert.deepEqual(algorithm.algorithmVersion, Buffer.from([0x1]));
   });
 
   it('encrypts data with deterministic initialization vector', () => {

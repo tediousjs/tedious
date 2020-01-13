@@ -1,3 +1,6 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { SQLServerStatementColumnEncryptionSetting } from './types';
 
 export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting, columnEncryptionSetting: boolean): boolean => {

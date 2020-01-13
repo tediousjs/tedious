@@ -179,7 +179,7 @@ class RpcRequestPayload {
   }
 
   _writeEncryptionMetadata(cryptoMetadata: CryptoMetadata | undefined, buffer: WritableTrackingBuffer, cb: () => void) {
-    if (!cryptoMetadata || !cryptoMetadata.cekTableEntry || !cryptoMetadata.cekTableEntry.columnEncryptionKeyValues || cryptoMetadata.cekTableEntry.columnEncryptionKeyValues.length <= 0) {
+    if (!cryptoMetadata || !cryptoMetadata.cekEntry || !cryptoMetadata.cekEntry.columnEncryptionKeyValues || cryptoMetadata.cekEntry.columnEncryptionKeyValues.length <= 0) {
       throw new Error('Invalid Crypto Metadata in _writeEncryptionMetadata');
     }
 
@@ -189,10 +189,10 @@ class RpcRequestPayload {
     }
 
     buffer.writeUInt8(cryptoMetadata.encryptionType);
-    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].dbId);
-    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].keyId);
-    buffer.writeUInt32LE(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].keyVersion);
-    buffer.writeBuffer(cryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].mdVersion);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].dbId);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].keyId);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].keyVersion);
+    buffer.writeBuffer(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion);
     buffer.writeUInt8(cryptoMetadata.normalizationRuleVersion[0]);
     cb();
   }

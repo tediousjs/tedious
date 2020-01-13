@@ -1,3 +1,6 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { createHmac } from 'crypto';
 import SymmetricKey from './symmetric-key';
 
@@ -7,8 +10,7 @@ const keySizeInBytes = keySize / 8;
 export const deriveKey = (rootKey: Buffer, salt: string): Buffer => {
   const hmac = createHmac('sha256', rootKey);
   hmac.update(Buffer.from(salt, 'utf16le'));
-  const derivedKeyBuff = hmac.digest().slice(0, keySizeInBytes);
-  return derivedKeyBuff;
+  return hmac.digest();
 };
 
 export const generateKeySalt = (

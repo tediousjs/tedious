@@ -1,3 +1,6 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { CryptoMetadata, EncryptionKeyInfo } from './types';
 import { InternalConnectionOptions as ConnectionOptions } from '../connection';
 import SymmetricKey from './symmetric-key';
@@ -62,17 +65,17 @@ export const decryptSymmetricKey = async (md: CryptoMetadata, options: Connectio
     throw new Error('md should not be null in DecryptSymmetricKey.');
   }
 
-  if (!md.cekTableEntry) {
+  if (!md.cekEntry) {
     throw new Error('md.EncryptionInfo should not be null in DecryptSymmetricKey.');
   }
 
-  if (!md.cekTableEntry.columnEncryptionKeyValues) {
+  if (!md.cekEntry.columnEncryptionKeyValues) {
     throw new Error('md.EncryptionInfo.ColumnEncryptionKeyValues should not be null in DecryptSymmetricKey.');
   }
 
   let symKey: SymmetricKey | undefined;
   let encryptionKeyInfoChosen: EncryptionKeyInfo | undefined;
-  const CEKValues: EncryptionKeyInfo[] = md.cekTableEntry.columnEncryptionKeyValues;
+  const CEKValues: EncryptionKeyInfo[] = md.cekEntry.columnEncryptionKeyValues;
   let lastError: Error | undefined;
 
   for (const CEKValue of CEKValues) {
@@ -97,10 +100,6 @@ export const decryptSymmetricKey = async (md: CryptoMetadata, options: Connectio
 
   const algorithmName = validateAndGetEncryptionAlgorithmName(md.cipherAlgorithmId, md.cipherAlgorithmName);
   const cipherAlgorithm = new AeadAes256CbcHmac256Algorithm(new AeadAes256CbcHmac256EncryptionKey(symKey.rootKey, algorithmName), md.encryptionType);
-
-  if (!cipherAlgorithm) {
-    throw new Error('Cipher algorithm cannot be null in DecryptSymmetricKey');
-  }
 
   md.cipherAlgorithm = cipherAlgorithm;
   md.encryptionKeyInfo = <EncryptionKeyInfo>encryptionKeyInfoChosen;

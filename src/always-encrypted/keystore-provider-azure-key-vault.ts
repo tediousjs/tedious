@@ -1,3 +1,6 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { ClientSecretCredential } from '@azure/identity';
 import { CryptographyClient, KeyWrapAlgorithm, KeyClient, KeyVaultKey } from '@azure/keyvault-keys';
 import { createHash } from 'crypto';

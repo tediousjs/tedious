@@ -13,7 +13,7 @@ const options = {
 };
 
 const sampleCryptoMetadata = {
-  cekTableEntry: {
+  cekEntry: {
     ordinal: 0x01,
     databaseId: 0x00,
     cekId: 0x00,
@@ -173,7 +173,7 @@ describe('RpcRequestPayload', () => {
       0x05, 0x00, 0x00, 0x00,
       0x31, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00,
-      ...sampleCryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].mdVersion,
+      ...sampleCryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion,
       ...sampleCryptoMetadata.normalizationRuleVersion,
     ]);
 
@@ -249,7 +249,7 @@ describe('RpcRequestPayload', () => {
       0x05, 0x00, 0x00, 0x00,
       0x31, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00,
-      ...sampleCryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].mdVersion,
+      ...sampleCryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion,
       ...sampleCryptoMetadata.normalizationRuleVersion,
 
       // parameter 2 name
@@ -272,7 +272,7 @@ describe('RpcRequestPayload', () => {
       0x05, 0x00, 0x00, 0x00,
       0x31, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00,
-      ...sampleCryptoMetadata.cekTableEntry.columnEncryptionKeyValues[0].mdVersion,
+      ...sampleCryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion,
       ...sampleCryptoMetadata.normalizationRuleVersion,
     ]);
 

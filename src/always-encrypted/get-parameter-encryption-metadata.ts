@@ -1,5 +1,8 @@
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
 import { SQLServerEncryptionType, CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
-import { CEKTableEntry } from './cek-table';
+import { CEKEntry } from './cek-entry';
 import { decryptSymmetricKey } from './key-crypto';
 import { typeByName as TYPES, Parameter } from '../data-type';
 import Request from '../request';
@@ -33,15 +36,15 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
   }
 
-  const cekList: CEKTableEntry[] = [];
+  const cekList: CEKEntry[] = [];
   metadataRequest.on('row', (columns: any) => {
     try {
       const isFirstRecordSet = columns.some((col: any) => (col && col.metadata && col.metadata.colName) === 'database_id');
       if (isFirstRecordSet === true) {
         const currentOrdinal = columns[DescribeParameterEncryptionResultSet1.KeyOrdinal].value;
-        let cekEntry: CEKTableEntry;
+        let cekEntry: CEKEntry;
         if (!cekList[currentOrdinal]) {
-          cekEntry = new CEKTableEntry(currentOrdinal);
+          cekEntry = new CEKEntry(currentOrdinal);
           cekList[cekEntry.ordinal] = cekEntry;
         } else {
           cekEntry = cekList[currentOrdinal];
@@ -59,7 +62,7 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
         const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
         const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
         const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
-        const cekEntry: CEKTableEntry = cekList[cekOrdinal];
+        const cekEntry: CEKEntry = cekList[cekOrdinal];
 
         if (cekEntry && cekList.length < cekOrdinal) {
           return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
@@ -68,7 +71,7 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
         const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
         if (SQLServerEncryptionType.PlainText !== encType) {
           request.parameters[paramIndex].cryptoMetadata = {
-            cekTableEntry: cekEntry,
+            cekEntry: cekEntry,
             ordinal: cekOrdinal,
             cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
             encryptionType: encType,

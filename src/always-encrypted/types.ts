@@ -1,4 +1,7 @@
-import { CEKTableEntry } from './cek-table';
+// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
+// Copyright (c) 2019 Microsoft Corporation
+
+import { CEKEntry } from './cek-entry';
 import { BaseMetadata } from '../metadata-parser';
 
 export interface EncryptionKeyInfo {
@@ -24,7 +27,7 @@ export interface EncryptionAlgorithm {
 }
 
 export interface CryptoMetadata {
-  cekTableEntry?: CEKTableEntry;
+  cekEntry?: CEKEntry;
   cipherAlgorithmId: number;
   cipherAlgorithmName?: string;
   normalizationRuleVersion: Buffer;

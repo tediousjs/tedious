@@ -1,39 +1,21 @@
 const assert = require('chai').assert;
-const { CEKTable, CEKTableEntry } = require('../../../src/always-encrypted/cek-table');
+const { CEKEntry } = require('../../../src/always-encrypted/cek-entry');
 
-describe('CEKTable', () => {
-  const table = new CEKTable(5);
-
-  it('constructs correct size', () => {
-    assert.strictEqual(table.keyList.length, 5);
-  });
-
-  it('setCEKTableEntry', () => {
-    table.setCEKTableEntry(2, new CEKTableEntry(0));
-    assert.strictEqual(table.keyList[2].ordinal, 0);
-  });
-
-  it('getCEKTableEntry', () => {
-    const tableEntry = table.getCEKTableEntry(1);
-    assert.strictEqual(tableEntry.ordinal, 1);
-  });
-});
-
-describe('CEKTableEntry', () => {
-  it('constructs CEKTableEntry', () => {
-    const tableEntry = new CEKTableEntry(1);
-    assert.strictEqual(tableEntry.ordinal, 1);
-    assert.strictEqual(tableEntry.databaseId, 0);
-    assert.strictEqual(tableEntry.cekId, 0);
-    assert.strictEqual(tableEntry.cekVersion, 0);
-    assert.deepEqual(tableEntry.cekMdVersion, Buffer.alloc(0));
-    assert.deepEqual(tableEntry.columnEncryptionKeyValues, []);
+describe('CEKEntry', () => {
+  it('constructs CEKEntry', () => {
+    const entry = new CEKEntry(1);
+    assert.strictEqual(entry.ordinal, 1);
+    assert.strictEqual(entry.databaseId, 0);
+    assert.strictEqual(entry.cekId, 0);
+    assert.strictEqual(entry.cekVersion, 0);
+    assert.deepEqual(entry.cekMdVersion, Buffer.alloc(0));
+    assert.deepEqual(entry.columnEncryptionKeyValues, []);
   });
 
   it('adds encryption key value', () => {
-    const tableEntry = new CEKTableEntry(0);
+    const entry = new CEKEntry(0);
 
-    tableEntry.add(
+    entry.add(
       Buffer.from([0x01, 0x02, 0x03, 0x04]),
       1,
       1,
@@ -44,7 +26,7 @@ describe('CEKTableEntry', () => {
       'algorithmName'
     );
 
-    assert.deepEqual(tableEntry.columnEncryptionKeyValues[0], {
+    assert.deepEqual(entry.columnEncryptionKeyValues[0], {
       encryptedKey: Buffer.from([0x01, 0x02, 0x03, 0x04]),
       dbId: 1,
       keyId: 1,
@@ -54,17 +36,17 @@ describe('CEKTableEntry', () => {
       keyStoreName: 'keyStoreName',
       algorithmName: 'algorithmName',
     });
-    assert.strictEqual(tableEntry.ordinal, 0);
-    assert.strictEqual(tableEntry.databaseId, 1);
-    assert.strictEqual(tableEntry.cekId, 1);
-    assert.strictEqual(tableEntry.cekVersion, 1);
-    assert.deepEqual(tableEntry.cekMdVersion, Buffer.from([0x01, 0x01, 0x01]));
+    assert.strictEqual(entry.ordinal, 0);
+    assert.strictEqual(entry.databaseId, 1);
+    assert.strictEqual(entry.cekId, 1);
+    assert.strictEqual(entry.cekVersion, 1);
+    assert.deepEqual(entry.cekMdVersion, Buffer.from([0x01, 0x01, 0x01]));
   });
 
   it('throws when added key metadata does not match other entries', () => {
-    const tableEntry = new CEKTableEntry(0);
+    const entry = new CEKEntry(0);
 
-    tableEntry.add(
+    entry.add(
       Buffer.from([0x01, 0x02, 0x03, 0x04]),
       1,
       1,
@@ -75,7 +57,7 @@ describe('CEKTableEntry', () => {
       'algorithmName'
     );
 
-    assert.throws(() => tableEntry.add(Buffer.from([0x01, 0x02, 0x03, 0x04]),
+    assert.throws(() => entry.add(Buffer.from([0x01, 0x02, 0x03, 0x04]),
       2,
       1,
       1,

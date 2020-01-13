@@ -317,8 +317,8 @@ describe('Colmetadata Token Parser', () => {
       Buffer.from([ 0x01 ]),
     );
 
-    assert.isNotNull(columnCryptoMetadata.cekTableEntry);
-    const columnCryptoCekTableEntry = columnCryptoMetadata.cekTableEntry;
+    assert.isNotNull(columnCryptoMetadata.cekEntry);
+    const columnCryptoCekTableEntry = columnCryptoMetadata.cekEntry;
     assert.strictEqual(columnCryptoCekTableEntry.ordinal, 0x01);
     assert.strictEqual(columnCryptoCekTableEntry.databaseId, 0x05);
     assert.strictEqual(columnCryptoCekTableEntry.cekId, 0x31);

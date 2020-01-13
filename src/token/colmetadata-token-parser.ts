@@ -1,5 +1,5 @@
 import metadataParse, { Metadata } from '../metadata-parser';
-import { CEKTable, CEKTableEntry } from '../always-encrypted/cek-table';
+import { CEKEntry } from '../always-encrypted/cek-entry';
 import { CryptoMetadata } from '../always-encrypted/types';
 
 import Parser from './stream-parser';
@@ -65,8 +65,8 @@ function readColumnName(parser: Parser, options: InternalConnectionOptions, inde
   });
 }
 
-function readCryptoMetadataOrdinal(parser: Parser, cekTable: CEKTable | undefined, callback: (ordinal: number) => void) {
-  if (cekTable) {
+function readCryptoMetadataOrdinal(parser: Parser, cekList: CEKEntry[] | undefined, callback: (ordinal: number) => void) {
+  if (cekList) {
     parser.readUInt16LE((ordinal) => {
       callback(ordinal);
     });
@@ -75,16 +75,16 @@ function readCryptoMetadataOrdinal(parser: Parser, cekTable: CEKTable | undefine
   }
 }
 
-function readCryptoMetadata(parser: Parser, metadata: Metadata, cekTable: CEKTable | undefined, options: InternalConnectionOptions, callback: (cryptoMetdata?: CryptoMetadata) => void) {
+function readCryptoMetadata(parser: Parser, metadata: Metadata, cekList: CEKEntry[] | undefined, options: InternalConnectionOptions, callback: (cryptoMetdata?: CryptoMetadata) => void) {
   if (options.serverSupportsColumnEncryption === true && 0x0800 === (metadata.flags & 0x0800)) {
-    readCryptoMetadataOrdinal(parser, cekTable, (ordinal) => {
+    readCryptoMetadataOrdinal(parser, cekList, (ordinal) => {
       metadataParse(parser, options, (metadata) => {
         parser.readUInt8((algorithmId) => {
           readCustomEncryptionMetadata(parser, algorithmId, (algorithmName) => {
             parser.readUInt8((encryptionType) => {
               parser.readBuffer(1, (normalizationRuleVersion) => {
                 callback({
-                  cekTableEntry: cekTable ? cekTable.getCEKTableEntry(ordinal) : undefined,
+                  cekEntry: cekList ? cekList[ordinal] : undefined,
                   ordinal,
                   cipherAlgorithmId: algorithmId,
                   cipherAlgorithmName: algorithmName,
@@ -116,10 +116,10 @@ function readCustomEncryptionMetadata(parser: Parser, algorithmId: number, callb
   }
 }
 
-function readColumn(parser: Parser, options: InternalConnectionOptions, index: number, cekTable: CEKTable | undefined, callback: (column: ColumnMetadata) => void) {
+function readColumn(parser: Parser, options: InternalConnectionOptions, index: number, cekList: CEKEntry[] | undefined, callback: (column: ColumnMetadata) => void) {
   metadataParse(parser, options, (metadata) => {
     readTableName(parser, options, metadata, (tableName) => {
-      readCryptoMetadata(parser, metadata, cekTable, options, (cryptoMetadata) => {
+      readCryptoMetadata(parser, metadata, cekList, options, (cryptoMetadata) => {
         if (cryptoMetadata && cryptoMetadata.baseTypeInfo) {
           cryptoMetadata.baseTypeInfo.flags = metadata.flags;
           metadata.collation = cryptoMetadata.baseTypeInfo.collation;
@@ -146,11 +146,11 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   }, true);
 }
 
-function readCEKTable(parser: Parser, options: InternalConnectionOptions, callback: (cekTable?: CEKTable) => void) {
+function readCEKTable(parser: Parser, options: InternalConnectionOptions, callback: (cekList?: CEKEntry[]) => void) {
   if (options.serverSupportsColumnEncryption === true) {
     parser.readUInt16LE((tableSize) => {
       if (tableSize > 0) {
-        const cekTable = new CEKTable(tableSize);
+        const cekList: CEKEntry[] = [];
 
         let i = 0;
         function next(done: () => void) {
@@ -158,8 +158,8 @@ function readCEKTable(parser: Parser, options: InternalConnectionOptions, callba
             return done();
           }
 
-          readCEKTableEntry(parser, (tableEntry: CEKTableEntry) => {
-            cekTable.setCEKTableEntry(i, tableEntry);
+          readCEKTableEntry(parser, (cekEntry: CEKEntry) => {
+            cekList.push(cekEntry);
 
             i++;
             next(done);
@@ -167,7 +167,7 @@ function readCEKTable(parser: Parser, options: InternalConnectionOptions, callba
         }
 
         next(() => {
-          callback(cekTable);
+          callback(cekList);
         });
       } else {
         callback();
@@ -178,13 +178,13 @@ function readCEKTable(parser: Parser, options: InternalConnectionOptions, callba
   }
 }
 
-function readCEKTableEntry(parser: Parser, callback: (tableEntry: CEKTableEntry) => void) {
+function readCEKTableEntry(parser: Parser, callback: (cekEntry: CEKEntry) => void) {
   parser.readUInt32LE((databaseId) => {
     parser.readUInt32LE((cekId) => {
       parser.readUInt32LE((cekVersion) => {
         parser.readBuffer(8, (cekMdVersion) => {
           parser.readUInt8((cekValueCount) => {
-            const tableEntry = new CEKTableEntry(cekValueCount);
+            const cekEntry = new CEKEntry(cekValueCount);
 
             let i = 0;
             function next(done: () => void) {
@@ -192,7 +192,7 @@ function readCEKTableEntry(parser: Parser, callback: (tableEntry: CEKTableEntry)
                 return done();
               }
 
-              readCEKValue(parser, tableEntry, {
+              readCEKValue(parser, cekEntry, {
                 databaseId,
                 cekId,
                 cekVersion,
@@ -205,7 +205,7 @@ function readCEKTableEntry(parser: Parser, callback: (tableEntry: CEKTableEntry)
             }
 
             next(() => {
-              callback(tableEntry);
+              callback(cekEntry);
             });
           });
         });
@@ -214,7 +214,7 @@ function readCEKTableEntry(parser: Parser, callback: (tableEntry: CEKTableEntry)
   });
 }
 
-function readCEKValue(parser: Parser, tableEntry: CEKTableEntry, cekTableEntryMetadata: cekTableEntryMetadata, callback: () => void) {
+function readCEKValue(parser: Parser, cekEntry: CEKEntry, cekTableEntryMetadata: cekTableEntryMetadata, callback: () => void) {
   parser.readUInt16LE((encryptedCEKLength) => {
     parser.readBuffer(encryptedCEKLength, (encryptedCEK) => {
       parser.readUInt8((keyStoreNameLength) => {
@@ -226,7 +226,7 @@ function readCEKValue(parser: Parser, tableEntry: CEKTableEntry, cekTableEntryMe
               parser.readUInt16BE((algorithmNameLength) => {
                 parser.readBuffer(2 * algorithmNameLength, (algorithmNameBuffer) => {
                   const algorithmName = algorithmNameBuffer.toString('ucs2');
-                  tableEntry.add(encryptedCEK, cekTableEntryMetadata.databaseId, cekTableEntryMetadata.cekId, cekTableEntryMetadata.cekVersion, cekTableEntryMetadata.cekMdVersion, keyPath, keyStoreName, algorithmName);
+                  cekEntry.add(encryptedCEK, cekTableEntryMetadata.databaseId, cekTableEntryMetadata.cekId, cekTableEntryMetadata.cekVersion, cekTableEntryMetadata.cekMdVersion, keyPath, keyStoreName, algorithmName);
                   callback();
                 });
               });
@@ -240,7 +240,7 @@ function readCEKValue(parser: Parser, tableEntry: CEKTableEntry, cekTableEntryMe
 
 function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
-    readCEKTable(parser, options, (cekTable) => {
+    readCEKTable(parser, options, (cekList?: CEKEntry[]) => {
       const columns: ColumnMetadata[] = [];
 
       let i = 0;
@@ -249,7 +249,7 @@ function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], optio
           return done();
         }
 
-        readColumn(parser, options, i, cekTable, (column) => {
+        readColumn(parser, options, i, cekList, (column) => {
           columns.push(column);
 
           i++;
