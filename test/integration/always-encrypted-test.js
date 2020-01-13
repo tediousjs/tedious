@@ -66,7 +66,7 @@ describe('always encrypted', function() {
   };
 
   const dropKeys = (cb) => {
-    const request = new Request(`IF OBJECT_ID('dbo.test_always_encrypted', 'U') IS NOT NULL DROP TABLE dbo.test_always_encrypted;`, (err) => {
+    const request = new Request('IF OBJECT_ID(\'dbo.test_always_encrypted\', \'U\') IS NOT NULL DROP TABLE dbo.test_always_encrypted;', (err) => {
       if (err) {
         return cb(err);
       }
@@ -75,12 +75,12 @@ describe('always encrypted', function() {
         if (err) {
           return cb(err);
         }
-        
+
         const request = new Request('IF (SELECT COUNT(*) FROM sys.column_master_keys WHERE name=\'CMK1\') > 0 DROP COLUMN MASTER KEY [CMK1];', (err) => {
           if (err) {
             return cb(err);
           }
-  
+
           cb();
         });
         connection.execSql(request);
