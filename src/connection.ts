@@ -1373,9 +1373,7 @@ class Connection extends EventEmitter {
     });
 
     tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
-      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
-        this.dispatchEvent('endOfMessageMarkerReceived');
-      }
+      this.dispatchEvent('endOfMessageMarkerReceived');
     });
 
     tokenStreamParser.on('resetConnection', () => {
@@ -2278,6 +2276,9 @@ Connection.prototype.STATE = {
         this.addToMessageBuffer(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         const preloginPayload = new PreloginPayload(this.messageBuffer);
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
@@ -2360,6 +2361,9 @@ Connection.prototype.STATE = {
         this.messageIo.tlsHandshakeData(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet();
 
@@ -2414,6 +2418,9 @@ Connection.prototype.STATE = {
         }
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.loggedIn) {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         } else if (this.loginError) {
@@ -2444,6 +2451,9 @@ Connection.prototype.STATE = {
         this.sendDataToTokenStreamParser(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.ntlmpacket) {
           const authentication = this.config.authentication as NtlmAuthentication;
 
@@ -2496,6 +2506,9 @@ Connection.prototype.STATE = {
         this.fedAuthInfoToken = token;
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         const fedAuthInfoToken = this.fedAuthInfoToken;
 
         if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
@@ -2581,6 +2594,9 @@ Connection.prototype.STATE = {
         this.sendDataToTokenStreamParser(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
       }
@@ -2668,7 +2684,7 @@ Connection.prototype.STATE = {
       attention: function() {
         this.attentionReceived = true;
       },
-      message: function() {
+      endOfMessageMarkerReceived: function() {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
@@ -2684,6 +2700,9 @@ Connection.prototype.STATE = {
             sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
+      },
+      message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
       }
     }
   },

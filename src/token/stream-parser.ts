@@ -128,39 +128,34 @@ class Parser extends Transform {
     done();
   }
 
-  parseTokens() {
+  async parseTokens() {
     const doneParsing = (token: Token | undefined) => {
       if (token) {
         if (token instanceof ColMetadataToken) {
           this.colMetadata = token.columns;
         }
-
+        this.debug.token(token);
         this.push(token);
       }
       this.processingComplete();
     };
 
-    const parse = () => {
-      if (this.suspended || this.activeBuffer().availableLength() <= 0) {
-        return;
-      }
 
+    while (!this.suspended && this.activeBuffer().availableLength() > 0) {
       this.processingStarted();
-      this.readUInt8((type) => {
-        if (tokenParsers[type]) {
-          tokenParsers[type](this, this.colMetadata, this.options, (token: Token | undefined) => {
-            doneParsing(token);
-            if (!this.suspended && this.activeBuffer().availableLength() > 0) {
-              parse();
-            }
-          });
-        } else {
-          this.emit('error', new Error('Unknown type: ' + type));
-        }
+      await new Promise((resolve) => {
+        this.readUInt8((type) => {
+          if (tokenParsers[type]) {
+            tokenParsers[type](this, this.colMetadata, this.options, (token: Token | undefined) => {
+              doneParsing(token);
+              resolve();
+            });
+          } else {
+            this.emit('error', new Error('Unknown type: ' + type));
+          }
+        });
       });
-    };
-
-    parse();
+    }
   }
 
   suspend(next: () => void) {
