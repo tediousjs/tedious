@@ -988,7 +988,8 @@ describe('Row Token Parser', () => {
     const colMetaData = [
       {
         type: dataTypeByName.VarChar,
-        dataLength: 65535
+        dataLength: 65535,
+        collation: {}
       }
     ];
     const value = 'abcdef';
@@ -1003,14 +1004,12 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    try {
-      const parser = new Parser({ token() { } }, colMetaData, options);
-      parser.write(buffer.data);
-      parser.read();
-      assert.isOk(false);
-    } catch {
-      // ???
-    }
+    const parser = new Parser({ token() { } }, colMetaData, options);
+    parser.on('error', (error) => {
+      assert.equal(error.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
+    });
+    parser.write(buffer.data);
+    parser.read();
   });
 
   // encrypted varcharMaxKnownLengthWrong is not an error-case
