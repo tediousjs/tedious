@@ -69,14 +69,17 @@ export interface DataType {
 
   declaration(parameter: Parameter) : string,
   writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions) : void,
-  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
+  // writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
+  writeParameterData(parameter: ParameterData, _options: InternalConnectionOptions, cb: (data: any) => []): void,
   validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
+  generate(parameter: ParameterData, _options: InternalConnectionOptions): any,
 
   hasTableName?: boolean,
 
   resolveLength?: (parameter: Parameter) => number,
   resolvePrecision?: (parameter: Parameter) => number,
-  resolveScale?: (parameter: Parameter) => number
+  resolveScale?: (parameter: Parameter) => number,
+  
 }
 
 export const TYPE = {

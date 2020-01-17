@@ -80,4 +80,24 @@ describe('Data Types', function() {
       assert.deepEqual(buffer.data, expectedBuffer);
     }
   });
+
+  it('should buffer bigInt', () => {
+    const bigInt = TYPES.typeByName.BigInt;
+    const parameter = {value: 123456789 }
+    const expected = Buffer.from('0815cd5b0700000000','hex')
+
+    bigInt.writeParameterData(parameter, null, (data)=>{
+      assert.isTrue(data[0].equals(expected))
+    });  
+  })
+
+  it('should buffer binary', () => {
+    const binary = TYPES.typeByName.Binary;
+    const parameter = {lengt: 4, value: Buffer.from([0x12, 0x34, 0x00, 0x00])}
+    const expected = Buffer.from('000012340000', 'hex')
+
+    binary.writeParameterData(parameter, null, (data) => {
+      assert.isTrue(data[0].equals(expected));
+    })
+  })
 });
