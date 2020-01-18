@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
@@ -18,9 +19,17 @@ const Date : DataType = {
     buffer.writeUInt8(this.id);
   },
 
-  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, { value }, options, cb) {
+  writeParameterData: function(buffer, parameter, options, cb) {
+    const gen: any = this.generate(parameter, options);
+    //@ts-ignore
+    cb(Array.from(gen))
+  },
+
+  generate: function* (parameter, options){
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
     if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
       buffer.writeUInt8(3);
 
       let date;
@@ -32,10 +41,12 @@ const Date : DataType = {
 
       const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
       buffer.writeUInt24LE(days);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   // TODO: value is techincally of type 'unknown'.

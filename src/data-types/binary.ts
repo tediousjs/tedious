@@ -41,8 +41,9 @@ const Binary: { maximumLength: number } & DataType = {
     buffer.writeUInt16LE(parameter.length);
   },
   
-  writeParameterData: function (parameter, _options, cb) {
+  writeParameterData: function (buff, parameter, _options, cb) {
     const gen: any = this.generate(parameter, _options);
+    //@ts-ignore
     cb(Array.from(gen))
   },
 

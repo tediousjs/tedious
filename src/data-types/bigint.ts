@@ -17,8 +17,9 @@ const BigInt: DataType = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(parameter, _options, cb) {
+  writeParameterData: function(buff, parameter, _options, cb) {
     const gen: any = this.generate(parameter, _options);
+    //@ts-ignore
     cb(Array.from(gen));
   },
 
