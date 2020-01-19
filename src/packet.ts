@@ -147,12 +147,12 @@ export class Packet {
     return statuses.join(' ').trim();
   }
 
-  headerToString(indent: string = '') {
+  headerToString(indent = '') {
     const text = sprintf('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X', this.buffer.readUInt8(OFFSET.Type), typeByValue[this.buffer.readUInt8(OFFSET.Type)], this.buffer.readUInt8(OFFSET.Status), this.statusAsString(), this.buffer.readUInt16BE(OFFSET.Length), this.buffer.readUInt16BE(OFFSET.SPID), this.buffer.readUInt8(OFFSET.PacketID), this.buffer.readUInt8(OFFSET.Window));
     return indent + text;
   }
 
-  dataToString(indent: string = '') {
+  dataToString(indent = '') {
     const BYTES_PER_GROUP = 0x04;
     const CHARS_PER_GROUP = 0x08;
     const BYTES_PER_LINE = 0x20;
@@ -201,7 +201,7 @@ export class Packet {
     return dataDump;
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return this.headerToString(indent) + '\n' + this.dataToString(indent + indent);
   }
 

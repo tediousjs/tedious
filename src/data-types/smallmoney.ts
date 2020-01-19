@@ -25,7 +25,7 @@ const SmallMoney: DataType = {
     cb();
   },
 
-  validate: function(value):null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
