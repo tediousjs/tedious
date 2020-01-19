@@ -67,6 +67,8 @@
     "@types/node": "^12.12.17",
     "@types/readable-stream": "^2.3.5",
     "@types/sprintf-js": "^1.1.2",
+    "@typescript-eslint/eslint-plugin": "^2.16.0",
+    "@typescript-eslint/parser": "^2.16.0",
     "async": "^2.6.3",
     "babel-eslint": "^11.0.0-beta.2",
     "babel-plugin-istanbul": "^5.2.0",
