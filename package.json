@@ -70,7 +70,6 @@
     "@typescript-eslint/eslint-plugin": "^2.16.0",
     "@typescript-eslint/parser": "^2.16.0",
     "async": "^2.6.3",
-    "babel-eslint": "^11.0.0-beta.2",
     "babel-plugin-istanbul": "^5.2.0",
     "benchmark": "^2.1.0",
     "chai": "^4.1.2",
