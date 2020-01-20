@@ -53,12 +53,12 @@ const Char: { maximumLength: number } & DataType = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buff, parameter, _options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function* (parameter, _options) {
+  generate: function* (parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {

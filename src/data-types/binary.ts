@@ -41,12 +41,12 @@ const Binary: { maximumLength: number } & DataType = {
     buffer.writeUInt16LE(parameter.length);
   },
   
-  writeParameterData: function(buff, parameter, _options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function* (parameter, _options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(parameter.length!);

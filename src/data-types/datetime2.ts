@@ -28,8 +28,8 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buff, parameter, _options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 

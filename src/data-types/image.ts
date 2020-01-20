@@ -25,12 +25,12 @@ const Image: DataType = {
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buff, parameter, _options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, _options) {
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(4)
       buffer.writeInt32LE(parameter.length!);

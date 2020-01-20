@@ -45,12 +45,12 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
   },
 
  
-  writeParameterData: function(buff, parameter, _options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, _options) {
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
