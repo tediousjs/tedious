@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Float: DataType = {
   id: 0x3E,
@@ -15,14 +16,23 @@ const Float: DataType = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, _options, cb) {
+    const gen: any = this.generate(parameter, _options);
+    //@ts-ignore
+    cb(Array.from(gen));
+  },
+
+  generate: function*(parameter, _options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(9);
       buffer.writeUInt8(8);
       buffer.writeDoubleLE(parseFloat(parameter.value));
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {

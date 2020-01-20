@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import DecimalN from './decimaln';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePrecision']>, resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x37,
@@ -43,34 +44,49 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, _options, cb) {
+    const gen: any = this.generate(parameter, _options);
+    //@ts-ignore
+    cb(Array.from(gen));
+  },
+
+  generate: function*(parameter, _options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
       if (parameter.precision! <= 9) {
+        const buffer = new WritableTrackingBuffer(6)
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);
         buffer.writeUInt32LE(value);
+        yield buffer.data;
       } else if (parameter.precision! <= 19) {
+        const buffer = new WritableTrackingBuffer(10)
         buffer.writeUInt8(9);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
+        yield buffer.data;
       } else if (parameter.precision! <= 28) {
+        const buffer = new WritableTrackingBuffer(14)
         buffer.writeUInt8(13);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
         buffer.writeUInt32LE(0x00000000);
+        yield buffer.data;
       } else {
+        const buffer = new WritableTrackingBuffer(18)
         buffer.writeUInt8(17);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
         buffer.writeUInt32LE(0x00000000);
         buffer.writeUInt32LE(0x00000000);
+        yield buffer.data;
       }
     } else {
+      const buffer = new WritableTrackingBuffer(1)
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {

@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Image: DataType = {
   id: 0x22,
@@ -24,14 +25,24 @@ const Image: DataType = {
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+
+  writeParameterData: function(buff, parameter, _options, cb) {
+    const gen: any = this.generate(parameter, _options);
+    //@ts-ignore
+    cb(Array.from(gen));
+  },
+
+  generate: function*(parameter, _options) {
     if (parameter.value != null) {
-      buffer.writeInt32LE(parameter.length);
+      const buffer = new WritableTrackingBuffer(4)
+      buffer.writeInt32LE(parameter.length!);
       buffer.writeBuffer(parameter.value);
+      yield buffer.data;
     } else {
-      buffer.writeInt32LE(parameter.length);
+      const buffer = new WritableTrackingBuffer(4);
+      buffer.writeInt32LE(parameter.length!);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): null | TypeError | Buffer {
