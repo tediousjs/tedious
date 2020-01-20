@@ -25,11 +25,9 @@ const Image: DataType = {
     buffer.writeInt32LE(parameter.length);
   },
 
-
   writeParameterData: function(buff, parameter, _options, cb) {
-    const gen: any = this.generate(parameter, _options);
-    //@ts-ignore
-    cb(Array.from(gen));
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+    cb();
   },
 
   generate: function*(parameter, _options) {

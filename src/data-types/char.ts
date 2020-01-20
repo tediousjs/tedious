@@ -53,10 +53,9 @@ const Char: { maximumLength: number } & DataType = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-    const gen: any = this.generate(parameter, options);
-    //@ts-ignore
-    cb(Array.from(gen))
+  writeParameterData: function(buff, parameter, _options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+    cb();
   },
 
   generate: function* (parameter, _options) {

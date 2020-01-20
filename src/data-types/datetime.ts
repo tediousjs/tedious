@@ -20,11 +20,11 @@ const DateTime: DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, parameter, options, cb) {
-    const gen: any = this.generate(parameter, options);
-    //@ts-ignore
-    cb(Array.from(gen))
+  writeParameterData: function(buff, parameter, _options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+    cb();
   },
+  
 
   generate: function*(parameter, options){
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.

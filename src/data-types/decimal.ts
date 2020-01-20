@@ -43,13 +43,12 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     buffer.writeUInt8(parameter.precision);
     buffer.writeUInt8(parameter.scale);
   },
-
+  
   writeParameterData: function(buff, parameter, _options, cb) {
-    const gen: any = this.generate(parameter, _options);
-    //@ts-ignore
-    cb(Array.from(gen));
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, _options))));
+    cb();
   },
-
+  
   generate: function*(parameter, _options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
