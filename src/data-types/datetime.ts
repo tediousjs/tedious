@@ -67,7 +67,7 @@ const DateTime: DataType = {
       buffer.writeInt32LE(days);
       buffer.writeUInt32LE(threeHundredthsOfSecond);
 
-      yield buffer.buffer
+      yield buffer.data
     } else {
       const buffer = new WritableTrackingBuffer(1)
       buffer.writeUInt8(0);
