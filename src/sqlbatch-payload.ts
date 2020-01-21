@@ -25,7 +25,7 @@ class SqlBatchPayload {
     cb(buffer.data);
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + ('SQL Batch - ' + this.sqlText);
   }
 }

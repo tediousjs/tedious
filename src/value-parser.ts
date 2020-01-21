@@ -631,7 +631,7 @@ function readDateTime(parser: Parser, useUTC: boolean, callback: (value: Date) =
 }
 
 interface DateWithNanosecondsDelta extends Date {
-  nanosecondsDelta: number
+  nanosecondsDelta: number;
 }
 
 function readTime(parser: Parser, dataLength: number, scale: number, useUTC: boolean, callback: (value: DateWithNanosecondsDelta) => void) {

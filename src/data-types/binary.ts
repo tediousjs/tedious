@@ -12,7 +12,7 @@ const Binary: { maximumLength: number } & DataType = {
   declaration: function(parameter) {
     const value = parameter.value as Buffer | null;
 
-    var length;
+    let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (value != null) {
@@ -59,7 +59,7 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value) : Buffer | null | TypeError {
+  validate: function(value): Buffer | null | TypeError {
     if (value == null) {
       return null;
     }

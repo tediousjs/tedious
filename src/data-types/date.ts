@@ -6,7 +6,7 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const globalDate = global.Date;
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
-const Date : DataType = {
+const Date: DataType = {
   id: 0x28,
   type: 'DATEN',
   name: 'Date',

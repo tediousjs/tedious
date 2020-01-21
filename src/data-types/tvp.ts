@@ -40,7 +40,7 @@ const TVP: DataType = {
     buffer.writeUInt8(0x00);
 
     const ref1 = parameter.value.rows;
-    const writeNext = (i:number) => {
+    const writeNext = (i: number) => {
       if (i >= ref1.length) {
         buffer.writeUInt8(0x00);
         cb();

@@ -46,7 +46,7 @@ for (const name in MARS) {
 
 
 type Options = {
-  encrypt: boolean
+  encrypt: boolean;
 };
 
 /*
@@ -57,11 +57,11 @@ class PreloginPayload {
   options: Options;
 
   version!: {
-    major: number,
-    minor: number,
-    patch: number,
-    trivial: number,
-    subbuild: number
+    major: number;
+    minor: number;
+    patch: number;
+    trivial: number;
+    subbuild: number;
   };
 
   encryption!: number;
@@ -242,7 +242,7 @@ class PreloginPayload {
     this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + 'PreLogin - ' + sprintf(
       'version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
       this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild,
