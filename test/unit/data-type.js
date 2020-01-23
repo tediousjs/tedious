@@ -221,15 +221,15 @@ describe('Data Types', function () {
   
   it('should writeParameterData DateTimeOffSet (Buffer)', function(done) {
     const value = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
-    const expected = Buffer.from('0820fd002d380b20fe', 'hex');
+    const expected = Buffer.from('0820fd002d380b', 'hex');
 
     const type = TYPES.typeByName.DateTimeOffset;
 
     const buffer = new WritableTrackingBuffer(0);
     const parameterValue = { value, scale: 0 };
-
-    type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-      assert.deepEqual(buffer.data, expected);
+  
+    type.writeParameterData(buffer, parameterValue, { useUTC: true }, () => {
+      assert.deepEqual(buffer.data.slice(0, 7), expected);
       done();
     });
   });
@@ -243,7 +243,7 @@ describe('Data Types', function () {
     const buffer = new WritableTrackingBuffer(0);
     const parameterValue = { value, scale: 0 };
 
-    type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
+    type.writeParameterData(buffer, parameterValue, { useUTC: true }, () => {
       assert.deepEqual(buffer.data, expected);
       done();
     });

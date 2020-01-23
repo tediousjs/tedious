@@ -22,7 +22,7 @@ const BigInt: DataType = {
     cb();
   },
 
-  generate: function* (parameter: ParameterData, options: InternalConnectionOptions) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(9);
       buffer.writeUInt8(8);
