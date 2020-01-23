@@ -21,7 +21,7 @@ const TinyInt: DataType = {
     cb();
   },
 
-  generate: function*(parameter, options){
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt8(1);

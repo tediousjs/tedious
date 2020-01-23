@@ -32,7 +32,7 @@ const Int: DataType = {
       buffer.writeUInt8(0);
       yield buffer.data;
     }
-  }, 
+  },
 
   validate: function(value): number | null | TypeError {
     if (value == null) {

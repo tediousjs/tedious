@@ -62,13 +62,13 @@ const Char: { maximumLength: number } & DataType = {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
-      const buffer = new WritableTrackingBuffer(0)
+      const buffer = new WritableTrackingBuffer(0);
       buffer.writeUsVarbyte(value, 'ascii');
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(2)
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
-      yield buffer.data
+      yield buffer.data;
     }
   },
 

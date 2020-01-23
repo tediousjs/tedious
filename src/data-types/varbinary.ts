@@ -1,4 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL = (1 << 16) - 1;

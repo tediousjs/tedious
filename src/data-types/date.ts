@@ -24,7 +24,7 @@ const Date: DataType = {
     cb();
   },
 
-  generate: function* (parameter, options){
+  generate: function* (parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {

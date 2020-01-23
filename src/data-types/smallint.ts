@@ -23,12 +23,12 @@ const SmallInt: DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(3)
+      const buffer = new WritableTrackingBuffer(3);
       buffer.writeUInt8(2);
       buffer.writeInt16LE(Number(parameter.value));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(3)
+      const buffer = new WritableTrackingBuffer(3);
       buffer.writeUInt8(0);
       yield buffer.data;
     }

@@ -17,7 +17,7 @@ const XML: DataType = {
     throw new Error('not implemented');
   },
 
-  generate(){
+  generate() {
     throw new Error('not implemented');
   },
 

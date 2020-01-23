@@ -24,13 +24,13 @@ const DateTime: DataType = {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
-  
 
-  generate: function*(parameter, options){
+
+  generate: function*(parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
-      const buffer = new WritableTrackingBuffer(16)
+      const buffer = new WritableTrackingBuffer(16);
 
       let date;
       if (options.useUTC) {
@@ -67,11 +67,11 @@ const DateTime: DataType = {
       buffer.writeInt32LE(days);
       buffer.writeUInt32LE(threeHundredthsOfSecond);
 
-      yield buffer.data
+      yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1)
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
-      yield buffer.data
+      yield buffer.data;
     }
   },
 

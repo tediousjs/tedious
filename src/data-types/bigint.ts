@@ -1,6 +1,5 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 import IntN from './intn';
-import { InternalConnectionOptions } from '../connection';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const BigInt: DataType = {

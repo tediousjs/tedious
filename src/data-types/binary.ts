@@ -40,7 +40,7 @@ const Binary: { maximumLength: number } & DataType = {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length);
   },
-  
+
   writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
@@ -55,7 +55,7 @@ const Binary: { maximumLength: number } & DataType = {
     } else {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
-      yield buffer.data
+      yield buffer.data;
     }
   },
 

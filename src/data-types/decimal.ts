@@ -48,32 +48,32 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
-  
+
   generate: function*(parameter, options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
       if (parameter.precision! <= 9) {
-        const buffer = new WritableTrackingBuffer(6)
+        const buffer = new WritableTrackingBuffer(6);
         buffer.writeUInt8(5);
         buffer.writeUInt8(sign);
         buffer.writeUInt32LE(value);
         yield buffer.data;
       } else if (parameter.precision! <= 19) {
-        const buffer = new WritableTrackingBuffer(10)
+        const buffer = new WritableTrackingBuffer(10);
         buffer.writeUInt8(9);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
         yield buffer.data;
       } else if (parameter.precision! <= 28) {
-        const buffer = new WritableTrackingBuffer(14)
+        const buffer = new WritableTrackingBuffer(14);
         buffer.writeUInt8(13);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
         buffer.writeUInt32LE(0x00000000);
         yield buffer.data;
       } else {
-        const buffer = new WritableTrackingBuffer(18)
+        const buffer = new WritableTrackingBuffer(18);
         buffer.writeUInt8(17);
         buffer.writeUInt8(sign);
         buffer.writeUInt64LE(value);
@@ -82,7 +82,7 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
         yield buffer.data;
       }
     } else {
-      const buffer = new WritableTrackingBuffer(1)
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
       yield buffer.data;
     }

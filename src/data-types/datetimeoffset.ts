@@ -29,7 +29,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     cb();
   },
 
-  generate: function*(parameter, options){
+  generate: function*(parameter, options) {
     const value = parameter.value;
     let scale = parameter.scale;
 

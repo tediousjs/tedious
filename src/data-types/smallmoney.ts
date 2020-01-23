@@ -21,7 +21,7 @@ const SmallMoney: DataType = {
     cb();
   },
 
-  generate: function*(parameter, options){
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(5);
       buffer.writeUInt8(4);

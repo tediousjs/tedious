@@ -33,7 +33,7 @@ const TVP: DataType = {
     };
     next();
   },
-  
+
   generate: function*(parameter, options) {
     if (parameter.value == null) {
       const buffer = new WritableTrackingBuffer(4);

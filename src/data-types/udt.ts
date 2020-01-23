@@ -18,7 +18,7 @@ const UDT: DataType = {
   },
 
   generate() {
-    throw new Error('not implemented')
+    throw new Error('not implemented');
   },
 
   validate() {

@@ -16,7 +16,7 @@ const NumericN: DataType = {
   writeParameterData() {
     throw new Error('not implemented');
   },
-  
+
   generate() {
     throw new Error('not implemented');
   },

@@ -61,11 +61,11 @@ const NChar: DataType & { maximumLength: number } = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0)
+      const buffer = new WritableTrackingBuffer(0);
       buffer.writeUsVarbyte(parameter.value, 'ucs2');
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(2)
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
       yield buffer.data;
     }

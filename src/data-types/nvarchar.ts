@@ -63,7 +63,7 @@ const NVarChar: { maximumLength: number } & DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0)
+      const buffer = new WritableTrackingBuffer(0);
       if (parameter.length! <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value, 'ucs2');
         yield buffer.data;
@@ -72,11 +72,11 @@ const NVarChar: { maximumLength: number } & DataType = {
         yield buffer.data;
       }
     } else if (parameter.length! <= this.maximumLength) {
-      const buffer = new WritableTrackingBuffer(2)
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(4)
+      const buffer = new WritableTrackingBuffer(4);
       buffer.writeUInt32LE(0xFFFFFFFF);
       buffer.writeUInt32LE(0xFFFFFFFF);
       yield buffer.data;

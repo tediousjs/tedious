@@ -23,14 +23,14 @@ const Real: DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(1)
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(4);
       buffer.writeFloatLE(parseFloat(parameter.value));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1)
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
-      yield buffer.data
+      yield buffer.data;
     }
   },
 

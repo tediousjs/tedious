@@ -20,7 +20,7 @@ const Float: DataType = {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
-  
+
   generate: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(9);

@@ -32,7 +32,7 @@ const Image: DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(4)
+      const buffer = new WritableTrackingBuffer(4);
       buffer.writeInt32LE(parameter.length!);
       buffer.writeBuffer(parameter.value);
       yield buffer.data;

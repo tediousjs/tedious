@@ -67,11 +67,11 @@ export interface DataType {
   type: string;
   name: string;
 
-  declaration(parameter: Parameter) : string,
-  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions) : void,
-  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void,
-  validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
-  generate(parameter: ParameterData, options: InternalConnectionOptions):  Generator<Buffer, void>,
+  declaration(parameter: Parameter): string;
+  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions): void;
+  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
+  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
 
   hasTableName?: boolean;
 
