@@ -230,7 +230,7 @@ describe('Data Types', function () {
   
     type.writeParameterData(buffer, parameterValue, { useUTC: true }, () => {
       assert.deepEqual(buffer.data.slice(0, 7), expected);
-      done();
+      done(); 
     });
   });
 
