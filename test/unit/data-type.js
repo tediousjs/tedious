@@ -91,6 +91,16 @@ describe('Data Types', function() {
     }
   });
 
+  it('should writeTypeInfo Time', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.Time;
+    const expected = Buffer.from([0x29, 1])
+
+    type.writeTypeInfo(buffer, {scale: 1});
+    assert.deepEqual(buffer.data, expected)
+  })
+
+
   // Test rounding of nanosecondDelta
   it('nanoSecondRounding', () => {
     const type = TYPES.typeByName.Time;
@@ -830,6 +840,15 @@ describe('Data Types', function() {
     });
   });
 
+  it('should writeTypeInfo SmallInt', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.SmallInt;
+    const expected = Buffer.from([0x26, 2])
+
+    type.writeTypeInfo(buffer);
+    assert.deepEqual(buffer.data, expected)
+  })
+
   it('should writeParameterData SmallInt (Buffer)', function(done) {
     const value = 2;
     const expected = Buffer.from('020200', 'hex');
@@ -859,6 +878,15 @@ describe('Data Types', function() {
       done();
     });
   });
+
+  it('should writeTypeInfo SmallMoney', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.SmallMoney;
+    const expected = Buffer.from([0x6E, 4])
+
+    type.writeTypeInfo(buffer);
+    assert.deepEqual(buffer.data, expected)
+  })
 
   it('should writeParameterData SmallMoney (Buffer)', function(done) {
     const value = 2;
@@ -890,6 +918,15 @@ describe('Data Types', function() {
     });
   });
 
+  it('should writeTypeInfo Text', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.Text;
+    const expected = Buffer.from([0x23, 1, 0, 0, 0])
+
+    type.writeTypeInfo(buffer, {length: 1});
+    assert.deepEqual(buffer.data, expected)
+  })
+
   it('should writeParameterData Text (Buffer)', function(done) {
     const value = Buffer.from('Hello World', 'ascii');
     const expected = Buffer.from('00000000000f00000048656c6c6f20576f726c64', 'hex');
@@ -920,6 +957,16 @@ describe('Data Types', function() {
     });
   });
 
+  it('should writeTypeInfo TinyInt', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.TinyInt;
+    const expected = Buffer.from([0x26, 1])
+
+    type.writeTypeInfo(buffer);
+    assert.deepEqual(buffer.data, expected)
+  })
+
+
   it('should writeParameterData TinyInt (Buffer)', function(done) {
     const value = 1;
     const expected = Buffer.from('0101', 'hex');
@@ -949,6 +996,15 @@ describe('Data Types', function() {
       done();
     });
   });
+
+  it('should writeTypeInfo TVP', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.TVP;
+    const expected = Buffer.from([0xF3, 0x00, 0x00, 0x00])
+
+    type.writeTypeInfo(buffer, {value: null, });
+    assert.deepEqual(buffer.data, expected)
+  })
 
   it('should writeParameterData TVP (Buffer)', function(done) {
     const value = {
@@ -984,6 +1040,15 @@ describe('Data Types', function() {
     });
   });
 
+  it('should writeTypeInfo UniqueIdentifier', function() {
+    const buffer = new WritableTrackingBuffer(2);
+    const type = TYPES.typeByName.UniqueIdentifier;
+    const expected = Buffer.from([0x24, 0x10])
+
+    type.writeTypeInfo(buffer);
+    assert.deepEqual(buffer.data, expected)
+  })
+
   it('should writeParameterData UniqueIdentifier (Buffer)', function(done) {
     const value = 'e062ae34-6de5-47f3-8ba3-29d25f77e71a';
 
@@ -1016,6 +1081,23 @@ describe('Data Types', function() {
     });
   });
 
+  it('should writeTypeInfo VarBinary', function() {
+    const type = TYPES.typeByName.VarBinary;
+
+    //Length <= Maximum Length
+    const buffer = new WritableTrackingBuffer(2);
+    const expected = Buffer.from([0xA5, 0x40, 0x1F])
+
+    type.writeTypeInfo(buffer, {length: 1});
+    assert.deepEqual(buffer.data, expected)
+
+    //Length > Maximum Length
+    const buffer1 = new WritableTrackingBuffer(2);
+    const expected1 = Buffer.from([0xA5, 0xFF, 0xFF])
+
+    type.writeTypeInfo(buffer1, {length: 8500});
+    assert.deepEqual(buffer1.data, expected1)
+  })
 
   it('should writeParameterData varbinary', () => {
     const type = TYPES.typeByName.VarBinary;
@@ -1087,6 +1169,24 @@ describe('Data Types', function() {
       done();
     });
   });
+
+  it('should writeTypeInfo VarChar', function() {
+    const type = TYPES.typeByName.VarChar;
+
+    //Length <= Maximum Length
+    const buffer = new WritableTrackingBuffer(2);
+    const expected = Buffer.from('a7401f0000000000', 'hex')
+
+    type.writeTypeInfo(buffer, {length: 1});
+    assert.deepEqual(buffer.data, expected)
+
+    //Length > Maximum Length
+    const buffer1 = new WritableTrackingBuffer(2);
+    const expected1 = Buffer.from('a7ffff0000000000', 'hex')
+
+    type.writeTypeInfo(buffer1, {length: 8500});
+    assert.deepEqual(buffer1.data, expected1)
+  })
 
   it('should writeParameterData VarChar (Buffer, Length <= Maximum Length)', function(done) {
     const value = 'hello world';
