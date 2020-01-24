@@ -5,6 +5,8 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
+import { Readable } from 'readable-stream';
+
 import {
   loginWithUsernamePassword,
   loginWithVmMSI,
@@ -298,7 +300,6 @@ class Connection extends EventEmitter {
     SENT_LOGIN7_WITH_FEDAUTH: State;
     LOGGED_IN_SENDING_INITIAL_SQL: State;
     LOGGED_IN: State;
-    BUILDING_CLIENT_REQUEST: State;
     SENT_CLIENT_REQUEST: State;
     SENT_ATTENTION: State;
     FINAL: State;
@@ -1654,9 +1655,10 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    payload.getData((data) => {
-      return this.messageIo.sendMessage(TYPE.SQL_BATCH, data);
-    });
+
+    const message = new Message({ type: TYPE.SQL_BATCH });
+    this.messageIo.outgoingMessageStream.write(message);
+    payload.getStream().pipe(message);
   }
 
   getInitialSql() {
@@ -1982,8 +1984,8 @@ class Connection extends EventEmitter {
   }
 
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: { getData: (callback: (data: Buffer) => void) => void, toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getData: (callback: (data: Buffer) => void) => void, toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: { getStream: () => Readable, toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getStream: () => Readable, toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -2009,12 +2011,7 @@ class Connection extends EventEmitter {
 
       request.once('cancel', () => {
         // There's three ways to handle request cancelation:
-        if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
-          // The request was cancelled before buffering finished
-          this.request = undefined;
-          request.callback(RequestError('Canceled.', 'ECANCEL'));
-          this.transitionTo(this.STATE.LOGGED_IN);
-        } else if (!this.isRequestActive(request)) {
+        if (!this.isRequestActive(request)) {
           // Cancel was called on a request that is no longer active on this connection
           return;
         } else if (message.writable) {
@@ -2053,33 +2050,23 @@ class Connection extends EventEmitter {
       } else {
         this.createRequestTimer();
 
-        // Transition to an intermediate state to ensure that no new requests
-        // are made on the connection while the buffer is being populated.
-        this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);
+        message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+        this.messageIo.outgoingMessageStream.write(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-        payload!.getData((data) => {
-          if (this.state !== this.STATE.BUILDING_CLIENT_REQUEST) {
-            // Something else has happened on the connection since starting to
-            // build the request. That state change should have invoked the
-            // request handler so there is nothing to do at this point.
-            return;
-          }
-
-          message = this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
-
+        message.once('finish', () => {
           this.resetConnectionOnNextRequest = false;
           this.debug.payload(function() {
             return payload!.toString('  ');
           });
 
-          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
           if (request.paused) { // Request.pause() has been called before the request was started
             this.pauseRequest(request);
           }
         });
-      }
 
+        payload!.getStream().pipe(message);
+      }
     }
   }
 
@@ -2474,18 +2461,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      }
-    }
-  },
-  BUILDING_CLIENT_REQUEST: {
-    name: 'BuildingClientRequest',
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
       }
     }
   },
