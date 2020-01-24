@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import MoneyN from './moneyn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const SmallMoney: DataType = {
   id: 0x7A,
@@ -15,14 +16,22 @@ const SmallMoney: DataType = {
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(5);
       buffer.writeUInt8(4);
       buffer.writeInt32LE(parameter.value * 10000);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): null | number | TypeError {
