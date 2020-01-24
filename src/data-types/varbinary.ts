@@ -65,14 +65,14 @@ const VarBinary: { maximumLength: number } & DataType = {
       }
       yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(NULL);
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(NULL, 0);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(8);
-      buffer.writeUInt32LE(0xFFFFFFFF);
-      buffer.writeUInt32LE(0xFFFFFFFF);
-      yield buffer.data;
+      const buffer = Buffer.alloc(8);
+      buffer.writeUInt32LE(0xFFFFFFFF, 0);
+      buffer.writeUInt32LE(0xFFFFFFFF, 4);
+      yield buffer;
     }
   },
 

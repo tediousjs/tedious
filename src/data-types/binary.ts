@@ -1,7 +1,6 @@
 import { DataType, ParameterData } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const NULL = (1 << 16) - 1;
+const NULL_BUFFER = Buffer.from([0xFF, 0xFF]);
 
 const Binary: { maximumLength: number } & DataType = {
   id: 0xAD,
@@ -48,14 +47,15 @@ const Binary: { maximumLength: number } & DataType = {
 
   generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(parameter.length!);
-      buffer.writeBuffer(parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength));
-      yield buffer.data;
+      const dataLength = parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength;
+
+      const buffer = Buffer.alloc(2 + dataLength);
+      buffer.writeUInt16LE(dataLength, 0);
+      parameter.value.copy(buffer, 2, 0, dataLength);
+
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(NULL);
-      yield buffer.data;
+      yield NULL_BUFFER;
     }
   },
 

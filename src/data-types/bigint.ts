@@ -2,6 +2,8 @@ import { DataType } from '../data-type';
 import IntN from './intn';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
+const NULL_BUFFER = Buffer.alloc(1);
+
 const BigInt: DataType = {
   id: 0x7F,
   type: 'INT8',
@@ -28,9 +30,7 @@ const BigInt: DataType = {
       buffer.writeInt64LE(Number(parameter.value));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield NULL_BUFFER;
     }
   },
 
