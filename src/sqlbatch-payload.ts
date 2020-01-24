@@ -1,5 +1,6 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
+import { Readable } from 'readable-stream';
 
 /*
   s2.2.6.6
@@ -15,14 +16,25 @@ class SqlBatchPayload {
     this.options = options;
   }
 
-  getData(cb: (data: Buffer) => void) {
-    const buffer = new WritableTrackingBuffer(100 + 2 * this.sqlText.length, 'ucs2');
-    if (this.options.tdsVersion >= '7_2') {
-      const outstandingRequestCount = 1;
-      writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
-    }
-    buffer.writeString(this.sqlText, 'ucs2');
-    cb(buffer.data);
+  getStream() {
+    const { sqlText, txnDescriptor, options: { tdsVersion } } = this;
+
+    return new Readable({
+      read() {
+        if (tdsVersion >= '7_2') {
+          const buffer = new WritableTrackingBuffer(18, 'ucs2');
+          const outstandingRequestCount = 1;
+
+          writeToTrackingBuffer(buffer, txnDescriptor, outstandingRequestCount);
+
+          this.push(buffer.data);
+        }
+
+        this.push(sqlText, 'ucs2');
+
+        this.push(null);
+      }
+    });
   }
 
   toString(indent = '') {
