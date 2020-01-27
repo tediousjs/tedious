@@ -35,6 +35,20 @@ const TinyInt: DataType = {
 
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = value as number;
+      const result = Buffer.alloc(8);
+      result.writeInt8(val, 0);
+
+      return result;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;

@@ -43,8 +43,14 @@ const VarBinary: { maximumLength: number } & DataType = {
 
   writeTypeInfo: function(buffer, parameter) {
     buffer.writeUInt8(this.id);
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength);
+    if (parameter.length != null && isFinite(parameter.length)) {
+      const length = parameter.length;
+
+      if (length <= this.maximumLength) {
+        buffer.writeUInt16LE(length);
+      } else {
+        buffer.writeUInt16LE(this.maximumLength);
+      }
     } else {
       buffer.writeUInt16LE(MAX);
     }
@@ -73,6 +79,17 @@ const VarBinary: { maximumLength: number } & DataType = {
       buffer.writeUInt32LE(0xFFFFFFFF);
       buffer.writeUInt32LE(0xFFFFFFFF);
       yield buffer.data;
+    }
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
     }
   },
 

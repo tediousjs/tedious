@@ -34,6 +34,22 @@ const SmallMoney: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = parseFloat(value as string) * 10000;
+
+      // SmallMoney is still 8 bytes, but the first 4 are always ignored
+      const result = Buffer.alloc(8);
+      result.writeInt32LE(val, 4);
+
+      return result;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

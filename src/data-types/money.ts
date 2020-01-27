@@ -34,6 +34,21 @@ const Money: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = parseFloat(value as string) * 10000;
+
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeMoney(val);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;

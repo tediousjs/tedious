@@ -42,6 +42,9 @@ import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { shouldHonorAE } from './always-encrypted/utils';
+import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
 import depd from 'depd';
 
@@ -137,6 +140,8 @@ export interface InternalConnectionOptions {
   appName: undefined | string;
   camelCaseColumns: boolean;
   cancelTimeout: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
   columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
   connectTimeout: number;
@@ -162,6 +167,7 @@ export interface InternalConnectionOptions {
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
   encrypt: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProviderMap;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -175,12 +181,24 @@ export interface InternalConnectionOptions {
   requestTimeout: number;
   rowCollectionOnDone: boolean;
   rowCollectionOnRequestCompletion: boolean;
+  serverName: undefined | string;
+  serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: string;
+  trustedServerNameAE?: string;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
   lowerCaseGuids: boolean;
+}
+
+interface KeyStoreProvider {
+  key: string;
+  value: ColumnEncryptionAzureKeyVaultProvider;
+}
+
+interface KeyStoreProviderMap {
+  [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
 interface State {
@@ -218,6 +236,8 @@ interface ConnectionOptions {
   appName?: string | undefined;
   camelCaseColumns?: boolean;
   cancelTimeout?: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string;
   connectionRetryInterval?: number;
   connectTimeout?: number;
@@ -243,6 +263,7 @@ interface ConnectionOptions {
   enableNumericRoundabort?: boolean;
   enableQuotedIdentifier?: boolean;
   encrypt?: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
   fallbackToDefaultDb?: boolean;
   instanceName?: string | undefined;
   isolationLevel?: number;
@@ -497,6 +518,8 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
@@ -523,6 +546,7 @@ class Connection extends EventEmitter {
         enableQuotedIdentifier: true,
         encrypt: true,
         fallbackToDefaultDb: false,
+        encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
@@ -535,8 +559,11 @@ class Connection extends EventEmitter {
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
+        serverName: undefined,
+        serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
+        trustedServerNameAE: undefined,
         trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true,
@@ -933,6 +960,26 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.columnEncryptionSetting !== undefined) {
+        if (typeof config.options.columnEncryptionSetting !== 'boolean') {
+          throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
+        }
+
+        this.config.options.columnEncryptionSetting = config.options.columnEncryptionSetting;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL <= 0) {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be greater than 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+      }
+
       if (config.options.lowerCaseGuids !== undefined) {
         if (typeof config.options.lowerCaseGuids !== 'boolean') {
           throw new TypeError('The "config.options.lowerCaseGuids" property must be of type boolean.');
@@ -940,6 +987,51 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.encryptionKeyStoreProviders) {
+        for (const entry of config.options.encryptionKeyStoreProviders) {
+          const providerName = entry.key;
+
+          if (!providerName || providerName.length === 0) {
+            throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+          }
+
+          if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+            throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+          }
+
+          if (!entry.value) {
+            throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+          }
+
+          if (!this.config.options.encryptionKeyStoreProviders) {
+            this.config.options.encryptionKeyStoreProviders = {};
+          }
+
+          this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
+        }
+      }
+    }
+
+    let serverName = this.config.server;
+    if (!serverName) {
+      serverName = 'localhost';
+    }
+
+    const px = serverName.indexOf('\\');
+
+    if (px > 0) {
+      serverName = serverName.substring(0, px);
+    }
+
+    this.config.options.trustedServerNameAE = serverName;
+
+    if (this.config.options.instanceName) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.instanceName}`;
+    }
+
+    if (this.config.options.port) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.port}`;
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -1067,6 +1159,10 @@ class Connection extends EventEmitter {
 
         this.loginError = error;
       }
+    });
+
+    tokenStreamParser.parser.on('error', (error) => {
+      this.emit('error', error);
     });
 
     tokenStreamParser.on('databaseChange', (token) => {
@@ -1280,9 +1376,7 @@ class Connection extends EventEmitter {
     });
 
     tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
-      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
-        this.dispatchEvent('endOfMessageMarkerReceived');
-      }
+      this.dispatchEvent('endOfMessageMarkerReceived');
     });
 
     tokenStreamParser.on('resetConnection', () => {
@@ -1558,6 +1652,8 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
+    payload.columnEncryption = this.config.options.columnEncryptionSetting;
+
     const { authentication } = this.config;
     switch (authentication.type) {
       case 'azure-active-directory-password':
@@ -1762,7 +1858,7 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  execSql(request: Request) {
+  _execSql(request: Request) {
     request.transformIntoExecuteSqlRpc();
 
     const error = request.error;
@@ -1775,6 +1871,24 @@ class Connection extends EventEmitter {
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+  }
+
+  execSql(request: Request) {
+    request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
+    if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
+      getParameterEncryptionMetadata(this, request, (error?: Error) => {
+        if (error != null) {
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+        this._execSql(request);
+      });
+    } else {
+      this._execSql(request);
+    }
   }
 
   /**
@@ -2152,6 +2266,9 @@ Connection.prototype.STATE = {
         this.addToMessageBuffer(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         const preloginPayload = new PreloginPayload(this.messageBuffer);
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
@@ -2234,6 +2351,9 @@ Connection.prototype.STATE = {
         this.messageIo.tlsHandshakeData(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.messageIo.tlsNegotiationComplete) {
           this.sendLogin7Packet();
 
@@ -2266,6 +2386,10 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.REROUTING);
       },
       featureExtAck: function(token) {
+        if (token.columnEncryption) {
+          this.config.options.serverSupportsColumnEncryption = true;
+          return;
+        }
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
           if (token.fedAuth === undefined) {
@@ -2284,6 +2408,9 @@ Connection.prototype.STATE = {
         }
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.loggedIn) {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         } else if (this.loginError) {
@@ -2314,6 +2441,9 @@ Connection.prototype.STATE = {
         this.sendDataToTokenStreamParser(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         if (this.ntlmpacket) {
           const authentication = this.config.authentication as NtlmAuthentication;
 
@@ -2366,6 +2496,9 @@ Connection.prototype.STATE = {
         this.fedAuthInfoToken = token;
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         const fedAuthInfoToken = this.fedAuthInfoToken;
 
         if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
@@ -2451,6 +2584,9 @@ Connection.prototype.STATE = {
         this.sendDataToTokenStreamParser(data);
       },
       message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
+      },
+      endOfMessageMarkerReceived: function() {
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
       }
@@ -2526,7 +2662,7 @@ Connection.prototype.STATE = {
       attention: function() {
         this.attentionReceived = true;
       },
-      message: function() {
+      endOfMessageMarkerReceived: function() {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (this.attentionReceived) {
@@ -2542,6 +2678,9 @@ Connection.prototype.STATE = {
             sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
           }
         }
+      },
+      message: function() {
+        this.tokenStreamParser.addEndOfMessageMarker();
       }
     }
   },

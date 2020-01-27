@@ -59,6 +59,17 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
+  },
+
   validate: function(value): Buffer | null | TypeError {
     if (value == null) {
       return null;

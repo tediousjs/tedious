@@ -3,6 +3,9 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
+import { encryptWithKey } from './always-encrypted/key-crypto';
+import VarBinary from './data-types/varbinary';
+import { CryptoMetadata } from './always-encrypted/types';
 import { Readable } from 'readable-stream';
 
 // const OPTION = {
@@ -13,7 +16,8 @@ import { Readable } from 'readable-stream';
 
 const STATUS = {
   BY_REF_VALUE: 0x01,
-  DEFAULT_VALUE: 0x02
+  DEFAULT_VALUE: 0x02,
+  ENCRYPTED_VALUE: 0x08,
 };
 
 /*
@@ -63,36 +67,51 @@ class RpcRequestPayload {
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
 
-    const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        cb(buffer.data);
-        return;
-      }
+    this._encryptParameters(this.request.parameters, (parameters: Parameter[]) => {
+      const writeNext = (i: number) => {
+        if (i >= parameters.length) {
+          cb(buffer.data);
+          return;
+        }
 
-      this._writeParameterData(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
+        this._writeParameter(parameters[i], buffer, () => {
+          setImmediate(() => {
+            writeNext(i + 1);
+          });
         });
-      });
-    };
-    writeNext(0);
+      };
+      writeNext(0);
+    });
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  _writeParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
+    if (parameter.cryptoMetadata) {
+      statusFlags |= STATUS.ENCRYPTED_VALUE;
+    }
     buffer.writeUInt8(statusFlags);
 
-    const param: ParameterData = { value: parameter.value };
+    if (parameter.cryptoMetadata) {
+      this._writeEncryptedParameter(parameter, buffer, cb);
+    } else {
+      this._writeParameterData(parameter, buffer, true, cb);
+    }
+  }
+
+  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, writeValue: boolean, cb: () => void) {
+    const param: ParameterData = {
+      value: parameter.value,
+      cryptoMetadata: parameter.cryptoMetadata
+    };
 
     const type = parameter.type;
 
@@ -116,10 +135,80 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
+    if (parameter.collation) {
+      param.collation = parameter.collation;
+    }
+
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
+    if (writeValue) {
+      type.writeParameterData(buffer, param, this.options, () => {
+        cb();
+      });
+    } else {
       cb();
+    }
+  }
+
+  _writeEncryptedParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+    const encryptedParam = {
+      value: parameter.encryptedVal,
+      type: VarBinary,
+      output: parameter.output,
+      name: parameter.name,
+      forceEncrypt: parameter.forceEncrypt
+    };
+
+    this._writeParameterData(encryptedParam, buffer, true, () => {
+      this._writeParameterData(parameter, buffer, false, () => {
+        this._writeEncryptionMetadata(parameter.cryptoMetadata, buffer, () => {
+          cb();
+        });
+      });
     });
+  }
+
+  _encryptParameters(parameters: Parameter[], callback: (parameters: Parameter[]) => void) {
+    if (this.options.serverSupportsColumnEncryption === true) {
+      const promises: Promise<void>[] = [];
+
+      for (let i = 0, len = parameters.length; i < len; i++) {
+        const type = parameters[i].type;
+        if (parameters[i].cryptoMetadata && parameters[i].value) {
+          if (!type.toBuffer) {
+            throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
+          }
+          const plainTextBuffer = type.toBuffer(parameters[i], this.options);
+          if (plainTextBuffer) {
+            promises.push(encryptWithKey(plainTextBuffer, parameters[i].cryptoMetadata as CryptoMetadata, this.options).then((encryptedValue: Buffer) => {
+              parameters[i].encryptedVal = encryptedValue;
+            }));
+          }
+        }
+      }
+
+      Promise.all(promises).then(() => callback(parameters));
+    } else {
+      callback(parameters);
+    }
+  }
+
+  _writeEncryptionMetadata(cryptoMetadata: CryptoMetadata | undefined, buffer: WritableTrackingBuffer, cb: () => void) {
+    if (!cryptoMetadata || !cryptoMetadata.cekEntry || !cryptoMetadata.cekEntry.columnEncryptionKeyValues || cryptoMetadata.cekEntry.columnEncryptionKeyValues.length <= 0) {
+      throw new Error('Invalid Crypto Metadata in _writeEncryptionMetadata');
+    }
+
+    buffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
+    if (cryptoMetadata.cipherAlgorithmId === 0) {
+      buffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName || '');
+    }
+
+    buffer.writeUInt8(cryptoMetadata.encryptionType);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].dbId);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].keyId);
+    buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].keyVersion);
+    buffer.writeBuffer(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion);
+    buffer.writeUInt8(cryptoMetadata.normalizationRuleVersion[0]);
+    cb();
   }
 }
 
