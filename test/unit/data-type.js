@@ -186,7 +186,7 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeParameterData Binary (Null)', function(done) {
+  it('should writeParameterData binary (Null)', function(done) {
     const value = null;
     const expected = Buffer.from('ffff', 'hex');
 

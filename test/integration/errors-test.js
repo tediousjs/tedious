@@ -149,7 +149,7 @@ describe('Errors Test', function() {
     }
   });
 
-  it('should cancel during BUILDING_CLIENT_REQUEST State', function(done) {
+  it('should support cancelling after starting query execution', function(done) {
     const connection = new Connection(config);
 
     const request = new Request("select 42, 'hello world'", function(err, rowCount) {
