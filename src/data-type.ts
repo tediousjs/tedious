@@ -42,62 +42,63 @@ import { InternalConnectionOptions } from './connection';
 import { CryptoMetadata } from './always-encrypted/types';
 
 export type Parameter = {
-  type: DataType,
-  name: string,
+  type: DataType;
+  name: string;
 
-  value: unknown,
+  value: unknown;
 
-  output: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
+  output: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
   collation?: {
-    lcid: number,
-    flags: number,
-    version: number,
-    sortId: number,
-  },
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
 
-  nullable?: boolean
+  nullable?: boolean;
 
-  forceEncrypt?: boolean,
-  cryptoMetadata?: CryptoMetadata,
+  forceEncrypt?: boolean;
+  cryptoMetadata?: CryptoMetadata;
   encryptedVal?: Buffer;
 };
 
 export type ParameterData<T = any> = {
-  length?: number,
-  scale?: number,
-  precision?: number,
+  length?: number;
+  scale?: number;
+  precision?: number;
   collation?: {
-    lcid: number,
-    flags: number,
-    version: number,
-    sortId: number,
-  },
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
 
-  value: T,
+  value: T;
 
-  cryptoMetadata?: CryptoMetadata,
+  cryptoMetadata?: CryptoMetadata;
 };
 
 export interface DataType {
-  id: number,
-  type: string,
-  name: string,
+  id: number;
+  type: string;
+  name: string;
 
-  declaration(parameter: Parameter) : string,
-  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions) : void,
-  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
-  validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
+  declaration(parameter: Parameter): string;
+  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions): void;
+  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
+  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
 
-  hasTableName?: boolean,
+  hasTableName?: boolean;
 
-  resolveLength?: (parameter: Parameter) => number,
-  resolvePrecision?: (parameter: Parameter) => number,
-  resolveScale?: (parameter: Parameter) => number,
+  resolveLength?: (parameter: Parameter) => number;
+  resolvePrecision?: (parameter: Parameter) => number;
+  resolveScale?: (parameter: Parameter) => number;
 
-  toBuffer?: (parameter: Parameter, options: InternalConnectionOptions) => Buffer | undefined,
+  toBuffer?: (parameter: Parameter, options: InternalConnectionOptions) => Buffer | undefined;
 }
 
 export const TYPE = {

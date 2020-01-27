@@ -1,6 +1,7 @@
 import { DataType } from '../data-type';
 import DateTimeN from './datetimen';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 
@@ -19,8 +20,18 @@ const DateTime: DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, { value }, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+
+  generate: function*(parameter, options) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
     if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
+
       let date;
       if (options.useUTC) {
         date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
@@ -55,10 +66,13 @@ const DateTime: DataType = {
       buffer.writeUInt8(8);
       buffer.writeInt32LE(days);
       buffer.writeUInt32LE(threeHundredthsOfSecond);
+
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   toBuffer: function(parameter, options) {

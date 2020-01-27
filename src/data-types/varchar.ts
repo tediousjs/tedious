@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -85,20 +86,31 @@ const VarChar: { maximumLength: number } & DataType = {
     buffer.writeBuffer(collation);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(0);
       if (parameter.length! <= this.maximumLength) {
         buffer.writeUsVarbyte(parameter.value, 'ascii');
       } else {
         buffer.writePLPBody(parameter.value, 'ascii');
       }
+      yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(8);
       buffer.writeUInt32LE(0xFFFFFFFF);
       buffer.writeUInt32LE(0xFFFFFFFF);
+      yield buffer.data;
     }
-    cb();
   },
 
   toBuffer: function(parameter) {

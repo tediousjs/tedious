@@ -13,8 +13,8 @@ function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options:
 }
 
 type Column = {
-  value: unknown,
-  metadata: ColumnMetadata
+  value: unknown;
+  metadata: ColumnMetadata;
 };
 
 function nbcRowParser(parser: Parser, columnsMetaData: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {

@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import DateTimeN from './datetimen';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
@@ -18,8 +19,14 @@ const SmallDateTime: DataType = {
     buffer.writeUInt8(4);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(8);
       let days, dstDiff, minutes;
       if (options.useUTC) {
         days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
@@ -34,10 +41,12 @@ const SmallDateTime: DataType = {
       buffer.writeUInt16LE(days);
 
       buffer.writeUInt16LE(minutes);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   toBuffer: function(parameter, options) {

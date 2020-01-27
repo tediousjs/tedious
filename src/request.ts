@@ -9,17 +9,17 @@ import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/ty
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
 type ParameterOptions = {
-  output?: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
+  output?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
   collation?: {
-    lcid: number,
-    flags: number,
-    version: number,
-    sortId: number,
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
   },
-  forceEncrypt?: boolean,
+  forceEncrypt?: boolean;
 }
 
 interface RequestOptions {

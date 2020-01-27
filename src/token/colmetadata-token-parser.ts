@@ -7,8 +7,8 @@ import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
 export type ColumnMetadata = Metadata & {
-  colName: string,
-  tableName?: string | string[]
+  colName: string;
+  tableName?: string | string[];
 };
 
 type cekTableEntryMetadata = {

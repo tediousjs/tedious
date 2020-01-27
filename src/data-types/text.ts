@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Text: DataType = {
   id: 0x23,
@@ -26,15 +27,22 @@ const Text: DataType = {
     buffer.writeInt32LE(parameter.length);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
+    const buffer = new WritableTrackingBuffer(0);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
     if (parameter.value != null) {
-      buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(parameter.length!);
       buffer.writeString(parameter.value.toString(), 'ascii');
+      yield buffer.data;
     } else {
-      buffer.writeInt32LE(parameter.length);
+      buffer.writeInt32LE(parameter.length!);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): string | null | TypeError {

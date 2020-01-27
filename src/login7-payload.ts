@@ -69,13 +69,13 @@ const COLUMN_ENCRYPTION_OPTIONS = {
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
 type Options = {
-  tdsVersion: number,
-  packetSize: number,
-  clientProgVer: number,
-  clientPid: number,
-  connectionId: number,
-  clientTimeZone: number,
-  clientLcid: number
+  tdsVersion: number;
+  packetSize: number;
+  clientProgVer: number;
+  clientPid: number;
+  connectionId: number;
+  clientTimeZone: number;
+  clientLcid: number;
 };
 
 /*
@@ -470,7 +470,7 @@ class Login7Payload {
     return password;
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
               this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId

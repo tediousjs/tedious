@@ -6,6 +6,7 @@ import { InternalConnectionOptions } from './connection';
 import { encryptWithKey } from './always-encrypted/key-crypto';
 import VarBinary from './data-types/varbinary';
 import { CryptoMetadata } from './always-encrypted/types';
+import { Readable } from 'readable-stream';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -34,6 +35,19 @@ class RpcRequestPayload {
     this.procedure = this.request.sqlTextOrProcedure!;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
+  }
+
+  getStream() {
+    const self = this;
+
+    return new Readable({
+      read() {
+        self.getData((buf) => {
+          this.push(buf);
+          this.push(null);
+        });
+      }
+    });
   }
 
   getData(cb: (data: Buffer) => void) {

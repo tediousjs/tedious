@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import BitN from './bitn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Bit: DataType = {
   id: 0x32,
@@ -15,14 +16,22 @@ const Bit: DataType = {
     buffer.writeUInt8(1);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function* (parameter, options) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt8(1);
       buffer.writeUInt8(parameter.value ? 1 : 0);
+      yield buffer.data;
     }
-    cb();
   },
 
   toBuffer: function(parameter) {

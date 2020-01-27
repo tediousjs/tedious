@@ -16,14 +16,22 @@ const Money: DataType = {
     buffer.writeUInt8(8);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(9);
       buffer.writeUInt8(8);
       buffer.writeMoney(parameter.value * 10000);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   toBuffer: function(parameter) {

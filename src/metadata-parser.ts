@@ -7,37 +7,37 @@ import { CryptoMetadata } from './always-encrypted/types';
 import { sprintf } from 'sprintf-js';
 
 type Collation = {
-  lcid: number,
-  flags: number,
-  version: number,
-  sortId: number,
-  codepage: string
+  lcid: number;
+  flags: number;
+  version: number;
+  sortId: number;
+  codepage: string;
 };
 
 type XmlSchema = {
-  dbname: string,
-  owningSchema: string,
-  xmlSchemaCollection: string
+  dbname: string;
+  owningSchema: string;
+  xmlSchemaCollection: string;
 };
 
 type UdtInfo = {
-  maxByteSize: number,
-  dbname: string,
-  owningSchema: string,
-  typeName: string,
-  assemblyName: string
+  maxByteSize: number;
+  dbname: string;
+  owningSchema: string;
+  typeName: string;
+  assemblyName: string;
 };
 
 export type BaseMetadata = {
-  userType: number,
-  flags: number,
-  type: DataType,
-  collation: Collation | undefined,
-  precision: number | undefined,
-  scale: number | undefined,
-  dataLength: number | undefined,
-  schema: XmlSchema | undefined,
-  udtInfo: UdtInfo | undefined,
+  userType: number;
+  flags: number;
+  type: DataType;
+  collation: Collation | undefined;
+  precision: number | undefined;
+  scale: number | undefined;
+  dataLength: number | undefined;
+  schema: XmlSchema | undefined;
+  udtInfo: UdtInfo | undefined;
 };
 
 export type Metadata = {

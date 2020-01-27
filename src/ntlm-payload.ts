@@ -3,13 +3,13 @@ import * as crypto from 'crypto';
 import JSBI from 'jsbi';
 
 type Options = {
-  domain: string,
-  userName: string,
-  password: string,
+  domain: string;
+  userName: string;
+  password: string;
   ntlmpacket: {
-    target: Buffer,
-    nonce: Buffer
-  }
+    target: Buffer;
+    nonce: Buffer;
+  };
 };
 
 class NTLMResponsePayload {
@@ -19,7 +19,7 @@ class NTLMResponsePayload {
     this.data = this.createResponse(loginData);
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + 'NTLM Auth';
   }
 

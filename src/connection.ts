@@ -5,6 +5,8 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
+import { Readable } from 'readable-stream';
+
 import {
   loginWithUsernamePassword,
   loginWithVmMSI,
@@ -45,6 +47,8 @@ import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keysto
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
 import depd from 'depd';
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
 
 // A rather basic state machine for managing a connection.
@@ -64,61 +68,61 @@ const DEFAULT_LANGUAGE = 'us_english';
 const DEFAULT_DATEFORMAT = 'mdy';
 
 interface AzureActiveDirectoryMsiAppServiceAuthentication {
-  type: 'azure-active-directory-msi-app-service',
+  type: 'azure-active-directory-msi-app-service';
   options: {
-    clientId?: string,
-    msiEndpoint?: string,
-    msiSecret?: string
-  }
+    clientId?: string;
+    msiEndpoint?: string;
+    msiSecret?: string;
+  };
 }
 
 interface AzureActiveDirectoryMsiVmAuthentication {
-  type: 'azure-active-directory-msi-vm',
+  type: 'azure-active-directory-msi-vm';
   options: {
-    clientId?: string,
-    msiEndpoint?: string
-  }
+    clientId?: string;
+    msiEndpoint?: string;
+  };
 }
 
 interface AzureActiveDirectoryAccessTokenAuthentication {
-  type: 'azure-active-directory-access-token',
+  type: 'azure-active-directory-access-token';
   options: {
-    token: string
-  }
+    token: string;
+  };
 }
 
 interface AzureActiveDirectoryPasswordAuthentication {
-  type: 'azure-active-directory-password',
+  type: 'azure-active-directory-password';
   options: {
-    userName: string,
-    password: string,
-  }
+    userName: string;
+    password: string;
+  };
 }
 
 interface AzureActiveDirectoryServicePrincipalSecret {
-  type: 'azure-active-directory-service-principal-secret',
+  type: 'azure-active-directory-service-principal-secret';
   options: {
-    clientId: string,
-    clientSecret: string,
-    tenantId: string
-  }
+    clientId: string;
+    clientSecret: string;
+    tenantId: string;
+  };
 }
 
 interface NtlmAuthentication {
-  type: 'ntlm',
+  type: 'ntlm';
   options: {
-    userName: string,
-    password: string,
-    domain: string
-  }
+    userName: string;
+    password: string;
+    domain: string;
+  };
 }
 
 interface DefaultAuthentication {
-  type: 'default',
+  type: 'default';
   options: {
-    userName?: string,
-    password?: string
-  }
+    userName?: string;
+    password?: string;
+  };
 }
 
 interface ErrorWithCode extends Error {
@@ -126,66 +130,66 @@ interface ErrorWithCode extends Error {
 }
 
 interface InternalConnectionConfig {
-  server: string,
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret,
-  options: InternalConnectionOptions
+  server: string;
+  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+  options: InternalConnectionOptions;
 }
 
 export interface InternalConnectionOptions {
-  abortTransactionOnError: boolean,
-  appName: undefined | string,
-  camelCaseColumns: boolean,
-  cancelTimeout: number,
-  columnEncryptionKeyCacheTTL: number,
-  columnEncryptionSetting: boolean,
-  columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string),
-  connectionRetryInterval: number,
-  connectTimeout: number,
-  connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL],
-  cryptoCredentialsDetails: SecureContextOptions,
-  database: undefined | string,
-  datefirst: number,
-  dateFormat: string,
+  abortTransactionOnError: boolean;
+  appName: undefined | string;
+  camelCaseColumns: boolean;
+  cancelTimeout: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
+  columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string);
+  connectionRetryInterval: number;
+  connectTimeout: number;
+  connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
+  cryptoCredentialsDetails: SecureContextOptions;
+  database: undefined | string;
+  datefirst: number;
+  dateFormat: string;
   debug: {
-    data: boolean,
-    packet: boolean,
-    payload: boolean,
+    data: boolean;
+    packet: boolean;
+    payload: boolean;
     token: boolean
-  },
-  enableAnsiNull: null | boolean,
-  enableAnsiNullDefault: null | boolean,
-  enableAnsiPadding: null | boolean,
-  enableAnsiWarnings: null | boolean,
-  enableArithAbort: null | boolean,
-  enableConcatNullYieldsNull: null | boolean,
-  enableCursorCloseOnCommit: null | boolean,
-  enableImplicitTransactions: null | boolean,
-  enableNumericRoundabort: null | boolean,
-  enableQuotedIdentifier: null | boolean,
-  encrypt: boolean,
-  encryptionKeyStoreProviders?: KeyStoreProviderMap,
-  fallbackToDefaultDb: boolean,
-  instanceName: undefined | string,
-  isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL],
-  language: string,
-  localAddress: undefined | string,
-  maxRetriesOnTransientErrors: number,
-  multiSubnetFailover: boolean,
-  packetSize: number,
-  port: undefined | number,
-  readOnlyIntent: boolean,
-  requestTimeout: number,
-  rowCollectionOnDone: boolean,
-  rowCollectionOnRequestCompletion: boolean,
-  serverName: undefined | string,
-  serverSupportsColumnEncryption: boolean,
-  tdsVersion: string,
-  textsize: string,
-  trustedServerNameAE?: string,
-  trustServerCertificate: boolean,
-  useColumnNames: boolean,
-  useUTC: boolean,
-  lowerCaseGuids: boolean
+  };
+  enableAnsiNull: null | boolean;
+  enableAnsiNullDefault: null | boolean;
+  enableAnsiPadding: null | boolean;
+  enableAnsiWarnings: null | boolean;
+  enableArithAbort: null | boolean;
+  enableConcatNullYieldsNull: null | boolean;
+  enableCursorCloseOnCommit: null | boolean;
+  enableImplicitTransactions: null | boolean;
+  enableNumericRoundabort: null | boolean;
+  enableQuotedIdentifier: null | boolean;
+  encrypt: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProviderMap;
+  fallbackToDefaultDb: boolean;
+  instanceName: undefined | string;
+  isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
+  language: string;
+  localAddress: undefined | string;
+  maxRetriesOnTransientErrors: number;
+  multiSubnetFailover: boolean;
+  packetSize: number;
+  port: undefined | number;
+  readOnlyIntent: boolean;
+  requestTimeout: number;
+  rowCollectionOnDone: boolean;
+  rowCollectionOnRequestCompletion: boolean;
+  serverName: undefined | string;
+  serverSupportsColumnEncryption: boolean;
+  tdsVersion: string;
+  textsize: string;
+  trustedServerNameAE?: string;
+  trustServerCertificate: boolean;
+  useColumnNames: boolean;
+  useUTC: boolean;
+  lowerCaseGuids: boolean;
 }
 
 interface KeyStoreProvider {
@@ -198,87 +202,87 @@ interface KeyStoreProviderMap {
 }
 
 interface State {
-  name: string,
-  enter?(this: Connection): void,
-  exit?(this: Connection, newState: State): void,
+  name: string;
+  enter?(this: Connection): void;
+  exit?(this: Connection, newState: State): void;
   events: {
-    socketError?(this: Connection, err: Error): void
-    connectTimeout?(this: Connection): void,
-    socketConnect?(this: Connection): void,
-    data?(this: Connection, data: Buffer): void,
-    message?(this: Connection): void,
-    retry?(this: Connection): void,
-    routingChange?(this: Connection): void,
-    reconnect?(this: Connection): void,
-    featureExtAck?(this: Connection, token: FeatureExtAckToken): void,
-    fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void
-    endOfMessageMarkerReceived?(this: Connection): void,
-    loginFailed?(this: Connection): void,
-    attention?(this: Connection): void
-  }
+    socketError?(this: Connection, err: Error): void;
+    connectTimeout?(this: Connection): void;
+    socketConnect?(this: Connection): void;
+    data?(this: Connection, data: Buffer): void;
+    message?(this: Connection): void;
+    retry?(this: Connection): void;
+    routingChange?(this: Connection): void;
+    reconnect?(this: Connection): void;
+    featureExtAck?(this: Connection, token: FeatureExtAckToken): void;
+    fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void;
+    endOfMessageMarkerReceived?(this: Connection): void;
+    loginFailed?(this: Connection): void;
+    attention?(this: Connection): void;
+  };
 }
 
 interface ConnectionConfiguration {
-  server: string,
-  options?: ConnectionOptions,
+  server: string;
+  options?: ConnectionOptions;
   authentication?: {
-    type?: string,
-    options?: any
-  }
+    type?: string;
+    options?: any;
+  };
 }
 
 interface ConnectionOptions {
-  abortTransactionOnError?: boolean,
-  appName?: string | undefined,
-  camelCaseColumns?: boolean,
-  cancelTimeout?: number,
-  columnEncryptionKeyCacheTTL: number,
-  columnEncryptionSetting: boolean,
-  columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string,
-  connectionRetryInterval?: number,
-  connectTimeout?: number,
-  connectionIsolationLevel?: number,
-  cryptoCredentialsDetails?: {},
-  database?: string | undefined,
-  datefirst?: number,
-  dateFormat?: string,
+  abortTransactionOnError?: boolean;
+  appName?: string | undefined;
+  camelCaseColumns?: boolean;
+  cancelTimeout?: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
+  columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string;
+  connectionRetryInterval?: number;
+  connectTimeout?: number;
+  connectionIsolationLevel?: number;
+  cryptoCredentialsDetails?: {};
+  database?: string | undefined;
+  datefirst?: number;
+  dateFormat?: string;
   debug?: {
-    data: boolean,
-    packet: boolean,
-    payload: boolean,
+    data: boolean;
+    packet: boolean;
+    payload: boolean;
     token: boolean
-  },
-  enableAnsiNull?: boolean,
-  enableAnsiNullDefault?: boolean,
-  enableAnsiPadding?: boolean,
-  enableAnsiWarnings?: boolean,
-  enableArithAbort?: boolean,
-  enableConcatNullYieldsNull?: boolean,
-  enableCursorCloseOnCommit?: boolean | null,
-  enableImplicitTransactions?: boolean,
-  enableNumericRoundabort?: boolean,
-  enableQuotedIdentifier?: boolean,
-  encrypt?: boolean,
-  encryptionKeyStoreProviders?: KeyStoreProvider[],
-  fallbackToDefaultDb?: boolean,
-  instanceName?: string | undefined,
-  isolationLevel?: number,
-  language?: string,
-  localAddress?: string | undefined,
-  maxRetriesOnTransientErrors?: number,
-  multiSubnetFailover?: boolean,
-  packetSize?: number,
-  port?: number,
-  readOnlyIntent?: boolean,
-  requestTimeout?: number,
-  rowCollectionOnDone?: boolean,
-  rowCollectionOnRequestCompletion?: boolean,
-  tdsVersion?: string,
-  textsize?: string,
-  trustServerCertificate?: boolean,
-  useColumnNames?: boolean,
-  useUTC?: boolean,
-  lowerCaseGuids?: boolean,
+  };
+  enableAnsiNull?: boolean;
+  enableAnsiNullDefault?: boolean;
+  enableAnsiPadding?: boolean;
+  enableAnsiWarnings?: boolean;
+  enableArithAbort?: boolean;
+  enableConcatNullYieldsNull?: boolean;
+  enableCursorCloseOnCommit?: boolean | null;
+  enableImplicitTransactions?: boolean;
+  enableNumericRoundabort?: boolean;
+  enableQuotedIdentifier?: boolean;
+  encrypt?: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
+  fallbackToDefaultDb?: boolean;
+  instanceName?: string | undefined;
+  isolationLevel?: number;
+  language?: string;
+  localAddress?: string | undefined;
+  maxRetriesOnTransientErrors?: number;
+  multiSubnetFailover?: boolean;
+  packetSize?: number;
+  port?: number;
+  readOnlyIntent?: boolean;
+  requestTimeout?: number;
+  rowCollectionOnDone?: boolean;
+  rowCollectionOnRequestCompletion?: boolean;
+  tdsVersion?: string;
+  textsize?: string;
+  trustServerCertificate?: boolean;
+  useColumnNames?: boolean;
+  useUTC?: boolean;
+  lowerCaseGuids?: boolean;
 }
 
 const CLEANUP_TYPE = {
@@ -307,20 +311,19 @@ class Connection extends EventEmitter {
   ntlmpacketBuffer: undefined | Buffer;
 
   STATE!: {
-    CONNECTING: State,
-    SENT_PRELOGIN: State,
-    REROUTING: State,
-    TRANSIENT_FAILURE_RETRY: State,
-    SENT_TLSSSLNEGOTIATION: State,
-    SENT_LOGIN7_WITH_STANDARD_LOGIN: State,
-    SENT_LOGIN7_WITH_NTLM: State,
-    SENT_LOGIN7_WITH_FEDAUTH: State,
-    LOGGED_IN_SENDING_INITIAL_SQL: State,
-    LOGGED_IN: State,
-    BUILDING_CLIENT_REQUEST: State,
-    SENT_CLIENT_REQUEST: State,
-    SENT_ATTENTION: State,
-    FINAL: State
+    CONNECTING: State;
+    SENT_PRELOGIN: State;
+    REROUTING: State;
+    TRANSIENT_FAILURE_RETRY: State;
+    SENT_TLSSSLNEGOTIATION: State;
+    SENT_LOGIN7_WITH_STANDARD_LOGIN: State;
+    SENT_LOGIN7_WITH_NTLM: State;
+    SENT_LOGIN7_WITH_FEDAUTH: State;
+    LOGGED_IN_SENDING_INITIAL_SQL: State;
+    LOGGED_IN: State;
+    SENT_CLIENT_REQUEST: State;
+    SENT_ATTENTION: State;
+    FINAL: State;
   }
 
   routingData: any;
@@ -1748,9 +1751,10 @@ class Connection extends EventEmitter {
 
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
-    payload.getData((data) => {
-      return this.messageIo.sendMessage(TYPE.SQL_BATCH, data);
-    });
+
+    const message = new Message({ type: TYPE.SQL_BATCH });
+    this.messageIo.outgoingMessageStream.write(message);
+    payload.getStream().pipe(message);
   }
 
   getInitialSql() {
@@ -1897,8 +1901,8 @@ class Connection extends EventEmitter {
    @param {boolean} [options.tableLock=false] - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
    @param {callback} callback - Function to call after BulkLoad executes.
    */
-  newBulkLoad(table: string, callback: BulkLoadCallback) : BulkLoad
-  newBulkLoad(table: string, options: BulkLoadOptions, callback: BulkLoadCallback) : BulkLoad
+  newBulkLoad(table: string, callback: BulkLoadCallback): BulkLoad
+  newBulkLoad(table: string, options: BulkLoadOptions, callback: BulkLoadCallback): BulkLoad
   newBulkLoad(table: string, callbackOrOptions: BulkLoadOptions | BulkLoadCallback, callback?: BulkLoadCallback) {
     let options: BulkLoadOptions;
 
@@ -2039,6 +2043,7 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
 
+  // eslint-disable-next-line space-before-function-paren
   transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
     if (typeof cb !== 'function') {
       throw new TypeError('`cb` must be a function');
@@ -2093,8 +2098,8 @@ class Connection extends EventEmitter {
   }
 
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: { getData: (callback: (data: Buffer) => void) => void, toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getData: (callback: (data: Buffer) => void) => void, toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: { getStream: () => Readable, toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getStream: () => Readable, toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -2120,12 +2125,7 @@ class Connection extends EventEmitter {
 
       request.once('cancel', () => {
         // There's three ways to handle request cancelation:
-        if (this.state === this.STATE.BUILDING_CLIENT_REQUEST) {
-          // The request was cancelled before buffering finished
-          this.request = undefined;
-          request.callback(RequestError('Canceled.', 'ECANCEL'));
-          this.transitionTo(this.STATE.LOGGED_IN);
-        } else if (!this.isRequestActive(request)) {
+        if (!this.isRequestActive(request)) {
           // Cancel was called on a request that is no longer active on this connection
           return;
         } else if (message.writable) {
@@ -2164,33 +2164,23 @@ class Connection extends EventEmitter {
       } else {
         this.createRequestTimer();
 
-        // Transition to an intermediate state to ensure that no new requests
-        // are made on the connection while the buffer is being populated.
-        this.transitionTo(this.STATE.BUILDING_CLIENT_REQUEST);
+        message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+        this.messageIo.outgoingMessageStream.write(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-        payload!.getData((data) => {
-          if (this.state !== this.STATE.BUILDING_CLIENT_REQUEST) {
-            // Something else has happened on the connection since starting to
-            // build the request. That state change should have invoked the
-            // request handler so there is nothing to do at this point.
-            return;
-          }
-
-          message = this.messageIo.sendMessage(packetType, data, this.resetConnectionOnNextRequest);
-
+        message.once('finish', () => {
           this.resetConnectionOnNextRequest = false;
           this.debug.payload(function() {
             return payload!.toString('  ');
           });
 
-          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
           if (request.paused) { // Request.pause() has been called before the request was started
             this.pauseRequest(request);
           }
         });
-      }
 
+        payload!.getStream().pipe(message);
+      }
     }
   }
 
@@ -2607,18 +2597,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      }
-    }
-  },
-  BUILDING_CLIENT_REQUEST: {
-    name: 'BuildingClientRequest',
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
       }
     }
   },
