@@ -50,8 +50,30 @@ class RpcRequestPayload {
     buffer.writeUInt16LE(optionFlags);
 
     const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
+    const buffers: Buffer[] = [];
+    let i = 0;
+    const next = () => {
+      if( i >= parameters.length) {
+        buffer.writeBuffer(Buffer.concat(buffers));
+        cb(buffer.data);
+        return;
+      }
+
+      const run = (generatorFn: any) => {
+        const resume = () => {
+          buffers.push()
+        }
+
+        const genItr = generatorFn(parameters[i], buffer, resume);
+      }
+
+      run(this._writeParameterData)
+    }
+
+    next();
+  /*   const writeNext = (i: number) => {
       if (i >= parameters.length) {
+        buffer.writeBuffer(Buffer.concat(buffers));
         cb(buffer.data);
         return;
       }
@@ -63,13 +85,26 @@ class RpcRequestPayload {
       });
     };
     writeNext(0);
+ */
+    
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  _writeParameterData(genFn: Generator, parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+    const resume = (cbVal: any) => {
+      
+    }
+
+    //@ts-ignore
+    let genFnItr = genFn(resume);
+    genFnItr.next();
+  }
+
+  * generate(parameter: Parameter, resume: any) {
+    const buffer = new WritableTrackingBuffer(500);
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -103,9 +138,7 @@ class RpcRequestPayload {
     }
 
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
-      cb();
-    });
+    return yield type.writeParameterData(buffer, param, this.options, resume);
   }
 }
 
