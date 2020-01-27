@@ -107,13 +107,13 @@ class RpcRequestPayload {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(genFn: Generator, parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  _writeParameterData(genFn: Generator, parameter: Parameter) {
     const resume = (cbVal: any) => {
-      
+      return genFnItr.next(cbVal).value;
     }
 
     //@ts-ignore
-    let genFnItr = genFn(resume);
+    let genFnItr = genFn(parameter, resume);
     genFnItr.next();
   }
 
