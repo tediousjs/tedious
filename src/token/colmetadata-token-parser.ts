@@ -12,10 +12,10 @@ export type ColumnMetadata = Metadata & {
 };
 
 type cekTableEntryMetadata = {
-  databaseId: number,
-  cekId: number,
-  cekVersion: number,
-  cekMdVersion: Buffer,
+  databaseId: number;
+  cekId: number;
+  cekVersion: number;
+  cekMdVersion: Buffer;
 }
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {

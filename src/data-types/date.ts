@@ -1,7 +1,6 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;

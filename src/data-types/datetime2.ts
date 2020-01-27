@@ -1,7 +1,6 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 

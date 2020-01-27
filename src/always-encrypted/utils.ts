@@ -7,9 +7,9 @@ export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementCol
   switch (stmtColumnEncryptionSetting) {
     case SQLServerStatementColumnEncryptionSetting.Disabled:
     case SQLServerStatementColumnEncryptionSetting.ResultSetOnly:
-        return false;
+      return false;
     case SQLServerStatementColumnEncryptionSetting.Enabled:
-        return true;
+      return true;
     default:
       return columnEncryptionSetting;
   }

@@ -18,7 +18,7 @@ type ParameterOptions = {
     flags: number;
     version: number;
     sortId: number;
-  },
+  };
   forceEncrypt?: boolean;
 }
 

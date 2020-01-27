@@ -199,7 +199,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
 
     this.createKeyClient(keyParts.vaultUrl);
 
-    return (<KeyClient> this.keyClient).getKey(keyParts.name, { version: keyParts.version });
+    return (this.keyClient as KeyClient).getKey(keyParts.name, { version: keyParts.version });
   }
 
   private createKeyClient(keyVaultUrl: string): void {
@@ -221,7 +221,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
     let baseUri;
     try {
       baseUri = parse(masterKeyPath, true, true);
-    } catch (e) {
+    } catch {
       throw new Error(`Invalid keys identifier: ${masterKeyPath}. Not a valid URI`);
     }
 
@@ -243,9 +243,9 @@ export class ColumnEncryptionAzureKeyVaultProvider {
       );
     }
 
-    var vaultUrl = `${baseUri.protocol}//${baseUri.host}`;
-    var name = segments[2];
-    var version = segments.length === 4 ? segments[3] : undefined;
+    const vaultUrl = `${baseUri.protocol}//${baseUri.host}`;
+    const name = segments[2];
+    const version = segments.length === 4 ? segments[3] : undefined;
     return {
       vaultUrl,
       name,
@@ -272,7 +272,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
       throw new Error('Column encryption key cannot be null.');
     }
 
-    const wrappedKey = await cryptoClient.wrapKey(<KeyWrapAlgorithm>encryptionAlgorithm, columnEncryptionKey);
+    const wrappedKey = await cryptoClient.wrapKey(encryptionAlgorithm as KeyWrapAlgorithm, columnEncryptionKey);
 
     return Buffer.from(wrappedKey.result);
   }
@@ -290,7 +290,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
       throw new Error('Encrypted Column Encryption Key length should not be zero.');
     }
 
-    const unwrappedKey = await cryptoClient.unwrapKey(<KeyWrapAlgorithm>encryptionAlgorithm, encryptedColumnEncryptionKey);
+    const unwrappedKey = await cryptoClient.unwrapKey(encryptionAlgorithm as KeyWrapAlgorithm, encryptedColumnEncryptionKey);
 
     return Buffer.from(unwrappedKey.result);
   }

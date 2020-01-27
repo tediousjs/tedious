@@ -154,7 +154,7 @@ export interface InternalConnectionOptions {
     data: boolean;
     packet: boolean;
     payload: boolean;
-    token: boolean
+    token: boolean;
   };
   enableAnsiNull: null | boolean;
   enableAnsiNullDefault: null | boolean;
@@ -250,7 +250,7 @@ interface ConnectionOptions {
     data: boolean;
     packet: boolean;
     payload: boolean;
-    token: boolean
+    token: boolean;
   };
   enableAnsiNull?: boolean;
   enableAnsiNullDefault?: boolean;

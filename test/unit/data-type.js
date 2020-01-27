@@ -798,6 +798,9 @@ describe('Data Types', function() {
           assert.deepEqual(actual, expected);
         });
       });
+    });
+  });
+
   it('should writeParameterData BigInt (Buffer)', function(done) {
     const value = 123456789;
     const expected = Buffer.from('0815cd5b0700000000', 'hex');

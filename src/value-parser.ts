@@ -752,7 +752,7 @@ function readEncryptedBinary(parser: Parser, metadata: Metadata, options: Intern
     }
 
     parser.pushIntermediateBuffer(decryptedValue);
-    let hasProcessedIntermediateBuffer: boolean = false;
+    let hasProcessedIntermediateBuffer = false;
 
     try {
       return denormalizedValue(parser, decryptedValue.length, baseMetadata, options, (value) => {

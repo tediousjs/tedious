@@ -179,7 +179,7 @@ class RpcRequestPayload {
           }
           const plainTextBuffer = type.toBuffer(parameters[i], this.options);
           if (plainTextBuffer) {
-            promises.push(encryptWithKey(plainTextBuffer, <CryptoMetadata>parameters[i].cryptoMetadata, this.options).then((encryptedValue: Buffer) => {
+            promises.push(encryptWithKey(plainTextBuffer, parameters[i].cryptoMetadata as CryptoMetadata, this.options).then((encryptedValue: Buffer) => {
               parameters[i].encryptedVal = encryptedValue;
             }));
           }

@@ -57,7 +57,8 @@ describe('CEKEntry', () => {
       'algorithmName'
     );
 
-    assert.throws(() => entry.add(Buffer.from([0x01, 0x02, 0x03, 0x04]),
+    assert.throws(() => entry.add(
+      Buffer.from([0x01, 0x02, 0x03, 0x04]),
       2,
       1,
       1,

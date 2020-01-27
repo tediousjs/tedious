@@ -102,5 +102,5 @@ export const decryptSymmetricKey = async (md: CryptoMetadata, options: Connectio
   const cipherAlgorithm = new AeadAes256CbcHmac256Algorithm(new AeadAes256CbcHmac256EncryptionKey(symKey.rootKey, algorithmName), md.encryptionType);
 
   md.cipherAlgorithm = cipherAlgorithm;
-  md.encryptionKeyInfo = <EncryptionKeyInfo>encryptionKeyInfoChosen;
+  md.encryptionKeyInfo = encryptionKeyInfoChosen as EncryptionKeyInfo;
 };

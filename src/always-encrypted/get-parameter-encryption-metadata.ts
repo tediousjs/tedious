@@ -77,12 +77,12 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
             encryptionType: encType,
             normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
           };
-          decryptSymmetricKeyPromises.push(decryptSymmetricKey(<CryptoMetadata>request.parameters[paramIndex].cryptoMetadata, connection.config.options));
+          decryptSymmetricKeyPromises.push(decryptSymmetricKey(request.parameters[paramIndex].cryptoMetadata as CryptoMetadata, connection.config.options));
         } else if (request.parameters[paramIndex].forceEncrypt === true) {
           return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
         }
       }
-    } catch (error) {
+    } catch {
       return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
     }
   });

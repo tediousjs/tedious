@@ -240,9 +240,9 @@ describe('Colmetadata Token Parser', () => {
       // collation ...
       0x09, 0x04, 0x00,         // lcid               (1033)
       0x02,                     // flags              (0)
-                                // version            (2)
+      // version            (2)
       0x00,                     // sortid             (0)
-                                // => codepage CP1252
+      // => codepage CP1252
 
       // no schema
       // no user-defined type

@@ -15,10 +15,10 @@ export const getKey = async (keyInfo: EncryptionKeyInfo, options: ConnectionOpti
 
   const serverName: string = options.trustedServerNameAE;
 
-  const keyLookupValue: string = `${serverName}:${Buffer.from(keyInfo.encryptedKey).toString('base64')}:${keyInfo.keyStoreName}`;
+  const keyLookupValue = `${serverName}:${Buffer.from(keyInfo.encryptedKey).toString('base64')}:${keyInfo.keyStoreName}`;
 
   if (cache.has(keyLookupValue)) {
-    return <SymmetricKey>cache.get(keyLookupValue);
+    return cache.get(keyLookupValue) as SymmetricKey;
   } else {
     const provider = options.encryptionKeyStoreProviders && options.encryptionKeyStoreProviders[keyInfo.keyStoreName];
     if (!provider) {

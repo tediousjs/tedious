@@ -39,7 +39,7 @@ export interface CryptoMetadata {
 }
 
 export interface HashMap<T> {
-  [hash: string]: T
+  [hash: string]: T;
 }
 
 

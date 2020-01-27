@@ -117,7 +117,7 @@ function readFlags(parser: Parser, shouldReadFlags: boolean, callback: (flags: n
   }
 }
 
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void, shouldReadFlags: boolean = true) {
+function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void, shouldReadFlags = true) {
   (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     readFlags(parser, shouldReadFlags, (flags) => {
       parser.readUInt8((typeNumber) => {
