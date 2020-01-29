@@ -3,7 +3,7 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-const { Readable } = require('stream');
+import { Readable } from 'stream';
 
 
 // const OPTION = {
@@ -35,7 +35,7 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    return Readable.from(this.generateData())
+    return Readable.from(this.generateData());
   }
 
   * generateData() {
@@ -59,17 +59,17 @@ class RpcRequestPayload {
     const buffers: Buffer[] = [];
 
     parameters.forEach((param: Parameter) => {
-      const gen = this.generateParameterData(param, this.options)
+      const gen = this.generateParameterData(param, this.options);
       const next = () => {
-        let curr = gen.next();
-        if(curr.done) {
+        const curr = gen.next();
+        if (curr.done) {
           return;
         }
         buffers.push(curr.value);
         next();
-      }
+      };
       next();
-    })
+    });
 
     buffer.writeBuffer(Buffer.concat(buffers));
 
