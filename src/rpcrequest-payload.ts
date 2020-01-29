@@ -3,7 +3,8 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-import { Readable } from 'readable-stream';
+const { Readable } = require('stream');
+
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -34,19 +35,10 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    const self = this;
-
-    return new Readable({
-      read() {
-        self.generateData((buf) => {
-          this.push(buf);
-          this.push(null);
-        });
-      }
-    });
+    return Readable.from(this.generateData())
   }
 
-  generateData(cb: (data: Buffer) => void) {
+  * generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -67,14 +59,21 @@ class RpcRequestPayload {
     const buffers: Buffer[] = [];
 
     parameters.forEach((param: Parameter) => {
-      const buffer = this.generateParameterData(param, this.options)
-      buffers.push(buffer.next().value);
-      buffers.push(buffer.next().value);
+      const gen = this.generateParameterData(param, this.options)
+      const next = () => {
+        let curr = gen.next();
+        if(curr.done) {
+          return;
+        }
+        buffers.push(curr.value);
+        next();
+      }
+      next();
     })
 
     buffer.writeBuffer(Buffer.concat(buffers));
 
-    cb(buffer.data);
+    yield buffer.data;
   }
 
   toString(indent = '') {

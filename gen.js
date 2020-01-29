@@ -1,23 +1,12 @@
-function delay(time, cb) {
-    setTimeout(() => {
-        cb(time + 1)
-    }, time)
+const { Readable } = require('stream');
+
+async function * generate() {
+  yield 'hello';
+  yield 'streams';
 }
 
-function* myDelayedMessage(resume) {
-    return yield delay(1000, resume);
-}
+const readable = Readable.from(generate());
 
-
-function run(gf, cb) {
-    function resume(cbVal) {
-        cb(gfItr.next(cbVal).value);
-    }
-
-    var gfItr = gf(resume);
-    gfItr.next();
-}
-
-run(myDelayedMessage, (data) => {
-    console.log('result ', data)
-})
+readable.on('data', (chunk) => {
+  console.log(chunk);
+});
