@@ -116,7 +116,7 @@ jobs:
       script: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
     - stage: release
-      node_js: 8
+      node_js: 12
       before_install: skip
       before_script: skip
       script: npm run semantic-release
