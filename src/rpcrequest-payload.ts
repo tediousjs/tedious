@@ -38,7 +38,7 @@ class RpcRequestPayload {
 
     return new Readable({
       read() {
-        self.getData((buf) => {
+        self.generateData((buf) => {
           this.push(buf);
           this.push(null);
         });
@@ -46,7 +46,7 @@ class RpcRequestPayload {
     });
   }
 
-  getData(cb: (data: Buffer) => void) {
+  generateData(cb: (data: Buffer) => void) {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -65,60 +65,24 @@ class RpcRequestPayload {
 
     const parameters = this.request.parameters;
     const buffers: Buffer[] = [];
-    let i = 0;
-    const next = () => {
-      if( i >= parameters.length) {
-        buffer.writeBuffer(Buffer.concat(buffers));
-        cb(buffer.data);
-        return;
-      }
 
-      const run = (generatorFn: any) => {
-        const resume = () => {
-          buffers.push()
-        }
+    parameters.forEach((param: Parameter) => {
+      const buffer = this.generateParameterData(param, this.options)
+      buffers.push(buffer.next().value);
+      buffers.push(buffer.next().value);
+    })
 
-        const genItr = generatorFn(parameters[i], buffer, resume);
-      }
+    buffer.writeBuffer(Buffer.concat(buffers));
 
-      run(this._writeParameterData)
-    }
-
-    next();
-  /*   const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        buffer.writeBuffer(Buffer.concat(buffers));
-        cb(buffer.data);
-        return;
-      }
-
-      this._writeParameterData(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
-        });
-      });
-    };
-    writeNext(0);
- */
-    
+    cb(buffer.data);
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(genFn: Generator, parameter: Parameter) {
-    const resume = (cbVal: any) => {
-      return genFnItr.next(cbVal).value;
-    }
-
-    //@ts-ignore
-    let genFnItr = genFn(parameter, resume);
-    genFnItr.next();
-  }
-
-  * generate(parameter: Parameter, resume: any) {
-    const buffer = new WritableTrackingBuffer(500);
+  * generateParameterData(parameter: Parameter, options: any) {
+    const buffer = new WritableTrackingBuffer(0);
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -152,7 +116,9 @@ class RpcRequestPayload {
     }
 
     type.writeTypeInfo(buffer, param, this.options);
-    return yield type.writeParameterData(buffer, param, this.options, resume);
+
+    yield buffer.data;
+    yield* type.generate(param, options);
   }
 }
 

@@ -8,14 +8,16 @@ function* myDelayedMessage(resume) {
     return yield delay(1000, resume);
 }
 
-function run(gf) {
+
+function run(gf, cb) {
     function resume(cbVal) {
-        let foo = gfItr.next(cbVal);
-        console.log('result', foo.value);
+        cb(gfItr.next(cbVal).value);
     }
 
     var gfItr = gf(resume);
     gfItr.next();
 }
 
-run(myDelayedMessage)
+run(myDelayedMessage, (data) => {
+    console.log('result ', data)
+})
