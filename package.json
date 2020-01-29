@@ -64,7 +64,7 @@
     "@commitlint/travis-cli": "^8.3.5",
     "@types/bl": "^2.1.0",
     "@types/depd": "^1.1.32",
-    "@types/node": "^12.12.17",
+    "@types/node": "^13.5.1",
     "@types/readable-stream": "^2.3.5",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^2.16.0",
