@@ -35,7 +35,7 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    return Readable.from(this.generateData(), {objectMode: false});
+    return Readable.from(this.generateData(), { objectMode: false });
   }
 
   * generateData() {
@@ -56,24 +56,11 @@ class RpcRequestPayload {
     buffer.writeUInt16LE(optionFlags);
 
     const parameters = this.request.parameters;
-    const buffers: Buffer[] = [];
-
-    parameters.forEach((param: Parameter) => {
-      const gen = this.generateParameterData(param, this.options);
-      const next = () => {
-        const curr = gen.next();
-        if (curr.done) {
-          return;
-        }
-        buffers.push(curr.value);
-        next();
-      };
-      next();
-    });
-
-    buffer.writeBuffer(Buffer.concat(buffers));
-
     yield buffer.data;
+
+    for (let i = 0; i < parameters.length; i++) {
+      yield* this.generateParameterData(parameters[i], this.options);
+    }
   }
 
   toString(indent = '') {
