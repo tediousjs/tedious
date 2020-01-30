@@ -35,7 +35,7 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    return Readable.from(this.generateData(), { objectMode: false });
+    return Readable.from(this.generateData(), { objectMode: false }) as Readable;
   }
 
   * generateData() {
