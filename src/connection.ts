@@ -5,7 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { Readable } from 'stream';
+import { Readable } from 'readable-stream';
 
 import {
   loginWithUsernamePassword,

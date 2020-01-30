@@ -3,7 +3,7 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-import { Readable } from 'stream';
+import { Readable } from 'readable-stream';
 
 
 // const OPTION = {
@@ -35,7 +35,7 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    return Readable.from(this.generateData());
+    return Readable.from(this.generateData(), {objectMode: false});
   }
 
   * generateData() {
