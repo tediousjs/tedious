@@ -12,7 +12,10 @@ import Message from './message';
 import { TYPE } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
-import OutgoingMessageStream from './outgoing-message-stream';
+// import OutgoingMessageStream from './outgoing-message-stream';
+import { Readable } from 'readable-stream';
+import { packetTransform } from './packet-transform';
+
 
 class MessageIO extends EventEmitter {
   socket: Socket;
@@ -21,12 +24,16 @@ class MessageIO extends EventEmitter {
   tlsNegotiationComplete: boolean;
 
   incomingMessageStream: IncomingMessageStream;
-  outgoingMessageStream: OutgoingMessageStream;
+  // outgoingMessageStream: OutgoingMessageStream;
 
   securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
   }
+
+  _packetSize: number;
+
+  stream: Socket | tls.TLSSocket;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -42,24 +49,27 @@ class MessageIO extends EventEmitter {
       message.on('end', () => { this.emit('message'); });
     });
 
-    this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
+    this._packetSize = packetSize;
+    // this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
+
+    this.stream = socket;
 
     this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(this.socket);
+    // this.outgoingMessageStream.pipe(this.socket);
   }
 
   packetSize(...args: [number]) {
     if (args.length > 0) {
       const packetSize = args[0];
-      this.debug.log('Packet size changed from ' + this.outgoingMessageStream.packetSize + ' to ' + packetSize);
-      this.outgoingMessageStream.packetSize = packetSize;
+      this.debug.log('Packet size changed from ' + this._packetSize + ' to ' + packetSize);
+      this._packetSize = packetSize;
     }
 
     if (this.securePair) {
-      this.securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+      this.securePair.cleartext.setMaxSendFragment(this._packetSize);
     }
 
-    return this.outgoingMessageStream.packetSize;
+    return this._packetSize;
   }
 
   startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
@@ -101,17 +111,19 @@ class MessageIO extends EventEmitter {
   encryptAllFutureTraffic() {
     const securePair = this.securePair!;
 
-    securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+    securePair.cleartext.setMaxSendFragment(this._packetSize);
     securePair.encrypted.removeAllListeners('data');
 
-    this.outgoingMessageStream.unpipe(this.socket);
+    // this.outgoingMessageStream.unpipe(this.socket);
     this.socket.unpipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
 
     this.socket.pipe(securePair.encrypted);
     securePair.encrypted.pipe(this.socket);
 
     securePair.cleartext.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(securePair.cleartext);
+    // this.outgoingMessageStream.pipe(securePair.cleartext);
+
+    this.stream = securePair.cleartext;
 
     this.tlsNegotiationComplete = true;
   }
@@ -127,8 +139,16 @@ class MessageIO extends EventEmitter {
   sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
-    this.outgoingMessageStream.write(message);
+
+    this.writeMessage(message);
+
+    // this.stream.write(message);
+
     return message;
+  }
+
+  writeMessage(message: Message) {
+    Readable.from(packetTransform(message, this.debug, this._packetSize), { objectMode: false }).pipe(this.stream, { end: false });
   }
 
   // Temporarily suspends the flow of incoming packets.

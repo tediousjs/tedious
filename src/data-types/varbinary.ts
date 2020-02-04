@@ -4,6 +4,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 
+const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
   type: 'BIGVARBIN',
@@ -57,13 +59,31 @@ const VarBinary: { maximumLength: number } & DataType = {
 
   generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
       if (parameter.length! <= this.maximumLength) {
+        const buffer = new WritableTrackingBuffer(0);
         buffer.writeUsVarbyte(parameter.value);
+        yield buffer.data;
       } else {
-        buffer.writePLPBody(parameter.value);
+        // Length of all chunks.
+        // this.writeUInt64LE(length);
+        // unknown seems to work better here - might revisit later.
+        yield UNKNOWN_PLP_LEN;
+
+        const length = parameter.value.length;
+
+        // In the UNKNOWN_PLP_LEN case, the data is represented as a series of zero or more chunks.
+        if (length > 0) {
+          // One chunk.
+          const lengthBuffer = Buffer.alloc(4);
+          lengthBuffer.writeUInt32LE(length, 0);
+          yield lengthBuffer;
+
+          yield parameter.value;
+        }
+
+        // PLP_TERMINATOR (no more chunks).
+        yield Buffer.alloc(4);
       }
-      yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);

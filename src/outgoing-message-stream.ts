@@ -5,6 +5,8 @@ import Debug from './debug';
 import Message from './message';
 import { Packet, HEADER_LENGTH } from './packet';
 
+import { packetTransform } from './packet-transform';
+
 class OutgoingMessageStream extends Duplex {
   packetSize: number;
   debug: Debug;
@@ -27,57 +29,17 @@ class OutgoingMessageStream extends Duplex {
   }
 
   _write(message: Message, _encoding: string, callback: (err?: Error | null) => void) {
-    const length = this.packetSize - HEADER_LENGTH;
-    let packetNumber = 0;
-
     this.currentMessage = message;
-    this.currentMessage.on('data', (data: Buffer) => {
-      if (message.ignore) {
-        return;
+
+    (async () => {
+      for await (const chunk of packetTransform(message, this.debug, this.packetSize)) {
+        this.push(chunk);
       }
-
-      this.bl.append(data);
-
-      while (this.bl.length > length) {
-        const data = this.bl.slice(0, length);
-        this.bl.consume(length);
-
-        // TODO: Get rid of creating `Packet` instances here.
-        const packet = new Packet(message.type);
-        packet.packetId(packetNumber += 1);
-        packet.resetConnection(message.resetConnection);
-        packet.addData(data);
-
-        this.debug.packet('Sent', packet);
-        this.debug.data(packet);
-
-        if (this.push(packet.buffer) === false) {
-          message.pause();
-        }
-      }
-    });
-
-    this.currentMessage.on('end', () => {
-      const data = this.bl.slice();
-      this.bl.consume(data.length);
-
-      // TODO: Get rid of creating `Packet` instances here.
-      const packet = new Packet(message.type);
-      packet.packetId(packetNumber += 1);
-      packet.resetConnection(message.resetConnection);
-      packet.last(true);
-      packet.ignore(message.ignore);
-      packet.addData(data);
-
-      this.debug.packet('Sent', packet);
-      this.debug.data(packet);
-
-      this.push(packet.buffer);
 
       this.currentMessage = undefined;
 
       callback();
-    });
+    })();
   }
 
   _read(_size: number) {

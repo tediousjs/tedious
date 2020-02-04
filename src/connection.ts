@@ -1657,7 +1657,7 @@ class Connection extends EventEmitter {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
     const message = new Message({ type: TYPE.SQL_BATCH });
-    this.messageIo.outgoingMessageStream.write(message);
+    this.messageIo.writeMessage(message);
     payload.getStream().pipe(message);
   }
 
@@ -2041,7 +2041,7 @@ class Connection extends EventEmitter {
         if (!request.streamingMode) {
           request.rowToPacketTransform.end();
         }
-        this.messageIo.outgoingMessageStream.write(message);
+        this.messageIo.writeMessage(message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
         if (request.paused) { // Request.pause() has been called before the request was started
@@ -2051,7 +2051,7 @@ class Connection extends EventEmitter {
         this.createRequestTimer();
 
         message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
+        this.messageIo.writeMessage(message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
         message.once('finish', () => {

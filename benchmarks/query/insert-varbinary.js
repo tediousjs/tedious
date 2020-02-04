@@ -3,11 +3,12 @@ const { createBenchmark, createConnection } = require('../common');
 const { Request, TYPES } = require('../../lib/tedious');
 
 const bench = createBenchmark(main, {
-  n: [10],
+  n: [10, 100],
   size: [
+    10,
+    1024,
     1024 * 1024,
-    10 * 1024 * 1024,
-    50 * 1024 * 1024
+    10 * 1024 * 1024
   ]
 });
 

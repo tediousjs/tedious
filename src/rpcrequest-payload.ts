@@ -34,19 +34,10 @@ class RpcRequestPayload {
   }
 
   getStream() {
-    const self = this;
-
-    return new Readable({
-      read() {
-        self.getData((buf) => {
-          this.push(buf);
-          this.push(null);
-        });
-      }
-    });
+    return Readable.from(this.generateData(), { objectMode: false });
   }
 
-  getData(cb: (data: Buffer) => void) {
+  *generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -62,28 +53,20 @@ class RpcRequestPayload {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
+    yield buffer.data;
 
     const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        cb(buffer.data);
-        return;
-      }
-
-      this._writeParameterData(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
-        });
-      });
-    };
-    writeNext(0);
+    for (let i = 0; i < parameters.length; i++) {
+      yield * this.generateParameterData(parameters[i]);
+    }
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  *generateParameterData(parameter: Parameter) {
+    const buffer = new WritableTrackingBuffer(500);
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -117,9 +100,9 @@ class RpcRequestPayload {
     }
 
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
-      cb();
-    });
+    yield buffer.data;
+
+    yield * type.generate(param, this.options);
   }
 }
 
