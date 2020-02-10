@@ -56,14 +56,44 @@ const VarBinary: { maximumLength: number } & DataType = {
   },
 
   generate: function* (parameter, options) {
-    if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
+    let value = parameter.value;
+
+    if (value != null) {
       if (parameter.length! <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value);
+        const buffer = new WritableTrackingBuffer(0);
+        buffer.writeUsVarbyte(value);
+        yield buffer.data;
+
       } else {
-        buffer.writePLPBody(parameter.value);
+        console.log('PLP Bodaay')
+        const buf = new WritableTrackingBuffer(0);
+        const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+        let length;
+        if (value instanceof Buffer) {
+          length = value.length;
+        } else {
+          value = value.toString();
+          length = Buffer.byteLength(value, buf.encoding);
+        }
+
+        buf.writeBuffer(UNKNOWN_PLP_LEN);
+        if(length > 0) {
+          buf.writeUInt32LE(length);
+          if(value instanceof Buffer) {
+            buf.writeBuffer(value);
+          } else {
+            buf.makeRoomFor(length);
+            buf.buffer.write(value, buf.position, buf.encoding);
+            buf.position = length;
+          }
+        }
+
+        buf.writeUInt32LE(0);
+        yield buf.data; 
       }
-      yield buffer.data;
+
+      // yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
