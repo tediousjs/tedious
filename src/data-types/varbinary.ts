@@ -64,9 +64,7 @@ const VarBinary: { maximumLength: number } & DataType = {
         buffer.writeUsVarbyte(value);
         yield buffer.data;
 
-      } else {
-        console.log('PLP Bodaay')
-        const buf = new WritableTrackingBuffer(0);
+      } else { //writePLPBody
         const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 
         let length;
@@ -74,23 +72,24 @@ const VarBinary: { maximumLength: number } & DataType = {
           length = value.length;
         } else {
           value = value.toString();
-          length = Buffer.byteLength(value, buf.encoding);
+          length = Buffer.byteLength(value, 'ucs2');
         }
 
-        buf.writeBuffer(UNKNOWN_PLP_LEN);
+        let buffer = Buffer.alloc(4);
         if(length > 0) {
-          buf.writeUInt32LE(length);
+          buffer.writeUInt32LE(length, 0);
+          
           if(value instanceof Buffer) {
-            buf.writeBuffer(value);
+            buffer = Buffer.concat([buffer, value], buffer.length + value.length);
+
           } else {
-            buf.makeRoomFor(length);
-            buf.buffer.write(value, buf.position, buf.encoding);
-            buf.position = length;
+            const buffer2 = Buffer.from(value, 'ucs2');
+            buffer = Buffer.concat([buffer, buffer2], buffer.length + buffer2.length);
           }
         }
 
-        buf.writeUInt32LE(0);
-        yield buf.data; 
+        const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+        yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length); 
       }
 
       // yield buffer.data;
