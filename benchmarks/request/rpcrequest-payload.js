@@ -16,8 +16,9 @@ function main({ n, size }) {
   const buf = Buffer.alloc(size);
   buf.fill('x');
 
-  const request = new Request('INSERT INTO #benchmark ([value]) VALUES (@value)', () => {});
+  const request = new Request('INSERT INTO #benchmark ([value], [val]) VALUES (@value, @val)', () => {});
   request.addParameter('value', TYPES.VarBinary, buf);
+  request.addParameter('val', TYPES.VarChar, 'Hello World');
 
   let i = 0;
   bench.start();

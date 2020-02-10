@@ -22,7 +22,7 @@ connection.on('debug', function(text) {
 
 //12345567
 function executeStatement() {
-  let request = new Request("select * from varbins where col1=@inpt", function(err, rowCount) {
+  let request = new Request("select * from varbins where col3=@inpt", function(err, rowCount) {
     if (err) {
       console.log(err);
     } else {
@@ -32,7 +32,7 @@ function executeStatement() {
     connection.close();
   });
 
-  request.addParameter('inpt', TYPES.VarBinary, Buffer.from([0x61]), {length: 8001});
+  request.addParameter('inpt', TYPES.VarChar, 'hello', {length: 8001});
 
 
   request.on('row', function(columns) {

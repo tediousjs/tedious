@@ -64,7 +64,7 @@ const VarBinary: { maximumLength: number } & DataType = {
         buffer.writeUsVarbyte(value);
         yield buffer.data;
 
-      } else { //writePLPBody
+      } else { // writePLPBody
         const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 
         let length;
@@ -76,10 +76,10 @@ const VarBinary: { maximumLength: number } & DataType = {
         }
 
         let buffer = Buffer.alloc(4);
-        if(length > 0) {
+        if (length > 0) {
           buffer.writeUInt32LE(length, 0);
-          
-          if(value instanceof Buffer) {
+
+          if (value instanceof Buffer) {
             buffer = Buffer.concat([buffer, value], buffer.length + value.length);
 
           } else {
@@ -89,7 +89,7 @@ const VarBinary: { maximumLength: number } & DataType = {
         }
 
         const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-        yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length); 
+        yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length);
       }
 
       // yield buffer.data;

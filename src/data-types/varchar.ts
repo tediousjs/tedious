@@ -63,15 +63,30 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
+      let value = parameter.value;
+
       if (parameter.length! <= this.maximumLength) {
+        const buffer = new WritableTrackingBuffer(0);
         buffer.writeUsVarbyte(parameter.value, 'ascii');
+        yield buffer.data;
       } else {
-        buffer.writePLPBody(parameter.value, 'ascii');
+        const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+        value = value.toString();
+        const length = Buffer.byteLength(value, 'ascii');
+
+        if (length > 0) {
+          let buffer = Buffer.alloc(4);
+          buffer.writeUInt32LE(length, 0);
+          const buffer2 = Buffer.from(value, 'ascii');
+          buffer = Buffer.concat([buffer, buffer2], buffer.length + buffer2.length);
+          yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length);
+        } else {
+          yield Buffer.concat([UNKNOWN_PLP_LEN, end], UNKNOWN_PLP_LEN.length + end.length);
+        }
       }
-      yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
