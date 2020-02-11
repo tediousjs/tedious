@@ -79,12 +79,12 @@ const VarChar: { maximumLength: number } & DataType = {
 
         yield UNKNOWN_PLP_LEN;
         if (length > 0) {
-          let buffer = Buffer.alloc(4);
+          const buffer = Buffer.alloc(4);
           buffer.writeUInt32LE(length, 0);
           yield buffer;
           yield Buffer.from(value, 'ascii');
-        } 
-        
+        }
+
         yield end;
       }
     } else if (parameter.length! <= this.maximumLength) {
