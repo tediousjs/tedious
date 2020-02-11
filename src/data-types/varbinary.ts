@@ -75,24 +75,23 @@ const VarBinary: { maximumLength: number } & DataType = {
           length = Buffer.byteLength(value, 'ucs2');
         }
 
-        let buffer = Buffer.alloc(4);
+        yield UNKNOWN_PLP_LEN;
         if (length > 0) {
+          let buffer = Buffer.alloc(4);
           buffer.writeUInt32LE(length, 0);
+          yield buffer;
 
           if (value instanceof Buffer) {
-            buffer = Buffer.concat([buffer, value], buffer.length + value.length);
-
+            yield value;
           } else {
-            const buffer2 = Buffer.from(value, 'ucs2');
-            buffer = Buffer.concat([buffer, buffer2], buffer.length + buffer2.length);
+            yield Buffer.from(value, 'ucs2');
           }
         }
 
         const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-        yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length);
+        yield end;
       }
 
-      // yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);

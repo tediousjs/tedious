@@ -77,15 +77,15 @@ const VarChar: { maximumLength: number } & DataType = {
         value = value.toString();
         const length = Buffer.byteLength(value, 'ascii');
 
+        yield UNKNOWN_PLP_LEN;
         if (length > 0) {
           let buffer = Buffer.alloc(4);
           buffer.writeUInt32LE(length, 0);
-          const buffer2 = Buffer.from(value, 'ascii');
-          buffer = Buffer.concat([buffer, buffer2], buffer.length + buffer2.length);
-          yield Buffer.concat([UNKNOWN_PLP_LEN, buffer, end], UNKNOWN_PLP_LEN.length + buffer.length + end.length);
-        } else {
-          yield Buffer.concat([UNKNOWN_PLP_LEN, end], UNKNOWN_PLP_LEN.length + end.length);
-        }
+          yield buffer;
+          yield Buffer.from(value, 'ascii');
+        } 
+        
+        yield end;
       }
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
