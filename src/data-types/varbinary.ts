@@ -3,6 +3,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
+const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
@@ -65,8 +67,6 @@ const VarBinary: { maximumLength: number } & DataType = {
         yield buffer.data;
 
       } else { // writePLPBody
-        const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-
         let length;
         if (value instanceof Buffer) {
           length = value.length;
@@ -87,9 +87,8 @@ const VarBinary: { maximumLength: number } & DataType = {
             yield Buffer.from(value, 'ucs2');
           }
         }
-
-        const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-        yield end;
+        
+        yield PLP_TERMINATOR;
       }
 
     } else if (parameter.length! <= this.maximumLength) {

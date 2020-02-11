@@ -3,6 +3,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
+const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
@@ -72,8 +74,6 @@ const VarChar: { maximumLength: number } & DataType = {
         buffer.writeUsVarbyte(parameter.value, 'ascii');
         yield buffer.data;
       } else {
-        const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-        const end = Buffer.from([0x00, 0x00, 0x00, 0x00]);
         value = value.toString();
         const length = Buffer.byteLength(value, 'ascii');
 
@@ -85,7 +85,7 @@ const VarChar: { maximumLength: number } & DataType = {
           yield Buffer.from(value, 'ascii');
         }
 
-        yield end;
+        yield PLP_TERMINATOR;
       }
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
