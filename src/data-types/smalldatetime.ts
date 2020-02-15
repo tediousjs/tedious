@@ -10,23 +10,28 @@ const SmallDateTime: DataType = {
   type: 'DATETIM4',
   name: 'SmallDateTime',
 
-  declaration: function() {
+  declaration: function () {
     return 'smalldatetime';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(DateTimeN.id);
-    buffer.writeUInt8(4);
+  writeTypeInfo: function (buffer) {
+    if (buffer) {
+      buffer.writeUInt8(DateTimeN.id);
+      buffer.writeUInt8(4);
+      return;
+    }
+
+    return Buffer.from([DateTimeN.id, 0x04]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(8);
+      const buffer = Buffer.alloc(5);
       let days, dstDiff, minutes;
       if (options.useUTC) {
         days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
@@ -36,20 +41,17 @@ const SmallDateTime: DataType = {
         days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
         minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
       }
-
-      buffer.writeUInt8(4);
-      buffer.writeUInt16LE(days);
-
-      buffer.writeUInt16LE(minutes);
-      yield buffer.data;
+      let offset = 0;
+      offset = buffer.writeUInt8(4, offset);
+      offset = buffer.writeUInt16LE(days, offset);
+      offset = buffer.writeUInt16LE(minutes, offset);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 
-  validate: function(value): null | Date| TypeError {
+  validate: function (value): null | Date | TypeError {
     if (value == null) {
       return null;
     }

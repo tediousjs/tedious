@@ -12,8 +12,13 @@ const BigInt: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(8);
+    if(buffer) {
+      buffer.writeUInt8(IntN.id);
+      buffer.writeUInt8(8);
+      return;
+    }
+
+    return Buffer.from([IntN.id, 0x08])
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -28,9 +33,7 @@ const BigInt: DataType = {
       buffer.writeInt64LE(Number(parameter.value));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

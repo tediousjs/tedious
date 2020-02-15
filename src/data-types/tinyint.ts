@@ -12,8 +12,13 @@ const TinyInt: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(1);
+    if(buffer) {
+      buffer.writeUInt8(IntN.id);
+      buffer.writeUInt8(1);
+      return;
+    }
+    
+    return Buffer.from([IntN.id, 0x01]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -23,16 +28,14 @@ const TinyInt: DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt8(1);
-      buffer.writeUInt8(Number(parameter.value));
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      let offset = 0;
+      offset = buffer.writeUInt8(1, offset);
+      buffer.writeUInt8(Number(parameter.value), offset);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
-
   },
 
   validate: function(value): number | null | TypeError {

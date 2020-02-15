@@ -7,11 +7,11 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
   type: 'DECIMAL',
   name: 'Decimal',
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
     return 'decimal(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolvePrecision: function(parameter) {
+  resolvePrecision: function (parameter) {
     if (parameter.precision != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
@@ -21,7 +21,7 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     }
   },
 
-  resolveScale: function(parameter) {
+  resolveScale: function (parameter) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else {
@@ -29,36 +29,54 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(DecimalN.id);
-    if (parameter.precision! <= 9) {
-      buffer.writeUInt8(5);
-    } else if (parameter.precision! <= 19) {
-      buffer.writeUInt8(9);
-    } else if (parameter.precision! <= 28) {
-      buffer.writeUInt8(13);
-    } else {
-      buffer.writeUInt8(17);
+  writeTypeInfo: function (buffer, parameter) {
+    if (buffer) {
+      buffer.writeUInt8(DecimalN.id);
+      if (parameter.precision! <= 9) {
+        buffer.writeUInt8(5);
+      } else if (parameter.precision! <= 19) {
+        buffer.writeUInt8(9);
+      } else if (parameter.precision! <= 28) {
+        buffer.writeUInt8(13);
+      } else {
+        buffer.writeUInt8(17);
+      }
+      buffer.writeUInt8(parameter.precision);
+      buffer.writeUInt8(parameter.scale);
+      return;
     }
-    buffer.writeUInt8(parameter.precision);
-    buffer.writeUInt8(parameter.scale);
+
+    let precision; 
+    if (parameter.precision! <= 9) {
+      precision = 0x05;
+    } else if (parameter.precision! <= 19) {
+      precision = 0x09;
+    } else if (parameter.precision! <= 28) {
+      precision = 0x0D
+    } else {
+      precision = 0x11;
+    }
+
+    return Buffer.from([DecimalN.id, precision, parameter.precision!, parameter.scale!])
+
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
       if (parameter.precision! <= 9) {
-        const buffer = new WritableTrackingBuffer(6);
-        buffer.writeUInt8(5);
-        buffer.writeUInt8(sign);
-        buffer.writeUInt32LE(value);
-        yield buffer.data;
+        const buffer = Buffer.alloc(6);
+        let offset = 0;
+        offset = buffer.writeUInt8(5, offset);
+        offset = buffer.writeUInt8(sign, offset);
+        buffer.writeUInt32LE(value, offset);
+        yield buffer;
       } else if (parameter.precision! <= 19) {
         const buffer = new WritableTrackingBuffer(10);
         buffer.writeUInt8(9);
@@ -82,13 +100,11 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
         yield buffer.data;
       }
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 
-  validate: function(value): number | null | TypeError {
+  validate: function (value): number | null | TypeError {
     if (value == null) {
       return null;
     }

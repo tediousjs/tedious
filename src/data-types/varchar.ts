@@ -50,20 +50,35 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength);
-    } else {
-      buffer.writeUInt16LE(MAX);
+    if(buffer) {
+      buffer.writeUInt8(this.id);
+      if (parameter.length! <= this.maximumLength) {
+        buffer.writeUInt16LE(this.maximumLength);
+      } else {
+        buffer.writeUInt16LE(MAX);
+      }
+      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+      return;
     }
-    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+    
+    const buff = Buffer.from([this.id]);
+
+    const buff2 = Buffer.alloc(2);
+    if (parameter.length! <= this.maximumLength) {
+      buff2.writeUInt16LE(this.maximumLength, 0);
+    } else {
+      buff2.writeUInt16LE(MAX, 0);
+    }
+
+    const buff3 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
+
+    return Buffer.concat([buff, buff2, buff3], buff.length + buff2.length + buff3.length);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
-
 
   generate: function* (parameter, options) {
     if (parameter.value != null) {

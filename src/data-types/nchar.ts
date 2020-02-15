@@ -9,7 +9,7 @@ const NChar: DataType & { maximumLength: number } = {
   name: 'NChar',
   maximumLength: 4000,
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
     // const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
@@ -31,7 +31,7 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function (parameter) {
     // const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
@@ -48,30 +48,58 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt16LE(parameter.length! * 2);
-    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+  writeTypeInfo: function (buffer, parameter) {
+    if (buffer) {
+      buffer.writeUInt8(this.id);
+      buffer.writeUInt16LE(parameter.length! * 2);
+      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+      return;
+    }
+
+    const buff = Buffer.alloc(3);
+    let offset = 0;
+    offset = buff.writeUInt8(this.id, offset);
+    buff.writeUInt16LE(parameter.length! * 2, offset);
+
+    const buff2 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
+
+    return Buffer.concat([buff, buff2], buff.length + buff2.length);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
+    let value = parameter.value;
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
-      buffer.writeUsVarbyte(parameter.value, 'ucs2');
-      yield buffer.data;
+      if (value instanceof Buffer) {
+        const length = value.length;
+        const buffer = Buffer.alloc(2);
+
+        buffer.writeUInt16LE(length, 0);
+
+        yield buffer;
+        yield value;
+
+      } else {
+        value = value.toString();
+        const length = Buffer.byteLength(value, 'ucs2');
+        const buffer = Buffer.alloc(2);
+
+        buffer.writeUInt16LE(length, 0);
+        yield buffer;
+        yield Buffer.from(value, 'ucs2');
+      }
     } else {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(NULL);
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(NULL, 0);
+      yield buffer;
     }
   },
 
-  validate: function(value): string | null | TypeError {
+  validate: function (value): string | null | TypeError {
     if (value == null) {
       return null;
     }

@@ -21,8 +21,13 @@ const Time: DataType = {
   },
 
   writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale!);
+    if(buffer) {
+      buffer.writeUInt8(this.id);
+      buffer.writeUInt8(parameter.scale!);
+      return;
+    }
+    
+    return Buffer.from([this.id, parameter.scale!]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -67,9 +72,7 @@ const Time: DataType = {
 
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

@@ -12,7 +12,7 @@ const VarBinary: { maximumLength: number } & DataType = {
   name: 'VarBinary',
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     let length;
     if (parameter.length) {
@@ -32,7 +32,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -43,16 +43,30 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength);
-    } else {
-      buffer.writeUInt16LE(MAX);
+  writeTypeInfo: function (buffer, parameter) {
+    if (buffer) {
+      buffer.writeUInt8(this.id);
+      if (parameter.length! <= this.maximumLength) {
+        buffer.writeUInt16LE(this.maximumLength);
+      } else {
+        buffer.writeUInt16LE(MAX);
+      }
+      return;
     }
+
+    const buff = Buffer.from([this.id]);
+
+    const buff2 = Buffer.alloc(2);
+    if (parameter.length! <= this.maximumLength) {
+      buff2.writeUInt16LE(this.maximumLength, 0);
+    } else {
+      buff2.writeUInt16LE(MAX, 0);
+    }
+
+    return Buffer.concat([buff, buff2], buff.length + buff2.length);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -87,7 +101,7 @@ const VarBinary: { maximumLength: number } & DataType = {
             yield Buffer.from(value, 'ucs2');
           }
         }
-        
+
         yield PLP_TERMINATOR;
       }
 
@@ -103,7 +117,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): Buffer | null | TypeError {
+  validate: function (value): Buffer | null | TypeError {
     if (value == null) {
       return null;
     }

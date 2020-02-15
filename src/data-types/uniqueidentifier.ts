@@ -16,8 +16,13 @@ const UniqueIdentifier: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(0x10);
+    if (buffer) {
+      buffer.writeUInt8(this.id);
+      buffer.writeUInt8(0x10);
+      return;
+    }
+    
+    return Buffer.from([this.id, 0x10]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {

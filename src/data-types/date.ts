@@ -16,7 +16,12 @@ const Date: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(this.id);
+    if(buffer){
+      buffer.writeUInt8(this.id);
+      return;
+    }
+    
+    return Buffer.from([this.id]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -42,9 +47,7 @@ const Date: DataType = {
       buffer.writeUInt24LE(days);
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

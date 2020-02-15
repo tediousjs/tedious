@@ -7,34 +7,40 @@ const Int: DataType = {
   type: 'INT4',
   name: 'Int',
 
-  declaration: function() {
+  declaration: function () {
     return 'int';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(4);
+  writeTypeInfo: function (buffer) {
+    if (buffer) {
+      buffer.writeUInt8(IntN.id);
+      buffer.writeUInt8(4);
+      return;
+    }
+
+    return Buffer.from([IntN.id, 0x04]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(5);
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(Number(parameter.value));
-      yield buffer.data;
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(4, 0);
+      yield buffer;
+
+      const buffer2 = Buffer.alloc(4);
+      buffer2.writeInt32LE(Number(parameter.value), 0);
+      yield buffer2;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 
-  validate: function(value): number | null | TypeError {
+  validate: function (value): number | null | TypeError {
     if (value == null) {
       return null;
     }

@@ -20,13 +20,20 @@ describe('Data Types', function() {
     }
   });
 
+  it('should writeTypeInfo SmallDateTime', function() {
+    const type = TYPES.typeByName.SmallDateTime;
+    const expected = Buffer.from([0x6F, 0x04]);
+
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
+  });
+
   it('should writeTypeInfo DateTime', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.DateTime;
     const expected = Buffer.from([0x6F, 8]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('dateTimeDaylightSaving', () => {
@@ -69,12 +76,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Date', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Date;
     const expected = Buffer.from([0x28]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('dateDaylightSaving', () => {
@@ -92,12 +98,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Time', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Time;
     const expected = Buffer.from([0x29, 1]);
 
-    type.writeTypeInfo(buffer, { scale: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const reuslt = type.writeTypeInfo(undefined, { scale: 1 });
+    assert.deepEqual(reuslt, expected);
   });
 
 
@@ -119,13 +124,12 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo BigInt', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.BigInt;
 
     const expected = Buffer.from([0x26, 8]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData BigInt (Buffer)', function(done) {
@@ -160,14 +164,13 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Binary', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Binary;
     const parameter = { length: 1 };
 
     const expected = Buffer.from([0xAD, 1, 0]);
 
-    type.writeTypeInfo(buffer, parameter);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, parameter);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Binary (Buffer)', function(done) {
@@ -203,12 +206,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Bit', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Bit;
     const expected = Buffer.from([0x68, 1]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Bit (Buffer)', function(done) {
@@ -257,12 +259,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Char', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Char;
     const expected = Buffer.from([0xAF, 1, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Char (Buffer)', function(done) {
@@ -338,29 +339,25 @@ describe('Data Types', function() {
     const type = TYPES.typeByName.Decimal;
 
     // Precision <= 9
-    const buffer1 = new WritableTrackingBuffer(4);
     const expected1 = Buffer.from([0x6A, 5, 1, 1]);
-    type.writeTypeInfo(buffer1, { precision: 1, scale: 1 });
-    assert.deepEqual(buffer1.data, expected1);
+    const result = type.writeTypeInfo(undefined, { precision: 1, scale: 1 });
+    assert.deepEqual(result, expected1);
 
     // Precision <= 19
-    const buffer2 = new WritableTrackingBuffer(4);
     const expected2 = Buffer.from([0x6A, 9, 15, 1]);
-    type.writeTypeInfo(buffer2, { precision: 15, scale: 1 });
-    assert.deepEqual(buffer2.data, expected2);
+    const result2 = type.writeTypeInfo(undefined, { precision: 15, scale: 1 });
+    assert.deepEqual(result2, expected2);
 
 
     // Precision <= 28
-    const buffer3 = new WritableTrackingBuffer(4);
     const expected3 = Buffer.from([0x6A, 13, 20, 1]);
-    type.writeTypeInfo(buffer3, { precision: 20, scale: 1 });
-    assert.deepEqual(buffer3.data, expected3);
+    const result3 = type.writeTypeInfo(undefined, { precision: 20, scale: 1 });
+    assert.deepEqual(result3, expected3);
 
     // Precision > 28
-    const buffer4 = new WritableTrackingBuffer(4);
     const expected4 = Buffer.from([0x6A, 17, 30, 1]);
-    type.writeTypeInfo(buffer4, { precision: 30, scale: 1 });
-    assert.deepEqual(buffer4.data, expected4);
+    const result4 = type.writeTypeInfo(undefined, { precision: 30, scale: 1 });
+    assert.deepEqual(result4, expected4);
   });
 
   it('should writeParameterData Decimal (Precision <= 9)', function(done) {
@@ -430,12 +427,11 @@ describe('Data Types', function() {
 
 
   it('should writeTypeInfo Float', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Float;
     const expected = Buffer.from([0x6D, 8]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Float (Buffer)', function(done) {
@@ -469,12 +465,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Image', function() {
-    const buffer = new WritableTrackingBuffer(5);
     const type = TYPES.typeByName.Image;
     const expected = Buffer.from([0x22, 1, 0, 0, 0]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Image (Buffer)', function(done) {
@@ -508,12 +503,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Int', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Int;
     const expected = Buffer.from([0x26, 4]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Int (Buffer)', function(done) {
@@ -547,12 +541,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Money', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Money;
     const expected = Buffer.from([0x6E, 8]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
 
@@ -587,12 +580,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo NChar', function() {
-    const buffer = new WritableTrackingBuffer(8);
     const type = TYPES.typeByName.NChar;
     const expected = Buffer.from([0xEF, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData NChar (Buffer)', function(done) {
@@ -630,29 +622,25 @@ describe('Data Types', function() {
     const type = TYPES.typeByName.Numeric;
 
     // Precision <= 9
-    const buffer1 = new WritableTrackingBuffer(4);
     const expected1 = Buffer.from([0x6C, 5, 1, 1]);
-    type.writeTypeInfo(buffer1, { precision: 1, scale: 1 });
-    assert.deepEqual(buffer1.data, expected1);
+    const result = type.writeTypeInfo(undefined, { precision: 1, scale: 1 });
+    assert.deepEqual(result, expected1);
 
     // Precision <= 19
-    const buffer2 = new WritableTrackingBuffer(4);
     const expected2 = Buffer.from([0x6C, 9, 15, 1]);
-    type.writeTypeInfo(buffer2, { precision: 15, scale: 1 });
-    assert.deepEqual(buffer2.data, expected2);
+    const result2 = type.writeTypeInfo(undefined, { precision: 15, scale: 1 });
+    assert.deepEqual(result2, expected2);
 
 
     // Precision <= 28
-    const buffer3 = new WritableTrackingBuffer(4);
     const expected3 = Buffer.from([0x6C, 13, 20, 1]);
-    type.writeTypeInfo(buffer3, { precision: 20, scale: 1 });
-    assert.deepEqual(buffer3.data, expected3);
+    const result3 = type.writeTypeInfo(undefined, { precision: 20, scale: 1 });
+    assert.deepEqual(result3, expected3);
 
     // Precision > 28
-    const buffer4 = new WritableTrackingBuffer(4);
     const expected4 = Buffer.from([0x6C, 17, 30, 1]);
-    type.writeTypeInfo(buffer4, { precision: 30, scale: 1 });
-    assert.deepEqual(buffer4.data, expected4);
+    const result4 = type.writeTypeInfo(undefined, { precision: 30, scale: 1 });
+    assert.deepEqual(result4, expected4);
   });
 
   it('should writeParameterData Numeric (Precision <= 9)', function(done) {
@@ -722,19 +710,17 @@ describe('Data Types', function() {
 
   it('should writeTypeInfo NVarChar', function() {
     // Length <= Maximum Length
-    const buffer = new WritableTrackingBuffer(8);
     const type = TYPES.typeByName.NVarChar;
     const expected = Buffer.from([0xE7, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
 
     // Length > Maximum Length
-    const buffer1 = new WritableTrackingBuffer(8);
     const expected1 = Buffer.from([0xE7, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    type.writeTypeInfo(buffer1, { length: 4100 });
-    assert.deepEqual(buffer1.data, expected1);
+    const result2 = type.writeTypeInfo(undefined, { length: 4100 });
+    assert.deepEqual(result2, expected1);
   });
 
   it('should writeParameterData NVarChar (Buffer, Length <= Maximum Length )', function(done) {
@@ -802,12 +788,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Real', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Real;
     const expected = Buffer.from([0x6D, 4]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Real (Buffer)', function(done) {
@@ -841,12 +826,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo SmallInt', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.SmallInt;
     const expected = Buffer.from([0x26, 2]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData SmallInt (Buffer)', function(done) {
@@ -880,12 +864,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo SmallMoney', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.SmallMoney;
     const expected = Buffer.from([0x6E, 4]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result =  type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData SmallMoney (Buffer)', function(done) {
@@ -919,12 +902,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo Text', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.Text;
     const expected = Buffer.from([0x23, 1, 0, 0, 0]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData Text (Buffer)', function(done) {
@@ -958,12 +940,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo TinyInt', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.TinyInt;
     const expected = Buffer.from([0x26, 1]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
 
@@ -998,12 +979,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo TVP', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.TVP;
     const expected = Buffer.from([0xF3, 0x00, 0x00, 0x00]);
 
-    type.writeTypeInfo(buffer, { value: null });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { value: null });
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData TVP (Buffer)', function(done) {
@@ -1041,12 +1021,11 @@ describe('Data Types', function() {
   });
 
   it('should writeTypeInfo UniqueIdentifier', function() {
-    const buffer = new WritableTrackingBuffer(2);
     const type = TYPES.typeByName.UniqueIdentifier;
     const expected = Buffer.from([0x24, 0x10]);
 
-    type.writeTypeInfo(buffer);
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined);
+    assert.deepEqual(result, expected);
   });
 
   it('should writeParameterData UniqueIdentifier (Buffer)', function(done) {
@@ -1085,18 +1064,16 @@ describe('Data Types', function() {
     const type = TYPES.typeByName.VarBinary;
 
     // Length <= Maximum Length
-    const buffer = new WritableTrackingBuffer(2);
     const expected = Buffer.from([0xA5, 0x40, 0x1F]);
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
 
     // Length > Maximum Length
-    const buffer1 = new WritableTrackingBuffer(2);
     const expected1 = Buffer.from([0xA5, 0xFF, 0xFF]);
 
-    type.writeTypeInfo(buffer1, { length: 8500 });
-    assert.deepEqual(buffer1.data, expected1);
+    const result1 = type.writeTypeInfo(undefined, { length: 8500 });
+    assert.deepEqual(result1, expected1);
   });
 
   it('should writeParameterData varbinary', () => {
@@ -1174,18 +1151,16 @@ describe('Data Types', function() {
     const type = TYPES.typeByName.VarChar;
 
     // Length <= Maximum Length
-    const buffer = new WritableTrackingBuffer(2);
     const expected = Buffer.from('a7401f0000000000', 'hex');
 
-    type.writeTypeInfo(buffer, { length: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const result = type.writeTypeInfo(undefined, { length: 1 });
+    assert.deepEqual(result, expected);
 
     // Length > Maximum Length
-    const buffer1 = new WritableTrackingBuffer(2);
     const expected1 = Buffer.from('a7ffff0000000000', 'hex');
 
-    type.writeTypeInfo(buffer1, { length: 8500 });
-    assert.deepEqual(buffer1.data, expected1);
+    const result2 = type.writeTypeInfo(undefined, { length: 8500 });
+    assert.deepEqual(result2, expected1);
   });
 
   it('should writeParameterData VarChar (Buffer, Length <= Maximum Length)', function(done) {

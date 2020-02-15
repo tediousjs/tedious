@@ -12,8 +12,13 @@ const SmallMoney: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(MoneyN.id);
-    buffer.writeUInt8(4);
+    if(buffer) {
+      buffer.writeUInt8(MoneyN.id);
+      buffer.writeUInt8(4);
+      return;
+    }
+    
+    return Buffer.from([MoneyN.id, 0x04])
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -23,14 +28,13 @@ const SmallMoney: DataType = {
 
   generate: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(5);
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(parameter.value * 10000);
-      yield buffer.data;
+      const buffer = Buffer.alloc(5);
+      let offset = 0;
+      offset = buffer.writeUInt8(4, offset);
+      offset = buffer.writeInt32LE(parameter.value * 10000, offset);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

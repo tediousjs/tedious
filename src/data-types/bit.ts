@@ -12,8 +12,13 @@ const Bit: DataType = {
   },
 
   writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(BitN.id);
-    buffer.writeUInt8(1);
+    if(buffer) {
+      buffer.writeUInt8(BitN.id);
+      buffer.writeUInt8(1);
+      return;
+    }
+    
+    return Buffer.from([BitN.id, 0x01])
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
@@ -23,14 +28,14 @@ const Bit: DataType = {
 
   generate: function* (parameter, options) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(0, 0);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt8(1);
-      buffer.writeUInt8(parameter.value ? 1 : 0);
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt8(1, 0);
+      buffer.writeUInt8(parameter.value ? 1 : 0, 1);
+      yield buffer;
     }
   },
 

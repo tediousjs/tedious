@@ -7,34 +7,38 @@ const SmallInt: DataType = {
   type: 'INT2',
   name: 'SmallInt',
 
-  declaration: function() {
+  declaration: function () {
     return 'smallint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(2);
+  writeTypeInfo: function (buffer) {
+    if (buffer) {
+      buffer.writeUInt8(IntN.id);
+      buffer.writeUInt8(2);
+      return;
+    }
+
+    return Buffer.from([IntN.id, 0x02]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
+  writeParameterData: function (buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
 
-  generate: function*(parameter, options) {
+  generate: function* (parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(3);
-      buffer.writeUInt8(2);
-      buffer.writeInt16LE(Number(parameter.value));
-      yield buffer.data;
+      const buffer = Buffer.alloc(3);
+      let offset = 0;
+      offset = buffer.writeUInt8(2, offset);
+      offset = buffer.writeInt16LE(Number(parameter.value), offset);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(3);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 
-  validate: function(value): null | number | TypeError {
+  validate: function (value): null | number | TypeError {
     if (value == null) {
       return null;
     }
