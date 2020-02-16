@@ -20,13 +20,7 @@ const Time: DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    if(buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeUInt8(parameter.scale!);
-      return;
-    }
-    
+  generateTypeInfo(parameter) {
     return Buffer.from([this.id, parameter.scale!]);
   },
 

@@ -322,7 +322,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      c.type.writeTypeInfo(tBuf, c, this.options);
+      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');

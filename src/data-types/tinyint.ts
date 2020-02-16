@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const TinyInt: DataType = {
   id: 0x30,
@@ -11,13 +10,7 @@ const TinyInt: DataType = {
     return 'tinyint';
   },
 
-  writeTypeInfo: function(buffer) {
-    if(buffer) {
-      buffer.writeUInt8(IntN.id);
-      buffer.writeUInt8(1);
-      return;
-    }
-    
+  generateTypeInfo() {
     return Buffer.from([IntN.id, 0x01]);
   },
 

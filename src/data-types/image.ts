@@ -1,5 +1,4 @@
 import { DataType } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Image: DataType = {
   id: 0x22,
@@ -7,11 +6,11 @@ const Image: DataType = {
   name: 'Image',
   hasTableName: true,
 
-  declaration: function () {
+  declaration: function() {
     return 'image';
   },
 
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     if (parameter.value != null) {
       const value = parameter.value as any; // TODO: Temporary solution. Replace 'any' more with specific type;
       return value.length;
@@ -20,22 +19,14 @@ const Image: DataType = {
     }
   },
 
-  writeTypeInfo: function (buffer, parameter) {
-    if (buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeInt32LE(parameter.length);
-      return;
-    }
-
-    const buff = Buffer.from([this.id]);
-
-    const buff2 = Buffer.alloc(4);
-    buff2.writeInt32LE(parameter.length!, 0);
-
-    return Buffer.concat([buff, buff2], buff.length + buff2.length);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(5);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeInt32LE(parameter.length!, 1);
+    return buffer;
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -54,7 +45,7 @@ const Image: DataType = {
     }
   },
 
-  validate: function (value): null | TypeError | Buffer {
+  validate: function(value): null | TypeError | Buffer {
     if (value == null) {
       return null;
     }

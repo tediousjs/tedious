@@ -1,5 +1,4 @@
 import { DataType } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -12,7 +11,7 @@ const NVarChar: { maximumLength: number } & DataType = {
   name: 'NVarChar',
   maximumLength: 4000,
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     let length;
@@ -33,7 +32,7 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -48,34 +47,20 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function (buffer, parameter) {
-    if (buffer) {
-      buffer.writeUInt8(this.id);
-      if (parameter.length! <= this.maximumLength) {
-        buffer.writeUInt16LE(parameter.length! * 2);
-      } else {
-        buffer.writeUInt16LE(MAX);
-      }
-      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
-      return;
-    }
-
-    const buff = Buffer.alloc(3);
-    let offset = 0;
-    offset = buff.writeUInt8(this.id, offset);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
 
     if (parameter.length! <= this.maximumLength) {
-      buff.writeUInt16LE(parameter.length! * 2, offset);
+      buffer.writeUInt16LE(parameter.length! * 2, 1);
     } else {
-      buff.writeUInt16LE(MAX, offset);
+      buffer.writeUInt16LE(MAX, 1);
     }
 
-    const buff2 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
-
-    return Buffer.concat([buff, buff2], buff.length + buff2.length)
+    return buffer;
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -113,7 +98,7 @@ const NVarChar: { maximumLength: number } & DataType = {
             const buffer = Buffer.alloc(4);
             buffer.writeUInt32LE(length, 0);
             yield buffer;
-            yield value
+            yield value;
           }
         } else {
           value = value.toString();
@@ -135,13 +120,13 @@ const NVarChar: { maximumLength: number } & DataType = {
       yield buffer;
     } else {
       const buffer = Buffer.alloc(8);
-      let offset = buffer.writeUInt32LE(0xFFFFFFFF, 0);
+      const offset = buffer.writeUInt32LE(0xFFFFFFFF, 0);
       buffer.writeUInt32LE(0xFFFFFFFF, offset);
       yield buffer;
     }
   },
 
-  validate: function (value): null | string | TypeError {
+  validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;
     }

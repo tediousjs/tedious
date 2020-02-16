@@ -1,5 +1,4 @@
 import { DataType } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL = (1 << 16) - 1;
 
@@ -9,7 +8,7 @@ const NChar: DataType & { maximumLength: number } = {
   name: 'NChar',
   maximumLength: 4000,
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     // const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
@@ -31,7 +30,7 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     // const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
@@ -48,25 +47,14 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  writeTypeInfo: function (buffer, parameter) {
-    if (buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeUInt16LE(parameter.length! * 2);
-      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
-      return;
-    }
-
-    const buff = Buffer.alloc(3);
-    let offset = 0;
-    offset = buff.writeUInt8(this.id, offset);
-    buff.writeUInt16LE(parameter.length! * 2, offset);
-
-    const buff2 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
-
-    return Buffer.concat([buff, buff2], buff.length + buff2.length);
+  generateTypeInfo: function(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt16LE(parameter.length! * 2, 1);
+    return buffer;
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -99,7 +87,7 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  validate: function (value): string | null | TypeError {
+  validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;
     }

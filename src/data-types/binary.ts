@@ -1,5 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
@@ -36,18 +35,11 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter: ParameterData<Buffer | null>) {
-    if(buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeUInt16LE(parameter.length);
-      return;
-    }
-
-    const buff = Buffer.alloc(3);
-    let offset = 0;
-    offset = buff.writeUInt8(this.id, offset);
-    buff.writeUInt16LE(parameter.length!, offset);
-    return buff;
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(3);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt16LE(parameter.length!, 1);
+    return buffer;
   },
 
   writeParameterData: function(buff, parameter, options, cb) {

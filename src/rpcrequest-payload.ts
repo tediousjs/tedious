@@ -77,6 +77,8 @@ class RpcRequestPayload {
     }
     buffer.writeUInt8(statusFlags);
 
+    yield buffer.data;
+
     const param: ParameterData = { value: parameter.value };
 
     const type = parameter.type;
@@ -101,9 +103,7 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
-    type.writeTypeInfo(buffer, param, this.options);
-
-    yield buffer.data;
+    yield type.generateTypeInfo(param, this.options);
     yield* type.generate(param, options);
   }
 }

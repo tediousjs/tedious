@@ -7,11 +7,11 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
   type: 'NUMERIC',
   name: 'Numeric',
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     return 'numeric(' + (this.resolvePrecision(parameter)) + ', ' + (this.resolveScale(parameter)) + ')';
   },
 
-  resolvePrecision: function (parameter) {
+  resolvePrecision: function(parameter) {
     if (parameter.precision != null) {
       return parameter.precision;
     } else if (parameter.value === null) {
@@ -21,7 +21,7 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     }
   },
 
-  resolveScale: function (parameter) {
+  resolveScale: function(parameter) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else {
@@ -29,31 +29,14 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     }
   },
 
-  writeTypeInfo: function (buffer, parameter) {
-    if (buffer) {
-      buffer.writeUInt8(NumericN.id);
-      if (parameter.precision! <= 9) {
-        buffer.writeUInt8(5);
-      } else if (parameter.precision! <= 19) {
-        buffer.writeUInt8(9);
-      } else if (parameter.precision! <= 28) {
-        buffer.writeUInt8(13);
-      } else {
-        buffer.writeUInt8(17);
-      }
-      buffer.writeUInt8(parameter.precision);
-      buffer.writeUInt8(parameter.scale);
-      return;
-    }
-
-
+  generateTypeInfo(parameter) {
     let precision;
     if (parameter.precision! <= 9) {
       precision = 0x05;
     } else if (parameter.precision! <= 19) {
       precision = 0x09;
     } else if (parameter.precision! <= 28) {
-      precision = 0x0D
+      precision = 0x0D;
     } else {
       precision = 0x11;
     }
@@ -61,8 +44,7 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     return Buffer.from([NumericN.id, precision, parameter.precision!, parameter.scale!]);
   },
 
-
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -105,7 +87,7 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     }
   },
 
-  validate: function (value): null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

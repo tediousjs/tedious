@@ -1,27 +1,20 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Int: DataType = {
   id: 0x38,
   type: 'INT4',
   name: 'Int',
 
-  declaration: function () {
+  declaration: function() {
     return 'int';
   },
 
-  writeTypeInfo: function (buffer) {
-    if (buffer) {
-      buffer.writeUInt8(IntN.id);
-      buffer.writeUInt8(4);
-      return;
-    }
-
+  generateTypeInfo() {
     return Buffer.from([IntN.id, 0x04]);
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -40,7 +33,7 @@ const Int: DataType = {
     }
   },
 
-  validate: function (value): number | null | TypeError {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

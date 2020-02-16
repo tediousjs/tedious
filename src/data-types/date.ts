@@ -15,12 +15,7 @@ const Date: DataType = {
     return 'date';
   },
 
-  writeTypeInfo: function(buffer) {
-    if(buffer){
-      buffer.writeUInt8(this.id);
-      return;
-    }
-    
+  generateTypeInfo: function(buffer) {
     return Buffer.from([this.id]);
   },
 

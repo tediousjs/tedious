@@ -1,27 +1,20 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Real: DataType = {
   id: 0x3B,
   type: 'FLT4',
   name: 'Real',
 
-  declaration: function () {
+  declaration: function() {
     return 'real';
   },
 
-  writeTypeInfo: function (buffer) {
-    if (buffer) {
-      buffer.writeUInt8(FloatN.id);
-      buffer.writeUInt8(4);
-      return;
-    }
-
+  generateTypeInfo() {
     return Buffer.from([FloatN.id, 0x04]);
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -38,7 +31,7 @@ const Real: DataType = {
     }
   },
 
-  validate: function (value): null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

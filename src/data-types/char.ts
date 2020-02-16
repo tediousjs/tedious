@@ -1,5 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
@@ -9,7 +8,7 @@ const Char: { maximumLength: number } & DataType = {
   name: 'Char',
   maximumLength: 8000,
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     // const value = parameter.value as null | string | { toString(): string };
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
@@ -32,7 +31,7 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -47,24 +46,14 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function (buffer, parameter: ParameterData<any>) {
-    if (buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeUInt16LE(parameter.length);
-      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
-      return;
-    }
-
-    const buff = Buffer.alloc(3);
-    let offset = 0;
-    offset = buff.writeUInt8(this.id, offset);
-    buff.writeUInt16LE(parameter.length!, offset);
-
-    const buff2 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00])
-    return Buffer.concat([buff, buff2], buff.length + buff2.length);   
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt16LE(parameter.length!, 1);
+    return buffer;
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -88,7 +77,7 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function (value): null | string | TypeError {
+  validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;
     }

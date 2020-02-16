@@ -15,13 +15,7 @@ const UniqueIdentifier: DataType = {
     return 16;
   },
 
-  writeTypeInfo: function(buffer) {
-    if (buffer) {
-      buffer.writeUInt8(this.id);
-      buffer.writeUInt8(0x10);
-      return;
-    }
-    
+  generateTypeInfo() {
     return Buffer.from([this.id, 0x10]);
   },
 
@@ -37,9 +31,7 @@ const UniqueIdentifier: DataType = {
       buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

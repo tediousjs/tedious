@@ -68,7 +68,8 @@ export interface DataType {
   name: string;
 
   declaration(parameter: Parameter): string;
-  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions): void;
+  generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
+
   writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
   validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
   generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;

@@ -23,9 +23,8 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale);
+  generateTypeInfo(parameter, _options) {
+    return Buffer.from([this.id, parameter.scale!]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {

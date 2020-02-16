@@ -9,7 +9,7 @@ const MoneyN: DataType = {
     throw new Error('not implemented');
   },
 
-  writeTypeInfo() {
+  generateTypeInfo() {
     throw new Error('not implemented');
   },
 

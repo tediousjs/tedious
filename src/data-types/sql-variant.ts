@@ -9,7 +9,7 @@ const Variant: DataType = {
     return 'sql_variant';
   },
 
-  writeTypeInfo() {
+  generateTypeInfo() {
     throw new Error('not implemented');
   },
 

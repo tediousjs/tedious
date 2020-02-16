@@ -20,19 +20,19 @@ describe('Data Types', function() {
     }
   });
 
-  it('should writeTypeInfo SmallDateTime', function() {
+  it('should generateTypeInfo SmallDateTime', function() {
     const type = TYPES.typeByName.SmallDateTime;
     const expected = Buffer.from([0x6F, 0x04]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
-  it('should writeTypeInfo DateTime', function() {
+  it('should generateTypeInfo DateTime', function() {
     const type = TYPES.typeByName.DateTime;
     const expected = Buffer.from([0x6F, 8]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -52,13 +52,12 @@ describe('Data Types', function() {
     }
   });
 
-  it('should writeTypeInfo DateTime2', function() {
-    const buffer = new WritableTrackingBuffer(2);
+  it('should generateTypeInfo DateTime2', function() {
     const type = TYPES.typeByName.DateTime2;
     const expected = Buffer.from([0x2A, 1]);
 
-    type.writeTypeInfo(buffer, { scale: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const buffer = type.generateTypeInfo({ scale: 1 });
+    assert.deepEqual(buffer, expected);
   });
 
   it('dateTime2DaylightSaving', () => {
@@ -75,11 +74,11 @@ describe('Data Types', function() {
     }
   });
 
-  it('should writeTypeInfo Date', function() {
+  it('should generateTypeInfo Date', function() {
     const type = TYPES.typeByName.Date;
     const expected = Buffer.from([0x28]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -97,11 +96,11 @@ describe('Data Types', function() {
     }
   });
 
-  it('should writeTypeInfo Time', function() {
+  it('should generateTypeInfo Time', function() {
     const type = TYPES.typeByName.Time;
     const expected = Buffer.from([0x29, 1]);
 
-    const reuslt = type.writeTypeInfo(undefined, { scale: 1 });
+    const reuslt = type.generateTypeInfo({ scale: 1 });
     assert.deepEqual(reuslt, expected);
   });
 
@@ -123,12 +122,12 @@ describe('Data Types', function() {
     }
   });
 
-  it('should writeTypeInfo BigInt', function() {
+  it('should generateTypeInfo BigInt', function() {
     const type = TYPES.typeByName.BigInt;
 
     const expected = Buffer.from([0x26, 8]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -163,13 +162,13 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Binary', function() {
+  it('should generateTypeInfo Binary', function() {
     const type = TYPES.typeByName.Binary;
     const parameter = { length: 1 };
 
     const expected = Buffer.from([0xAD, 1, 0]);
 
-    const result = type.writeTypeInfo(undefined, parameter);
+    const result = type.generateTypeInfo(parameter);
     assert.deepEqual(result, expected);
   });
 
@@ -205,11 +204,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Bit', function() {
+  it('should generateTypeInfo Bit', function() {
     const type = TYPES.typeByName.Bit;
     const expected = Buffer.from([0x68, 1]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -258,11 +257,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Char', function() {
+  it('should generateTypeInfo Char', function() {
     const type = TYPES.typeByName.Char;
     const expected = Buffer.from([0xAF, 1, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
   });
 
@@ -296,13 +295,12 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo DateTimeOffset', function() {
-    const buffer = new WritableTrackingBuffer(2);
+  it('should generateTypeInfo DateTimeOffset', function() {
     const type = TYPES.typeByName.DateTimeOffset;
     const expected = Buffer.from([0x2B, 1]);
 
-    type.writeTypeInfo(buffer, { scale: 1 });
-    assert.deepEqual(buffer.data, expected);
+    const buffer = type.generateTypeInfo({ scale: 1 });
+    assert.deepEqual(buffer, expected);
   });
 
   it('should writeParameterData DateTimeOffSet (Buffer)', function(done) {
@@ -335,28 +333,28 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Decimal ', function() {
+  it('should generateTypeInfo Decimal ', function() {
     const type = TYPES.typeByName.Decimal;
 
     // Precision <= 9
     const expected1 = Buffer.from([0x6A, 5, 1, 1]);
-    const result = type.writeTypeInfo(undefined, { precision: 1, scale: 1 });
+    const result = type.generateTypeInfo({ precision: 1, scale: 1 });
     assert.deepEqual(result, expected1);
 
     // Precision <= 19
     const expected2 = Buffer.from([0x6A, 9, 15, 1]);
-    const result2 = type.writeTypeInfo(undefined, { precision: 15, scale: 1 });
+    const result2 = type.generateTypeInfo({ precision: 15, scale: 1 });
     assert.deepEqual(result2, expected2);
 
 
     // Precision <= 28
     const expected3 = Buffer.from([0x6A, 13, 20, 1]);
-    const result3 = type.writeTypeInfo(undefined, { precision: 20, scale: 1 });
+    const result3 = type.generateTypeInfo({ precision: 20, scale: 1 });
     assert.deepEqual(result3, expected3);
 
     // Precision > 28
     const expected4 = Buffer.from([0x6A, 17, 30, 1]);
-    const result4 = type.writeTypeInfo(undefined, { precision: 30, scale: 1 });
+    const result4 = type.generateTypeInfo({ precision: 30, scale: 1 });
     assert.deepEqual(result4, expected4);
   });
 
@@ -426,11 +424,11 @@ describe('Data Types', function() {
   });
 
 
-  it('should writeTypeInfo Float', function() {
+  it('should generateTypeInfo Float', function() {
     const type = TYPES.typeByName.Float;
     const expected = Buffer.from([0x6D, 8]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -464,11 +462,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Image', function() {
+  it('should generateTypeInfo Image', function() {
     const type = TYPES.typeByName.Image;
     const expected = Buffer.from([0x22, 1, 0, 0, 0]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
   });
 
@@ -502,11 +500,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Int', function() {
+  it('should generateTypeInfo Int', function() {
     const type = TYPES.typeByName.Int;
     const expected = Buffer.from([0x26, 4]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -540,11 +538,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Money', function() {
+  it('should generateTypeInfo Money', function() {
     const type = TYPES.typeByName.Money;
     const expected = Buffer.from([0x6E, 8]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -579,11 +577,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo NChar', function() {
+  it('should generateTypeInfo NChar', function() {
     const type = TYPES.typeByName.NChar;
     const expected = Buffer.from([0xEF, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
   });
 
@@ -618,28 +616,28 @@ describe('Data Types', function() {
   });
 
 
-  it('should writeTypeInfo Numeric', function() {
+  it('should generateTypeInfo Numeric', function() {
     const type = TYPES.typeByName.Numeric;
 
     // Precision <= 9
     const expected1 = Buffer.from([0x6C, 5, 1, 1]);
-    const result = type.writeTypeInfo(undefined, { precision: 1, scale: 1 });
+    const result = type.generateTypeInfo({ precision: 1, scale: 1 });
     assert.deepEqual(result, expected1);
 
     // Precision <= 19
     const expected2 = Buffer.from([0x6C, 9, 15, 1]);
-    const result2 = type.writeTypeInfo(undefined, { precision: 15, scale: 1 });
+    const result2 = type.generateTypeInfo({ precision: 15, scale: 1 });
     assert.deepEqual(result2, expected2);
 
 
     // Precision <= 28
     const expected3 = Buffer.from([0x6C, 13, 20, 1]);
-    const result3 = type.writeTypeInfo(undefined, { precision: 20, scale: 1 });
+    const result3 = type.generateTypeInfo({ precision: 20, scale: 1 });
     assert.deepEqual(result3, expected3);
 
     // Precision > 28
     const expected4 = Buffer.from([0x6C, 17, 30, 1]);
-    const result4 = type.writeTypeInfo(undefined, { precision: 30, scale: 1 });
+    const result4 = type.generateTypeInfo({ precision: 30, scale: 1 });
     assert.deepEqual(result4, expected4);
   });
 
@@ -708,18 +706,18 @@ describe('Data Types', function() {
   });
 
 
-  it('should writeTypeInfo NVarChar', function() {
+  it('should generateTypeInfo NVarChar', function() {
     // Length <= Maximum Length
     const type = TYPES.typeByName.NVarChar;
     const expected = Buffer.from([0xE7, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
 
     // Length > Maximum Length
     const expected1 = Buffer.from([0xE7, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    const result2 = type.writeTypeInfo(undefined, { length: 4100 });
+    const result2 = type.generateTypeInfo({ length: 4100 });
     assert.deepEqual(result2, expected1);
   });
 
@@ -787,11 +785,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Real', function() {
+  it('should generateTypeInfo Real', function() {
     const type = TYPES.typeByName.Real;
     const expected = Buffer.from([0x6D, 4]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -825,11 +823,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo SmallInt', function() {
+  it('should generateTypeInfo SmallInt', function() {
     const type = TYPES.typeByName.SmallInt;
     const expected = Buffer.from([0x26, 2]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -863,11 +861,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo SmallMoney', function() {
+  it('should generateTypeInfo SmallMoney', function() {
     const type = TYPES.typeByName.SmallMoney;
     const expected = Buffer.from([0x6E, 4]);
 
-    const result =  type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -901,11 +899,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo Text', function() {
+  it('should generateTypeInfo Text', function() {
     const type = TYPES.typeByName.Text;
     const expected = Buffer.from([0x23, 1, 0, 0, 0]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
   });
 
@@ -939,11 +937,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo TinyInt', function() {
+  it('should generateTypeInfo TinyInt', function() {
     const type = TYPES.typeByName.TinyInt;
     const expected = Buffer.from([0x26, 1]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -978,11 +976,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo TVP', function() {
+  it('should generateTypeInfo TVP', function() {
     const type = TYPES.typeByName.TVP;
     const expected = Buffer.from([0xF3, 0x00, 0x00, 0x00]);
 
-    const result = type.writeTypeInfo(undefined, { value: null });
+    const result = type.generateTypeInfo({ value: null });
     assert.deepEqual(result, expected);
   });
 
@@ -1020,11 +1018,11 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo UniqueIdentifier', function() {
+  it('should generateTypeInfo UniqueIdentifier', function() {
     const type = TYPES.typeByName.UniqueIdentifier;
     const expected = Buffer.from([0x24, 0x10]);
 
-    const result = type.writeTypeInfo(undefined);
+    const result = type.generateTypeInfo();
     assert.deepEqual(result, expected);
   });
 
@@ -1060,19 +1058,19 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo VarBinary', function() {
+  it('should generateTypeInfo VarBinary', function() {
     const type = TYPES.typeByName.VarBinary;
 
     // Length <= Maximum Length
     const expected = Buffer.from([0xA5, 0x40, 0x1F]);
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
 
     // Length > Maximum Length
     const expected1 = Buffer.from([0xA5, 0xFF, 0xFF]);
 
-    const result1 = type.writeTypeInfo(undefined, { length: 8500 });
+    const result1 = type.generateTypeInfo({ length: 8500 });
     assert.deepEqual(result1, expected1);
   });
 
@@ -1147,19 +1145,19 @@ describe('Data Types', function() {
     });
   });
 
-  it('should writeTypeInfo VarChar', function() {
+  it('should generateTypeInfo VarChar', function() {
     const type = TYPES.typeByName.VarChar;
 
     // Length <= Maximum Length
     const expected = Buffer.from('a7401f0000000000', 'hex');
 
-    const result = type.writeTypeInfo(undefined, { length: 1 });
+    const result = type.generateTypeInfo({ length: 1 });
     assert.deepEqual(result, expected);
 
     // Length > Maximum Length
     const expected1 = Buffer.from('a7ffff0000000000', 'hex');
 
-    const result2 = type.writeTypeInfo(undefined, { length: 8500 });
+    const result2 = type.generateTypeInfo({ length: 8500 });
     assert.deepEqual(result2, expected1);
   });
 

@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
 import MoneyN from './moneyn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
@@ -10,21 +9,15 @@ const Money: DataType = {
   type: 'MONEY',
   name: 'Money',
 
-  declaration: function () {
+  declaration: function() {
     return 'money';
   },
 
-  writeTypeInfo: function (buffer) {
-    if (buffer) {
-      buffer.writeUInt8(MoneyN.id);
-      buffer.writeUInt8(8);
-      return;
-    }
-
+  generateTypeInfo: function() {
     return Buffer.from([MoneyN.id, 0x08]);
   },
 
-  writeParameterData: function (buff, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
     buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
     cb();
   },
@@ -50,7 +43,7 @@ const Money: DataType = {
     }
   },
 
-  validate: function (value): number | null | TypeError {
+  validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }

@@ -11,14 +11,8 @@ const BigInt: DataType = {
     return 'bigint';
   },
 
-  writeTypeInfo: function(buffer) {
-    if(buffer) {
-      buffer.writeUInt8(IntN.id);
-      buffer.writeUInt8(8);
-      return;
-    }
-
-    return Buffer.from([IntN.id, 0x08])
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x08]);
   },
 
   writeParameterData: function(buff, parameter, options, cb) {

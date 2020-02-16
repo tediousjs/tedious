@@ -49,30 +49,17 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    if(buffer) {
-      buffer.writeUInt8(this.id);
-      if (parameter.length! <= this.maximumLength) {
-        buffer.writeUInt16LE(this.maximumLength);
-      } else {
-        buffer.writeUInt16LE(MAX);
-      }
-      buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
-      return;
-    }
-    
-    const buff = Buffer.from([this.id]);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
 
-    const buff2 = Buffer.alloc(2);
     if (parameter.length! <= this.maximumLength) {
-      buff2.writeUInt16LE(this.maximumLength, 0);
+      buffer.writeUInt16LE(this.maximumLength, 1);
     } else {
-      buff2.writeUInt16LE(MAX, 0);
+      buffer.writeUInt16LE(MAX, 1);
     }
 
-    const buff3 = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
-
-    return Buffer.concat([buff, buff2, buff3], buff.length + buff2.length + buff3.length);
+    return buffer;
   },
 
   writeParameterData: function(buff, parameter, options, cb) {
