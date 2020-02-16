@@ -75,7 +75,7 @@ const TVP: DataType = {
           scale: column.scale,
           precision: column.precision
         };
-        yield Buffer.concat(Array.from(column.type.generateParameterData(param, options)));
+        yield * column.type.generateParameterData(param, options);
       }
     }
     yield Buffer.from([0x00]);
