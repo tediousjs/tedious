@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
+const TVP_ROW_TOKEN = Buffer.from([0x01]);
+const TVP_END_TOKEN = Buffer.from([0x00]);
+
 const TVP: DataType = {
   id: 0xF3,
   type: 'TVPTYPE',
@@ -49,36 +52,43 @@ const TVP: DataType = {
       const column = columns[i];
 
       const buff = Buffer.alloc(6);
-      const offset = buff.writeUInt32LE(0x00000000, 0);
-      buff.writeUInt16LE(0x0000, offset);
+      // UserType
+      buff.writeUInt32LE(0x00000000, 0);
+
+      // Flags
+      buff.writeUInt16LE(0x0000, 4);
       yield buff;
 
+      // TYPE_INFO
       yield column.type.generateTypeInfo(column);
 
-      const emptyString = '';
-      const buff2 = Buffer.from([emptyString.length]);
-      const buff21 = Buffer.from(emptyString, 'ucs2'); // Encoding might be different?
-      yield Buffer.concat([buff2, buff21], buff2.length + buff21.length);
+      // ColName
+      yield Buffer.from([0x00]);
     }
-    yield Buffer.from([0x00]);
+
+    yield TVP_END_TOKEN;
 
     for (let i = 0, length = rows.length; i < length; i++) {
-      const row = rows[i];
-      yield Buffer.from([0x01]);
+      yield TVP_ROW_TOKEN;
 
+      const row = rows[i];
       for (let k = 0, len2 = row.length; k < len2; k++) {
         const column = columns[k];
         const value = row[k];
+
         const param = {
           value: value,
           length: column.length,
           scale: column.scale,
           precision: column.precision
         };
+
+        // TvpColumnData
         yield * column.type.generateParameterData(param, options);
       }
     }
-    yield Buffer.from([0x00]);
+
+    yield TVP_END_TOKEN;
   },
 
   validate: function(value): Buffer | null | TypeError {
