@@ -1,48 +1,38 @@
 const TYPES = require('../../src/data-type').typeByName;
 
-const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 const { assert } = require('chai');
 
 describe('BigInt', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 123456789;
       const expected = Buffer.from('0815cd5b0700000000', 'hex');
 
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 4 };
-      TYPES.BigInt.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false })]);
 
-        done();
-      });
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values', function(done) {
+    it('correctly converts `string` values', function() {
       const value = '123456789';
       const expected = Buffer.from('0815cd5b0700000000', 'hex');
 
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 4 };
-      TYPES.BigInt.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false })]);
 
-        done();
-      });
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from([0x00]);
 
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 4 };
 
-      TYPES.BigInt.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false })]);
 
-        done();
-      });
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -57,33 +47,23 @@ describe('BigInt', function() {
 });
 
 describe('Binary', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values', function() {
       const value = Buffer.from([0x12, 0x34, 0x00, 0x00]);
       const expected = Buffer.from('040012340000', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 4 };
 
-      TYPES.Binary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('ffff', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 4 };
 
-      TYPES.Binary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -101,44 +81,32 @@ describe('Binary', function() {
 });
 
 describe('Bit', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 1;
       const expected = Buffer.from('0101', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.Bit.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.Bit.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `undefined` values', function(done) {
+    it('correctly converts `undefined` values', function() {
       const value = undefined;
       const expected = Buffer.from('00', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.Bit.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -153,31 +121,23 @@ describe('Bit', function() {
 });
 
 describe('Char', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values', function() {
       const value = Buffer.from([0xff, 0xff, 0xff, 0xff]);
       const expected = Buffer.from('0400ffffffff', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.Char.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('ffff', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.Char.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -192,18 +152,16 @@ describe('Char', function() {
 });
 
 describe('Date', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts dates during daylight savings period', () => {
-      const type = TYPES.Date;
+  describe('.generateParameterData', function() {
+    it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedBuffer] of [
         [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('03163a0b', 'hex')],
         [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('03173a0b', 'hex')],
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('03173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('03183a0b', 'hex')]
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
-        type.writeParameterData(buffer, { value: value }, { useUTC: false }, () => { });
-        assert.deepEqual(buffer.data, expectedBuffer);
+        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, { useUTC: false })]);
+        assert.deepEqual(buffer, expectedBuffer);
       }
     });
   });
@@ -220,19 +178,18 @@ describe('Date', function() {
 });
 
 describe('DateTime', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts dates during daylight savings period', () => {
+  describe('.generateParameterData', function() {
+    it('correctly converts dates during daylight savings period', function() {
       for (const testSet of [
         [new Date(2015, 5, 18, 23, 59, 59), 42171],
         [new Date(2015, 5, 19, 0, 0, 0), 42172],
         [new Date(2015, 5, 19, 23, 59, 59), 42172],
         [new Date(2015, 5, 20, 0, 0, 0), 42173]
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
         const parameter = { value: testSet[0] };
         const expectedNoOfDays = testSet[1];
-        TYPES.DateTime.writeParameterData(buffer, parameter, { useUTC: false }, () => { });
-        assert.strictEqual(buffer.data.readInt32LE(1), expectedNoOfDays);
+        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, { useUTC: false })]);
+        assert.strictEqual(buffer.readInt32LE(1), expectedNoOfDays);
       }
     });
   });
@@ -249,7 +206,7 @@ describe('DateTime', function() {
 });
 
 describe('DateTime2', function() {
-  describe('.writeParameterData', function() {
+  describe('.generateParameterData', function() {
     it('correctly converts dates during daylight savings period', () => {
       for (const [value, expectedBuffer] of [
         [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('067f5101163a0b', 'hex')],
@@ -257,9 +214,8 @@ describe('DateTime2', function() {
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('067f5101173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('06000000183a0b', 'hex')]
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
-        TYPES.DateTime2.writeParameterData(buffer, { value: value, scale: 0 }, { useUTC: false }, () => { });
-        assert.deepEqual(buffer.data, expectedBuffer);
+        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, { useUTC: false })]);
+        assert.deepEqual(buffer, expectedBuffer);
       }
     });
   });
@@ -275,31 +231,23 @@ describe('DateTime2', function() {
 });
 
 describe('DateTimeOffset', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Date` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Date` values', function() {
       const value = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
       const expected = Buffer.from('0820fd002d380b', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, scale: 0 };
 
-      TYPES.DateTimeOffset.writeParameterData(buffer, parameterValue, { useUTC: true }, () => {
-        assert.deepEqual(buffer.data.slice(0, 7), expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, { useUTC: true })]);
+      assert.deepEqual(buffer.slice(0, 7), expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, scale: 0 };
-
-      TYPES.DateTimeOffset.writeParameterData(buffer, parameterValue, { useUTC: true }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, { useUTC: true })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -314,70 +262,54 @@ describe('DateTimeOffset', function() {
 });
 
 describe('Decimal', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values (Precision <= 9)', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values (Precision <= 9)', function() {
       const value = 1.23;
       const expected = Buffer.from('050101000000', 'hex');
       const precision = 1;
 
       const type = TYPES.Decimal;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Precision <= 19)', function(done) {
+    it('correctly converts `number` values (Precision <= 19)', function() {
       const value = 1.23;
       const expected = Buffer.from('09010100000000000000', 'hex');
       const precision = 15;
 
       const type = TYPES.Decimal;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Precision <= 28)', function(done) {
+    it('correctly converts `number` values (Precision <= 28)', function() {
       const value = 1.23;
       const expected = Buffer.from('0d01010000000000000000000000', 'hex');
       const precision = 25;
 
       const type = TYPES.Decimal;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
 
-    it('correctly converts `number` values (Precision > 28)', function(done) {
+    it('correctly converts `number` values (Precision > 28)', function() {
       const value = 1.23;
       const expected = Buffer.from('110101000000000000000000000000000000', 'hex');
       const precision = 30;
 
       const type = TYPES.Decimal;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -410,35 +342,27 @@ describe('Decimal', function() {
 });
 
 describe('Float', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 1.2345;
       const expected = Buffer.from('088d976e1283c0f33f', 'hex');
 
       const type = TYPES.Float;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.Float;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
   });
@@ -455,35 +379,27 @@ describe('Float', function() {
 });
 
 describe('Image', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values', function() {
       const value = Buffer.from('010101', 'hex');
       const expected = Buffer.from('64000000010101', 'hex');
 
       const type = TYPES.Image;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 100 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('64000000', 'hex');
 
       const type = TYPES.Image;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 100 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -499,35 +415,27 @@ describe('Image', function() {
 });
 
 describe('Int', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 1234;
       const expected = Buffer.from('04d2040000', 'hex');
 
       const type = TYPES.Int;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.Int;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -543,35 +451,27 @@ describe('Int', function() {
 });
 
 describe('Money', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 1234;
       const expected = Buffer.from('0800000000204bbc00', 'hex');
 
       const type = TYPES.Money;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.Money;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -587,35 +487,27 @@ describe('Money', function() {
 });
 
 describe('NChar', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values', function() {
       const value = Buffer.from([0xff, 0xff, 0xff, 0xff]);
       const expected = Buffer.from('0400ffffffff', 'hex');
 
       const type = TYPES.NChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('ffff', 'hex');
 
       const type = TYPES.NChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -631,69 +523,53 @@ describe('NChar', function() {
 });
 
 describe('Numeric', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values (Precision <= 9)', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values (Precision <= 9)', function() {
       const value = 1.23;
       const expected = Buffer.from('050101000000', 'hex');
       const precision = 1;
 
       const type = TYPES.Numeric;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Precision <= 19)', function(done) {
+    it('correctly converts `number` values (Precision <= 19)', function() {
       const value = 1.23;
       const expected = Buffer.from('09010100000000000000', 'hex');
       const precision = 15;
 
       const type = TYPES.Numeric;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Precision <= 28)', function(done) {
+    it('correctly converts `number` values (Precision <= 28)', function() {
       const value = 1.23;
       const expected = Buffer.from('0d01010000000000000000000000', 'hex');
       const precision = 25;
 
       const type = TYPES.Numeric;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Precision > 28)', function(done) {
+    it('correctly converts `number` values (Precision > 28)', function() {
       const value = 1.23;
       const expected = Buffer.from('110101000000000000000000000000000000', 'hex');
       const precision = 30;
 
       const type = TYPES.Numeric;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, precision, scale: 0 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -725,69 +601,53 @@ describe('Numeric', function() {
 });
 
 describe('NVarChar', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values (Length <= Maximum Length)', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
       const value = Buffer.from([0xff, 0xff]);
       const expected = Buffer.from('0200ffff', 'hex');
       const length = 1;
 
       const type = TYPES.NVarChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `Buffer` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `Buffer` values (Length > Maximum Length)', function() {
       const value = Buffer.from([0xff, 0xff]);
       const expected = Buffer.from('feffffffffffffff02000000ffff00000000', 'hex');
       const length = 4100;
 
       const type = TYPES.NVarChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values (Length <= Maximum Length)', function(done) {
+    it('correctly converts `null` values (Length <= Maximum Length)', function() {
       const value = null;
       const expected = Buffer.from('ffff', 'hex');
       const length = 1;
 
       const type = TYPES.NVarChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `null` values (Length > Maximum Length)', function() {
       const value = null;
       const expected = Buffer.from('ffffffffffffffff', 'hex');
       const length = 5000;
 
       const type = TYPES.NVarChar;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -810,35 +670,27 @@ describe('NVarChar', function() {
 });
 
 describe('Real', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 123.123;
       const expected = Buffer.from('04fa3ef642', 'hex');
 
       const type = TYPES.Real;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.Real;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -854,7 +706,7 @@ describe('Real', function() {
 });
 
 describe('SmallDateTime', function() {
-  describe('.writeParameterData', function() {
+  describe('.generateParameterData', function() {
     it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedNoOfDays] of [
         [new Date(2015, 5, 18, 23, 59, 59), 42171],
@@ -862,10 +714,9 @@ describe('SmallDateTime', function() {
         [new Date(2015, 5, 19, 23, 59, 59), 42172],
         [new Date(2015, 5, 20, 0, 0, 0), 42173]
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
-        TYPES.SmallDateTime.writeParameterData(buffer, { value }, { useUTC: false }, () => {});
+        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, { useUTC: false })]);
 
-        assert.strictEqual(buffer.buffer.readUInt16LE(1), expectedNoOfDays);
+        assert.strictEqual(buffer.readUInt16LE(1), expectedNoOfDays);
       }
     });
   });
@@ -881,35 +732,27 @@ describe('SmallDateTime', function() {
 });
 
 describe('SmallInt', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 2;
       const expected = Buffer.from('020200', 'hex');
 
       const type = TYPES.SmallInt;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.SmallInt;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -925,35 +768,27 @@ describe('SmallInt', function() {
 });
 
 describe('SmallMoney', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 2;
       const expected = Buffer.from('04204e0000', 'hex');
 
       const type = TYPES.SmallMoney;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.SmallMoney;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -969,35 +804,27 @@ describe('SmallMoney', function() {
 });
 
 describe('Text', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `Buffer` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `Buffer` values', function() {
       const value = Buffer.from('Hello World', 'ascii');
       const expected = Buffer.from('00000000000f00000048656c6c6f20576f726c64', 'hex');
 
       const type = TYPES.Text;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 15 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00000000000f000000', 'hex');
 
       const type = TYPES.Text;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length: 15 };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -1013,7 +840,7 @@ describe('Text', function() {
 });
 
 describe('Time', function() {
-  describe('.writeParameterData', function() {
+  describe('.generateParameterData', function() {
     // Test rounding of nanosecondDelta
     it('correctly converts `Date` values with a `nanosecondDelta` property', () => {
       const type = TYPES.Time;
@@ -1025,9 +852,8 @@ describe('Time', function() {
         const parameter = { value: value, scale: scale };
         parameter.value.nanosecondDelta = nanosecondDelta;
 
-        const buffer = new WritableTrackingBuffer(0);
-        type.writeParameterData(buffer, parameter, { useUTC: false }, () => { });
-        assert.deepEqual(buffer.data, expectedBuffer);
+        const buffer = Buffer.concat([...type.generateParameterData(parameter, { useUTC: false }, () => { })]);
+        assert.deepEqual(buffer, expectedBuffer);
       }
     });
   });
@@ -1044,35 +870,27 @@ describe('Time', function() {
 });
 
 describe('TinyInt', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `number` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `number` values', function() {
       const value = 1;
       const expected = Buffer.from('0101', 'hex');
 
       const type = TYPES.TinyInt;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from('00', 'hex');
 
       const type = TYPES.TinyInt;
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      type.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -1088,35 +906,27 @@ describe('TinyInt', function() {
 });
 
 describe('TVP', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts TVP table values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts TVP table values', function() {
       const value = {
         columns: [{ name: 'user_id', type: TYPES.Int }],
         rows: [[ 15 ]]
       };
       const expected = Buffer.from('01000000000000002604000001040f00000000', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.TVP.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
 
       const expected = Buffer.from('ffff0000', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.TVP.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -1131,33 +941,25 @@ describe('TVP', function() {
 });
 
 describe('UniqueIdentifier', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `string` values', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `string` values', function() {
       const value = 'e062ae34-6de5-47f3-8ba3-29d25f77e71a';
 
       const expected = Buffer.from('1034ae62e0e56df3478ba329d25f77e71a', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.UniqueIdentifier.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function(done) {
+    it('correctly converts `null` values', function() {
       const value = null;
 
       const expected = Buffer.from('00', 'hex');
-
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value };
 
-      TYPES.UniqueIdentifier.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -1172,16 +974,15 @@ describe('UniqueIdentifier', function() {
 });
 
 describe('VarBinary', function() {
-  describe('.writeParameterData', function() {
+  describe('.generateParameterData', function() {
     it('correctly converts `null` values', () => {
       for (const [value, length, expected] of [
         [null, 1, Buffer.from('ffff', 'hex')],
         [null, 9000, Buffer.from('FFFFFFFFFFFFFFFF', 'hex')]
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
         const parameterValue = { value, length };
-        TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => { });
-        assert.isTrue(buffer.data.equals(expected));
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false }, () => { })]);
+        assert.deepEqual(buffer, expected);
       }
     });
 
@@ -1189,63 +990,47 @@ describe('VarBinary', function() {
       for (const [value, length, expected] of [
         [1, 1, Buffer.from('02003100', 'hex')],
       ]) {
-        const buffer = new WritableTrackingBuffer(0);
         const parameterValue = { value, length };
-        TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => { });
-        assert.isTrue(buffer.data.equals(expected));
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false }, () => { })]);
+        assert.deepEqual(buffer, expected);
       }
     });
 
-    it('correctly converts `number` values (Length <= Maximum Length)', function(done) {
+    it('correctly converts `number` values (Length <= Maximum Length)', function() {
       const value = 1;
       const length = 1;
-      const expected = Buffer.from('02003100', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('02003100', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `number` values (Length > Maximum Length)', function() {
       const value = 1;
       const length = 9000;
       const expected = Buffer.from('feffffffffffffff02000000310000000000', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
       const parameterValue = { value, length };
 
-      TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values (Length <= Maximum Length)', function(done) {
+    it('correctly converts `null` values (Length <= Maximum Length)', function() {
       const value = null;
       const length = 1;
-      const expected = Buffer.from('ffff', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('ffff', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `null` values (Length > Maximum Length)', function() {
       const value = null;
       const length = 9000;
-      const expected = Buffer.from('FFFFFFFFFFFFFFFF', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('FFFFFFFFFFFFFFFF', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarBinary.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 
@@ -1267,57 +1052,41 @@ describe('VarBinary', function() {
 });
 
 describe('VarChar', function() {
-  describe('.writeParameterData', function() {
-    it('correctly converts `string` values (Length <= Maximum Length)', function(done) {
+  describe('.generateParameterData', function() {
+    it('correctly converts `string` values (Length <= Maximum Length)', function() {
       const value = 'hello world';
       const length = 1;
-      const expected = Buffer.from('0b0068656c6c6f20776f726c64', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('0b0068656c6c6f20776f726c64', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarChar.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `string` values (Length > Maximum Length)', function() {
       const value = 'hello world';
       const length = 9000;
-      const expected = Buffer.from('feffffffffffffff0b00000068656c6c6f20776f726c6400000000', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('feffffffffffffff0b00000068656c6c6f20776f726c6400000000', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarChar.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values (Length <= Maximum Length)', function(done) {
+    it('correctly converts `null` values (Length <= Maximum Length)', function() {
       const value = null;
       const length = 1;
-      const expected = Buffer.from('ffff', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('ffff', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarChar.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function(done) {
+    it('correctly converts `string` values (Length > Maximum Length)', function() {
       const value = null;
       const length = 9000;
-      const expected = Buffer.from('FFFFFFFFFFFFFFFF', 'hex');
-      const buffer = new WritableTrackingBuffer(0);
-      const parameterValue = { value, length };
+      const expected = Buffer.from('FFFFFFFFFFFFFFFF', 'hex'); const parameterValue = { value, length };
 
-      TYPES.VarChar.writeParameterData(buffer, parameterValue, { useUTC: false }, () => {
-        assert.deepEqual(buffer.data, expected);
-        done();
-      });
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
+      assert.deepEqual(buffer, expected);
     });
   });
 

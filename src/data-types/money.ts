@@ -17,12 +17,7 @@ const Money: DataType = {
     return Buffer.from([MoneyN.id, 0x08]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       const buffer = Buffer.alloc(1);
       buffer.writeUInt8(8, 0);

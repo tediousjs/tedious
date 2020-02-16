@@ -14,12 +14,7 @@ const TinyInt: DataType = {
     return Buffer.from([IntN.id, 0x01]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = Buffer.alloc(2);
       let offset = 0;

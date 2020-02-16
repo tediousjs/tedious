@@ -19,12 +19,7 @@ const Date: DataType = {
     return Buffer.from([this.id]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {

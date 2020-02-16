@@ -44,12 +44,7 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     return Buffer.from([DecimalN.id, precision, parameter.precision!, parameter.scale!]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));

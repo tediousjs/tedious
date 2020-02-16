@@ -19,12 +19,7 @@ const UniqueIdentifier: DataType = {
     return Buffer.from([this.id, 0x10]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0x10);

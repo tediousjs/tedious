@@ -28,12 +28,7 @@ const Text: DataType = {
     return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     yield Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 
     if (parameter.value != null) {

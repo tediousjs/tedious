@@ -56,12 +56,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     let value = parameter.value;
 
     if (value != null) {

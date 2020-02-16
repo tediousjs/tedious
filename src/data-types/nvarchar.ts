@@ -60,12 +60,7 @@ const NVarChar: { maximumLength: number } & DataType = {
     return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       let value = parameter.value;
 

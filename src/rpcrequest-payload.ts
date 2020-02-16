@@ -104,7 +104,7 @@ class RpcRequestPayload {
     }
 
     yield type.generateTypeInfo(param, this.options);
-    yield* type.generate(param, options);
+    yield* type.generateParameterData(param, options);
   }
 }
 

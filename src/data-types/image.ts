@@ -26,12 +26,7 @@ const Image: DataType = {
     return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       const buffer = Buffer.alloc(4);
       buffer.writeInt32LE(parameter.length!, 0);

@@ -17,14 +17,7 @@ const DateTime: DataType = {
     return Buffer.from([DateTimeN.id, 0x08]);
   },
 
-  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {

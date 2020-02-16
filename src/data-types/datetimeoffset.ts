@@ -25,12 +25,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     return Buffer.from([this.id, parameter.scale!]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     const value = parameter.value;
     let scale = parameter.scale;
 

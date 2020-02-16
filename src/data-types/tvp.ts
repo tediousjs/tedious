@@ -30,22 +30,7 @@ const TVP: DataType = {
     return buffer.data;
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-    const it = this.generate(parameter, options);
-    const buffers: Buffer[] = [];
-    const next = () => {
-      const result = it.next();
-      if (result.done) {
-        buffer.writeBuffer(Buffer.concat(buffers));
-        return cb();
-      }
-      buffers.push(result.value);
-      setImmediate(next);
-    };
-    next();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value == null) {
       const buffer = Buffer.alloc(4);
       buffer.writeUInt16LE(0xFFFF, 0);
@@ -90,7 +75,7 @@ const TVP: DataType = {
           scale: column.scale,
           precision: column.precision
         };
-        yield Buffer.concat(Array.from(column.type.generate(param, options)));
+        yield Buffer.concat(Array.from(column.type.generateParameterData(param, options)));
       }
     }
     yield Buffer.from([0x00]);

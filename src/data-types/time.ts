@@ -24,12 +24,7 @@ const Time: DataType = {
     return Buffer.from([this.id, parameter.scale!]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(16);
       const time = parameter.value;

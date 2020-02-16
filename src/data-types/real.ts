@@ -14,12 +14,7 @@ const Real: DataType = {
     return Buffer.from([FloatN.id, 0x04]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       const buffer = Buffer.alloc(5);
       let offset = 0;

@@ -14,12 +14,7 @@ const Bit: DataType = {
     return Buffer.from([BitN.id, 0x01]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
       const buffer = Buffer.alloc(1);
       buffer.writeUInt8(0, 0);

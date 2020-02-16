@@ -88,18 +88,21 @@ class RowTransform extends Transform {
 
     const buf = new WritableTrackingBuffer(64, 'ucs2', true);
     buf.writeUInt8(TOKEN_TYPE.ROW);
+    this.push(buf.data);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
-      c.type.writeParameterData(buf, {
+      const parameter = {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
         value: row[i]
-      }, this.mainOptions, () => {});
-    }
+      };
 
-    this.push(buf.data);
+      for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+        this.push(chunk);
+      }
+    }
 
     process.nextTick(callback);
   }
