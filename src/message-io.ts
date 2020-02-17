@@ -4,7 +4,7 @@ const DuplexPair = require('native-duplexpair');
 import { Duplex } from 'stream';
 import * as tls from 'tls';
 import { Socket } from 'net';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 
 import Debug from './debug';
 
@@ -48,9 +48,8 @@ class MessageIO extends EventEmitter {
     this.outgoingMessageStream.pipe(this.socket);
   }
 
-  packetSize(...args: [number]) {
-    if (args.length > 0) {
-      const packetSize = args[0];
+  packetSize(packetSize?: number) {
+    if (packetSize !== undefined) {
       this.debug.log('Packet size changed from ' + this.outgoingMessageStream.packetSize + ' to ' + packetSize);
       this.outgoingMessageStream.packetSize = packetSize;
     }
@@ -129,6 +128,17 @@ class MessageIO extends EventEmitter {
     message.end(data);
     this.outgoingMessageStream.write(message);
     return message;
+  }
+
+  async write(data: Iterable<Buffer>) {
+    const socket = this.securePair ? this.securePair.cleartext : this.socket;
+
+    for (const chunk of data) {
+      if (socket.write(chunk) === false) {
+        if (socket.destroyed) return;
+        await once(socket, 'drain');
+      }
+    }
   }
 
   // Temporarily suspends the flow of incoming packets.

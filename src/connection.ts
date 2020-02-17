@@ -45,6 +45,8 @@ import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 import depd from 'depd';
 
+import OutgoingMessage from './outgoing-message';
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
 
@@ -2048,13 +2050,13 @@ class Connection extends EventEmitter {
           this.pauseRequest(request);
         }
       } else {
-        this.createRequestTimer();
+        (async () => {
+          this.createRequestTimer();
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-        message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+          message = new OutgoingMessage(this.debug, { type: packetType, resetConnection: this.resetConnectionOnNextRequest, packetSize: this.messageIo.packetSize() }, payload!) as unknown as Message;
+          await this.messageIo.write(message as unknown as Iterable<Buffer>);
 
-        message.once('finish', () => {
           this.resetConnectionOnNextRequest = false;
           this.debug.payload(function() {
             return payload!.toString('  ');
@@ -2063,9 +2065,7 @@ class Connection extends EventEmitter {
           if (request.paused) { // Request.pause() has been called before the request was started
             this.pauseRequest(request);
           }
-        });
-
-        Readable.from(payload!, { objectMode: false }).pipe(message);
+        })();
       }
     }
   }
