@@ -1,6 +1,5 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { Readable } from 'readable-stream';
 
 /*
   s2.2.6.8
@@ -51,13 +50,8 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getStream: () => {
-        return new Readable({
-          read() {
-            this.push(buffer.data);
-            this.push(null);
-          }
-        });
+      *[Symbol.iterator]() {
+        yield buffer.data;
       },
       toString: () => {
         return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
@@ -75,13 +69,8 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getStream: () => {
-        return new Readable({
-          read() {
-            this.push(buffer.data);
-            this.push(null);
-          }
-        });
+      *[Symbol.iterator]() {
+        yield buffer.data;
       },
       toString: () => {
         return 'Commit Transaction: name=' + this.name;
@@ -99,13 +88,8 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getStream: () => {
-        return new Readable({
-          read() {
-            this.push(buffer.data);
-            this.push(null);
-          }
-        });
+      *[Symbol.iterator]() {
+        yield buffer.data;
       },
       toString: () => {
         return 'Rollback Transaction: name=' + this.name;
@@ -121,13 +105,8 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getStream: () => {
-        return new Readable({
-          read() {
-            this.push(buffer.data);
-            this.push(null);
-          }
-        });
+      *[Symbol.iterator]() {
+        yield buffer.data;
       },
       toString: () => {
         return 'Save Transaction: name=' + this.name;

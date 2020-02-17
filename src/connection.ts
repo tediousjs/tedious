@@ -1658,7 +1658,7 @@ class Connection extends EventEmitter {
 
     const message = new Message({ type: TYPE.SQL_BATCH });
     this.messageIo.outgoingMessageStream.write(message);
-    payload.getStream().pipe(message);
+    Readable.from(payload, { objectMode: false }).pipe(message);
   }
 
   getInitialSql() {
@@ -1984,8 +1984,8 @@ class Connection extends EventEmitter {
   }
 
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: { getStream: () => Readable, toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getStream: () => Readable, toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -2065,7 +2065,7 @@ class Connection extends EventEmitter {
           }
         });
 
-        payload!.getStream().pipe(message);
+        Readable.from(payload!, { objectMode: false }).pipe(message);
       }
     }
   }
