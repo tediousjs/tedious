@@ -13,23 +13,10 @@ const bench = createBenchmark(main, {
 });
 
 function main({ n, size }) {
-  const buf = Buffer.alloc(size);
-  buf.fill('x');
+  const buf = Buffer.alloc(size, 'x');
 
-  var table = {
-    columns: [
-      {name: 'user_id', type: TYPES.Int},
-      {name: 'user_name', type: TYPES.VarChar, length: 500},
-      {name: 'user_enabled', type: TYPES.Bit}
-    ],
-    rows: [
-      [15, 'Eric', true],
-      [16, 'John', false]
-    ]
-  };
-
-  const request = new Request('INSERT INTO #benchmark ([value]) VALUES (@value)', () => {});
-  request.addParameter('value', TYPES.TVP, table);
+  const request = new Request('...', () => {});
+  request.addParameter('value', TYPES.VarBinary, buf);
 
   let i = 0;
   bench.start();
