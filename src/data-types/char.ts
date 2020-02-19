@@ -1,4 +1,5 @@
 import { DataType, ParameterData } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL = (1 << 16) - 1;
 
@@ -52,15 +53,23 @@ const Char: { maximumLength: number } & DataType = {
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
   },
 
-  writeParameterData: function(buffer, parameter: ParameterData<Buffer | null>, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function* (parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
+      const buffer = new WritableTrackingBuffer(0);
       buffer.writeUsVarbyte(value, 'ascii');
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): null | string | TypeError {

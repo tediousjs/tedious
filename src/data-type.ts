@@ -41,38 +41,39 @@ import Variant from './data-types/sql-variant';
 import { InternalConnectionOptions } from './connection';
 
 export type Parameter = {
-  type: DataType,
-  name: string,
+  type: DataType;
+  name: string;
 
-  value: unknown,
+  value: unknown;
 
-  output: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
+  output: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
 
-  nullable?: boolean
+  nullable?: boolean;
 };
 
 export type ParameterData<T = any> = {
-  length?: number,
-  scale?: number,
-  precision?: number,
+  length?: number;
+  scale?: number;
+  precision?: number;
 
-  value: T
+  value: T;
 };
 
 export interface DataType {
-  id: number,
-  type: string,
-  name: string,
+  id: number;
+  type: string;
+  name: string;
 
-  declaration(parameter: Parameter) : string,
-  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions) : void,
-  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void) : void,
-  validate(value: any) : any, // TODO: Refactor 'any' and replace with more specific type.
+  declaration(parameter: Parameter): string;
+  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions): void;
+  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
+  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
 
-  hasTableName?: boolean,
+  hasTableName?: boolean;
 
   getDataType?: (dataLength: number) => number | object;
   resolveLength?: (parameter: Parameter) => number,

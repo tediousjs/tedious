@@ -9,8 +9,8 @@ import { RowToken } from './token';
 import valueParse from '../value-parser';
 
 type Column = {
-  value: unknown,
-  metadata: ColumnMetadata
+  value: unknown;
+  metadata: ColumnMetadata;
 };
 
 function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: RowToken) => void) {

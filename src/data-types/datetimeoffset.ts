@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
@@ -23,8 +24,17 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeUInt8(this.id);
     buffer.writeUInt8(parameter.scale);
   },
-  writeParameterData: function(buffer, { value, scale }, _options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
+    const value = parameter.value;
+    let scale = parameter.scale;
+
     if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
       scale = scale!;
 
       let timestamp;
@@ -58,10 +68,12 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
 
       const offset = -value.getTimezoneOffset();
       buffer.writeInt16LE(offset);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
   validate: function(value): null | number | TypeError {
     if (value == null) {
