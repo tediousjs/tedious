@@ -1147,9 +1147,9 @@ class Connection extends EventEmitter {
       const request = this.request;
       if (request) {
         if (!request.canceled) {
-          let columns: { [key: string]: ColumnMetadata } | ColumnMetadata[];
+          let columns: any;
           if (this.config.options.useColumnNames) {
-            columns = {};
+            columns = {} as { [key: string]: ColumnMetadata };
 
             for (let j = 0, len = token.columns.length; j < len; j++) {
               const col = token.columns[j];
@@ -1158,19 +1158,18 @@ class Connection extends EventEmitter {
               }
             }
           } else {
-            columns = token.columns;
+            columns = token.columns as ColumnMetadata[];
           }
 
           // Replace variable length data-type to specific data-type (e.g., type intN -> smallint etc...)
           const emittedColumns: any = [];
-          if (Array.isArray(columns)) {
-            columns.forEach((column) => {
+          if (Array.isArray(columns as ColumnMetadata[])) {
+            columns.forEach((column: ColumnMetadata) => {
               emittedColumns.push(specifyDataType(column));
             });
           } else {
-            Object.keys(columns).forEach((colName) => {
-              // @ts-ignore TODO: Fix TypeScript Error
-              const tempCol = columns[colName];
+            Object.keys(columns).forEach((colName: string) => {
+              const tempCol = columns[colName] as ColumnMetadata;
               emittedColumns.push(specifyDataType(tempCol));
             });
           }
