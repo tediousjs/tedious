@@ -1,4 +1,6 @@
 import { DataType } from '../data-type';
+import smallmoney from './smallmoney';
+import money from './money';
 
 const MoneyN: DataType = {
   id: 0x6E,
@@ -6,9 +8,6 @@ const MoneyN: DataType = {
   name: 'MoneyN',
 
   getDataType: function(dataLength: number) {
-    const smallmoney = require('./smallmoney');
-    const money = require('./money');
-
     switch (dataLength) {
       case 4:
         return smallmoney;

@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import float from './float';
 
 const FloatN: DataType = {
   id: 0x6D,
@@ -6,8 +7,6 @@ const FloatN: DataType = {
   name: 'FloatN',
 
   getDataType: function(dataLength: number) {
-    const float = require('./float');
-
     return (dataLength === 4 || dataLength === 8) ? float : this;
   },
 

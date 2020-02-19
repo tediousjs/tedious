@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import decimal from './decimal';
 
 const DecimalN: DataType = {
   id: 0x6A,
@@ -6,8 +7,6 @@ const DecimalN: DataType = {
   name: 'DecimalN',
 
   getDataType: function(dataLength: number) {
-    const decimal = require('./decimal');
-
     return (dataLength === 17) ? decimal : this;
   },
 

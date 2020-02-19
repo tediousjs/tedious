@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import numeric from './numeric';
 
 const NumericN: DataType = {
   id: 0x6C,
@@ -6,8 +7,6 @@ const NumericN: DataType = {
   name: 'NumericN',
 
   getDataType: function(dataLength) {
-    const numeric = require('./numeric');
-
     return (dataLength === 17) ? numeric : this;
   },
 

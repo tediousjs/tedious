@@ -1,4 +1,6 @@
 import { DataType } from '../data-type';
+import smalldatetime from './smalldatetime';
+import datetime from './datetime';
 
 const DateTimeN: DataType = {
   id: 0x6F,
@@ -6,9 +8,6 @@ const DateTimeN: DataType = {
   name: 'DateTimeN',
 
   getDataType: function(dataLength: number) {
-    const smalldatetime = require('./smalldatetime');
-    const datetime = require('./datetime');
-
     switch (dataLength) {
       case 4:
         return smalldatetime;

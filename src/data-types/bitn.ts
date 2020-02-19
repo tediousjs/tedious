@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import bit from './bit';
 
 const BitN: DataType = {
   id: 0x68,
@@ -6,7 +7,6 @@ const BitN: DataType = {
   name: 'BitN',
 
   getDataType: function(dataLength: number) {
-    const bit = require('./bit');
 
     return (dataLength === 1) ? bit : this;
   },

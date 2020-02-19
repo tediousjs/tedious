@@ -1,4 +1,8 @@
 import { DataType } from '../data-type';
+import tinyInt from './tinyint';
+import smallInt from './smallint';
+import int from './int';
+import bigInt from './bigint';
 
 const IntN: DataType = {
   id: 0x26,
@@ -6,11 +10,6 @@ const IntN: DataType = {
   name: 'IntN',
 
   getDataType: function(dataLength: number) {
-    const tinyInt = require('./tinyint');
-    const smallInt = require('./smallint');
-    const int = require('./int');
-    const bigInt = require('./bigint');
-
     switch (dataLength) {
       case 1:
         return tinyInt;
