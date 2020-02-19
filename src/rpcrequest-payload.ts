@@ -3,6 +3,7 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
+import { Readable } from 'readable-stream';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -32,7 +33,11 @@ class RpcRequestPayload {
     this.txnDescriptor = txnDescriptor;
   }
 
-  getData(cb: (data: Buffer) => void) {
+  getStream() {
+    return Readable.from(this.generateData(), { objectMode: false }) as Readable;
+  }
+
+  * generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -50,26 +55,19 @@ class RpcRequestPayload {
     buffer.writeUInt16LE(optionFlags);
 
     const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        cb(buffer.data);
-        return;
-      }
+    yield buffer.data;
 
-      this._writeParameterData(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
-        });
-      });
-    };
-    writeNext(0);
+    for (let i = 0; i < parameters.length; i++) {
+      yield* this.generateParameterData(parameters[i], this.options);
+    }
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  * generateParameterData(parameter: Parameter, options: any) {
+    const buffer = new WritableTrackingBuffer(0);
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -103,9 +101,9 @@ class RpcRequestPayload {
     }
 
     type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
-      cb();
-    });
+
+    yield buffer.data;
+    yield* type.generate(param, options);
   }
 }
 

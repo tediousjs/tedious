@@ -18,12 +18,12 @@ const STATUS = {
 };
 
 type TokenData = {
-  more: boolean,
-  sqlError: boolean,
-  attention: boolean,
-  serverError: boolean,
-  rowCount: number | undefined,
-  curCmd: number
+  more: boolean;
+  sqlError: boolean;
+  attention: boolean;
+  serverError: boolean;
+  rowCount: number | undefined;
+  curCmd: number;
 };
 
 function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {

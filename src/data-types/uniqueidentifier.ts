@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -19,14 +20,22 @@ const UniqueIdentifier: DataType = {
     buffer.writeUInt8(0x10);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0x10);
       buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): string | null | TypeError {

@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
@@ -27,8 +28,17 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     buffer.writeUInt8(parameter.scale);
   },
 
-  writeParameterData: function(buffer, { value, scale }, options, cb) {
+  writeParameterData: function(buff, parameter, options, cb) {
+    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
+    cb();
+  },
+
+  generate: function* (parameter, options) {
+    const value = parameter.value;
+    let scale = parameter.scale;
+
     if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
       scale = scale!;
 
       let timestamp;
@@ -69,10 +79,12 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
 
       const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
       buffer.writeUInt24LE(days);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
 
   validate: function(value): null | number | TypeError {

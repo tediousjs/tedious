@@ -17,6 +17,10 @@ const FloatN: DataType = {
     throw new Error('not implemented');
   },
 
+  generate() {
+    throw new Error('not implemented');
+  },
+
   validate() {
     throw new Error('not implemented');
   }
