@@ -8,15 +8,14 @@ const bench = createBenchmark(main, {
   size: [
     1024 * 1024,
     10 * 1024 * 1024,
-    50 * 1024 * 1024
+    50 * 1024 * 1024,
   ]
 });
 
 function main({ n, size }) {
-  const buf = Buffer.alloc(size);
-  buf.fill('x');
+  const buf = Buffer.alloc(size, 'x');
 
-  const request = new Request('INSERT INTO #benchmark ([value]) VALUES (@value)', () => {});
+  const request = new Request('...', () => {});
   request.addParameter('value', TYPES.VarBinary, buf);
 
   let i = 0;
