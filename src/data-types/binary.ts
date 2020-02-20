@@ -1,5 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
@@ -36,26 +35,25 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter: ParameterData<Buffer | null>) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt16LE(parameter.length);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(3);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt16LE(parameter.length!, 1);
+    return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(parameter.length!);
-      buffer.writeBuffer(parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength));
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(parameter.length!, 0);
+      yield buffer;
+
+      const value = parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength);
+      yield value;
     } else {
-      const buffer = new WritableTrackingBuffer(2);
-      buffer.writeUInt16LE(NULL);
-      yield buffer.data;
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(NULL, 0);
+      yield buffer;
     }
   },
 

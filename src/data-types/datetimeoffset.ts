@@ -20,16 +20,12 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
       return 7;
     }
   },
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale);
-  },
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
+
+  generateTypeInfo(parameter) {
+    return Buffer.from([this.id, parameter.scale!]);
   },
 
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     const value = parameter.value;
     let scale = parameter.scale;
 

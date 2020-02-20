@@ -3,6 +3,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
+const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
@@ -47,31 +49,41 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
+
     if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength);
+      buffer.writeUInt16LE(this.maximumLength, 1);
     } else {
-      buffer.writeUInt16LE(MAX);
+      buffer.writeUInt16LE(MAX, 1);
     }
-    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+
+    return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-
-  generate: function*(parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
+      let value = parameter.value;
+
       if (parameter.length! <= this.maximumLength) {
+        const buffer = new WritableTrackingBuffer(0);
         buffer.writeUsVarbyte(parameter.value, 'ascii');
+        yield buffer.data;
       } else {
-        buffer.writePLPBody(parameter.value, 'ascii');
+        value = value.toString();
+        const length = Buffer.byteLength(value, 'ascii');
+
+        yield UNKNOWN_PLP_LEN;
+        if (length > 0) {
+          const buffer = Buffer.alloc(4);
+          buffer.writeUInt32LE(length, 0);
+          yield buffer;
+          yield Buffer.from(value, 'ascii');
+        }
+
+        yield PLP_TERMINATOR;
       }
-      yield buffer.data;
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);
