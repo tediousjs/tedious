@@ -3,7 +3,6 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-import { Readable } from 'readable-stream';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -19,7 +18,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload {
+class RpcRequestPayload implements Iterable<Buffer> {
   request: Request;
   procedure: string | number;
 
@@ -33,8 +32,8 @@ class RpcRequestPayload {
     this.txnDescriptor = txnDescriptor;
   }
 
-  getStream() {
-    return Readable.from(this.generateData(), { objectMode: false }) as Readable;
+  [Symbol.iterator]() {
+    return this.generateData();
   }
 
   * generateData() {
