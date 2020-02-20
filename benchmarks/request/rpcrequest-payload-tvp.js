@@ -3,6 +3,8 @@ const { createBenchmark } = require('../common');
 const { Request, TYPES } = require('../../lib/tedious');
 const RpcRequestPayload = require('../../lib/rpcrequest-payload');
 
+const { Readable } = require('readable-stream');
+
 const bench = createBenchmark(main, {
   n: [10, 100],
   size: [10, 100, 1000, 10000]
@@ -35,7 +37,7 @@ function main({ n, size }) {
     }
 
     const payload = new RpcRequestPayload(request, Buffer.alloc(0), {});
-    const stream = payload.getStream();
+    const stream = Readable.from(payload, { objectMode: false });
     const chunks = [];
     stream.on('data', (chunk) => {
       chunks.push(chunk);
