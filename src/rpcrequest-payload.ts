@@ -52,10 +52,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-
-    const parameters = this.request.parameters;
     yield buffer.data;
 
+    const parameters = this.request.parameters;
     for (let i = 0; i < parameters.length; i++) {
       yield* this.generateParameterData(parameters[i], this.options);
     }
@@ -74,6 +73,8 @@ class RpcRequestPayload implements Iterable<Buffer> {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
     buffer.writeUInt8(statusFlags);
+
+    yield buffer.data;
 
     const param: ParameterData = { value: parameter.value };
 
@@ -99,10 +100,8 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.scale = type.resolveScale(parameter);
     }
 
-    type.writeTypeInfo(buffer, param, this.options);
-
-    yield buffer.data;
-    yield* type.generate(param, options);
+    yield type.generateTypeInfo(param, this.options);
+    yield* type.generateParameterData(param, options);
   }
 }
 

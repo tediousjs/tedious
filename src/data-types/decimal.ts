@@ -29,36 +29,32 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(DecimalN.id);
+  generateTypeInfo(parameter, _options) {
+    let precision;
     if (parameter.precision! <= 9) {
-      buffer.writeUInt8(5);
+      precision = 0x05;
     } else if (parameter.precision! <= 19) {
-      buffer.writeUInt8(9);
+      precision = 0x09;
     } else if (parameter.precision! <= 28) {
-      buffer.writeUInt8(13);
+      precision = 0x0D;
     } else {
-      buffer.writeUInt8(17);
+      precision = 0x11;
     }
-    buffer.writeUInt8(parameter.precision);
-    buffer.writeUInt8(parameter.scale);
+
+    return Buffer.from([DecimalN.id, precision, parameter.precision!, parameter.scale!]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
       const sign = parameter.value < 0 ? 0 : 1;
       const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
       if (parameter.precision! <= 9) {
-        const buffer = new WritableTrackingBuffer(6);
-        buffer.writeUInt8(5);
-        buffer.writeUInt8(sign);
-        buffer.writeUInt32LE(value);
-        yield buffer.data;
+        const buffer = Buffer.alloc(6);
+        let offset = 0;
+        offset = buffer.writeUInt8(5, offset);
+        offset = buffer.writeUInt8(sign, offset);
+        buffer.writeUInt32LE(value, offset);
+        yield buffer;
       } else if (parameter.precision! <= 19) {
         const buffer = new WritableTrackingBuffer(10);
         buffer.writeUInt8(9);
@@ -82,9 +78,7 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
         yield buffer.data;
       }
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

@@ -15,26 +15,18 @@ const UniqueIdentifier: DataType = {
     return 16;
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(0x10);
+  generateTypeInfo() {
+    return Buffer.from([this.id, 0x10]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0x10);
       buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 
