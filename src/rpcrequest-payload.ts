@@ -3,7 +3,6 @@ import { writeToTrackingBuffer } from './all-headers';
 import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
-import { Readable } from 'readable-stream';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -19,7 +18,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload {
+class RpcRequestPayload implements Iterable<Buffer> {
   request: Request;
   procedure: string | number;
 
@@ -33,8 +32,8 @@ class RpcRequestPayload {
     this.txnDescriptor = txnDescriptor;
   }
 
-  getStream() {
-    return Readable.from(this.generateData(), { objectMode: false }) as Readable;
+  [Symbol.iterator]() {
+    return this.generateData();
   }
 
   * generateData() {
@@ -53,10 +52,9 @@ class RpcRequestPayload {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-
-    const parameters = this.request.parameters;
     yield buffer.data;
 
+    const parameters = this.request.parameters;
     for (let i = 0; i < parameters.length; i++) {
       yield* this.generateParameterData(parameters[i], this.options);
     }
@@ -75,6 +73,8 @@ class RpcRequestPayload {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
     buffer.writeUInt8(statusFlags);
+
+    yield buffer.data;
 
     const param: ParameterData = { value: parameter.value };
 
@@ -100,10 +100,8 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
-    type.writeTypeInfo(buffer, param, this.options);
-
-    yield buffer.data;
-    yield* type.generate(param, options);
+    yield type.generateTypeInfo(param, this.options);
+    yield* type.generateParameterData(param, options);
   }
 }
 
