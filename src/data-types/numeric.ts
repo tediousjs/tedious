@@ -88,7 +88,7 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     if (value != null) {
       const scale = this.resolveScale(parameter);
 
-      const sign = value < 0 ? 0x00 : 0x01;
+      const sign = value < 0 ? 0 : 1;
       const mag = Math.round(Math.abs(value * Math.pow(10, scale)));
 
       // block size does not matter for encrypted numeric

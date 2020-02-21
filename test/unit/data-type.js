@@ -1591,6 +1591,12 @@ describe('DataType.toBuffer', () => {
         options: { useUTC: false },
         expected: Buffer.from([ 0x14, 0x64, 0x00, 0x00, 0x00, 0xC1, 0xC5, 0x00 ]),
       },
+      {
+        name: 'value is local date, with use utc false and is midnight',
+        parameter: { value: new Date(1970, 1, 23, 23, 59, 59, 999) },
+        options: { useUTC: false },
+        expected: Buffer.from([ 0x15, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
         const actual = TYPES.DateTime.toBuffer(parameter, options);
@@ -1693,8 +1699,32 @@ describe('DataType.toBuffer', () => {
     });
   });
 
-  // DateTimeOffset is already tested by Date, and only has the additional time-zone offset
-  // Adding a portable, dynamic test for it wouldn't really be testing much, so skip it
+  describe('DateTimeOffset.toBuffer', () => {
+    [
+      undefinedValueCase,
+      nullValueCase,
+      {
+        name: 'value is utc date, with use utc',
+        parameter: { value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) },
+        expected: Buffer.from([ 0x00, 0xE0, 0x34, 0x95, 0x64, 0x6F, 0xF9, 0x0A, 0xd4, 0xfe ]),
+      },
+      {
+        name: 'value is local date, with nanoseconds',
+        parameter: {
+          value: Object.assign(
+            new Date(1970, 1, 23, 12, 0, 0),
+            { nanosecondDelta: 1234 },
+          ),
+        },
+        expected: Buffer.from([ 0x00, 0x5D, 0x90, 0x5D, 0x91, 0x6F, 0xF9, 0x0A, 0xd4, 0xfe ]),
+      },
+    ].forEach(({ name, parameter, expected }) => {
+      it(name, () => {
+        const actual = TYPES.DateTimeOffset.toBuffer(parameter);
+        assert.deepEqual(actual, expected);
+      });
+    });
+  });
 
   describe('Numeric.toBuffer', () => {
     [
@@ -1704,6 +1734,11 @@ describe('DataType.toBuffer', () => {
         name: 'value is a float number',
         parameter: { value: 1234.5678 },
         expected: Buffer.from([ 0x01, 0xD3, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
+      },
+      {
+        name: 'value is a negative float number',
+        parameter: { value: -1234.5678 },
+        expected: Buffer.from([ 0x00, 0xD3, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ]),
       },
       {
         name: 'value is a float string',
