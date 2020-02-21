@@ -27,9 +27,9 @@ const Float: DataType = {
 
   toBuffer: function(parameter) {
     if (parameter.value != null) {
-      const result = new WritableTrackingBuffer(8);
-      result.writeDoubleLE(parseFloat(parameter.value));
-      return result.data;
+      const buffer = Buffer.alloc(8);
+      buffer.writeDoubleLE(parseFloat(parameter.value), 0);
+      return buffer;
     }
   },
 

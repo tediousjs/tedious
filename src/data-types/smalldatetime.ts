@@ -55,11 +55,11 @@ const SmallDateTime: DataType = {
         minutes = (value.getHours() * 60) + value.getMinutes();
       }
 
-      const result = new WritableTrackingBuffer(4);
-      result.writeUInt16LE(days);
-      result.writeUInt16LE(minutes);
+      const buffer = Buffer.alloc(4);
+      buffer.writeUInt16LE(days, 0);
+      buffer.writeUInt16LE(minutes, 2);
 
-      return result.data;
+      return buffer;
     }
   },
 

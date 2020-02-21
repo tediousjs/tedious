@@ -97,11 +97,11 @@ const DateTime: DataType = {
         threeHundredthsOfSecond = 0;
       }
 
-      const result = new WritableTrackingBuffer(8);
-      result.writeUInt32LE(days);
-      result.writeUInt32LE(threeHundredthsOfSecond);
+      const buffer = Buffer.alloc(8);
+      buffer.writeUInt32LE(days, 0);
+      buffer.writeUInt32LE(threeHundredthsOfSecond, 4);
 
-      return result.data;
+      return buffer;
     }
   },
 

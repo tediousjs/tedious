@@ -40,9 +40,11 @@ const Money: DataType = {
 
   toBuffer: function(parameter) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(8);
-      buffer.writeMoney(parameter.value * 10000);
-      return buffer.data;
+      const value = parameter.value * 10000;
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
+      buffer.writeInt32LE(value & -1, 4);
+      return buffer;
     }
   },
 

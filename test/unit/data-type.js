@@ -1137,7 +1137,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.TinyInt.toBuffer(parameter);
+        const actual = TYPES.TinyInt.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1159,7 +1159,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.SmallInt.toBuffer(parameter);
+        const actual = TYPES.SmallInt.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1181,7 +1181,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Int.toBuffer(parameter);
+        const actual = TYPES.Int.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1203,7 +1203,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.BigInt.toBuffer(parameter);
+        const actual = TYPES.BigInt.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1230,7 +1230,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Real.toBuffer(parameter);
+        const actual = TYPES.Real.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1257,7 +1257,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Float.toBuffer(parameter);
+        const actual = TYPES.Float.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1274,7 +1274,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.SmallMoney.toBuffer(parameter);
+        const actual = TYPES.SmallMoney.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1291,7 +1291,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Money.toBuffer(parameter);
+        const actual = TYPES.Money.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1323,7 +1323,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Bit.toBuffer(parameter);
+        const actual = TYPES.Bit.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1360,7 +1360,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.VarChar.toBuffer(parameter);
+        const actual = TYPES.VarChar.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1397,7 +1397,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Char.toBuffer(parameter);
+        const actual = TYPES.Char.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1434,7 +1434,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.NVarChar.toBuffer(parameter);
+        const actual = TYPES.NVarChar.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1471,7 +1471,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.NChar.toBuffer(parameter);
+        const actual = TYPES.NChar.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1508,7 +1508,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.VarBinary.toBuffer(parameter);
+        const actual = TYPES.VarBinary.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1545,7 +1545,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Binary.toBuffer(parameter);
+        const actual = TYPES.Binary.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1569,7 +1569,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.SmallDateTime.toBuffer(parameter, options);
+        const actual = TYPES.SmallDateTime.toBuffer(parameter, options);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1593,7 +1593,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.DateTime.toBuffer(parameter, options);
+        const actual = TYPES.DateTime.toBuffer(parameter, options);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1628,7 +1628,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Time.toBuffer(parameter, options);
+        const actual = TYPES.Time.toBuffer(parameter, options);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1652,7 +1652,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Date.toBuffer(parameter, options);
+        const actual = TYPES.Date.toBuffer(parameter, options);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1687,7 +1687,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, options, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.DateTime2.toBuffer(parameter, options);
+        const actual = TYPES.DateTime2.toBuffer(parameter, options);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1722,7 +1722,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Numeric.toBuffer(parameter);
+        const actual = TYPES.Numeric.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1754,7 +1754,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.Decimal.toBuffer(parameter);
+        const actual = TYPES.Decimal.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });
@@ -1790,7 +1790,7 @@ describe('DataType.toBuffer', () => {
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
-        const actual = TYPES.typeByName.UniqueIdentifier.toBuffer(parameter);
+        const actual = TYPES.UniqueIdentifier.toBuffer(parameter);
         assert.deepEqual(actual, expected);
       });
     });

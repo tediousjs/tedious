@@ -28,9 +28,9 @@ const Real: DataType = {
 
   toBuffer: function(parameter) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(4);
-      buffer.writeFloatLE(parseFloat(parameter.value));
-      return buffer.data;
+      const buffer = Buffer.alloc(4);
+      buffer.writeFloatLE(parseFloat(parameter.value), 0);
+      return buffer;
     }
   },
 
