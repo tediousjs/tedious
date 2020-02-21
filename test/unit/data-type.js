@@ -1716,11 +1716,11 @@ describe('DataType.toBuffer', () => {
         name: 'value is local date, with nanoseconds',
         parameter: {
           value: Object.assign(
-            new Date(1970, 1, 23, 12, 0, 0),
+            new Date(Date.UTC(1970, 1, 23, 12, 0, 0)),
             { nanosecondDelta: 1234 },
           ),
         },
-        expected: Buffer.concat([Buffer.from([ 0x00, 0x5D, 0x90, 0x5D, 0x91, 0x6F, 0xF9, 0x0A ]), offsetBuffer]),
+        expected: Buffer.concat([Buffer.from([ 0x00, 0x55, 0xBA, 0x74, 0x67, 0x6F, 0xF9, 0x0A ]), offsetBuffer]),
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
