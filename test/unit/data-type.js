@@ -1700,13 +1700,17 @@ describe('DataType.toBuffer', () => {
   });
 
   describe('DateTimeOffset.toBuffer', () => {
+    const offsetBuffer = Buffer.alloc(2);
+    const offset = new Date().getTimezoneOffset();
+    offsetBuffer.writeInt16LE(-offset, 0);
+
     [
       undefinedValueCase,
       nullValueCase,
       {
         name: 'value is utc date, with use utc',
         parameter: { value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) },
-        expected: Buffer.from([ 0x00, 0xE0, 0x34, 0x95, 0x64, 0x6F, 0xF9, 0x0A, 0xd4, 0xfe ]),
+        expected: Buffer.concat([Buffer.from([ 0x00, 0xE0, 0x34, 0x95, 0x64, 0x6F, 0xF9, 0x0A ]), offsetBuffer]),
       },
       {
         name: 'value is local date, with nanoseconds',
@@ -1716,7 +1720,7 @@ describe('DataType.toBuffer', () => {
             { nanosecondDelta: 1234 },
           ),
         },
-        expected: Buffer.from([ 0x00, 0x5D, 0x90, 0x5D, 0x91, 0x6F, 0xF9, 0x0A, 0xd4, 0xfe ]),
+        expected: Buffer.concat([Buffer.from([ 0x00, 0x5D, 0x90, 0x5D, 0x91, 0x6F, 0xF9, 0x0A ]), offsetBuffer]),
       },
     ].forEach(({ name, parameter, expected }) => {
       it(name, () => {
