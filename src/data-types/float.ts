@@ -33,6 +33,14 @@ const Float: DataType = {
       yield buffer.data;
     }
   },
+  
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      const result = new WritableTrackingBuffer(8)
+      result.writeDoubleLE(parseFloat(parameter.value));
+      return result.data;
+    }
+  },
 
   validate: function(value): number | null | TypeError {
     if (value == null) {

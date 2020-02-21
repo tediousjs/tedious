@@ -62,7 +62,6 @@ const VarChar: { maximumLength: number } & DataType = {
     cb();
   },
 
-
   generate: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(0);
@@ -81,6 +80,14 @@ const VarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt32LE(0xFFFFFFFF);
       buffer.writeUInt32LE(0xFFFFFFFF);
       yield buffer.data;
+    }
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+    const length = this.resolveLength!(parameter);
+    if (value != null && length <= this.maximumLength) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
     }
   },
 

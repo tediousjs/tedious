@@ -34,6 +34,15 @@ const SmallMoney: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      // SmallMoney is still 8 bytes, but the first 4 are always ignored
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt32LE(parameter.value * 10000, 4);
+      return buffer;
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

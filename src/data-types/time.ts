@@ -73,6 +73,33 @@ const Time: DataType = {
     }
   },
 
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date & { nanosecondDelta?: number | null };
+
+    if (value != null) {
+      const scale = this.resolveScale!(parameter);
+      const time = value;
+
+      let timestamp: number;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
+      } else {
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
+      }
+
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp = Math.round(timestamp);
+
+      // data size does not matter for encrypted time
+      // just choose the smallest that maintains full scale (7)
+      const buffer = new WritableTrackingBuffer(5);
+      buffer.writeUInt40LE(timestamp);
+
+      return buffer.data;
+    }
+  },
+
   validate: function(value): null | number | TypeError | Date {
     if (value == null) {
       return null;

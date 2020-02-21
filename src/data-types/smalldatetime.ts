@@ -49,6 +49,28 @@ const SmallDateTime: DataType = {
     }
   },
 
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date;
+
+    if (value != null) {
+      let days, dstDiff, minutes;
+      if (options.useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
+      } else {
+        dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (value.getHours() * 60) + value.getMinutes();
+      }
+
+      const result = new WritableTrackingBuffer(4);
+      result.writeUInt16LE(days);
+      result.writeUInt16LE(minutes);
+
+      return result.data;
+    }
+  },
+
   validate: function(value): null | Date| TypeError {
     if (value == null) {
       return null;

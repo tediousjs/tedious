@@ -34,6 +34,14 @@ const Money: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeMoney(parameter.value * 10000);
+      return buffer.data;
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;

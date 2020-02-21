@@ -38,6 +38,12 @@ const UniqueIdentifier: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      return Buffer.from(guidToArray(parameter.value));
+    }
+  },
+
   validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;

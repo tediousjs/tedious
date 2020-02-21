@@ -72,12 +72,13 @@ export interface DataType {
   writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
   validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
   generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
+  toBuffer?(parameter: ParameterData, options: InternalConnectionOptions): Buffer | void;
 
   hasTableName?: boolean;
 
-  resolveLength?: (parameter: Parameter) => number;
+  resolveLength?: (parameter: ParameterData) => number;
   resolvePrecision?: (parameter: Parameter) => number;
-  resolveScale?: (parameter: Parameter) => number;
+  resolveScale?: (parameter: ParameterData) => number;
 }
 
 export const TYPE = {

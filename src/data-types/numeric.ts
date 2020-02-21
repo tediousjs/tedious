@@ -89,6 +89,26 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as number;
+
+    if (value != null) {
+      const scale = this.resolveScale(parameter);
+
+      const sign = value < 0 ? 0x00 : 0x01;
+      const mag = Math.round(Math.abs(value * Math.pow(10, scale)));
+
+      // block size does not matter for encrypted numeric
+      // just choose the smallest that maintains full precision (18), instead
+      // of tailoring it for each parameter.precision
+      const buffer = new WritableTrackingBuffer(16);
+      buffer.writeUInt8(sign);
+      buffer.writeUInt64LE(mag);
+
+      return buffer.data;
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

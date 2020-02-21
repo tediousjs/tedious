@@ -34,6 +34,15 @@ const Int: DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      // Always Encrypted length must be normalized to 8 bytes for int
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt32LE(Number(parameter.value), 0);
+      return buffer;
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;

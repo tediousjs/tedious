@@ -72,6 +72,13 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    }
+  },
+
   validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;

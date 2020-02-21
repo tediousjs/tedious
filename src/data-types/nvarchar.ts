@@ -83,6 +83,15 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+    const length = this.resolveLength!(parameter);
+    if (value != null && length! <= this.maximumLength) {
+      // length must be less than 4000 since PLP body is not supported with Always Encrypted
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'ucs2');
+    }
+  },
+
   validate: function(value): null | string | TypeError {
     if (value == null) {
       return null;
