@@ -15,16 +15,11 @@ const Date: DataType = {
     return 'date';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(this.id);
+  generateTypeInfo: function(buffer) {
+    return Buffer.from([this.id]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function* (parameter, options) {
+  *generateParameterData(parameter, options) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
@@ -42,9 +37,7 @@ const Date: DataType = {
       buffer.writeUInt24LE(days);
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

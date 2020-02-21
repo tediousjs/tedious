@@ -1,6 +1,5 @@
 const { assert } = require('chai');
 const { typeByName: { Int, SmallInt, TinyInt } } = require('../../src/data-type');
-const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 
 describe('integer-data-types', function() {
   describe('int data type test', function() {
@@ -11,14 +10,9 @@ describe('integer-data-types', function() {
     ];
 
     params.forEach(function(item) {
-      it('test valid parameter values', function(done) {
-        const buffer = new WritableTrackingBuffer(4 + 1);
-
-        Int.writeParameterData(buffer, item.param, {}, () => {
-          assert.equal(buffer.buffer.readInt32LE(1), item.expected);
-
-          done();
-        });
+      it('test valid parameter values', function() {
+        const buffer = Buffer.concat([...Int.generateParameterData(item.param, {})]);
+        assert.equal(buffer.readInt32LE(1), item.expected);
       });
     });
   });
@@ -31,14 +25,9 @@ describe('integer-data-types', function() {
     ];
 
     params.forEach(function(item) {
-      it('test valid parameter values', function(done) {
-        const buffer = new WritableTrackingBuffer(4 + 1);
-
-        SmallInt.writeParameterData(buffer, item.param, {}, () => {
-          assert.equal(buffer.buffer.readInt32LE(1), item.expected);
-
-          done();
-        });
+      it('test valid parameter values', function() {
+        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, {})]);
+        assert.equal(buffer.readInt16LE(1), item.expected);
       });
     });
   });
@@ -51,13 +40,9 @@ describe('integer-data-types', function() {
     ];
 
     params.forEach(function(item) {
-      it('test valid parameter values', function(done) {
-        const buffer = new WritableTrackingBuffer(4 + 1);
-        TinyInt.writeParameterData(buffer, item.param, {}, () => {
-          assert.equal(buffer.buffer.readInt32LE(1), item.expected);
-
-          done();
-        });
+      it('test valid parameter values', function() {
+        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, {})]);
+        assert.equal(buffer.readInt8(1), item.expected);
       });
     });
   });
