@@ -15,15 +15,22 @@ const BigInt: DataType = {
     return Buffer.from([IntN.id, 0x08]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(9);
-      buffer.writeUInt8(8);
-      buffer.writeInt64LE(Number(parameter.value));
-      yield buffer.data;
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     } else {
-      yield Buffer.from([0x00]);
+      return Buffer.from([0x08]);
     }
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = new WritableTrackingBuffer(8);
+    buffer.writeInt64LE(Number(parameter.value));
+    yield buffer.data;
   },
 
   validate: function(value): null | number | TypeError {

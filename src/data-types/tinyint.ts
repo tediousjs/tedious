@@ -14,16 +14,22 @@ const TinyInt: DataType = {
     return Buffer.from([IntN.id, 0x01]);
   },
 
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(2);
-      let offset = 0;
-      offset = buffer.writeUInt8(1, offset);
-      buffer.writeUInt8(Number(parameter.value), offset);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    return Buffer.from([0x01]);
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(1);
+    buffer.writeUInt8(Number(parameter.value), 0);
+    yield buffer;
   },
 
   validate: function(value): number | null | TypeError {

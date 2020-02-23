@@ -26,18 +26,18 @@ const Image: DataType = {
     return buffer;
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(4);
-      buffer.writeInt32LE(parameter.length!, 0);
-      yield buffer;
+  generateParameterLength(parameter, options) {
+    const buffer = Buffer.alloc(4);
+    buffer.writeInt32LE(parameter.length!, 0);
+    return buffer;
+  },
 
-      yield parameter.value;
-    } else {
-      const buffer = Buffer.alloc(4);
-      buffer.writeInt32LE(parameter.length!, 0);
-      yield buffer;
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
     }
+
+    yield parameter.value;
   },
 
   validate: function(value): null | TypeError | Buffer {

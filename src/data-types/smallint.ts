@@ -14,15 +14,22 @@ const SmallInt: DataType = {
     return Buffer.from([IntN.id, 0x02]);
   },
 
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(3);
-      buffer.writeUInt8(2, 0);
-      buffer.writeInt16LE(Number(parameter.value), 1);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    return Buffer.from([0x02]);
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(2);
+    buffer.writeInt16LE(Number(parameter.value), 0);
+    yield buffer;
   },
 
   validate: function(value): null | number | TypeError {

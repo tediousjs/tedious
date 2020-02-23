@@ -14,18 +14,24 @@ const Int: DataType = {
     return Buffer.from([IntN.id, 0x04]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(1);
-      buffer.writeUInt8(4, 0);
-      yield buffer;
-
-      const buffer2 = Buffer.alloc(4);
-      buffer2.writeInt32LE(Number(parameter.value), 0);
-      yield buffer2;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    const buffer = Buffer.alloc(1);
+    buffer.writeUInt8(4, 0);
+    return buffer;
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(4);
+    buffer.writeInt32LE(Number(parameter.value), 0);
+    yield buffer;
   },
 
   validate: function(value): number | null | TypeError {

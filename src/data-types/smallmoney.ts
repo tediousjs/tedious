@@ -14,15 +14,22 @@ const SmallMoney: DataType = {
     return Buffer.from([MoneyN.id, 0x04]);
   },
 
-  generateParameterData: function*(parameter) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(5);
-      buffer.writeUInt8(4, 0);
-      buffer.writeInt32LE(parameter.value * 10000, 1);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    return Buffer.from([0x04]);
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(4);
+    buffer.writeInt32LE(parameter.value * 10000, 0);
+    yield buffer;
   },
 
   validate: function(value): null | number | TypeError {

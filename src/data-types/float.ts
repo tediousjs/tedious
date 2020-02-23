@@ -14,15 +14,22 @@ const Float: DataType = {
     return Buffer.from([FloatN.id, 0x08]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(9);
-      buffer.writeUInt8(8, 0);
-      buffer.writeDoubleLE(parseFloat(parameter.value), 1);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    return Buffer.from([0x08]);
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(8);
+    buffer.writeDoubleLE(parseFloat(parameter.value), 0);
+    yield buffer;
   },
 
   validate: function(value): number | null | TypeError {

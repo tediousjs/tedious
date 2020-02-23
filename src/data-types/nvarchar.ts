@@ -60,64 +60,75 @@ const NVarChar: { maximumLength: number } & DataType = {
     return buffer;
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      let value = parameter.value;
-
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
       if (parameter.length! <= this.maximumLength) {
-        let length;
-        if (value instanceof Buffer) {
-          length = value.length;
+        const buffer = Buffer.alloc(2);
+        buffer.writeUInt16LE(NULL, 0);
+        return buffer;
+      } else {
+        const buffer = Buffer.alloc(8);
+        const offset = buffer.writeUInt32LE(0xFFFFFFFF, 0);
+        buffer.writeUInt32LE(0xFFFFFFFF, offset);
+        return buffer;
+      }
+    }
 
-          const buffer = Buffer.alloc(2);
-          buffer.writeUInt16LE(length, 0);
+    let value = parameter.value;
+    if (parameter.length! <= this.maximumLength) {
+      let length;
+      if (value instanceof Buffer) {
+        length = value.length;
+      } else {
+        value = value.toString();
+        length = Buffer.byteLength(value, 'ucs2');
+      }
+
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(length, 0);
+      return buffer;
+    } else {
+      return UNKNOWN_PLP_LEN;
+    }
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    let value = parameter.value;
+
+    if (parameter.length! <= this.maximumLength) {
+      if (value instanceof Buffer) {
+        yield value;
+      } else {
+        value = value.toString();
+        yield Buffer.from(value, 'ucs2');
+      }
+    } else {
+      if (value instanceof Buffer) {
+        const length = value.length;
+
+        if (length > 0) {
+          const buffer = Buffer.alloc(4);
+          buffer.writeUInt32LE(length, 0);
           yield buffer;
-
           yield value;
-        } else {
-          value = value.toString();
-          length = Buffer.byteLength(value, 'ucs2');
-
-          const buffer = Buffer.alloc(2);
-          buffer.writeUInt16LE(length, 0);
-          yield buffer;
-
-          yield Buffer.from(value, 'ucs2');
         }
       } else {
-        yield UNKNOWN_PLP_LEN;
+        value = value.toString();
+        const length = Buffer.byteLength(value, 'ucs2');
 
-        if (value instanceof Buffer) {
-          const length = value.length;
-          if (length > 0) {
-            const buffer = Buffer.alloc(4);
-            buffer.writeUInt32LE(length, 0);
-            yield buffer;
-            yield value;
-          }
-        } else {
-          value = value.toString();
-          const length = Buffer.byteLength(value, 'ucs2');
-
-          if (length > 0) {
-            const buffer = Buffer.alloc(4);
-            buffer.writeUInt32LE(length, 0);
-            yield buffer;
-            yield Buffer.from(value, 'ucs2');
-          }
+        if (length > 0) {
+          const buffer = Buffer.alloc(4);
+          buffer.writeUInt32LE(length, 0);
+          yield buffer;
+          yield Buffer.from(value, 'ucs2');
         }
-
-        yield PLP_TERMINATOR;
       }
-    } else if (parameter.length! <= this.maximumLength) {
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(NULL, 0);
-      yield buffer;
-    } else {
-      const buffer = Buffer.alloc(8);
-      const offset = buffer.writeUInt32LE(0xFFFFFFFF, 0);
-      buffer.writeUInt32LE(0xFFFFFFFF, offset);
-      yield buffer;
+
+      yield PLP_TERMINATOR;
     }
   },
 

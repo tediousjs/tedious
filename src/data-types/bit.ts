@@ -14,17 +14,20 @@ const Bit: DataType = {
     return Buffer.from([BitN.id, 0x01]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (typeof parameter.value === 'undefined' || parameter.value === null) {
-      const buffer = Buffer.alloc(1);
-      buffer.writeUInt8(0, 0);
-      yield buffer;
-    } else {
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt8(1, 0);
-      buffer.writeUInt8(parameter.value ? 1 : 0, 1);
-      yield buffer;
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
     }
+
+    return Buffer.from([0x01]);
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    yield parameter.value ? Buffer.from([0x01]) : Buffer.from([0x00]);
   },
 
   validate: function(value): null | boolean {

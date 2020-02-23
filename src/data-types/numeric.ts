@@ -44,41 +44,53 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     return Buffer.from([NumericN.id, precision, parameter.precision!, parameter.scale!]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const sign = parameter.value < 0 ? 0 : 1;
-      const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
-      if (parameter.precision! <= 9) {
-        const buffer = Buffer.alloc(6);
-        let offset = 0;
-        offset = buffer.writeUInt8(5, offset);
-        offset = buffer.writeUInt8(sign, offset);
-        buffer.writeUInt32LE(value, offset);
-        yield buffer;
-      } else if (parameter.precision! <= 19) {
-        const buffer = new WritableTrackingBuffer(10);
-        buffer.writeUInt8(9);
-        buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
-        yield buffer.data;
-      } else if (parameter.precision! <= 28) {
-        const buffer = new WritableTrackingBuffer(14);
-        buffer.writeUInt8(13);
-        buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
-        buffer.writeUInt32LE(0x00000000);
-        yield buffer.data;
-      } else {
-        const buffer = new WritableTrackingBuffer(18);
-        buffer.writeUInt8(17);
-        buffer.writeUInt8(sign);
-        buffer.writeUInt64LE(value);
-        buffer.writeUInt32LE(0x00000000);
-        buffer.writeUInt32LE(0x00000000);
-        yield buffer.data;
-      }
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0x00]);
+    }
+
+    const precision = parameter.precision!;
+    if (precision <= 9) {
+      return Buffer.from([0x05]);
+    } else if (precision <= 19) {
+      return Buffer.from([0x09]);
+    } else if (precision <= 28) {
+      return Buffer.from([0x0D]);
     } else {
-      yield Buffer.from([0x00]);
+      return Buffer.from([0x11]);
+    }
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const sign = parameter.value < 0 ? 0 : 1;
+    const value = Math.round(Math.abs(parameter.value * Math.pow(10, parameter.scale!)));
+    if (parameter.precision! <= 9) {
+      const buffer = Buffer.alloc(5);
+      buffer.writeUInt8(sign, 0);
+      buffer.writeUInt32LE(value, 1);
+      yield buffer;
+    } else if (parameter.precision! <= 19) {
+      const buffer = new WritableTrackingBuffer(10);
+      buffer.writeUInt8(sign);
+      buffer.writeUInt64LE(value);
+      yield buffer.data;
+    } else if (parameter.precision! <= 28) {
+      const buffer = new WritableTrackingBuffer(14);
+      buffer.writeUInt8(sign);
+      buffer.writeUInt64LE(value);
+      buffer.writeUInt32LE(0x00000000);
+      yield buffer.data;
+    } else {
+      const buffer = new WritableTrackingBuffer(18);
+      buffer.writeUInt8(sign);
+      buffer.writeUInt64LE(value);
+      buffer.writeUInt32LE(0x00000000);
+      buffer.writeUInt32LE(0x00000000);
+      yield buffer.data;
     }
   },
 

@@ -33,20 +33,25 @@ const TVP: DataType = {
     return buffer.data;
   },
 
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return Buffer.from([0xFF, 0xFF]);
+    }
+
+    const { columns } = parameter.value;
+    const buffer = Buffer.alloc(2);
+    buffer.writeUInt16LE(columns.length, 0);
+    return buffer;
+  },
+
   *generateParameterData(parameter, options) {
     if (parameter.value == null) {
-      const buffer = Buffer.alloc(4);
-      buffer.writeUInt16LE(0xFFFF, 0);
-      buffer.writeUInt8(0x00, 2);
-      buffer.writeUInt8(0x00, 3);
-      yield buffer;
+      yield TVP_END_TOKEN;
+      yield TVP_END_TOKEN;
       return;
     }
 
     const { columns, rows } = parameter.value;
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(columns.length, 0);
-    yield buffer;
 
     for (let i = 0, len = columns.length; i < len; i++) {
       const column = columns[i];
@@ -84,6 +89,7 @@ const TVP: DataType = {
         };
 
         // TvpColumnData
+        yield column.type.generateParameterLength(param, options);
         yield * column.type.generateParameterData(param, options);
       }
     }
