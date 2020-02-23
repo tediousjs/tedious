@@ -4,6 +4,9 @@ const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
   type: 'BIGVARBIN',
@@ -57,9 +60,9 @@ const VarBinary: { maximumLength: number } & DataType = {
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
       if (parameter.length! <= this.maximumLength) {
-        return Buffer.from([0xFF, 0xFF]);
+        return NULL_LENGTH;
       } else {
-        return Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        return MAX_NULL_LENGTH;
       }
     }
 

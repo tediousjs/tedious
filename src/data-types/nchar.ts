@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+
 const NChar: DataType & { maximumLength: number } = {
   id: 0xEF,
   type: 'NCHAR',
@@ -54,7 +56,7 @@ const NChar: DataType & { maximumLength: number } = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0xFF, 0xFF]);
+      return NULL_LENGTH;
     }
 
     const { value } = parameter;

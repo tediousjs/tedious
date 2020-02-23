@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
+
 const Text: DataType = {
   id: 0x23,
   type: 'TEXT',
@@ -30,6 +32,10 @@ const Text: DataType = {
   },
 
   generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
+    }
+
     const buffer = Buffer.alloc(4);
     buffer.writeInt32LE(parameter.length!, 0);
     return buffer;

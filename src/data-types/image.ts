@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
+
 const Image: DataType = {
   id: 0x22,
   type: 'IMAGE',
@@ -27,6 +29,10 @@ const Image: DataType = {
   },
 
   generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
+    }
+
     const buffer = Buffer.alloc(4);
     buffer.writeInt32LE(parameter.length!, 0);
     return buffer;

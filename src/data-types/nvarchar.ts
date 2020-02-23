@@ -1,9 +1,11 @@
 import { DataType } from '../data-type';
 
-const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
 const NVarChar: { maximumLength: number } & DataType = {
   id: 0xE7,
@@ -63,14 +65,9 @@ const NVarChar: { maximumLength: number } & DataType = {
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
       if (parameter.length! <= this.maximumLength) {
-        const buffer = Buffer.alloc(2);
-        buffer.writeUInt16LE(NULL, 0);
-        return buffer;
+        return NULL_LENGTH;
       } else {
-        const buffer = Buffer.alloc(8);
-        const offset = buffer.writeUInt32LE(0xFFFFFFFF, 0);
-        buffer.writeUInt32LE(0xFFFFFFFF, offset);
-        return buffer;
+        return MAX_NULL_LENGTH;
       }
     }
 

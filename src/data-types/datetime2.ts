@@ -3,6 +3,7 @@ import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
+const NULL_LENGTH = Buffer.from([0x00]);
 
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
@@ -29,7 +30,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
     switch (parameter.scale!) {

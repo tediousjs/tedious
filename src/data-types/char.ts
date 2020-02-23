@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+
 const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
   type: 'BIGCHAR',
@@ -53,7 +55,7 @@ const Char: { maximumLength: number } & DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0xFF, 0xFF]);
+      return NULL_LENGTH;
     }
 
     const length = Buffer.byteLength(parameter.value.toString(), 'ascii');

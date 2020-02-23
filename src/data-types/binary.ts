@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+
 const Binary: { maximumLength: number } & DataType = {
   id: 0xAD,
   type: 'BIGBinary',
@@ -42,7 +44,7 @@ const Binary: { maximumLength: number } & DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0xFF, 0xFF]);
+      return NULL_LENGTH;
     }
 
     const buffer = Buffer.alloc(2);

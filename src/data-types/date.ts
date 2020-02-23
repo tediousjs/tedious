@@ -4,6 +4,8 @@ import { ChronoUnit, LocalDate } from '@js-joda/core';
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x03]);
 
 const Date: DataType = {
   id: 0x28,
@@ -20,10 +22,10 @@ const Date: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x03]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {

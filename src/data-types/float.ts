@@ -1,6 +1,8 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const Float: DataType = {
   id: 0x3E,
   type: 'FLT8',
@@ -16,7 +18,7 @@ const Float: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
     return Buffer.from([0x08]);

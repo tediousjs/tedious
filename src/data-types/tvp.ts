@@ -4,6 +4,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
 const TVP_END_TOKEN = Buffer.from([0x00]);
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+
 const TVP: DataType = {
   id: 0xF3,
   type: 'TVPTYPE',
@@ -35,7 +37,7 @@ const TVP: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0xFF, 0xFF]);
+      return NULL_LENGTH;
     }
 
     const { columns } = parameter.value;

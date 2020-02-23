@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x10]);
+
 const UniqueIdentifier: DataType = {
   id: 0x24,
   type: 'GUIDN',
@@ -20,10 +23,10 @@ const UniqueIdentifier: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x10]);
+    return DATA_LENGTH;
   },
 
   generateParameterData: function*(parameter, options) {
@@ -38,6 +41,7 @@ const UniqueIdentifier: DataType = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
         return TypeError('Invalid string.');

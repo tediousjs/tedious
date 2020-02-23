@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import MoneyN from './moneyn';
 
+const DATA_LENGTH = Buffer.from([0x04]);
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const SmallMoney: DataType = {
   id: 0x7A,
   type: 'MONEY4',
@@ -16,10 +19,10 @@ const SmallMoney: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x04]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {

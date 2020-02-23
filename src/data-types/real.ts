@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x04]);
+
 const Real: DataType = {
   id: 0x3B,
   type: 'FLT4',
@@ -16,10 +19,10 @@ const Real: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x04]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {

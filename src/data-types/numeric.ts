@@ -2,6 +2,8 @@ import { DataType } from '../data-type';
 import NumericN from './numericn';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>, resolvePrecision: NonNullable<DataType['resolvePrecision']> } = {
   id: 0x3F,
   type: 'NUMERIC',
@@ -46,7 +48,7 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
     const precision = parameter.precision!;

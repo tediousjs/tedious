@@ -1,6 +1,8 @@
 import { DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const Time: DataType = {
   id: 0x29,
   type: 'TIMEN',
@@ -26,7 +28,7 @@ const Time: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
     switch (parameter.scale) {

@@ -4,6 +4,9 @@ import MoneyN from './moneyn';
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x08]);
+
 const Money: DataType = {
   id: 0x3C,
   type: 'MONEY',
@@ -19,10 +22,10 @@ const Money: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x08]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {

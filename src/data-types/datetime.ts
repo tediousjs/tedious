@@ -3,6 +3,8 @@ import DateTimeN from './datetimen';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x08]);
 
 const DateTime: DataType = {
   id: 0x3D,
@@ -19,10 +21,10 @@ const DateTime: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x08]);
+    return DATA_LENGTH;
   },
 
   generateParameterData: function*(parameter, options) {

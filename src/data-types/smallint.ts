@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
 
+const DATA_LENGTH = Buffer.from([0x02]);
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const SmallInt: DataType = {
   id: 0x34,
   type: 'INT2',
@@ -16,10 +19,10 @@ const SmallInt: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x02]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {

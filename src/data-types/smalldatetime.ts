@@ -4,6 +4,9 @@ import DateTimeN from './datetimen';
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
+const DATA_LENGTH = Buffer.from([0x04]);
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const SmallDateTime: DataType = {
   id: 0x3A,
   type: 'DATETIM4',
@@ -19,10 +22,10 @@ const SmallDateTime: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x04]);
+    return DATA_LENGTH;
   },
 
   generateParameterData: function*(parameter, options) {

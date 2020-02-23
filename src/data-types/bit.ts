@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import BitN from './bitn';
 
+const DATA_LENGTH = Buffer.from([0x01]);
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const Bit: DataType = {
   id: 0x32,
   type: 'BIT',
@@ -16,10 +19,10 @@ const Bit: DataType = {
 
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
-      return Buffer.from([0x00]);
+      return NULL_LENGTH;
     }
 
-    return Buffer.from([0x01]);
+    return DATA_LENGTH;
   },
 
   * generateParameterData(parameter, options) {
