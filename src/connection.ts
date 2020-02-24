@@ -175,6 +175,7 @@ export interface InternalConnectionOptions {
   requestTimeout: number;
   rowCollectionOnDone: boolean;
   rowCollectionOnRequestCompletion: boolean;
+  serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: string;
   trustServerCertificate: boolean;
@@ -535,6 +536,7 @@ class Connection extends EventEmitter {
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
+        serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
