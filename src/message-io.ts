@@ -4,15 +4,16 @@ const DuplexPair = require('native-duplexpair');
 import { Duplex } from 'stream';
 import * as tls from 'tls';
 import { Socket } from 'net';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 
 import Debug from './debug';
 
 import Message from './message';
-import { TYPE } from './packet';
+import { TYPE, Packet, HEADER_LENGTH } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
+import BufferList from 'bl';
 
 class MessageIO extends EventEmitter {
   socket: Socket;
@@ -129,6 +130,58 @@ class MessageIO extends EventEmitter {
     message.end(data);
     this.outgoingMessageStream.write(message);
     return message;
+  }
+
+  async write(message: Message) {
+    const socket = this.securePair?.cleartext ?? this.socket;
+    const length = this.outgoingMessageStream.packetSize - HEADER_LENGTH;
+    let packetNumber = 0;
+
+    const bl = new BufferList();
+
+    for await (const data of message) {
+      if (message.ignore) {
+        break;
+      }
+
+      bl.append(data);
+
+      while (bl.length > length) {
+        const data = bl.slice(0, length);
+        bl.consume(length);
+
+        // TODO: Get rid of creating `Packet` instances here.
+        const packet = new Packet(message.type);
+        packet.packetId(packetNumber += 1);
+        packet.resetConnection(message.resetConnection);
+        packet.addData(data);
+
+        this.debug.packet('Sent', packet);
+        this.debug.data(packet);
+
+        if (socket.write(packet.buffer) === false) {
+          await once(socket, 'drain');
+        }
+      }
+    }
+
+    const data = bl.slice();
+    bl.consume(data.length);
+
+    // TODO: Get rid of creating `Packet` instances here.
+    const packet = new Packet(message.type);
+    packet.packetId(packetNumber += 1);
+    packet.resetConnection(message.resetConnection);
+    packet.last(true);
+    packet.ignore(message.ignore);
+    packet.addData(data);
+
+    this.debug.packet('Sent', packet);
+    this.debug.data(packet);
+
+    if (socket.write(packet.buffer) === false) {
+      await once(socket, 'drain');
+    }
   }
 
   // Temporarily suspends the flow of incoming packets.

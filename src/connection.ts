@@ -1657,8 +1657,8 @@ class Connection extends EventEmitter {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
     const message = new Message({ type: TYPE.SQL_BATCH });
-    this.messageIo.outgoingMessageStream.write(message);
     Readable.from(payload, { objectMode: false }).pipe(message);
+    this.messageIo.write(message);
   }
 
   getInitialSql() {
@@ -2051,10 +2051,15 @@ class Connection extends EventEmitter {
         this.createRequestTimer();
 
         message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+        message[Symbol.asyncIterator] = async function*() {
+          yield * payload!;
+        };
 
-        message.once('finish', () => {
+        (async () => {
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+          await this.messageIo.write(message);
+
           this.resetConnectionOnNextRequest = false;
           this.debug.payload(function() {
             return payload!.toString('  ');
@@ -2063,9 +2068,7 @@ class Connection extends EventEmitter {
           if (request.paused) { // Request.pause() has been called before the request was started
             this.pauseRequest(request);
           }
-        });
-
-        Readable.from(payload!, { objectMode: false }).pipe(message);
+        })();
       }
     }
   }
