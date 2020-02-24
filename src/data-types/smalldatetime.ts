@@ -13,13 +13,14 @@ const SmallDateTime: DataType = {
     return 'smalldatetime';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(DateTimeN.id);
-    buffer.writeUInt8(4);
+  generateTypeInfo() {
+    return Buffer.from([DateTimeN.id, 0x04]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
+      const buffer = Buffer.alloc(5);
+
       let days, dstDiff, minutes;
       if (options.useUTC) {
         days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
@@ -30,23 +31,23 @@ const SmallDateTime: DataType = {
         minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
       }
 
-      buffer.writeUInt8(4);
-      buffer.writeUInt16LE(days);
+      buffer.writeUInt8(4, 0);
+      buffer.writeUInt16LE(days, 1);
+      buffer.writeUInt16LE(minutes, 3);
 
-      buffer.writeUInt16LE(minutes);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
-  validate: function(value): null | Date| TypeError {
+  validate: function(value): null | Date | TypeError {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
-      value = Date.parse(value);
+      value = new Date(Date.parse(value));
     }
 
     if (isNaN(value)) {

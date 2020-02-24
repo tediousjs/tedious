@@ -1,6 +1,8 @@
 import { DataType } from '../data-type';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const UTC_YEAR_ONE = Date.UTC(2000, 0, -730118);
+const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
 const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
@@ -18,24 +20,26 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
       return 7;
     }
   },
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale);
+
+  generateTypeInfo(parameter) {
+    return Buffer.from([this.id, parameter.scale!]);
   },
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      const time = new Date(+parameter.value);
-      time.setUTCFullYear(1970);
-      time.setUTCMonth(0);
-      time.setUTCDate(1);
+
+  generateParameterData: function*(parameter, options) {
+    const value = parameter.value;
+    let scale = parameter.scale;
+
+    if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
+      scale = scale!;
 
       let timestamp;
-      timestamp = +time * Math.pow(10, parameter.scale! - 3);
-      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
+      timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
-      const offset = -parameter.value.getTimezoneOffset();
-      switch (parameter.scale) {
+      switch (scale) {
         case 0:
         case 1:
         case 2:
@@ -53,23 +57,33 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
           buffer.writeUInt8(10);
           buffer.writeUInt40LE(timestamp);
       }
-      buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+
+      const date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      buffer.writeUInt24LE(days);
+
+      const offset = -value.getTimezoneOffset();
       buffer.writeInt16LE(offset);
+      yield buffer.data;
     } else {
+      const buffer = new WritableTrackingBuffer(1);
       buffer.writeUInt8(0);
+      yield buffer.data;
     }
-    cb();
   },
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
+
     if (!(value instanceof Date)) {
-      value = Date.parse(value);
+      value = new Date(Date.parse(value));
     }
+
     if (isNaN(value)) {
       return new TypeError('Invalid date.');
     }
+
     return value;
   }
 };

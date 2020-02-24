@@ -10,33 +10,42 @@ const Int: DataType = {
     return 'int';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(4);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x04]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(parseInt(parameter.value));
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(4, 0);
+      yield buffer;
+
+      const buffer2 = Buffer.alloc(4);
+      buffer2.writeInt32LE(Number(parameter.value), 0);
+      yield buffer2;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+
     if (value < -2147483648 || value > 2147483647) {
-      return new TypeError('Value must be between -2147483648 and 2147483647.');
+      return new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
     }
-    return value;
+
+    return value | 0;
   }
 };
 

@@ -5,8 +5,8 @@ import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
 export type ColumnMetadata = Metadata & {
-  colName: string,
-  tableName?: string | string[]
+  colName: string;
+  tableName?: string | string[];
 };
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {

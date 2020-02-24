@@ -10,33 +10,39 @@ const SmallInt: DataType = {
     return 'smallint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(2);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x02]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(2);
-      buffer.writeInt16LE(parseInt(parameter.value));
+      const buffer = Buffer.alloc(3);
+      buffer.writeUInt8(2, 0);
+      buffer.writeInt16LE(Number(parameter.value), 1);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+
     if (value < -32768 || value > 32767) {
-      return new TypeError('Value must be between -32768 and 32767.');
+      return new TypeError('Value must be between -32768 and 32767, inclusive.');
     }
-    return value;
+
+    return value | 0;
   }
 };
 

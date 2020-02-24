@@ -50,7 +50,9 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
       }
@@ -67,8 +69,9 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
-      data: buffer.data,
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Commit Transaction: name=' + this.name;
       }
@@ -85,7 +88,9 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Rollback Transaction: name=' + this.name;
       }
@@ -100,7 +105,9 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Save Transaction: name=' + this.name;
       }

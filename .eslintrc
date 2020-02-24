@@ -2,11 +2,17 @@ env:
   node: true
   es6: true
 
-parser: "babel-eslint"
+parser: "@typescript-eslint/parser"
+
+parserOptions:
+  sourceType: "module"
+
+plugins:
+  - "@typescript-eslint"
 
 rules:
   accessor-pairs: "error"
-  # array-callback-return: "error"
+  array-callback-return: "error"
   arrow-parens: ["error", "always"]
   arrow-spacing: ["error", { before: true, after: true }]
   block-spacing: "error"
@@ -24,15 +30,15 @@ rules:
   func-call-spacing: "error"
   func-name-matching: "error"
   func-style: ["error", "declaration", { allowArrowFunctions: true }]
-  # indent: ["error", 2, {
-  #   ArrayExpression: "first",
-  #   CallExpression: { arguments: "first" },
-  #   FunctionDeclaration: { parameters: "first" },
-  #   FunctionExpression: { parameters: "first" },
-  #   MemberExpression: "off",
-  #   ObjectExpression: "first",
-  #   SwitchCase: 1,
-  # }]
+  indent: ["error", 2, {
+    ArrayExpression: "first",
+    CallExpression: { arguments: "first" },
+    FunctionDeclaration: { parameters: "first" },
+    FunctionExpression: { parameters: "first" },
+    MemberExpression: "off",
+    ObjectExpression: "first",
+    SwitchCase: 1,
+  }]
   key-spacing: ["error", {mode: "strict"}]
   keyword-spacing: "error"
   linebreak-style: ["error", "unix"]
@@ -147,10 +153,49 @@ rules:
   use-isnan: "error"
   valid-typeof: "error"
 
+extends:
+  - 'plugin:@typescript-eslint/eslint-recommended'
+
 overrides:
   - files:
       - '*.ts'
     rules:
-      no-undef: off
-      no-unused-vars: off
-      no-use-before-define: off
+      "@typescript-eslint/adjacent-overload-signatures": "error"
+      "@typescript-eslint/ban-ts-ignore": "error"
+      "@typescript-eslint/ban-types": "error"
+      "@typescript-eslint/class-name-casing": "error"
+      "@typescript-eslint/consistent-type-assertions": "error"
+      "@typescript-eslint/interface-name-prefix": "error"
+      "@typescript-eslint/member-delimiter-style": ["error", {
+        "multiline": {
+          "delimiter": "semi",
+          "requireLast": true
+        },
+        "singleline": {
+          "delimiter": "comma",
+          "requireLast": false
+        }
+      }]
+      "no-array-constructor": "off"
+      "@typescript-eslint/no-array-constructor": "error"
+      "@typescript-eslint/no-empty-interface": "error"
+      "@typescript-eslint/no-inferrable-types": "error"
+      "@typescript-eslint/no-misused-new": "error"
+      "@typescript-eslint/no-namespace": "error"
+      "@typescript-eslint/no-this-alias": ["error", { allowDestructuring: true, allowedNames: ['self'] }]
+      "no-unused-vars": "off"
+      "@typescript-eslint/no-unused-vars": ["error", { args: "none", caughtErrors: "all" }]
+      "no-use-before-define": "off"
+      "@typescript-eslint/no-use-before-define": ["error", {
+        classes: true,
+        functions: false,
+        variables: false
+      }]
+      "@typescript-eslint/no-var-requires": "error"
+      "@typescript-eslint/prefer-namespace-keyword": "error"
+      "@typescript-eslint/triple-slash-reference": "error"
+      "@typescript-eslint/type-annotation-spacing": "error"
+      "no-var": "error"
+      "prefer-const": "error"
+      "prefer-rest-params": "error"
+      "prefer-spread": "error"

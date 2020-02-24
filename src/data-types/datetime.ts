@@ -1,8 +1,8 @@
 import { DataType } from '../data-type';
 import DateTimeN from './datetimen';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
-const EPOCH_DATE = new Date(1900, 0, 1);
-const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 
 const DateTime: DataType = {
   id: 0x3D,
@@ -13,27 +13,34 @@ const DateTime: DataType = {
     return 'datetime';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(DateTimeN.id);
-    buffer.writeUInt8(8);
+  generateTypeInfo() {
+    return Buffer.from([DateTimeN.id, 0x08]);
   },
-  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
-      let days, dstDiff, milliseconds, seconds, threeHundredthsOfSecond;
+
+  generateParameterData: function*(parameter, options) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
+    if (value != null) {
+      let date;
       if (options.useUTC) {
-        days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getUTCHours() * 60 * 60;
-        seconds += parameter.value.getUTCMinutes() * 60;
-        seconds += parameter.value.getUTCSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getUTCMilliseconds();
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
       } else {
-        dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-        days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-        seconds = parameter.value.getHours() * 60 * 60;
-        seconds += parameter.value.getMinutes() * 60;
-        seconds += parameter.value.getSeconds();
-        milliseconds = (seconds * 1000) + parameter.value.getMilliseconds();
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      }
+
+      let days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+
+      let milliseconds, threeHundredthsOfSecond;
+      if (options.useUTC) {
+        let seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
+      } else {
+        let seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
       }
 
       threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
@@ -45,14 +52,14 @@ const DateTime: DataType = {
         threeHundredthsOfSecond = 0;
       }
 
-      buffer.writeUInt8(8);
-      buffer.writeInt32LE(days);
-
-      buffer.writeUInt32LE(threeHundredthsOfSecond);
+      const buffer = Buffer.alloc(9);
+      buffer.writeUInt8(8, 0);
+      buffer.writeInt32LE(days, 1);
+      buffer.writeUInt32LE(threeHundredthsOfSecond, 5);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   // TODO: type 'any' needs to be revisited.
@@ -60,12 +67,15 @@ const DateTime: DataType = {
     if (value == null) {
       return null;
     }
+
     if (!(value instanceof Date)) {
-      value = Date.parse(value);
+      value = new Date(Date.parse(value));
     }
+
     if (isNaN(value)) {
       return new TypeError('Invalid date.');
     }
+
     return value;
   }
 };

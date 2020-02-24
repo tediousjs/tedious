@@ -5,20 +5,20 @@ import { InternalConnectionOptions } from '../connection';
 import { SSPIToken } from './token';
 
 type Data = {
-  magic: string,
-  type: number,
-  domainLen: number,
-  domainMax: number,
-  domainOffset: number,
-  flags: number,
-  nonce: Buffer,
-  zeroes: Buffer,
-  targetLen: number,
-  targetMax: number,
-  targetOffset: number,
-  oddData: Buffer,
-  domain: string,
-  target: Buffer
+  magic: string;
+  type: number;
+  domainLen: number;
+  domainMax: number;
+  domainOffset: number;
+  flags: number;
+  nonce: Buffer;
+  zeroes: Buffer;
+  targetLen: number;
+  targetMax: number;
+  targetOffset: number;
+  oddData: Buffer;
+  domain: string;
+  target: Buffer;
 };
 
 function parseChallenge(buffer: Buffer) {

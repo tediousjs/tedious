@@ -52,9 +52,11 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
       expectedValue = value;
     }
 
-    if (cast) {
+    if (expectedValue === null) {
+      assert.isNull(columns[0].value);
+    } else if (cast) {
       assert.strictEqual(columns[0].value, expectedValue);
-    } else if (value instanceof Date) {
+    } else if (expectedValue instanceof Date) {
       assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       assert.strictEqual(columns[0].value, expectedValue.toString());
@@ -419,217 +421,302 @@ describe('Parameterised Statements Test', function() {
     execSql(done, TYPES.Text, dBuf.toString());
   });
 
-  var testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
+  describe('´time´', function() {
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.Time, null, '7_3', null);
+    });
 
-  it('should test time', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+    it('ignores the date part of given `Date` values', function(done) {
+      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3', null, new Date('1970-01-01T12:34:56Z'));
+    });
+
+    it('should handle `string` values', function(done) {
+      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3', null, '12:34:56.0000000', true);
+    });
+
+    const testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
+
+    it('should test time', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+    });
+
+    it('should test time1', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
+    });
+
+    it('should test time2', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
+    });
+
+    it('should test time3', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
+    });
+
+    it('should test time4', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
+    });
+
+    it('should test time5', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
+    });
+
+    it('should test time 6', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
+    });
+
+    it('should test time7', function(done) {
+      execSql(done, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
+    });
   });
 
-  it('should test time1', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
+  describe('`smalldatetime`', function() {
+    it('should handle `Date` values', function(done) {
+      execSql(
+        done,
+        TYPES.SmallDateTime,
+        new Date('December 4, 2011 10:04:00')
+      );
+    });
+
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.SmallDateTime, null);
+    });
+
+    it('should handle `string` values', function(done) {
+      execSql(done, TYPES.SmallDateTime, '2015-10-31 00:00:00', undefined, undefined, new Date('2015-10-31 00:00:00'));
+    });
   });
 
-  it('should test time2', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
+  describe('`datetime`', function() {
+    it('should handle `Date` values', function(done) {
+      execSql(done, TYPES.DateTime, new Date('December 4, 2011 10:04:23'));
+    });
+
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.DateTime, null);
+    });
+
+    it('should handle `string` values', function(done) {
+      execSql(done, TYPES.DateTime, '2015-10-31 00:00:00', undefined, undefined, new Date('2015-10-31 00:00:00'));
+    });
+
+    // The tests below validate DateTime precision on the input side, as described in
+    //  the section "Rounding of datetime Fractional Second Precision" from
+    // https://msdn.microsoft.com/en-us/library/ms187819.aspx
+    it('should test date time precision_0', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.990'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.990')
+      );
+    });
+
+    it('should test date time precision_1', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.991'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.990')
+      );
+    });
+
+    it('should test date time precision_2', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.992'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.993')
+      );
+    });
+
+    it('should test date time precision_3', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.993'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.993')
+      );
+    });
+
+    it('should test date time precision_4', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.994'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.993')
+      );
+    });
+
+    it('should test date time precision_5', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.995'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.997')
+      );
+    });
+
+    it('should test date time precision_6', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.996'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.997')
+      );
+    });
+
+    it('should test date time precision_7', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.997'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.997')
+      );
+    });
+
+    it('should test date time precison_8', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.998'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.997')
+      );
+    });
+
+    it('should test date time precision_9 sec flip', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:58.999'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:59.000')
+      );
+    });
+
+    it('should test date time precision_9 min flip', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:58:59.999'),
+        null,
+        null,
+        new Date('January 1, 1998 23:59:00.000')
+      );
+    });
+
+    it('should test date time precision_9 hr flip', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 22:59:59.999'),
+        null,
+        null,
+        new Date('January 1, 1998 23:00:00.000')
+      );
+    });
+
+    it('should test date time precision_9 hr flip', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime,
+        new Date('January 1, 1998 23:59:59.999'),
+        null,
+        null,
+        new Date('January 2, 1998 00:00:00.000')
+      );
+    });
   });
 
-  it('should test time3', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
+  describe('`datetime2`', function() {
+    it('should handle `Date` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime2,
+        new Date('December 4, 2011 10:04:23'),
+        '7_3_A'
+      );
+    });
+
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.DateTime2, null, '7_3_A');
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9970000', true, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9980000', true, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    });
+
+    it('should handle `string` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTime2,
+        'December 4, 2011 10:04:23',
+        '7_3_A',
+        null,
+        new Date('December 4, 2011 10:04:23')
+      );
+    });
   });
 
-  it('should test time4', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
-  });
+  describe('`datetimeoffset`', function() {
+    it('should handle `Date` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
+        '7_3_A'
+      );
+    });
 
-  it('should test time5', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
-  });
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.DateTimeOffset, null, '7_3_A');
+    });
 
-  it('should test time 6', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
-  });
-
-  it('should test time7', function(done) {
-    execSql(done, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
-  });
-
-  it('should test small date time', function(done) {
-    execSql(
-      done,
-      TYPES.SmallDateTime,
-      new Date('December 4, 2011 10:04:00')
-    );
-  });
-
-  it('should test small date time null', function(done) {
-    execSql(done, TYPES.SmallDateTime, null);
-  });
-
-  it('should test date time', function(done) {
-    execSql(done, TYPES.DateTime, new Date('December 4, 2011 10:04:23'));
-  });
-
-  it('should test date time null', function(done) {
-    execSql(done, TYPES.DateTime, null);
-  });
-
-  // The tests below validate DateTime precision on the input side, as described in
-  //  the section "Rounding of datetime Fractional Second Precision" from
-  // https://msdn.microsoft.com/en-us/library/ms187819.aspx
-  it('should test date time precision_0', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.990'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.990')
-    );
-  });
-
-  it('should test date time precision_1', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.991'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.990')
-    );
-  });
-
-  it('should test date time precision_2', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.992'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.993')
-    );
-  });
-
-  it('should test date time precision_3', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.993'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.993')
-    );
-  });
-
-  it('should test date time precision_4', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.994'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.993')
-    );
-  });
-
-  it('should test date time precision_5', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.995'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.997')
-    );
-  });
-
-  it('should test date time precision_6', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.996'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.997')
-    );
-  });
-
-  it('should test date time precision_7', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.997'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.997')
-    );
-  });
-
-  it('should test date time precison_8', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.998'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.997')
-    );
-  });
-
-  it('should test date time precision_9 sec flip', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:58.999'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:59.000')
-    );
-  });
-
-  it('should test date time precision_9 min flip', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:58:59.999'),
-      null,
-      null,
-      new Date('January 1, 1998 23:59:00.000')
-    );
-  });
-
-  it('should test date time precision_9 hr flip', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 22:59:59.999'),
-      null,
-      null,
-      new Date('January 1, 1998 23:00:00.000')
-    );
-  });
-
-  it('should test date time precision_9 hr flip', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.999'),
-      null,
-      null,
-      new Date('January 2, 1998 00:00:00.000')
-    );
-  });
-
-  it('should test date time 2', function(done) {
-    execSql(
-      done,
-      TYPES.DateTime2,
-      new Date('December 4, 2011 10:04:23'),
-      '7_3_A'
-    );
-  });
-
-  it('should test date time 2 null', function(done) {
-    execSql(done, TYPES.DateTime2, null, '7_3_A');
+    it('should handle `string` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        'December 4, 2011 10:04:23',
+        '7_3_A',
+        null,
+        new Date('December 4, 2011 10:04:23')
+      );
+    });
   });
 
   it('should test output bit true', function(done) {

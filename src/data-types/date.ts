@@ -1,11 +1,12 @@
 import { DataType } from '../data-type';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
-const YEAR_ONE = new globalDate(2000, 0, -730118);
-const UTC_YEAR_ONE = globalDate.UTC(2000, 0, -730118);
+const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 
-const Date : DataType = {
+const Date: DataType = {
   id: 0x28,
   type: 'DATEN',
   name: 'Date',
@@ -14,24 +15,30 @@ const Date : DataType = {
     return 'date';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(this.id);
+  generateTypeInfo: function(buffer) {
+    return Buffer.from([this.id]);
   },
 
-  // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
-  writeParameterData: function(buffer, parameter, options, cb) {
-    if (parameter.value != null) {
+  *generateParameterData(parameter, options) {
+    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
+    if (value != null) {
+      const buffer = new WritableTrackingBuffer(16);
       buffer.writeUInt8(3);
+
+      let date;
       if (options.useUTC) {
-        buffer.writeUInt24LE(Math.floor((+parameter.value - UTC_YEAR_ONE) / 86400000));
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
       } else {
-        const dstDiff = -(parameter.value.getTimezoneOffset() - YEAR_ONE.getTimezoneOffset()) * 60 * 1000;
-        buffer.writeUInt24LE(Math.floor((+parameter.value - +YEAR_ONE + dstDiff) / 86400000));
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
       }
+
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      buffer.writeUInt24LE(days);
+      yield buffer.data;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   // TODO: value is techincally of type 'unknown'.
@@ -39,12 +46,15 @@ const Date : DataType = {
     if (value == null) {
       return null;
     }
+
     if (!(value instanceof globalDate)) {
-      value = globalDate.parse(value);
+      value = new globalDate(globalDate.parse(value));
     }
+
     if (isNaN(value)) {
       return new TypeError('Invalid date.');
     }
+
     return value;
   }
 };

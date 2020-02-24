@@ -2,7 +2,6 @@ const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const fs = require('fs');
 const assert = require('chai').assert;
-
 const debug = false;
 
 const config = JSON.parse(
@@ -148,5 +147,29 @@ describe('Errors Test', function() {
         console.log(message);
       });
     }
+  });
+
+  it('should support cancelling after starting query execution', function(done) {
+    const connection = new Connection(config);
+
+    const request = new Request("select 42, 'hello world'", function(err, rowCount) {
+      if (err) {
+        assert.equal(err.message, 'Canceled.');
+      }
+      connection.close();
+    });
+
+    connection.on('connect', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execSql(request);
+      connection.cancel();
+    });
+
+    connection.on('end', function(info) {
+      done();
+    });
   });
 });

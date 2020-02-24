@@ -4,7 +4,7 @@ import { writeToTrackingBuffer } from './all-headers';
 /*
   s2.2.6.6
  */
-class SqlBatchPayload {
+class SqlBatchPayload implements Iterable<Buffer> {
   sqlText: string;
   txnDescriptor: Buffer;
   options: { tdsVersion: string };
@@ -15,17 +15,20 @@ class SqlBatchPayload {
     this.options = options;
   }
 
-  getData(cb: (data: Buffer) => void) {
-    const buffer = new WritableTrackingBuffer(100 + 2 * this.sqlText.length, 'ucs2');
+  *[Symbol.iterator]() {
     if (this.options.tdsVersion >= '7_2') {
+      const buffer = new WritableTrackingBuffer(18, 'ucs2');
       const outstandingRequestCount = 1;
+
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
+
+      yield buffer.data;
     }
-    buffer.writeString(this.sqlText, 'ucs2');
-    cb(buffer.data);
+
+    yield Buffer.from(this.sqlText, 'ucs2');
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + ('SQL Batch - ' + this.sqlText);
   }
 }

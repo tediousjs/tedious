@@ -1,5 +1,6 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 import IntN from './intn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const BigInt: DataType = {
   id: 0x7F,
@@ -10,41 +11,38 @@ const BigInt: DataType = {
     return 'bigint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(8);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x08]);
   },
 
-  writeParameterData: function(buffer, parameter: ParameterData<null | unknown>, _options, cb) {
-    const value = parameter.value;
-
-    if (value != null) {
-      const val = typeof value !== 'number' ? parseInt(value as string) : value;
+  *generateParameterData(parameter, options) {
+    if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(9);
       buffer.writeUInt8(8);
-      buffer.writeInt64LE(val);
+      buffer.writeInt64LE(Number(parameter.value));
+      yield buffer.data;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-
-    cb();
   },
 
-  validate: function(value) : null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }
-    if (isNaN(value as number)) {
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
+    if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
-    if (value as number < -9007199254740991 || value as number > 9007199254740991) {
-      // Number.MIN_SAFE_INTEGER = -9007199254740991
-      // Number.MAX_SAFE_INTEGER = 9007199254740991
-      // 9007199254740991 = (2**53) - 1
-      // Can't use Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER directly though
-      // as these constants are not available in node 0.10.
-      return new TypeError('Value must be between -9007199254740991 and 9007199254740991, inclusive.' +
-        ' For bigger numbers, use VarChar type.');
+
+    if (value < Number.MIN_SAFE_INTEGER || value > Number.MAX_SAFE_INTEGER) {
+      return new TypeError(`Value must be between ${Number.MIN_SAFE_INTEGER} and ${Number.MAX_SAFE_INTEGER}, inclusive.  For smaller or bigger numbers, use VarChar type.`);
     }
+
     return value;
   }
 };

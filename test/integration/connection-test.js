@@ -1347,7 +1347,7 @@ describe('Boolean Config Options Test', function() {
   });
 
   it('should test arith abort default', function(done) {
-    testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, false);
+    testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, true);
   });
 
   it('should test arith abort on', function(done) {

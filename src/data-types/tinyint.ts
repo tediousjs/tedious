@@ -10,33 +10,40 @@ const TinyInt: DataType = {
     return 'tinyint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(1);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x01]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(1);
-      buffer.writeUInt8(parseInt(parameter.value));
+      const buffer = Buffer.alloc(2);
+      let offset = 0;
+      offset = buffer.writeUInt8(1, offset);
+      buffer.writeUInt8(Number(parameter.value), offset);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
     }
-    value = parseInt(value);
+
+    if (typeof value !== 'number') {
+      value = Number(value);
+    }
+
     if (isNaN(value)) {
       return new TypeError('Invalid number.');
     }
+
     if (value < 0 || value > 255) {
-      return new TypeError('Value must be between 0 and 255.');
+      return new TypeError('Value must be between 0 and 255, inclusive.');
     }
-    return value;
+
+    return value | 0;
   }
 };
 
