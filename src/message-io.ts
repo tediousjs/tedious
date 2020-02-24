@@ -9,7 +9,7 @@ import { EventEmitter, once } from 'events';
 import Debug from './debug';
 
 import Message from './message';
-import { TYPE, Packet, HEADER_LENGTH } from './packet';
+import { TYPE, Packet, HEADER_LENGTH, writePacketHeader } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
@@ -134,7 +134,8 @@ class MessageIO extends EventEmitter {
 
   async write(message: Message) {
     const socket = this.securePair?.cleartext ?? this.socket;
-    const length = this.outgoingMessageStream.packetSize - HEADER_LENGTH;
+    const packetSize = this.outgoingMessageStream.packetSize;
+    const length = packetSize - HEADER_LENGTH;
     let packetNumber = 0;
 
     const bl = new BufferList();
@@ -147,39 +148,59 @@ class MessageIO extends EventEmitter {
       bl.append(data);
 
       while (bl.length > length) {
-        const data = bl.slice(0, length);
+        const data = Buffer.alloc(packetSize);
+        bl.copy(data, HEADER_LENGTH, 0, length);
         bl.consume(length);
 
-        // TODO: Get rid of creating `Packet` instances here.
-        const packet = new Packet(message.type);
-        packet.packetId(packetNumber += 1);
-        packet.resetConnection(message.resetConnection);
-        packet.addData(data);
+        writePacketHeader(data, {
+          type: message.type,
+          id: packetNumber++,
+          resetConnection: message.resetConnection,
+          ignore: false,
+          length: data.length,
+          last: false
+        });
 
-        this.debug.packet('Sent', packet);
-        this.debug.data(packet);
+        // // TODO: Get rid of creating `Packet` instances here.
+        // const packet = new Packet(message.type);
+        // packet.packetId(packetNumber += 1);
+        // packet.resetConnection(message.resetConnection);
+        // packet.addData(data);
 
-        if (socket.write(packet.buffer) === false) {
+        // this.debug.packet('Sent', packet);
+        // this.debug.data(packet);
+
+        if (socket.write(data) === false) {
           await once(socket, 'drain');
         }
       }
     }
 
-    const data = bl.slice();
-    bl.consume(data.length);
+    const data = Buffer.alloc(bl.length + HEADER_LENGTH);
+    bl.copy(data, HEADER_LENGTH);
+    bl.consume();
+
+    writePacketHeader(data, {
+      type: message.type,
+      id: packetNumber++,
+      resetConnection: message.resetConnection,
+      ignore: message.ignore,
+      length: data.length,
+      last: true
+    });
 
     // TODO: Get rid of creating `Packet` instances here.
-    const packet = new Packet(message.type);
-    packet.packetId(packetNumber += 1);
-    packet.resetConnection(message.resetConnection);
-    packet.last(true);
-    packet.ignore(message.ignore);
-    packet.addData(data);
+    // const packet = new Packet(message.type);
+    // packet.packetId(packetNumber += 1);
+    // packet.resetConnection(message.resetConnection);
+    // packet.last(true);
+    // packet.ignore(message.ignore);
+    // packet.addData(data);
 
-    this.debug.packet('Sent', packet);
-    this.debug.data(packet);
+    // this.debug.packet('Sent', packet);
+    // this.debug.data(packet);
 
-    if (socket.write(packet.buffer) === false) {
+    if (socket.write(data) === false) {
       await once(socket, 'drain');
     }
   }

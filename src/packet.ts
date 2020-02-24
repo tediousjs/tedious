@@ -46,6 +46,34 @@ const DEFAULT_WINDOW = 0;
 
 const NL = '\n';
 
+export function writePacketHeader(buffer: Buffer, { type, resetConnection, last, ignore, length, id }: { type: number, resetConnection: boolean, last: boolean, ignore: boolean, length: number, id: number }) {
+  buffer.writeUInt8(type, OFFSET.Type);
+
+  let status = STATUS.NORMAL;
+
+  if (resetConnection) {
+    status |= STATUS.RESETCONNECTION;
+  }
+
+  if (last) {
+    status |= STATUS.EOM;
+  }
+
+  if (ignore) {
+    status |= STATUS.IGNORE;
+  }
+
+  buffer.writeUInt8(status, OFFSET.Status);
+
+  buffer.writeUInt16BE(length, OFFSET.Length);
+
+  buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID);
+
+  buffer.writeUInt8(id, OFFSET.PacketID);
+
+  buffer.writeUInt8(DEFAULT_WINDOW, OFFSET.Window);
+}
+
 export class Packet {
   buffer: Buffer;
 
