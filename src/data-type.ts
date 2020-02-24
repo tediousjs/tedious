@@ -1,42 +1,83 @@
-const Null = require('./data-types/null');
-const TinyInt = require('./data-types/tinyint');
-const Bit = require('./data-types/bit');
-const SmallInt = require('./data-types/smallint');
-const Int = require('./data-types/int');
-const SmallDateTime = require('./data-types/smalldatetime');
-const Real = require('./data-types/real');
-const Money = require('./data-types/money');
-const DateTime = require('./data-types/datetime');
-const Float = require('./data-types/float');
-const Decimal = require('./data-types/decimal');
-const Numeric = require('./data-types/numeric');
-const SmallMoney = require('./data-types/smallmoney');
-const BigInt = require('./data-types/bigint');
-const Image = require('./data-types/image');
-const Text = require('./data-types/text');
-const UniqueIdentifier = require('./data-types/uniqueidentifier');
-const IntN = require('./data-types/intn');
-const NText = require('./data-types/ntext');
-const BitN = require('./data-types/bitn');
-const DecimalN = require('./data-types/decimaln');
-const NumericN = require('./data-types/numericn');
-const FloatN = require('./data-types/floatn');
-const MoneyN = require('./data-types/moneyn');
-const DateTimeN = require('./data-types/datetimen');
-const VarBinary = require('./data-types/varbinary');
-const VarChar = require('./data-types/varchar');
-const Binary = require('./data-types/binary');
-const Char = require('./data-types/char');
-const NVarChar = require('./data-types/nvarchar');
-const NChar = require('./data-types/nchar');
-const Xml = require('./data-types/xml');
-const Time = require('./data-types/time');
-const Date = require('./data-types/date');
-const DateTime2 = require('./data-types/datetime2');
-const DateTimeOffset = require('./data-types/datetimeoffset');
-const UDT = require('./data-types/udt');
-const TVP = require('./data-types/tvp');
-const Variant = require('./data-types/sql-variant');
+import Null from './data-types/null';
+import TinyInt from './data-types/tinyint';
+import Bit from './data-types/bit';
+import SmallInt from './data-types/smallint';
+import Int from './data-types/int';
+import SmallDateTime from './data-types/smalldatetime';
+import Real from './data-types/real';
+import Money from './data-types/money';
+import DateTime from './data-types/datetime';
+import Float from './data-types/float';
+import Decimal from './data-types/decimal';
+import Numeric from './data-types/numeric';
+import SmallMoney from './data-types/smallmoney';
+import BigInt from './data-types/bigint';
+import Image from './data-types/image';
+import Text from './data-types/text';
+import UniqueIdentifier from './data-types/uniqueidentifier';
+import IntN from './data-types/intn';
+import NText from './data-types/ntext';
+import BitN from './data-types/bitn';
+import DecimalN from './data-types/decimaln';
+import NumericN from './data-types/numericn';
+import FloatN from './data-types/floatn';
+import MoneyN from './data-types/moneyn';
+import DateTimeN from './data-types/datetimen';
+import VarBinary from './data-types/varbinary';
+import VarChar from './data-types/varchar';
+import Binary from './data-types/binary';
+import Char from './data-types/char';
+import NVarChar from './data-types/nvarchar';
+import NChar from './data-types/nchar';
+import Xml from './data-types/xml';
+import Time from './data-types/time';
+import Date from './data-types/date';
+import DateTime2 from './data-types/datetime2';
+import DateTimeOffset from './data-types/datetimeoffset';
+import UDT from './data-types/udt';
+import TVP from './data-types/tvp';
+import Variant from './data-types/sql-variant';
+
+import { InternalConnectionOptions } from './connection';
+
+export type Parameter = {
+  type: DataType;
+  name: string;
+
+  value: unknown;
+
+  output: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
+
+  nullable?: boolean;
+};
+
+export type ParameterData<T = any> = {
+  length?: number;
+  scale?: number;
+  precision?: number;
+
+  value: T;
+};
+
+export interface DataType {
+  id: number;
+  type: string;
+  name: string;
+
+  declaration(parameter: Parameter): string;
+  generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
+  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
+  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+
+  hasTableName?: boolean;
+
+  resolveLength?: (parameter: Parameter) => number;
+  resolvePrecision?: (parameter: Parameter) => number;
+  resolveScale?: (parameter: Parameter) => number;
+}
 
 export const TYPE = {
   [Null.id]: Null,

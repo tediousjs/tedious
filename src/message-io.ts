@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const DuplexPair = require('native-duplexpair');
 
 import { Duplex } from 'stream';
@@ -13,7 +14,7 @@ import { TYPE } from './packet';
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
-module.exports = class MessageIO extends EventEmitter {
+class MessageIO extends EventEmitter {
   socket: Socket;
   debug: Debug;
 
@@ -23,8 +24,8 @@ module.exports = class MessageIO extends EventEmitter {
   outgoingMessageStream: OutgoingMessageStream;
 
   securePair?: {
-    cleartext: tls.TLSSocket,
-    encrypted: Duplex
+    cleartext: tls.TLSSocket;
+    encrypted: Duplex;
   }
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
@@ -139,4 +140,7 @@ module.exports = class MessageIO extends EventEmitter {
   resume() {
     this.incomingMessageStream.resume();
   }
-};
+}
+
+export default MessageIO;
+module.exports = MessageIO;

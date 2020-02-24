@@ -1,5 +1,5 @@
-const BufferList = require('bl');
-const { Duplex } = require('readable-stream');
+import BufferList from 'bl';
+import { Duplex } from 'readable-stream';
 
 import Debug from './debug';
 import Message from './message';
@@ -12,7 +12,7 @@ class OutgoingMessageStream extends Duplex {
 
   currentMessage: Message | undefined;
 
-  constructor(debug: Debug, { packetSize } : { packetSize: number }) {
+  constructor(debug: Debug, { packetSize }: { packetSize: number }) {
     super({ writableObjectMode: true });
 
     this.packetSize = packetSize;

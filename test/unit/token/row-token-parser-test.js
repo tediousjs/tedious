@@ -601,7 +601,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual('10000', token.columns[11].value);
   });
 
-  it('should write guidN', () => {
+  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', () => {
     const colMetaData = [
       { type: dataTypeByName.UniqueIdentifier },
       { type: dataTypeByName.UniqueIdentifier }
@@ -633,7 +633,51 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, options);
+    const parser = new Parser({ token() {} }, colMetaData, Object.assign({ lowerCaseGuids: false }, options));
+    parser.write(buffer.data);
+    var token = parser.read();
+    // console.log(token)
+
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.deepEqual(
+      '67452301-AB89-EFCD-0123-456789ABCDEF',
+      token.columns[1].value
+    );
+  });
+
+  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', () => {
+    var colMetaData = [
+      { type: dataTypeByName.UniqueIdentifier },
+      { type: dataTypeByName.UniqueIdentifier }
+    ];
+
+    var buffer = new WritableTrackingBuffer(0, 'ucs2');
+    buffer.writeUInt8(0xd1);
+    buffer.writeBuffer(
+      Buffer.from([
+        0,
+        16,
+        0x01,
+        0x23,
+        0x45,
+        0x67,
+        0x89,
+        0xab,
+        0xcd,
+        0xef,
+        0x01,
+        0x23,
+        0x45,
+        0x67,
+        0x89,
+        0xab,
+        0xcd,
+        0xef
+      ])
+    );
+    // console.log(buffer.data)
+    const parser = new Parser({ token() {} }, colMetaData, Object.assign({ lowerCaseGuids: true }, options));
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
@@ -641,7 +685,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 2);
     assert.strictEqual(token.columns[0].value, null);
     assert.deepEqual(
-      '67452301-AB89-EFCD-0123-456789ABCDEF',
+      '67452301-ab89-efcd-0123-456789abcdef',
       token.columns[1].value
     );
   });

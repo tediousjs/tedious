@@ -1,12 +1,14 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import { ConnectionOptions } from './connection';
+import Connection, { InternalConnectionOptions } from './connection';
 
-const Transform = require('readable-stream').Transform;
-const TOKEN_TYPE = require('./token/token').TYPE;
-const Message = require('./message');
-const PACKET_TYPE = require('./packet').TYPE;
-const { RequestError } = require('./errors');
+import { Transform } from 'readable-stream';
+import { TYPE as TOKEN_TYPE } from './token/token';
+import Message from './message';
+import { TYPE as PACKET_TYPE } from './packet';
+
+import { DataType, Parameter } from './data-type';
+import { RequestError } from './errors';
 
 const FLAGS = {
   nullable: 1 << 0,
@@ -33,52 +35,84 @@ const DONE_STATUS = {
 };
 
 type InternalOptions = {
-  checkConstraints: boolean,
-  fireTriggers: boolean,
-  keepNulls: boolean,
-  lockTable: boolean,
+  checkConstraints: boolean;
+  fireTriggers: boolean;
+  keepNulls: boolean;
+  lockTable: boolean;
 };
 
-type Options = {
-  checkConstraints?: InternalOptions['checkConstraints'],
-  fireTriggers?: InternalOptions['fireTriggers'],
-  keepNulls?: InternalOptions['keepNulls'],
-  lockTable?: InternalOptions['lockTable'],
-};
+export interface Options {
+  checkConstraints?: InternalOptions['checkConstraints'];
+  fireTriggers?: InternalOptions['fireTriggers'];
+  keepNulls?: InternalOptions['keepNulls'];
+  lockTable?: InternalOptions['lockTable'];
+}
 
-type DataType = {
-  id: number,
-  declaration: (column: Column) => string,
-  writeTypeInfo: (buf: any, column: Column, options: ConnectionOptions) => void,
-  writeParameterData: (buf: any, data: { length?: number, scale?: number, precision?: number, value: unknown }, options: ConnectionOptions, callback: () => void) => void,
+export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
-  hasPrecision?: Boolean,
-  hasScale?: Boolean,
-  resolveLength?: (column: Column) => number,
-  resolvePrecision?: (column: Column) => number,
-  resolveScale?: (column: Column) => number
-};
-
-type Column = {
-  type: DataType,
-  name: string,
-  value: null,
-  output: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
-  objName: string,
-  nullable?: boolean
+type Column = Parameter & {
+  objName: string;
 };
 
 type ColumnOptions = {
-  output?: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
-  objName?: string,
-  nullable?: boolean
+  output?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  objName?: string;
+  nullable?: boolean;
 };
+
+// A transform that converts rows to packets.
+class RowTransform extends Transform {
+  columnMetadataWritten: boolean;
+  bulkLoad: BulkLoad;
+  mainOptions: BulkLoad['options'];
+  columns: BulkLoad['columns'];
+
+  constructor(bulkLoad: BulkLoad) {
+    super({ writableObjectMode: true });
+
+    this.bulkLoad = bulkLoad;
+    this.mainOptions = bulkLoad.options;
+    this.columns = bulkLoad.columns;
+
+    this.columnMetadataWritten = false;
+  }
+
+  _transform(row: Array<any>, _encoding: string, callback: () => void) {
+    if (!this.columnMetadataWritten) {
+      this.push(this.bulkLoad.getColMetaData());
+      this.columnMetadataWritten = true;
+    }
+
+    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
+    buf.writeUInt8(TOKEN_TYPE.ROW);
+    this.push(buf.data);
+
+    for (let i = 0; i < this.columns.length; i++) {
+      const c = this.columns[i];
+      const parameter = {
+        length: c.length,
+        scale: c.scale,
+        precision: c.precision,
+        value: row[i]
+      };
+
+      for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+        this.push(chunk);
+      }
+    }
+
+    process.nextTick(callback);
+  }
+
+  _flush(callback: () => void) {
+    this.push(this.bulkLoad.createDoneToken());
+
+    process.nextTick(callback);
+  }
+}
 
 class BulkLoad extends EventEmitter {
   error?: Error;
@@ -86,10 +120,18 @@ class BulkLoad extends EventEmitter {
   executionStarted: boolean;
   streamingMode: boolean;
   table: string;
-  timeout?: number
 
-  options: ConnectionOptions;
-  callback: (err: Error | undefined | null, rowCount: number) => void;
+  connection?: Connection;
+  timeout?: number;
+
+  rows?: Array<any>;
+  rst?: Array<any>;
+  rowCount?: number;
+
+  paused?: boolean;
+
+  options: InternalConnectionOptions;
+  callback: Callback;
 
   columns: Array<Column>;
   columnsByName: { [name: string]: Column };
@@ -99,12 +141,12 @@ class BulkLoad extends EventEmitter {
 
   bulkOptions: InternalOptions;
 
-  constructor(table: string, connectionOptions: ConnectionOptions, {
+  constructor(table: string, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-  }: Options, callback: (err: Error | undefined | null, rowCount: number) => void) {
+  }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
     }
@@ -140,7 +182,7 @@ class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name: string, type: any, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
+  addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -166,16 +208,12 @@ class BulkLoad extends EventEmitter {
       }
     }
 
-    if (type.hasPrecision) {
-      if (column.precision == null && type.resolvePrecision) {
-        column.precision = type.resolvePrecision(column);
-      }
+    if (type.resolvePrecision && column.precision == null) {
+      column.precision = type.resolvePrecision(column);
     }
 
-    if (type.hasScale) {
-      if (column.scale == null && type.resolveScale) {
-        column.scale = type.resolveScale(column);
-      }
+    if (type.resolveScale && column.scale == null) {
+      column.scale = type.resolveScale(column);
     }
 
     this.columns.push(column);
@@ -287,7 +325,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      c.type.writeTypeInfo(tBuf, c, this.options);
+      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');
@@ -357,51 +395,3 @@ class BulkLoad extends EventEmitter {
 
 export default BulkLoad;
 module.exports = BulkLoad;
-
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  columnMetadataWritten: boolean;
-  bulkLoad: BulkLoad;
-  mainOptions: BulkLoad['options'];
-  columns: BulkLoad['columns'];
-
-  constructor(bulkLoad: BulkLoad) {
-    super({ writableObjectMode: true });
-
-    this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
-    this.columns = bulkLoad.columns;
-
-    this.columnMetadataWritten = false;
-  }
-
-  _transform(row: Array<any>, _encoding: string, callback: () => void) {
-    if (!this.columnMetadataWritten) {
-      this.push(this.bulkLoad.getColMetaData());
-      this.columnMetadataWritten = true;
-    }
-
-    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
-    buf.writeUInt8(TOKEN_TYPE.ROW);
-
-    for (let i = 0; i < this.columns.length; i++) {
-      const c = this.columns[i];
-      c.type.writeParameterData(buf, {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: row[i]
-      }, this.mainOptions, () => {});
-    }
-
-    this.push(buf.data);
-
-    process.nextTick(callback);
-  }
-
-  _flush(callback: () => void) {
-    this.push(this.bulkLoad.createDoneToken());
-
-    process.nextTick(callback);
-  }
-}
