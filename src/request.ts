@@ -1,28 +1,17 @@
 import { EventEmitter } from 'events';
-const TYPES = require('./data-type').typeByName;
-const RequestError = require('./errors').RequestError;
+import { typeByName as TYPES, Parameter } from './data-type';
+import { RequestError } from './errors';
 
 import Connection from './connection';
 
 // TODO: Figure out how to type the `rows` parameter here.
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-export type Parameter = {
-  // TODO: `type` must be a valid TDS value type
-  type: any,
-  name: string,
-  value: unknown,
-  output: boolean,
-  length: number | undefined,
-  precision: number | undefined,
-  scale: number | undefined
-};
-
 type ParameterOptions = {
-  output?: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number
+  output?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
 }
 
 class Request extends EventEmitter {

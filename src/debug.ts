@@ -4,10 +4,10 @@ import { Packet } from './packet';
 
 class Debug extends EventEmitter {
   options: {
-    data: boolean,
-    payload: boolean,
-    packet: boolean,
-    token: boolean
+    data: boolean;
+    payload: boolean;
+    packet: boolean;
+    token: boolean;
   };
 
   indent: string;

@@ -8,10 +8,11 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "noImplicitAny": true,
     "lib": [ "esnext" ]
   },
 
   "include": [
-      "src/**/*.ts"
+    "src/**/*.ts", "src/data-types/bitn.js", "src/data-types/bit.js"
   ]
 }
