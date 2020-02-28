@@ -164,19 +164,6 @@ describe('Date', function() {
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
-    it('nanoSecondRounding', () => {
-      for (const [value, nanosecondDelta, scale, expectedBuffer] of [
-        [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, Buffer.from('0568fc624b91', 'hex')],
-        [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, Buffer.from('05c422ceb80c', 'hex')],
-        [new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118, 7, Buffer.from('051e94c8e96b', 'hex')]
-      ]) {
-        const parameter = { value: value, scale: scale };
-        parameter.value.nanosecondDelta = nanosecondDelta;
-  
-        const buffer = Buffer.concat([...TYPES.Date.generateParameterData(parameter, { useUTC: false })]);
-        assert.deepEqual(buffer, expectedBuffer);
-      }
-    });
     it('dateInputWithSlashSeparator', () => {
       const parameter = { value: '2015/06/18 23:59:59' };
       const buffer = Buffer.concat([...TYPES.Date.generateParameterData(parameter, { useUTC: false })]);
@@ -189,7 +176,6 @@ describe('Date', function() {
       } catch (err) {
         assert.strictEqual(err.message, 'Invalid date.');
       }
-      assert.done();
     });
   });
 
@@ -231,7 +217,6 @@ describe('DateTime', function() {
       } catch (err) {
         assert.strictEqual(err.message, 'Invalid date.');
       }
-      assert.done();
     });
   });
 

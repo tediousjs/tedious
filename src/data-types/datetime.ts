@@ -21,7 +21,7 @@ const DateTime: DataType = {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
-      let time = new Date();
+      const time = new Date(value);
       if ('Invalid Date' === time.toString()) {
         throw new TypeError('Invalid date.');
       }
