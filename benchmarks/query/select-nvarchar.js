@@ -1,6 +1,6 @@
 const { createBenchmark, createConnection } = require('../common');
 
-const { Request, TYPES } = require('../../lib/tedious');
+const { Request, TYPES } = require('../..');
 
 const bench = createBenchmark(main, {
   n: [10, 100, 1000],
