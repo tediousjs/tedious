@@ -5,8 +5,6 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { Readable } from 'readable-stream';
-
 import {
   loginWithUsernamePassword,
   loginWithVmMSI,
@@ -1657,8 +1655,7 @@ class Connection extends EventEmitter {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
     const message = new Message({ type: TYPE.SQL_BATCH });
-    this.messageIo.outgoingMessageStream.write(message);
-    Readable.from(payload).pipe(message);
+    this.messageIo.write(message, payload);
   }
 
   getInitialSql() {
@@ -2041,7 +2038,7 @@ class Connection extends EventEmitter {
         if (!request.streamingMode) {
           request.rowToPacketTransform.end();
         }
-        this.messageIo.outgoingMessageStream.write(message);
+        this.messageIo.write(message, message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
         if (request.paused) { // Request.pause() has been called before the request was started
@@ -2051,10 +2048,7 @@ class Connection extends EventEmitter {
         this.createRequestTimer();
 
         message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-        message.once('finish', () => {
+        this.messageIo.write(message, payload!).then(() => {
           this.resetConnectionOnNextRequest = false;
           this.debug.payload(function() {
             return payload!.toString('  ');
@@ -2064,8 +2058,7 @@ class Connection extends EventEmitter {
             this.pauseRequest(request);
           }
         });
-
-        Readable.from(payload!).pipe(message);
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
       }
     }
   }

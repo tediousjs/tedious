@@ -4,15 +4,15 @@ const DuplexPair = require('native-duplexpair');
 import { Duplex } from 'stream';
 import * as tls from 'tls';
 import { Socket } from 'net';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 
 import Debug from './debug';
 
 import Message from './message';
-import { TYPE } from './packet';
+import { TYPE, HEADER_LENGTH, Packet } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
-import OutgoingMessageStream from './outgoing-message-stream';
+import BufferList from 'bl';
 
 class MessageIO extends EventEmitter {
   socket: Socket;
@@ -21,12 +21,13 @@ class MessageIO extends EventEmitter {
   tlsNegotiationComplete: boolean;
 
   incomingMessageStream: IncomingMessageStream;
-  outgoingMessageStream: OutgoingMessageStream;
 
   securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
   }
+
+  _packetSize: number;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -42,24 +43,23 @@ class MessageIO extends EventEmitter {
       message.on('end', () => { this.emit('message'); });
     });
 
-    this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
+    this._packetSize = packetSize;
 
     this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(this.socket);
   }
 
   packetSize(...args: [number]) {
     if (args.length > 0) {
       const packetSize = args[0];
-      this.debug.log('Packet size changed from ' + this.outgoingMessageStream.packetSize + ' to ' + packetSize);
-      this.outgoingMessageStream.packetSize = packetSize;
+      this.debug.log('Packet size changed from ' + this._packetSize + ' to ' + packetSize);
+      this._packetSize = packetSize;
     }
 
     if (this.securePair) {
-      this.securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+      this.securePair.cleartext.setMaxSendFragment(this._packetSize);
     }
 
-    return this.outgoingMessageStream.packetSize;
+    return this._packetSize;
   }
 
   startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
@@ -101,17 +101,15 @@ class MessageIO extends EventEmitter {
   encryptAllFutureTraffic() {
     const securePair = this.securePair!;
 
-    securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+    securePair.cleartext.setMaxSendFragment(this._packetSize);
     securePair.encrypted.removeAllListeners('data');
 
-    this.outgoingMessageStream.unpipe(this.socket);
     this.socket.unpipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
 
     this.socket.pipe(securePair.encrypted);
     securePair.encrypted.pipe(this.socket);
 
     securePair.cleartext.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(securePair.cleartext);
 
     this.tlsNegotiationComplete = true;
   }
@@ -127,8 +125,61 @@ class MessageIO extends EventEmitter {
   sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
-    this.outgoingMessageStream.write(message);
+    this.write(message, message);
     return message;
+  }
+
+  async write(message: Message, payload: Iterable<Buffer> | AsyncIterable<Buffer>) {
+    const socket = this.tlsNegotiationComplete ? this.securePair!.cleartext : this.socket;
+
+    const length = this._packetSize - HEADER_LENGTH;
+    let packetNumber = 0;
+
+    const bl = new BufferList();
+
+    for await (const chunk of payload) {
+      if (message.ignore) {
+        break;
+      }
+
+      bl.append(chunk);
+
+      while (bl.length > length) {
+        const data = bl.slice(0, length);
+        bl.consume(length);
+
+        // TODO: Get rid of creating `Packet` instances here.
+        const packet = new Packet(message.type);
+        packet.packetId(packetNumber += 1);
+        packet.resetConnection(message.resetConnection);
+        packet.addData(data);
+
+        this.debug.packet('Sent', packet);
+        this.debug.data(packet);
+
+        if (socket.write(packet.buffer) === false) {
+          await once(socket, 'drain');
+        }
+      }
+    }
+
+    const data = bl.slice();
+    bl.consume(data.length);
+
+    // TODO: Get rid of creating `Packet` instances here.
+    const packet = new Packet(message.type);
+    packet.packetId(packetNumber += 1);
+    packet.resetConnection(message.resetConnection);
+    packet.last(true);
+    packet.ignore(message.ignore);
+    packet.addData(data);
+
+    this.debug.packet('Sent', packet);
+    this.debug.data(packet);
+
+    if (socket.write(packet.buffer) === false) {
+      await once(socket, 'drain');
+    }
   }
 
   // Temporarily suspends the flow of incoming packets.
