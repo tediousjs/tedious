@@ -60,31 +60,27 @@ const VarBinary: { maximumLength: number } & DataType = {
     let value = parameter.value;
 
     if (value != null) {
+      if (!Buffer.isBuffer(value)) {
+        value = value.toString();
+      }
+
+      const length = Buffer.byteLength(value, 'ucs2');
+
       if (parameter.length! <= this.maximumLength) {
-        const buffer = new WritableTrackingBuffer(0);
-        buffer.writeUsVarbyte(value);
-        yield buffer.data;
+        const buffer = Buffer.alloc(2);
+        buffer.writeUInt16LE(length, 0);
+        yield buffer;
 
+        yield Buffer.from(value, 'ucs2');
       } else { // writePLPBody
-        let length;
-        if (value instanceof Buffer) {
-          length = value.length;
-        } else {
-          value = value.toString();
-          length = Buffer.byteLength(value, 'ucs2');
-        }
-
         yield UNKNOWN_PLP_LEN;
+
         if (length > 0) {
           const buffer = Buffer.alloc(4);
           buffer.writeUInt32LE(length, 0);
           yield buffer;
 
-          if (value instanceof Buffer) {
-            yield value;
-          } else {
-            yield Buffer.from(value, 'ucs2');
-          }
+          yield Buffer.from(value, 'ucs2');
         }
 
         yield PLP_TERMINATOR;

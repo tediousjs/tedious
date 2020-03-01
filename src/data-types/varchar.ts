@@ -66,19 +66,26 @@ const VarChar: { maximumLength: number } & DataType = {
     if (parameter.value != null) {
       let value = parameter.value;
 
-      if (parameter.length! <= this.maximumLength) {
-        const buffer = new WritableTrackingBuffer(0);
-        buffer.writeUsVarbyte(parameter.value, 'ascii');
-        yield buffer.data;
-      } else {
-        value = value.toString();
-        const length = Buffer.byteLength(value, 'ascii');
+      const length = Buffer.byteLength(value, 'ascii');
 
+      if (!Buffer.isBuffer(value)) {
+        value = value.toString();
+      }
+
+      if (parameter.length! <= this.maximumLength) {
+        const buffer = Buffer.alloc(2);
+        buffer.writeUInt16LE(length, 0);
+        yield buffer;
+
+        yield Buffer.from(value, 'ascii');
+      } else {
         yield UNKNOWN_PLP_LEN;
+
         if (length > 0) {
           const buffer = Buffer.alloc(4);
           buffer.writeUInt32LE(length, 0);
           yield buffer;
+
           yield Buffer.from(value, 'ascii');
         }
 
