@@ -5,7 +5,7 @@ const child_process = require('child_process');
 
 require('@babel/register')({ extensions: ['.ts'] });
 
-const { Connection } = require('..');
+const { Connection } = require('../src/tedious');
 
 // The `Benchmark` class is taken from Node.js - see
 // https://github.com/nodejs/node/blob/0f96dc266fd0cd8c1baa82ce7eb951c11b29a331/benchmark/common.js
