@@ -4,7 +4,8 @@ const DuplexPair = require('native-duplexpair');
 import { Duplex } from 'stream';
 import * as tls from 'tls';
 import { Socket } from 'net';
-import { EventEmitter, once } from 'events';
+import { EventEmitter } from 'events';
+import once from 'events.once';
 
 import Debug from './debug';
 
