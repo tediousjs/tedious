@@ -77,7 +77,11 @@ const VarChar: { maximumLength: number } & DataType = {
         buffer.writeUInt16LE(length, 0);
         yield buffer;
 
-        yield Buffer.from(value, 'ascii');
+        if (Buffer.isBuffer(value)) {
+          yield value;
+        } else {
+          yield Buffer.from(value, 'ascii');
+        }
       } else {
         yield UNKNOWN_PLP_LEN;
 
@@ -86,7 +90,11 @@ const VarChar: { maximumLength: number } & DataType = {
           buffer.writeUInt32LE(length, 0);
           yield buffer;
 
-          yield Buffer.from(value, 'ascii');
+          if (Buffer.isBuffer(value)) {
+            yield value;
+          } else {
+            yield Buffer.from(value, 'ascii');
+          }
         }
 
         yield PLP_TERMINATOR;

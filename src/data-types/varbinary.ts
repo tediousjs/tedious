@@ -71,7 +71,11 @@ const VarBinary: { maximumLength: number } & DataType = {
         buffer.writeUInt16LE(length, 0);
         yield buffer;
 
-        yield Buffer.from(value, 'ucs2');
+        if (Buffer.isBuffer(value)) {
+          yield value;
+        } else {
+          yield Buffer.from(value, 'ucs2');
+        }
       } else { // writePLPBody
         yield UNKNOWN_PLP_LEN;
 
@@ -80,7 +84,11 @@ const VarBinary: { maximumLength: number } & DataType = {
           buffer.writeUInt32LE(length, 0);
           yield buffer;
 
-          yield Buffer.from(value, 'ucs2');
+          if (Buffer.isBuffer(value)) {
+            yield value;
+          } else {
+            yield Buffer.from(value, 'ucs2');
+          }
         }
 
         yield PLP_TERMINATOR;
