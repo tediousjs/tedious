@@ -48,7 +48,7 @@
     "jsbi": "^3.1.1",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
-    "readable-stream": "^3.5.0",
+    "readable-stream": "^3.6.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
