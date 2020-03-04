@@ -10,20 +10,19 @@ const SmallInt: DataType = {
     return 'smallint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(2);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x02]);
   },
 
-  writeParameterData: function(buffer, parameter, _options, cb) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(2);
-      buffer.writeInt16LE(Number(parameter.value));
+      const buffer = Buffer.alloc(3);
+      buffer.writeUInt8(2, 0);
+      buffer.writeInt16LE(Number(parameter.value), 1);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-
-    cb();
   },
 
   validate: function(value): null | number | TypeError {

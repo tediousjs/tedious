@@ -10,20 +10,20 @@ const TinyInt: DataType = {
     return 'tinyint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(1);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x01]);
   },
 
-  writeParameterData: function(buffer, parameter, _options, cb) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(1);
-      buffer.writeUInt8(Number(parameter.value));
+      const buffer = Buffer.alloc(2);
+      let offset = 0;
+      offset = buffer.writeUInt8(1, offset);
+      buffer.writeUInt8(Number(parameter.value), offset);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-
-    cb();
   },
 
   validate: function(value): number | null | TypeError {

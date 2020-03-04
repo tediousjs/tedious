@@ -9,11 +9,11 @@ const UDT: DataType = {
     throw new Error('not implemented');
   },
 
-  writeTypeInfo() {
+  generateTypeInfo() {
     throw new Error('not implemented');
   },
 
-  writeParameterData() {
+  generateParameterData() {
     throw new Error('not implemented');
   },
 

@@ -661,6 +661,26 @@ describe('Parameterised Statements Test', function() {
       execSql(done, TYPES.DateTime2, null, '7_3_A');
     });
 
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9970000', true, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9980000', true, { useUTC: false });
+    });
+
+    it('should correctly handle `Date` values with high precision', function(done) {
+      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    });
+
     it('should handle `string` values', function(done) {
       execSql(
         done,

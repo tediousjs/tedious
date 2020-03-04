@@ -10,22 +10,22 @@ const SmallMoney: DataType = {
     return 'smallmoney';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(MoneyN.id);
-    buffer.writeUInt8(4);
+  generateTypeInfo: function() {
+    return Buffer.from([MoneyN.id, 0x04]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  generateParameterData: function*(parameter) {
     if (parameter.value != null) {
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(parameter.value * 10000);
+      const buffer = Buffer.alloc(5);
+      buffer.writeUInt8(4, 0);
+      buffer.writeInt32LE(parameter.value * 10000, 1);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
-  validate: function(value):null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

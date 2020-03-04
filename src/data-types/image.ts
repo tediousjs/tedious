@@ -19,19 +19,25 @@ const Image: DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeInt32LE(parameter.length);
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(5);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeInt32LE(parameter.length!, 1);
+    return buffer;
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeInt32LE(parameter.length);
-      buffer.writeBuffer(parameter.value);
+      const buffer = Buffer.alloc(4);
+      buffer.writeInt32LE(parameter.length!, 0);
+      yield buffer;
+
+      yield parameter.value;
     } else {
-      buffer.writeInt32LE(parameter.length);
+      const buffer = Buffer.alloc(4);
+      buffer.writeInt32LE(parameter.length!, 0);
+      yield buffer;
     }
-    cb();
   },
 
   validate: function(value): null | TypeError | Buffer {

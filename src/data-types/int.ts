@@ -10,20 +10,22 @@ const Int: DataType = {
     return 'int';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(4);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x04]);
   },
 
-  writeParameterData: function(buffer, parameter, _options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(4);
-      buffer.writeInt32LE(Number(parameter.value));
-    } else {
-      buffer.writeUInt8(0);
-    }
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(4, 0);
+      yield buffer;
 
-    cb();
+      const buffer2 = Buffer.alloc(4);
+      buffer2.writeInt32LE(Number(parameter.value), 0);
+      yield buffer2;
+    } else {
+      yield Buffer.from([0x00]);
+    }
   },
 
   validate: function(value): number | null | TypeError {
