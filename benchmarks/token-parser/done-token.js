@@ -1,6 +1,6 @@
 const { createBenchmark } = require('../common');
 
-const { Parser } = require('../../lib/token/token-stream-parser');
+const { Parser } = require('../../src/token/token-stream-parser');
 
 const bench = createBenchmark(main, {
   n: [10, 100, 1000],
