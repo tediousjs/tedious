@@ -54,9 +54,9 @@ We'd like to learn more about how you use tedious:
 We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
 
 <a name="license"></a>
-## Licence
+## License
 
-Copyright (c) 2010-2018 Mike D Pilsbury
+Copyright (c) 2010-2020 Mike D Pilsbury
 
 The MIT License
 
