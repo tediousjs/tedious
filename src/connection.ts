@@ -1658,7 +1658,7 @@ class Connection extends EventEmitter {
 
     const message = new Message({ type: TYPE.SQL_BATCH });
     this.messageIo.outgoingMessageStream.write(message);
-    Readable.from(payload, { objectMode: false }).pipe(message);
+    Readable.from(payload).pipe(message);
   }
 
   getInitialSql() {
@@ -2072,7 +2072,7 @@ class Connection extends EventEmitter {
           }
         });
 
-        Readable.from(payload!, { objectMode: false }).pipe(message);
+        Readable.from(payload!).pipe(message);
       }
     }
   }
