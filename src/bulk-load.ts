@@ -92,10 +92,6 @@ class RowTransform extends Transform {
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
-      const error = c.type.validate(row[i]);
-      if (error instanceof TypeError) {
-        throw error;
-      }
       const parameter = {
         length: c.length,
         scale: c.scale,
