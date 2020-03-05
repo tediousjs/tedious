@@ -24,9 +24,7 @@ const Date: DataType = {
 
     if (value != null) {
       const time = new globalDate(value);
-      if ('Invalid Date' === time.toString()) {
-        throw new TypeError('Invalid date.');
-      }
+      
       const buffer = new WritableTrackingBuffer(16);
       buffer.writeUInt8(3);
 

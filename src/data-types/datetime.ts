@@ -22,9 +22,7 @@ const DateTime: DataType = {
 
     if (value != null) {
       const time = new Date(value);
-      if ('Invalid Date' === time.toString()) {
-        throw new TypeError('Invalid date.');
-      }
+      
       let date;
       if (options.useUTC) {
         date = LocalDate.of(time.getUTCFullYear(), time.getUTCMonth() + 1, time.getUTCDate());

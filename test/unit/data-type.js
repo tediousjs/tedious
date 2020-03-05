@@ -169,7 +169,7 @@ describe('Date', function() {
       const buffer = Buffer.concat([...TYPES.Date.generateParameterData(parameter, { useUTC: false })]);
       assert.deepEqual(buffer, Buffer.from('03163a0b', 'hex'));
     });
-    it('dateInputWithSlashSeparator', () => {
+    it('dateTypeWithErrorInput', () => {
       const parameter = { value: 'wrongvalue' };
       try {
         TYPES.Date.generateParameterData(parameter, { useUTC: false });
