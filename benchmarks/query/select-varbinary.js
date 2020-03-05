@@ -1,10 +1,16 @@
 const { createBenchmark, createConnection } = require('../common');
 
-const { Request, TYPES } = require('../../src/tedious');
+const { Request, TYPES } = require('../../lib/tedious');
 
 const bench = createBenchmark(main, {
   n: [10, 100],
-  size: [10, 100, 1000, 10000, 1024 * 1024, 10 * 1024 * 1024]
+  size: [
+    10,
+    1024,
+    1024 * 1024,
+    10 * 1024 * 1024,
+    52428800
+  ]
 });
 
 function main({ n, size }) {
@@ -14,36 +20,41 @@ function main({ n, size }) {
         throw err;
       }
 
-      var request = new Request('INSERT INTO #benchmark ([value]) VALUES (@value)', (err) => {
-        let i = 0;
+      const buf = Buffer.alloc(size);
+      buf.fill('x');
 
-        bench.start();
+      let i = 0;
 
-        (function cb() {
-          const request = new Request('SELECT * FROM #benchmark', (err) => {
-            if (err) {
-              throw err;
-            }
+      bench.start();
 
-            if (i++ === n) {
-              bench.end(n);
+      (function cb() {
+        const request = new Request('INSERT INTO #benchmark ([value]) VALUES (@value)', (err) => {
+          if (err) {
+            throw err;
+          }
 
-              connection.close();
+          if (i++ === n) {
+            bench.end(n);
 
-              return;
-            }
+            connection.close();
+            const used = process.memoryUsage().rss / 1024 / 1024;
+            console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB <-- connection close`);
+            return;
+          }
 
-            cb();
-          });
+          cb();
+        });
 
-          connection.execSql(request);
-        })();
-      });
+        request.addParameter('value', TYPES.VarBinary, buf);
 
-      const value = Buffer.alloc(size, 'a');
-      request.addParameter('value', TYPES.VarBinary, value);
-      connection.execSql(request);
+        connection.execSql(request);    
+      })();
     });
+
+    request.on('done', () => {
+        const used = process.memoryUsage().rss / 1024 / 1024;
+        console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB <--- request done`);
+    })
 
     connection.execSqlBatch(request);
   });
