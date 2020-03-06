@@ -1,5 +1,5 @@
 # Tedious (node implementation of TDS)
-[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Slack Status](https://tediousjs-slack.herokuapp.com/badge.svg)](https://tediousjs-slack.herokuapp.com/)
+[![Dependency Status](https://david-dm.org/tediousjs/tedious.svg)](https://david-dm.org/tediousjs/tedious) [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://secure.travis-ci.org/tediousjs/tedious.svg)](http://travis-ci.org/tediousjs/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Slack Status](https://tediousjs-slack.herokuapp.com/badge.svg)](https://tediousjs-slack.herokuapp.com/)[![Code Coverage](https://codecov.io/gh/tediousjs/tedious/badge.svg)](https://codecov.io/gh/tediousjs/tedious)
 
 
 Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
@@ -11,7 +11,7 @@ Previous behavior can be restored using `config.options.enableAnsiNullDefault = 
 
 **NOTE: Default login behavior has changed slightly as of version 1.2**
 
-See the [changelog](http://tediousjs.github.io/tedious/changelog.html) for version history.
+See the [changelog](https://github.com/tediousjs/tedious/releases) for version history.
 
 
 ### Supported TDS versions
@@ -47,16 +47,16 @@ _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the 
 
 We'd like to learn more about how you use tedious:
 
-<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://meetsstorenew.blob.core.windows.net/contianerhd/survey.png?st=2017-02-17T22%3A03%3A00Z&se=2100-02-18T22%3A03%3A00Z&sp=rl&sv=2015-12-11&sr=b&sig=DJSFoihBptSvO%2BjvWzwpHecf8o5yfAbJoD2qW5oB8tc%3D"></a>
+<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://sqlchoice.blob.core.windows.net/sqlchoice/static/images/survey.png"></a>
 
 <a name="contributing"></a>
 ## Contributing
 We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
 
 <a name="license"></a>
-## Licence
+## License
 
-Copyright (c) 2010-2018 Mike D Pilsbury
+Copyright (c) 2010-2020 Mike D Pilsbury
 
 The MIT License
 

@@ -1,3 +1,4 @@
-require('babel-register');
-
-global.describe = function() {};
+require('@babel/register')({
+  extensions: ['.js', '.ts'],
+  plugins: [ 'istanbul' ]
+});
