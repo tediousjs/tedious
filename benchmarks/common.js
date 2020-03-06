@@ -202,6 +202,11 @@ Benchmark.prototype.start = function() {
   this._started = true;
   this._observer.observe({ entryTypes: ['gc'], buffered: false });
 
+  this._memory = [];
+  this._memoryTracker = setInterval(() => {
+    this._memory.push(process.memoryUsage().rss);
+  }, 500);
+
   this._time = process.hrtime();
 };
 
@@ -226,6 +231,7 @@ Benchmark.prototype.end = function(operations) {
   }
 
   this._observer.disconnect();
+  clearInterval(this._memoryTracker);
 
   const time = elapsed[0] + elapsed[1] / 1e9;
   const rate = operations / time;
@@ -233,6 +239,10 @@ Benchmark.prototype.end = function(operations) {
 };
 
 function formatResult(data) {
+  for (const usage of data.memoryUsage) {
+    console.log(usage);
+  }
+
   // Construct configuration string, " A=a, B=b, ..."
   let conf = '';
   for (const key of Object.keys(data.conf)) {
@@ -268,7 +278,8 @@ Benchmark.prototype.report = function(rate, elapsed) {
     rate: rate,
     time: elapsed[0] + elapsed[1] / 1e9,
     type: 'report',
-    gcStats: this._gcStats
+    gcStats: this._gcStats,
+    memoryUsage: this._memory
   });
 };
 
@@ -280,7 +291,11 @@ function createConnection(cb) {
   var config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
 
   var connection = new Connection(config);
-  connection.on('connect', function() {
+  connection.on('connect', function(err) {
+    if (err) {
+      throw err;
+    }
+
     cb(connection);
   });
 }
