@@ -204,7 +204,7 @@ Benchmark.prototype.start = function() {
 
   this._memory = [];
   this._memoryTracker = setInterval(() => {
-    this._memory.push(process.memoryUsage().rss);
+    this._memory.push(process.memoryUsage());
   }, 500);
 
   this._time = process.hrtime();
@@ -239,8 +239,9 @@ Benchmark.prototype.end = function(operations) {
 };
 
 function formatResult(data) {
+  console.log('rss;heapTotal;heapUsed;external');
   for (const usage of data.memoryUsage) {
-    console.log(usage);
+    console.log(`${usage.rss};${usage.heapTotal};${usage.heapUsed};${usage.external}`);
   }
 
   // Construct configuration string, " A=a, B=b, ..."
