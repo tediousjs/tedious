@@ -32,7 +32,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
-import { Transaction, ISOLATION_LEVEL } from './transaction';
+import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { Connector } from './connector';
 import { name as libraryName } from './library';
@@ -600,6 +600,8 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.connectionIsolationLevel !== undefined) {
+        assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
+
         this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
       }
 
@@ -787,9 +789,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.isolationLevel !== undefined) {
-        if (typeof config.options.isolationLevel !== 'number') {
-          throw new TypeError('The "config.options.isolationLevel" property must be of type number.');
-        }
+        assertValidIsolationLevel(config.options.isolationLevel, 'config.options.isolationLevel');
 
         this.config.options.isolationLevel = config.options.isolationLevel;
       }
@@ -1871,7 +1871,10 @@ class Connection extends EventEmitter {
   }
 
   beginTransaction(callback: (err: Error | null | undefined, transactionDescriptor?: Buffer) => void, name = '', isolationLevel = this.config.options.isolationLevel) {
+    assertValidIsolationLevel(isolationLevel, 'isolationLevel');
+
     const transaction = new Transaction(name, isolationLevel);
+
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
         this.transactionDepth++;
@@ -1933,6 +1936,10 @@ class Connection extends EventEmitter {
 
   // eslint-disable-next-line space-before-function-paren
   transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
+    if (isolationLevel) {
+      assertValidIsolationLevel(isolationLevel, 'isolationLevel');
+    }
+
     if (typeof cb !== 'function') {
       throw new TypeError('`cb` must be a function');
     }
