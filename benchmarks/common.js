@@ -3,9 +3,18 @@
 const fs = require('fs');
 const child_process = require('child_process');
 
+const {
+  PerformanceObserver,
+  constants: {
+    NODE_PERFORMANCE_GC_INCREMENTAL,
+    NODE_PERFORMANCE_GC_MAJOR,
+    NODE_PERFORMANCE_GC_MINOR
+  }
+} = require('perf_hooks');
+
 require('@babel/register')({ extensions: ['.ts'] });
 
-const { Connection } = require('..');
+const { Connection } = require('../src/tedious');
 
 // The `Benchmark` class is taken from Node.js - see
 // https://github.com/nodejs/node/blob/0f96dc266fd0cd8c1baa82ce7eb951c11b29a331/benchmark/common.js
@@ -34,6 +43,36 @@ function Benchmark(fn, configs, options) {
   this._time = [0, 0];
   // Used to make sure a benchmark only start a timer once
   this._started = false;
+
+  this._gcStats = {
+    [NODE_PERFORMANCE_GC_INCREMENTAL]: {
+      count: 0,
+      totalDuration: 0
+    },
+    [NODE_PERFORMANCE_GC_MINOR]: {
+      count: 0,
+      totalDuration: 0
+    },
+    [NODE_PERFORMANCE_GC_MAJOR]: {
+      count: 0,
+      totalDuration: 0
+    }
+  };
+
+  this._observer = new PerformanceObserver((list) => {
+    const entries = list.getEntries();
+    const length = entries.length;
+
+    for (let i = 0; i < length; i++) {
+      const entry = entries[i];
+      const stats = this._gcStats[entry.kind];
+
+      if (stats) {
+        stats.count += 1;
+        stats.totalDuration += entry.duration;
+      }
+    }
+  });
 
   // this._run will use fork() to create a new process for each configuration
   // combination.
@@ -161,6 +200,8 @@ Benchmark.prototype.start = function() {
     throw new Error('Called start more than once in a single benchmark');
   }
   this._started = true;
+  this._observer.observe({ entryTypes: ['gc'], buffered: false });
+
   this._time = process.hrtime();
 };
 
@@ -184,6 +225,8 @@ Benchmark.prototype.end = function(operations) {
     elapsed[1] = 1;
   }
 
+  this._observer.disconnect();
+
   const time = elapsed[0] + elapsed[1] / 1e9;
   const rate = operations / time;
   this.report(rate, elapsed);
@@ -199,7 +242,13 @@ function formatResult(data) {
   var rate = data.rate.toString().split('.');
   rate[0] = rate[0].replace(/(\d)(?=(?:\d\d\d)+(?!\d))/g, '$1,');
   rate = (rate[1] ? rate.join('.') : rate[0]);
-  return `${data.name}${conf}: ${rate}`;
+
+  var gcInfo;
+  gcInfo = `(minor: ${data.gcStats[NODE_PERFORMANCE_GC_MINOR].count} - ${data.gcStats[NODE_PERFORMANCE_GC_MINOR].totalDuration}ms,`;
+  gcInfo += ` major: ${data.gcStats[NODE_PERFORMANCE_GC_MAJOR].count} - ${data.gcStats[NODE_PERFORMANCE_GC_MAJOR].totalDuration}ms,`;
+  gcInfo += ` incremental: ${data.gcStats[NODE_PERFORMANCE_GC_INCREMENTAL].count} - ${data.gcStats[NODE_PERFORMANCE_GC_INCREMENTAL].totalDuration}ms)`;
+
+  return `${data.name}${conf}: ${rate} ${gcInfo}`;
 }
 
 function sendResult(data) {
@@ -219,6 +268,7 @@ Benchmark.prototype.report = function(rate, elapsed) {
     rate: rate,
     time: elapsed[0] + elapsed[1] / 1e9,
     type: 'report',
+    gcStats: this._gcStats
   });
 };
 
