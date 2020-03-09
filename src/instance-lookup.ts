@@ -32,7 +32,7 @@ export class InstanceLookup {
       throw new TypeError('Invalid arguments: "callback" must be a function');
     }
 
-    let sender, timer;
+    let sender: Sender, timer: ReturnType<typeof setTimeout>;
 
     const onTimeout = () => {
       sender.cancel();
@@ -46,10 +46,10 @@ export class InstanceLookup {
         clearTimeout(timer);
         if (err) {
           callback('Failed to lookup instance on ' + server + ' - ' + err.message);
-          return;
+
         } else {
-          message = message.toString('ascii', MYSTERY_HEADER_LENGTH);
-          const port = this.parseBrowserResponse(message, instanceName);
+          const strMsg: string = message!.toString('ascii', MYSTERY_HEADER_LENGTH);
+          const port = this.parseBrowserResponse(strMsg, instanceName);
 
           if (port) {
             callback(undefined, port);
