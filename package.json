@@ -48,17 +48,17 @@
     "jsbi": "^3.1.1",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
-    "readable-stream": "^3.5.0",
+    "readable-stream": "^3.6.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.8.3",
-    "@babel/core": "^7.8.3",
-    "@babel/node": "^7.8.3",
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.6",
+    "@babel/node": "^7.8.4",
     "@babel/plugin-proposal-class-properties": "^7.8.3",
-    "@babel/preset-env": "^7.8.3",
+    "@babel/preset-env": "^7.8.6",
     "@babel/preset-typescript": "^7.8.3",
-    "@babel/register": "^7.8.3",
+    "@babel/register": "^7.8.6",
     "@commitlint/cli": "^8.3.5",
     "@commitlint/config-conventional": "^8.3.4",
     "@commitlint/travis-cli": "^8.3.5",
@@ -80,7 +80,7 @@
     "rimraf": "^3.0.0",
     "semantic-release": "^17.0.1",
     "sinon": "^7.5.0",
-    "typescript": "^3.7.5"
+    "typescript": "^3.8.3"
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
