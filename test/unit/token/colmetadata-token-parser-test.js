@@ -1,4 +1,5 @@
 import { specifyDataType } from '../../../src/token/colmetadata-token-parser';
+import { typeByName } from '../../../src/data-type';
 const dataTypeByName = require('../../../src/data-type').typeByName;
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const TokenStreamParser = require('../../../src/token/stream-parser');
@@ -83,97 +84,86 @@ describe('Colmetadata Token Parser', function() {
 
   describe('should specify data type', function() {
     it('should return correct intN type', function() {
-      const intNCol1 = { type: intN, dataLength: 1 };
-      const intCol1 = specifyDataType(intNCol1);
-      assert.strictEqual(intCol1.type.id, 48);
+      for (const [input, expected] of [
+        [{ type: intN, dataLength: 1 }, typeByName.TinyInt.name],
+        [{ type: intN, dataLength: 2 }, typeByName.SmallInt.name],
+        [{ type: intN, dataLength: 4 }, typeByName.Int.name],
+        [{ type: intN, dataLength: 8 }, typeByName.BigInt.name],
+        [{ type: intN, dataLength: 0 }, undefined]
+      ]) {
 
-      const intNCol2 = { type: intN, dataLength: 2 };
-      const intCol2 = specifyDataType(intNCol2);
-      assert.strictEqual(intCol2.type.id, 52);
-
-      const intNCol4 = { type: intN, dataLength: 4 };
-      const intCol4 = specifyDataType(intNCol4);
-      assert.strictEqual(intCol4.type.id, 56);
-
-      const intNCol8 = { type: intN, dataLength: 8 };
-      const intCol8 = specifyDataType(intNCol8);
-      assert.strictEqual(intCol8.type.id, 127);
-
-      const intNColThis = { type: intN, dataLength: 0 };
-      const intColN = specifyDataType(intNColThis);
-      assert.strictEqual(intColN.type.id, 0x26);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct moneyN data type', function() {
-      const moneyNCol4 = { type: moneyN, dataLength: 4 };
-      const moneyCol4 = specifyDataType(moneyNCol4);
-      assert.strictEqual(moneyCol4.type.id, 122);
+      for (const [input, expected] of [
+        [ { type: moneyN, dataLength: 4 }, typeByName.SmallMoney.name],
+        [ { type: moneyN, dataLength: 8 }, typeByName.Money.name],
+        [ { type: moneyN, dataLength: 0 }, undefined]
+      ]) {
 
-      const moneyNCol8 = { type: moneyN, dataLength: 8 };
-      const moneyCol8 = specifyDataType(moneyNCol8);
-      assert.strictEqual(moneyCol8.type.id, 60);
-
-      const moneyNColThis = { type: moneyN, dataLength: 0 };
-      const moneyColN = specifyDataType(moneyNColThis);
-      assert.strictEqual(moneyColN.type.id, 0x6E);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct dateTimeN data type', function() {
-      const dateTimeNCol4 = { type: dateTimeN, dataLength: 4 };
-      const dateTimeCol4 = specifyDataType(dateTimeNCol4);
-      assert.strictEqual(dateTimeCol4.type.id, 58);
+      for (const [input, expected] of [
+        [ { type: dateTimeN, dataLength: 4 }, typeByName.SmallDateTime.name],
+        [ { type: dateTimeN, dataLength: 8 }, typeByName.DateTime.name],
+        [ { type: dateTimeN, dataLength: 0 }, undefined]
+      ]) {
 
-      const dateTimeNCol8 = { type: dateTimeN, dataLength: 8 };
-      const dateTimeCol8 = specifyDataType(dateTimeNCol8);
-      assert.strictEqual(dateTimeCol8.type.id, 61);
-
-      const dateTimeNColThis = { type: dateTimeN, dataLength: 0 };
-      const dateTimeColN = specifyDataType(dateTimeNColThis);
-      assert.strictEqual(dateTimeColN.type.id, 0x6F);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct floatN data type', function() {
-      const floatNCol4 = { type: floatN, dataLength: 4 };
-      const floatCol4 = specifyDataType(floatNCol4);
-      assert.strictEqual(floatCol4.type.id, 62);
+      for (const [input, expected] of [
+        [ { type: floatN, dataLength: 4 }, typeByName.Float.name],
+        [ { type: floatN, dataLength: 8 }, typeByName.Float.name],
+        [ { type: floatN, dataLength: 0 }, undefined]
+      ]) {
 
-      const floatNCol8 = { type: floatN, dataLength: 8 };
-      const floatCol8 = specifyDataType(floatNCol8);
-      assert.strictEqual(floatCol8.type.id, 62);
-
-      const floatNColthis = { type: floatN, dataLength: 0 };
-      const floatColN = specifyDataType(floatNColthis);
-      assert.strictEqual(floatColN.type.id, 0x6D);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct BitN data type', function() {
-      const bitNCol4 = { type: bitN, dataLength: 1 };
-      const bitCol4 = specifyDataType(bitNCol4);
-      assert.strictEqual(bitCol4.type.id, 50);
+      for (const [input, expected] of [
+        [ { type: bitN, dataLength: 1 }, typeByName.Bit.name],
+        [ { type: bitN, dataLength: 0 }, undefined]
+      ]) {
 
-      const bitNColThis = { type: bitN, dataLength: 0 };
-      const bitColN = specifyDataType(bitNColThis);
-      assert.strictEqual(bitColN.type.id, 0x68);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct NumericN data type', function() {
-      const numericNCol1 = { type: numericN, dataLength: 17 };
-      const numericCol1 = specifyDataType(numericNCol1);
-      assert.strictEqual(numericCol1.type.id, 63);
+      for (const [input, expected] of [
+        [ { type: numericN, dataLength: 17 }, typeByName.Numeric.name],
+        [ { type: numericN, dataLength: 0 }, undefined]
+      ]) {
 
-      const numericNColThis = { type: numericN, dataLength: 0 };
-      const numericColN = specifyDataType(numericNColThis);
-      assert.strictEqual(numericColN.type.id, 0x6C);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
 
     it('should return correct DecimalN data type', function() {
-      const decimalNCol1 = { type: decimalN, dataLength: 17 };
-      const decimalCol1 = specifyDataType(decimalNCol1);
-      assert.strictEqual(decimalCol1.type.id, 55);
+      for (const [input, expected] of [
+        [ { type: decimalN, dataLength: 17 }, typeByName.Decimal.name],
+        [ { type: decimalN, dataLength: 0 }, undefined]
+      ]) {
 
-      const decimalNColThis = { type: decimalN, dataLength: 0 };
-      const decimalColN = specifyDataType(decimalNColThis);
-      assert.strictEqual(decimalColN.type.id, 0x6A);
+        const output = specifyDataType([input])[0].typeName;
+        assert.strictEqual(output, expected);
+      }
     });
   });
 });

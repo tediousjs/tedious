@@ -5,7 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { specifyDataType, ColumnMetadata } from './token/colmetadata-token-parser';
+import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { Readable } from 'readable-stream';
 
 import {
@@ -1160,21 +1160,7 @@ class Connection extends EventEmitter {
           } else {
             columns = token.columns as ColumnMetadata[];
           }
-
-          // Replace variable length data-type to specific data-type (e.g., type intN -> smallint etc...)
-          const emittedColumns: any = [];
-          if (Array.isArray(columns as ColumnMetadata[])) {
-            columns.forEach((column: ColumnMetadata) => {
-              emittedColumns.push(specifyDataType(column));
-            });
-          } else {
-            Object.keys(columns).forEach((colName: string) => {
-              const tempCol = columns[colName] as ColumnMetadata;
-              emittedColumns.push(specifyDataType(tempCol));
-            });
-          }
-
-          request.emit('columnMetadata', emittedColumns);
+          request.emit('columnMetadata', columns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
