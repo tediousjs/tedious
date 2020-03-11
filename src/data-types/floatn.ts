@@ -1,14 +1,9 @@
 import { DataType } from '../data-type';
-import float from './float';
 
 const FloatN: DataType = {
   id: 0x6D,
   type: 'FLTN',
   name: 'FloatN',
-
-  getDataType: function(dataLength: number) {
-    return (dataLength === 4 || dataLength === 8) ? float : this;
-  },
 
   declaration() {
     throw new Error('not implemented');

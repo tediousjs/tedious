@@ -1,14 +1,9 @@
 import { DataType } from '../data-type';
-import numeric from './numeric';
 
 const NumericN: DataType = {
   id: 0x6C,
   type: 'NUMERICN',
   name: 'NumericN',
-
-  getDataType: function(dataLength) {
-    return (dataLength === 17) ? numeric : this;
-  },
 
   declaration() {
     throw new Error('not implemented');

@@ -74,7 +74,6 @@ export interface DataType {
 
   hasTableName?: boolean;
 
-  getDataType?: (dataLength: number) => number | object;
   resolveLength?: (parameter: Parameter) => number;
   resolvePrecision?: (parameter: Parameter) => number;
   resolveScale?: (parameter: Parameter) => number;

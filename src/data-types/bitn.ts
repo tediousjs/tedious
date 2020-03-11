@@ -1,15 +1,9 @@
 import { DataType } from '../data-type';
-import bit from './bit';
 
 const BitN: DataType = {
   id: 0x68,
   type: 'BITN',
   name: 'BitN',
-
-  getDataType: function(dataLength: number) {
-
-    return (dataLength === 1) ? bit : this;
-  },
 
   declaration() {
     throw new Error('not implemented');
