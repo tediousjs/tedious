@@ -18,7 +18,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload {
+class RpcRequestPayload implements Iterable<Buffer> {
   request: Request;
   procedure: string | number;
 
@@ -32,7 +32,11 @@ class RpcRequestPayload {
     this.txnDescriptor = txnDescriptor;
   }
 
-  getData(cb: (data: Buffer) => void) {
+  [Symbol.iterator]() {
+    return this.generateData();
+  }
+
+  * generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -48,28 +52,20 @@ class RpcRequestPayload {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
+    yield buffer.data;
 
     const parameters = this.request.parameters;
-    const writeNext = (i: number) => {
-      if (i >= parameters.length) {
-        cb(buffer.data);
-        return;
-      }
-
-      this._writeParameterData(parameters[i], buffer, () => {
-        setImmediate(() => {
-          writeNext(i + 1);
-        });
-      });
-    };
-    writeNext(0);
+    for (let i = 0; i < parameters.length; i++) {
+      yield* this.generateParameterData(parameters[i], this.options);
+    }
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  * generateParameterData(parameter: Parameter, options: any) {
+    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -77,6 +73,8 @@ class RpcRequestPayload {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
     buffer.writeUInt8(statusFlags);
+
+    yield buffer.data;
 
     const param: ParameterData = { value: parameter.value };
 
@@ -102,10 +100,8 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
-    type.writeTypeInfo(buffer, param, this.options);
-    type.writeParameterData(buffer, param, this.options, () => {
-      cb();
-    });
+    yield type.generateTypeInfo(param, this.options);
+    yield* type.generateParameterData(param, options);
   }
 }
 

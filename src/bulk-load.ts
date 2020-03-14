@@ -35,33 +35,84 @@ const DONE_STATUS = {
 };
 
 type InternalOptions = {
-  checkConstraints: boolean,
-  fireTriggers: boolean,
-  keepNulls: boolean,
-  lockTable: boolean,
+  checkConstraints: boolean;
+  fireTriggers: boolean;
+  keepNulls: boolean;
+  lockTable: boolean;
 };
 
 export interface Options {
-  checkConstraints?: InternalOptions['checkConstraints'],
-  fireTriggers?: InternalOptions['fireTriggers'],
-  keepNulls?: InternalOptions['keepNulls'],
-  lockTable?: InternalOptions['lockTable'],
+  checkConstraints?: InternalOptions['checkConstraints'];
+  fireTriggers?: InternalOptions['fireTriggers'];
+  keepNulls?: InternalOptions['keepNulls'];
+  lockTable?: InternalOptions['lockTable'];
 }
 
 export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
 type Column = Parameter & {
-  objName: string,
+  objName: string;
 };
 
 type ColumnOptions = {
-  output?: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number,
-  objName?: string,
-  nullable?: boolean
+  output?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  objName?: string;
+  nullable?: boolean;
 };
+
+// A transform that converts rows to packets.
+class RowTransform extends Transform {
+  columnMetadataWritten: boolean;
+  bulkLoad: BulkLoad;
+  mainOptions: BulkLoad['options'];
+  columns: BulkLoad['columns'];
+
+  constructor(bulkLoad: BulkLoad) {
+    super({ writableObjectMode: true });
+
+    this.bulkLoad = bulkLoad;
+    this.mainOptions = bulkLoad.options;
+    this.columns = bulkLoad.columns;
+
+    this.columnMetadataWritten = false;
+  }
+
+  _transform(row: Array<any>, _encoding: string, callback: () => void) {
+    if (!this.columnMetadataWritten) {
+      this.push(this.bulkLoad.getColMetaData());
+      this.columnMetadataWritten = true;
+    }
+
+    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
+    buf.writeUInt8(TOKEN_TYPE.ROW);
+    this.push(buf.data);
+
+    for (let i = 0; i < this.columns.length; i++) {
+      const c = this.columns[i];
+      const parameter = {
+        length: c.length,
+        scale: c.scale,
+        precision: c.precision,
+        value: row[i]
+      };
+
+      for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+        this.push(chunk);
+      }
+    }
+
+    process.nextTick(callback);
+  }
+
+  _flush(callback: () => void) {
+    this.push(this.bulkLoad.createDoneToken());
+
+    process.nextTick(callback);
+  }
+}
 
 class BulkLoad extends EventEmitter {
   error?: Error;
@@ -274,7 +325,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      c.type.writeTypeInfo(tBuf, c, this.options);
+      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');
@@ -344,51 +395,3 @@ class BulkLoad extends EventEmitter {
 
 export default BulkLoad;
 module.exports = BulkLoad;
-
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  columnMetadataWritten: boolean;
-  bulkLoad: BulkLoad;
-  mainOptions: BulkLoad['options'];
-  columns: BulkLoad['columns'];
-
-  constructor(bulkLoad: BulkLoad) {
-    super({ writableObjectMode: true });
-
-    this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
-    this.columns = bulkLoad.columns;
-
-    this.columnMetadataWritten = false;
-  }
-
-  _transform(row: Array<any>, _encoding: string, callback: () => void) {
-    if (!this.columnMetadataWritten) {
-      this.push(this.bulkLoad.getColMetaData());
-      this.columnMetadataWritten = true;
-    }
-
-    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
-    buf.writeUInt8(TOKEN_TYPE.ROW);
-
-    for (let i = 0; i < this.columns.length; i++) {
-      const c = this.columns[i];
-      c.type.writeParameterData(buf, {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: row[i]
-      }, this.mainOptions, () => {});
-    }
-
-    this.push(buf.data);
-
-    process.nextTick(callback);
-  }
-
-  _flush(callback: () => void) {
-    this.push(this.bulkLoad.createDoneToken());
-
-    process.nextTick(callback);
-  }
-}

@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const Time: DataType = {
   id: 0x29,
@@ -19,14 +20,13 @@ const Time: DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale!);
+  generateTypeInfo(parameter) {
+    return Buffer.from([this.id, parameter.scale!]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
-
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(16);
       const time = parameter.value;
 
       let timestamp;
@@ -58,10 +58,11 @@ const Time: DataType = {
           buffer.writeUInt8(5);
           buffer.writeUInt40LE(timestamp);
       }
+
+      yield buffer.data;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): null | number | TypeError | Date {

@@ -5,13 +5,13 @@ import { InternalConnectionOptions } from '../connection';
 import { InfoMessageToken, ErrorMessageToken } from './token';
 
 type TokenData = {
-  number: number,
-  state: number,
-  class: number,
-  message: string,
-  serverName: string,
-  procName: string,
-  lineNumber: number,
+  number: number;
+  state: number;
+  class: number;
+  message: string;
+  serverName: string;
+  procName: string;
+  lineNumber: number;
 };
 
 function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {

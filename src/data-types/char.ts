@@ -1,4 +1,4 @@
-import { DataType, ParameterData } from '../data-type';
+import { DataType } from '../data-type';
 
 const NULL = (1 << 16) - 1;
 
@@ -46,21 +46,30 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  writeTypeInfo: function(buffer, parameter: ParameterData<any>) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt16LE(parameter.length);
-    buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]));
+  generateTypeInfo(parameter) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt16LE(parameter.length!, 1);
+    return buffer;
   },
 
-  writeParameterData: function(buffer, parameter: ParameterData<Buffer | null>, options, cb) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+  *generateParameterData(parameter, options) {
+    let value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (value != null) {
-      buffer.writeUsVarbyte(value, 'ascii');
+      value = value.toString();
+      const length = Buffer.byteLength(value, 'ascii');
+
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(length, 0);
+      yield buffer;
+
+      yield Buffer.alloc(length, parameter.value, 'ascii');
     } else {
-      buffer.writeUInt16LE(NULL);
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(NULL, 0);
+      yield buffer;
     }
-    cb();
   },
 
   validate: function(value): null | string | TypeError {

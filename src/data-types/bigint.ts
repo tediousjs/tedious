@@ -1,5 +1,6 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const BigInt: DataType = {
   id: 0x7F,
@@ -10,23 +11,22 @@ const BigInt: DataType = {
     return 'bigint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(8);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x08]);
   },
 
-  writeParameterData: function(buffer, parameter, _options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(9);
       buffer.writeUInt8(8);
       buffer.writeInt64LE(Number(parameter.value));
+      yield buffer.data;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-
-    cb();
   },
 
-  validate: function(value) : null | number | TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

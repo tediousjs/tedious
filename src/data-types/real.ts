@@ -10,22 +10,23 @@ const Real: DataType = {
     return 'real';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(FloatN.id);
-    buffer.writeUInt8(4);
+  generateTypeInfo() {
+    return Buffer.from([FloatN.id, 0x04]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(4);
-      buffer.writeFloatLE(parseFloat(parameter.value));
+      const buffer = Buffer.alloc(5);
+      let offset = 0;
+      offset = buffer.writeUInt8(4, offset);
+      buffer.writeFloatLE(parseFloat(parameter.value), offset);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
-  validate: function(value): null| number |TypeError {
+  validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;
     }

@@ -356,6 +356,45 @@ describe('Encrypt Test', function() {
   });
 });
 
+describe('BeginTransaction Tests', function() {
+  let connection;
+  beforeEach(function(done) {
+    const config = getConfig();
+    connection = new Connection(config);
+    connection.on('connect', done);
+  });
+
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
+    } else {
+      done();
+    }
+  });
+
+  it('should validate isolation level is a number', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 'some string');
+    }, TypeError, 'The "isolationLevel" argument must be of type number. Received type string (some string)');
+  });
+
+  it('should validate isolation level is an integer', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 2.3);
+    }, RangeError, 'The value of "isolationLevel" is out of range. It must be an integer. Received: 2.3');
+  });
+
+  it('should validate isolation level is a valid isolation level value', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 9);
+    }, RangeError, 'The value of "isolationLevel" is out of range. It must be >= 0 && <= 5. Received: 9');
+  });
+});
+
 describe('Insertion Tests', function() {
   it('should execSql', function(done) {
     const config = getConfig();
@@ -1342,7 +1381,7 @@ describe('Boolean Config Options Test', function() {
   });
 
   it('should test arith abort default', function(done) {
-    testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, false);
+    testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, true);
   });
 
   it('should test arith abort on', function(done) {

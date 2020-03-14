@@ -10,19 +10,19 @@ const Float: DataType = {
     return 'float';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(FloatN.id);
-    buffer.writeUInt8(8);
+  generateTypeInfo() {
+    return Buffer.from([FloatN.id, 0x08]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(8);
-      buffer.writeDoubleLE(parseFloat(parameter.value));
+      const buffer = Buffer.alloc(9);
+      buffer.writeUInt8(8, 0);
+      buffer.writeDoubleLE(parseFloat(parameter.value), 1);
+      yield buffer;
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {

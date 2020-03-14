@@ -10,19 +10,21 @@ const Bit: DataType = {
     return 'bit';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(BitN.id);
-    buffer.writeUInt8(1);
+  generateTypeInfo() {
+    return Buffer.from([BitN.id, 0x01]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (typeof parameter.value === 'undefined' || parameter.value === null) {
-      buffer.writeUInt8(0);
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(0, 0);
+      yield buffer;
     } else {
-      buffer.writeUInt8(1);
-      buffer.writeUInt8(parameter.value ? 1 : 0);
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt8(1, 0);
+      buffer.writeUInt8(parameter.value ? 1 : 0, 1);
+      yield buffer;
     }
-    cb();
   },
 
   validate: function(value): null | boolean {

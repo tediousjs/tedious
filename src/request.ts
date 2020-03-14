@@ -8,10 +8,10 @@ import Connection from './connection';
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
 type ParameterOptions = {
-  output?: boolean,
-  length?: number,
-  precision?: number,
-  scale?: number
+  output?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
 }
 
 class Request extends EventEmitter {

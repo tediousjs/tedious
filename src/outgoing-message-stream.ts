@@ -12,7 +12,7 @@ class OutgoingMessageStream extends Duplex {
 
   currentMessage: Message | undefined;
 
-  constructor(debug: Debug, { packetSize } : { packetSize: number }) {
+  constructor(debug: Debug, { packetSize }: { packetSize: number }) {
     super({ writableObjectMode: true });
 
     this.packetSize = packetSize;

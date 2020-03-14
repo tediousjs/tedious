@@ -30,6 +30,20 @@ for (const name in ISOLATION_LEVEL) {
   isolationLevelByValue[value] = name;
 }
 
+export function assertValidIsolationLevel(isolationLevel: any, name: string): asserts isolationLevel is 0 | 1 | 2 | 3 | 4 | 5 {
+  if (typeof isolationLevel !== 'number') {
+    throw new TypeError(`The "${name}" ${name.includes('.') ? 'property' : 'argument'} must be of type number. Received type ${typeof isolationLevel} (${isolationLevel})`);
+  }
+
+  if (!Number.isInteger(isolationLevel)) {
+    throw new RangeError(`The value of "${name}" is out of range. It must be an integer. Received: ${isolationLevel}`);
+  }
+
+  if (!(isolationLevel >= 0 && isolationLevel <= 5)) {
+    throw new RangeError(`The value of "${name}" is out of range. It must be >= 0 && <= 5. Received: ${isolationLevel}`);
+  }
+}
+
 export class Transaction {
   name: string;
   isolationLevel: number;
@@ -50,7 +64,9 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Begin Transaction: name=' + this.name + ', isolationLevel=' + isolationLevelByValue[this.isolationLevel];
       }
@@ -67,8 +83,9 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
-      data: buffer.data,
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Commit Transaction: name=' + this.name;
       }
@@ -85,7 +102,9 @@ export class Transaction {
     buffer.writeUInt8(0);
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Rollback Transaction: name=' + this.name;
       }
@@ -100,7 +119,9 @@ export class Transaction {
     buffer.writeString(this.name, 'ucs2');
 
     return {
-      getData: (cb: (data: Buffer) => void) => { cb(buffer.data); },
+      *[Symbol.iterator]() {
+        yield buffer.data;
+      },
       toString: () => {
         return 'Save Transaction: name=' + this.name;
       }

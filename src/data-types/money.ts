@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import MoneyN from './moneyn';
 
+const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
+const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
+
 const Money: DataType = {
   id: 0x3C,
   type: 'MONEY',
@@ -10,19 +13,29 @@ const Money: DataType = {
     return 'money';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(MoneyN.id);
-    buffer.writeUInt8(8);
+  generateTypeInfo: function() {
+    return Buffer.from([MoneyN.id, 0x08]);
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value != null) {
-      buffer.writeUInt8(8);
-      buffer.writeMoney(parameter.value * 10000);
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(8, 0);
+      yield buffer;
+
+      const value = parameter.value * 10000;
+
+      const buffer2 = Buffer.alloc(4);
+      buffer2.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
+      yield buffer2;
+
+      const buffer3 = Buffer.alloc(4);
+      buffer3.writeInt32LE(value & -1, 0);
+      yield buffer3;
+
     } else {
-      buffer.writeUInt8(0);
+      yield Buffer.from([0x00]);
     }
-    cb();
   },
 
   validate: function(value): number | null | TypeError {

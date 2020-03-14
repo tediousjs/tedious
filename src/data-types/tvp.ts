@@ -1,4 +1,8 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+
+const TVP_ROW_TOKEN = Buffer.from([0x01]);
+const TVP_END_TOKEN = Buffer.from([0x00]);
 
 const TVP: DataType = {
   id: 0xF3,
@@ -10,64 +14,83 @@ const TVP: DataType = {
     return value.name + ' readonly';
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    let ref, ref1, ref2, ref3;
+  generateTypeInfo(parameter) {
+    const databaseName = '';
+    const schema = parameter.value?.schema ?? '';
+    const typeName = parameter.value?.name ?? '';
+
+    const bufferLength = 1 +
+      1 + Buffer.byteLength(databaseName, 'ucs2') +
+      1 + Buffer.byteLength(schema, 'ucs2') +
+      1 + Buffer.byteLength(typeName, 'ucs2');
+
+    const buffer = new WritableTrackingBuffer(bufferLength, 'ucs2');
     buffer.writeUInt8(this.id);
-    buffer.writeBVarchar('');
-    buffer.writeBVarchar((ref = (ref1 = parameter.value) != null ? ref1.schema : undefined) != null ? ref : '');
-    buffer.writeBVarchar((ref2 = (ref3 = parameter.value) != null ? ref3.name : undefined) != null ? ref2 : '');
+    buffer.writeBVarchar(databaseName);
+    buffer.writeBVarchar(schema);
+    buffer.writeBVarchar(typeName);
+
+    return buffer.data;
   },
 
-  writeParameterData: function(buffer, parameter, options, cb) {
+  *generateParameterData(parameter, options) {
     if (parameter.value == null) {
-      buffer.writeUInt16LE(0xFFFF);
-      buffer.writeUInt8(0x00);
-      buffer.writeUInt8(0x00);
+      const buffer = Buffer.alloc(4);
+      buffer.writeUInt16LE(0xFFFF, 0);
+      buffer.writeUInt8(0x00, 2);
+      buffer.writeUInt8(0x00, 3);
+      yield buffer;
       return;
     }
 
-    buffer.writeUInt16LE(parameter.value.columns.length);
+    const { columns, rows } = parameter.value;
+    const buffer = Buffer.alloc(2);
+    buffer.writeUInt16LE(columns.length, 0);
+    yield buffer;
 
-    const ref = parameter.value.columns;
-    for (let i = 0, len = ref.length; i < len; i++) {
-      const column = ref[i];
-      buffer.writeUInt32LE(0x00000000);
-      buffer.writeUInt16LE(0x0000);
-      column.type.writeTypeInfo(buffer, column);
-      buffer.writeBVarchar('');
+    for (let i = 0, len = columns.length; i < len; i++) {
+      const column = columns[i];
+
+      const buff = Buffer.alloc(6);
+      // UserType
+      buff.writeUInt32LE(0x00000000, 0);
+
+      // Flags
+      buff.writeUInt16LE(0x0000, 4);
+      yield buff;
+
+      // TYPE_INFO
+      yield column.type.generateTypeInfo(column);
+
+      // ColName
+      yield Buffer.from([0x00]);
     }
 
-    buffer.writeUInt8(0x00);
+    yield TVP_END_TOKEN;
 
-    const ref1 = parameter.value.rows;
-    const writeNext = (i:number) => {
-      if (i >= ref1.length) {
-        buffer.writeUInt8(0x00);
-        cb();
-        return;
-      }
-      const row = ref1[i];
+    for (let i = 0, length = rows.length; i < length; i++) {
+      yield TVP_ROW_TOKEN;
 
-      buffer.writeUInt8(0x01);
-
+      const row = rows[i];
       for (let k = 0, len2 = row.length; k < len2; k++) {
+        const column = columns[k];
         const value = row[k];
+
         const param = {
           value: value,
-          length: parameter.value.columns[k].length,
-          scale: parameter.value.columns[k].scale,
-          precision: parameter.value.columns[k].precision
+          length: column.length,
+          scale: column.scale,
+          precision: column.precision
         };
-        parameter.value.columns[k].type.writeParameterData(buffer, param, options, () => {});
+
+        // TvpColumnData
+        yield * column.type.generateParameterData(param, options);
       }
+    }
 
-      setImmediate(() => {
-        writeNext(i + 1);
-      });
-    };
-
-    writeNext(0);
+    yield TVP_END_TOKEN;
   },
+
   validate: function(value): Buffer | null | TypeError {
     if (value == null) {
       return null;
