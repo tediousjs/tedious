@@ -1,5 +1,5 @@
 import BulkLoad from './bulk-load';
-import Connection from './connection';
+import Connection, { ConnectionConfiguration } from './connection';
 import Request from './request';
 import { name } from './library';
 
@@ -10,6 +10,12 @@ import { ISOLATION_LEVEL } from './transaction';
 import { versions as TDS_VERSION } from './tds-versions';
 
 const library = { name: name };
+
+export function connect(config: ConnectionConfiguration, connectListener?: (err?: Error) => {}) {
+  const connection = new Connection(config);
+  connection.connect(connectListener);
+  return connection;
+}
 
 export {
   BulkLoad,
