@@ -45,7 +45,8 @@ before_test:
             }
           },
           "options": {
-            "database": "master"
+            "database": "master",
+            "trustServerCertificate": true
           }
         },
 
@@ -60,7 +61,8 @@ before_test:
             }
           },
           "options": {
-            "database": "master"
+            "database": "master",
+            "trustServerCertificate": true
           }
         }
       }') -Path C:\Users\appveyor\.tedious\test-connection.json
