@@ -1,10 +1,12 @@
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
-const fs = require('fs');
 const TYPES = require('../../src/data-type').typeByName;
 
+const fs = require('fs');
+const { assert } = require('chai');
+
 const config = JSON.parse(
-  fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 
 config.options.debug = {
@@ -17,52 +19,56 @@ config.options.debug = {
 
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
-exports.insertBinary = function(test) {
-  const connection = new Connection(config);
-  connection.on('end', function() {
-    test.done();
+describe('inserting binary data', function() {
+  this.timeout(60000);
+
+  beforeEach(function(done) {
+    this.connection = new Connection(config);
+    this.connection.on('connect', done);
   });
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
+  afterEach(function(done) {
+    if (!this.connection.closed) {
+      this.connection.on('end', done);
+      this.connection.close();
+    } else {
+      done();
+    }
+  });
 
-    const request = new Request(
-      'CREATE TABLE #test ([data] binary(4))',
-      function(err) {
-        test.ifError(err);
-
-        const request = new Request(
-          'INSERT INTO #test ([data]) VALUES (@p1)',
-          function(err) {
-            test.ifError(err);
-
-            const request = new Request('SELECT [data] FROM #test', function(
-              err
-            ) {
-              test.ifError(err);
-              connection.close();
-            });
-
-            request.on('row', function(columns) {
-              test.strictEqual(
-                columns[0].value.toString('hex'),
-                new Buffer([0x12, 0x34, 0x00, 0xce]).toString('hex')
-              );
-            });
-
-            connection.execSql(request);
-          }
-        );
-
-        request.addParameter(
-          'p1',
-          TYPES.Binary,
-          new Buffer([0x12, 0x34, 0x00, 0xce])
-        );
-        connection.execSql(request);
+  it('should correctly insert the binary data', function(done) {
+    const request = new Request('CREATE TABLE #test ([data] binary(4))', (err) => {
+      if (err) {
+        return done(err);
       }
-    );
 
-    connection.execSqlBatch(request);
+      const request = new Request('INSERT INTO #test ([data]) VALUES (@p1)', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const values = [];
+        const request = new Request('SELECT [data] FROM #test', (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          assert.deepEqual(values, [Buffer.from([0x12, 0x34, 0x00, 0xce])]);
+
+          done();
+        });
+
+        request.on('row', function(columns) {
+          values.push(columns[0].value);
+        });
+
+        this.connection.execSql(request);
+      });
+
+      request.addParameter('p1', TYPES.Binary, Buffer.from([0x12, 0x34, 0x00, 0xce]));
+      this.connection.execSql(request);
+    });
+
+    this.connection.execSqlBatch(request);
   });
-};
+});

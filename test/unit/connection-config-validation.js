@@ -1,70 +1,97 @@
 const Connection = require('../../src/tedious').Connection;
+const assert = require('chai').assert;
 
-exports['Connection configuration validation'] = {
-  setUp: function(done) {
-    this.config = {};
-    this.config.options = { encrypt: false };
-    this.config.server = 'localhost';
-    done();
-  },
+function ensureConnectionIsClosed(connection, callback) {
+  if (connection.closed) {
+    process.nextTick(callback);
+    return;
+  }
 
-  'default transient retry interval': function(test) {
-    const connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.connectionRetryInterval, 500);
-    test.done();
-  },
+  connection.on('end', callback);
+  connection.close();
+}
 
-  'good transient retry interval': function(test) {
+describe('Connection configuration validation', function() {
+  let config;
+
+  beforeEach(function() {
+    config = {};
+    config.options = { encrypt: false };
+    config.server = 'localhost';
+  });
+
+  it('default transient retry interval', () => {
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('good transient retry interval', () => {
     const goodRetryInterval = 75;
-    this.config.options.connectionRetryInterval = goodRetryInterval;
-    const connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.connectionRetryInterval, goodRetryInterval);
-    test.done();
-  },
+    config.options.connectionRetryInterval = goodRetryInterval;
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.connectionRetryInterval, goodRetryInterval);
+    ensureConnectionIsClosed(connection, () => {});
+  });
 
-  'bad transient retry interval': function(test) {
+  it('bad transient retry interval', () => {
     const zeroRetryInterval = 0;
-    this.config.options.connectionRetryInterval = zeroRetryInterval;
-    test.throws(() => {
-      new Connection(this.config);
+    config.options.connectionRetryInterval = zeroRetryInterval;
+    assert.throws(() => {
+      new Connection(config);
     });
 
     const negativeRetryInterval = -25;
-    this.config.options.connectionRetryInterval = negativeRetryInterval;
-    test.throws(() => {
-      new Connection(this.config);
+    config.options.connectionRetryInterval = negativeRetryInterval;
+    assert.throws(() => {
+      new Connection(config);
     });
+  });
 
-    test.done();
-  },
+  it('default max transient retries', () => {
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
+    ensureConnectionIsClosed(connection, () => {});
+  });
 
-  'default max transient retries': function(test) {
-    const connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
-    test.done();
-  },
-
-  'good max transient retries': function(test) {
+  it('good max transient retries', () => {
     const zeroMaxRetries = 0;
-    this.config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
-    let connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, zeroMaxRetries);
+    config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
+    const firstConnection = new Connection(config);
+    assert.strictEqual(firstConnection.config.options.maxRetriesOnTransientErrors, zeroMaxRetries);
 
     const nonZeroMaxRetries = 5;
-    this.config.options.maxRetriesOnTransientErrors = nonZeroMaxRetries;
-    connection = new Connection(this.config);
-    test.strictEqual(connection.config.options.maxRetriesOnTransientErrors, nonZeroMaxRetries);
+    config.options.maxRetriesOnTransientErrors = nonZeroMaxRetries;
+    const secondConnection = new Connection(config);
+    assert.strictEqual(secondConnection.config.options.maxRetriesOnTransientErrors, nonZeroMaxRetries);
 
-    test.done();
-  },
-
-  'bad max transient retries': function(test) {
-    const negativeMaxRetries = -5;
-    this.config.options.maxRetriesOnTransientErrors = negativeMaxRetries;
-    test.throws(() => {
-      new Connection(this.config);
+    ensureConnectionIsClosed(firstConnection, () => {
+      ensureConnectionIsClosed(secondConnection, () => {});
     });
+  });
 
-    test.done();
-  }
-};
+  it('bad max transient retries', () => {
+    const negativeMaxRetries = -5;
+    config.options.maxRetriesOnTransientErrors = negativeMaxRetries;
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
+
+  it('bad azure ad authentication method', () => {
+    const authenticationMethod = 'abc';
+    config.authentication = authenticationMethod;
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
+
+  it('bad tds version for with azure ad', () => {
+    const authenticationMethod = 'activedirectorypassword';
+    config.authentication = authenticationMethod;
+    config.options.tdsVersion = '7_2';
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
+});

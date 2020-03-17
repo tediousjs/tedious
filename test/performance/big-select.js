@@ -3,11 +3,11 @@ var Request = require('../../src/request');
 var fs = require('fs');
 var async = require('async');
 
-var getConfig = function() {
+function getConfig() {
   return JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
-};
+}
 
 exports.smallRows = function(test) {
   var rows = 50000;
@@ -39,7 +39,7 @@ insert into #many_rows (id, first_name, last_name, medium) values(@count, 'MyFir
   createInsertSelect(test, rows, createTableSql, insertRowSql);
 };
 
-var createInsertSelect = function(test, rows, createTableSql, insertRowSql) {
+function createInsertSelect(test, rows, createTableSql, insertRowSql) {
   test.expect(2);
 
   var insertRowsSql = `\
@@ -57,25 +57,25 @@ end\
   var config = getConfig();
   var connection = new Connection(config);
 
-  var createTable = function(callback) {
+  function createTable(callback) {
     var request = new Request(createTableSql, function(err, rowCount) {
       callback(err);
     });
 
     console.log('Creating table');
     connection.execSqlBatch(request);
-  };
+  }
 
-  var insertRows = function(callback) {
+  function insertRows(callback) {
     var request = new Request(insertRowsSql, function(err, rowCount) {
       callback(err);
     });
 
     console.log('Inserting rows');
     connection.execSqlBatch(request);
-  };
+  }
 
-  var select = function(callback) {
+  function select(callback) {
     var start = Date.now();
     var request = new Request(selectSql, function(err, rowCount) {
       test.strictEqual(rows, rowCount);
@@ -91,12 +91,12 @@ end\
     });
 
     request.on('row', function(columns) {
-      //console.log(columns[0].value)
+      // console.log(columns[0].value)
     });
 
     console.log('Selecting rows');
     connection.execSqlBatch(request);
-  };
+  }
 
   connection.on('connect', function(err) {
     test.ok(!err);
@@ -116,14 +116,14 @@ end\
   });
 
   connection.on('infoMessage', function(info) {
-    //console.log("#{info.number} : #{info.message}")
+    // console.log("#{info.number} : #{info.message}")
   });
 
   connection.on('errorMessage', function(error) {
-    //console.log("#{error.number} : #{error.message}")
+    // console.log("#{error.number} : #{error.message}")
   });
 
   connection.on('debug', function(text) {
-    //console.log(text)
+    // console.log(text)
   });
-};
+}

@@ -1,13 +1,12 @@
-var Connection = require('../../src/connection');
-var Request = require('../../src/request');
-var fs = require('fs');
-var TYPES = require('../../src/data-type').typeByName;
+const Connection = require('../../src/connection');
+const Request = require('../../src/request');
+const fs = require('fs');
+const TYPES = require('../../src/data-type').typeByName;
+const assert = require('chai').assert;
 
-/* eslint-disable no-unused-vars */
-
-var getConfig = function() {
-  var config = JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+function getConfig() {
+  const config = JSON.parse(
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
   config.options.debug = {
@@ -21,74 +20,71 @@ var getConfig = function() {
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
-};
+}
 
-exports.prepareExecute = function(test) {
-  test.expect(5);
-  var value = 8;
+describe('Prepare Execute Statement', function() {
+  it('should prepare execute', function(done) {
+    const value = 8;
 
-  var config = getConfig();
+    const config = getConfig();
 
-  var request = new Request('select @param', function(err) {
-    test.ifError(err);
-    connection.close();
-  });
-  request.addParameter('param', TYPES.Int);
+    const request = new Request('select @param', function(err) {
+      assert.ifError(err);
+      connection.close();
+    });
+    request.addParameter('param', TYPES.Int);
 
-  var connection = new Connection(config);
+    const connection = new Connection(config);
 
-  request.on('prepared', function() {
-    test.ok(request.handle);
-    connection.execute(request, {param: value});
-  });
+    request.on('prepared', function() {
+      assert.ok(request.handle);
+      connection.execute(request, { param: value });
+    });
 
-  request.on('row', function(columns) {
-    test.strictEqual(columns.length, 1);
-    test.strictEqual(columns[0].value, value);
-  });
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, value);
+    });
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.prepare(request);
-  });
+    connection.on('connect', function(err) {
+      assert.ifError(err);
+      connection.prepare(request);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    connection.on('end', function(info) {
+      done();
+    });
 
-  connection.on('debug', function(text) {
-    //console.log(text)
-  });
-};
-
-exports.unprepare = function(test) {
-  test.expect(3);
-
-  var config = getConfig();
-  var prepared = false;
-
-  var request = new Request('select 3', function(err) {
-    test.ifError(err);
-    connection.close();
+    connection.on('debug', function(text) {
+      // console.log(text)
+    });
   });
 
-  var connection = new Connection(config);
+  it('should test unprepare', function(done) {
+    const config = getConfig();
+    const request = new Request('select 3', function(err) {
+      assert.ifError(err);
+      connection.close();
+    });
 
-  request.on('prepared', function() {
-    test.ok(request.handle);
-    connection.unprepare(request);
-  });
+    const connection = new Connection(config);
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
-    connection.prepare(request);
-  });
+    request.on('prepared', function() {
+      assert.ok(request.handle);
+      connection.unprepare(request);
+    });
 
-  connection.on('end', function(info) {
-    test.done();
-  });
+    connection.on('connect', function(err) {
+      assert.ifError(err);
+      connection.prepare(request);
+    });
 
-  connection.on('debug', function(text) {
-    //console.log(text)
+    connection.on('end', function(info) {
+      done();
+    });
+
+    connection.on('debug', function(text) {
+      // console.log(text)
+    });
   });
-};
+});

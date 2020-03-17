@@ -1,39 +1,34 @@
-var PreloginPayload = require('../../src/prelogin-payload');
+const PreloginPayload = require('../../src/prelogin-payload');
+const assert = require('chai').assert;
 
-exports.noEncrypt = function(test) {
-  var payload = new PreloginPayload();
+function assertPayload(payload, encryptionString) {
+  assert.strictEqual(payload.version.major, 0);
+  assert.strictEqual(payload.version.minor, 0);
+  assert.strictEqual(payload.version.patch, 0);
+  assert.strictEqual(payload.version.trivial, 1);
+  assert.strictEqual(payload.version.subbuild, 1);
 
-  assertPayload(test, payload, 'NOT_SUP');
+  assert.strictEqual(payload.encryptionString, encryptionString);
+  assert.strictEqual(payload.instance, 0);
+  assert.strictEqual(payload.threadId, 0);
+  assert.strictEqual(payload.marsString, 'OFF');
+  assert.strictEqual(payload.fedAuthRequired, 1);
+}
 
-  test.done();
-};
+describe('prelogin-payload-assert', function() {
+  it('should not encrypt', function() {
+    const payload = new PreloginPayload();
+    assertPayload(payload, 'NOT_SUP');
+  });
 
-exports.encrypt = function(test) {
-  var payload = new PreloginPayload({ encrypt: true });
+  it('should encrypt', function() {
+    const payload = new PreloginPayload({ encrypt: true });
+    assertPayload(payload, 'ON');
+  });
 
-  assertPayload(test, payload, 'ON');
-
-  test.done();
-};
-
-exports.createFromBuffer = function(test) {
-  var payload = new PreloginPayload();
-  new PreloginPayload(payload.data);
-
-  assertPayload(test, payload, 'NOT_SUP');
-
-  test.done();
-};
-
-var assertPayload = function(test, payload, encryptionString) {
-  test.strictEqual(payload.version.major, 0);
-  test.strictEqual(payload.version.minor, 0);
-  test.strictEqual(payload.version.patch, 0);
-  test.strictEqual(payload.version.trivial, 1);
-  test.strictEqual(payload.version.subbuild, 1);
-
-  test.strictEqual(payload.encryptionString, encryptionString);
-  test.strictEqual(payload.instance, 0);
-  test.strictEqual(payload.threadId, 0);
-  test.strictEqual(payload.marsString, 'OFF');
-};
+  it('should create from buffer', function() {
+    const payload = new PreloginPayload();
+    new PreloginPayload(payload.data);
+    assertPayload(payload, 'NOT_SUP');
+  });
+});

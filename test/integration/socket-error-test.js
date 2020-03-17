@@ -1,10 +1,12 @@
+const fs = require('fs');
+const { assert } = require('chai');
+
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
-const fs = require('fs');
 
 function getConfig() {
   const config = JSON.parse(
-    fs.readFileSync(process.env.HOME + '/.tedious/test-connection.json', 'utf8')
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
   config.options.debug = {
@@ -20,27 +22,77 @@ function getConfig() {
   return config;
 }
 
-exports.socketError = function(test) {
-  const connection = new Connection(getConfig());
+describe('A `error` on the network socket', function() {
+  let connection;
 
-  test.expect(3);
+  beforeEach(function(done) {
+    this.timeout(5000);
 
-  connection.on('connect', function(err) {
-    test.ifError(err);
+    connection = new Connection(getConfig());
+    connection.on('error', done);
+    connection.on('connect', (err) => {
+      connection.removeListener('error', done);
+      done(err);
+    });
+  });
+
+  afterEach(function() {
+    connection.close();
+  });
+
+  it('forwards the error to in-flight requests', function(done) {
+    const socketError = new Error('socket error');
+    connection.on('error', () => {});
 
     const request = new Request('WAITFOR 00:00:30', function(err) {
-      test.ok(~err.message.indexOf('socket error'));
+      assert.strictEqual(err, socketError);
+
+      done();
     });
 
     connection.execSql(request);
-    connection.socket.emit('error', new Error('socket error'));
+    process.nextTick(() => {
+      connection.socket.emit('error', socketError);
+    });
   });
 
-  connection.on('end', function() {
-    test.done();
+  it('calls the request completion callback after closing the connection', function(done) {
+    const socketError = new Error('socket error');
+    connection.on('error', () => {});
+
+    const request = new Request('WAITFOR 00:00:30', function(err) {
+      assert.strictEqual(connection.closed, true);
+
+      done();
+    });
+
+    connection.execSql(request);
+    process.nextTick(() => {
+      connection.socket.emit('error', socketError);
+    });
   });
 
-  connection.on('error', function(err) {
-    test.ok(~err.message.indexOf('socket error'));
+  it('calls the request completion callback before emitting the `end` event', function(done) {
+    const socketError = new Error('socket error');
+    connection.on('error', () => {});
+
+    let endEmitted = false;
+    connection.on('end', () => {
+      endEmitted = true;
+    });
+
+    const request = new Request('WAITFOR 00:00:30', function(err) {
+      assert.strictEqual(endEmitted, false);
+
+      process.nextTick(() => {
+        assert.strictEqual(endEmitted, true);
+        done();
+      });
+    });
+
+    connection.execSql(request);
+    process.nextTick(() => {
+      connection.socket.emit('error', socketError);
+    });
   });
-};
+});
