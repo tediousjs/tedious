@@ -255,6 +255,77 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
+  it('should emit a deprecation message if `trustServerCertificate` is `undefined`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = undefined;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', (error) => {
+      deprecationEmitted = true;
+
+      assert.include(error.message, 'config.options.trustServerCertificate');
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isTrue(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not emit a deprecation message if `trustServerCertificate` is `false`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = false;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', () => {
+      deprecationEmitted = true;
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isFalse(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not emit a deprecation message if `trustServerCertificate` is `true`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = true;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', () => {
+      deprecationEmitted = true;
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isFalse(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
   it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;

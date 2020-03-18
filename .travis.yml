@@ -43,7 +43,8 @@ before_install:
         },
         "options": {
           "port": 1433,
-          "database": "master"
+          "database": "master",
+          "trustServerCertificate": true
         }
       }
     }' > ~/.tedious/test-connection.json
@@ -85,7 +86,8 @@ jobs:
               }
             },
             "options": {
-              "database": "test"
+              "database": "test",
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -108,7 +110,8 @@ jobs:
               }
             },
             "options": {
-              "database": "test"
+              "database": "test",
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
