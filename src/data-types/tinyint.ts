@@ -27,23 +27,16 @@ const TinyInt: DataType = {
   },
 
   validate: function(value): number | null | TypeError {
-    if (value == null) {
+    if (value === null || value === undefined) {
       return null;
     }
 
-    if (typeof value !== 'number') {
-      value = Number(value);
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue) || value < 0 || value > 255) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
-    }
-
-    if (value < 0 || value > 255) {
-      return new TypeError('Value must be between 0 and 255, inclusive.');
-    }
-
-    return value | 0;
+    return numberValue;
   }
 };
 

@@ -41,26 +41,16 @@ const SmallDateTime: DataType = {
     }
   },
 
-<<<<<<< HEAD:src/data-types/smalldatetime.js
-  validate(value) {
+  validate(value): null | Date | TypeError  {
     if (value === undefined || value === null) {
       return null;
     }
 
-    let dateValue;
+    let dateValue: any;
     if (value instanceof Date) {
       dateValue = value;
     } else {
       dateValue = new Date(Date.parse(value));
-=======
-  validate: function(value): null | Date | TypeError {
-    if (value == null) {
-      return null;
-    }
-
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a:src/data-types/smalldatetime.ts
     }
 
     if (isNaN(dateValue)) {

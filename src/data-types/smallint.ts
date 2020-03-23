@@ -26,23 +26,16 @@ const SmallInt: DataType = {
   },
 
   validate: function(value): null | number | TypeError {
-    if (value == null) {
+    if (value === null || value === undefined) {
       return null;
     }
 
-    if (typeof value !== 'number') {
-      value = Number(value);
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue) || value < -32768 || value > 32767) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
-    }
-
-    if (value < -32768 || value > 32767) {
-      return new TypeError('Value must be between -32768 and 32767, inclusive.');
-    }
-
-    return value | 0;
+    return numberValue;
   }
 };
 

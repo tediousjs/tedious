@@ -48,7 +48,7 @@ const BigInt: DataType = {
       return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    return value;
+    return numberValue;
   }
 };
 

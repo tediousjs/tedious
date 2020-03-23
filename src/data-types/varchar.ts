@@ -12,7 +12,7 @@ const VarChar: { maximumLength: number } & DataType = {
   name: 'VarChar',
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     let length;
@@ -33,7 +33,7 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     if (parameter.length != null) {
@@ -111,17 +111,27 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): string | null | TypeError {
-    if (value == null) {
+  validate: function (value, length): string | null | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+
+    if (length) {
+      const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+      if (typeof stringValue !== 'string' || (length <= this.maximumLength && stringValue.length > length)) {
+        return new TypeError(`The given value could not be converted to ${this.name}`);
       }
-      value = value.toString();
+      return stringValue
+    } else {
+      if (typeof value !== 'string') {
+        if (typeof value.toString !== 'function') {
+          return TypeError('Invalid string.');
+        }
+        value = value.toString();
+      }
+
+      return value;
     }
-    return value;
   }
 };
 

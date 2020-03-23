@@ -28,14 +28,10 @@ const Bit: DataType = {
   },
 
   validate: function(value): null | boolean {
-    if (value == null) {
+    if (value == null || value === undefined) {
       return null;
     }
-    if (value) {
-      return true;
-    } else {
-      return false;
-    }
+    return !!value;
   }
 };
 

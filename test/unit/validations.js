@@ -191,19 +191,6 @@ describe('Validations', function() {
     value = TYPE.Decimal.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-<<<<<<< HEAD
-  value = TYPE.Real.validate(4.875);
-  test.strictEqual(value, 4.875);
-
-  value = TYPE.Real.validate('4.875');
-  test.strictEqual(value, 4.875);
-
-  value = TYPE.Real.validate(1516.61556);
-  test.ok(value instanceof TypeError);
-
-  value = TYPE.Real.validate('1516.61556');
-  test.ok(value instanceof TypeError);
-=======
     value = TYPE.Decimal.validate('xxx');
     assert.ok(value instanceof TypeError);
   });
@@ -211,7 +198,6 @@ describe('Validations', function() {
   it('Numeric', () => {
     let value = TYPE.Numeric.validate(null);
     assert.strictEqual(value, null);
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a
 
     value = TYPE.Numeric.validate(1516.61556);
     assert.strictEqual(value, 1516.61556);
@@ -280,19 +266,6 @@ describe('Validations', function() {
     value = TYPE.VarBinary.validate(buffer);
     assert.strictEqual(value, buffer);
 
-<<<<<<< HEAD
-  value = TYPE.Money.validate(214748.3647);
-  test.strictEqual(value, 214748.3647);
-
-  value = TYPE.Money.validate(214748.3648);
-  test.strictEqual(value, 214748.3648);
-
-  value = TYPE.Money.validate(1516.61556);
-  test.ok(value instanceof TypeError);
-
-  value = TYPE.Money.validate('1516.61556');
-  test.ok(value instanceof TypeError);
-=======
     value = TYPE.VarBinary.validate({});
     assert.ok(value instanceof TypeError);
   });
@@ -300,7 +273,6 @@ describe('Validations', function() {
   it('Text', () => {
     let value = TYPE.Text.validate(null);
     assert.strictEqual(value, null);
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a
 
     value = TYPE.Text.validate('asdf');
     assert.strictEqual(value, 'asdf');
@@ -319,19 +291,8 @@ describe('Validations', function() {
     value = TYPE.VarChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-<<<<<<< HEAD
-  value = TYPE.SmallMoney.validate(1516.61556);
-  test.ok(value instanceof TypeError);
-
-  value = TYPE.SmallMoney.validate('1516.61556');
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-=======
     value = TYPE.VarChar.validate(Buffer.from('asdf', 'utf8'));
     assert.strictEqual(value, 'asdf');
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a
 
     value = TYPE.VarChar.validate({ toString: null });
     assert.ok(value instanceof TypeError);
@@ -387,93 +348,7 @@ describe('Validations', function() {
     value = TYPE.TVP.validate(table);
     assert.strictEqual(value, table);
 
-<<<<<<< HEAD
-  value = TYPE.Text.validate({ toString: null });
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-
-exports.VarChar = function(test) {
-  var value = TYPE.VarChar.validate(null);
-  test.strictEqual(value, null);
-
-  value = TYPE.VarChar.validate('asdf');
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.VarChar.validate(new Buffer('asdf', 'utf8'));
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.VarChar.validate({ toString: null });
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-
-exports.NVarChar = function(test) {
-  var value = TYPE.NVarChar.validate(null);
-  test.strictEqual(value, null);
-
-  value = TYPE.NVarChar.validate('asdf');
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.NVarChar.validate(new Buffer('asdf', 'utf8'));
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.NVarChar.validate({ toString: null });
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-
-exports.Char = function(test) {
-  var value = TYPE.Char.validate(null);
-  test.strictEqual(value, null);
-
-  value = TYPE.Char.validate('asdf');
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.Char.validate(new Buffer('asdf', 'utf8'));
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.Char.validate({ toString: null });
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-
-exports.NChar = function(test) {
-  var value = TYPE.NChar.validate(null);
-  test.strictEqual(value, null);
-
-  value = TYPE.NChar.validate('asdf');
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.NChar.validate(new Buffer('asdf', 'utf8'));
-  test.strictEqual(value, 'asdf');
-
-  value = TYPE.NChar.validate({ toString: null });
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-
-exports.TVP = function(test) {
-  var value = TYPE.TVP.validate(null);
-  test.strictEqual(value, null);
-
-  var table = { columns: [], rows: [] };
-  value = TYPE.TVP.validate(table);
-  test.deepEqual(value, table);
-
-  value = TYPE.TVP.validate({});
-  test.ok(value instanceof TypeError);
-
-  test.done();
-};
-=======
     value = TYPE.TVP.validate({});
     assert.ok(value instanceof TypeError);
   });
 });
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a

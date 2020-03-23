@@ -43,19 +43,22 @@ const Date: DataType = {
 
   // TODO: value is techincally of type 'unknown'.
   validate: function(value): null | Date | TypeError {
-    if (value == null) {
+    if (value === undefined || value === null) {
       return null;
     }
 
-    if (!(value instanceof globalDate)) {
-      value = new globalDate(globalDate.parse(value));
+    let dateValue: any;
+    if (value instanceof globalDate) {
+      dateValue = value;
+    } else {
+      dateValue = new globalDate(globalDate.parse(value));
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+    if (isNaN(dateValue)) {
+        return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    return value;
+    return dateValue;
   }
 };
 

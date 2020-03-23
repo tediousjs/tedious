@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+const MAX = 2147483647;
 
 const Text: DataType = {
   id: 0x23,
@@ -45,16 +46,16 @@ const Text: DataType = {
   },
 
   validate: function(value): string | null | TypeError {
-    if (value == null) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
-      }
-      value = value.toString();
+
+    const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+    if (typeof stringValue !== 'string' || stringValue.length > MAX) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return stringValue;
   }
 };
 

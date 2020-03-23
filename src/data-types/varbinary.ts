@@ -12,7 +12,7 @@ const VarBinary: { maximumLength: number } & DataType = {
   name: 'VarBinary',
   maximumLength: 8000,
 
-  declaration: function(parameter) {
+  declaration: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     let length;
     if (parameter.length) {
@@ -32,7 +32,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function(parameter) {
+  resolveLength: function (parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -43,7 +43,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  generateTypeInfo: function(parameter) {
+  generateTypeInfo: function (parameter) {
     const buffer = Buffer.alloc(3);
     buffer.writeUInt8(this.id, 0);
 
@@ -106,13 +106,19 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): Buffer | null | TypeError {
-    if (value == null) {
+  validate: function (value, length): Buffer | null | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
     if (!Buffer.isBuffer(value)) {
       return new TypeError('Invalid buffer.');
     }
+    if (length) {
+      if ((length <= this.maximumLength && value.length > length)) {
+        return new TypeError(`The given value could not be converted to ${this.name}`);
+      }
+    }
+
     return value;
   }
 };

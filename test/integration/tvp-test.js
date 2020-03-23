@@ -27,11 +27,7 @@ function getConfig() {
 describe('calling a procedure that takes and returns a TVP', function() {
   this.timeout(5000);
 
-<<<<<<< HEAD
-  test.expect(14);
-=======
   let connection;
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a
 
   beforeEach(function(done) {
     const config = getConfig();
@@ -42,12 +38,6 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
     connection = new Connection(config);
 
-<<<<<<< HEAD
-  var request4 = new Request('__tediousTvpTest', function(err, rowCount) {
-    test.ifError(err);
-    connection.close();
-  });
-=======
     connection.on(
       'infoMessage',
       function(info) {}
@@ -59,7 +49,6 @@ describe('calling a procedure that takes and returns a TVP', function() {
       function(text) {}
       // console.log(text)
     );
->>>>>>> 2fb901ae41417a1d98dcfdb584e637db9b453f5a
 
     connection.on('connect', done);
   });
