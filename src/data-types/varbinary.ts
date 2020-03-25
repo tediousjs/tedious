@@ -12,7 +12,7 @@ const VarBinary: { maximumLength: number } & DataType = {
   name: 'VarBinary',
   maximumLength: 8000,
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     let length;
     if (parameter.length) {
@@ -32,7 +32,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -43,7 +43,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  generateTypeInfo: function (parameter) {
+  generateTypeInfo: function(parameter) {
     const buffer = Buffer.alloc(3);
     buffer.writeUInt8(this.id, 0);
 
@@ -106,7 +106,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function (value, length): Buffer | null | TypeError {
+  validate: function(value, length): Buffer | null | TypeError {
     if (value === undefined || value === null) {
       return null;
     }

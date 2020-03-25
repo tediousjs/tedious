@@ -28,7 +28,7 @@ const Image: DataType = {
     if (value === null) {
       buffer.writeInt32LE(NULL, 1);
     } else {
-      buffer.writeInt32LE(value.length!, 1);
+      buffer.writeInt32LE(parameter.length!, 1);
     }
     return buffer;
   },

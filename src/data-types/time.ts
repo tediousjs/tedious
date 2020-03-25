@@ -6,11 +6,11 @@ const Time: DataType = {
   type: 'TIMEN',
   name: 'Time',
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     return 'time(' + (this.resolveScale!(parameter)) + ')';
   },
 
-  resolveScale: function (parameter) {
+  resolveScale: function(parameter) {
     if (parameter.scale != null) {
       return parameter.scale;
     } else if (parameter.value === null) {
@@ -27,47 +27,45 @@ const Time: DataType = {
   generateParameterData: function* (parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(16);
-      const value = parameter.value;
-      
-      if (value != null) {
-        let timestamp;
-        if (options.useUTC) {
-          timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
-        } else {
-          timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
-        }
+      const time = parameter.value;
 
-        timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
-        timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
-        timestamp = Math.round(timestamp);
-
-        switch (parameter.scale) {
-          case 0:
-          case 1:
-          case 2:
-            buffer.writeUInt8(3);
-            buffer.writeUInt24LE(timestamp);
-            break;
-          case 3:
-          case 4:
-            buffer.writeUInt8(4);
-            buffer.writeUInt32LE(timestamp);
-            break;
-          case 5:
-          case 6:
-          case 7:
-            buffer.writeUInt8(5);
-            buffer.writeUInt40LE(timestamp);
-        }
-
-        yield buffer.data;
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
       } else {
-        yield Buffer.from([0x00]);
+        timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
       }
+
+      timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
+      timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
+      timestamp = Math.round(timestamp);
+
+      switch (parameter.scale) {
+        case 0:
+        case 1:
+        case 2:
+          buffer.writeUInt8(3);
+          buffer.writeUInt24LE(timestamp);
+          break;
+        case 3:
+        case 4:
+          buffer.writeUInt8(4);
+          buffer.writeUInt32LE(timestamp);
+          break;
+        case 5:
+        case 6:
+        case 7:
+          buffer.writeUInt8(5);
+          buffer.writeUInt40LE(timestamp);
+      }
+
+      yield buffer.data;
+    } else {
+      yield Buffer.from([0x00]);
     }
   },
 
-  validate(value): null | number | TypeError | Date  {
+  validate(value): null | number | TypeError | Date {
     if (value === undefined || value === null) {
       return null;
     }
@@ -84,9 +82,9 @@ const Time: DataType = {
     }
 
     return dateValue;
-  }
-}
 
+  }
+};
 
 
 export default Time;

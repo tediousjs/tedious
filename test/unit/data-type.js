@@ -408,7 +408,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const expected = Buffer.from([0x22, 1, 0, 0, 0]);
 
-      const result = type.generateTypeInfo({ length: 1 });
+      const result = type.generateTypeInfo({ value: undefined, length: 1 });
       assert.deepEqual(result, expected);
     });
   });

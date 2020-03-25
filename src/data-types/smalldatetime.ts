@@ -41,7 +41,7 @@ const SmallDateTime: DataType = {
     }
   },
 
-  validate(value): null | Date | TypeError  {
+  validate(value): null | Date | TypeError {
     if (value === undefined || value === null) {
       return null;
     }

@@ -157,11 +157,17 @@ describe('Validations', function() {
     let value = TYPE.Real.validate(null);
     assert.strictEqual(value, null);
 
+    value = TYPE.Real.validate(4.875);
+    assert.equal(value, 4.875);
+
+    value = TYPE.Real.validate('4.875');
+    assert.equal(value, 4.875);
+
     value = TYPE.Real.validate(1516.61556);
-    assert.strictEqual(value, 1516.61556);
+    assert.ok(value instanceof TypeError);
 
     value = TYPE.Real.validate('1516.61556');
-    assert.strictEqual(value, 1516.61556);
+    assert.ok(value instanceof TypeError);
 
     value = TYPE.Real.validate('xxx');
     assert.ok(value instanceof TypeError);
@@ -213,11 +219,17 @@ describe('Validations', function() {
     let value = TYPE.Money.validate(null);
     assert.strictEqual(value, null);
 
+    value = TYPE.Money.validate(214748.3647);
+    assert.strictEqual(value, 214748.3647);
+
+    value = TYPE.Money.validate(214748.3648);
+    assert.strictEqual(value, 214748.3648);
+
     value = TYPE.Money.validate(1516.61556);
-    assert.strictEqual(value, 1516.61556);
+    assert.ok(value instanceof TypeError);
 
     value = TYPE.Money.validate('1516.61556');
-    assert.strictEqual(value, 1516.61556);
+    assert.ok(value instanceof TypeError);
 
     value = TYPE.Money.validate('xxx');
     assert.ok(value instanceof TypeError);
@@ -231,6 +243,12 @@ describe('Validations', function() {
     assert.strictEqual(value, 214748.3647);
 
     value = TYPE.SmallMoney.validate(214748.3648);
+    assert.ok(value instanceof TypeError);
+
+    value = TYPE.SmallMoney.validate('1516.61556');
+    assert.ok(value instanceof TypeError);
+
+    value = TYPE.SmallMoney.validate(1516.61556);
     assert.ok(value instanceof TypeError);
   });
 
@@ -346,7 +364,7 @@ describe('Validations', function() {
 
     const table = { columns: [], rows: [] };
     value = TYPE.TVP.validate(table);
-    assert.strictEqual(value, table);
+    assert.deepEqual(value, table);
 
     value = TYPE.TVP.validate({});
     assert.ok(value instanceof TypeError);

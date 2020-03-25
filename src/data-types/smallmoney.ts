@@ -14,7 +14,7 @@ const SmallMoney: DataType = {
     return Buffer.from([MoneyN.id, 0x04]);
   },
 
-  generateParameterData: function*(parameter) {
+  generateParameterData: function* (parameter) {
     if (parameter.value != null) {
       const buffer = Buffer.alloc(5);
       buffer.writeUInt8(4, 0);
@@ -35,11 +35,12 @@ const SmallMoney: DataType = {
     } else {
       numberValue = parseFloat(value);
     }
-    if (!Number.isFinite(numberValue) || 
-    numberValue < -214748.3648 || 
-    numberValue > 214748.3647 || 
-    (typeof value === 'string' && value !== numberValue.toString()) || 
-    numberValue.toString().split('.')[1].length <= 4) {
+
+    if (!Number.isFinite(numberValue) ||
+      numberValue < -214748.3648 ||
+      numberValue > 214748.3647 ||
+      (typeof value === 'string' && value !== numberValue.toString()) ||
+      numberValue.toString().split('.')[1].length > 4) {
       return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 

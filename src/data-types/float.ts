@@ -35,7 +35,7 @@ const Float: DataType = {
     } else {
       numberValue = parseFloat(value);
     }
-    
+
     if (!Number.isFinite(numberValue) || (typeof value === 'string' && value !== numberValue.toString())) {
       return new TypeError(`The given value could not be converted to ${this.name}`);
     }

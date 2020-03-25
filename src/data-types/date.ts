@@ -55,7 +55,7 @@ const Date: DataType = {
     }
 
     if (isNaN(dateValue)) {
-        return new TypeError(`The given value could not be converted to ${this.name}`);
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
     return dateValue;

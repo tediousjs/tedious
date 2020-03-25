@@ -9,11 +9,11 @@ const Money: DataType = {
   type: 'MONEY',
   name: 'Money',
 
-  declaration: function () {
+  declaration: function() {
     return 'money';
   },
 
-  generateTypeInfo: function () {
+  generateTypeInfo: function() {
     return Buffer.from([MoneyN.id, 0x08]);
   },
 
@@ -38,11 +38,11 @@ const Money: DataType = {
     }
   },
 
-  validate: function (value): number | null | TypeError {
+  validate: function(value): number | null | TypeError {
     if (value === undefined || value === null) {
       return null;
     }
-    
+
     let numberValue;
     if (typeof value === 'number') {
       numberValue = value;
@@ -52,7 +52,7 @@ const Money: DataType = {
 
     if (!Number.isFinite(numberValue) ||
       (typeof value === 'string' && value !== numberValue.toString()) ||
-      numberValue.toString().split('.')[1].length <= 4) {
+      numberValue.toString().split('.')[1].length > 4) {
       return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 

@@ -66,8 +66,8 @@ const Binary: { maximumLength: number } & DataType = {
       return new TypeError('Invalid buffer.');
     }
 
-    if(length) {
-      if(value.length > length) {
+    if (length) {
+      if (value.length > length) {
         return new TypeError(`The given value could not be converted to ${this.name}`);
       }
     }

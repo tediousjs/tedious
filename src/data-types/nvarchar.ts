@@ -11,7 +11,7 @@ const NVarChar: { maximumLength: number } & DataType = {
   name: 'NVarChar',
   maximumLength: 4000,
 
-  declaration: function (parameter) {
+  declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
     let length;
@@ -32,7 +32,7 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  resolveLength: function (parameter) {
+  resolveLength: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     if (parameter.length != null) {
       return parameter.length;
@@ -121,7 +121,7 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function (value, length): null | string | TypeError {
+  validate: function(value, length): null | string | TypeError {
     if (value === undefined || value === null) {
       return null;
     }

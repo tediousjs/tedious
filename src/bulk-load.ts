@@ -233,10 +233,29 @@ class BulkLoad extends EventEmitter {
 
     // write each column
     if (Array.isArray(row)) {
+      this.columns.map((column, index) => {
+        const data = row[index];
+        try {
+          column.type.validate(data, column.length);
+        } catch (e) {
+          console.log(e);
+          console.debug(e);
+        }
+
+        return null;
+      });
       this.rowToPacketTransform.write(row);
     } else {
       const object = row;
       this.rowToPacketTransform.write(this.columns.map((column) => {
+        const data = object[column.objName];
+        try {
+          column.type.validate(data, column.length);
+        } catch (e) {
+          console.log(e);
+          console.debug(e);
+        }
+
         return object[column.objName];
       }));
     }

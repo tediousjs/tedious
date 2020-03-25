@@ -37,10 +37,10 @@ const UniqueIdentifier: DataType = {
     }
 
     const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
-    if (typeof stringValue !== 'string' || stringValue.length != 36 || !GUID_REGEXP.test(stringValue)) {
+    if (typeof stringValue !== 'string' || stringValue.length !== 36 || !GUID_REGEXP.test(stringValue)) {
       return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    
+
     return stringValue;
   }
 };

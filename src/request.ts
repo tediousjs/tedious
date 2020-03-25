@@ -172,7 +172,7 @@ class Request extends EventEmitter {
   validateParameters() {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
-      const value = parameter.type.validate(parameter.value, parameter.length, parameter.precision, parameter.scale);
+      const value = parameter.type.validate(parameter.value, parameter.length);
 
       if (value instanceof TypeError) {
         return this.error = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + value.message, 'EPARAM');
