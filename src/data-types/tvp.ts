@@ -113,36 +113,12 @@ const TVP: DataType = {
             return new TypeError();
           }
 
-          /*  return {
-            value: column.type.validate(columnValue, column.length, column.scale, column.precision),
-            length: column.length,
-            scale: column.scale,
-            precision: column.precision
-          }; */
           return column.type.validate(columnValue, column.length, column.scale, column.precision);
         });
       })
     };
 
     return result;
-    /*  if (value == null) {
-      return null;
-    }
-
-    if (typeof value !== 'object') {
-      return new TypeError('Invalid table.');
-    }
-
-    if (!Array.isArray(value.columns)) {
-      return new TypeError('Invalid table.');
-    }
-
-    if (!Array.isArray(value.rows)) {
-      return new TypeError('Invalid table.');
-    }
-
-    return value; */
-
   }
 };
 
