@@ -1971,8 +1971,11 @@ class Connection extends EventEmitter {
 
     tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
-      const request = this.request as Request;
-      request.emit('errorMessage', token.name, token.message);
+      if (this.request) {
+        const request = this.request as Request;
+        request.emit('errorMessage', token.name, token.message);
+      }
+
 
       if (this.loggedIn) {
         const request = this.request;
