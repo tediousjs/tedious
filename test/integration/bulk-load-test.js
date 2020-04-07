@@ -106,6 +106,106 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
+  it('should return encrypted table creation', function(done) {
+    const expected = 
+`CREATE TABLE test_always_encrypted (
+[plaintext] nvarchar(50) NULL,
+[nvarchar_determ_test] nvarchar(50) COLLATE Latin1_General_BIN2
+ ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[nvarchar_rand_test] nvarchar(50) COLLATE Latin1_General_BIN2
+ ENCRYPTED WITH (
+          ENCRYPTION_TYPE = RANDOMIZED, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[int_test] int ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[date_test] int ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[datetime_test] int ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[datetime2_test] int ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,
+[datetimeoffset_test] int ENCRYPTED WITH (
+          ENCRYPTION_TYPE = DETERMINISTIC, 
+          ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', 
+          COLUMN_ENCRYPTION_KEY = [CEK1]) NULL
+)`;
+
+    const bulkLoad = connection.newBulkLoad('test_always_encrypted', function(err, rowCount) {
+      if (err) {
+        return done(err);
+      }
+    })
+
+    bulkLoad.addColumn('plaintext', TYPES.NVarChar, {
+      length: 50,
+    })
+
+    bulkLoad.addColumn('nvarchar_determ_test', TYPES.NVarChar, {
+      length: 50,
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      collation: 'Latin1_General_BIN2',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('nvarchar_rand_test', TYPES.NVarChar, {
+      length: 50,
+      encryptionType: 'RANDOMIZED',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      collation: 'Latin1_General_BIN2',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('int_test', TYPES.Int, {
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('date_test', TYPES.Int, {
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('datetime_test', TYPES.Int, {
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('datetime2_test', TYPES.Int, {
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    bulkLoad.addColumn('datetimeoffset_test', TYPES.Int, {
+      encryptionType: 'DETERMINISTIC',
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
+      columnEncryptionKey: 'CEK1',
+    })
+
+    connection.close();
+
+    connection.on('end', () => {
+      assert.equal(bulkLoad.getTableCreationSql(), expected)
+      done();
+    })
+  })
+
   it('should bulkLoadError', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(
       err,
