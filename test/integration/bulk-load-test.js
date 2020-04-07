@@ -107,7 +107,7 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should return encrypted table creation', function(done) {
-    const expected = 
+    const expected =
 `CREATE TABLE test_always_encrypted (
 [plaintext] nvarchar(50) NULL,
 [nvarchar_determ_test] nvarchar(50) COLLATE Latin1_General_BIN2
@@ -146,11 +146,11 @@ describe('Bulk Load Tests', function() {
       if (err) {
         return done(err);
       }
-    })
+    });
 
     bulkLoad.addColumn('plaintext', TYPES.NVarChar, {
       length: 50,
-    })
+    });
 
     bulkLoad.addColumn('nvarchar_determ_test', TYPES.NVarChar, {
       length: 50,
@@ -158,7 +158,7 @@ describe('Bulk Load Tests', function() {
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       collation: 'Latin1_General_BIN2',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('nvarchar_rand_test', TYPES.NVarChar, {
       length: 50,
@@ -166,45 +166,45 @@ describe('Bulk Load Tests', function() {
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       collation: 'Latin1_General_BIN2',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('int_test', TYPES.Int, {
       encryptionType: 'DETERMINISTIC',
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('date_test', TYPES.Int, {
       encryptionType: 'DETERMINISTIC',
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('datetime_test', TYPES.Int, {
       encryptionType: 'DETERMINISTIC',
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('datetime2_test', TYPES.Int, {
       encryptionType: 'DETERMINISTIC',
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     bulkLoad.addColumn('datetimeoffset_test', TYPES.Int, {
       encryptionType: 'DETERMINISTIC',
       algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_256',
       columnEncryptionKey: 'CEK1',
-    })
+    });
 
     connection.close();
 
     connection.on('end', () => {
-      assert.equal(bulkLoad.getTableCreationSql(), expected)
+      assert.equal(bulkLoad.getTableCreationSql(), expected);
       done();
-    })
-  })
+    });
+  });
 
   it('should bulkLoadError', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(

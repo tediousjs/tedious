@@ -62,10 +62,10 @@ type ColumnOptions = {
   objName?: string;
   nullable?: boolean;
   // For AE Feature:
-  collation?: string,
-  encryptionType?: string, // Deterministic or Random
-  algorithm?: string, // E.g., 'AEAD_AES_256_CBC_HMAC_SHA_256'
-  columnEncryptionKey?: string // E.g., CEK1
+  collation?: string;
+  encryptionType?: string; // Deterministic or Random
+  algorithm?: string; // E.g., 'AEAD_AES_256_CBC_HMAC_SHA_256'
+  columnEncryptionKey?: string; // E.g., CEK1
 };
 
 // A transform that converts rows to packets.
@@ -187,13 +187,13 @@ class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name: string, type: DataType, { 
-    output = false, 
-    length, 
-    precision, 
-    scale, 
-    objName = name, 
-    nullable = true, 
+  addColumn(name: string, type: DataType, {
+    output = false,
+    length,
+    precision,
+    scale,
+    objName = name,
+    nullable = true,
     collation,
     encryptionType,
     algorithm,
@@ -207,20 +207,20 @@ class BulkLoad extends EventEmitter {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
 
-    const column = { 
-      type, 
-      name, 
+    const column = {
+      type,
+      name,
       value: null,
-      output, 
-      length, 
-      precision, 
-      scale, 
-      objName, 
+      output,
+      length,
+      precision,
+      scale,
+      objName,
       nullable,
-      // Encryption options: 
-      collation, 
-      encryptionType, 
-      algorithm, 
+      // Encryption options:
+      collation,
+      encryptionType,
+      algorithm,
       columnEncryptionKey };
 
     if ((type.id & 0x30) === 0x20) {
@@ -314,15 +314,15 @@ class BulkLoad extends EventEmitter {
       }
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
 
-      if(c.collation) {
+      if (c.collation) {
         sql += ` COLLATE ${c.collation}\n`;
       }
 
-      if(c.encryptionType) {
+      if (c.encryptionType) {
         sql += ` ENCRYPTED WITH (
           ENCRYPTION_TYPE = ${c.encryptionType}, 
           ALGORITHM = '${c.algorithm}', 
-          COLUMN_ENCRYPTION_KEY = [${c.columnEncryptionKey}])`
+          COLUMN_ENCRYPTION_KEY = [${c.columnEncryptionKey}])`;
       }
 
       if (c.nullable !== undefined) {
