@@ -227,6 +227,77 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
+  it('should emit a deprecation message if `trustServerCertificate` is `undefined`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = undefined;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', (error) => {
+      deprecationEmitted = true;
+
+      assert.include(error.message, 'config.options.trustServerCertificate');
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isTrue(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not emit a deprecation message if `trustServerCertificate` is `false`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = false;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', () => {
+      deprecationEmitted = true;
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isFalse(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not emit a deprecation message if `trustServerCertificate` is `true`', function(done) {
+    const config = getConfig();
+    config.options.trustServerCertificate = true;
+
+    let deprecationEmitted = false;
+
+    process.once('deprecation', () => {
+      deprecationEmitted = true;
+    });
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      assert.isFalse(deprecationEmitted);
+
+      if (err) {
+        return done();
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
   it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
@@ -356,6 +427,45 @@ describe('Encrypt Test', function() {
     return connection.on('debug', function(text) {
       // console.log(text)
     });
+  });
+});
+
+describe('BeginTransaction Tests', function() {
+  let connection;
+  beforeEach(function(done) {
+    const config = getConfig();
+    connection = new Connection(config);
+    connection.on('connect', done);
+  });
+
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
+    } else {
+      done();
+    }
+  });
+
+  it('should validate isolation level is a number', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 'some string');
+    }, TypeError, 'The "isolationLevel" argument must be of type number. Received type string (some string)');
+  });
+
+  it('should validate isolation level is an integer', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 2.3);
+    }, RangeError, 'The value of "isolationLevel" is out of range. It must be an integer. Received: 2.3');
+  });
+
+  it('should validate isolation level is a valid isolation level value', function() {
+    assert.throws(() => {
+      const callback = () => { assert.fail('callback should not be executed'); };
+      connection.beginTransaction(callback, 'test', 9);
+    }, RangeError, 'The value of "isolationLevel" is out of range. It must be >= 0 && <= 5. Received: 9');
   });
 });
 
