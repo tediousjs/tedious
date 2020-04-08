@@ -50,7 +50,7 @@ export interface Options {
 
 export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
-type Column = Parameter & {
+type Column = Parameter & ColumnOptions & {
   objName: string;
 };
 
@@ -61,6 +61,11 @@ type ColumnOptions = {
   scale?: number;
   objName?: string;
   nullable?: boolean;
+  // For AE Feature:
+  collation?: string;
+  encryptionType?: string; // Deterministic or Random
+  algorithm?: string; // E.g., 'AEAD_AES_256_CBC_HMAC_SHA_256'
+  columnEncryptionKey?: string; // E.g., CEK1
 };
 
 // A transform that converts rows to packets.
@@ -182,7 +187,19 @@ class BulkLoad extends EventEmitter {
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
-  addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
+  addColumn(name: string, type: DataType, {
+    output = false,
+    length,
+    precision,
+    scale,
+    objName = name,
+    nullable = true,
+    collation,
+    encryptionType,
+    algorithm,
+    columnEncryptionKey
+
+  }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
     }
@@ -191,16 +208,20 @@ class BulkLoad extends EventEmitter {
     }
 
     const column = {
-      type: type,
-      name: name,
+      type,
+      name,
       value: null,
-      output: output,
-      length: length,
-      precision: precision,
-      scale: scale,
-      objName: objName,
-      nullable: nullable
-    };
+      output,
+      length,
+      precision,
+      scale,
+      objName,
+      nullable,
+      // Encryption options:
+      collation,
+      encryptionType,
+      algorithm,
+      columnEncryptionKey };
 
     if ((type.id & 0x30) === 0x20) {
       if (column.length == null && type.resolveLength) {
@@ -268,7 +289,7 @@ class BulkLoad extends EventEmitter {
     }
   }
 
-  getBulkInsertSql() {
+  getBulkInsertSql(): string {
     let sql = 'insert bulk ' + this.table + '(';
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
@@ -283,14 +304,27 @@ class BulkLoad extends EventEmitter {
     return sql;
   }
 
-  getTableCreationSql() {
-    let sql = 'CREATE TABLE ' + this.table + '(\n';
+  getTableCreationSql(): string {
+    let sql = 'CREATE TABLE ' + this.table + ' (\n';
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
+
       if (i !== 0) {
         sql += ',\n';
       }
       sql += '[' + c.name + '] ' + (c.type.declaration(c));
+
+      if (c.collation) {
+        sql += ` COLLATE ${c.collation}\n`;
+      }
+
+      if (c.encryptionType) {
+        sql += ` ENCRYPTED WITH (
+          ENCRYPTION_TYPE = ${c.encryptionType}, 
+          ALGORITHM = '${c.algorithm}', 
+          COLUMN_ENCRYPTION_KEY = [${c.columnEncryptionKey}])`;
+      }
+
       if (c.nullable !== undefined) {
         sql += ' ' + (c.nullable ? 'NULL' : 'NOT NULL');
       }
