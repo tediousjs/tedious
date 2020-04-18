@@ -42,7 +42,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
         timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
       }
       timestamp = timestamp * Math.pow(10, scale - 3);
-      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp += (value.nanosecondsDelta != null ? value.nanosecondsDelta : 0) * Math.pow(10, scale);
       timestamp = Math.round(timestamp);
 
       switch (scale) {
