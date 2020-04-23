@@ -2095,7 +2095,11 @@ class Connection extends EventEmitter {
           }
         });
 
-        Readable.from(payload!).pipe(message);
+        const readable = Readable.from(payload!);
+        readable.on('error', (e) => {
+          request.callback(e);
+        });
+        readable.pipe(message);
       }
     }
   }
