@@ -225,6 +225,55 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
+  it('should allow connecting by calling `.connect` on the returned connection', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not allow calling `.connect` on a connected connection', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      process.nextTick(() => {
+        connection.close();
+      });
+
+      assert.throws(() => {
+        connection.connect();
+      }, '`.connect` can not be called on a Connection in `LoggedIn` state.');
+    });
+  });
+
+  it('should allow calling `.connect` without a callback', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+    connection.connect();
+  });
+
   it('should emit a deprecation message if `trustServerCertificate` is `undefined`', function(done) {
     const config = getConfig();
     config.options.trustServerCertificate = undefined;
