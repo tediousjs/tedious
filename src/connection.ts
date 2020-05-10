@@ -204,7 +204,7 @@ interface State {
   };
 }
 
-interface ConnectionConfiguration {
+export interface ConnectionConfiguration {
   server: string;
   options?: ConnectionOptions;
   authentication?: {
@@ -290,6 +290,7 @@ class Connection extends EventEmitter {
   ntlmpacketBuffer: undefined | Buffer;
 
   STATE!: {
+    INITIALIZED: State;
     CONNECTING: State;
     SENT_PRELOGIN: State;
     REROUTING: State;
@@ -979,8 +980,31 @@ class Connection extends EventEmitter {
     this.curTransientRetryCount = 0;
     this.transientErrorLookup = new TransientErrorLookup();
 
-    this.state = this.STATE.CONNECTING;
-    this.state.enter!.call(this);
+    this.state = this.STATE.INITIALIZED;
+
+    process.nextTick(() => {
+      if (this.state === this.STATE.INITIALIZED) {
+        const message = 'In the next major version of `tedious`, creating a new ' +
+          '`Connection` instance will no longer establish a connection to the ' +
+          'server automatically. Please use the new `connect` helper function or ' +
+          'call the `.connect` method on the newly created `Connection` object to ' +
+          'silence this message.';
+        deprecate(message);
+        this.connect();
+      }
+    });
+  }
+
+  connect(connectListener?: (err?: Error) => void) {
+    if (this.state !== this.STATE.INITIALIZED) {
+      throw new ConnectionError('`.connect` can not be called on a Connection in `' + this.state.name + '` state.');
+    }
+
+    if (connectListener) {
+      this.once('connect', connectListener);
+    }
+
+    this.transitionTo(this.STATE.CONNECTING);
   }
 
   close() {
@@ -988,8 +1012,27 @@ class Connection extends EventEmitter {
   }
 
   initialiseConnection() {
-    this.connect();
     this.createConnectTimer();
+
+    if (this.config.options.port) {
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
+    } else {
+      return new InstanceLookup().instanceLookup({
+        server: this.config.server,
+        instanceName: this.config.options.instanceName!,
+        timeout: this.config.options.connectTimeout
+      }, (message, port) => {
+        if (this.state === this.STATE.FINAL) {
+          return;
+        }
+
+        if (message) {
+          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+        } else {
+          this.connectOnPort(port!, this.config.options.multiSubnetFailover);
+        }
+      });
+    }
   }
 
   cleanupConnection(cleanupType: typeof CLEANUP_TYPE[keyof typeof CLEANUP_TYPE]) {
@@ -1299,28 +1342,6 @@ class Connection extends EventEmitter {
     });
 
     return tokenStreamParser;
-  }
-
-  connect() {
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
-    } else {
-      return new InstanceLookup().instanceLookup({
-        server: this.config.server,
-        instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout
-      }, (message, port) => {
-        if (this.state === this.STATE.FINAL) {
-          return;
-        }
-
-        if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover);
-        }
-      });
-    }
   }
 
   connectOnPort(port: number, multiSubnetFailover: boolean) {
@@ -2128,6 +2149,10 @@ export default Connection;
 module.exports = Connection;
 
 Connection.prototype.STATE = {
+  INITIALIZED: {
+    name: 'Initialized',
+    events: {}
+  },
   CONNECTING: {
     name: 'Connecting',
     enter: function() {
