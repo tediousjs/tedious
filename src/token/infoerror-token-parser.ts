@@ -1,5 +1,4 @@
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
 import { InternalConnectionOptions } from '../connection';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';
@@ -43,13 +42,13 @@ function parseToken(parser: Parser, options: InternalConnectionOptions, callback
   });
 }
 
-export function infoParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: InfoMessageToken) => void) {
+export function infoParser(parser: Parser, options: InternalConnectionOptions, callback: (token: InfoMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new InfoMessageToken(data));
   });
 }
 
-export function errorParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ErrorMessageToken) => void) {
+export function errorParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ErrorMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new ErrorMessageToken(data));
   });

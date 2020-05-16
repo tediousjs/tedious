@@ -78,7 +78,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
