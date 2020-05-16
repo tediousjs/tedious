@@ -1192,20 +1192,20 @@ class Connection extends EventEmitter {
       const request = this.request;
       if (request) {
         if (!request.canceled) {
-          let columns: any;
           if (this.config.options.useColumnNames) {
-            columns = {} as { [key: string]: ColumnMetadata };
+            const columnsByColumnName: { [key: string]: ColumnMetadata } = {};
 
             for (let j = 0, len = token.columns.length; j < len; j++) {
               const col = token.columns[j];
-              if (columns[col.colName] == null) {
-                columns[col.colName] = col;
+              if (columnsByColumnName[col.colName] == null) {
+                columnsByColumnName[col.colName] = col;
               }
             }
+
+            request.emit('columnMetadata', columnsByColumnName);
           } else {
-            columns = token.columns as ColumnMetadata[];
+            request.emit('columnMetadata', token.columns);
           }
-          request.emit('columnMetadata', columns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
