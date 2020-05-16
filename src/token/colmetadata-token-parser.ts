@@ -7,7 +7,6 @@ import { ColMetadataToken } from './token';
 export type ColumnMetadata = Metadata & {
   colName: string;
   tableName?: string | string[];
-  typeName?: string;
 };
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
@@ -79,7 +78,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-export default function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
@@ -102,3 +101,6 @@ export default function colMetadataParser(parser: Parser, _colMetadata: ColumnMe
     });
   });
 }
+
+export default colMetadataParser;
+module.exports = colMetadataParser;
