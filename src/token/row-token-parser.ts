@@ -13,7 +13,7 @@ type Column = {
   metadata: ColumnMetadata;
 };
 
-function rowParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
   const columns: Column[] = [];
 
   const len = parser.colMetadata.length;

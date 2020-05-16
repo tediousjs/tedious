@@ -17,8 +17,9 @@ type Column = {
   metadata: ColumnMetadata;
 };
 
-function nbcRowParser(parser: Parser, _columnsMetaData: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
+function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
   const length = Math.ceil(parser.colMetadata.length / 8);
+
   parser.readBuffer(length, (bytes) => {
     const bitmap: boolean[] = [];
 

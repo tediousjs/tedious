@@ -148,15 +148,13 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, colMetadata: ColumnMetadata[], options: InternalConnectionOptions) {
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     super({ objectMode: true });
 
     this.debug = debug;
     this.internalColMetadata = [];
     this.externalColMetadata = [];
-    if (colMetadata) {
-      this.colMetadata = colMetadata;
-    }
+
     this.options = options;
     this.endOfMessageMarker = new EndOfMessageMarker();
 
@@ -225,7 +223,7 @@ class Parser extends Transform {
       this.position += 1;
 
       if (tokenParsers[type]) {
-        tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
+        tokenParsers[type](this, this.options, doneParsing);
       } else {
         this.emit('error', new Error('Unknown type: ' + type));
       }
