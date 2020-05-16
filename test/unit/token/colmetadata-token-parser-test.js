@@ -20,7 +20,7 @@ describe('Colmetadata Token Parser', function() {
     buffer.writeBVarchar(columnName);
     // console.log(buffer.data)
 
-    const parser = new TokenStreamParser({ token() { } }, [], {});
+    const parser = new TokenStreamParser({ token() { } }, {});
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
@@ -53,7 +53,7 @@ describe('Colmetadata Token Parser', function() {
     buffer.writeBVarchar(columnName);
     // console.log(buffer)
 
-    const parser = new TokenStreamParser({ token() { } }, [], {});
+    const parser = new TokenStreamParser({ token() { } }, {});
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)

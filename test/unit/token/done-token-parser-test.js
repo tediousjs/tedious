@@ -14,7 +14,7 @@ function parse(status, curCmd, doneRowCount) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  var parser = new Parser({ token() { } }, [], { tdsVersion: '7_2' });
+  var parser = new Parser({ token() { } }, { tdsVersion: '7_2' });
   parser.write(buffer.data);
   return parser.read();
 }
