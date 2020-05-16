@@ -1,5 +1,4 @@
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
 import { InternalConnectionOptions } from '../connection';
 
 import { LoginAckToken } from './token';
@@ -11,7 +10,7 @@ const interfaceTypes: { [key: number]: string } = {
   1: 'SQL_TSQL'
 };
 
-function loginAckParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: InternalConnectionOptions, callback: (token: LoginAckToken) => void) {
+function loginAckParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: LoginAckToken) => void) {
   // length
   parser.readUInt16LE(() => {
     parser.readUInt8((interfaceNumber) => {
