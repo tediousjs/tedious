@@ -30,7 +30,7 @@ describe('Loginack Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+    const parser = new Parser({ token() { } }, [], { tdsVersion: '7_2' });
     parser.write(data);
     const token = parser.read();
 

@@ -15,7 +15,7 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+    const parser = new Parser({ token() { } }, [], { tdsVersion: '7_2' });
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
@@ -38,7 +38,7 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column2);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+    const parser = new Parser({ token() { } }, [], { tdsVersion: '7_2' });
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)

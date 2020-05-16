@@ -22,7 +22,7 @@ describe('Feature Ext Praser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, [], {});
     parser.write(buffer.data);
 
     const token = parser.read();

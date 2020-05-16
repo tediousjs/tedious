@@ -17,7 +17,7 @@ describe('Fedauth Info Parser', () => {
     buffer.writeString('spn');
     buffer.writeString('stsurl');
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, [], {});
     parser.write(buffer.data);
     const token = parser.read();
 
