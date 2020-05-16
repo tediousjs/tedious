@@ -1071,7 +1071,7 @@ class Connection extends EventEmitter {
   }
 
   createTokenStreamParser() {
-    const tokenStreamParser = new TokenStreamParser(this.debug, undefined, this.config.options);
+    const tokenStreamParser = new TokenStreamParser(this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
       this.emit('infoMessage', token);
