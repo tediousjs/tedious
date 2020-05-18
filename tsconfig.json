@@ -12,6 +12,7 @@
   },
 
   "include": [
-    "src/**/*.ts", "src/data-types/bitn.js", "src/data-types/bit.js"
+    "src/**/*.ts",
+    "test/**/*.ts",
   ]
 }
