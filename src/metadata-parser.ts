@@ -10,7 +10,7 @@ type Collation = {
   flags: number;
   version: number;
   sortId: number;
-  codepage: string;
+  codepage: string | undefined;
 };
 
 type XmlSchema = {
