@@ -1,6 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
-const WriteBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import { assert } from 'chai';
+
+import Parser from '../../../src/token/stream-parser';
+import WriteBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+import Debug from '../../../src/debug';
 
 describe('sspi token parser', () => {
   it('should parse challenge', () => {
@@ -22,7 +25,7 @@ describe('sspi token parser', () => {
     source.writeString('domain', 'ucs2'); // domain
     source.writeInt32BE(11259375); // target == 'abcdef'
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser(new Debug(), new InternalConnectionOptions());
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
     parser.write(data);

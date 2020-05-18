@@ -1,6 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import { assert } from 'chai';
+
+import Parser from '../../../src/token/stream-parser';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+import Debug from '../../../src/debug';
 
 describe('Loginack Token Parser', () => {
   it('should have correct info', () => {
@@ -30,7 +33,7 @@ describe('Loginack Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+    const parser = new Parser(new Debug(), new InternalConnectionOptions({ tdsVersion: '7_2' }));
     parser.write(data);
     const token = parser.read();
 

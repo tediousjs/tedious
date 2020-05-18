@@ -1,6 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import { assert } from 'chai';
+
+import Parser from '../../../src/token/stream-parser';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
+import { InternalConnectionOptions } from '../../../src/connection-options';
 
 describe('Feature Ext Praser', () => {
   it('should be fed authentication', () => {
@@ -22,7 +25,7 @@ describe('Feature Ext Praser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser(new Debug(), new InternalConnectionOptions());
     parser.write(buffer.data);
 
     const token = parser.read();

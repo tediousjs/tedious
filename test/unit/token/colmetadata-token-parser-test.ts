@@ -1,7 +1,9 @@
-const dataTypeByName = require('../../../src/data-type').typeByName;
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const TokenStreamParser = require('../../../src/token/stream-parser');
-const assert = require('chai').assert;
+import { typeByName as dataTypeByName } from '../../../src/data-type';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import TokenStreamParser from '../../../src/token/stream-parser';
+import { assert } from 'chai';
+import Debug from '../../../src/debug';
+import { InternalConnectionOptions } from '../../../src/connection-options';
 
 describe('Colmetadata Token Parser', () => {
   it('should int', () => {
@@ -20,7 +22,7 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer.data)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
+    const parser = new TokenStreamParser(new Debug(), new InternalConnectionOptions());
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
@@ -53,7 +55,7 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
+    const parser = new TokenStreamParser(new Debug(), new InternalConnectionOptions());
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)

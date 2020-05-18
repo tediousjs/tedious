@@ -1,12 +1,14 @@
-const Parser = require('../../../src/token/stream-parser');
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import Parser from '../../../src/token/stream-parser';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { assert } from 'chai';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+import Debug from '../../../src/debug';
 
-function parse(status, curCmd, doneRowCount) {
-  var doneRowCountLow = doneRowCount % 0x100000000;
-  var doneRowCountHi = ~~(doneRowCount / 0x100000000);
+function parse(status: number, curCmd: number, doneRowCount: number) {
+  const doneRowCountLow = doneRowCount % 0x100000000;
+  const doneRowCountHi = ~~(doneRowCount / 0x100000000);
 
-  var buffer = new WritableTrackingBuffer(50, 'ucs2');
+  const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
   buffer.writeUInt8(0xfd);
   buffer.writeUInt16LE(status);
@@ -14,7 +16,7 @@ function parse(status, curCmd, doneRowCount) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  var parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+  const parser = new Parser(new Debug(), new InternalConnectionOptions({ tdsVersion: '7_2' }));
   parser.write(buffer.data);
   return parser.read();
 }

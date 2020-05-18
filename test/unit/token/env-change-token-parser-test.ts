@@ -1,6 +1,8 @@
-const Parser = require('../../../src/token/stream-parser');
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import Parser from '../../../src/token/stream-parser';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { assert } from 'chai';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+import Debug from '../../../src/debug';
 
 describe('Env Change Token Parser', () => {
   it('should write to database', () => {
@@ -18,7 +20,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser(new Debug(), new InternalConnectionOptions());
     parser.write(data);
     const token = parser.read();
 
@@ -42,7 +44,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser(new Debug(), new InternalConnectionOptions());
     parser.write(data);
     const token = parser.read();
 
@@ -61,7 +63,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser(new Debug(), new InternalConnectionOptions());
     parser.write(data);
     const token = parser.read();
 

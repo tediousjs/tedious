@@ -1,15 +1,19 @@
-const assert = require('chai').assert;
-const MoneyN = require('../../../src/data-types/moneyn');
-const Money = require('../../../src/data-types/money');
-const SmallMoney = require('../../../src/data-types/smallmoney');
-const IntN = require('../../../src/data-types/intn');
-const FloatN = require('../../../src/data-types/floatn');
-const DateTimeN = require('../../../src/data-types/datetimen');
-const NumericN = require('../../../src/data-types/numericn');
+import { assert } from 'chai';
 
-const Parser = require('../../../src/token/stream-parser');
-const dataTypeByName = require('../../../src/data-type').typeByName;
-const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
+import MoneyN from '../../../src/data-types/moneyn';
+import Money from '../../../src/data-types/money';
+import SmallMoney from '../../../src/data-types/smallmoney';
+import IntN from '../../../src/data-types/intn';
+import FloatN from '../../../src/data-types/floatn';
+import DateTimeN from '../../../src/data-types/datetimen';
+import NumericN from '../../../src/data-types/numericn';
+
+import Parser from '../../../src/token/stream-parser';
+import { typeByName as dataTypeByName } from '../../../src/data-type';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+
 const options = {
   useUTC: false,
   tdsVersion: '7_2'
@@ -17,14 +21,16 @@ const options = {
 
 describe('Row Token Parser', () => {
   it('should write int', () => {
-    const colMetadata = [{ type: dataTypeByName.Int }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.Int, userType: 0, flags: 0 }
+    ];
     const value = 3;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
 
     parser.write(buffer.data);
@@ -37,8 +43,8 @@ describe('Row Token Parser', () => {
 
   it('should write bigint', () => {
     const colMetadata = [
-      { type: dataTypeByName.BigInt },
-      { type: dataTypeByName.BigInt }
+      { colName: 'first', type: dataTypeByName.BigInt, userType: 0, flags: 0 },
+      { colName: 'second', type: dataTypeByName.BigInt, userType: 0, flags: 0 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -47,7 +53,7 @@ describe('Row Token Parser', () => {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
 
     parser.write(buffer.data);
@@ -60,14 +66,16 @@ describe('Row Token Parser', () => {
   });
 
   it('should write real', () => {
-    const colMetadata = [{ type: dataTypeByName.Real }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.Real, userType: 0, flags: 0 }
+    ];
     const value = 9.5;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -79,7 +87,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write float', () => {
-    const colMetadata = [{ type: dataTypeByName.Float }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.Float, userType: 0, flags: 0 }
+    ];
     const value = 9.5;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -88,7 +98,7 @@ describe('Row Token Parser', () => {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -101,12 +111,12 @@ describe('Row Token Parser', () => {
 
   it('should write Money', () => {
     const colMetadata = [
-      { type: SmallMoney },
-      { type: Money },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN }
+      { colName: '1', type: SmallMoney, userType: 0, flags: 0 },
+      { colName: '2', type: Money, userType: 0, flags: 0 },
+      { colName: '3', type: MoneyN, userType: 0, flags: 0 },
+      { colName: '4', type: MoneyN, userType: 0, flags: 0 },
+      { colName: '5', type: MoneyN, userType: 0, flags: 0 },
+      { colName: '6', type: MoneyN, userType: 0, flags: 0 }
     ];
     const value = 123.456;
     const valueLarge = 123456789012345.11;
@@ -126,7 +136,7 @@ describe('Row Token Parser', () => {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -144,9 +154,16 @@ describe('Row Token Parser', () => {
   it('should write varchar without code page', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
+        userType: 0,
+        flags: 0,
         collation: {
-          codepage: undefined
+          codepage: undefined,
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
         }
       }
     ];
@@ -157,7 +174,7 @@ describe('Row Token Parser', () => {
     buffer.writeUsVarchar(value);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -171,9 +188,16 @@ describe('Row Token Parser', () => {
   it('should write varchar with code page', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
+        userType: 0,
+        flags: 0,
         collation: {
-          codepage: 'WINDOWS-1252'
+          codepage: 'WINDOWS-1252',
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
         }
       }
     ];
@@ -184,7 +208,7 @@ describe('Row Token Parser', () => {
     buffer.writeUsVarchar(value);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -196,7 +220,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write nvarchar', () => {
-    const colMetadata = [{ type: dataTypeByName.NVarChar }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.NVarChar, userType: 0, flags: 0 }
+    ];
     const value = 'abc';
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -205,7 +231,7 @@ describe('Row Token Parser', () => {
     buffer.writeString(value);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -217,7 +243,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varBinary', () => {
-    const colMetadata = [{ type: dataTypeByName.VarBinary }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.VarBinary, userType: 0, flags: 0 }
+    ];
     const value = Buffer.from([0x12, 0x34]);
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -226,7 +254,7 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -238,7 +266,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write binary', () => {
-    const colMetadata = [{ type: dataTypeByName.Binary }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.Binary, userType: 0, flags: 0 }
+    ];
     const value = Buffer.from([0x12, 0x34]);
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -247,7 +277,7 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -261,11 +291,18 @@ describe('Row Token Parser', () => {
   it('should write varcharMaxNull', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
         dataLength: 65535,
         collation: {
-          codepage: undefined
-        }
+          codepage: undefined,
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
+        },
+        userType: 0,
+        flags: 0
       }
     ];
 
@@ -276,7 +313,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -290,11 +327,18 @@ describe('Row Token Parser', () => {
   it('should write varcharMaxUnkownLength', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
         dataLength: 65535,
         collation: {
-          codepage: undefined
-        }
+          codepage: undefined,
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
+        },
+        userType: 0,
+        flags: 0
       }
     ];
     const value = 'abcdef';
@@ -311,7 +355,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -325,11 +369,18 @@ describe('Row Token Parser', () => {
   it('should write varcharMaxKnownLength', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
         dataLength: 65535,
         collation: {
-          codepage: undefined
-        }
+          codepage: undefined,
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
+        },
+        userType: 0,
+        flags: 0
       }
     ];
     const value = 'abcdef';
@@ -344,7 +395,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -358,11 +409,18 @@ describe('Row Token Parser', () => {
   it('should write varcharmaxWithCodePage', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
         dataLength: 65535,
         collation: {
-          codepage: 'WINDOWS-1252'
-        }
+          codepage: 'WINDOWS-1252',
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
+        },
+        userType: 0,
+        flags: 0
       }
     ];
     const value = 'abcdéf';
@@ -377,7 +435,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -391,8 +449,18 @@ describe('Row Token Parser', () => {
   it('should write varcharMaxKnownLengthWrong', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarChar,
-        dataLength: 65535
+        dataLength: 65535,
+        collation: {
+          codepage: undefined,
+          lcid: 0,
+          flags: 0,
+          version: 0,
+          sortId: 0
+        },
+        userType: 0,
+        flags: 0
       }
     ];
     const value = 'abcdef';
@@ -407,22 +475,29 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    try {
-      const parser = new Parser({ token() { } }, options);
-      parser.colMetadata = colMetadata;
-      parser.write(buffer.data);
-      parser.read();
-      assert.isOk(false);
-    } catch {
-      // ???
-    }
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
+    parser.colMetadata = colMetadata;
+
+    let raisedError: Error | undefined;
+    parser.on('error', (err: Error) => {
+      raisedError = err;
+    });
+
+    parser.write(buffer.data);
+    parser.read();
+
+    assert.isOk(raisedError);
+    assert.strictEqual(raisedError!.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
   });
 
   it('should write varBinaryMaxNull', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarBinary,
-        dataLength: 65535
+        dataLength: 65535,
+        userType: 0,
+        flags: 0
       }
     ];
 
@@ -433,7 +508,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -447,8 +522,11 @@ describe('Row Token Parser', () => {
   it('should write varBinaryMaxUnknownLength', () => {
     const colMetadata = [
       {
+        colName: 'example',
         type: dataTypeByName.VarBinary,
-        dataLength: 65535
+        dataLength: 65535,
+        userType: 0,
+        flags: 0
       }
     ];
     const value = Buffer.from([0x12, 0x34, 0x56, 0x78]);
@@ -465,7 +543,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -478,18 +556,18 @@ describe('Row Token Parser', () => {
 
   it('should write intN', () => {
     const colMetadata = [
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN }
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 },
+      { colName: '', type: IntN, userType: 0, flags: 0 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -600,7 +678,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -623,8 +701,8 @@ describe('Row Token Parser', () => {
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', () => {
     const colMetadata = [
-      { type: dataTypeByName.UniqueIdentifier },
-      { type: dataTypeByName.UniqueIdentifier }
+      { colName: 'first', type: dataTypeByName.UniqueIdentifier, userType: 0, flags: 0 },
+      { colName: 'second', type: dataTypeByName.UniqueIdentifier, userType: 0, flags: 0 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -653,10 +731,10 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() {} }, Object.assign({ lowerCaseGuids: false }, options));
+    const parser = new Parser(new Debug(), new InternalConnectionOptions({ ...options, lowerCaseGuids: false }));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
-    var token = parser.read();
+    const token = parser.read();
     // console.log(token)
 
     assert.strictEqual(token.columns.length, 2);
@@ -668,12 +746,12 @@ describe('Row Token Parser', () => {
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', () => {
-    var colMetadata = [
-      { type: dataTypeByName.UniqueIdentifier },
-      { type: dataTypeByName.UniqueIdentifier }
+    const colMetadata = [
+      { colName: 'first', type: dataTypeByName.UniqueIdentifier, userType: 0, flags: 0 },
+      { colName: 'second', type: dataTypeByName.UniqueIdentifier, userType: 0, flags: 0 }
     ];
 
-    var buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([
@@ -698,7 +776,7 @@ describe('Row Token Parser', () => {
       ])
     );
     // console.log(buffer.data)
-    const parser = new Parser({ token() {} }, Object.assign({ lowerCaseGuids: true }, options));
+    const parser = new Parser(new Debug(), new InternalConnectionOptions({ ...options, lowerCaseGuids: true }));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -714,9 +792,9 @@ describe('Row Token Parser', () => {
 
   it('should write floatN', () => {
     const colMetadata = [
-      { type: FloatN },
-      { type: FloatN },
-      { type: FloatN }
+      { colName: 'example1', type: FloatN, userType: 0, flags: 0 },
+      { colName: 'example2', type: FloatN, userType: 0, flags: 0 },
+      { colName: 'example3', type: FloatN, userType: 0, flags: 0 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -742,7 +820,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -755,7 +833,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write datetime', () => {
-    const colMetadata = [{ type: dataTypeByName.DateTime }];
+    const colMetadata = [
+      { colName: 'example', type: dataTypeByName.DateTime, userType: 0, flags: 0 }
+    ];
 
     const days = 2; // 3rd January 1900
     const threeHundredthsOfSecond = 45 * 300; // 45 seconds
@@ -767,7 +847,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(threeHundredthsOfSecond);
     // console.log(buffer)
 
-    let parser = new Parser({ token() { } }, { useUTC: false });
+    let parser = new Parser(new Debug(), new InternalConnectionOptions({ useUTC: false }));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     let token = parser.read();
@@ -779,7 +859,7 @@ describe('Row Token Parser', () => {
       new Date('January 3, 1900 00:00:45').getTime()
     );
 
-    parser = new Parser({ token() { } }, { useUTC: true });
+    parser = new Parser(new Debug(), new InternalConnectionOptions({ useUTC: true }));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     token = parser.read();
@@ -793,7 +873,9 @@ describe('Row Token Parser', () => {
   });
 
   it('should write datetimeN', () => {
-    const colMetadata = [{ type: DateTimeN }];
+    const colMetadata = [
+      { colName: 'example', type: DateTimeN, userType: 0, flags: 0 }
+    ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
@@ -801,7 +883,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -813,11 +895,7 @@ describe('Row Token Parser', () => {
 
   it('should write numeric4Bytes', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 3,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 3, scale: 1 }
     ];
 
     const value = 9.3;
@@ -830,7 +908,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -842,11 +920,7 @@ describe('Row Token Parser', () => {
 
   it('should write numeric4BytesNegative', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 3,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 3, scale: 1 }
     ];
 
     const value = -9.3;
@@ -859,7 +933,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -871,11 +945,7 @@ describe('Row Token Parser', () => {
 
   it('should write numeric8Bytes', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 13,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 13, scale: 1 }
     ];
 
     const value = (0x100000000 + 93) / 10;
@@ -889,7 +959,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -901,11 +971,7 @@ describe('Row Token Parser', () => {
 
   it('should write numeric12Bytes', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 23,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 23, scale: 1 }
     ];
 
     const value = (0x100000000 * 0x100000000 + 0x200000000 + 93) / 10;
@@ -920,7 +986,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -932,11 +998,7 @@ describe('Row Token Parser', () => {
 
   it('should write numeric16Bytes', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 33,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 33, scale: 1 }
     ];
 
     const value =
@@ -957,7 +1019,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();
@@ -969,11 +1031,7 @@ describe('Row Token Parser', () => {
 
   it('should write numericNull', () => {
     const colMetadata = [
-      {
-        type: NumericN,
-        precision: 3,
-        scale: 1
-      }
+      { colName: 'example', type: NumericN, userType: 0, flags: 0, precision: 3, scale: 1 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -982,7 +1040,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, options);
+    const parser = new Parser(new Debug(), new InternalConnectionOptions(options));
     parser.colMetadata = colMetadata;
     parser.write(buffer.data);
     const token = parser.read();

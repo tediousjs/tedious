@@ -1,15 +1,17 @@
-var Debug = require('../../../src/debug');
-var Parser = require('../../../src/token/token-stream-parser').Parser;
-var TYPE = require('../../../src/token/token').TYPE;
-var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const assert = require('chai').assert;
+import { assert } from 'chai';
 
-var debug = new Debug({ token: true });
+import Debug from '../../../src/debug';
+import { Parser } from '../../../src/token/token-stream-parser';
+import { TYPE } from '../../../src/token/token';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { InternalConnectionOptions } from '../../../src/connection-options';
+
+const debug = new Debug({ token: true });
 
 function createDbChangeBuffer() {
-  var oldDb = 'old';
-  var newDb = 'new';
-  var buffer = new WritableTrackingBuffer(50, 'ucs2');
+  const oldDb = 'old';
+  const newDb = 'new';
+  const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
   buffer.writeUInt8(TYPE.ENVCHANGE);
   buffer.writeUInt16LE(0); // Length written later
@@ -27,9 +29,9 @@ function createDbChangeBuffer() {
 
 describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
-    var buffer = createDbChangeBuffer();
+    const buffer = createDbChangeBuffer();
 
-    var parser = new Parser(debug);
+    const parser = new Parser(debug, new InternalConnectionOptions());
     parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
@@ -42,9 +44,9 @@ describe('Token Stream Parser', () => {
   });
 
   it('should split token across buffers', (done) => {
-    var buffer = createDbChangeBuffer();
+    const buffer = createDbChangeBuffer();
 
-    var parser = new Parser(debug);
+    const parser = new Parser(debug, new InternalConnectionOptions());
     parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
