@@ -64,6 +64,7 @@
     "@commitlint/travis-cli": "^8.3.5",
     "@types/bl": "^2.1.0",
     "@types/depd": "^1.1.32",
+    "@types/mocha": "^7.0.2",
     "@types/node": "^13.5.1",
     "@types/readable-stream": "^2.3.5",
     "@types/sprintf-js": "^1.1.2",
