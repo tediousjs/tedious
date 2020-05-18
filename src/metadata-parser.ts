@@ -31,12 +31,13 @@ export type Metadata = {
   userType: number;
   flags: number;
   type: DataType;
-  collation: Collation | undefined;
-  precision: number | undefined;
-  scale: number | undefined;
-  dataLength: number | undefined;
-  schema: XmlSchema | undefined;
-  udtInfo: UdtInfo | undefined;
+
+  collation?: Collation;
+  precision?: number;
+  scale?: number;
+  dataLength?: number;
+  schema?: XmlSchema;
+  udtInfo?: UdtInfo;
 };
 
 function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
