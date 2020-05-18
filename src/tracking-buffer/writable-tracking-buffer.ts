@@ -5,8 +5,6 @@ const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 const ZERO_LENGTH_BUFFER = Buffer.alloc(0);
 
-export type Encoding = 'utf8' | 'ucs2' | 'ascii';
-
 /**
   A Buffer-like class that tracks position.
 
@@ -15,7 +13,7 @@ export type Encoding = 'utf8' | 'ucs2' | 'ascii';
  */
 class WritableTrackingBuffer {
   initialSize: number;
-  encoding: Encoding;
+  encoding: BufferEncoding;
   doubleSizeGrowth: boolean;
 
   buffer: Buffer;
@@ -23,7 +21,7 @@ class WritableTrackingBuffer {
 
   position: number;
 
-  constructor(initialSize: number, encoding?: Encoding | null, doubleSizeGrowth?: boolean) {
+  constructor(initialSize: number, encoding?: BufferEncoding | null, doubleSizeGrowth?: boolean) {
     this.initialSize = initialSize;
     this.encoding = encoding || 'ucs2';
     this.doubleSizeGrowth = doubleSizeGrowth || false;
@@ -208,7 +206,7 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeString(value: string, encoding?: Encoding | null) {
+  writeString(value: string, encoding?: BufferEncoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
@@ -221,18 +219,18 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeBVarchar(value: string, encoding?: Encoding | null) {
+  writeBVarchar(value: string, encoding?: BufferEncoding | null) {
     this.writeUInt8(value.length);
     this.writeString(value, encoding);
   }
 
-  writeUsVarchar(value: string, encoding?: Encoding | null) {
+  writeUsVarchar(value: string, encoding?: BufferEncoding | null) {
     this.writeUInt16LE(value.length);
     this.writeString(value, encoding);
   }
 
   // TODO: Figure out what types are passed in other than `Buffer`
-  writeUsVarbyte(value: any, encoding?: Encoding | null) {
+  writeUsVarbyte(value: any, encoding?: BufferEncoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
@@ -256,7 +254,7 @@ class WritableTrackingBuffer {
     }
   }
 
-  writePLPBody(value: any, encoding?: Encoding | null) {
+  writePLPBody(value: any, encoding?: BufferEncoding | null) {
     if (encoding == null) {
       encoding = this.encoding;
     }
