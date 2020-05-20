@@ -297,17 +297,11 @@ describe('Transactions Test', function() {
               assert.ok(true);
             });
 
-            req = new Request(
-              "insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')",
-              function(err) {
-                assert.strictEqual(
-                  err.message,
-                  'String or binary data would be truncated.'
-                );
+            req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
+              assert.match(err.message, /^String or binary data would be truncated/);
 
-                connection.close();
-              }
-            );
+              connection.close();
+            });
             connection.execSqlBatch(req);
           });
         });
