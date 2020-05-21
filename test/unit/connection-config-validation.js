@@ -20,21 +20,21 @@ describe('Connection configuration validation', function() {
     config.server = 'localhost';
   });
 
-  it('default transient retry interval', () => {
+  it('default transient retry interval', function(done) {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
-    ensureConnectionIsClosed(connection, () => {});
+    ensureConnectionIsClosed(connection, done);
   });
 
-  it('good transient retry interval', () => {
+  it('good transient retry interval', function(done) {
     const goodRetryInterval = 75;
     config.options.connectionRetryInterval = goodRetryInterval;
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, goodRetryInterval);
-    ensureConnectionIsClosed(connection, () => {});
+    ensureConnectionIsClosed(connection, done);
   });
 
-  it('bad transient retry interval', () => {
+  it('bad transient retry interval', function() {
     const zeroRetryInterval = 0;
     config.options.connectionRetryInterval = zeroRetryInterval;
     assert.throws(() => {
@@ -48,13 +48,13 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('default max transient retries', () => {
+  it('default max transient retries', function(done) {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
-    ensureConnectionIsClosed(connection, () => {});
+    ensureConnectionIsClosed(connection, done);
   });
 
-  it('good max transient retries', () => {
+  it('good max transient retries', function(done) {
     const zeroMaxRetries = 0;
     config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
     const firstConnection = new Connection(config);
@@ -66,7 +66,7 @@ describe('Connection configuration validation', function() {
     assert.strictEqual(secondConnection.config.options.maxRetriesOnTransientErrors, nonZeroMaxRetries);
 
     ensureConnectionIsClosed(firstConnection, () => {
-      ensureConnectionIsClosed(secondConnection, () => {});
+      ensureConnectionIsClosed(secondConnection, done);
     });
   });
 

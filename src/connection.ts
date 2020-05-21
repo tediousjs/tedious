@@ -1352,6 +1352,10 @@ class Connection extends EventEmitter {
 
     new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
       if (err) {
+        if (this.closed) {
+          return;
+        }
+
         return this.socketError(err);
       }
 
