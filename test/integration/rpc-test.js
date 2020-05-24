@@ -22,50 +22,75 @@ function getConfig() {
   return config;
 }
 
-function execSqlBatch(connection, sql, doneCallback) {
-  const request = new Request(sql, function(err) {
-    if (err) {
-      console.log(err);
-      assert.ok(false);
-    }
+describe('RPC test', function() {
+  let connection;
 
-    doneCallback();
+  beforeEach(function(done) {
+    const config = getConfig();
+    connection = new Connection(config);
+    connection.on('connect', done);
+
+    connection.on('infoMessage', (info) => {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('errorMessage', (error) => {
+      console.log(`${error.number} : ${error.message}`);
+    });
+
+    connection.on('debug', (text) => {
+      // console.log(text)
+    });
   });
 
-  connection.execSqlBatch(request);
-}
-
-function testProc(done, type, typeAsString, value) {
-  const config = getConfig();
-
-  const request = new Request('#test_proc', function(err) {
-    assert.ifError(err);
-
-    connection.close();
-  });
-
-  request.addParameter('param', type, value);
-
-  request.on('doneProc', function(rowCount, more, returnStatus) {
-    assert.ok(!more);
-    assert.strictEqual(returnStatus, 0);
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
-  });
-
-  request.on('row', function(columns) {
-    if (value instanceof Date) {
-      assert.strictEqual(columns[0].value.getTime(), value.getTime());
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
     } else {
-      assert.strictEqual(columns[0].value, value);
+      done();
     }
   });
 
-  let connection = new Connection(config);
+  function execSqlBatch(connection, sql, done) {
+    const request = new Request(sql, function(err) {
+      if (err) {
+        console.log(err);
+        assert.ok(false);
+      }
 
-  connection.on('connect', function(err) {
+      done();
+    });
+
+    connection.execSqlBatch(request);
+  }
+
+  function testProc(done, type, typeAsString, value) {
+    const request = new Request('#test_proc', function(err) {
+      assert.ifError(err);
+
+      done();
+    });
+
+    request.addParameter('param', type, value);
+
+    request.on('doneProc', function(rowCount, more, returnStatus) {
+      assert.ok(!more);
+      assert.strictEqual(returnStatus, 0);
+    });
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.ok(more);
+    });
+
+    request.on('row', function(columns) {
+      if (value instanceof Date) {
+        assert.strictEqual(columns[0].value.getTime(), value.getTime());
+      } else {
+        assert.strictEqual(columns[0].value, value);
+      }
+    });
+
     execSqlBatch(
       connection,
       `\
@@ -78,63 +103,38 @@ select @param\
         connection.callProcedure(request);
       }
     );
-  });
+  }
 
-  connection.on('end', function(info) {
-    done();
-  });
+  function testProcOutput(done, type, typeAsString, value) {
 
-  connection.on(
-    'infoMessage',
-    function(info) { }
-    // console.log("#{info.number} : #{info.message}")
-  );
+    const request = new Request('#test_proc', function(err) {
+      assert.ifError(err);
 
-  connection.on('errorMessage', function(error) {
-    console.log(`${error.number} : ${error.message}`);
-  });
+      done();
+    });
 
-  connection.on(
-    'debug',
-    function(text) { }
-    // console.log(text)
-  );
-}
+    request.addParameter('paramIn', type, value);
+    request.addOutputParameter('paramOut', type);
 
-function testProcOutput(done, type, typeAsString, value) {
-  const config = getConfig();
+    request.on('doneProc', function(rowCount, more, returnStatus) {
+      assert.ok(!more);
+      assert.strictEqual(returnStatus, 0);
+    });
 
-  const request = new Request('#test_proc', function(err) {
-    assert.ifError(err);
+    request.on('doneInProc', function(rowCount, more) {
+      assert.ok(more);
+    });
 
-    connection.close();
-  });
+    request.on('returnValue', function(name, returnValue, metadata) {
+      assert.strictEqual(name, 'paramOut');
+      if (value instanceof Date) {
+        assert.strictEqual(returnValue.getTime(), value.getTime());
+      } else {
+        assert.strictEqual(returnValue, value);
+      }
+      assert.ok(metadata);
+    });
 
-  request.addParameter('paramIn', type, value);
-  request.addOutputParameter('paramOut', type);
-
-  request.on('doneProc', function(rowCount, more, returnStatus) {
-    assert.ok(!more);
-    assert.strictEqual(returnStatus, 0);
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
-  });
-
-  request.on('returnValue', function(name, returnValue, metadata) {
-    assert.strictEqual(name, 'paramOut');
-    if (value instanceof Date) {
-      assert.strictEqual(returnValue.getTime(), value.getTime());
-    } else {
-      assert.strictEqual(returnValue, value);
-    }
-    assert.ok(metadata);
-  });
-
-  let connection = new Connection(config);
-
-  connection.on('connect', function(err) {
     execSqlBatch(
       connection,
       `\
@@ -148,27 +148,8 @@ set @paramOut = @paramIn\
         connection.callProcedure(request);
       }
     );
-  });
+  }
 
-  connection.on('end', function(info) {
-    done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('errorMessage', function(error) {
-    console.log(`${error.number} : ${error.message}`);
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-}
-
-
-describe('RPC test', function() {
   it('should exec proc varchar', function(done) {
     testProc(done, TYPES.VarChar, 'varchar(10)', 'test');
   });

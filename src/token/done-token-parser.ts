@@ -1,7 +1,6 @@
 import JSBI from 'jsbi';
 
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
 import { InternalConnectionOptions } from '../connection';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
@@ -57,19 +56,19 @@ function parseToken(parser: Parser, options: InternalConnectionOptions, callback
   });
 }
 
-export function doneParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: DoneToken) => void) {
+export function doneParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new DoneToken(data));
   });
 }
 
-export function doneInProcParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: DoneInProcToken) => void) {
+export function doneInProcParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneInProcToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new DoneInProcToken(data));
   });
 }
 
-export function doneProcParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: DoneProcToken) => void) {
+export function doneProcParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneProcToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new DoneProcToken(data));
   });
