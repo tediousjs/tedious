@@ -127,11 +127,7 @@ function readCustomEncryptionMetadata(parser: Parser, cipherAlgorithmId: number,
     return callback();
   }
 
-  parser.readUInt8((nameSize) => {
-    parser.readBuffer(nameSize, (algorithmNameBuffer) => {
-      callback(algorithmNameBuffer.toString('ucs2'));
-    });
-  });
+  parser.readBVarChar(callback);
 }
 
 function readCryptoMetadataOrdinal(parser: Parser, columnEncryptionKeys: EncryptionKeyInfo[][] | undefined, callback: (ordinal: number) => void) {
@@ -139,9 +135,7 @@ function readCryptoMetadataOrdinal(parser: Parser, columnEncryptionKeys: Encrypt
     // Ordinal is not provided for SQL function return values
     callback(0);
   } else {
-    parser.readUInt16LE((ordinal) => {
-      callback(ordinal);
-    });
+    parser.readUInt16LE(callback);
   }
 }
 
@@ -154,11 +148,7 @@ function readEncryptedCEK(parser: Parser, callback: (encryptedCEK: Buffer) => vo
 }
 
 function readKeyStoreName(parser: Parser, callback: (keyStoreName: string) => void) {
-  parser.readUInt8((keyStoreNameLength) => {
-    parser.readBuffer(2 * keyStoreNameLength, (keyStoreNameBuffer) => {
-      callback(keyStoreNameBuffer.toString('ucs2'));
-    });
-  });
+  parser.readBVarChar(callback);
 }
 
 function readKeyPath(parser: Parser, callback: (keyPath: string) => void) {

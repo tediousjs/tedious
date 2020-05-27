@@ -325,9 +325,7 @@ function parseUserType(parser: Parser, options: InternalConnectionOptions, callb
 }
 
 function parseFlags(parser: Parser, callback: (flags: number) => void) {
-  parser.readUInt16LE((flags) => {
-    callback(flags);
-  });
+  parser.readUInt16LE(callback);
 }
 
 function metadataParseCrypto(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
