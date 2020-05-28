@@ -49,7 +49,7 @@ class IncomingMessageStream extends Transform {
       // Get the full packet length
       const length = this.bl.readUInt16BE(2);
 
-      if (this.bl.length >= length) {
+      if (this.bl.length >= length && length >= HEADER_LENGTH) {
         const data = this.bl.slice(0, length);
         this.bl.consume(length);
 
