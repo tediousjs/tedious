@@ -87,7 +87,7 @@ jobs:
               }
             },
             "options": {
-              "database": "test",
+              "database": "tedious",
               "trustServerCertificate": true
             }
           }
@@ -111,7 +111,7 @@ jobs:
               }
             },
             "options": {
-              "database": "test",
+              "database": "tedious",
               "trustServerCertificate": true
             }
           }
