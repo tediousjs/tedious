@@ -45,9 +45,9 @@ for (const name in MARS) {
 }
 
 
-type Options = {
+interface Options {
   encrypt: boolean;
-};
+}
 
 /*
   s2.2.6.4

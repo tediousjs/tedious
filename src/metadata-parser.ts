@@ -5,29 +5,29 @@ import { TYPE, DataType } from './data-type';
 
 import { sprintf } from 'sprintf-js';
 
-type Collation = {
+interface Collation {
   lcid: number;
   flags: number;
   version: number;
   sortId: number;
   codepage: string;
-};
+}
 
-type XmlSchema = {
+interface XmlSchema {
   dbname: string;
   owningSchema: string;
   xmlSchemaCollection: string;
-};
+}
 
-type UdtInfo = {
+interface UdtInfo {
   maxByteSize: number;
   dbname: string;
   owningSchema: string;
   typeName: string;
   assemblyName: string;
-};
+}
 
-export type Metadata = {
+export interface Metadata {
   userType: number;
   flags: number;
   type: DataType;
@@ -37,7 +37,7 @@ export type Metadata = {
   dataLength: number | undefined;
   schema: XmlSchema | undefined;
   udtInfo: UdtInfo | undefined;
-};
+}
 
 function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
   // s2.2.5.1.2

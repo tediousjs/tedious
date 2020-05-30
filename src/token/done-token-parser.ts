@@ -16,14 +16,14 @@ const STATUS = {
   SRVERROR: 0x0100
 };
 
-type TokenData = {
+interface TokenData {
   more: boolean;
   sqlError: boolean;
   attention: boolean;
   serverError: boolean;
   rowCount: number | undefined;
   curCmd: number;
-};
+}
 
 function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {
   parser.readUInt16LE((status) => {

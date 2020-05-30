@@ -12,10 +12,10 @@ function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options:
   callback(null);
 }
 
-type Column = {
+interface Column {
   value: unknown;
   metadata: ColumnMetadata;
-};
+}
 
 function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
   const columnsMetaData = parser.colMetadata;

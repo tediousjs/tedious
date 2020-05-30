@@ -3,7 +3,7 @@ import { InternalConnectionOptions } from '../connection';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';
 
-type TokenData = {
+interface TokenData {
   number: number;
   state: number;
   class: number;
@@ -11,7 +11,7 @@ type TokenData = {
   serverName: string;
   procName: string;
   lineNumber: number;
-};
+}
 
 function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {
   // length
