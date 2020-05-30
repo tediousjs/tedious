@@ -34,12 +34,12 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-type InternalOptions = {
+interface InternalOptions {
   checkConstraints: boolean;
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
-};
+}
 
 export interface Options {
   checkConstraints?: InternalOptions['checkConstraints'];
@@ -50,18 +50,18 @@ export interface Options {
 
 export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
-type Column = Parameter & {
+interface Column extends Parameter {
   objName: string;
-};
+}
 
-type ColumnOptions = {
+interface ColumnOptions {
   output?: boolean;
   length?: number;
   precision?: number;
   scale?: number;
   objName?: string;
   nullable?: boolean;
-};
+}
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {

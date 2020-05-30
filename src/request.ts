@@ -7,7 +7,7 @@ import Connection from './connection';
 // TODO: Figure out how to type the `rows` parameter here.
 type CompletionCallback = (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-type ParameterOptions = {
+interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;

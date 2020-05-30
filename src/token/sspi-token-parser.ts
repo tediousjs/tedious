@@ -3,7 +3,7 @@ import { InternalConnectionOptions } from '../connection';
 
 import { SSPIToken } from './token';
 
-type Data = {
+interface Data {
   magic: string;
   type: number;
   domainLen: number;
@@ -18,7 +18,7 @@ type Data = {
   oddData: Buffer;
   domain: string;
   target: Buffer;
-};
+}
 
 function parseChallenge(buffer: Buffer) {
   const challenge: Partial<Data> = {};
