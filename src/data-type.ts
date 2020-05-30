@@ -40,7 +40,7 @@ import Variant from './data-types/sql-variant';
 
 import { InternalConnectionOptions } from './connection';
 
-export type Parameter = {
+export interface Parameter {
   type: DataType;
   name: string;
 
@@ -52,15 +52,15 @@ export type Parameter = {
   scale?: number;
 
   nullable?: boolean;
-};
+}
 
-export type ParameterData<T = any> = {
+export interface ParameterData<T = any> {
   length?: number;
   scale?: number;
   precision?: number;
 
   value: T;
-};
+}
 
 export interface DataType {
   id: number;

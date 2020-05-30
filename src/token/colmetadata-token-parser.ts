@@ -4,10 +4,10 @@ import Parser from './stream-parser';
 import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
-export type ColumnMetadata = Metadata & {
+export interface ColumnMetadata extends Metadata {
   colName: string;
   tableName?: string | string[];
-};
+}
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
