@@ -11,7 +11,7 @@ import { versions as TDS_VERSION } from './tds-versions';
 
 const library = { name: name };
 
-export function connect(config: ConnectionConfiguration, connectListener?: (err?: Error) => {}) {
+export function connect(config: ConnectionConfiguration, connectListener?: (err?: Error) => void) {
   const connection = new Connection(config);
   connection.connect(connectListener);
   return connection;
