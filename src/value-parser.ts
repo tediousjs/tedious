@@ -706,6 +706,10 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
           enumerable: false,
           value: time.nanosecondsDelta
         });
+        Object.defineProperty(date, 'timezoneOffset', {
+          enumerable: false,
+          value: timezoneOffset
+        });
         callback(date);
       });
     });
