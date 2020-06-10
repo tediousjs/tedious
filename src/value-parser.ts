@@ -700,7 +700,7 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
   readTime(parser, dataLength - 5, scale, true, (time) => {
     parser.readUInt24LE((days) => {
       // offset
-      parser.readInt16LE(timezoneOffset => {
+      parser.readInt16LE((timezoneOffset) => {
         const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time)) as DateWithNanosecondsDelta;
         Object.defineProperty(date, 'nanosecondsDelta', {
           enumerable: false,
