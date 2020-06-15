@@ -44,7 +44,9 @@ jobs:
 
     - name: Prepare Commitlint (push)
       if: ${{ github.event_name == 'push' }}
-      run: echo "::set-env name=TRAVIS_COMMIT_RANGE::${{ github.event.before }}..${{ github.event.after }}"
+      run:  |
+        echo "::set-env name=TRAVIS_PULL_REQUEST_SLUG::"
+        echo "::set-env name=TRAVIS_COMMIT_RANGE::${{ github.event.before }}..${{ github.event.after }}"
 
     - run: npx commitlint-travis
       env:
