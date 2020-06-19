@@ -2,7 +2,6 @@ import { Sender } from './sender';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
-const RETRIES = 3;
 // There are three bytes at the start of the response, whose purpose is unknown.
 const MYSTERY_HEADER_LENGTH = 3;
 
@@ -29,51 +28,37 @@ export class InstanceLookup {
       throw new TypeError('Invalid arguments: "timeout" must be a number');
     }
 
-    const retries = options.retries === undefined ? RETRIES : options.retries;
-    if (typeof retries !== 'number') {
-      throw new TypeError('Invalid arguments: "retries" must be a number');
-    }
-
     if (typeof callback !== 'function') {
       throw new TypeError('Invalid arguments: "callback" must be a function');
     }
 
-    let sender: Sender;
-    let timer: NodeJS.Timeout;
-    let retriesLeft = retries;
+    let sender: Sender, timer: ReturnType<typeof setTimeout>;
 
     const onTimeout = () => {
       sender.cancel();
-      makeAttempt();
+      callback('Failed to get response from SQL Server Browser on ' + server);
     };
 
     const makeAttempt = () => {
-      if (retriesLeft > 0) {
-        retriesLeft--;
+      const request = Buffer.from([0x02]);
+      sender = this.createSender(options.server, SQL_SERVER_BROWSER_PORT, request);
+      sender.execute((err, message) => {
+        clearTimeout(timer);
+        if (err) {
+          callback('Failed to lookup instance on ' + server + ' - ' + err.message);
 
-        const request = Buffer.from([0x02]);
-        sender = this.createSender(options.server, SQL_SERVER_BROWSER_PORT, request);
-        sender.execute((err, response) => {
-          clearTimeout(timer);
-          if (err) {
-            callback('Failed to lookup instance on ' + server + ' - ' + err.message);
+        } else {
+          const strMsg: string = message!.toString('ascii', MYSTERY_HEADER_LENGTH);
+          const port = this.parseBrowserResponse(strMsg, instanceName);
 
+          if (port) {
+            callback(undefined, port);
           } else {
-            const message = response!.toString('ascii', MYSTERY_HEADER_LENGTH);
-            const port = this.parseBrowserResponse(message, instanceName);
-
-            if (port) {
-              callback(undefined, port);
-            } else {
-              callback('Port for ' + instanceName + ' not found in ' + options.server);
-            }
+            callback('Port for ' + instanceName + ' not found in ' + options.server);
           }
-        });
-
-        timer = setTimeout(onTimeout, timeout);
-      } else {
-        callback('Failed to get response from SQL Server Browser on ' + server);
-      }
+        }
+      });
+      timer = setTimeout(onTimeout, timeout);
     };
 
     makeAttempt();

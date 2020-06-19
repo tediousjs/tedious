@@ -1510,7 +1510,7 @@ class Connection extends EventEmitter {
 
   socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
-      const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
+      const message = `Failed to connect to ${this.config.server}: ${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', ConnectionError(message, 'ESOCKET'));
     } else {
