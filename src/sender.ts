@@ -3,6 +3,8 @@ import dns from 'dns';
 import net from 'net';
 import * as punycode from 'punycode';
 
+type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
+
 export class ParallelSendStrategy {
   addresses: dns.LookupAddress[];
   port: number;
@@ -106,11 +108,13 @@ export class Sender {
   port: number;
   request: Buffer;
   parallelSendStrategy: ParallelSendStrategy | null;
+  lookup: LookupFunction;
 
-  constructor(host: string, port: number, request: Buffer) {
+  constructor(host: string, port: number, lookup: LookupFunction, request: Buffer) {
     this.host = host;
     this.port = port;
     this.request = request;
+    this.lookup = lookup;
 
     this.parallelSendStrategy = null;
   }
@@ -129,7 +133,7 @@ export class Sender {
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
   invokeLookupAll(host: string, cb: (error: Error | null, addresses?: dns.LookupAddress[]) => void) {
-    dns.lookup(punycode.toASCII(host), { all: true }, cb);
+    this.lookup.call(null, punycode.toASCII(host), { all: true }, cb);
   }
 
   executeForHostname(cb: (error: Error | null, message?: Buffer) => void) {
