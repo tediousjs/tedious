@@ -2199,7 +2199,7 @@ Connection.prototype.STATE = {
             return this.close();
           }
 
-          this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
+          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
         } else {
           this.sendLogin7Packet();
