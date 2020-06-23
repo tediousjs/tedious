@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
-    if: ${{ github.repository == github.event.pull_request.head.repo.full_name }}
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
     - uses: actions/checkout@v1
