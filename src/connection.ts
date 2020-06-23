@@ -538,7 +538,7 @@ class Connection extends EventEmitter {
         rowCollectionOnRequestCompletion: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
-        trustServerCertificate: true,
+        trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
         lowerCaseGuids: false
@@ -916,8 +916,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
-      } else {
-        deprecate('The default value for `config.options.trustServerCertificate` will change from `true` to `false` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.useColumnNames !== undefined) {
