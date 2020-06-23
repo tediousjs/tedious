@@ -45,9 +45,11 @@ export class ParallelConnectionStrategy {
     }
 
     for (let i = 0, len = addresses.length; i < len; i++) {
-      const socket = sockets[i] = net.connect(Object.create(this.options, {
-        host: { value: addresses[i].address }
-      }));
+      const socket = sockets[i] = net.connect({
+        ...this.options,
+        host: addresses[i].address,
+        family: addresses[i].family
+      });
 
       socket.on('error', onError);
       socket.on('connect', onConnect);
@@ -70,9 +72,11 @@ export class SequentialConnectionStrategy {
       return callback(new Error('Could not connect (sequence)'));
     }
 
-    const socket = net.connect(Object.create(this.options, {
-      host: { value: next.address }
-    }));
+    const socket = net.connect({
+      ...this.options,
+      host: next.address,
+      family: next.family
+    });
 
     const onError = (_err: Error) => {
       socket.removeListener('error', onError);
@@ -95,48 +99,21 @@ export class SequentialConnectionStrategy {
   }
 }
 
+type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
+
 export class Connector {
   options: { port: number, host: string, localAddress?: string };
   multiSubnetFailover: boolean;
+  lookup: LookupFunction;
 
-  constructor(options: { port: number, host: string, localAddress?: string }, multiSubnetFailover: boolean) {
+  constructor(options: { port: number, host: string, localAddress?: string, lookup?: LookupFunction }, multiSubnetFailover: boolean) {
     this.options = options;
+    this.lookup = options.lookup ?? dns.lookup;
     this.multiSubnetFailover = multiSubnetFailover;
   }
 
   execute(cb: (err: Error | null, socket?: net.Socket) => void) {
-    if (net.isIP(this.options.host)) {
-      this.executeForIP(cb);
-    } else {
-      this.executeForHostname(cb);
-    }
-  }
-
-  executeForIP(cb: (err: Error | null, socket?: net.Socket) => void) {
-    const socket = net.connect(this.options);
-
-    const onError = (err: Error) => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
-      socket.destroy();
-
-      cb(err);
-    };
-
-    const onConnect = () => {
-      socket.removeListener('error', onError);
-      socket.removeListener('connect', onConnect);
-
-      cb(null, socket);
-    };
-
-    socket.on('error', onError);
-    socket.on('connect', onConnect);
-  }
-
-  executeForHostname(cb: (err: Error | null, socket?: net.Socket) => void) {
-    dns.lookup(punycode.toASCII(this.options.host), { all: true }, (err, addresses) => {
+    this.lookupAllAddresses(this.options.host, (err, addresses) => {
       if (err) {
         return cb(err);
       }
@@ -147,5 +124,15 @@ export class Connector {
         new SequentialConnectionStrategy(addresses, this.options).connect(cb);
       }
     });
+  }
+
+  lookupAllAddresses(host: string, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) {
+    if (net.isIPv6(host)) {
+      process.nextTick(callback, null, [{ address: host, family: 6 }]);
+    } else if (net.isIPv4(host)) {
+      process.nextTick(callback, null, [{ address: host, family: 4 }]);
+    } else {
+      this.lookup.call(null, punycode.toASCII(host), { all: true }, callback);
+    }
   }
 }
