@@ -73,6 +73,8 @@ describe('Datatypes in results test', function() {
           const request = new Request(sql, done);
 
           request.on('row', function(columns) {
+            assert.strictEqual(columns[0].metadata.type, expectedType);
+
             const expectedRowVal = (expectedValue instanceof Array) ? expectedValue[rowProcessed++] : expectedValue;
             if (expectedRowVal instanceof Date) {
               assert.strictEqual(columns[0].value.getTime(), expectedRowVal.getTime());
@@ -490,7 +492,7 @@ describe('Datatypes in results test', function() {
     ],
 
     'should test variant nvarchar': [
-      "select N'abcdШ' as sql_variant",
+      "select cast(N'abcdШ' as sql_variant)",
       'abcdШ'
     ],
 

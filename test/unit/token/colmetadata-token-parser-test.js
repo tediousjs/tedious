@@ -3,8 +3,8 @@ const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tr
 const TokenStreamParser = require('../../../src/token/stream-parser');
 const assert = require('chai').assert;
 
-describe('Colmetadata Token Parser', () => {
-  it('should int', () => {
+describe('Colmetadata Token Parser', function() {
+  it('should int', function() {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -20,7 +20,7 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer.data)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
+    const parser = new TokenStreamParser({ token() { } }, {});
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
@@ -33,7 +33,7 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].colName, 'name');
   });
 
-  it('should varchar', () => {
+  it('should varchar', function() {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -53,7 +53,7 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
+    const parser = new TokenStreamParser({ token() { } }, {});
     parser.write(buffer.data);
     const token = parser.read();
     // console.log(token)
