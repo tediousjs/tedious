@@ -98,7 +98,8 @@ jobs:
             },
             "options": {
               "port": 1433,
-              "database": "master"
+              "database": "master",
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
