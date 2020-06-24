@@ -1,4 +1,6 @@
 import { DataType } from '../data-type';
+const MAX = 2147483647;
+const NULL = -1;
 
 const Image: DataType = {
   id: 0x22,
@@ -20,9 +22,14 @@ const Image: DataType = {
   },
 
   generateTypeInfo(parameter) {
+    const value = parameter.value;
     const buffer = Buffer.alloc(5);
     buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
+    if (value === null) {
+      buffer.writeInt32LE(NULL, 1);
+    } else {
+      buffer.writeInt32LE(parameter.length!, 1);
+    }
     return buffer;
   },
 
@@ -41,11 +48,12 @@ const Image: DataType = {
   },
 
   validate: function(value): null | TypeError | Buffer {
-    if (value == null) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+
+    if (!Buffer.isBuffer(value) || value.length > MAX) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
     return value;
   }

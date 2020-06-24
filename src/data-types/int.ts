@@ -29,23 +29,16 @@ const Int: DataType = {
   },
 
   validate: function(value): number | null | TypeError {
-    if (value == null) {
+    if (value === null || value === undefined) {
       return null;
     }
 
-    if (typeof value !== 'number') {
-      value = Number(value);
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue) || value < -2147483648 || value > 2147483647) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid number.');
-    }
-
-    if (value < -2147483648 || value > 2147483647) {
-      return new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
-    }
-
-    return value | 0;
+    return numberValue;
   }
 };
 

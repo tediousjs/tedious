@@ -24,7 +24,7 @@ const Time: DataType = {
     return Buffer.from([this.id, parameter.scale!]);
   },
 
-  generateParameterData: function*(parameter, options) {
+  generateParameterData: function* (parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(16);
       const time = parameter.value;
@@ -65,20 +65,24 @@ const Time: DataType = {
     }
   },
 
-  validate: function(value): null | number | TypeError | Date {
-    if (value == null) {
+  validate(value): null | number | TypeError | Date {
+    if (value === undefined || value === null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
+    let dateValue: any;
+    if (value instanceof Date) {
+      dateValue = value;
+    } else {
+      dateValue = new Date(Date.parse(value));
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid time.');
+    if (isNaN(dateValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    return value;
+    return dateValue;
+
   }
 };
 

@@ -41,20 +41,23 @@ const SmallDateTime: DataType = {
     }
   },
 
-  validate: function(value): null | Date | TypeError {
-    if (value == null) {
+  validate(value): null | Date | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
+    let dateValue: any;
+    if (value instanceof Date) {
+      dateValue = value;
+    } else {
+      dateValue = new Date(Date.parse(value));
     }
 
-    if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+    if (isNaN(dateValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
 
-    return value;
+    return dateValue;
   }
 };
 

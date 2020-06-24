@@ -121,17 +121,28 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): null | string | TypeError {
-    if (value == null) {
+  validate: function(value, length): null | string | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+
+    if (length) {
+      const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+      if (typeof stringValue !== 'string' || (length <= this.maximumLength && stringValue.length > length)) {
+        return new TypeError(`The given value could not be converted to ${this.name}`);
       }
-      value = value.toString();
+
+      return stringValue;
+    } else {
+
+      if (typeof value !== 'string') {
+        if (typeof value.toString !== 'function') {
+          return TypeError('Invalid string.');
+        }
+        value = value.toString();
+      }
+      return value;
     }
-    return value;
   }
 };
 

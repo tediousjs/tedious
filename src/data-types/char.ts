@@ -72,17 +72,17 @@ const Char: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): null | string | TypeError {
-    if (value == null) {
+  validate: function(value, length): null | string | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
-      }
-      value = value.toString();
+
+    const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+    if (typeof stringValue !== 'string' || (length && stringValue.length > length) || stringValue.length > this.maximumLength) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return stringValue;
   }
 };
 

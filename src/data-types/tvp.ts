@@ -91,24 +91,34 @@ const TVP: DataType = {
     yield TVP_END_TOKEN;
   },
 
-  validate: function(value): Buffer | null | TypeError {
-    if (value == null) {
+  validate: function(value): Buffer | null | TypeError | object {
+    if (value === undefined || value === null) {
       return null;
     }
 
-    if (typeof value !== 'object') {
+    if (typeof value !== 'object' || !Array.isArray(value.columns) || !Array.isArray(value.rows)) {
       return new TypeError('Invalid table.');
     }
 
-    if (!Array.isArray(value.columns)) {
-      return new TypeError('Invalid table.');
-    }
+    const result = {
+      columns: value.columns,
+      rows: value.rows.map(function(row: any[]) {
+        if (!Array.isArray(row)) {
+          return new TypeError();
+        }
+        return row.map(function(columnValue, index) {
+          const column = value.columns[index];
 
-    if (!Array.isArray(value.rows)) {
-      return new TypeError('Invalid table.');
-    }
+          if (column === undefined || column.type === undefined) {
+            return new TypeError();
+          }
 
-    return value;
+          return column.type.validate(columnValue, column.length, column.scale, column.precision);
+        });
+      })
+    };
+
+    return result;
   }
 };
 

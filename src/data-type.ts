@@ -70,7 +70,7 @@ export interface DataType {
   declaration(parameter: Parameter): string;
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
-  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  validate(value: any, length?: number): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
 

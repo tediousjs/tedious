@@ -27,7 +27,7 @@ const BigInt: DataType = {
   },
 
   validate: function(value): null | number | TypeError {
-    if (value == null) {
+    if (value == null || value === undefined) {
       return null;
     }
 
@@ -43,7 +43,12 @@ const BigInt: DataType = {
       return new TypeError(`Value must be between ${Number.MIN_SAFE_INTEGER} and ${Number.MAX_SAFE_INTEGER}, inclusive.  For smaller or bigger numbers, use VarChar type.`);
     }
 
-    return value;
+    const numberValue = typeof value === 'number' ? value : parseInt(value);
+    if (!Number.isSafeInteger(numberValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
+    }
+
+    return numberValue;
   }
 };
 

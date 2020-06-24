@@ -57,13 +57,19 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): Buffer | null | TypeError {
-    if (value == null) {
+  validate: function(value, length): Buffer | null | TypeError {
+    if (value === undefined || value === null) {
       return null;
     }
 
     if (!Buffer.isBuffer(value)) {
       return new TypeError('Invalid buffer.');
+    }
+
+    if (length) {
+      if (value.length > length) {
+        return new TypeError(`The given value could not be converted to ${this.name}`);
+      }
     }
 
     return value;

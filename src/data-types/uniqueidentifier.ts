@@ -1,6 +1,7 @@
 import { DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+const GUID_REGEXP = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -31,16 +32,16 @@ const UniqueIdentifier: DataType = {
   },
 
   validate: function(value): string | null | TypeError {
-    if (value == null) {
+    if (value === undefined || value === null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
-      }
-      value = value.toString();
+
+    const stringValue = typeof value !== 'string' && typeof value.toString === 'function' ? value.toString() : value;
+    if (typeof stringValue !== 'string' || stringValue.length !== 36 || !GUID_REGEXP.test(stringValue)) {
+      return new TypeError(`The given value could not be converted to ${this.name}`);
     }
-    return value;
+
+    return stringValue;
   }
 };
 
