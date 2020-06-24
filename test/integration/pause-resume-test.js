@@ -12,7 +12,6 @@ function getConfig() {
 }
 
 describe('Pause-Resume Test', function() {
-  this.timeout(10000);
   let connection;
 
   beforeEach(function(done) {
@@ -200,4 +199,4 @@ describe('Pause-Resume Test', function() {
       request.resume();
     }, 200);
   });
-});
+}, 10000);

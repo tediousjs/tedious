@@ -26,8 +26,6 @@ describe('A `error` on the network socket', function() {
   let connection;
 
   beforeEach(function(done) {
-    this.timeout(5000);
-
     connection = new Connection(getConfig());
     connection.on('error', done);
     connection.on('connect', (err) => {
@@ -95,4 +93,4 @@ describe('A `error` on the network socket', function() {
       connection.socket.emit('error', socketError);
     });
   });
-});
+}, 5000);

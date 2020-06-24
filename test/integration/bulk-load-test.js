@@ -28,7 +28,6 @@ function getConfig() {
 }
 
 describe('Bulk Load Tests', function() {
-  this.timeout(60000);
   let connection;
 
   beforeEach(function(done) {
@@ -351,8 +350,6 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should test stream bulk load', function(done) {
-    this.timeout(50000);
-
     const totalRows = 500000;
     const tableName = '#streamingBulkLoadTest';
 
@@ -429,11 +426,9 @@ describe('Bulk Load Tests', function() {
       assert.equal(rowCount, 1);
       done();
     }
-  });
+  }, 50000);
 
   it('should test streaming bulk load with cancel', function(done) {
-    this.timeout(50000);
-
     const totalRows = 500000;
 
     startCreateTable();
@@ -520,5 +515,5 @@ describe('Bulk Load Tests', function() {
 
       done();
     }
-  });
-});
+  }, 50000);
+}, 60000);

@@ -40,8 +40,6 @@ function getNtlmConfig() {
 }
 
 describe('Initiate Connect Test', function() {
-  this.timeout(20000);
-
   it('should be bad server', function(done) {
     const config = getConfig();
     config.server = 'bad-server';
@@ -112,7 +110,7 @@ describe('Initiate Connect Test', function() {
 
     if ((config.options != null ? config.options.port : undefined) == null) {
       // Config says don't do this test (probably because ports are dynamic).
-      return this.skip();
+      return done();
     }
 
     const connection = new Connection(config);
@@ -143,7 +141,7 @@ describe('Initiate Connect Test', function() {
   it('should connect by instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
-      return this.skip();
+      return done();
     }
 
     const config = getConfig();
@@ -178,7 +176,7 @@ describe('Initiate Connect Test', function() {
   it('should connect by invalid instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
-      return this.skip();
+      return done();
     }
 
     const config = getConfig();
@@ -306,8 +304,7 @@ describe('Initiate Connect Test', function() {
 
     setTimeout(() => { done(); }, 500);
   });
-
-});
+}, 20000);
 
 
 describe('Ntlm Test', function() {
@@ -321,7 +318,7 @@ describe('Ntlm Test', function() {
     const ntlmConfig = getNtlmConfig();
 
     if (!ntlmConfig) {
-      return this.skip();
+      return done();
     }
 
     switch (domainCase) {
@@ -448,8 +445,6 @@ describe('BeginTransaction Tests', function() {
 });
 
 describe('Insertion Tests', function() {
-  this.timeout(30000);
-
   it('should execSql', function(done) {
     const config = getConfig();
 
@@ -1132,7 +1127,7 @@ describe('Insertion Tests', function() {
       // console.log(text)
     });
   });
-});
+}, 30000);
 
 describe('Advanced Input Test', function() {
   function runSqlBatch(done, config, sql, requestCallback) {

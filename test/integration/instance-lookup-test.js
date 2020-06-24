@@ -28,7 +28,7 @@ describe('Instance Lookup Test', function() {
 
     if (!config.instanceName) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
-      return this.skip();
+      return done();
     }
 
     new InstanceLookup().instanceLookup({ server: config.server, instanceName: config.instanceName }, function(err, port) {

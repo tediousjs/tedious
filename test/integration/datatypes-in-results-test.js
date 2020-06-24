@@ -73,8 +73,6 @@ function execSql(done, sql, expectedValue, tdsVersion) {
 }
 
 describe('Datatypes in results test', function() {
-  this.timeout(60000);
-
   it('should test dbnull', function(done) {
     execSql(done, 'select null', null);
   });
@@ -718,4 +716,4 @@ describe('Datatypes in results test', function() {
     execSql(done, 'select cast(null as geography)', null, '7_2');
 
   });
-});
+}, 60000);

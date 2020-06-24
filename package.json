@@ -76,8 +76,8 @@
     "chai": "^4.1.2",
     "codecov": "^3.6.1",
     "eslint": "^5.16.0",
+    "jest": "^24.8.0",
     "mitm": "^1.7.0",
-    "mocha": "^6.2.2",
     "nyc": "^14.1.1",
     "rimraf": "^3.0.0",
     "semantic-release": "^17.0.1",
@@ -86,9 +86,9 @@
   },
   "scripts": {
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "mocha test/integration/",
-    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "jest test/unit test/unit/token test/unit/tracking-buffer",
+    "test-integration": "jest test/integration/",
+    "test-all": "jest test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
@@ -126,6 +126,12 @@
           "loose": true
         }
       ]
+    ]
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/test/**/*-test.js"
     ]
   },
   "commitlint": {
