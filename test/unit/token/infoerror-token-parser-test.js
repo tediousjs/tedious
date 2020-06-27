@@ -27,7 +27,7 @@ describe('Infoerror token parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
+    const parser = new Parser({ token() { } }, { tdsVersion: '7_2' });
     parser.write(data);
     const token = parser.read();
 

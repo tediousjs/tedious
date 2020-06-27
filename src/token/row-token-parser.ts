@@ -14,10 +14,9 @@ interface Column {
 }
 
 function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
-  const colMetadata = parser.colMetadata;
   const columns: Column[] = [];
 
-  const len = colMetadata.length;
+  const len = parser.colMetadata.length;
   let i = 0;
 
   function next(done: () => void) {
@@ -25,11 +24,10 @@ function rowParser(parser: Parser, options: InternalConnectionOptions, callback:
       return done();
     }
 
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
+    valueParse(parser, parser.colMetadata[i], options, (value) => {
       columns.push({
         value: value,
-        metadata: columnMetaData
+        metadata: parser.externalColMetadata[i]
       });
 
       i++;
