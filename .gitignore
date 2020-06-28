@@ -12,3 +12,4 @@ test/unit/perf-buffer.coffee
 
 src-coffee/
 test-coffee/
+docs/
