@@ -82,9 +82,11 @@
     "rimraf": "^3.0.0",
     "semantic-release": "^17.0.1",
     "sinon": "^7.5.0",
+    "typedoc": "^0.17.0-3",
     "typescript": "^3.8.3"
   },
   "scripts": {
+    "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha test/integration/",

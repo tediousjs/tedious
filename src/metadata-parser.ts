@@ -29,13 +29,31 @@ interface UdtInfo {
 
 export interface Metadata {
   userType: number;
+
   flags: number;
+  /**
+   * The column's type, such as VarChar, Int or Binary.
+   */
   type: DataType;
+
   collation: Collation | undefined;
+  /**
+   * The precision. Only applicable to numeric and decimal.
+   */
   precision: number | undefined;
+
+  /**
+   * The scale. Only applicable to numeric, decimal, time, datetime2 and datetimeoffset.
+   */
   scale: number | undefined;
+
+  /**
+   * The length, for char, varchar, nvarchar and varbinary.
+   */
   dataLength: number | undefined;
+
   schema: XmlSchema | undefined;
+
   udtInfo: UdtInfo | undefined;
 }
 
