@@ -46,7 +46,7 @@ describe('Prepare Execute Statement', function() {
       assert.strictEqual(columns[0].value, value);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.prepare(request);
     });
@@ -74,7 +74,7 @@ describe('Prepare Execute Statement', function() {
       connection.unprepare(request);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.prepare(request);
     });

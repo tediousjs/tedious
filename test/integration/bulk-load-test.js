@@ -33,7 +33,7 @@ describe('Bulk Load Tests', function() {
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
-    connection.on('connect', done);
+    connection.connect(done);
 
     if (debugMode) {
       connection.on('debug', (message) => console.log(message));

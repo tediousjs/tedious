@@ -234,7 +234,7 @@ describe('SequentialConnectionStrategy', function() {
     );
 
     const attemptedConnections = [];
-    mitm.on('connect', function(socket, options) {
+    mitm.connect(function(socket, options) {
       attemptedConnections.push(options);
 
       const expectedConnectionCount = attemptedConnections.length;
@@ -245,7 +245,7 @@ describe('SequentialConnectionStrategy', function() {
         assert.strictEqual(attemptedConnections.length, expectedConnectionCount);
       };
 
-      socket.on('connect', handler);
+      socket.connect(handler);
       socket.on('error', handler);
 
       if (options.host !== '127.0.0.4') {
@@ -289,7 +289,7 @@ describe('SequentialConnectionStrategy', function() {
     );
 
     let expectedSocket;
-    mitm.on('connect', function(socket, opts) {
+    mitm.connect(function(socket, opts) {
       if (opts.host !== '127.0.0.4') {
         socket.destroy(new Error());
       } else {
@@ -316,7 +316,7 @@ describe('SequentialConnectionStrategy', function() {
 
     const attemptedConnections = [];
 
-    mitm.on('connect', function(socket, options) {
+    mitm.connect(function(socket, options) {
       attemptedConnections.push(options);
     });
 
@@ -345,7 +345,7 @@ describe('SequentialConnectionStrategy', function() {
       { port: 12345, localAddress: '192.168.0.1' }
     );
 
-    mitm.on('connect', function(socket) {
+    mitm.connect(function(socket) {
       process.nextTick(() => {
         socket.emit('error', new Error());
       });
@@ -370,7 +370,7 @@ describe('SequentialConnectionStrategy', function() {
 
     const attemptedSockets = [];
 
-    mitm.on('connect', function(socket, options) {
+    mitm.connect(function(socket, options) {
       attemptedSockets.push(socket);
 
       if (options.host !== '127.0.0.4') {
@@ -418,7 +418,7 @@ describe('ParallelConnectionStrategy', function() {
 
     const attemptedConnections = [];
 
-    mitm.on('connect', function(socket, options) {
+    mitm.connect(function(socket, options) {
       attemptedConnections.push(options);
 
       socket.once('connect', function() {
@@ -457,7 +457,7 @@ describe('ParallelConnectionStrategy', function() {
       { port: 12345, localAddress: '192.168.0.1' }
     );
 
-    mitm.on('connect', function(socket) {
+    mitm.connect(function(socket) {
       process.nextTick(() => {
         socket.emit('error', new Error());
       });
@@ -481,7 +481,7 @@ describe('ParallelConnectionStrategy', function() {
     );
 
     let expectedSocket;
-    mitm.on('connect', function(socket, opts) {
+    mitm.connect(function(socket, opts) {
       if (opts.host !== '127.0.0.4') {
         process.nextTick(() => {
           socket.emit('error', new Error());
@@ -514,7 +514,7 @@ describe('ParallelConnectionStrategy', function() {
 
     const attemptedSockets = [];
 
-    mitm.on('connect', function(socket) {
+    mitm.connect(function(socket) {
       attemptedSockets.push(socket);
     });
 

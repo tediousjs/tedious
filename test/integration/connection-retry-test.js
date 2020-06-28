@@ -47,7 +47,7 @@ describe('Connection Retry Test', function() {
       assert.ok(true);
     });
 
-    connection.on('connect', (err) => {
+    connection.connect((err) => {
       assert.ok(err);
     });
 
@@ -73,7 +73,7 @@ describe('Connection Retry Test', function() {
       assert.ok(false);
     });
 
-    connection.on('connect', (err) => {
+    connection.connect((err) => {
       assert.ok(err);
     });
 
@@ -108,7 +108,7 @@ describe('Connection Retry Test', function() {
       clock.tick(config.options.connectTimeout + 1);
     });
 
-    connection.on('connect', (err) => {
+    connection.connect((err) => {
       assert.ok(err);
     });
 
