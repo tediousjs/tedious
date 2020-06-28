@@ -5,7 +5,11 @@ import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
 export interface ColumnMetadata extends Metadata {
+  /**
+   * The column's name。
+   */
   colName: string;
+
   tableName?: string | string[];
 }
 
