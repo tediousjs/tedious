@@ -34,12 +34,19 @@ const UniqueIdentifier: DataType = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
         return TypeError('Invalid string.');
       }
+
       value = value.toString();
     }
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return TypeError('Invalid GUID.');
+    }
+
     return value;
   }
 };

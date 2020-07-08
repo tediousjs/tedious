@@ -5,7 +5,7 @@ import { name } from './library';
 
 import { ConnectionError, RequestError } from './errors';
 
-import { typeByName as TYPES } from './data-type';
+import { TYPES } from './data-type';
 import { ISOLATION_LEVEL } from './transaction';
 import { versions as TDS_VERSION } from './tds-versions';
 
