@@ -16,9 +16,9 @@ jobs:
         node-version: 12
 
     - name: Tag latest release
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
+        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        
         read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
         if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
           date_format="%Y-%m-%dT%H:%M:%SZ"
