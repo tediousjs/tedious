@@ -4,6 +4,7 @@ const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
+const os = require('os');
 
 function getConfig() {
   const config = JSON.parse(
@@ -292,6 +293,62 @@ describe('Initiate Connect Test', function() {
     });
 
     connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('should use the local hostname as the default workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, os.hostname());
+    });
+
+    let connection = new Connection(config);
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('should allow specifying a custom workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, 'foo.bar.baz');
+    });
+
+    let connection = new Connection({ ...config, options: { ...config.options, workstationId: 'foo.bar.baz' } });
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
       done();
     });
   });

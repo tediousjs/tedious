@@ -367,6 +367,7 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
 
@@ -805,6 +806,15 @@ interface ConnectionOptions {
   useUTC?: boolean;
 
   /**
+   * The workstation ID (WSID) of the client, default os.hostname().
+   * Used for identifying a specific client in profiling, logging or
+   * tracing client activity in SQLServer.
+   *
+   * The value is reported by the TSQL function HOST_NAME().
+   */
+  workstationId?: string | undefined;
+
+  /**
    * A boolean determining whether to parse unique identifier type with lowercase case characters.
    *
    * (default: `false`).
@@ -1226,6 +1236,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
+        workstationId: undefined,
         lowerCaseGuids: false
       }
     };
@@ -1617,6 +1628,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.useUTC = config.options.useUTC;
+      }
+
+      if (config.options.workstationId !== undefined) {
+        if (typeof config.options.workstationId !== 'string') {
+          throw new TypeError('The "config.options.workstationId" property must be of type string.');
+        }
+
+        this.config.options.workstationId = config.options.workstationId;
       }
 
       if (config.options.lowerCaseGuids !== undefined) {
@@ -2519,7 +2538,7 @@ class Connection extends EventEmitter {
         payload.password = authentication.options.password;
     }
 
-    payload.hostname = os.hostname();
+    payload.hostname = this.config.options.workstationId || os.hostname();
     payload.serverName = this.routingData ? this.routingData.server : this.config.server;
     payload.appName = this.config.options.appName || 'Tedious';
     payload.libraryName = libraryName;
