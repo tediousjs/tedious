@@ -36,6 +36,12 @@ export interface ParameterOptions {
   length?: number;
   precision?: number;
   scale?: number;
+  collation?: {
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
 }
 
 interface RequestOptions {
@@ -402,7 +408,7 @@ class Request extends EventEmitter {
       options = {};
     }
 
-    const { output = false, length, precision, scale } = options;
+    const { output = false, length, precision, scale, collation } = options;
 
     const parameter: Parameter = {
       type: type,
@@ -411,6 +417,7 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
+      collation: collation,
       scale: scale
     };
     this.parameters.push(parameter);
