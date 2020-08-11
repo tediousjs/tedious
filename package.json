@@ -44,7 +44,7 @@
     "@js-joda/core": "^2.0.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
-    "iconv-lite": "^0.5.0",
+    "iconv-lite": "^0.6.2",
     "jsbi": "^3.1.1",
     "native-duplexpair": "^1.0.0",
     "punycode": "^2.1.0",
