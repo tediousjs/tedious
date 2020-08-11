@@ -77,7 +77,7 @@
     "codecov": "^3.7.2",
     "eslint": "^5.16.0",
     "mitm": "^1.7.1",
-    "mocha": "^6.2.2",
+    "mocha": "^6.2.3",
     "nyc": "^14.1.1",
     "rimraf": "^3.0.0",
     "semantic-release": "^17.0.1",
