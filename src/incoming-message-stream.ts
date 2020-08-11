@@ -4,6 +4,7 @@ import { Transform } from 'readable-stream';
 import Debug from './debug';
 import Message from './message';
 import { Packet, HEADER_LENGTH } from './packet';
+import { ConnectionError } from './errors';
 
 /**
   IncomingMessageStream
@@ -43,11 +44,14 @@ class IncomingMessageStream extends Transform {
     return this;
   }
 
-  processBufferedData(callback: () => void) {
+  processBufferedData(callback: (err?: ConnectionError) => void) {
     // The packet header is always 8 bytes of length.
     while (this.bl.length >= HEADER_LENGTH) {
       // Get the full packet length
       const length = this.bl.readUInt16BE(2);
+      if (length < HEADER_LENGTH) {
+        return callback(new ConnectionError('Unable to process incoming packet'));
+      }
 
       if (this.bl.length >= length) {
         const data = this.bl.slice(0, length);

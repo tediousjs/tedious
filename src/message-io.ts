@@ -42,6 +42,10 @@ class MessageIO extends EventEmitter {
       message.on('end', () => { this.emit('message'); });
     });
 
+    this.incomingMessageStream.on('error', (message) => {
+      this.emit('error', message);
+    });
+
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
     this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
