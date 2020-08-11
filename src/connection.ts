@@ -1685,6 +1685,9 @@ class Connection extends EventEmitter {
 
     if (connectListener) {
       this.once('connect', connectListener);
+      this.once('error', (err) => {
+        connectListener(err);
+      });
     }
 
     this.transitionTo(this.STATE.CONNECTING);
@@ -2198,6 +2201,9 @@ class Connection extends EventEmitter {
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      this.messageIo.on('error', (error) => {
+        this.socketError(error);
+      });
 
       this.socket = socket;
       this.socketConnect();
