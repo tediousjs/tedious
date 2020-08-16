@@ -367,6 +367,7 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  validateBulkLoadParameters: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
@@ -806,6 +807,13 @@ interface ConnectionOptions {
   useUTC?: boolean;
 
   /**
+   * A boolean determining whether BulkLoad parameters should be validated.
+   *
+   * (default: `false`).
+   */
+  validateBulkLoadParameters?: boolean;
+
+  /**
    * The workstation ID (WSID) of the client, default os.hostname().
    * Used for identifying a specific client in profiling, logging or
    * tracing client activity in SQLServer.
@@ -1236,6 +1244,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
+        validateBulkLoadParameters: false,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1628,6 +1637,16 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.useUTC = config.options.useUTC;
+      }
+
+      if (config.options.validateBulkLoadParameters !== undefined) {
+        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
+          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
+      } else {
+        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.workstationId !== undefined) {

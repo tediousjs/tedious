@@ -94,4 +94,13 @@ describe('Connection configuration validation', function() {
       new Connection(config);
     });
   });
+
+  it('bad validateBulkLoadParameters value', () => {
+    const validateBulkLoadParametersVal = 'text';
+    config.options.validateBulkLoadParameters = validateBulkLoadParametersVal;
+    config.options.tdsVersion = '7_2';
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
 });
