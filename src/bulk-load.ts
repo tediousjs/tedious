@@ -151,7 +151,7 @@ class RowTransform extends Transform {
   /**
    * @private
    */
-  _transform(row: Array<any>, _encoding: string, callback: () => void) {
+  _transform(row: Array<any>, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
@@ -163,6 +163,13 @@ class RowTransform extends Transform {
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
+      if (this.bulkLoad.options.validateBulkLoadParameters) {
+        const error = c.type.validate(row[i]);
+
+        if (error instanceof TypeError) {
+          return callback(error);
+        }
+      }
       const parameter = {
         length: c.length,
         scale: c.scale,
@@ -268,6 +275,7 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   rowToPacketTransform: RowTransform;
+  message: Message;
 
   /**
    * @private
@@ -331,6 +339,28 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = false;
 
     this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
+    this.message = new Message({ type: PACKET_TYPE.BULK_LOAD });
+    this.rowToPacketTransform.pipe(this.message);
+
+    this.rowToPacketTransform.once('finish', () => {
+      this.removeListener('cancel', onCancel);
+    });
+
+    this.rowToPacketTransform.once('error', (err) => {
+      this.rowToPacketTransform.unpipe(this.message);
+
+      this.error = err;
+
+      this.message.ignore = true;
+      this.message.end();
+    });
+
+    const onCancel = () => {
+      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
+      this.rowToPacketTransform.destroy();
+    };
+
+    this.once('cancel', onCancel);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
@@ -394,6 +424,18 @@ class BulkLoad extends EventEmitter {
   }
 
   /**
+   * @private
+   */
+  colTypeValidation(column: Column, value: any) {
+    if (this.options.validateBulkLoadParameters) {
+      const error = column.type.validate(value);
+      if (error instanceof TypeError) {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Adds a row to the bulk insert. This method accepts arguments in three different formats:
    *
    * ```js
@@ -428,11 +470,18 @@ class BulkLoad extends EventEmitter {
 
     // write each column
     if (Array.isArray(row)) {
+      this.columns.forEach((column, i) => {
+        this.colTypeValidation(column, row[i]);
+      });
+
       this.rowToPacketTransform.write(row);
     } else {
-      const object = row;
+      this.columns.forEach((column) => {
+        this.colTypeValidation(column, row[column.objName]);
+      });
+
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        return object[column.objName];
+        return row[column.objName];
       }));
     }
   }
@@ -608,6 +657,7 @@ class BulkLoad extends EventEmitter {
       throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
     }
     this.streamingMode = true;
+
     return this.rowToPacketTransform;
   }
 
@@ -615,22 +665,7 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   getMessageStream() {
-    const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
-
-    this.rowToPacketTransform.pipe(message);
-
-    this.rowToPacketTransform.once('finish', () => {
-      this.removeListener('cancel', onCancel);
-    });
-
-    const onCancel = () => {
-      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
-      this.rowToPacketTransform.destroy();
-    };
-
-    this.once('cancel', onCancel);
-
-    return message;
+    return this.message;
   }
 
   /**
