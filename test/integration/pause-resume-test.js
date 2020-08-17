@@ -17,7 +17,7 @@ describe('Pause-Resume Test', function() {
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
-    connection.on('connect', done);
+    connection.connect(done);
   });
 
   afterEach(function(done) {
