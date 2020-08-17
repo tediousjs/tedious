@@ -280,7 +280,7 @@ function createConnection(cb) {
   var config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
 
   var connection = new Connection(config);
-  connection.on('connect', function() {
+  connection.connect(function() {
     cb(connection);
   });
 }

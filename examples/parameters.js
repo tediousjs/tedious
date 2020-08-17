@@ -13,7 +13,7 @@ var connection = new Connection({
   }
 });
 
-connection.on('connect', function(err){
+connection.connect(function(err){
 	var request = new Request("INSERT INTO MyTable (uniqueIdCol, intCol, nVarCharCol) VALUES (@uniqueIdVal, @intVal, @nVarCharVal)",
 	function(err){
 		if(err){

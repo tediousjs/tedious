@@ -33,7 +33,7 @@ describe('Bulk Load Tests', function() {
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
-    connection.on('connect', done);
+    connection.connect(done);
 
     if (debugMode) {
       connection.on('debug', (message) => console.log(message));
@@ -530,7 +530,7 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     const config = getConfig();
     config.options = { ...config.options, validateBulkLoadParameters: true };
     connection = new Connection(config);
-    connection.on('connect', done);
+    connection.connect(done);
 
     if (debugMode) {
       connection.on('debug', (message) => console.log(message));

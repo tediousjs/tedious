@@ -70,7 +70,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
   const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
   var connection = new Connection(connectionConfig);
 
-  connection.on('connect', function(err) {
+  connection.connect(function(err) {
     assert.ifError(err);
     connection.execSql(request);
   });
@@ -128,7 +128,7 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
   const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
   var connection = new Connection(connectionConfig);
 
-  connection.on('connect', function(err) {
+  connection.connect(function(err) {
     assert.ifError(err);
     connection.execSql(request);
   });
@@ -967,7 +967,7 @@ describe('Parameterised Statements Test', function() {
 
     var connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSql(request);
     });
@@ -1050,7 +1050,7 @@ end')\
 
     var connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSqlBatch(request);
     });

@@ -47,7 +47,7 @@ function loadBulkData() {
   connection.execBulkLoad(bulkLoad);
 }
 
-connection.on('connect', function(err) {
+connection.connect(function(err) {
   if (err) {
     console.log('Connection Failed');
     throw err;
