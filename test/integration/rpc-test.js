@@ -28,7 +28,7 @@ describe('RPC test', function() {
   beforeEach(function(done) {
     const config = getConfig();
     connection = new Connection(config);
-    connection.on('connect', done);
+    connection.connect(done);
 
     connection.on('infoMessage', (info) => {
       // console.log("#{info.number} : #{info.message}")
@@ -317,7 +317,7 @@ set @paramOut = @paramIn\
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.callProcedure(request);
     });
 
@@ -361,7 +361,7 @@ set @paramOut = @paramIn\
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       execSqlBatch(
         connection,
         '\

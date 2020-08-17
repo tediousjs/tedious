@@ -30,7 +30,7 @@ describe('A `error` on the network socket', function() {
 
     connection = new Connection(getConfig());
     connection.on('error', done);
-    connection.on('connect', (err) => {
+    connection.connect((err) => {
       connection.removeListener('error', done);
       done(err);
     });

@@ -98,7 +98,7 @@ end\
     connection.execSqlBatch(request);
   }
 
-  connection.on('connect', function(err) {
+  connection.connect(function(err) {
     test.ok(!err);
 
     async.series([

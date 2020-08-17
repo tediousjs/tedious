@@ -24,7 +24,7 @@ describe('inserting binary data', function() {
 
   beforeEach(function(done) {
     this.connection = new Connection(config);
-    this.connection.on('connect', done);
+    this.connection.connect(done);
   });
 
   afterEach(function(done) {

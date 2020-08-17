@@ -1722,9 +1722,9 @@ class Connection extends EventEmitter {
     }
 
     if (connectListener) {
-      const onConnect = () => {
+      const onConnect = (err?: Error) => {
         this.removeListener('error', onError);
-        connectListener();
+        connectListener(err);
       };
 
       const onError = (err: Error) => {
