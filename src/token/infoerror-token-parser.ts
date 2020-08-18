@@ -14,31 +14,59 @@ interface TokenData {
 }
 
 function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {
-  // length
-  parser.readUInt16LE(() => {
-    parser.readUInt32LE((number) => {
-      parser.readUInt8((state) => {
-        parser.readUInt8((clazz) => {
-          parser.readUsVarChar((message) => {
-            parser.readBVarChar((serverName) => {
-              parser.readBVarChar((procName) => {
-                (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber: number) => {
-                  callback({
-                    'number': number,
-                    'state': state,
-                    'class': clazz,
-                    'message': message,
-                    'serverName': serverName,
-                    'procName': procName,
-                    'lineNumber': lineNumber
-                  });
-                });
-              });
-            });
-          });
-        });
-      });
+  const { buffer, position } = parser;
+
+  if (buffer.length < position + 2) {
+    return parser.suspend(() => {
+      parseToken(parser, options, callback);
     });
+  }
+
+  const length = buffer.readUInt16LE(position);
+
+  const data = buffer.slice(position + 2, position + 2 + length);
+
+  let offset = 0;
+  const number = data.readUInt32LE(offset);
+  offset += 4;
+
+  const state = data.readUInt8(offset);
+  offset += 1;
+
+  const clazz = data.readUInt8(offset);
+  offset += 1;
+
+  const messageLength = data.readUInt16LE(offset) * 2;
+  offset += 2;
+  const message = data.toString('ucs2', offset, offset += messageLength);
+
+  const serverNameLength = data.readUInt8(offset) * 2;
+  offset += 1;
+  const serverName = data.toString('ucs2', offset, offset += serverNameLength);
+
+  const procNameLength = data.readUInt8(offset);
+  offset += 1;
+  const procName = data.toString('ucs2', offset, offset += procNameLength * 2);
+
+  let lineNumber;
+  if (options.tdsVersion < '7_2') {
+    lineNumber = data.readUInt16LE(offset);
+    offset += 2;
+  } else {
+    lineNumber = data.readUInt32LE(offset);
+    offset += 4;
+  }
+
+  parser.position += 2 + length;
+
+  callback({
+    'number': number,
+    'state': state,
+    'class': clazz,
+    'message': message,
+    'serverName': serverName,
+    'procName': procName,
+    'lineNumber': lineNumber
   });
 }
 

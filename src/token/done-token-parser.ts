@@ -25,35 +25,81 @@ interface TokenData {
   curCmd: number;
 }
 
-function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {
-  parser.readUInt16LE((status) => {
-    const more = !!(status & STATUS.MORE);
-    const sqlError = !!(status & STATUS.ERROR);
-    const rowCountValid = !!(status & STATUS.COUNT);
-    const attention = !!(status & STATUS.ATTN);
-    const serverError = !!(status & STATUS.SRVERROR);
+function readBigUInt64LE(buffer: Buffer, position: number) {
+  const low = JSBI.BigInt(buffer.readUInt32LE(position));
+  const high = JSBI.BigInt(buffer.readUInt32LE(position + 4));
 
-    parser.readUInt16LE((curCmd) => {
-      const next = (rowCount: number) => {
-        callback({
-          more: more,
-          sqlError: sqlError,
-          attention: attention,
-          serverError: serverError,
-          rowCount: rowCountValid ? rowCount : undefined,
-          curCmd: curCmd
-        });
-      };
+  return JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32)));
+}
 
-      if (options.tdsVersion < '7_2') {
-        parser.readUInt32LE(next);
-      } else {
-        parser.readBigUInt64LE((rowCount) => {
-          next(JSBI.toNumber(rowCount));
-        });
-      }
+function parseToken70(parser: Parser, callback: (token: TokenData) => void) {
+  const { buffer, position } = parser;
+
+  if (buffer.length < position + 8) {
+    return parser.suspend(() => {
+      parseToken72(parser, callback);
     });
+  }
+
+  const status = buffer.readUInt16LE(position);
+  const curCmd = buffer.readUInt16LE(position + 2);
+  const rowCount = buffer.readUInt32LE(position + 4);
+
+  const more = !!(status & STATUS.MORE);
+  const sqlError = !!(status & STATUS.ERROR);
+  const rowCountValid = !!(status & STATUS.COUNT);
+  const attention = !!(status & STATUS.ATTN);
+  const serverError = !!(status & STATUS.SRVERROR);
+
+  parser.position += 8;
+
+  callback({
+    more: more,
+    sqlError: sqlError,
+    attention: attention,
+    serverError: serverError,
+    rowCount: rowCountValid ? rowCount : undefined,
+    curCmd: curCmd
   });
+}
+
+function parseToken72(parser: Parser, callback: (token: TokenData) => void) {
+  const { buffer, position } = parser;
+
+  if (buffer.length < position + 12) {
+    return parser.suspend(() => {
+      parseToken72(parser, callback);
+    });
+  }
+
+  const status = buffer.readUInt16LE(position);
+  const curCmd = buffer.readUInt16LE(position + 2);
+  const rowCount = JSBI.toNumber(readBigUInt64LE(buffer, position + 4));
+
+  const more = !!(status & STATUS.MORE);
+  const sqlError = !!(status & STATUS.ERROR);
+  const rowCountValid = !!(status & STATUS.COUNT);
+  const attention = !!(status & STATUS.ATTN);
+  const serverError = !!(status & STATUS.SRVERROR);
+
+  parser.position += 12;
+
+  callback({
+    more: more,
+    sqlError: sqlError,
+    attention: attention,
+    serverError: serverError,
+    rowCount: rowCountValid ? rowCount : undefined,
+    curCmd: curCmd
+  });
+}
+
+function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (token: TokenData) => void) {
+  if (options.tdsVersion < '7_2') {
+    parseToken70(parser, callback);
+  } else {
+    parseToken72(parser, callback);
+  }
 }
 
 export function doneParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneToken) => void) {
