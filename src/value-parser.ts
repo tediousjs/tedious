@@ -1,4 +1,3 @@
-import Parser from './token/stream-parser';
 import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
@@ -6,7 +5,8 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
-import { Result, uInt32LE, uInt8, int16LE, int32LE, bigInt64LE, floatLE, doubleLE, uInt16LE, uInt24LE, uInt40LE, IncompleteError, uNumeric96LE, uNumeric128LE, uNumeric64LE } from './parser';
+import { Result, uInt32LE, uInt8, int16LE, int32LE, bigInt64LE, floatLE, doubleLE, uInt16LE, uInt24LE, uInt40LE, IncompleteError, uNumeric96LE, uNumeric128LE, uNumeric64LE, bigUInt64LE } from './parser';
+import JSBI from 'jsbi';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -238,18 +238,37 @@ function readImage(buffer: Buffer, offset: number) {
   return new Result(offset, data);
 }
 
-function valueParse(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
+export function isPLPStream({ type: { name }, dataLength }: Metadata) {
+  switch (name) {
+    case 'Xml':
+    case 'UDT':
+      return true;
+
+    case 'VarChar':
+    case 'Char':
+    case 'NVarChar':
+    case 'NChar':
+    case 'VarBinary':
+    case 'Binary':
+      return dataLength === MAX;
+
+    default:
+      return false;
+  }
+}
+
+function valueParse(buffer: Buffer, offset: number, metadata: Metadata, options: InternalConnectionOptions) {
   const type = metadata.type;
 
   switch (type.name) {
     case 'Xml':
-      return readMaxNChars(parser, callback);
+      return readMaxNChars(buffer, offset);
 
     case 'VarChar':
     case 'Char': {
       if (metadata.dataLength === MAX) {
         const codepage = metadata.collation!.codepage;
-        return readMaxChars(parser, codepage, callback);
+        return readMaxChars(buffer, offset, codepage);
       }
 
       break;
@@ -258,7 +277,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
     case 'NVarChar':
     case 'NChar': {
       if (metadata.dataLength === MAX) {
-        return readMaxNChars(parser, callback);
+        return readMaxNChars(buffer, offset);
       }
 
       break;
@@ -267,29 +286,17 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
     case 'VarBinary':
     case 'Binary': {
       if (metadata.dataLength === MAX) {
-        return readMaxBinary(parser, callback);
+        return readMaxBinary(buffer, offset);
       }
 
       break;
     }
 
     case 'UDT':
-      return readMaxBinary(parser, callback);
+      return readMaxBinary(buffer, offset);
   }
 
-  let value;
-  try {
-    ({ offset: parser.position, value } = valueParseNew(parser.buffer, parser.position, metadata, options));
-  } catch (err) {
-    if (err instanceof IncompleteError) {
-      return parser.suspend(() => {
-        valueParse(parser, metadata, options, callback);
-      });
-    }
-
-    throw err;
-  }
-  return callback(value);
+  return valueParseNew(buffer, offset, metadata, options);
 }
 
 function valueParseNew(buffer: Buffer, offset: number, metadata: Metadata, options: InternalConnectionOptions): Result<unknown> {
@@ -658,104 +665,79 @@ function readNChars(buffer: Buffer, offset: number, dataLength: number, codepage
   return new Result(offset, value);
 }
 
-function readMaxBinary(parser: Parser, callback: (value: unknown) => void) {
-  return readMax(parser, callback);
+function readMaxBinary(buffer: Buffer, offset: number) {
+  return readMax(buffer, offset);
 }
 
-function readMaxChars(parser: Parser, codepage: string, callback: (value: unknown) => void) {
+function readMaxChars(buffer: Buffer, offset: number, codepage: string) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
 
-  readMax(parser, (data) => {
-    if (data) {
-      callback(iconv.decode(data, codepage));
-    } else {
-      callback(null);
-    }
-  });
+  let value;
+  ({ offset, value } = readMax(buffer, offset));
+
+  if (value) {
+    return new Result(offset, iconv.decode(value, codepage));
+  } else {
+    return new Result(offset, value);
+  }
 }
 
-function readMaxNChars(parser: Parser, callback: (value: string | null) => void) {
-  readMax(parser, (data) => {
-    if (data) {
-      callback(data.toString('ucs2'));
-    } else {
-      callback(null);
-    }
-  });
+function readMaxNChars(buffer: Buffer, offset: number) {
+  let value;
+  ({ offset, value } = readMax(buffer, offset));
+
+  if (value) {
+    return new Result(offset, value.toString('ucs2'));
+  } else {
+    return new Result(offset, value);
+  }
 }
 
-function readMax(parser: Parser, callback: (value: null | Buffer) => void) {
-  parser.readBuffer(8, (type) => {
-    if (type.equals(PLP_NULL)) {
-      return callback(null);
-    } else if (type.equals(UNKNOWN_PLP_LEN)) {
-      return readMaxUnknownLength(parser, callback);
-    } else {
-      const low = type.readUInt32LE(0);
-      const high = type.readUInt32LE(4);
-
-      if (high >= (2 << (53 - 32))) {
-        console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
-      }
-
-      const expectedLength = low + (0x100000000 * high);
-      return readMaxKnownLength(parser, expectedLength, callback);
-    }
-  });
-}
-
-function readMaxKnownLength(parser: Parser, totalLength: number, callback: (value: null | Buffer) => void) {
-  const data = Buffer.alloc(totalLength, 0);
-
-  let offset = 0;
-  function next(done: any) {
-    parser.readUInt32LE((chunkLength) => {
-      if (!chunkLength) {
-        return done();
-      }
-
-      parser.readBuffer(chunkLength, (chunk) => {
-        chunk.copy(data, offset);
-        offset += chunkLength;
-
-        next(done);
-      });
-    });
+function readMax(buffer: Buffer, offset: number): Result<null | Buffer> {
+  if (buffer.length < offset + 8) {
+    throw new IncompleteError();
   }
 
-  next(() => {
-    if (offset !== totalLength) {
-      parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes'));
-    }
+  const type = buffer.slice(offset, offset += 8);
+  if (type.equals(PLP_NULL)) {
+    return new Result(offset, null);
+  }
 
-    callback(data);
-  });
+  if (type.equals(UNKNOWN_PLP_LEN)) {
+    return readPLPChunks(buffer, offset, undefined);
+  }
+
+  let bigTotalLength;
+  ({ offset, value: bigTotalLength } = bigUInt64LE(buffer, offset));
+  const totalLength = JSBI.toNumber(bigTotalLength);
+  return readPLPChunks(buffer, offset, totalLength);
 }
 
-function readMaxUnknownLength(parser: Parser, callback: (value: null | Buffer) => void) {
+function readPLPChunks(buffer: Buffer, offset: number, totalLength: number | undefined) {
   const chunks: Buffer[] = [];
+  let chunkLength;
 
-  let length = 0;
-  function next(done: any) {
-    parser.readUInt32LE((chunkLength) => {
-      if (!chunkLength) {
-        return done();
+  while (true) {
+    ({ offset, value: chunkLength } = uInt32LE(buffer, offset));
+
+    if (!chunkLength) {
+      const data = Buffer.concat(chunks);
+
+      if (totalLength && data.length !== totalLength) {
+        throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + data.length + ' bytes');
       }
 
-      parser.readBuffer(chunkLength, (chunk) => {
-        chunks.push(chunk);
-        length += chunkLength;
+      return new Result(offset, data);
+    }
 
-        next(done);
-      });
-    });
+    if (buffer.length < offset + chunkLength) {
+      throw new IncompleteError();
+    }
+
+    chunks.push(buffer.slice(offset, offset += chunkLength));
   }
-
-  next(() => {
-    callback(Buffer.concat(chunks, length));
-  });
 }
 
 function readSmallDateTime(buffer: Buffer, offset: number, useUTC: boolean) {

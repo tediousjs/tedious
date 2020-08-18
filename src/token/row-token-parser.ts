@@ -7,53 +7,50 @@ import { InternalConnectionOptions } from '../connection';
 import { RowToken } from './token';
 
 import valueParse from '../value-parser';
+import { IncompleteError } from '../parser';
 
 interface Column {
   value: unknown;
   metadata: ColumnMetadata;
 }
 
-function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
-  const colMetadata = parser.colMetadata;
-  const columns: Column[] = [];
+function parseRow(parser: Parser, options: InternalConnectionOptions, columns: Column[], callback: (token: RowToken) => void) {
+  const buffer = parser.buffer;
+  const length = parser.colMetadata.length;
+  let value;
 
-  const len = colMetadata.length;
-  let i = 0;
-
-  function next(done: () => void) {
-    if (i === len) {
-      return done();
+  try {
+    while (columns.length < length) {
+      const metadata = parser.colMetadata[columns.length];
+      ({ offset: parser.position, value } = valueParse(buffer, parser.position, metadata, options));
+      columns.push({ metadata, value });
     }
-
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
-      columns.push({
-        value: value,
-        metadata: columnMetaData
+  } catch (err) {
+    if (err instanceof IncompleteError) {
+      parser.suspend(() => {
+        parseRow(parser, options, columns, callback);
       });
-
-      i++;
-
-      next(done);
-    });
+    }
   }
 
-  next(() => {
-    if (options.useColumnNames) {
-      const columnsMap: { [key: string]: Column } = {};
+  if (options.useColumnNames) {
+    const columnsMap: { [key: string]: Column } = {};
 
-      columns.forEach((column) => {
-        const colName = column.metadata.colName;
-        if (columnsMap[colName] == null) {
-          columnsMap[colName] = column;
-        }
-      });
+    columns.forEach((column) => {
+      const colName = column.metadata.colName;
+      if (columnsMap[colName] == null) {
+        columnsMap[colName] = column;
+      }
+    });
 
-      callback(new RowToken(columnsMap));
-    } else {
-      callback(new RowToken(columns));
-    }
-  });
+    callback(new RowToken(columnsMap));
+  } else {
+    callback(new RowToken(columns));
+  }
+}
+
+function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+  parseRow(parser, options, [], callback);
 }
 
 export default rowParser;
