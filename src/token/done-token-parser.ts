@@ -1,8 +1,7 @@
 import JSBI from 'jsbi';
 
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
+import { IncompleteError, Result, wrap } from '../parser';
 
 // s2.2.7.5/6/7
 
@@ -32,18 +31,14 @@ function readBigUInt64LE(buffer: Buffer, position: number) {
   return JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32)));
 }
 
-function parseToken70(parser: Parser, callback: (token: TokenData) => void) {
-  const { buffer, position } = parser;
-
-  if (buffer.length < position + 8) {
-    return parser.suspend(() => {
-      parseToken72(parser, callback);
-    });
+function parseToken70(buffer: Buffer, offset: number): Result<TokenData> {
+  if (buffer.length < offset + 8) {
+    throw new IncompleteError();
   }
 
-  const status = buffer.readUInt16LE(position);
-  const curCmd = buffer.readUInt16LE(position + 2);
-  const rowCount = buffer.readUInt32LE(position + 4);
+  const status = buffer.readUInt16LE(offset);
+  const curCmd = buffer.readUInt16LE(offset + 2);
+  const rowCount = buffer.readUInt32LE(offset + 4);
 
   const more = !!(status & STATUS.MORE);
   const sqlError = !!(status & STATUS.ERROR);
@@ -51,9 +46,7 @@ function parseToken70(parser: Parser, callback: (token: TokenData) => void) {
   const attention = !!(status & STATUS.ATTN);
   const serverError = !!(status & STATUS.SRVERROR);
 
-  parser.position += 8;
-
-  callback({
+  return new Result(offset + 8, {
     more: more,
     sqlError: sqlError,
     attention: attention,
@@ -63,18 +56,14 @@ function parseToken70(parser: Parser, callback: (token: TokenData) => void) {
   });
 }
 
-function parseToken72(parser: Parser, callback: (token: TokenData) => void) {
-  const { buffer, position } = parser;
-
-  if (buffer.length < position + 12) {
-    return parser.suspend(() => {
-      parseToken72(parser, callback);
-    });
+function parseToken72(buffer: Buffer, offset: number): Result<TokenData> {
+  if (buffer.length < offset + 12) {
+    throw new IncompleteError();
   }
 
-  const status = buffer.readUInt16LE(position);
-  const curCmd = buffer.readUInt16LE(position + 2);
-  const rowCount = JSBI.toNumber(readBigUInt64LE(buffer, position + 4));
+  const status = buffer.readUInt16LE(offset);
+  const curCmd = buffer.readUInt16LE(offset + 2);
+  const rowCount = JSBI.toNumber(readBigUInt64LE(buffer, offset + 4));
 
   const more = !!(status & STATUS.MORE);
   const sqlError = !!(status & STATUS.ERROR);
@@ -82,9 +71,7 @@ function parseToken72(parser: Parser, callback: (token: TokenData) => void) {
   const attention = !!(status & STATUS.ATTN);
   const serverError = !!(status & STATUS.SRVERROR);
 
-  parser.position += 12;
-
-  callback({
+  return new Result(offset + 12, {
     more: more,
     sqlError: sqlError,
     attention: attention,
@@ -94,28 +81,38 @@ function parseToken72(parser: Parser, callback: (token: TokenData) => void) {
   });
 }
 
-function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (token: TokenData) => void) {
+export const doneParser = wrap(function doneParser(buffer, offset, { options }) {
+  let data;
+
   if (options.tdsVersion < '7_2') {
-    parseToken70(parser, callback);
+    ({ offset, value: data } = parseToken70(buffer, offset));
   } else {
-    parseToken72(parser, callback);
+    ({ offset, value: data } = parseToken72(buffer, offset));
   }
-}
 
-export function doneParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneToken(data));
-  });
-}
+  return new Result(offset, new DoneToken(data));
+});
 
-export function doneInProcParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneInProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneInProcToken(data));
-  });
-}
+export const doneInProcParser = wrap(function doneInProcParser(buffer, offset, { options }) {
+  let data;
 
-export function doneProcParser(parser: Parser, options: InternalConnectionOptions, callback: (token: DoneProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneProcToken(data));
-  });
-}
+  if (options.tdsVersion < '7_2') {
+    ({ offset, value: data } = parseToken70(buffer, offset));
+  } else {
+    ({ offset, value: data } = parseToken72(buffer, offset));
+  }
+
+  return new Result(offset, new DoneInProcToken(data));
+});
+
+export const doneProcParser = wrap(function doneProcParser(buffer, offset, { options }) {
+  let data;
+
+  if (options.tdsVersion < '7_2') {
+    ({ offset, value: data } = parseToken70(buffer, offset));
+  } else {
+    ({ offset, value: data } = parseToken72(buffer, offset));
+  }
+
+  return new Result(offset, new DoneProcToken(data));
+});
