@@ -1,47 +1,69 @@
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
-
 import { LoginAckToken } from './token';
 
 import { versionsByValue as versions } from '../tds-versions';
+import { IncompleteError, uInt16LE, uInt8, Result, bVarChar, uInt32BE, wrap } from '../parser';
 
 const interfaceTypes: { [key: number]: string } = {
   0: 'SQL_DFLT',
   1: 'SQL_TSQL'
 };
 
-function loginAckParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: LoginAckToken) => void) {
-  // length
-  parser.readUInt16LE(() => {
-    parser.readUInt8((interfaceNumber) => {
-      const interfaceType = interfaceTypes[interfaceNumber];
-      parser.readUInt32BE((tdsVersionNumber) => {
-        const tdsVersion = versions[tdsVersionNumber];
-        parser.readBVarChar((progName) => {
-          parser.readUInt8((major) => {
-            parser.readUInt8((minor) => {
-              parser.readUInt8((buildNumHi) => {
-                parser.readUInt8((buildNumLow) => {
-                  callback(new LoginAckToken({
-                    interface: interfaceType,
-                    tdsVersion: tdsVersion,
-                    progName: progName,
-                    progVersion: {
-                      major: major,
-                      minor: minor,
-                      buildNumHi: buildNumHi,
-                      buildNumLow: buildNumLow
-                    }
-                  }));
-                });
-              });
-            });
-          });
-        });
-      });
-    });
-  });
+function parseToken(buffer: Buffer, offset: number): Result<LoginAckToken> {
+  let interfaceNumber;
+  ({ offset, value: interfaceNumber } = uInt8(buffer, offset));
+  const interfaceType = interfaceTypes[interfaceNumber];
+
+  let tdsVersionNumber;
+  ({ offset, value: tdsVersionNumber } = uInt32BE(buffer, offset));
+  const tdsVersion = versions[tdsVersionNumber];
+
+  let progName;
+  ({ offset, value: progName } = bVarChar(buffer, offset));
+
+  let major;
+  ({ offset, value: major } = uInt8(buffer, offset));
+
+  let minor;
+  ({ offset, value: minor } = uInt8(buffer, offset));
+
+  let buildNumHi;
+  ({ offset, value: buildNumHi } = uInt8(buffer, offset));
+
+  let buildNumLow;
+  ({ offset, value: buildNumLow } = uInt8(buffer, offset));
+
+  return new Result(offset, new LoginAckToken({
+    interface: interfaceType,
+    tdsVersion: tdsVersion,
+    progName: progName,
+    progVersion: {
+      major: major,
+      minor: minor,
+      buildNumHi: buildNumHi,
+      buildNumLow: buildNumLow
+    }
+  }));
 }
+
+const loginAckParser = wrap(function loginAckParser(buffer: Buffer, offset: number) {
+  let tokenLength;
+  ({ offset, value: tokenLength } = uInt16LE(buffer, offset));
+
+  // Ensure we can read the full token
+  if (buffer.length < offset + tokenLength) {
+    throw new IncompleteError();
+  }
+
+  try {
+    return parseToken(buffer, offset);
+  } catch (err) {
+    if (err instanceof IncompleteError) {
+      throw new Error('Malformed LoginAck token');
+    }
+
+    throw err;
+  }
+});
 
 export default loginAckParser;
 module.exports = loginAckParser;

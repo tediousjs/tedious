@@ -132,7 +132,7 @@ function readUDTInfo(buffer: Buffer, offset: number): Result<UdtInfo> {
   });
 }
 
-function _metadataParse(buffer: Buffer, offset: number, options: InternalConnectionOptions): Result<Metadata> {
+function metadataParse(buffer: Buffer, offset: number, options: InternalConnectionOptions): Result<Metadata> {
   let userType;
   ({ offset, value: userType } = options.tdsVersion < '7_2' ? uInt16LE(buffer, offset) : uInt32LE(buffer, offset));
 
@@ -371,23 +371,6 @@ function _metadataParse(buffer: Buffer, offset: number, options: InternalConnect
     default:
       throw new Error(sprintf('Unrecognised type %s', type.name));
   }
-}
-
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
-  let metadata;
-  try {
-    ({ offset: parser.position, value: metadata } = _metadataParse(parser.buffer, parser.position, options));
-  } catch (err) {
-    if (err instanceof IncompleteError) {
-      return parser.suspend(() => {
-        metadataParse(parser, options, callback);
-      });
-    }
-
-    throw err;
-  }
-
-  callback(metadata);
 }
 
 export default metadataParse;
