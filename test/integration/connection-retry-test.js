@@ -47,12 +47,12 @@ describe('Connection Retry Test', function() {
       assert.ok(true);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 
@@ -73,12 +73,12 @@ describe('Connection Retry Test', function() {
       assert.ok(false);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 
@@ -108,13 +108,13 @@ describe('Connection Retry Test', function() {
       clock.tick(config.options.connectTimeout + 1);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       clock.restore();
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 });

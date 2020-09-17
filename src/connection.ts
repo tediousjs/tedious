@@ -32,7 +32,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
-import { Transaction, ISOLATION_LEVEL } from './transaction';
+import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { Connector } from './connector';
 import { name as libraryName } from './library';
@@ -51,27 +51,169 @@ import depd from 'depd';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
 
-// A rather basic state machine for managing a connection.
-// Implements something approximating s3.2.1.
+type BeginTransactionCallback =
+  /**
+   * The callback is called when the request to start the transaction has completed,
+   * either successfully or with an error.
+   * If an error occurred then `err` will describe the error.
+   *
+   * As only one request at a time may be executed on a connection, another request should not
+   * be initiated until this callback is called.
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param transactionDescriptor A Buffer that describe the transaction
+   */
+  (err: Error | null | undefined, transactionDescriptor?: Buffer) => void
 
+type SaveTransactionCallback =
+  /**
+   * The callback is called when the request to set a savepoint within the
+   * transaction has completed, either successfully or with an error.
+   * If an error occurred then `err` will describe the error.
+   *
+   * As only one request at a time may be executed on a connection, another request should not
+   * be initiated until this callback is called.
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   */
+  (err: Error | null | undefined) => void;
+
+type CommitTransactionCallback =
+  /**
+   * The callback is called when the request to commit the transaction has completed,
+   * either successfully or with an error.
+   * If an error occurred then `err` will describe the error.
+   *
+   * As only one request at a time may be executed on a connection, another request should not
+   * be initiated until this callback is called.
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   */
+  (err: Error | null | undefined) => void;
+
+type RollbackTransactionCallback =
+  /**
+   * The callback is called when the request to rollback the transaction has
+   * completed, either successfully or with an error.
+   * If an error occurred then err will describe the error.
+   *
+   * As only one request at a time may be executed on a connection, another request should not
+   * be initiated until this callback is called.
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   */
+  (err: Error | null | undefined) => void;
+
+type ResetCallback =
+  /**
+   * The callback is called when the connection reset has completed,
+   * either successfully or with an error.
+   *
+   * If an error occurred then `err` will describe the error.
+   *
+   * As only one request at a time may be executed on a connection, another
+   * request should not be initiated until this callback is called
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   */
+  (err: Error | null | undefined) => void;
+
+type TransactionCallback<T extends (err: Error | null | undefined, ...args: any[]) => void> =
+  /**
+   * The callback is called when the request to start a transaction (or create a savepoint, in
+   * the case of a nested transaction) has completed, either successfully or with an error.
+   * If an error occurred, then `err` will describe the error.
+   * If no error occurred, the callback should perform its work and eventually call
+   * `done` with an error or null (to trigger a transaction rollback or a
+   * transaction commit) and an additional completion callback that will be called when the request
+   * to rollback or commit the current transaction has completed, either successfully or with an error.
+   * Additional arguments given to `done` will be passed through to this callback.
+   *
+   * As only one request at a time may be executed on a connection, another request should not
+   * be initiated until the completion callback is called.
+   *
+   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param txDone If no error occurred, a function to be called to commit or rollback the transaction.
+   */
+  (err: Error | null | undefined, txDone?: TransactionDone<T>) => void;
+
+type TransactionDoneCallback = (err: Error | null | undefined, ...args: any[]) => void;
+type CallbackParameters<T extends (err: Error | null | undefined, ...args: any[]) => any> = T extends (err: Error | null | undefined, ...args: infer P) => any ? P : never;
+
+type TransactionDone<T extends (err: Error | null | undefined, ...args: any[]) => void> =
+  /**
+   * If no error occurred, a function to be called to commit or rollback the transaction.
+   *
+   * @param err If an err occurred, a string with details of the error.
+   */
+  (err: Error | null | undefined, done: T, ...args: CallbackParameters<T>) => void;
+
+/**
+ * @private
+ */
 const KEEP_ALIVE_INITIAL_DELAY = 30 * 1000;
+/**
+ * @private
+ */
 const DEFAULT_CONNECT_TIMEOUT = 15 * 1000;
+/**
+ * @private
+ */
 const DEFAULT_CLIENT_REQUEST_TIMEOUT = 15 * 1000;
+/**
+ * @private
+ */
 const DEFAULT_CANCEL_TIMEOUT = 5 * 1000;
+/**
+ * @private
+ */
 const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
+/**
+ * @private
+ */
 const DEFAULT_PACKET_SIZE = 4 * 1024;
+/**
+ * @private
+ */
 const DEFAULT_TEXTSIZE = '2147483647';
+/**
+ * @private
+ */
 const DEFAULT_DATEFIRST = 7;
+/**
+ * @private
+ */
 const DEFAULT_PORT = 1433;
+/**
+ * @private
+ */
 const DEFAULT_TDS_VERSION = '7_4';
+/**
+ * @private
+ */
 const DEFAULT_LANGUAGE = 'us_english';
+/**
+ * @private
+ */
 const DEFAULT_DATEFORMAT = 'mdy';
 
 interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
+    /**
+     * If you user want to connect to an Azure app service using a specific client account
+     * they need to provide `clientId` asscoiate to their created idnetity.
+     *
+     * This is optional for retrieve token from azure web app service
+     */
     clientId?: string;
+    /**
+     * A msi app service environment need to provide `msiEndpoint` for retriving the accesstoken.
+     */
     msiEndpoint?: string;
+    /**
+     * A msi app service environment need to provide `msiSecret` for retriving the accesstoken.
+     */
     msiSecret?: string;
   };
 }
@@ -79,7 +221,16 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
 interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
+    /**
+     * If you user want to connect to an Azure app service using a specific client account
+     * they need to provide `clientId` asscoiate to their created idnetity.
+     *
+     * This is optional for retrieve token from azure web app service
+     */
     clientId?: string;
+    /**
+     * A user need to provide `msiEndpoint` for retriving the accesstoken.
+     */
     msiEndpoint?: string;
   };
 }
@@ -87,6 +238,10 @@ interface AzureActiveDirectoryMsiVmAuthentication {
 interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
+    /**
+     * A user need to provide `token` which they retrived else where
+     * to forming the connection.
+     */
     token: string;
   };
 }
@@ -94,7 +249,13 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
 interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
+    /**
+     * A user need to provide `userName` asscoiate to their account.
+     */
     userName: string;
+    /**
+     * A user need to provide `password` asscoiate to their account.
+     */
     password: string;
   };
 }
@@ -102,8 +263,17 @@ interface AzureActiveDirectoryPasswordAuthentication {
 interface AzureActiveDirectoryServicePrincipalSecret {
   type: 'azure-active-directory-service-principal-secret';
   options: {
+    /**
+     * Application (`client`) ID from your registered Azure application
+     */
     clientId: string;
+    /**
+     * The created `client secret` for this registered Azure application
+     */
     clientSecret: string;
+    /**
+     * Directory (`tenant`) ID from your registered Azure application
+     */
     tenantId: string;
   };
 }
@@ -111,8 +281,19 @@ interface AzureActiveDirectoryServicePrincipalSecret {
 interface NtlmAuthentication {
   type: 'ntlm';
   options: {
+    /**
+     * User name from your windows account.
+     */
     userName: string;
+    /**
+     * Password from your windows account.
+     */
     password: string;
+    /**
+     * Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
+     *
+     * This is necessary for forming a connection using ntlm type
+     */
     domain: string;
   };
 }
@@ -120,7 +301,13 @@ interface NtlmAuthentication {
 interface DefaultAuthentication {
   type: 'default';
   options: {
+    /**
+     * User name to use for sql server login.
+     */
     userName?: string;
+    /**
+     * Password to use for sql server login.
+     */
     password?: string;
   };
 }
@@ -140,9 +327,13 @@ export interface InternalConnectionOptions {
   appName: undefined | string;
   camelCaseColumns: boolean;
   cancelTimeout: number;
+<<<<<<< HEAD
   columnEncryptionKeyCacheTTL: number;
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string);
+=======
+  columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
+>>>>>>> origin-master
   connectionRetryInterval: number;
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -189,9 +380,12 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  validateBulkLoadParameters: boolean;
+  workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
 
+<<<<<<< HEAD
 interface KeyStoreProvider {
   key: string;
   value: ColumnEncryptionAzureKeyVaultProvider;
@@ -201,6 +395,11 @@ interface KeyStoreProviderMap {
   [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
+=======
+/**
+ * @private
+ */
+>>>>>>> origin-master
 interface State {
   name: string;
   enter?(this: Connection): void;
@@ -222,95 +421,553 @@ interface State {
   };
 }
 
-interface ConnectionConfiguration {
+type Authentication = DefaultAuthentication |
+                      NtlmAuthentication |
+                      AzureActiveDirectoryPasswordAuthentication |
+                      AzureActiveDirectoryMsiAppServiceAuthentication |
+                      AzureActiveDirectoryMsiVmAuthentication |
+                      AzureActiveDirectoryAccessTokenAuthentication |
+                      AzureActiveDirectoryServicePrincipalSecret;
+
+type AuthenticationType = Authentication['type'];
+
+export interface ConnectionConfiguration {
+  /**
+   * Hostname to connect to.
+   */
   server: string;
+  /**
+   * Configuration options for forming the connection.
+   */
   options?: ConnectionOptions;
-  authentication?: {
-    type?: string;
-    options?: any;
-  };
+  /**
+   * Authentication realted options for connection.
+   */
+  authentication?: AuthenticationOptions;
+}
+
+interface DebugOptions {
+  /**
+   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet data details
+   *
+   * (default: `false`)
+   */
+  data: boolean;
+  /**
+   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet details
+   *
+   * (default: `false`)
+   */
+  packet: boolean;
+  /**
+   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet payload details
+   *
+   * (default: `false`)
+   */
+  payload: boolean;
+  /**
+   * A boolean, controlling whether [[debug]] events will be emitted with text describing token stream tokens
+   *
+   * (default: `false`)
+   */
+  token: boolean;
+  }
+
+interface AuthenticationOptions {
+  /**
+   * Type of the authentication method, valid types are `default`, `ntlm`,
+   * `azure-active-directory-password`, `azure-active-directory-access-token`,
+   * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
+   * or `azure-active-directory-service-principal-secret`
+   */
+   type?: AuthenticationType;
+   /**
+    * Different options for authentication types:
+    *
+    * * `default`: [[DefaultAuthentication.options]]
+    * * `ntlm` :[[NtlmAuthentication]]
+    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
+    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
+    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
+    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
+    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+    */
+   options?: any;
 }
 
 interface ConnectionOptions {
+  /**
+   * A boolean determining whether to rollback a transaction automatically if any error is encountered
+   * during the given transaction's execution. This sets the value for `SET XACT_ABORT` during the
+   * initial SQL phase of a connection [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-xact-abort-transact-sql).
+   */
   abortTransactionOnError?: boolean;
+
+  /**
+   * Application name used for identifying a specific application in profiling, logging or tracing tools of SQLServer.
+   *
+   * (default: `Tedious`)
+   */
   appName?: string | undefined;
+
+  /**
+   * A boolean, controlling whether the column names returned will have the first letter converted to lower case
+   * (`true`) or not. This value is ignored if you provide a [[columnNameReplacer]].
+   *
+   * (default: `false`).
+   */
   camelCaseColumns?: boolean;
+
+  /**
+   * The number of milliseconds before the [[Request.cancel]] (abort) of a request is considered failed
+   *
+   * (default: `5000`).
+   */
   cancelTimeout?: number;
+<<<<<<< HEAD
   columnEncryptionKeyCacheTTL: number;
   columnEncryptionSetting: boolean;
+=======
+
+  /**
+   * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
+   * this will be called once per column per result-set. The returned value will be used instead of the SQL-provided
+   * column name on row and meta data objects. This allows you to dynamically convert between naming conventions.
+   *
+   * (default: `null`)
+   */
+>>>>>>> origin-master
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string;
+
+  /**
+   * Number of milliseconds before retrying to establish connection, in case of transient failure.
+   *
+   * (default:`500`)
+   */
   connectionRetryInterval?: number;
+
+  /**
+   * The number of milliseconds before the attempt to connect is considered failed
+   *
+   * (default: `15000`).
+   */
   connectTimeout?: number;
+
+  /**
+   * The default isolation level for new connections. All out-of-transaction queries are executed with this setting.
+   *
+   * The isolation levels are available from `require('tedious').ISOLATION_LEVEL`.
+   * * `READ_UNCOMMITTED`
+   * * `READ_COMMITTED`
+   * * `REPEATABLE_READ`
+   * * `SERIALIZABLE`
+   * * `SNAPSHOT`
+   *
+   * (default: `READ_COMMITED`).
+   */
   connectionIsolationLevel?: number;
+
+  /**
+   * When encryption is used, an object may be supplied that will be used
+   * for the first argument when calling [`tls.createSecurePair`](http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized)
+   *
+   * (default: `{}`)
+   */
   cryptoCredentialsDetails?: {};
+
+  /**
+   * Database to connect to (default: dependent on server configuration).
+   */
   database?: string | undefined;
+
+  /**
+   * Sets the first day of the week to a number from 1 through 7.
+   */
   datefirst?: number;
+
+  /**
+   * A string representing position of month, day and year in temporal datatypes.
+   *
+   * (default: `mdy`)
+   */
   dateFormat?: string;
-  debug?: {
-    data: boolean;
-    packet: boolean;
-    payload: boolean;
-    token: boolean;
-  };
+
+  debug?: DebugOptions;
+
+  /**
+   * A boolean, controls the way null values should be used during comparison operation.
+   *
+   * (default: `true`)
+   */
   enableAnsiNull?: boolean;
+
+  /**
+   * If true, `SET ANSI_NULL_DFLT_ON ON` will be set in the initial sql. This means new columns will be
+   * nullable by default. See the [T-SQL documentation](https://msdn.microsoft.com/en-us/library/ms187375.aspx)
+   *
+   * (default: `true`).
+   */
   enableAnsiNullDefault?: boolean;
+
+  /**
+   * A boolean, controls if padding should be applied for values shorter than the size of defined column.
+   *
+   * (default: `true`)
+   */
   enableAnsiPadding?: boolean;
+
+  /**
+   * If true, SQL Server will follow ISO standard behavior during various error conditions. For details,
+   * see [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-ansi-warnings-transact-sql)
+   *
+   * (default: `true`)
+   */
   enableAnsiWarnings?: boolean;
+
+  /**
+   * Ends a query when an overflow or divide-by-zero error occurs during query execution.
+   * See [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017)
+   * for more details.
+   *
+   * (default: `true`)
+   */
   enableArithAbort?: boolean;
+
+  /**
+   * A boolean, determines if concatenation with NULL should result in NULL or empty string value, more details in
+   * [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-concat-null-yields-null-transact-sql)
+   *
+   * (default: `true`)
+   */
   enableConcatNullYieldsNull?: boolean;
+
+  /**
+   * A boolean, controls whether cursor should be closed, if the transaction opening it gets committed or rolled
+   * back.
+   *
+   * (default: `null`)
+   */
   enableCursorCloseOnCommit?: boolean | null;
+
+  /**
+   * A boolean, sets the connection to either implicit or autocommit transaction mode.
+   *
+   * (default: `false`)
+   */
   enableImplicitTransactions?: boolean;
+
+  /**
+   * If false, error is not generated during loss of precession.
+   *
+   * (default: `false`)
+   */
   enableNumericRoundabort?: boolean;
+
+  /**
+   * If true, characters enclosed in single quotes are treated as literals and those enclosed double quotes are treated as identifiers.
+   *
+   * (default: `true`)
+   */
   enableQuotedIdentifier?: boolean;
+
+  /**
+   * A boolean determining whether or not the connection will be encrypted. Set to `true` if you're on Windows Azure.
+   *
+   * (default: `false`)
+   */
   encrypt?: boolean;
+<<<<<<< HEAD
   encryptionKeyStoreProviders?: KeyStoreProvider[];
+=======
+
+  /**
+   * By default, if the database requested by [[database]] cannot be accessed,
+   * the connection will fail with an error. However, if [[fallbackToDefaultDb]] is
+   * set to `true`, then the user's default database will be used instead
+   *
+   * (default: `false`)
+   */
+>>>>>>> origin-master
   fallbackToDefaultDb?: boolean;
+
+  /**
+   * The instance name to connect to.
+   * The SQL Server Browser service must be running on the database server,
+   * and UDP port 1434 on the database server must be reachable.
+   *
+   * (no default)
+   *
+   * Mutually exclusive with [[port]].
+   */
   instanceName?: string | undefined;
+
+  /**
+   * The default isolation level that transactions will be run with.
+   *
+   * The isolation levels are available from `require('tedious').ISOLATION_LEVEL`.
+   * * `READ_UNCOMMITTED`
+   * * `READ_COMMITTED`
+   * * `REPEATABLE_READ`
+   * * `SERIALIZABLE`
+   * * `SNAPSHOT`
+   *
+   * (default: `READ_COMMITED`).
+   */
   isolationLevel?: number;
+
+  /**
+   * Specifies the language environment for the session. The session language determines the datetime formats and system messages.
+   *
+   * (default: `us_english`).
+   */
   language?: string;
+
+  /**
+   * A string indicating which network interface (ip address) to use when connecting to SQL Server.
+   */
   localAddress?: string | undefined;
+
+  /**
+   * The maximum number of connection retries for transient errors.、
+   *
+   * (default: `3`).
+   */
   maxRetriesOnTransientErrors?: number;
+
+  /**
+   * Sets the MultiSubnetFailover = True parameter, which can help minimize the client recovery latency when failovers occur.
+   *
+   * (default: `false`).
+   */
   multiSubnetFailover?: boolean;
+
+  /**
+   * The size of TDS packets (subject to negotiation with the server).
+   * Should be a power of 2.
+   *
+   * (default: `4096`).
+   */
   packetSize?: number;
+
+  /**
+   * Port to connect to (default: `1433`).
+   *
+   * Mutually exclusive with [[instanceName]]
+   */
   port?: number;
+
+  /**
+   * A boolean, determining whether the connection will request read only access from a SQL Server Availability
+   * Group. For more information, see [here](http://msdn.microsoft.com/en-us/library/hh710054.aspx "Microsoft: Configure Read-Only Routing for an Availability Group (SQL Server)")
+   *
+   * (default: `false`).
+   */
   readOnlyIntent?: boolean;
+
+  /**
+   * The number of milliseconds before a request is considered failed, or `0` for no timeout
+   *
+   * (default: `15000`).
+   */
   requestTimeout?: number;
+
+  /**
+   * A boolean, that when true will expose received rows in Requests done related events:
+   * * [[Request.Event_doneInProc]]
+   * * [[Request.Event_doneProc]]
+   * * [[Request.Event_done]]
+   *
+   * (default: `false`)
+   *
+   * Caution: If many row are received, enabling this option could result in
+   * excessive memory usage.
+   */
   rowCollectionOnDone?: boolean;
+
+  /**
+   * A boolean, that when true will expose received rows in Requests' completion callback.See [[Request.constructor]].
+   *
+   * (default: `false`)
+   *
+   * Caution: If many row are received, enabling this option could result in
+   * excessive memory usage.
+   */
   rowCollectionOnRequestCompletion?: boolean;
+
+  /**
+   * The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
+   *
+   * The versions are available from `require('tedious').TDS_VERSION`.
+   * * `7_1`
+   * * `7_2`
+   * * `7_3_A`
+   * * `7_3_B`
+   * * `7_4`
+   *
+   * (default: `7_4`)
+   */
   tdsVersion?: string;
+
+  /**
+   * Specifies the size of varchar(max), nvarchar(max), varbinary(max), text, ntext, and image data returned by a SELECT statement.
+   *
+   * (default: `2147483647`)
+   */
   textsize?: string;
+
+  /**
+   * If "true", the SQL Server SSL certificate is automatically trusted when the communication layer is encrypted using SSL.
+   *
+   * If "false", the SQL Server validates the server SSL certificate. If the server certificate validation fails,
+   * the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
+   * matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
+   *
+   * (default: `true`)
+   */
   trustServerCertificate?: boolean;
+
+  /**
+   * A boolean determining whether to return rows as arrays or key-value collections.
+   *
+   * (default: `false`).
+   */
   useColumnNames?: boolean;
+
+  /**
+   * A boolean determining whether to pass time values in UTC or local time.
+   *
+   * (default: `true`).
+   */
   useUTC?: boolean;
+
+  /**
+   * A boolean determining whether BulkLoad parameters should be validated.
+   *
+   * (default: `false`).
+   */
+  validateBulkLoadParameters?: boolean;
+
+  /**
+   * The workstation ID (WSID) of the client, default os.hostname().
+   * Used for identifying a specific client in profiling, logging or
+   * tracing client activity in SQLServer.
+   *
+   * The value is reported by the TSQL function HOST_NAME().
+   */
+  workstationId?: string | undefined;
+
+  /**
+   * A boolean determining whether to parse unique identifier type with lowercase case characters.
+   *
+   * (default: `false`).
+   */
   lowerCaseGuids?: boolean;
 }
 
+/**
+ * @private
+ */
 const CLEANUP_TYPE = {
   NORMAL: 0,
   REDIRECT: 1,
   RETRY: 2
 };
 
+/**
+ * A [[Connection]] instance represents a single connection to a database server.
+ *
+ * ```js
+ * var Connection = require('tedious').Connection;
+ * var config = {
+ *  "authentication": {
+ *    ...,
+ *    "options": {...}
+ *  },
+ *  "options": {...}
+ * };
+ * var connection = new Connection(config);
+ * ```
+ *
+ * Only one request at a time may be executed on a connection. Once a [[Request]]
+ * has been initiated (with [[Connection.callProcedure]], [[Connection.execSql]],
+ * or [[Connection.execSqlBatch]]), another should not be initiated until the
+ * [[Request]]'s completion callback is called.
+ */
 class Connection extends EventEmitter {
+  /**
+   * @private
+   */
   fedAuthRequired: boolean;
+  /**
+   * @private
+   */
   fedAuthInfoToken: undefined | FedAuthInfoToken;
+  /**
+   * @private
+   */
   config: InternalConnectionConfig;
+  /**
+   * @private
+   */
   secureContext: SecureContext;
+  /**
+   * @private
+   */
   inTransaction: boolean;
+  /**
+   * @private
+   */
   transactionDescriptors: Buffer[];
+  /**
+   * @private
+   */
   transactionDepth: number;
+  /**
+   * @private
+   */
   isSqlBatch: boolean;
+  /**
+   * @private
+   */
   curTransientRetryCount: number;
+  /**
+   * @private
+   */
   transientErrorLookup: TransientErrorLookup;
+  /**
+   * @private
+   */
   closed: boolean;
+  /**
+   * @private
+   */
   loggedIn: boolean;
+  /**
+   * @private
+   */
   loginError: undefined | ConnectionError;
+  /**
+   * @private
+   */
   debug: Debug;
+  /**
+   * @private
+   */
   tokenStreamParser: TokenStreamParser;
+  /**
+   * @private
+   */
   ntlmpacket: undefined | any;
+  /**
+   * @private
+   */
   ntlmpacketBuffer: undefined | Buffer;
 
+  /**
+   * @private
+   */
   STATE!: {
+    INITIALIZED: State;
     CONNECTING: State;
     SENT_PRELOGIN: State;
     REROUTING: State;
@@ -326,22 +983,82 @@ class Connection extends EventEmitter {
     FINAL: State;
   }
 
+  /**
+   * @private
+   */
   routingData: any;
+  /**
+   * @private
+   */
   messageIo!: MessageIO;
+  /**
+   * @private
+   */
   state: State;
+  /**
+   * @private
+   */
   resetConnectionOnNextRequest: undefined | boolean;
+  /**
+   * @private
+   */
   attentionReceived: undefined | boolean;
 
+  /**
+   * @private
+   */
   request: undefined | Request | BulkLoad;
+  /**
+   * @private
+   */
   procReturnStatusValue: undefined | any;
+  /**
+   * @private
+   */
   socket: undefined | Socket;
+  /**
+   * @private
+   */
   messageBuffer: Buffer;
 
+  /**
+   * @private
+   */
   connectTimer: undefined | NodeJS.Timeout;
+  /**
+   * @private
+   */
   cancelTimer: undefined | NodeJS.Timeout;
+  /**
+   * @private
+   */
   requestTimer: undefined | NodeJS.Timeout;
+  /**
+   * @private
+   */
   retryTimer: undefined | NodeJS.Timeout;
 
+  /**
+   * Note: be aware of the different options field:
+   * 1. config.authentication.options
+   * 2. config.options
+   *
+   * ```js
+   * const { Connection } = require('tedious');
+   *
+   * const config = {
+   *  "authentication": {
+   *    ...,
+   *    "options": {...}
+   *  },
+   *  "options": {...}
+   * };
+   *
+   * const connection = new Connection(config);
+   * ```
+   *
+   * @param config
+   */
   constructor(config: ConnectionConfiguration) {
     super();
 
@@ -563,10 +1280,16 @@ class Connection extends EventEmitter {
         serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
+<<<<<<< HEAD
         trustedServerNameAE: undefined,
         trustServerCertificate: true,
+=======
+        trustServerCertificate: false,
+>>>>>>> origin-master
         useColumnNames: false,
         useUTC: true,
+        validateBulkLoadParameters: false,
+        workstationId: undefined,
         lowerCaseGuids: false
       }
     };
@@ -625,6 +1348,8 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.connectionIsolationLevel !== undefined) {
+        assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
+
         this.config.options.connectionIsolationLevel = config.options.connectionIsolationLevel;
       }
 
@@ -812,9 +1537,7 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.isolationLevel !== undefined) {
-        if (typeof config.options.isolationLevel !== 'number') {
-          throw new TypeError('The "config.options.isolationLevel" property must be of type number.');
-        }
+        assertValidIsolationLevel(config.options.isolationLevel, 'config.options.isolationLevel');
 
         this.config.options.isolationLevel = config.options.isolationLevel;
       }
@@ -960,6 +1683,7 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+<<<<<<< HEAD
       if (config.options.columnEncryptionSetting !== undefined) {
         if (typeof config.options.columnEncryptionSetting !== 'boolean') {
           throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
@@ -978,6 +1702,24 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+=======
+      if (config.options.validateBulkLoadParameters !== undefined) {
+        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
+          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
+      } else {
+        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
+      }
+
+      if (config.options.workstationId !== undefined) {
+        if (typeof config.options.workstationId !== 'string') {
+          throw new TypeError('The "config.options.workstationId" property must be of type string.');
+        }
+
+        this.config.options.workstationId = config.options.workstationId;
+>>>>>>> origin-master
       }
 
       if (config.options.lowerCaseGuids !== undefined) {
@@ -1069,19 +1811,212 @@ class Connection extends EventEmitter {
     this.curTransientRetryCount = 0;
     this.transientErrorLookup = new TransientErrorLookup();
 
-    this.state = this.STATE.CONNECTING;
-    this.state.enter!.call(this);
+    this.state = this.STATE.INITIALIZED;
+
+    process.nextTick(() => {
+      if (this.state === this.STATE.INITIALIZED) {
+        const message = 'In the next major version of `tedious`, creating a new ' +
+          '`Connection` instance will no longer establish a connection to the ' +
+          'server automatically. Please use the new `connect` helper function or ' +
+          'call the `.connect` method on the newly created `Connection` object to ' +
+          'silence this message.';
+        deprecate(message);
+        this.connect();
+      }
+    });
   }
 
+  connect(connectListener?: (err?: Error) => void) {
+    if (this.state !== this.STATE.INITIALIZED) {
+      throw new ConnectionError('`.connect` can not be called on a Connection in `' + this.state.name + '` state.');
+    }
+
+    if (connectListener) {
+      const onConnect = (err?: Error) => {
+        this.removeListener('error', onError);
+        connectListener(err);
+      };
+
+      const onError = (err: Error) => {
+        this.removeListener('connect', onConnect);
+        connectListener(err);
+      };
+
+      this.once('connect', onConnect);
+      this.once('error', onError);
+    }
+
+    this.transitionTo(this.STATE.CONNECTING);
+  }
+
+  /**
+   * The server has reported that the charset has changed.
+   */
+  on(event: 'charsetChange', listener: (charset: string) => void): this
+
+  /**
+   * The attempt to connect and validate has completed.
+   */
+  on(
+    event: 'connect',
+    /**
+     * @param err If successfully connected, will be falsey. If there was a
+     *   problem (with either connecting or validation), will be an [[Error]] object.
+     */
+    listener: (err: Error | undefined) => void
+  ): this
+
+  /**
+   * The server has reported that the active database has changed.
+   * This may be as a result of a successful login, or a `use` statement.
+   */
+  on(event: 'databaseChange', listener: (databaseName: string) => void): this
+
+  /**
+   * A debug message is available. It may be logged or ignored.
+   */
+  on(event: 'debug', listener: (messageText: string) => void): this
+
+  /**
+   * Internal error occurs.
+   */
+  on(event: 'error', listener: (err: Error) => void): this
+
+  /**
+   * The server has issued an error message.
+   */
+  on(event: 'errorMessage', listener: (message: import('./token/token').ErrorMessageToken) => void): this
+
+  /**
+   * The connection has ended.
+   *
+   * This may be as a result of the client calling [[close]], the server
+   * closing the connection, or a network error.
+   */
+  on(event: 'end', listener: () => void): this
+
+  /**
+   * The server has issued an information message.
+   */
+  on(event: 'infoMessage', listener: (message: import('./token/token').InfoMessageToken) => void): this
+
+  /**
+   * The server has reported that the language has changed.
+   */
+  on(event: 'languageChange', listener: (languageName: string) => void): this
+
+  /**
+   * A secure connection has been established.
+   */
+  on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
+
+  on(event: string | symbol, listener: (...args: any[]) => void) {
+    return super.on(event, listener);
+  }
+
+  /**
+   * @private
+   */
+  emit(event: 'charsetChange', charset: string): boolean
+  /**
+   * @private
+   */
+  emit(event: 'connect', error?: Error): boolean
+  /**
+   * @private
+   */
+  emit(event: 'databaseChange', databaseName: string): boolean
+  /**
+   * @private
+   */
+  emit(event: 'debug', messageText: string): boolean
+  /**
+   * @private
+   */
+  emit(event: 'error', error: Error): boolean
+  /**
+   * @private
+   */
+  emit(event: 'errorMessage', message: import('./token/token').ErrorMessageToken): boolean
+  /**
+   * @private
+   */
+  emit(event: 'end'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'infoMessage', message: import('./token/token').InfoMessageToken): boolean
+  /**
+   * @private
+   */
+  emit(event: 'languageChange', languageName: string): boolean
+  /**
+   * @private
+   */
+  emit(event: 'secure', cleartext: import('tls').TLSSocket): boolean
+  /**
+   * @private
+   */
+  emit(event: 'rerouting'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'resetConnection'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'retry'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'rollbackTransaction'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'sspichallenge', token: import('./token/token').SSPIToken): boolean
+  emit(event: string | symbol, ...args: any[]) {
+    return super.emit(event, ...args);
+  }
+
+  /**
+   * Closes the connection to the database.
+   *
+   * The [[Event_end]] will be emitted once the connection has been closed.
+   */
   close() {
     this.transitionTo(this.STATE.FINAL);
   }
 
+  /**
+   * @private
+   */
   initialiseConnection() {
-    this.connect();
     this.createConnectTimer();
+
+    if (this.config.options.port) {
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
+    } else {
+      return new InstanceLookup().instanceLookup({
+        server: this.config.server,
+        instanceName: this.config.options.instanceName!,
+        timeout: this.config.options.connectTimeout
+      }, (message, port) => {
+        if (this.state === this.STATE.FINAL) {
+          return;
+        }
+
+        if (message) {
+          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+        } else {
+          this.connectOnPort(port!, this.config.options.multiSubnetFailover);
+        }
+      });
+    }
   }
 
+  /**
+   * @private
+   */
   cleanupConnection(cleanupType: typeof CLEANUP_TYPE[keyof typeof CLEANUP_TYPE]) {
     if (!this.closed) {
       this.clearConnectTimer();
@@ -1109,6 +2044,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   createDebug() {
     const debug = new Debug(this.config.options.debug);
     debug.on('debug', (message) => {
@@ -1117,8 +2055,11 @@ class Connection extends EventEmitter {
     return debug;
   }
 
+  /**
+   * @private
+   */
   createTokenStreamParser() {
-    const tokenStreamParser = new TokenStreamParser(this.debug, undefined, this.config.options);
+    const tokenStreamParser = new TokenStreamParser(this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
       this.emit('infoMessage', token);
@@ -1392,28 +2333,6 @@ class Connection extends EventEmitter {
     return tokenStreamParser;
   }
 
-  connect() {
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
-    } else {
-      return new InstanceLookup().instanceLookup({
-        server: this.config.server,
-        instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout
-      }, (message, port) => {
-        if (this.state === this.STATE.FINAL) {
-          return;
-        }
-
-        if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover);
-        }
-      });
-    }
-  }
-
   connectOnPort(port: number, multiSubnetFailover: boolean) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
@@ -1440,24 +2359,36 @@ class Connection extends EventEmitter {
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      this.messageIo.on('error', (error) => {
+        this.socketError(error);
+      });
 
       this.socket = socket;
       this.socketConnect();
     });
   }
 
+  /**
+   * @private
+   */
   closeConnection() {
     if (this.socket) {
       this.socket.destroy();
     }
   }
 
+  /**
+   * @private
+   */
   createConnectTimer() {
     this.connectTimer = setTimeout(() => {
       this.connectTimeout();
     }, this.config.options.connectTimeout);
   }
 
+  /**
+   * @private
+   */
   createCancelTimer() {
     this.clearCancelTimer();
     const timeout = this.config.options.cancelTimeout;
@@ -1468,6 +2399,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   createRequestTimer() {
     this.clearRequestTimer(); // release old timer, just to be safe
     const request = this.request as Request;
@@ -1479,6 +2413,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   createRetryTimer() {
     this.clearRetryTimer();
     this.retryTimer = setTimeout(() => {
@@ -1486,6 +2423,9 @@ class Connection extends EventEmitter {
     }, this.config.options.connectionRetryInterval);
   }
 
+  /**
+   * @private
+   */
   connectTimeout() {
     const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
@@ -1494,12 +2434,18 @@ class Connection extends EventEmitter {
     this.dispatchEvent('connectTimeout');
   }
 
+  /**
+   * @private
+   */
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
     this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
   }
 
+  /**
+   * @private
+   */
   requestTimeout() {
     this.requestTimer = undefined;
     const request = this.request!;
@@ -1509,24 +2455,36 @@ class Connection extends EventEmitter {
     request.error = RequestError(message, 'ETIMEOUT');
   }
 
+  /**
+   * @private
+   */
   retryTimeout() {
     this.retryTimer = undefined;
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
   }
 
+  /**
+   * @private
+   */
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
     }
   }
 
+  /**
+   * @private
+   */
   clearCancelTimer() {
     if (this.cancelTimer) {
       clearTimeout(this.cancelTimer);
     }
   }
 
+  /**
+   * @private
+   */
   clearRequestTimer() {
     if (this.requestTimer) {
       clearTimeout(this.requestTimer);
@@ -1534,6 +2492,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   clearRetryTimer() {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
@@ -1541,6 +2502,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   transitionTo(newState: State) {
     if (this.state === newState) {
       this.debug.log('State is already ' + newState.name);
@@ -1559,6 +2523,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   getEventHandler<T extends keyof State['events']>(eventName: T): NonNullable<State['events'][T]> {
     const handler = this.state.events[eventName];
 
@@ -1569,6 +2536,9 @@ class Connection extends EventEmitter {
     return handler!;
   }
 
+  /**
+   * @private
+   */
   dispatchEvent<T extends keyof State['events']>(eventName: T, ...args: Parameters<NonNullable<State['events'][T]>>) {
     const handler = this.state.events[eventName] as Function | undefined;
     if (handler) {
@@ -1579,6 +2549,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
@@ -1592,12 +2565,18 @@ class Connection extends EventEmitter {
     this.dispatchEvent('socketError', error);
   }
 
+  /**
+   * @private
+   */
   socketConnect() {
     this.closed = false;
     this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
     this.dispatchEvent('socketConnect');
   }
 
+  /**
+   * @private
+   */
   socketEnd() {
     this.debug.log('socket ended');
     if (this.state !== this.STATE.FINAL) {
@@ -1607,6 +2586,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
@@ -1623,6 +2605,9 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   sendPreLogin() {
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt
@@ -1633,14 +2618,23 @@ class Connection extends EventEmitter {
     });
   }
 
+  /**
+   * @private
+   */
   emptyMessageBuffer() {
     this.messageBuffer = Buffer.alloc(0);
   }
 
+  /**
+   * @private
+   */
   addToMessageBuffer(data: Buffer) {
     this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
+  /**
+   * @private
+   */
   sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
@@ -1691,7 +2685,7 @@ class Connection extends EventEmitter {
         payload.password = authentication.options.password;
     }
 
-    payload.hostname = os.hostname();
+    payload.hostname = this.config.options.workstationId || os.hostname();
     payload.serverName = this.routingData ? this.routingData.server : this.config.server;
     payload.appName = this.config.options.appName || 'Tedious';
     payload.libraryName = libraryName;
@@ -1710,6 +2704,9 @@ class Connection extends EventEmitter {
     });
   }
 
+  /**
+   * @private
+   */
   sendFedAuthTokenMessage(token: string) {
     const accessTokenLen = Buffer.byteLength(token, 'ucs2');
     const data = Buffer.alloc(8 + accessTokenLen);
@@ -1722,41 +2719,63 @@ class Connection extends EventEmitter {
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
-  // Returns false to apply backpressure.
+  /**
+   * Returns false to apply backpressure.
+   *
+   * @private
+   */
   sendDataToTokenStreamParser(data: Buffer) {
     return this.tokenStreamParser.addBuffer(data);
   }
 
-  // This is an internal method that is called from Request.pause().
-  // It has to check whether the passed Request object represents the currently
-  // active request, because the application might have called Request.pause()
-  // on an old inactive Request object.
+  /**
+   * This is an internal method that is called from [[Request.pause]].
+   * It has to check whether the passed Request object represents the currently
+   * active request, because the application might have called [[Request.pause]]
+   * on an old inactive Request object.
+   *
+   * @private
+   */
   pauseRequest(request: Request | BulkLoad) {
     if (this.isRequestActive(request)) {
       this.tokenStreamParser.pause();
     }
   }
 
-  // This is an internal method that is called from Request.resume().
+  /**
+   * This is an internal method that is called from [[Request.resume]].
+   *
+   * @private
+   */
   resumeRequest(request: Request | BulkLoad) {
     if (this.isRequestActive(request)) {
       this.tokenStreamParser.resume();
     }
   }
 
-  // Returns true if the passed request is the currently active request of the connection.
+  /**
+   * Returns true if the passed request is the currently active request of the connection.
+   *
+   * @private
+   */
   isRequestActive(request: Request | BulkLoad) {
     return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
   }
 
+  /**
+   * @private
+   */
   sendInitialSql() {
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
     const message = new Message({ type: TYPE.SQL_BATCH });
     this.messageIo.outgoingMessageStream.write(message);
-    payload.getStream().pipe(message);
+    Readable.from(payload).pipe(message);
   }
 
+  /**
+   * @private
+   */
   getInitialSql() {
     const options = [];
 
@@ -1849,16 +2868,47 @@ class Connection extends EventEmitter {
     return options.join('\n');
   }
 
+  /**
+   * @private
+   */
   processedInitialSql() {
     this.clearConnectTimer();
     this.emit('connect');
   }
 
+  /**
+   * Execute the SQL batch represented by [[Request]].
+   * There is no param support, and unlike [[Request.execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[Request.execSql]] will be a better choice.
+   *
+   * @param request A [[Request]] object representing the request.
+   */
   execSqlBatch(request: Request) {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
+<<<<<<< HEAD
   _execSql(request: Request) {
+=======
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSql(request: Request) {
+>>>>>>> origin-master
     request.transformIntoExecuteSqlRpc();
 
     const error = request.error;
@@ -1892,14 +2942,10 @@ class Connection extends EventEmitter {
   }
 
   /**
-   @function newBulkLoad
-   @param {string} table - Table's name.
-   @param {Object} [options] - BulkLoad options.
-   @param {boolean} [options.checkConstraints=false] - Honors constraints during bulk load, it is disabled by default.
-   @param {boolean} [options.fireTriggers=false] - Honors insert triggers during bulk load, it is disabled by default.
-   @param {boolean} [options.keepNulls=false] - Honors null value passed, ignores the default values set on table.
-   @param {boolean} [options.tableLock=false] - Places a bulk update(BU) lock on table while performing bulk load. Uses row locks by default.
-   @param {callback} callback - Function to call after BulkLoad executes.
+   * Creates a new BulkLoad instance.
+   *
+   * @param table The name of the table to bulk-insert into.
+   * @param options A set of bulk load options.
    */
   newBulkLoad(table: string, callback: BulkLoadCallback): BulkLoad
   newBulkLoad(table: string, options: BulkLoadOptions, callback: BulkLoadCallback): BulkLoad
@@ -1919,6 +2965,15 @@ class Connection extends EventEmitter {
     return new BulkLoad(table, this.config.options, options, callback);
   }
 
+  /**
+   * Execute the SQL batch represented by [[Request]] .
+   * There is no param support, and unlike [[execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[execSql]] will be a better choice.
+   *
+   * @param bulkLoad A previously prepared [[Request]] .
+   */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
@@ -1941,16 +2996,41 @@ class Connection extends EventEmitter {
     this.execSqlBatch(request);
   }
 
+  /**
+   * Prepare the SQL represented by the request.
+   *
+   * The request can then be used in subsequent calls to
+   * [[execute]] and [[unprepare]]
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   */
   prepare(request: Request) {
     request.transformIntoPrepareRpc();
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
+  /**
+   * Release the SQL Server resources associated with a previously prepared request.
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type.
+   *   Parameter values are ignored.
+   */
   unprepare(request: Request) {
     request.transformIntoUnprepareRpc();
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
+  /**
+   * Execute previously prepared SQL, using the supplied parameters.
+   *
+   * @param request A previously prepared [[Request]].
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the [[Request]] before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   */
   execute(request: Request, parameters: { [key: string]: unknown }) {
     request.transformIntoExecuteRpc(parameters);
 
@@ -1967,6 +3047,11 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
+  /**
+   * Call a stored procedure represented by [[Request]].
+   *
+   * @param request A [[Request]] object representing the request.
+   */
   callProcedure(request: Request) {
     request.validateParameters();
 
@@ -1982,8 +3067,29 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  beginTransaction(callback: (err: Error | null | undefined, transactionDescriptor?: Buffer) => void, name = '', isolationLevel = this.config.options.isolationLevel) {
+  /**
+   * Start a transaction.
+   *
+   * @param callback
+   * @param name A string representing a name to associate with the transaction.
+   *   Optional, and defaults to an empty string. Required when `isolationLevel`
+   *   is present.
+   * @param isolationLevel The isolation level that the transaction is to be run with.
+   *
+   *   The isolation levels are available from `require('tedious').ISOLATION_LEVEL`.
+   *   * `READ_UNCOMMITTED`
+   *   * `READ_COMMITTED`
+   *   * `REPEATABLE_READ`
+   *   * `SERIALIZABLE`
+   *   * `SNAPSHOT`
+   *
+   *   Optional, and defaults to the Connection's isolation level.
+   */
+  beginTransaction(callback: BeginTransactionCallback, name = '', isolationLevel = this.config.options.isolationLevel) {
+    assertValidIsolationLevel(isolationLevel, 'isolationLevel');
+
     const transaction = new Transaction(name, isolationLevel);
+
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
         this.transactionDepth++;
@@ -2000,7 +3106,17 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
   }
 
-  commitTransaction(callback: (err: Error | null | undefined) => void, name = '') {
+  /**
+   * Commit a transaction.
+   *
+   * There should be an active transaction - that is, [[beginTransaction]]
+   * should have been previously called.
+   *
+   * @param callback
+   * @param name A string representing a name to associate with the transaction.
+   *   Optional, and defaults to an empty string. Required when `isolationLevel`is present.
+   */
+  commitTransaction(callback: CommitTransactionCallback, name = '') {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (err) => {
@@ -2016,7 +3132,18 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
   }
 
-  rollbackTransaction(callback: (err: Error | null | undefined) => void, name = '') {
+  /**
+   * Rollback a transaction.
+   *
+   * There should be an active transaction - that is, [[beginTransaction]]
+   * should have been previously called.
+   *
+   * @param callback
+   * @param name A string representing a name to associate with the transaction.
+   *   Optional, and defaults to an empty string.
+   *   Required when `isolationLevel` is present.
+   */
+  rollbackTransaction(callback: RollbackTransactionCallback, name = '') {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (err) => {
@@ -2031,7 +3158,18 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
   }
 
-  saveTransaction(callback: (err: Error | null | undefined) => void, name: string) {
+  /**
+   * Set a savepoint within a transaction.
+   *
+   * There should be an active transaction - that is, [[beginTransaction]]
+   * should have been previously called.
+   *
+   * @param callback
+   * @param name A string representing a name to associate with the transaction.\
+   *   Optional, and defaults to an empty string.
+   *   Required when `isolationLevel` is present.
+   */
+  saveTransaction(callback: SaveTransactionCallback, name: string) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (err) => {
@@ -2043,15 +3181,35 @@ class Connection extends EventEmitter {
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
 
-  // eslint-disable-next-line space-before-function-paren
-  transaction<T extends (...args: any[]) => void>(cb: (err: Error | null | undefined, txDone?: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
+  /**
+   * Run the given callback after starting a transaction, and commit or
+   * rollback the transaction afterwards.
+   *
+   * This is a helper that employs [[beginTransaction]], [[commitTransaction]],
+   * [[rollbackTransaction]], and [[saveTransaction]] to greatly simplify the
+   * use of database transactions and automatically handle transaction nesting.
+   *
+   * @param cb
+   * @param isolationLevel
+   *   The isolation level that the transaction is to be run with.
+   *
+   *   The isolation levels are available from `require('tedious').ISOLATION_LEVEL`.
+   *   * `READ_UNCOMMITTED`
+   *   * `READ_COMMITTED`
+   *   * `REPEATABLE_READ`
+   *   * `SERIALIZABLE`
+   *   * `SNAPSHOT`
+   *
+   *   Optional, and defaults to the Connection's isolation level.
+   */
+  transaction(cb: (err: Error | null | undefined, txDone?: <T extends TransactionDoneCallback>(err: Error | null | undefined, done: T, ...args: CallbackParameters<T>) => void) => void, isolationLevel?: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
     if (typeof cb !== 'function') {
       throw new TypeError('`cb` must be a function');
     }
 
     const useSavepoint = this.inTransaction;
     const name = '_tedious_' + (crypto.randomBytes(10).toString('hex'));
-    const txDone: (err: Error | null | undefined, done: T, ...args: Parameters<T>) => void = (err, done, ...args) => {
+    const txDone: <T extends TransactionDoneCallback>(err: Error | null | undefined, done: T, ...args: CallbackParameters<T>) => void = (err, done, ...args) => {
       if (err) {
         if (this.inTransaction && this.state === this.STATE.LOGGED_IN) {
           this.rollbackTransaction((txErr) => {
@@ -2097,9 +3255,12 @@ class Connection extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: { getStream: () => Readable, toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: { getStream: () => Readable, toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -2116,10 +3277,10 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
-      request.connection = this;
-      request.rowCount = 0;
-      request.rows = [];
-      request.rst = [];
+      request.connection! = this;
+      request.rowCount! = 0;
+      request.rows! = [];
+      request.rst! = [];
 
       let message: Message;
 
@@ -2157,10 +3318,6 @@ class Connection extends EventEmitter {
         }
         this.messageIo.outgoingMessageStream.write(message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-        if (request.paused) { // Request.pause() has been called before the request was started
-          this.pauseRequest(request);
-        }
       } else {
         this.createRequestTimer();
 
@@ -2179,11 +3336,14 @@ class Connection extends EventEmitter {
           }
         });
 
-        payload!.getStream().pipe(message);
+        Readable.from(payload!).pipe(message);
       }
     }
   }
 
+  /**
+   * Cancel currently executed request.
+   */
   cancel() {
     if (!this.request) {
       return false;
@@ -2197,7 +3357,13 @@ class Connection extends EventEmitter {
     return true;
   }
 
-  reset(callback: (err: Error | undefined | null) => void) {
+  /**
+   * Reset the connection to its initial state.
+   * Can be useful for connection pool implementations.
+   *
+   * @param callback
+   */
+  reset(callback: ResetCallback) {
     const request = new Request(this.getInitialSql(), (err) => {
       if (this.config.options.tdsVersion < '7_2') {
         this.inTransaction = false;
@@ -2208,10 +3374,16 @@ class Connection extends EventEmitter {
     this.execSqlBatch(request);
   }
 
+  /**
+   * @private
+   */
   currentTransactionDescriptor() {
     return this.transactionDescriptors[this.transactionDescriptors.length - 1];
   }
 
+  /**
+   * @private
+   */
   getIsolationLevelText(isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL]) {
     switch (isolationLevel) {
       case ISOLATION_LEVEL.READ_UNCOMMITTED:
@@ -2232,6 +3404,10 @@ export default Connection;
 module.exports = Connection;
 
 Connection.prototype.STATE = {
+  INITIALIZED: {
+    name: 'Initialized',
+    events: {}
+  },
   CONNECTING: {
     name: 'Connecting',
     enter: function() {
@@ -2284,7 +3460,7 @@ Connection.prototype.STATE = {
             return this.close();
           }
 
-          this.messageIo.startTls(this.secureContext, this.config.server, this.config.options.trustServerCertificate);
+          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
         } else {
           this.sendLogin7Packet();

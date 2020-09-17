@@ -10,6 +10,9 @@ import { TYPE as PACKET_TYPE } from './packet';
 import { DataType, Parameter } from './data-type';
 import { RequestError } from './errors';
 
+/**
+ * @private
+ */
 const FLAGS = {
   nullable: 1 << 0,
   caseSen: 1 << 1,
@@ -24,6 +27,9 @@ const FLAGS = {
   nullableUnknown: 1 << 15 // introduced in TDS 7.2
 };
 
+/**
+ * @private
+ */
 const DONE_STATUS = {
   FINAL: 0x00,
   MORE: 0x1,
@@ -34,42 +40,104 @@ const DONE_STATUS = {
   SRVERROR: 0x100
 };
 
-type InternalOptions = {
+/**
+ * @private
+ */
+interface InternalOptions {
   checkConstraints: boolean;
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
-};
+}
 
 export interface Options {
+  /**
+   * Honors constraints during bulk load, using T-SQL
+   * [CHECK_CONSTRAINTS](https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx).
+   * (default: `false`)
+   */
   checkConstraints?: InternalOptions['checkConstraints'];
+
+  /**
+   * Honors insert triggers during bulk load, using the T-SQL [FIRE_TRIGGERS](https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx). (default: `false`)
+   */
   fireTriggers?: InternalOptions['fireTriggers'];
+
+  /**
+   * Honors null value passed, ignores the default values set on table, using T-SQL [KEEP_NULLS](https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx). (default: `false`)
+   */
   keepNulls?: InternalOptions['keepNulls'];
+
+  /**
+   * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
+   */
   lockTable?: InternalOptions['lockTable'];
 }
 
-export type Callback = (err: Error | undefined | null, rowCount?: number) => void;
 
-type Column = Parameter & {
+export type Callback =
+  /**
+   * A function which will be called after the [[BulkLoad]] finishes executing.
+   *
+   * @param rowCount the number of rows inserted
+   */
+  (err: Error | undefined | null, rowCount?: number) => void;
+
+interface Column extends Parameter {
   objName: string;
-};
+}
 
-type ColumnOptions = {
+interface ColumnOptions {
   output?: boolean;
+
+  /**
+   * For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   */
   length?: number;
+
+  /**
+   * For Numeric, Decimal.
+   */
   precision?: number;
+
+  /**
+   * For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
+   */
   scale?: number;
+
+  /**
+   * If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]], then you can use this option to specify the property name.
+   */
   objName?: string;
+
+  /**
+   * Indicates whether the column accepts NULL values.
+   */
   nullable?: boolean;
-};
+}
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
+  /**
+   * @private
+   */
   columnMetadataWritten: boolean;
+  /**
+   * @private
+   */
   bulkLoad: BulkLoad;
+  /**
+   * @private
+   */
   mainOptions: BulkLoad['options'];
+  /**
+   * @private
+   */
   columns: BulkLoad['columns'];
 
+  /**
+   * @private
+   */
   constructor(bulkLoad: BulkLoad) {
     super({ writableObjectMode: true });
 
@@ -80,7 +148,10 @@ class RowTransform extends Transform {
     this.columnMetadataWritten = false;
   }
 
-  _transform(row: Array<any>, _encoding: string, callback: () => void) {
+  /**
+   * @private
+   */
+  _transform(row: Array<any>, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
@@ -88,22 +159,35 @@ class RowTransform extends Transform {
 
     const buf = new WritableTrackingBuffer(64, 'ucs2', true);
     buf.writeUInt8(TOKEN_TYPE.ROW);
+    this.push(buf.data);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
-      c.type.writeParameterData(buf, {
+      if (this.bulkLoad.options.validateBulkLoadParameters) {
+        const error = c.type.validate(row[i]);
+
+        if (error instanceof TypeError) {
+          return callback(error);
+        }
+      }
+      const parameter = {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
         value: row[i]
-      }, this.mainOptions, () => {});
-    }
+      };
 
-    this.push(buf.data);
+      for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+        this.push(chunk);
+      }
+    }
 
     process.nextTick(callback);
   }
 
+  /**
+   * @private
+   */
   _flush(callback: () => void) {
     this.push(this.bulkLoad.createDoneToken());
 
@@ -111,33 +195,113 @@ class RowTransform extends Transform {
   }
 }
 
+/**
+ * A BulkLoad instance is used to perform a bulk insert.
+ *
+ * Use [[Connection.newBulkLoad]] to create a new instance, and [[Connection.execBulkLoad]] to execute it.
+ *
+ * Example of BulkLoad Usages:
+ *
+ * ```js
+ * // optional BulkLoad options
+ * const options = { keepNulls: true };
+ *
+ * // instantiate - provide the table where you'll be inserting to, options and a callback
+ * const bulkLoad = connection.newBulkLoad('MyTable', options, (error, rowCount) => {
+ *   console.log('inserted %d rows', rowCount);
+ * });
+ *
+ * // setup your columns - always indicate whether the column is nullable
+ * bulkLoad.addColumn('myInt', TYPES.Int, { nullable: false });
+ * bulkLoad.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
+ *
+ * // add rows
+ * bulkLoad.addRow({ myInt: 7, myString: 'hello' });
+ * bulkLoad.addRow({ myInt: 23, myString: 'world' });
+ *
+ * // execute
+ * connection.execBulkLoad(bulkLoad);
+ * ```
+ */
 class BulkLoad extends EventEmitter {
+  /**
+   * @private
+   */
   error?: Error;
+  /**
+   * @private
+   */
   canceled: boolean;
+  /**
+   * @private
+   */
   executionStarted: boolean;
+  /**
+   * @private
+   */
   streamingMode: boolean;
+  /**
+   * @private
+   */
   table: string;
+  /**
+   * @private
+   */
+  timeout?: number
 
-  connection?: Connection;
-  timeout?: number;
-
-  rows?: Array<any>;
-  rst?: Array<any>;
-  rowCount?: number;
-
-  paused?: boolean;
-
+  /**
+   * @private
+   */
   options: InternalConnectionOptions;
+  /**
+   * @private
+   */
   callback: Callback;
 
+  /**
+   * @private
+   */
   columns: Array<Column>;
+  /**
+   * @private
+   */
   columnsByName: { [name: string]: Column };
 
+  /**
+   * @private
+   */
   firstRowWritten: boolean;
+  /**
+   * @private
+   */
   rowToPacketTransform: RowTransform;
+  message: Message;
 
+  /**
+   * @private
+   */
   bulkOptions: InternalOptions;
 
+  /**
+   * @private
+   */
+  connection?: Connection;
+  /**
+   * @private
+   */
+  rows?: Array<any>;
+  /**
+   * @private
+   */
+  rst?: Array<any>;
+  /**
+   * @private
+   */
+  rowCount?: number;;
+
+  /**
+   * @private
+   */
   constructor(table: string, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
@@ -175,10 +339,51 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = false;
 
     this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
+    this.message = new Message({ type: PACKET_TYPE.BULK_LOAD });
+    this.rowToPacketTransform.pipe(this.message);
+
+    this.rowToPacketTransform.once('finish', () => {
+      this.removeListener('cancel', onCancel);
+    });
+
+    this.rowToPacketTransform.once('error', (err) => {
+      this.rowToPacketTransform.unpipe(this.message);
+
+      this.error = err;
+
+      this.message.ignore = true;
+      this.message.end();
+    });
+
+    const onCancel = () => {
+      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
+      this.rowToPacketTransform.destroy();
+    };
+
+    this.once('cancel', onCancel);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
   }
 
+  /**
+   * Adds a column to the bulk load.
+   *
+   * The column definitions should match the table you are trying to insert into.
+   * Attempting to call addColumn after the first row has been added will throw an exception.
+   *
+   * ```js
+   * bulkLoad.addColumn('MyIntColumn', TYPES.Int, { nullable: false });
+   * ```
+   *
+   * @param name The name of the column.
+   * @param type One of the supported `data types`.
+   * @param __namedParameters Type [[ColumnOptions]]<p> Additional column type information. At a minimum, `nullable` must be set to true or false.
+   * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   * @param nullable Indicates whether the column accepts NULL values.
+   * @param objName  If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]], then you can use this option to specify the property name.
+   * @param precision For Numeric, Decimal.
+   * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
+  */
   addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.firstRowWritten) {
       throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
@@ -218,7 +423,42 @@ class BulkLoad extends EventEmitter {
     this.columnsByName[name] = column;
   }
 
-  addRow(...input: [ { [key: string]: any } ] | Array<any>) {
+  /**
+   * @private
+   */
+  colTypeValidation(column: Column, value: any) {
+    if (this.options.validateBulkLoadParameters) {
+      const error = column.type.validate(value);
+      if (error instanceof TypeError) {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Adds a row to the bulk insert. This method accepts arguments in three different formats:
+   *
+   * ```js
+   * bulkLoad.addRow( rowObj )
+   * bulkLoad.addRow( columnArray )
+   * bulkLoad.addRow( col0, col1, ... colN )`
+   * ```
+   * * `rowObj`
+   *
+   *    An object of key/value pairs representing column name (or objName) and value.
+   *
+   * * `columnArray`
+   *
+   *    An array representing the values of each column in the same order which they were added to the bulkLoad object.
+   *
+   * * `col0, col1, ... colN`
+   *
+   *    If there are at least two columns, values can be passed as multiple arguments instead of an array. They
+   *    must be in the same order the columns were added in.
+   *
+   * @param input
+   */
+  addRow(...input: [{ [key: string]: any }] | Array<any>) {
     this.firstRowWritten = true;
 
     let row: any;
@@ -230,15 +470,25 @@ class BulkLoad extends EventEmitter {
 
     // write each column
     if (Array.isArray(row)) {
+      this.columns.forEach((column, i) => {
+        this.colTypeValidation(column, row[i]);
+      });
+
       this.rowToPacketTransform.write(row);
     } else {
-      const object = row;
+      this.columns.forEach((column) => {
+        this.colTypeValidation(column, row[column.objName]);
+      });
+
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        return object[column.objName];
+        return row[column.objName];
       }));
     }
   }
 
+  /**
+   * @private
+   */
   getOptionsSql() {
     const addOptions = [];
 
@@ -265,6 +515,9 @@ class BulkLoad extends EventEmitter {
     }
   }
 
+  /**
+   * @private
+   */
   getBulkInsertSql() {
     let sql = 'insert bulk ' + this.table + '(';
     for (let i = 0, len = this.columns.length; i < len; i++) {
@@ -280,6 +533,17 @@ class BulkLoad extends EventEmitter {
     return sql;
   }
 
+  /**
+   * This is simply a helper utility function which returns a `CREATE TABLE SQL` statement based on the columns added to the bulkLoad object.
+   * This may be particularly handy when you want to insert into a temporary table (a table which starts with `#`).
+   *
+   * ```js
+   * var sql = bulkLoad.getTableCreationSql();
+   * ```
+   *
+   * A side note on bulk inserting into temporary tables: if you want to access a local temporary table after executing the bulk load,
+   * you'll need to use the same connection and execute your requests using [[Connection.execSqlBatch]] instead of [[Connection.execSql]]
+   */
   getTableCreationSql() {
     let sql = 'CREATE TABLE ' + this.table + '(\n';
     for (let i = 0, len = this.columns.length; i < len; i++) {
@@ -296,6 +560,9 @@ class BulkLoad extends EventEmitter {
     return sql;
   }
 
+  /**
+   * @private
+   */
   getColMetaData() {
     const tBuf = new WritableTrackingBuffer(100, null, true);
     // TokenType
@@ -322,7 +589,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      c.type.writeTypeInfo(tBuf, c, this.options);
+      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');
@@ -330,10 +597,23 @@ class BulkLoad extends EventEmitter {
     return tBuf.data;
   }
 
+  /**
+   * Sets a timeout for this bulk load.
+   *
+   * ```js
+   * bulkLoad.setTimeout(timeout);
+   * ```
+   *
+   * @param timeout The number of milliseconds before the bulk load is considered failed, or 0 for no timeout.
+   *   When no timeout is set for the bulk load, the [[ConnectionOptions.requestTimeout]] of the Connection is used.
+   */
   setTimeout(timeout?: number) {
     this.timeout = timeout;
   }
 
+  /**
+   * @private
+   */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
     const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
@@ -348,8 +628,27 @@ class BulkLoad extends EventEmitter {
     return tBuf.data;
   }
 
-  // This method switches the BulkLoad object into streaming mode and returns
-  // a stream.Writable for streaming rows to the server.
+  /**
+   * Switches the `BulkLoad` object into streaming mode and returns a
+   * [writable stream](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_streams)
+   * that can be used to send a large amount of rows to the server.
+   *
+   * ```js
+   * const bulkLoad = connection.newBulkLoad(...);
+   * bulkLoad.addColumn(...);
+   *
+   * const rowStream = bulkLoad.getRowStream();
+   *
+   * connection.execBulkLoad(bulkLoad);
+   * ```
+   *
+   * In streaming mode, [[addRow]] cannot be used. Instead all data rows must be written to the returned stream object.
+   * The stream implementation uses data flow control to prevent memory overload. [`stream.write()`](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback)
+   * returns `false` to indicate that data transfer should be paused.
+   *
+   * After that, the stream emits a ['drain' event](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain)
+   * when it is ready to resume data transfer.
+   */
   getRowStream() {
     if (this.firstRowWritten) {
       throw new Error('BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
@@ -358,28 +657,20 @@ class BulkLoad extends EventEmitter {
       throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
     }
     this.streamingMode = true;
+
     return this.rowToPacketTransform;
   }
 
+  /**
+   * @private
+   */
   getMessageStream() {
-    const message = new Message({ type: PACKET_TYPE.BULK_LOAD });
-
-    this.rowToPacketTransform.pipe(message);
-
-    this.rowToPacketTransform.once('finish', () => {
-      this.removeListener('cancel', onCancel);
-    });
-
-    const onCancel = () => {
-      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
-      this.rowToPacketTransform.destroy();
-    };
-
-    this.once('cancel', onCancel);
-
-    return message;
+    return this.message;
   }
 
+  /**
+   * @private
+   */
   cancel() {
     if (this.canceled) {
       return;

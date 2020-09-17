@@ -41,7 +41,7 @@ import Variant from './data-types/sql-variant';
 import { InternalConnectionOptions } from './connection';
 import { CryptoMetadata } from './always-encrypted/types';
 
-export type Parameter = {
+export interface Parameter {
   type: DataType;
   name: string;
 
@@ -65,7 +65,7 @@ export type Parameter = {
   encryptedVal?: Buffer;
 };
 
-export type ParameterData<T = any> = {
+export interface ParameterData<T = any> {
   length?: number;
   scale?: number;
   precision?: number;
@@ -87,10 +87,9 @@ export interface DataType {
   name: string;
 
   declaration(parameter: Parameter): string;
-  writeTypeInfo(buf: any, data: ParameterData, options: InternalConnectionOptions): void;
-  writeParameterData(buf: any, data: ParameterData, options: InternalConnectionOptions, callback: () => void): void;
+  generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
+  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
   validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
-  generate(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
 
   hasTableName?: boolean;
 
@@ -143,7 +142,312 @@ export const TYPE = {
   [Variant.id]: Variant,
 };
 
-export const typeByName = {
+/**
+ * <table>
+ * <thead>
+ *   <tr>
+ *     <th>Type</th>
+ *     <th>Constant</th>
+ *     <th>JavaScript</th>
+ *     <th>Result set</th>
+ *     <th>Parameter</th>
+ *   </tr>
+ * </thead>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="5">Exact numerics</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>bit</code></td>
+ *     <td><code>[[TYPES.Bit]]</code></td>
+ *     <td><code>boolean</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>tinyint</code></td>
+ *     <td><code>[[TYPES.TinyInt]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>smallint</code></td>
+ *     <td><code>[[TYPES.SmallInt]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>int</code></td>
+ *     <td><code>[[TYPES.Int]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>bigint</code><sup>1</sup></td>
+ *     <td><code>[[TYPES.BigInt]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>numeric</code><sup>2</sup></td>
+ *     <td><code>[[TYPES.Numeric]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>decimal</code><sup>2</sup></td>
+ *     <td><code>[[TYPES.Decimal]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>smallmoney</code></td>
+ *     <td><code>[[TYPES.SmallMoney]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>money</code></td>
+ *     <td><code>[[TYPES.Money]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="5">Approximate numerics</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>float</code></td>
+ *     <td><code>[[TYPES.Float]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>real</code></td>
+ *     <td><code>[[TYPES.Real]]</code></td>
+ *     <td><code>number</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="4">Date and Time</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>smalldatetime</code></td>
+ *     <td><code>[[TYPES.SmallDateTime]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>datetime</code></td>
+ *     <td><code>[[TYPES.DateTime]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>datetime2</code></td>
+ *     <td><code>[[TYPES.DateTime2]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>datetimeoffset</code></td>
+ *     <td><code>[[TYPES.DateTimeOffset]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>time</code></td>
+ *     <td><code>[[TYPES.Time]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>date</code></td>
+ *     <td><code>[[TYPES.Date]]</code></td>
+ *     <td><code>Date</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="4">Character Strings</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>char</code></td>
+ *     <td><code>[[TYPES.Char]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>varchar</code><sup>3</sup></td>
+ *     <td><code>[[TYPES.VarChar]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>text</code></td>
+ *     <td><code>[[TYPES.Text]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="4">Unicode Strings</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>nchar</code></td>
+ *     <td><code>[[TYPES.NChar]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>nvarchar</code><sup>3</sup></td>
+ *     <td><code>[[TYPES.NVarChar]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>ntext</code></td>
+ *     <td><code>[[TYPES.NText]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>-</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="5">Binary Strings<sup>4</sup></th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>binary</code></td>
+ *     <td><code>[[TYPES.Binary]]</code></td>
+ *     <td><code>Buffer</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>varbinary</code></td>
+ *     <td><code>[[TYPES.VarBinary]]</code></td>
+ *     <td><code>Buffer</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>image</code></td>
+ *     <td><code>[[TYPES.Image]]</code></td>
+ *     <td><code>Buffer</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="5">Other Data Types</th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>TVP</code></td>
+ *     <td><code>[[TYPES.TVP]]</code></td>
+ *     <td><code>Object</code></td>
+ *     <td>-</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>UDT</code></td>
+ *     <td><code>[[TYPES.UDT]]</code></td>
+ *     <td><code>Buffer</code></td>
+ *     <td>✓</td>
+ *     <td>-</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>uniqueidentifier</code><sup>4</sup></td>
+ *     <td><code>[[TYPES.UniqueIdentifier]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>variant</code></td>
+ *     <td><code>[[TYPES.Variant]]</code></td>
+ *     <td><code>any</code></td>
+ *     <td>✓</td>
+ *     <td>-</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>xml</code></td>
+ *     <td><code>[[TYPES.Xml]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>-</td>
+ *   </tr>
+ * </tbody>
+ * </table>
+ *
+ * <ol>
+ *   <li>
+ *     <h4>BigInt</h4>
+ *     <p>
+ *       Values are returned as a string. This is because values can exceed 53 bits of significant data, which is greater than a
+ *       Javascript <code>number</code> type can represent as an integer.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>Numerical, Decimal</h4>
+ *     <p>
+ *       For input parameters, default precision is 18 and default scale is 0. Maximum supported precision is 19.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>VarChar, NVarChar</h4>
+ *     <p>
+ *       <code>varchar(max)</code> and <code>nvarchar(max)</code> are also supported.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>UniqueIdentifier</h4>
+ *     <p>
+ *       Values are returned as a 16 byte hexadecimal string.
+ *     </p>
+ *     <p>
+ *       Note that the order of bytes is not the same as the character representation. See
+ *       <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
+ *       for an example of the different ordering of bytes.
+ *     </p>
+ *   </li>
+ * </ol>
+ */
+export const TYPES = {
   TinyInt,
   Bit,
   SmallInt,
@@ -176,3 +480,5 @@ export const typeByName = {
   TVP,
   Variant
 };
+
+export const typeByName = TYPES;

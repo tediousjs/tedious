@@ -42,18 +42,16 @@ import {
  */
 export class Parser extends EventEmitter {
   debug: Debug;
-  colMetadata: any;
   options: InternalConnectionOptions;
   parser: StreamParser;
 
-  constructor(debug: Debug, colMetadata: any, options: InternalConnectionOptions) {
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     super();
 
     this.debug = debug;
-    this.colMetadata = colMetadata;
     this.options = options;
 
-    this.parser = new StreamParser(this.debug, this.colMetadata, this.options);
+    this.parser = new StreamParser(this.debug, this.options);
     this.parser.on('data', (token: Token) => {
       if (token.event) {
         this.emit(token.event, token);

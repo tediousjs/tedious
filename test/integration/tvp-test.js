@@ -50,7 +50,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
       // console.log(text)
     );
 
-    connection.on('connect', done);
+    connection.connect(done);
   });
 
   afterEach(function() {

@@ -6,6 +6,7 @@ node_js:
   - "10"
   - "12"
   - "13"
+  - "14"
 
 cache:
   npm: false
@@ -19,8 +20,6 @@ stages:
     if: (type = push) OR (type = pull_request)
   - name: release
     if: (type = push) AND (branch = master)
-  - name: tag-latest
-    if: (type = cron)
 
 services:
   - docker
@@ -43,7 +42,8 @@ before_install:
         },
         "options": {
           "port": 1433,
-          "database": "master"
+          "database": "master",
+          "trustServerCertificate": true
         }
       }
     }' > ~/.tedious/test-connection.json
@@ -85,7 +85,8 @@ jobs:
               }
             },
             "options": {
-              "database": "test"
+              "database": "tedious",
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -108,7 +109,8 @@ jobs:
               }
             },
             "options": {
-              "database": "test"
+              "database": "tedious",
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
@@ -116,26 +118,7 @@ jobs:
       script: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
     - stage: release
-      node_js: 8
+      node_js: 12
       before_install: skip
       before_script: skip
       script: npm run semantic-release
-
-    - stage: tag-latest
-      node_js: 8
-      before_install:
-        - echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > .npmrc
-      before_script: skip
-      script:
-        - |
-          read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
-          if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
-            date_format="%Y-%m-%dT%H:%M:%SZ"
-
-            publish_date=$(date -d $(npm info tedious --json | jq -r '.time["'"$next"'"]') +$date_format)
-            week_ago=$(date -d '-7 days' +$date_format)
-
-            if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
-              npm dist-tag add "tedious@$next" latest
-            fi
-          fi

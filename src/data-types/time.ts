@@ -20,17 +20,11 @@ const Time: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } =
     }
   },
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    buffer.writeUInt8(parameter.scale!);
+  generateTypeInfo(parameter) {
+    return Buffer.from([this.id, parameter.scale!]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
       const buffer = new WritableTrackingBuffer(16);
       const time = parameter.value;
@@ -67,9 +61,7 @@ const Time: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } =
 
       yield buffer.data;
     } else {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

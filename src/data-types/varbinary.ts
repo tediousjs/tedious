@@ -3,6 +3,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
+const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
@@ -40,36 +42,58 @@ const VarBinary: { maximumLength: number } & DataType = {
       return this.maximumLength;
     }
   },
+  
+  generateTypeInfo: function(parameter) {
+    const buffer = Buffer.alloc(3);
+    buffer.writeUInt8(this.id, 0);
 
-  writeTypeInfo: function(buffer, parameter) {
-    buffer.writeUInt8(this.id);
-    if (parameter.length != null && isFinite(parameter.length)) {
-      const length = parameter.length;
-
-      if (length <= this.maximumLength) {
-        buffer.writeUInt16LE(length);
-      } else {
-        buffer.writeUInt16LE(this.maximumLength);
-      }
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(this.maximumLength, 1);
     } else {
-      buffer.writeUInt16LE(MAX);
+      buffer.writeUInt16LE(MAX, 1);
     }
+
+    return buffer;
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
+  *generateParameterData(parameter, options) {
+    let value = parameter.value;
 
-  generate: function* (parameter, options) {
-    if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(0);
-      if (parameter.length! <= this.maximumLength) {
-        buffer.writeUsVarbyte(parameter.value);
-      } else {
-        buffer.writePLPBody(parameter.value);
+    if (value != null) {
+      if (!Buffer.isBuffer(value)) {
+        value = value.toString();
       }
-      yield buffer.data;
+
+      const length = Buffer.byteLength(value, 'ucs2');
+
+      if (parameter.length! <= this.maximumLength) {
+        const buffer = Buffer.alloc(2);
+        buffer.writeUInt16LE(length, 0);
+        yield buffer;
+
+        if (Buffer.isBuffer(value)) {
+          yield value;
+        } else {
+          yield Buffer.from(value, 'ucs2');
+        }
+      } else { // writePLPBody
+        yield UNKNOWN_PLP_LEN;
+
+        if (length > 0) {
+          const buffer = Buffer.alloc(4);
+          buffer.writeUInt32LE(length, 0);
+          yield buffer;
+
+          if (Buffer.isBuffer(value)) {
+            yield value;
+          } else {
+            yield Buffer.from(value, 'ucs2');
+          }
+        }
+
+        yield PLP_TERMINATOR;
+      }
+
     } else if (parameter.length! <= this.maximumLength) {
       const buffer = new WritableTrackingBuffer(2);
       buffer.writeUInt16LE(NULL);

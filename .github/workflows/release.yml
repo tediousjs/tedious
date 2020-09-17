@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js 12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
+    - name: Tag latest release
+      run: |
+        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        
+        read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
+        if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
+          date_format="%Y-%m-%dT%H:%M:%SZ"
+
+          publish_date=$(date -d $(npm info tedious --json | jq -r '.time["'"$next"'"]') +$date_format)
+          week_ago=$(date -d '-7 days' +$date_format)
+
+          if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
+            npm dist-tag add "tedious@$next" latest
+          fi
+        fi

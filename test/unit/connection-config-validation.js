@@ -95,8 +95,15 @@ describe('Connection configuration validation', function() {
     });
   });
 
+<<<<<<< HEAD
   it('bad column encryption key cache ttl', () => {
     config.options.columnEncryptionKeyCacheTTL = -5;
+=======
+  it('bad validateBulkLoadParameters value', () => {
+    const validateBulkLoadParametersVal = 'text';
+    config.options.validateBulkLoadParameters = validateBulkLoadParametersVal;
+    config.options.tdsVersion = '7_2';
+>>>>>>> origin-master
     assert.throws(() => {
       new Connection(config);
     });

@@ -6,10 +6,14 @@ import Parser from './stream-parser';
 import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
-export type ColumnMetadata = Metadata & {
+export interface ColumnMetadata extends Metadata {
+  /**
+   * The column's name。
+   */
   colName: string;
+
   tableName?: string | string[];
-};
+}
 
 type cekTableEntryMetadata = {
   databaseId: number;
@@ -238,7 +242,7 @@ function readCEKValue(parser: Parser, cekEntry: CEKEntry, cekTableEntryMetadata:
   });
 }
 
-function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     readCEKTable(parser, options, (cekList?: CEKEntry[]) => {
       const columns: ColumnMetadata[] = [];

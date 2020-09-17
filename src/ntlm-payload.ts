@@ -2,7 +2,7 @@ import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
 import JSBI from 'jsbi';
 
-type Options = {
+interface Options {
   domain: string;
   userName: string;
   password: string;
@@ -10,7 +10,7 @@ type Options = {
     target: Buffer;
     nonce: Buffer;
   };
-};
+}
 
 class NTLMResponsePayload {
   data: Buffer;

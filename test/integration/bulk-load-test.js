@@ -33,7 +33,7 @@ describe('Bulk Load Tests', function() {
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
-    connection.on('connect', done);
+    connection.connect(done);
 
     if (debugMode) {
       connection.on('debug', (message) => console.log(message));
@@ -351,7 +351,7 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should test stream bulk load', function(done) {
-    this.timeout(50000);
+    this.timeout(200000);
 
     const totalRows = 500000;
     const tableName = '#streamingBulkLoadTest';
@@ -494,7 +494,7 @@ describe('Bulk Load Tests', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Canceled.');
 
-      assert.equal(rowCount, 0);
+      assert.isUndefined(rowCount);
       startVerifyTableContent();
     }
 
@@ -519,6 +519,103 @@ describe('Bulk Load Tests', function() {
       assert.equal(rowCount, 1);
 
       done();
+    }
+  });
+});
+
+describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`', () => {
+  let connection;
+
+  beforeEach(function(done) {
+    const config = getConfig();
+    config.options = { ...config.options, validateBulkLoadParameters: true };
+    connection = new Connection(config);
+    connection.connect(done);
+
+    if (debugMode) {
+      connection.on('debug', (message) => console.log(message));
+      connection.on('infoMessage', (info) =>
+        console.log('Info: ' + info.number + ' - ' + info.message)
+      );
+      connection.on('errorMessage', (error) =>
+        console.log('Error: ' + error.number + ' - ' + error.message)
+      );
+    }
+  });
+
+  beforeEach(function(done) {
+    const request = new Request('create table #stream_test ([value] date)', (err) => {
+      done(err);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
+    } else {
+      done();
+    }
+  });
+
+  it('should handle validation errors during streaming bulk loads', (done) => {
+    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+    bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
+
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+
+    const rowSource = Readable.from([
+      ['invalid date']
+    ]);
+
+    pipeline(rowSource, rowStream, function(err) {
+      assert.ok(err);
+      assert.strictEqual(err.message, 'Invalid date.');
+    });
+
+    function completeBulkLoad(err, rowCount) {
+      assert.ok(err);
+      assert.strictEqual(err.message, 'Invalid date.');
+
+      done();
+    }
+  });
+
+  it('should allow reusing the connection after validation errors during streaming bulk loads', (done) => {
+    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+    bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
+
+    const rowStream = bulkLoad.getRowStream();
+    connection.execBulkLoad(bulkLoad);
+
+    const rowSource = Readable.from([ ['invalid date'] ]);
+
+    pipeline(rowSource, rowStream, function(err) {
+      assert.ok(err);
+      assert.strictEqual(err.message, 'Invalid date.');
+    });
+
+    function completeBulkLoad(err, rowCount) {
+      assert.ok(err);
+      assert.strictEqual(err.message, 'Invalid date.');
+
+      const rows = [];
+      const request = new Request('SELECT 1', (err) => {
+        assert.ifError(err);
+
+        assert.deepEqual([1], rows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        rows.push(row[0].value);
+      });
+
+      connection.execSql(request);
     }
   });
 });

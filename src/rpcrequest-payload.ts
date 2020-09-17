@@ -23,7 +23,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload {
+class RpcRequestPayload implements Iterable<Buffer> {
   request: Request;
   procedure: string | number;
 
@@ -37,20 +37,11 @@ class RpcRequestPayload {
     this.txnDescriptor = txnDescriptor;
   }
 
-  getStream() {
-    const self = this;
-
-    return new Readable({
-      read() {
-        self.getData((buf) => {
-          this.push(buf);
-          this.push(null);
-        });
-      }
-    });
+  [Symbol.iterator]() {
+    return this.generateData();
   }
 
-  getData(cb: (data: Buffer) => void) {
+  * generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -66,7 +57,9 @@ class RpcRequestPayload {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
+    yield buffer.data;
 
+<<<<<<< HEAD
     this._encryptParameters(this.request.parameters, (parameters: Parameter[]) => {
       const writeNext = (i: number) => {
         if (i >= parameters.length) {
@@ -82,13 +75,24 @@ class RpcRequestPayload {
       };
       writeNext(0);
     });
+=======
+    const parameters = this.request.parameters;
+    for (let i = 0; i < parameters.length; i++) {
+      yield* this.generateParameterData(parameters[i], this.options);
+    }
+>>>>>>> origin-master
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
+<<<<<<< HEAD
   _writeParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+=======
+  * generateParameterData(parameter: Parameter, options: any) {
+    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
+>>>>>>> origin-master
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -100,6 +104,7 @@ class RpcRequestPayload {
     }
     buffer.writeUInt8(statusFlags);
 
+<<<<<<< HEAD
     if (parameter.cryptoMetadata) {
       this._writeEncryptedParameter(parameter, buffer, cb);
     } else {
@@ -112,6 +117,11 @@ class RpcRequestPayload {
       value: parameter.value,
       cryptoMetadata: parameter.cryptoMetadata
     };
+=======
+    yield buffer.data;
+
+    const param: ParameterData = { value: parameter.value };
+>>>>>>> origin-master
 
     const type = parameter.type;
 
@@ -135,6 +145,7 @@ class RpcRequestPayload {
       param.scale = type.resolveScale(parameter);
     }
 
+<<<<<<< HEAD
     if (parameter.collation) {
       param.collation = parameter.collation;
     }
@@ -165,6 +176,10 @@ class RpcRequestPayload {
         });
       });
     });
+=======
+    yield type.generateTypeInfo(param, this.options);
+    yield* type.generateParameterData(param, options);
+>>>>>>> origin-master
   }
 
   _encryptParameters(parameters: Parameter[], callback: (parameters: Parameter[]) => void) {

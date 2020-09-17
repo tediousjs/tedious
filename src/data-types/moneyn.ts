@@ -9,11 +9,7 @@ const MoneyN: DataType = {
     throw new Error('not implemented');
   },
 
-  writeTypeInfo() {
-    throw new Error('not implemented');
-  },
-
-  writeParameterData() {
+  generateTypeInfo() {
     throw new Error('not implemented');
   },
 
@@ -21,7 +17,7 @@ const MoneyN: DataType = {
     throw new Error('not implemented');
   },
 
-  generate() {
+  generateParameterData() {
     throw new Error('not implemented');
   },
 

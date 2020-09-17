@@ -12,12 +12,13 @@ function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options:
   callback(null);
 }
 
-type Column = {
+interface Column {
   value: unknown;
   metadata: ColumnMetadata;
-};
+}
 
-function nbcRowParser(parser: Parser, columnsMetaData: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
+function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
+  const columnsMetaData = parser.colMetadata;
   const length = Math.ceil(columnsMetaData.length / 8);
   parser.readBuffer(length, (bytes) => {
     const bitmap: boolean[] = [];

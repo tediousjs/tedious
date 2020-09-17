@@ -27,7 +27,7 @@ var config = {
 
 var connection = new Connection(config);
 
-connection.on('connect', function(err) {
+connection.connect(function(err) {
     // If no error, then good to go...
     executeStatement();
   }

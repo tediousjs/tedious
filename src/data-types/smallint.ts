@@ -1,6 +1,5 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const SmallInt: DataType = {
   id: 0x34,
@@ -11,26 +10,18 @@ const SmallInt: DataType = {
     return 'smallint';
   },
 
-  writeTypeInfo: function(buffer) {
-    buffer.writeUInt8(IntN.id);
-    buffer.writeUInt8(2);
+  generateTypeInfo() {
+    return Buffer.from([IntN.id, 0x02]);
   },
 
-  writeParameterData: function(buff, parameter, options, cb) {
-    buff.writeBuffer(Buffer.concat(Array.from(this.generate(parameter, options))));
-    cb();
-  },
-
-  generate: function*(parameter, options) {
+  generateParameterData: function*(parameter, options) {
     if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(3);
-      buffer.writeUInt8(2);
-      buffer.writeInt16LE(Number(parameter.value));
-      yield buffer.data;
+      const buffer = Buffer.alloc(3);
+      buffer.writeUInt8(2, 0);
+      buffer.writeInt16LE(Number(parameter.value), 1);
+      yield buffer;
     } else {
-      const buffer = new WritableTrackingBuffer(3);
-      buffer.writeUInt8(0);
-      yield buffer.data;
+      yield Buffer.from([0x00]);
     }
   },
 

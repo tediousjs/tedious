@@ -68,7 +68,7 @@ const COLUMN_ENCRYPTION_OPTIONS = {
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
-type Options = {
+interface Options {
   tdsVersion: number;
   packetSize: number;
   clientProgVer: number;
@@ -76,7 +76,7 @@ type Options = {
   connectionId: number;
   clientTimeZone: number;
   clientLcid: number;
-};
+}
 
 /*
   s2.2.6.3
