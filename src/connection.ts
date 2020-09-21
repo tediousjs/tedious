@@ -3548,6 +3548,8 @@ Connection.prototype.STATE = {
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-msi-app-service') {
               loginWithAppServiceMSI({
+                msiEndpoint: authentication.options.msiEndpoint,
+                msiSecret: authentication.options.msiSecret,
                 resource: fedAuthInfoToken.spn,
                 clientId: authentication.options.clientId
               }, getTokenFromCredentials);
