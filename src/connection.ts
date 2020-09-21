@@ -3530,7 +3530,7 @@ Connection.prototype.STATE = {
               if (err) {
                 return callback(err);
               }
-                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined; }) => {
+                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
                   callback(null, tokenResponse.accessToken);
                 }, callback);
             };
