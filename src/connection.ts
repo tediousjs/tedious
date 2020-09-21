@@ -599,7 +599,7 @@ interface ConnectionOptions {
    * See [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017)
    * for more details.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
   enableArithAbort?: boolean;
 
