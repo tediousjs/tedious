@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import MoneyN from './moneyn';
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);

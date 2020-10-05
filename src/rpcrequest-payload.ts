@@ -6,7 +6,6 @@ import { InternalConnectionOptions } from './connection';
 import { encryptWithKey } from './always-encrypted/key-crypto';
 import VarBinary from './data-types/varbinary';
 import { CryptoMetadata } from './always-encrypted/types';
-import { Readable } from 'readable-stream';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -23,7 +22,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload implements Iterable<Buffer> {
+class RpcRequestPayload implements AsyncIterable<Buffer> {
   request: Request;
   procedure: string | number;
 
@@ -37,11 +36,11 @@ class RpcRequestPayload implements Iterable<Buffer> {
     this.txnDescriptor = txnDescriptor;
   }
 
-  [Symbol.iterator]() {
+  [Symbol.asyncIterator]() {
     return this.generateData();
   }
 
-  * generateData() {
+  async* generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -59,40 +58,19 @@ class RpcRequestPayload implements Iterable<Buffer> {
     buffer.writeUInt16LE(optionFlags);
     yield buffer.data;
 
-<<<<<<< HEAD
-    this._encryptParameters(this.request.parameters, (parameters: Parameter[]) => {
-      const writeNext = (i: number) => {
-        if (i >= parameters.length) {
-          cb(buffer.data);
-          return;
-        }
-
-        this._writeParameter(parameters[i], buffer, () => {
-          setImmediate(() => {
-            writeNext(i + 1);
-          });
-        });
-      };
-      writeNext(0);
-    });
-=======
     const parameters = this.request.parameters;
+    const encryptedParams = await this._encryptParameters(parameters);
     for (let i = 0; i < parameters.length; i++) {
-      yield* this.generateParameterData(parameters[i], this.options);
+      yield * this.generateParameter(encryptedParams[i], this.options);
     }
->>>>>>> origin-master
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-<<<<<<< HEAD
-  _writeParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
-=======
-  * generateParameterData(parameter: Parameter, options: any) {
+  *generateParameter(parameter: Parameter, options: any) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
->>>>>>> origin-master
     buffer.writeBVarchar('@' + parameter.name);
 
     let statusFlags = 0;
@@ -103,25 +81,23 @@ class RpcRequestPayload implements Iterable<Buffer> {
       statusFlags |= STATUS.ENCRYPTED_VALUE;
     }
     buffer.writeUInt8(statusFlags);
+    yield buffer.data;
 
-<<<<<<< HEAD
     if (parameter.cryptoMetadata) {
-      this._writeEncryptedParameter(parameter, buffer, cb);
+      yield* this._generateEncryptedParameter(parameter);
     } else {
-      this._writeParameterData(parameter, buffer, true, cb);
+      yield* this.generateParameterData(parameter, options, true);
     }
   }
 
-  _writeParameterData(parameter: Parameter, buffer: WritableTrackingBuffer, writeValue: boolean, cb: () => void) {
+  *generateParameterData(parameter: Parameter, options: any, writeValue: boolean) {
+    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
     const param: ParameterData = {
       value: parameter.value,
       cryptoMetadata: parameter.cryptoMetadata
     };
-=======
-    yield buffer.data;
 
-    const param: ParameterData = { value: parameter.value };
->>>>>>> origin-master
+    yield buffer.data;
 
     const type = parameter.type;
 
@@ -145,22 +121,18 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.scale = type.resolveScale(parameter);
     }
 
-<<<<<<< HEAD
     if (parameter.collation) {
       param.collation = parameter.collation;
     }
 
-    type.writeTypeInfo(buffer, param, this.options);
+    const typeINfo = type.generateTypeInfo(param, this.options);
+    yield typeINfo;
     if (writeValue) {
-      type.writeParameterData(buffer, param, this.options, () => {
-        cb();
-      });
-    } else {
-      cb();
+      yield* type.generateParameterData(param, options);
     }
   }
 
-  _writeEncryptedParameter(parameter: Parameter, buffer: WritableTrackingBuffer, cb: () => void) {
+  *_generateEncryptedParameter(parameter: Parameter) {
     const encryptedParam = {
       value: parameter.encryptedVal,
       type: VarBinary,
@@ -168,49 +140,46 @@ class RpcRequestPayload implements Iterable<Buffer> {
       name: parameter.name,
       forceEncrypt: parameter.forceEncrypt
     };
+    yield* this.generateParameterData(encryptedParam, null, true);
+    yield* this.generateParameterData(parameter, null, false);
+    yield* this._writeEncryptionMetadata(parameter.cryptoMetadata);
 
-    this._writeParameterData(encryptedParam, buffer, true, () => {
-      this._writeParameterData(parameter, buffer, false, () => {
-        this._writeEncryptionMetadata(parameter.cryptoMetadata, buffer, () => {
-          cb();
-        });
-      });
-    });
-=======
-    yield type.generateTypeInfo(param, this.options);
-    yield* type.generateParameterData(param, options);
->>>>>>> origin-master
   }
 
-  _encryptParameters(parameters: Parameter[], callback: (parameters: Parameter[]) => void) {
-    if (this.options.serverSupportsColumnEncryption === true) {
-      const promises: Promise<void>[] = [];
+  _encryptParameters(parameters: Parameter[]): Promise<Parameter[]> | Parameter[] {
+    return new Promise((resolve) => {
+      if (this.options.serverSupportsColumnEncryption === true) {
+        const promises: Promise<void>[] = [];
 
-      for (let i = 0, len = parameters.length; i < len; i++) {
-        const type = parameters[i].type;
-        if (parameters[i].cryptoMetadata && parameters[i].value) {
-          if (!type.toBuffer) {
-            throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
-          }
-          const plainTextBuffer = type.toBuffer(parameters[i], this.options);
-          if (plainTextBuffer) {
-            promises.push(encryptWithKey(plainTextBuffer, parameters[i].cryptoMetadata as CryptoMetadata, this.options).then((encryptedValue: Buffer) => {
-              parameters[i].encryptedVal = encryptedValue;
-            }));
+        for (let i = 0, len = parameters.length; i < len; i++) {
+          const type = parameters[i].type;
+          if (parameters[i].cryptoMetadata && parameters[i].value) {
+            if (!type.toBuffer) {
+              throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
+            }
+            const plainTextBuffer = type.toBuffer(parameters[i], this.options);
+            if (plainTextBuffer) {
+              promises.push(encryptWithKey(plainTextBuffer, parameters[i].cryptoMetadata as CryptoMetadata, this.options).then((encryptedValue: Buffer) => {
+                parameters[i].encryptedVal = encryptedValue;
+              }));
+            }
           }
         }
-      }
 
-      Promise.all(promises).then(() => callback(parameters));
-    } else {
-      callback(parameters);
-    }
+        Promise.all(promises).then(() => resolve(parameters));
+      } else {
+        resolve(parameters);
+      }
+    });
+
   }
 
-  _writeEncryptionMetadata(cryptoMetadata: CryptoMetadata | undefined, buffer: WritableTrackingBuffer, cb: () => void) {
+  *_writeEncryptionMetadata(cryptoMetadata: CryptoMetadata | undefined) {
     if (!cryptoMetadata || !cryptoMetadata.cekEntry || !cryptoMetadata.cekEntry.columnEncryptionKeyValues || cryptoMetadata.cekEntry.columnEncryptionKeyValues.length <= 0) {
       throw new Error('Invalid Crypto Metadata in _writeEncryptionMetadata');
     }
+
+    const buffer = new WritableTrackingBuffer(0);
 
     buffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
     if (cryptoMetadata.cipherAlgorithmId === 0) {
@@ -223,7 +192,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     buffer.writeUInt32LE(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].keyVersion);
     buffer.writeBuffer(cryptoMetadata.cekEntry.columnEncryptionKeyValues[0].mdVersion);
     buffer.writeUInt8(cryptoMetadata.normalizationRuleVersion[0]);
-    cb();
+    yield buffer.data;
   }
 }
 

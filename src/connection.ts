@@ -327,13 +327,9 @@ export interface InternalConnectionOptions {
   appName: undefined | string;
   camelCaseColumns: boolean;
   cancelTimeout: number;
-<<<<<<< HEAD
   columnEncryptionKeyCacheTTL: number;
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string);
-=======
-  columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
->>>>>>> origin-master
   connectionRetryInterval: number;
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -385,7 +381,6 @@ export interface InternalConnectionOptions {
   lowerCaseGuids: boolean;
 }
 
-<<<<<<< HEAD
 interface KeyStoreProvider {
   key: string;
   value: ColumnEncryptionAzureKeyVaultProvider;
@@ -395,11 +390,6 @@ interface KeyStoreProviderMap {
   [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
-=======
-/**
- * @private
- */
->>>>>>> origin-master
 interface State {
   name: string;
   enter?(this: Connection): void;
@@ -524,10 +514,8 @@ interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
-<<<<<<< HEAD
   columnEncryptionKeyCacheTTL: number;
   columnEncryptionSetting: boolean;
-=======
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
@@ -536,7 +524,6 @@ interface ConnectionOptions {
    *
    * (default: `null`)
    */
->>>>>>> origin-master
   columnNameReplacer?: (colName: string, index: number, metadata: Metadata) => string;
 
   /**
@@ -676,9 +663,7 @@ interface ConnectionOptions {
    * (default: `false`)
    */
   encrypt?: boolean;
-<<<<<<< HEAD
   encryptionKeyStoreProviders?: KeyStoreProvider[];
-=======
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -687,7 +672,6 @@ interface ConnectionOptions {
    *
    * (default: `false`)
    */
->>>>>>> origin-master
   fallbackToDefaultDb?: boolean;
 
   /**
@@ -1280,12 +1264,8 @@ class Connection extends EventEmitter {
         serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
-<<<<<<< HEAD
         trustedServerNameAE: undefined,
         trustServerCertificate: true,
-=======
-        trustServerCertificate: false,
->>>>>>> origin-master
         useColumnNames: false,
         useUTC: true,
         validateBulkLoadParameters: false,
@@ -1683,7 +1663,6 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
-<<<<<<< HEAD
       if (config.options.columnEncryptionSetting !== undefined) {
         if (typeof config.options.columnEncryptionSetting !== 'boolean') {
           throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
@@ -1702,7 +1681,7 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
-=======
+      }
       if (config.options.validateBulkLoadParameters !== undefined) {
         if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
           throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
@@ -1719,7 +1698,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.workstationId = config.options.workstationId;
->>>>>>> origin-master
       }
 
       if (config.options.lowerCaseGuids !== undefined) {
@@ -2889,9 +2867,20 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
-<<<<<<< HEAD
   _execSql(request: Request) {
-=======
+    request.transformIntoExecuteSqlRpc();
+
+    const error = request.error;
+    if (error != null) {
+      process.nextTick(() => {
+        this.debug.log(error.message);
+        request.callback(error);
+      });
+      return;
+    }
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+  }
   /**
    *  Execute the SQL represented by [[Request]].
    *
@@ -2907,22 +2896,6 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSql(request: Request) {
->>>>>>> origin-master
-    request.transformIntoExecuteSqlRpc();
-
-    const error = request.error;
-    if (error != null) {
-      process.nextTick(() => {
-        this.debug.log(error.message);
-        request.callback(error);
-      });
-      return;
-    }
-
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
-  }
-
   execSql(request: Request) {
     request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
     if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
@@ -3259,8 +3232,8 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);

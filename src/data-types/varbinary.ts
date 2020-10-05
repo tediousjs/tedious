@@ -42,17 +42,22 @@ const VarBinary: { maximumLength: number } & DataType = {
       return this.maximumLength;
     }
   },
-  
+
   generateTypeInfo: function(parameter) {
     const buffer = Buffer.alloc(3);
     buffer.writeUInt8(this.id, 0);
 
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength, 1);
+    if (parameter.length != null && isFinite(parameter.length)) {
+      const length = parameter.length;
+
+      if (length <= this.maximumLength) {
+        buffer.writeUInt16LE(length, 1);
+      } else {
+        buffer.writeUInt16LE(this.maximumLength, 1);
+      }
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }
-
     return buffer;
   },
 

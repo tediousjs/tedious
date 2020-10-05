@@ -1,10 +1,6 @@
 import BulkLoad from './bulk-load';
-<<<<<<< HEAD
-import Connection from './connection';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-=======
 import Connection, { ConnectionConfiguration } from './connection';
->>>>>>> origin-master
 import Request from './request';
 import { name } from './library';
 

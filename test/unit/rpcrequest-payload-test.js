@@ -20,7 +20,7 @@ const sampleCryptoMetadata = {
     cekVersion: 0x00,
     cekMdVersion: 0x00,
     columnEncryptionKeyValues: [{
-      encryptedKey: Buffer.from([ 0x00 ]),
+      encryptedKey: Buffer.from([0x00]),
       dbId: 0x05,
       keyId: 0x31,
       keyVersion: 0x01,
@@ -34,12 +34,12 @@ const sampleCryptoMetadata = {
   },
   cipherAlgorithmId: 0x02,
   encryptionType: 0x01,
-  normalizationRuleVersion: Buffer.from([ 0x01 ]),
+  normalizationRuleVersion: Buffer.from([0x01]),
 };
 
 describe('RpcRequestPayload', () => {
-  it('get data', () => {
-    const req = new Request('SELECT 1', () => {});
+  it('get data', async function() {
+    const req = new Request('SELECT 1', () => { });
     const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
 
     const expectedData = Buffer.from([
@@ -64,14 +64,17 @@ describe('RpcRequestPayload', () => {
       0x00, 0x00,
     ]);
 
-    payload.getData((data) => {
-      assert.deepEqual(data, expectedData);
-    });
+    const buffer = [];
+
+    for await (const value of payload) {
+      buffer.push(value);
+    }
+
+    assert.deepEqual(Buffer.concat(buffer), expectedData);
   });
 
-  it('get data with param', () => {
-    const req = new Request('SELECT @param', () => {});
-
+  it('get data with param', async function() {
+    const req = new Request('SELECT @param', () => { });
     req.addParameter('param', typeByName.Int, 1);
 
     const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
@@ -111,14 +114,17 @@ describe('RpcRequestPayload', () => {
       // parameter value
       0x04, 0x01, 0x00, 0x00, 0x00
     ]);
+    const buffer = [];
 
-    payload.getData((data) => {
-      assert.deepEqual(data, expectedData);
-    });
+    for await (const value of payload) {
+      buffer.push(value);
+    }
+
+    assert.deepEqual(Buffer.concat(buffer), expectedData);
   });
 
-  it('get data with encrypted param', () => {
-    const req = new Request('SELECT @param', () => {});
+  it('get data with encrypted param', async function() {
+    const req = new Request('SELECT @param', () => { });
 
     req.addParameter('param', typeByName.Int, 1);
 
@@ -177,13 +183,17 @@ describe('RpcRequestPayload', () => {
       ...sampleCryptoMetadata.normalizationRuleVersion,
     ]);
 
-    payload.getData((data) => {
-      assert.deepEqual(data, expectedData);
-    });
+    const buffer = [];
+
+    for await (const value of payload) {
+      buffer.push(value);
+    }
+
+    assert.deepEqual(Buffer.concat(buffer), expectedData);
   });
 
-  it('get data with 2 encrypted param', () => {
-    const req = new Request('SELECT @param1, @param2', () => {});
+  it('get data with 2 encrypted param', async function() {
+    const req = new Request('SELECT @param1, @param2', () => { });
 
     req.addParameter('param1', typeByName.Int, 1);
     req.addParameter('param2', typeByName.Int, 2);
@@ -276,8 +286,12 @@ describe('RpcRequestPayload', () => {
       ...sampleCryptoMetadata.normalizationRuleVersion,
     ]);
 
-    payload.getData((data) => {
-      assert.deepEqual(data, expectedData);
-    });
+    const buffer = [];
+
+    for await (const value of payload) {
+      buffer.push(value);
+    }
+
+    assert.deepEqual(Buffer.concat(buffer), expectedData);
   });
 });

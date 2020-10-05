@@ -63,7 +63,7 @@ export interface Parameter {
   forceEncrypt?: boolean;
   cryptoMetadata?: CryptoMetadata;
   encryptedVal?: Buffer;
-};
+}
 
 export interface ParameterData<T = any> {
   length?: number;
@@ -79,7 +79,7 @@ export interface ParameterData<T = any> {
   value: T;
 
   cryptoMetadata?: CryptoMetadata;
-};
+}
 
 export interface DataType {
   id: number;

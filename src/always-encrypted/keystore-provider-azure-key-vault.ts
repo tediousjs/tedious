@@ -24,6 +24,18 @@ export class ColumnEncryptionAzureKeyVaultProvider {
   constructor(clientId: string, clientKey: string, tenantId: string) {
     this.name = 'AZURE_KEY_VAULT';
     this.azureKeyVaultDomainName = 'vault.azure.net';
+    /*
+            trustedEndpoints.add("vault.azure.net");
+            trustedEndpoints.add("vault.azure.cn");
+            trustedEndpoints.add("vault.usgovcloudapi.net");
+            trustedEndpoints.add("vault.microsoftazure.de");
+            trustedEndpoints.add("managedhsm.azure.net");
+            trustedEndpoints.add("managedhsm.azure.cn");
+            trustedEndpoints.add("managedhsm.usgovcloudapi.net");
+            trustedEndpoints.add("managedhsm.microsoftazure.de");
+
+            TODO: Make these configurable
+    */
     this.rsaEncryptionAlgorithmWithOAEPForAKV = 'RSA-OAEP';
     this.firstVersion = Buffer.from([0x01]);
     this.credentials = new ClientSecretCredential(tenantId, clientId, clientKey);

@@ -78,7 +78,7 @@ const Char: { maximumLength: number } & DataType = {
       );
     }
 
-    collation.copy(buffer, collation.length); // Ian Fix
+    collation.copy(buffer, collation.length);
     return buffer;
   },
 

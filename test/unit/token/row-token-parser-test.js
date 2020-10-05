@@ -52,7 +52,7 @@ describe('Row Token Parser', () => {
 
   it('should write encrypted int', () => {
     const baseTypeInfo = { type: dataTypeByName.Int };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -73,7 +73,8 @@ describe('Row Token Parser', () => {
       ),
     );
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -81,7 +82,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, 0x03);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -120,7 +121,7 @@ describe('Row Token Parser', () => {
         baseTypeInfo,
       },
     };
-    const colMetaData = [colMetaDataEntry, colMetaDataEntry];
+    const colMetadata = [colMetaDataEntry, colMetaDataEntry];
 
     const value1 = Buffer.from([
       // 1
@@ -149,7 +150,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -157,9 +159,9 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 2);
         assert.strictEqual(token.columns[0].value, '1');
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
         assert.strictEqual(token.columns[1].value, '9223372036854775807');
-        assert.strictEqual(token.columns[1].metadata, colMetaData[1]);
+        assert.strictEqual(token.columns[1].metadata, colMetadata[1]);
       });
   });
 
@@ -186,7 +188,7 @@ describe('Row Token Parser', () => {
     const baseTypeInfo = {
       type: dataTypeByName.Real,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -209,7 +211,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -217,7 +220,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, 9.5);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -246,7 +249,7 @@ describe('Row Token Parser', () => {
     const baseTypeInfo = {
       type: dataTypeByName.Float,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -269,7 +272,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -277,7 +281,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, 9.5);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -332,7 +336,7 @@ describe('Row Token Parser', () => {
       { type: MoneyN, dataLength: 0x08 },
       { type: MoneyN, dataLength: 0x08 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -399,7 +403,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -445,7 +450,7 @@ describe('Row Token Parser', () => {
       type: dataTypeByName.VarChar,
       collation: { codepage: undefined },
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -498,7 +503,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data);
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -506,7 +512,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, value);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -543,7 +549,7 @@ describe('Row Token Parser', () => {
       type: dataTypeByName.VarChar,
       collation: { codepage: 'WINDOWS-1252' },
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -563,7 +569,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -571,7 +578,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, value);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -601,7 +608,7 @@ describe('Row Token Parser', () => {
       userType: 0x00,
       type: dataTypeByName.NVarChar,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -621,7 +628,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -629,7 +637,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, value);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -658,7 +666,7 @@ describe('Row Token Parser', () => {
     const baseTypeInfo = {
       type: dataTypeByName.VarBinary,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -678,7 +686,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -686,7 +695,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.deepEqual(token.columns[0].value, value);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -713,7 +722,7 @@ describe('Row Token Parser', () => {
 
   it('should write encrypted binary', () => {
     const baseTypeInfo = { type: dataTypeByName.Binary };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -733,7 +742,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -741,7 +751,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.deepEqual(token.columns[0].value, value);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -780,7 +790,7 @@ describe('Row Token Parser', () => {
       dataLength: 65535,
       collation: { codepage: undefined },
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -802,7 +812,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -810,7 +821,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, null);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -890,7 +901,7 @@ describe('Row Token Parser', () => {
       dataLength: 65535,
       collation: { codepage: undefined },
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -914,7 +925,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -922,7 +934,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, 'abcdef');
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -965,7 +977,7 @@ describe('Row Token Parser', () => {
       dataLength: 65535,
       collation: { codepage: 'WINDOWS-1252' },
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -988,7 +1000,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -996,7 +1009,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, 'abcdéf');
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -1020,24 +1033,13 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-<<<<<<< HEAD
-    const parser = new Parser({ token() { } }, colMetaData, options);
+    const parser = new Parser({ token() { } }, options);
+    parser.colMetadata = colMetadata;
     parser.on('error', (error) => {
       assert.equal(error.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
     });
     parser.write(buffer.data);
     parser.read();
-=======
-    try {
-      const parser = new Parser({ token() { } }, options);
-      parser.colMetadata = colMetadata;
-      parser.write(buffer.data);
-      parser.read();
-      assert.isOk(false);
-    } catch {
-      // ???
-    }
->>>>>>> origin-master
   });
 
   // encrypted varcharMaxKnownLengthWrong is not an error-case
@@ -1075,7 +1077,7 @@ describe('Row Token Parser', () => {
       type: dataTypeByName.VarBinary,
       dataLength: 65535,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1097,7 +1099,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1105,7 +1108,7 @@ describe('Row Token Parser', () => {
         // console.log(token);
         assert.strictEqual(token.columns.length, 1);
         assert.strictEqual(token.columns[0].value, null);
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -1306,7 +1309,7 @@ describe('Row Token Parser', () => {
       { type: IntN, dataLength: 0x02 },
       { type: IntN, dataLength: 0x04 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1458,7 +1461,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1521,7 +1525,7 @@ describe('Row Token Parser', () => {
       { type: dataTypeByName.UniqueIdentifier, dataLength: 0x00 },
       { type: dataTypeByName.UniqueIdentifier, dataLength: 0x10 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1561,7 +1565,8 @@ describe('Row Token Parser', () => {
       ...alwaysEncryptedOptions,
       lowerCaseGuids: false,
     };
-    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    const parser = new Parser({ token() { } }, parserOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1623,7 +1628,7 @@ describe('Row Token Parser', () => {
       { type: dataTypeByName.UniqueIdentifier, dataLength: 0x00 },
       { type: dataTypeByName.UniqueIdentifier, dataLength: 0x10 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1663,7 +1668,8 @@ describe('Row Token Parser', () => {
       ...alwaysEncryptedOptions,
       lowerCaseGuids: true,
     };
-    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    const parser = new Parser({ token() { } }, parserOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1723,7 +1729,7 @@ describe('Row Token Parser', () => {
       { type: FloatN, dataLength: 0x04 },
       { type: FloatN, dataLength: 0x08 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1766,7 +1772,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1820,7 +1827,7 @@ describe('Row Token Parser', () => {
     const baseTypeInfo = {
       type: dataTypeByName.DateTime,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1851,7 +1858,8 @@ describe('Row Token Parser', () => {
       ...alwaysEncryptedOptions,
       useUTC: false,
     };
-    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    const parser = new Parser({ token() { } }, parserOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1862,7 +1870,7 @@ describe('Row Token Parser', () => {
           token.columns[0].value.getTime(),
           new Date('January 3, 1900 00:00:45').getTime(),
         );
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -1870,7 +1878,7 @@ describe('Row Token Parser', () => {
     const baseTypeInfo = {
       type: dataTypeByName.DateTime,
     };
-    const colMetaData = [{
+    const colMetadata = [{
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1901,7 +1909,8 @@ describe('Row Token Parser', () => {
       ...alwaysEncryptedOptions,
       useUTC: true,
     };
-    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    const parser = new Parser({ token() { } }, parserOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -1912,7 +1921,7 @@ describe('Row Token Parser', () => {
           token.columns[0].value.getTime(),
           new Date('January 3, 1900 00:00:45 GMT').getTime(),
         );
-        assert.strictEqual(token.columns[0].metadata, colMetaData[0]);
+        assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
       });
   });
 
@@ -1941,7 +1950,7 @@ describe('Row Token Parser', () => {
       { type: DateTimeN, dataLength: 0x04 },
       { type: DateTimeN, dataLength: 0x08 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -1984,7 +1993,8 @@ describe('Row Token Parser', () => {
       ...alwaysEncryptedOptions,
       useUTC: false,
     };
-    const parser = new Parser({ token() { } }, colMetaData, parserOptions);
+    const parser = new Parser({ token() { } }, parserOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
@@ -2188,7 +2198,7 @@ describe('Row Token Parser', () => {
       { type: NumericN, precision: 33, scale: 1, dataLength: 17 },
       { type: NumericN, precision: 3, scale: 1, dataLength: 0 },
     ];
-    const colMetaData = baseTypeInfo.map((baseTypeInfo) => ({
+    const colMetadata = baseTypeInfo.map((baseTypeInfo) => ({
       type: dataTypeByName.VarBinary,
       cryptoMetadata: {
         ...cryptoMetadata,
@@ -2273,7 +2283,8 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = new Parser({ token() { } }, colMetaData, alwaysEncryptedOptions);
+    const parser = new Parser({ token() { } }, alwaysEncryptedOptions);
+    parser.colMetadata = colMetadata;
     parser.write(buffer.data);
 
     return readTokenAsync(parser)
