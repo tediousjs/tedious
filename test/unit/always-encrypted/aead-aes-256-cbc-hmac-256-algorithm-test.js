@@ -77,10 +77,10 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     const plaintext = 9007199254740991;
-    const plainTextBuffer = TYPE.typeByName.BigInt.toBuffer({value: plaintext});
+    const plainTextBuffer = TYPE.typeByName.BigInt.toBuffer({ value: plaintext });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.deepEqual(cipherText, testCipherText, deterministicFailMessage);
     }
@@ -91,12 +91,12 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
     const plaintext = 9007199254740991;
-    const plainTextBuffer = TYPE.typeByName.BigInt.toBuffer({value: plaintext});
+    const plainTextBuffer = TYPE.typeByName.BigInt.toBuffer({ value: plaintext });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
-      assert.notDeepEqual(cipherText, testCipherText, randomizedFailMessage );
+      assert.notDeepEqual(cipherText, testCipherText, randomizedFailMessage);
     }
   });
 
@@ -105,10 +105,10 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     const plaintext = "asdghjkl;@#$%^&*XCVBNM'";
-    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({value: plaintext});
+    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: plaintext });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.deepEqual(cipherText, testCipherText, deterministicFailMessage);
     }
@@ -119,10 +119,10 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
     const plaintext = "asdghjkl;@#$%^&*XCVBNM'";
-    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({value: plaintext});
+    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: plaintext });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.notDeepEqual(cipherText, testCipherText, randomizedFailMessage);
     }
@@ -132,11 +132,11 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
-    const plaintext = new Date('December 17, 1995 03:24:00');
-    const plainTextBuffer = TYPE.typeByName.DateTime.toBuffer({ value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) }, {options: { useUTC: true }});
+    // const plaintext = new Date('December 17, 1995 03:24:00');
+    const plainTextBuffer = TYPE.typeByName.DateTime.toBuffer({ value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) }, { options: { useUTC: true } });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.deepEqual(cipherText, testCipherText, deterministicFailMessage);
     }
@@ -146,11 +146,11 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const encryptionKey = new AeadAes256CbcHmac256EncryptionKey(sampleRootKey, algorithmName);
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
-    const plaintext = new Date('December 17, 1995 03:24:00');
-    const plainTextBuffer = TYPE.typeByName.DateTime.toBuffer({ value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) }, {options: { useUTC: true }});
+    // const plaintext = new Date('December 17, 1995 03:24:00');
+    const plainTextBuffer = TYPE.typeByName.DateTime.toBuffer({ value: new Date(Date.UTC(1970, 1, 23, 12, 0, 0)) }, { options: { useUTC: true } });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.notDeepEqual(cipherText, testCipherText, deterministicFailMessage);
     }
@@ -161,13 +161,13 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Deterministic);
 
     let string = '1';
-    for(let i = 0; i < 50000; i++) {
+    for (let i = 0; i < 50000; i++) {
       string += '1';
     }
-    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: string});
+    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: string });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.deepEqual(cipherText, testCipherText, deterministicFailMessage);
     }
@@ -178,13 +178,13 @@ describe('aead-aes-256-cbc-hmac-algorithm', () => {
     const algorithm = new AeadAes256CbcHmac256Algorithm(encryptionKey, SQLServerEncryptionType.Randomized);
 
     let string = '1';
-    for(let i = 0; i < 50000; i++) {
+    for (let i = 0; i < 50000; i++) {
       string += '1';
     }
-    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: string});
+    const plainTextBuffer = TYPE.typeByName.VarChar.toBuffer({ value: string });
     const cipherText = algorithm.encryptData(plainTextBuffer);
 
-    for(let i = 0; i < numberOfComparison; i++) {
+    for (let i = 0; i < numberOfComparison; i++) {
       const testCipherText = algorithm.encryptData(plainTextBuffer);
       assert.notDeepEqual(cipherText, testCipherText, randomizedFailMessage);
     }

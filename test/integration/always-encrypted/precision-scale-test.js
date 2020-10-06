@@ -116,17 +116,17 @@ describe('always encrypted', function() {
 
   it('should correctly insert/select the encrypted data', function(done) {
     const plaintext = 'nvarchar_determ_test_val123';
-    const datetime_randomized_test =  new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 997));
-    const datetime_deterministic_test =  new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 997));
-    const datetime2_randomized_test =  new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
-    const datetime2_deterministic_test =  new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
+    const datetime_randomized_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 997));
+    const datetime_deterministic_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 997));
+    const datetime2_randomized_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
+    const datetime2_deterministic_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
     const datetimeoffset_randomized_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
     const datetimeoffset_deterministic_test = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
-    const time_randomized_test = new Date(1970 , 0, 1, 15, 17, 20, 3);
-    const time_deterministic_test = new Date(1970 , 0, 1, 15, 17, 20, 3);
+    const time_randomized_test = new Date(1970, 0, 1, 15, 17, 20, 3);
+    const time_deterministic_test = new Date(1970, 0, 1, 15, 17, 20, 3);
     const float_randomized_test = 1.23;
     const float_deterministic_test = 1.23;
-    const numeric_test = 1.23
+    // const numeric_test = 1.23;
 
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [plaintext]  nvarchar(50),
@@ -192,7 +192,7 @@ describe('always encrypted', function() {
       )
     );`, (err) => {
       if (err) {
-        console.log('ERROR CREATE TABLE')
+        console.log('ERROR CREATE TABLE');
         return done(err);
       }
 
@@ -210,61 +210,60 @@ describe('always encrypted', function() {
             @float_randomized_test,
             @float_deterministic_test
             )`, (err) => {
-        if (err) {
-          console.log('ERROR INSERT INTO')
-          return done(err);
-        }
-        let values = [];
-        const request = new Request(`SELECT TOP 1 * FROM test_always_encrypted`, (err) => {
           if (err) {
-            console.log('ERROR SELECT TOP')
+            console.log('ERROR INSERT INTO');
             return done(err);
           }
+          let values = [];
+          const request = new Request('SELECT TOP 1 * FROM test_always_encrypted', (err) => {
+            if (err) {
+              console.log('ERROR SELECT TOP');
+              return done(err);
+            }
 
-          try {
-            assert.deepEqual(values, [
-              plaintext,
-              datetime_randomized_test,
-              datetime_deterministic_test,
-              datetime2_randomized_test,
-              datetime2_deterministic_test,
-              datetimeoffset_randomized_test,
-              datetimeoffset_deterministic_test,
-              time_randomized_test,
-              time_deterministic_test,
-              float_randomized_test,
-              float_deterministic_test,
+            try {
+              assert.deepEqual(values, [
+                plaintext,
+                datetime_randomized_test,
+                datetime_deterministic_test,
+                datetime2_randomized_test,
+                datetime2_deterministic_test,
+                datetimeoffset_randomized_test,
+                datetimeoffset_deterministic_test,
+                time_randomized_test,
+                time_deterministic_test,
+                float_randomized_test,
+                float_deterministic_test,
               // numeric_test,
               // numeric_test
-            ]);
-          } catch (error) {
-            return done(error);
-          }
+              ]);
+            } catch (error) {
+              return done(error);
+            }
 
-          return done();
+            return done();
+          });
+
+          request.on('row', function(columns) {
+            values = columns.map((col) => col.value);
+          });
+
+          connection.execSql(request);
         });
-
-        request.on('row', function(columns) {
-          values = columns.map((col) => col.value);
-        });
-
-        connection.execSql(request);
-      });
 
       request.addParameter('plaintext', TYPES.NVarChar, plaintext);
-      request.addParameter('datetime_randomized_test', TYPES.DateTime, datetime_randomized_test, {scale: 3});
-      request.addParameter('datetime_deterministic_test', TYPES.DateTime, datetime_deterministic_test, {scale: 3});
-      request.addParameter('datetime2_randomized_test', TYPES.DateTime2, datetime2_randomized_test, {scale: 7});
-      request.addParameter('datetime2_deterministic_test', TYPES.DateTime2, datetime2_deterministic_test, {scale: 7});
-      request.addParameter('datetimeoffset_randomized_test', TYPES.DateTimeOffset, datetimeoffset_randomized_test, {precision: 34, scale: 7});
-      request.addParameter('datetimeoffset_deterministic_test', TYPES.DateTimeOffset, datetimeoffset_deterministic_test, {precision: 34, scale: 7});
-      request.addParameter('time_randomized_test', TYPES.Time, time_randomized_test, {precision: 16, scale: 7});
-      request.addParameter('time_deterministic_test', TYPES.Time, time_deterministic_test, {precision: 16, scale: 7});
-      request.addParameter('float_randomized_test', TYPES.Float, float_randomized_test, {precision: 15});
-      request.addParameter('float_deterministic_test', TYPES.Float, float_deterministic_test, {precision: 15});
+      request.addParameter('datetime_randomized_test', TYPES.DateTime, datetime_randomized_test, { scale: 3 });
+      request.addParameter('datetime_deterministic_test', TYPES.DateTime, datetime_deterministic_test, { scale: 3 });
+      request.addParameter('datetime2_randomized_test', TYPES.DateTime2, datetime2_randomized_test, { scale: 7 });
+      request.addParameter('datetime2_deterministic_test', TYPES.DateTime2, datetime2_deterministic_test, { scale: 7 });
+      request.addParameter('datetimeoffset_randomized_test', TYPES.DateTimeOffset, datetimeoffset_randomized_test, { precision: 34, scale: 7 });
+      request.addParameter('datetimeoffset_deterministic_test', TYPES.DateTimeOffset, datetimeoffset_deterministic_test, { precision: 34, scale: 7 });
+      request.addParameter('time_randomized_test', TYPES.Time, time_randomized_test, { precision: 16, scale: 7 });
+      request.addParameter('time_deterministic_test', TYPES.Time, time_deterministic_test, { precision: 16, scale: 7 });
+      request.addParameter('float_randomized_test', TYPES.Float, float_randomized_test, { precision: 15 });
+      request.addParameter('float_deterministic_test', TYPES.Float, float_deterministic_test, { precision: 15 });
       // request.addParameter('numeric_randomized_test', TYPES.Numeric, numeric_test, {scale: 2});
       // request.addParameter('numeric_deterministic_test', TYPES.Numeric, numeric_test, {scale: 2});
-
 
 
       connection.execSql(request);

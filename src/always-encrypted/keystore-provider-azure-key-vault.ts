@@ -29,7 +29,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
     this.credentials = new ClientSecretCredential(tenantId, clientId, clientKey);
   }
 
-  async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> { 
+  async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> {
     if (!encryptedColumnEncryptionKey) {
       throw new Error('Internal error. Encrypted column encryption key cannot be null.');
     }
@@ -68,7 +68,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
     const signatureLength: number = encryptedColumnEncryptionKey.length - currentIndex - cipherTextLength;
 
     if (signatureLength !== keySizeInBytes) {
-      throw new Error(`The specified encrypted column encryption key\'s signature length: ${signatureLength} does not match the signature length: ${keySizeInBytes} when using column master key (Azure Key Vault key) in ${masterKeyPath}. The encrypted column encryption key may be corrupt, or the specified Azure Key Vault key path may be incorrect.`)
+      throw new Error(`The specified encrypted column encryption key's signature length: ${signatureLength} does not match the signature length: ${keySizeInBytes} when using column master key (Azure Key Vault key) in ${masterKeyPath}. The encrypted column encryption key may be corrupt, or the specified Azure Key Vault key path may be incorrect.`);
     }
 
     const cipherText = Buffer.alloc(cipherTextLength);
@@ -194,8 +194,8 @@ export class ColumnEncryptionAzureKeyVaultProvider {
   }
 
   private async getMasterKey(masterKeyPath: string): Promise<KeyVaultKey> {
-    if(!masterKeyPath) {
-      throw new Error(`Master key path cannot be null or undefined`);
+    if (!masterKeyPath) {
+      throw new Error('Master key path cannot be null or undefined');
     }
     const keyParts = this.parsePath(masterKeyPath);
 
@@ -205,7 +205,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
   }
 
   private createKeyClient(keyVaultUrl: string): void {
-    if(!keyVaultUrl){
+    if (!keyVaultUrl) {
       throw new Error('Cannot create key client with null or undefined keyVaultUrl');
     }
     if (!this.keyClient) {
@@ -215,8 +215,8 @@ export class ColumnEncryptionAzureKeyVaultProvider {
   }
 
   private createCryptoClient(masterKey: KeyVaultKey): CryptographyClient {
-    if(!masterKey) {
-      throw new Error('Cannot create CryptographyClient with null or undefined masterKey')
+    if (!masterKey) {
+      throw new Error('Cannot create CryptographyClient with null or undefined masterKey');
     }
     return new CryptographyClient(masterKey, this.credentials);
   }
@@ -290,7 +290,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
       throw new Error('Azure KVS Crypto Client is not defined.');
     }
 
-    if(!encryptionAlgorithm){
+    if (!encryptionAlgorithm) {
       throw new Error('Encryption Algorithm cannot be null or undefined');
     }
 
@@ -308,7 +308,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
   }
 
   private getAKVKeySize(retrievedKey: KeyVaultKey): number {
-    if(!retrievedKey){
+    if (!retrievedKey) {
       throw new Error('Retrieved key cannot be null or undefined');
     }
     const key = retrievedKey.key;

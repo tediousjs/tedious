@@ -2060,9 +2060,9 @@ class Connection extends EventEmitter {
           if (!request.canceled) {
             let message = token.message;
             // Check if attempting to insert non encrypted data into encrypted table
-            if(token.message.includes('Operand type clash') && token.message.includes('encrypted with')){
-              if(!this.config.options.columnEncryptionSetting) {
-                message = 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true'
+            if (token.message.includes('Operand type clash') && token.message.includes('encrypted with')) {
+              if (!this.config.options.columnEncryptionSetting) {
+                message = 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true';
               }
             }
             const error = new RequestError(message, 'EREQUEST');

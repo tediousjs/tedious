@@ -133,8 +133,8 @@ describe('always encrypted', function() {
 
       const request = new Request('INSERT INTO test_always_encrypted ([plaintext], [nvarchar_determ_test]) VALUES (@p1, @p2)', (err) => {
         if (err) {
-            assert.instanceOf(err, RequestError);
-            assert.equal(err.message, 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true');
+          assert.instanceOf(err, RequestError);
+          assert.equal(err.message, 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true');
           return done();
         }
 
