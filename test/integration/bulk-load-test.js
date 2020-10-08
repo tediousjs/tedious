@@ -314,7 +314,6 @@ describe('Bulk Load Tests', function() {
       if (err) {
         return done(err);
       }
-
       bulkLoad.cancel();
 
       connection.execSqlBatch(request_verifyBulkLoad);
@@ -345,6 +344,73 @@ describe('Bulk Load Tests', function() {
 
     request_verifyBulkLoad.on('row', function(columns) {
       assert.strictEqual(columns[0].value, 1234);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('should throw `RequestError: Canceled` after 10ms', function(done) {
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+      if (err) {
+        assert.strictEqual(err.name, 'RequestError');
+        assert.strictEqual(err.message, 'Canceled.');
+        return done();
+      }
+
+      done(new Error('Test did not throw error as expected'));
+    });
+
+    bulkLoad.setTimeout(10);
+
+    bulkLoad.addColumn('id', TYPES.Int, {
+      nullable: true
+    });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+      if (err) {
+        assert.strictEqual(err.name, 'RequestError');
+        assert.strictEqual(err.message, 'Canceled.');
+        return done();
+      }
+
+      for (let i = 0; i < 100000; i++) {
+        bulkLoad.addRow({ id: 1234 });
+      }
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('should throw `RequestError: Connection closed before request completed` after 100ms', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+      if (err) {
+        assert.strictEqual(err.name, 'RequestError');
+        assert.strictEqual(err.message, 'Connection closed before request completed.');
+        return done();
+      }
+
+      done(new Error('Test did not throw error as expected'));
+    });
+
+    bulkLoad.setTimeout(100);
+
+    bulkLoad.addColumn('id', TYPES.Int, {
+      nullable: true
+    });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      for (let i = 0; i < 100000; i++) {
+        bulkLoad.addRow({ id: 1234 });
+      }
+
+      connection.execBulkLoad(bulkLoad);
     });
 
     connection.execSqlBatch(request);
@@ -591,7 +657,7 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     const rowStream = bulkLoad.getRowStream();
     connection.execBulkLoad(bulkLoad);
 
-    const rowSource = Readable.from([ ['invalid date'] ]);
+    const rowSource = Readable.from([['invalid date']]);
 
     pipeline(rowSource, rowStream, function(err) {
       assert.ok(err);

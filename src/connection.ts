@@ -397,12 +397,12 @@ interface State {
 }
 
 type Authentication = DefaultAuthentication |
-                      NtlmAuthentication |
-                      AzureActiveDirectoryPasswordAuthentication |
-                      AzureActiveDirectoryMsiAppServiceAuthentication |
-                      AzureActiveDirectoryMsiVmAuthentication |
-                      AzureActiveDirectoryAccessTokenAuthentication |
-                      AzureActiveDirectoryServicePrincipalSecret;
+  NtlmAuthentication |
+  AzureActiveDirectoryPasswordAuthentication |
+  AzureActiveDirectoryMsiAppServiceAuthentication |
+  AzureActiveDirectoryMsiVmAuthentication |
+  AzureActiveDirectoryAccessTokenAuthentication |
+  AzureActiveDirectoryServicePrincipalSecret;
 
 type AuthenticationType = Authentication['type'];
 
@@ -446,7 +446,7 @@ interface DebugOptions {
    * (default: `false`)
    */
   token: boolean;
-  }
+}
 
 interface AuthenticationOptions {
   /**
@@ -455,19 +455,19 @@ interface AuthenticationOptions {
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
    * or `azure-active-directory-service-principal-secret`
    */
-   type?: AuthenticationType;
-   /**
-    * Different options for authentication types:
-    *
-    * * `default`: [[DefaultAuthentication.options]]
-    * * `ntlm` :[[NtlmAuthentication]]
-    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
-    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
-    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
-    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
-    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
-    */
-   options?: any;
+  type?: AuthenticationType;
+  /**
+   * Different options for authentication types:
+   *
+   * * `default`: [[DefaultAuthentication.options]]
+   * * `ntlm` :[[NtlmAuthentication]]
+   * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
+   * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
+   * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
+   * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
+   * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   */
+  options?: any;
 }
 
 interface ConnectionOptions {
@@ -2840,6 +2840,11 @@ class Connection extends EventEmitter {
    */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
+    if (bulkLoad.timeout) {
+      setTimeout(() => {
+        bulkLoad.cancel();
+      }, bulkLoad.timeout);
+    }
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       if (error) {
         if (error.code === 'UNKNOWN') {
@@ -3178,6 +3183,10 @@ class Connection extends EventEmitter {
         // If it was put into streaming mode, it's the user's responsibility
         // to end the stream.
         if (!request.streamingMode) {
+          request.on('cancel', () => {
+            this.transitionTo(this.STATE.LOGGED_IN);
+
+          });
           request.rowToPacketTransform.end();
         }
         this.messageIo.outgoingMessageStream.write(message);
@@ -3615,6 +3624,10 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+      },
+      data: function() {                        // Discards incoming data. Can occur if bulkLoad is canceled and data event is still emitted afterwards.
+      },
+      message: function() {                     // Like above, catch unused 'message' event. Can occur if bulkLoad is canceled and message event is still emitted afterwards
       }
     }
   },
