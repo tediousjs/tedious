@@ -4,10 +4,14 @@ import Parser from './stream-parser';
 import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
 
-export type ColumnMetadata = Metadata & {
+export interface ColumnMetadata extends Metadata {
+  /**
+   * The column's name。
+   */
   colName: string;
+
   tableName?: string | string[];
-};
+}
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
@@ -78,7 +82,7 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+function colMetadataParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 

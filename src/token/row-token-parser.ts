@@ -8,12 +8,13 @@ import { RowToken } from './token';
 
 import valueParse from '../value-parser';
 
-type Column = {
+interface Column {
   value: unknown;
   metadata: ColumnMetadata;
-};
+}
 
-function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+  const colMetadata = parser.colMetadata;
   const columns: Column[] = [];
 
   const len = colMetadata.length;

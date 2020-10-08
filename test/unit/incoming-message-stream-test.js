@@ -4,6 +4,7 @@ const { assert } = require('chai');
 const IncomingMessageStream = require('../../src/incoming-message-stream');
 const Message = require('../../src/message');
 const Debug = require('../../src/debug');
+const ConnectionError = require('../../src/errors').ConnectionError;
 
 describe('IncomingMessageStream', function() {
   it('extract messages from packet data', function(done) {
@@ -74,7 +75,7 @@ describe('IncomingMessageStream', function() {
         return done(err);
       }
 
-      assert.deepEqual(res, Buffer.concat([ packetData, packetData ]));
+      assert.deepEqual(res, Buffer.concat([packetData, packetData]));
 
       done();
     });
@@ -100,7 +101,7 @@ describe('IncomingMessageStream', function() {
         const writtenData = result.slice();
 
         assert.strictEqual(writtenData.length, 16);
-        assert.deepEqual(writtenData, Buffer.concat([ packetData, packetData ]));
+        assert.deepEqual(writtenData, Buffer.concat([packetData, packetData]));
 
         assert.strictEqual(messageEnded, true);
       });
@@ -138,7 +139,7 @@ describe('IncomingMessageStream', function() {
         return done(err);
       }
 
-      assert.deepEqual(res, Buffer.concat([ packetData, packetData ]));
+      assert.deepEqual(res, Buffer.concat([packetData, packetData]));
 
       done();
     });
@@ -166,7 +167,7 @@ describe('IncomingMessageStream', function() {
         const writtenData = result.slice();
 
         assert.strictEqual(writtenData.length, 16);
-        assert.deepEqual(writtenData, Buffer.concat([ packetData, packetData ]));
+        assert.deepEqual(writtenData, Buffer.concat([packetData, packetData]));
 
         assert.strictEqual(messageEnded, true);
       });
@@ -174,5 +175,30 @@ describe('IncomingMessageStream', function() {
       assert.isFalse(messageEnded);
       incoming.resume();
     });
+  });
+
+  it('should validate packet header size', function(done) {
+    const packetData = Buffer.from('test1234');
+    const packetHeader = Buffer.alloc(8);
+
+    let offset = 0;
+    offset = packetHeader.writeUInt8(0x11, offset);
+    offset = packetHeader.writeUInt8(0x01, offset);
+    offset = packetHeader.writeUInt16BE(5, offset);
+    offset = packetHeader.writeUInt16BE(0x0000, offset);
+    offset = packetHeader.writeUInt8(1, offset);
+    packetHeader.writeUInt8(0x00, offset);
+
+    const packet = Buffer.concat([packetHeader, packetData]);
+
+    const incoming = new IncomingMessageStream(new Debug());
+
+    incoming.on('error', (err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.equal(err.message, 'Unable to process incoming packet');
+      done();
+    });
+
+    incoming.end(packet);
   });
 });

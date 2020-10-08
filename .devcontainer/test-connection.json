@@ -1,0 +1,17 @@
+{
+  "config": {
+    "server": "mssql",
+    "authentication": {
+      "type": "default",
+      "options": {
+        "userName": "sa",
+        "password": "yourStrong(!)Password"
+      }
+    },
+    "options": {
+      "port": 1433,
+      "database": "master",
+      "trustServerCertificate": true
+    }
+  }
+}

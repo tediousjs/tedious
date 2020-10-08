@@ -24,7 +24,7 @@ var connection = new Connection({
   }
 });
 
-connection.on('connect', function(err) {
+connection.connect(function(err) {
   var request = new Request('countChar',
     function(err) {
       if (err) {

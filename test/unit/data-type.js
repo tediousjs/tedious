@@ -971,6 +971,20 @@ describe('UniqueIdentifier', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('returns the given value for values that match the UUID format', function() {
+      const expected = 'e062ae34-6de5-47f3-8ba3-29d25f77e71a';
+      const actual = TYPES.UniqueIdentifier.validate(expected);
+      assert.strictEqual(actual, expected);
+    });
+
+    it('returns a TypeError for values that don\'t matcht the UUID format', function() {
+      const result = TYPES.UniqueIdentifier.validate('invalid');
+      assert.instanceOf(result, TypeError);
+      assert.strictEqual(result.message, 'Invalid GUID.');
+    });
+  });
 });
 
 describe('VarBinary', function() {

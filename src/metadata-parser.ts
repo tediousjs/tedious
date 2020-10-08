@@ -5,39 +5,57 @@ import { TYPE, DataType } from './data-type';
 
 import { sprintf } from 'sprintf-js';
 
-type Collation = {
+interface Collation {
   lcid: number;
   flags: number;
   version: number;
   sortId: number;
   codepage: string;
-};
+}
 
-type XmlSchema = {
+interface XmlSchema {
   dbname: string;
   owningSchema: string;
   xmlSchemaCollection: string;
-};
+}
 
-type UdtInfo = {
+interface UdtInfo {
   maxByteSize: number;
   dbname: string;
   owningSchema: string;
   typeName: string;
   assemblyName: string;
-};
+}
 
-export type Metadata = {
+export interface Metadata {
   userType: number;
+
   flags: number;
+  /**
+   * The column's type, such as VarChar, Int or Binary.
+   */
   type: DataType;
+
   collation: Collation | undefined;
+  /**
+   * The precision. Only applicable to numeric and decimal.
+   */
   precision: number | undefined;
+
+  /**
+   * The scale. Only applicable to numeric, decimal, time, datetime2 and datetimeoffset.
+   */
   scale: number | undefined;
+
+  /**
+   * The length, for char, varchar, nvarchar and varbinary.
+   */
   dataLength: number | undefined;
+
   schema: XmlSchema | undefined;
+
   udtInfo: UdtInfo | undefined;
-};
+}
 
 function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
   // s2.2.5.1.2
