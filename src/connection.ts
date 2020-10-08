@@ -3161,6 +3161,8 @@ class Connection extends EventEmitter {
         this.createCancelTimer();
       });
 
+      this.createRequestTimer();
+
       if (request instanceof BulkLoad) {
         message = request.getMessageStream();
 
@@ -3175,8 +3177,6 @@ class Connection extends EventEmitter {
         this.messageIo.outgoingMessageStream.write(message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
       } else {
-        this.createRequestTimer();
-
         message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
         this.messageIo.outgoingMessageStream.write(message);
         this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
