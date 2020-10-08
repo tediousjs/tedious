@@ -556,7 +556,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should throw `RequestError: Connection closed before request completed` after 100ms', function(done) {
+  it('should throw `RequestError: Connection closed before request completed` after 1000ms', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
@@ -567,7 +567,7 @@ describe('Bulk Load Tests', function() {
       done(new Error('Test did not throw error as expected'));
     });
 
-    bulkLoad.setTimeout(100);
+    bulkLoad.setTimeout(2000);
 
     bulkLoad.addColumn('id', TYPES.Int, {
       nullable: true
@@ -578,7 +578,7 @@ describe('Bulk Load Tests', function() {
         return done(err);
       }
 
-      for (let i = 0; i < 100000; i++) {
+      for (let i = 0; i < 900000; i++) {
         bulkLoad.addRow({ id: 1234 });
       }
 
