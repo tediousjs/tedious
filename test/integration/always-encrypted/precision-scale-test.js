@@ -126,7 +126,10 @@ describe('always encrypted', function() {
     const time_deterministic_test = new Date(1970, 0, 1, 15, 17, 20, 3);
     const float_randomized_test = 1.23;
     const float_deterministic_test = 1.23;
-    // const numeric_test = 1.23;
+    const numeric_randomized_test = 1.23;
+    const numeric_deterministic_test = 1.23;
+    const decimal_randomized_test = 1.23;
+    const decimal_deterministic_test = 1.23;
 
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [plaintext]  nvarchar(50),
@@ -189,6 +192,30 @@ describe('always encrypted', function() {
         ENCRYPTION_TYPE = DETERMINISTIC,
         ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
         COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [numeric_randomized_test] numeric (3,2)
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [numeric_deterministic_test] numeric (3,2)
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [decimal_randomized_test] decimal (3,2)
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
+      ),
+      [decimal_deterministic_test] decimal (3,2)
+      ENCRYPTED WITH (
+        ENCRYPTION_TYPE = DETERMINISTIC,
+        ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256',
+        COLUMN_ENCRYPTION_KEY = [CEK1]
       )
     );`, (err) => {
       if (err) {
@@ -208,7 +235,11 @@ describe('always encrypted', function() {
             @time_randomized_test,
             @time_deterministic_test,
             @float_randomized_test,
-            @float_deterministic_test
+            @float_deterministic_test,
+            @numeric_randomized_test,
+            @numeric_deterministic_test,
+            @decimal_randomized_test,
+            @decimal_deterministic_test
             )`, (err) => {
           if (err) {
             console.log('ERROR INSERT INTO');
@@ -234,8 +265,10 @@ describe('always encrypted', function() {
                 time_deterministic_test,
                 float_randomized_test,
                 float_deterministic_test,
-              // numeric_test,
-              // numeric_test
+                numeric_randomized_test,
+                numeric_deterministic_test,
+                decimal_randomized_test,
+                decimal_deterministic_test
               ]);
             } catch (error) {
               return done(error);
@@ -262,8 +295,10 @@ describe('always encrypted', function() {
       request.addParameter('time_deterministic_test', TYPES.Time, time_deterministic_test, { precision: 16, scale: 7 });
       request.addParameter('float_randomized_test', TYPES.Float, float_randomized_test, { precision: 15 });
       request.addParameter('float_deterministic_test', TYPES.Float, float_deterministic_test, { precision: 15 });
-      // request.addParameter('numeric_randomized_test', TYPES.Numeric, numeric_test, {scale: 2});
-      // request.addParameter('numeric_deterministic_test', TYPES.Numeric, numeric_test, {scale: 2});
+      request.addParameter('numeric_randomized_test', TYPES.Numeric, numeric_randomized_test, { precision: 3, scale: 2 });
+      request.addParameter('numeric_deterministic_test', TYPES.Numeric, numeric_deterministic_test, { precision: 3, scale: 2 });
+      request.addParameter('decimal_randomized_test', TYPES.Decimal, decimal_randomized_test, { precision: 3, scale: 2 });
+      request.addParameter('decimal_deterministic_test', TYPES.Decimal, decimal_deterministic_test, { precision: 3, scale: 2 });
 
 
       connection.execSql(request);
