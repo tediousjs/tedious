@@ -40,7 +40,7 @@
     "tag": "next"
   },
   "dependencies": {
-    "@azure/ms-rest-nodeauth": "2.0.2",
+    "@azure/ms-rest-nodeauth": "^3.0.5",
     "@js-joda/core": "^3.1.0",
     "bl": "^3.0.0",
     "depd": "^2.0.0",
