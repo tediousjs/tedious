@@ -4,6 +4,7 @@ import { RequestError } from './errors';
 
 import Connection from './connection';
 import { Metadata } from './metadata-parser';
+import Procedures from './special-stored-procedure';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 /**
@@ -50,7 +51,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure?: string;
+  sqlTextOrProcedure?: string | number;
   /**
    * @private
    */
@@ -459,7 +460,7 @@ class Request extends EventEmitter {
       const parameter = this.originalParameters[i];
       this.parameters.push(parameter);
     }
-    this.sqlTextOrProcedure = 'sp_executesql';
+    this.sqlTextOrProcedure = Procedures.Sp_ExecuteSql;
   }
 
   /**
@@ -471,7 +472,7 @@ class Request extends EventEmitter {
     this.addOutputParameter('handle', TYPES.Int, undefined);
     this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
     this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
-    this.sqlTextOrProcedure = 'sp_prepare';
+    this.sqlTextOrProcedure = Procedures.Sp_Prepare;
     this.preparing = true;
     this.on('returnValue', (name: string, value: any) => {
       if (name === 'handle') {
@@ -488,7 +489,7 @@ class Request extends EventEmitter {
   transformIntoUnprepareRpc() {
     this.parameters = [];
     this.addParameter('handle', TYPES.Int, this.handle);
-    this.sqlTextOrProcedure = 'sp_unprepare';
+    this.sqlTextOrProcedure = Procedures.Sp_Unprepare;
   }
 
   /**
@@ -508,7 +509,7 @@ class Request extends EventEmitter {
       return;
     }
 
-    this.sqlTextOrProcedure = 'sp_execute';
+    this.sqlTextOrProcedure = Procedures.Sp_Execute;
   }
 
   /**

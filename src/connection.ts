@@ -2772,7 +2772,7 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSqlBatch(request: Request) {
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure as string, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
