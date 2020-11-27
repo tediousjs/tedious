@@ -543,7 +543,7 @@ interface ConnectionOptions {
    *
    * (default: `{}`)
    */
-  cryptoCredentialsDetails?: {};
+  cryptoCredentialsDetails?: SecureContextOptions;
 
   /**
    * Database to connect to (default: dependent on server configuration).
