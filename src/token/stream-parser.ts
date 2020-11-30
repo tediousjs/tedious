@@ -121,7 +121,7 @@ class Parser extends Transform {
     // If we're no longer suspended, parse new tokens
     if (!this.suspended) {
       // Start the parser
-        this.parseTokens();
+      this.parseTokens();
     }
 
     done();
