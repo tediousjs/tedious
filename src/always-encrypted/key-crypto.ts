@@ -39,7 +39,8 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
 };
 
 export const decryptWithKey = async (cipherText: Buffer, md: CryptoMetadata, options: ConnectionOptions): Promise<Buffer> => {
-  if (!options.trustedServerNameAE) {
+  try {
+     if (!options.trustedServerNameAE) {
     throw new Error('Server name should npt be null in DecryptWithKey');
   }
 
@@ -52,12 +53,16 @@ export const decryptWithKey = async (cipherText: Buffer, md: CryptoMetadata, opt
   }
 
   const plainText: Buffer = md.cipherAlgorithm.decryptData(cipherText);
+  // console.log('>> plaintext: ', plainText)
 
   if (!plainText) {
     throw new Error('Internal error. Plaintext value cannot be null.');
   }
 
   return plainText;
+  } catch (err) {
+    throw err;
+  }
 };
 
 export const decryptSymmetricKey = async (md: CryptoMetadata, options: ConnectionOptions): Promise<void> => {

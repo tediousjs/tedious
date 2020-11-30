@@ -39,7 +39,7 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
-class EndOfMessageMarker {}
+class EndOfMessageMarker { }
 
 class Parser extends Transform {
   debug: Debug;
@@ -61,7 +61,7 @@ class Parser extends Transform {
     this.options = options;
     this.endOfMessageMarker = new EndOfMessageMarker();
 
-    this.buffers = [ new ReadableTrackingBuffer(Buffer.alloc(0)) ];
+    this.buffers = [new ReadableTrackingBuffer(Buffer.alloc(0))];
     this.suspended = false;
     this.next = undefined;
     this.readyToEnd = false;
@@ -115,14 +115,13 @@ class Parser extends Transform {
       // Unsuspend and continue from where ever we left off.
       this.suspended = false;
       const next = this.next!;
-
       next();
     }
 
     // If we're no longer suspended, parse new tokens
     if (!this.suspended) {
       // Start the parser
-      this.parseTokens();
+        this.parseTokens();
     }
 
     done();
@@ -140,7 +139,7 @@ class Parser extends Transform {
       this.processingComplete();
     };
 
-    while (!this.suspended && this.activeBuffer().availableLength() > 0) {
+    while (!this.suspended && this.activeBuffer().availableLength() > 0 && this.processingQueue === 0) {
       this.processingStarted();
       await new Promise((resolve) => {
         this.readUInt8((type) => {
@@ -154,7 +153,6 @@ class Parser extends Transform {
           }
         });
       });
-
     }
   }
 
