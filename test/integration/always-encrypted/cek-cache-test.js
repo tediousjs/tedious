@@ -71,8 +71,7 @@ const dropKeys = (connection, numberOfKeys, done, cb) => {
 };
 
 describe('always encrypted', function() {
-  // TODO: Test fails if no. keys > 15... Figure out why...
-  const numberOfKeys = 15;
+  const numberOfKeys = 45;
 
   this.timeout(100000);
   let connection;
