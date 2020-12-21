@@ -202,27 +202,27 @@ jobs:
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
-    - name: Set up CI configuration (AD Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "azure-active-directory-password",
-              "options": {
-                "userName": "${{ secrets.AZURE_AD_USERNAME }}",
-                "password": "${{ secrets.AZURE_AD_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
+    # - name: Set up CI configuration (AD Authentication)
+    #   run: |
+    #     echo '{
+    #       "config": {
+    #         "server": "${{ secrets.AZURE_SERVER }}",
+    #         "authentication": {
+    #           "type": "azure-active-directory-password",
+    #           "options": {
+    #             "userName": "${{ secrets.AZURE_AD_USERNAME }}",
+    #             "password": "${{ secrets.AZURE_AD_PASSWORD }}"
+    #           }
+    #         },
+    #         "options": {
+    #           "port": 1433,
+    #           "database": "tedious"
+    #         }
+    #       }
+    #     }' > ~/.tedious/test-connection.json
 
-    - name: run integration tests
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+    # - name: run integration tests
+    #   run: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
   pre-release:
     name: Pre-Release
