@@ -254,6 +254,11 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
+
+    /**
+     * Optional parameter for specific Azure tenant ID
+     */
+    domain: string;
   };
 }
 
@@ -1095,6 +1100,7 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
+            domain: options.domain,
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -3538,7 +3544,8 @@ Connection.prototype.STATE = {
             if (authentication.type === 'azure-active-directory-password') {
               loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
                 clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                tokenAudience: fedAuthInfoToken.spn
+                tokenAudience: fedAuthInfoToken.spn,
+                domain: authentication.options.domain
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
