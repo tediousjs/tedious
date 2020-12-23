@@ -224,6 +224,29 @@ jobs:
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
+    - name: Set up CI configuration (AD Service Principal Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "azure-active-directory-service-principal-secret",
+              "options": {
+                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
+                "tenantId": "${{ secrets.AZURE_AD_SP_TENANT_ID }}",
+                "clientSecret": "${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
   pre-release:
     name: Pre-Release
     needs: [test, azure]
