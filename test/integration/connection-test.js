@@ -76,6 +76,10 @@ describe('Initiate Connect Test', function() {
   it('should be bad credentials', function(done) {
     const config = getConfig();
 
+    if (config.authentication && config.authentication.type !== 'default') {
+      return done();
+    }
+
     config.authentication.options.userName = 'bad-user';
     config.authentication.options.password = 'bad-password';
 
