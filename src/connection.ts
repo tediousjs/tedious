@@ -8,10 +8,8 @@ import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 import { Readable } from 'readable-stream';
 
 import {
-  loginWithUsernamePassword,
   loginWithVmMSI,
   loginWithAppServiceMSI,
-  loginWithServicePrincipalSecret,
   UserTokenCredentials,
   MSIVmTokenCredentials,
   MSIAppServiceTokenCredentials,
@@ -44,6 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 import depd from 'depd';
+import { MemoryCache } from 'adal-node';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -3273,6 +3272,8 @@ class Connection extends EventEmitter {
 export default Connection;
 module.exports = Connection;
 
+const authenticationCache = new MemoryCache();
+
 Connection.prototype.STATE = {
   INITIALIZED: {
     name: 'Initialized',
@@ -3536,17 +3537,24 @@ Connection.prototype.STATE = {
               if (err) {
                 return callback(err);
               }
-                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
-                  callback(null, tokenResponse.accessToken);
-                }, callback);
+
+              credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
+                callback(null, tokenResponse.accessToken);
+              }, callback);
             };
 
             if (authentication.type === 'azure-active-directory-password') {
-              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
-                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                tokenAudience: fedAuthInfoToken.spn,
-                domain: authentication.options.domain
-              }, getTokenFromCredentials);
+              const credentials = new UserTokenCredentials(
+                '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                authentication.options.domain ?? 'common',
+                authentication.options.userName,
+                authentication.options.password,
+                fedAuthInfoToken.spn,
+                undefined, // environment
+                authenticationCache
+              );
+
+              getTokenFromCredentials(undefined, credentials);
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
                 clientId: authentication.options.clientId,
@@ -3561,13 +3569,16 @@ Connection.prototype.STATE = {
                 clientId: authentication.options.clientId
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-              loginWithServicePrincipalSecret(
+              const credentials = new ApplicationTokenCredentials(
                 authentication.options.clientId,
+                authentication.options.tenantId, // domain
                 authentication.options.clientSecret,
-                authentication.options.tenantId,
-                { tokenAudience: fedAuthInfoToken.spn },
-                getTokenFromCredentials
+                fedAuthInfoToken.spn,
+                undefined, // environment
+                authenticationCache
               );
+
+              getTokenFromCredentials(undefined, credentials);
             }
           };
 
