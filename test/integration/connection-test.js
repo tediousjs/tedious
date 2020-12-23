@@ -3,6 +3,7 @@ const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
+const { AuthenticationContext } = require('adal-node');
 const assert = require('chai').assert;
 const os = require('os');
 
@@ -10,6 +11,11 @@ function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
+
+  const token = getMSIToken(config);
+  if ('undefined' !== token) {
+    config.authentication.options.token = token;
+  }
 
   config.options.debug = {
     packet: true,
@@ -38,6 +44,27 @@ function getNtlmConfig() {
   return JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).ntlm;
+}
+
+function getMSIToken(config) {
+  var token;
+  var authType = config.authentication.type;
+  if ('azure-active-directory-access-token' === authType) {
+    var uid = config.authentication.options.userName;
+    var pwd = config.authentication.options.password;
+    const spn = 'https://database.windows.net/';
+    const stsurl = 'https://login.windows.net/136C5EF1-C066-4A88-8B91-4B8BCD2708BB';
+    const clientId = '7f98cb04-cd1e-40df-9140-3bf7e2cea4db';
+    const context = new AuthenticationContext(stsurl);
+    context.acquireTokenWithUsernamePassword(spn, uid, pwd, clientId, (err, tokenResponse) => {
+      if (err) {
+        console.log('Token cannot be successfully retrived: ' + err.stack);
+        return token;
+      }
+      token = tokenResponse;
+    });
+  }
+  return token;
 }
 
 describe('Initiate Connect Test', function() {
@@ -77,6 +104,7 @@ describe('Initiate Connect Test', function() {
   it('should be bad credentials', function(done) {
     const config = getConfig();
 
+    config.authentication.options.token = { accessToken: 'bad-token' };
     config.authentication.options.userName = 'bad-user';
     config.authentication.options.password = 'bad-password';
 

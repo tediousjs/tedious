@@ -117,6 +117,30 @@ jobs:
       before_script: skip
       script: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
+    - stage: azure
+      node_js: 8
+      before_install:
+      - mkdir ~/.tedious
+      - >
+        echo '{
+          "config": {
+            "server": "'${AZURE_SERVER}'",
+            "authentication": {
+              "type": "azure-active-directory-access-token",
+              "options": {
+                "userName": "'${AZURE_AD_USER}'",
+                "password": "'${AZURE_AD_PASS}'",
+                "token": "undefined"
+              }
+            },
+            "options": {
+              "database": "test"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+      before_script: skip
+      script: npm run test-integration
+
     - stage: release
       node_js: 12
       before_install: skip
