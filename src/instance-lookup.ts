@@ -1,6 +1,8 @@
 import { Sender } from './sender';
 import dns from 'dns';
 
+import AbortController from 'node-abort-controller';
+
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
 const RETRIES = 3;
@@ -12,11 +14,11 @@ type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 export class InstanceLookup {
   // Wrapper allows for stubbing Sender when unit testing instance-lookup.
-  createSender(host: string, port: number, lookup: LookupFunction, request: Buffer) {
-    return new Sender(host, port, lookup, request);
+  createSender(host: string, port: number, lookup: LookupFunction, request: Buffer, signal?: AbortController['signal']) {
+    return new Sender(host, port, lookup, request, signal);
   }
 
-  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction }, callback: (message: string | undefined, port?: number) => void) {
+  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction, signal?: AbortController['signal'] }, callback: (message: string | undefined, port?: number) => void) {
     const server = options.server;
     if (typeof server !== 'string') {
       throw new TypeError('Invalid arguments: "server" must be a string');
@@ -66,7 +68,7 @@ export class InstanceLookup {
         retriesLeft--;
 
         const request = Buffer.from([0x02]);
-        sender = this.createSender(options.server, port, lookup, request);
+        sender = this.createSender(options.server, port, lookup, request, options.signal);
         timer = setTimeout(onTimeout, timeout);
         sender.execute((err, response) => {
           clearTimeout(timer);

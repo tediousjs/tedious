@@ -3,6 +3,8 @@ import dns from 'dns';
 import net from 'net';
 import * as punycode from 'punycode';
 
+import AbortController from 'node-abort-controller';
+
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export class ParallelSendStrategy {
@@ -15,6 +17,9 @@ export class ParallelSendStrategy {
 
   onMessage: ((message: Buffer) => void) | null;
   onError: ((err: Error) => void) | null;
+  onAbort: (() => void);
+
+  controller: AbortController;
 
   constructor(addresses: dns.LookupAddress[], port: number, request: Buffer) {
     this.addresses = addresses;
@@ -25,6 +30,10 @@ export class ParallelSendStrategy {
     this.socketV6 = null;
     this.onError = null;
     this.onMessage = null;
+    this.onAbort = () => {
+      this.clearSockets();
+    };
+    this.controller = new AbortController();
   }
 
   clearSockets() {
@@ -43,10 +52,14 @@ export class ParallelSendStrategy {
       clearSocket(this.socketV6, this.onError!, this.onMessage!);
       this.socketV6 = null;
     }
+
+    this.controller.signal.removeEventListener('abort', this.onAbort);
   }
 
   send(cb: (error: Error | null, message?: Buffer) => void) {
     let errorCount = 0;
+
+    this.controller.signal.addEventListener('abort', this.onAbort);
 
     const onError = (err: Error) => {
       errorCount++;
@@ -99,7 +112,7 @@ export class ParallelSendStrategy {
   }
 
   cancel() {
-    this.clearSockets();
+    this.controller.abort();
   }
 }
 
@@ -109,12 +122,20 @@ export class Sender {
   request: Buffer;
   parallelSendStrategy: ParallelSendStrategy | null;
   lookup: LookupFunction;
+  signal?: AbortController['signal'];
 
-  constructor(host: string, port: number, lookup: LookupFunction, request: Buffer) {
+  constructor(host: string, port: number, lookup: LookupFunction, request: Buffer, signal?: AbortController['signal']) {
     this.host = host;
     this.port = port;
     this.request = request;
     this.lookup = lookup;
+    this.signal = signal;
+
+    if (this.signal) {
+      this.signal.addEventListener('abort', () => {
+        this.cancel();
+      });
+    }
 
     this.parallelSendStrategy = null;
   }
@@ -138,6 +159,10 @@ export class Sender {
 
   executeForHostname(cb: (error: Error | null, message?: Buffer) => void) {
     this.invokeLookupAll(this.host, (err, addresses) => {
+      if (this.signal?.aborted) {
+        return;
+      }
+
       if (err) {
         return cb(err);
       }
