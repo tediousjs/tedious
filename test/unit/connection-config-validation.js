@@ -1,5 +1,6 @@
 const Connection = require('../../src/tedious').Connection;
 const assert = require('chai').assert;
+const fs = require('fs');
 
 function ensureConnectionIsClosed(connection, callback) {
   if (connection.closed) {
@@ -12,12 +13,12 @@ function ensureConnectionIsClosed(connection, callback) {
 }
 
 describe('Connection configuration validation', function() {
-  let config;
+  const config = JSON.parse(
+    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
+  ).config;
 
   beforeEach(function() {
-    config = {};
     config.options = { encrypt: false };
-    config.server = 'localhost';
   });
 
   it('default transient retry interval', () => {

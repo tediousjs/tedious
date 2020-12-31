@@ -269,6 +269,63 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
+  it('should bulkload verify ORDER', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: [{ columnName: 'nnn', direction: 'ASC' }, { columnName: 'sss', direction: 'DESC' }] }, function(
+      err,
+      rowCount
+    ) {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
+
+      done();
+    });
+
+    bulkLoad.addColumn('nnn', TYPES.Int, {
+      nullable: false
+    });
+    bulkLoad.addColumn('mmm', TYPES.Int, {
+      nullable: false
+    });
+    bulkLoad.addColumn('sss', TYPES.NVarChar, {
+      length: 50,
+      nullable: true
+    });
+    bulkLoad.addColumn('ddd', TYPES.DateTime, {
+      nullable: false
+    });
+    const request = new Request(bulkLoad.getTableCreationSql(), function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      bulkLoad.addRow({
+        nnn: 201,
+        mmm: 305,
+        sss: 'one zero one',
+        ddd: new Date(1986, 6, 20)
+      });
+      bulkLoad.addRow([202, 304, 'one zero two', new Date()]);
+      bulkLoad.addRow(203, 303, 'one zero three', new Date(2013, 7, 12));
+      bulkLoad.addRow({
+        nnn: 204,
+        mmm: 302,
+        sss: 'one zero four',
+        ddd: new Date()
+      });
+      bulkLoad.addRow({
+        nnn: 205,
+        mmm: 301,
+        sss: 'one zero five',
+        ddd: new Date()
+      });
+      connection.execBulkLoad(bulkLoad);
+    });
+    connection.execSqlBatch(request);
+  });
+
   it('should bulkload cancel after request send does nothing', function(done) {
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {

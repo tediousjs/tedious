@@ -520,11 +520,14 @@ class BulkLoad extends EventEmitter {
 
       for (const column of this.bulkOptions.order) {
         // Ensure column exists as a specified column, otherwise we ignore.
-        if (column.columnName in this.columnsByName) {
+        if (column.columnName && this.columnsByName[column.columnName] !== null) {
           orderColumns.push(`${column.columnName} ${column.direction}`);
         }
       }
-      addOptions.push(`ORDER (${orderColumns.join(',')})`);
+
+      if (orderColumns.length) {
+        addOptions.push(`ORDER (${orderColumns.join(',')})`);
+      }
     }
 
     if (addOptions.length > 0) {
