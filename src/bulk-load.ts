@@ -48,6 +48,7 @@ interface InternalOptions {
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
+  order: {columnName: string, direction: 'ASC' | 'DESC'}[];
 }
 
 export interface Options {
@@ -72,6 +73,11 @@ export interface Options {
    * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
    */
   lockTable?: InternalOptions['lockTable'];
+
+  /**
+   * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `null`)
+   */
+  order?: InternalOptions['order'];
 }
 
 
@@ -307,6 +313,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
+    order = [],
   }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
@@ -362,7 +369,7 @@ class BulkLoad extends EventEmitter {
 
     this.once('cancel', onCancel);
 
-    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
+    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
 
   /**
@@ -506,6 +513,18 @@ class BulkLoad extends EventEmitter {
 
     if (this.bulkOptions.lockTable) {
       addOptions.push('TABLOCK');
+    }
+
+    if (this.bulkOptions.order.length) {
+      const orderColumns = [];
+
+      for (const column of this.bulkOptions.order) {
+        // Ensure column exists as a specified column, otherwise we ignore.
+        if (column.columnName in this.columnsByName) {
+          orderColumns.push(`${column.columnName} ${column.direction}`);
+        }
+      }
+      addOptions.push(`ORDER (${orderColumns.join(',')})`);
     }
 
     if (addOptions.length > 0) {
