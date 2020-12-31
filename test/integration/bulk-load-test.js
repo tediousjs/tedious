@@ -321,6 +321,7 @@ describe('Bulk Load Tests', function() {
         sss: 'one zero five',
         ddd: new Date()
       });
+      assert(bulkLoad.getBulkInsertSql().includes('ORDER (nnn ASC,sss DESC)'));
       connection.execBulkLoad(bulkLoad);
     });
     connection.execSqlBatch(request);
