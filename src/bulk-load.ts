@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import Connection, { InternalConnectionOptions } from './connection';
+import LiteConnection, { InternalConnectionOptions } from './connection-lite';
 
 import { Transform } from 'readable-stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
@@ -285,7 +285,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  connection?: Connection;
+  connection?: LiteConnection;
   /**
    * @private
    */

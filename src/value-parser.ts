@@ -3,7 +3,7 @@ import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
 
-import iconv from 'iconv-lite';
+import { decode } from './decoder';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 
@@ -489,7 +489,7 @@ function readChars(parser: Parser, dataLength: number, codepage: string, callbac
   }
 
   return parser.readBuffer(dataLength, (data) => {
-    callback(iconv.decode(data, codepage));
+    callback(decode(data, codepage));
   });
 }
 
@@ -510,7 +510,7 @@ function readMaxChars(parser: Parser, codepage: string, callback: (value: unknow
 
   readMax(parser, (data) => {
     if (data) {
-      callback(iconv.decode(data, codepage));
+      callback(decode(data, codepage));
     } else {
       callback(null);
     }

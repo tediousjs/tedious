@@ -1,11 +1,14 @@
 {
   "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
     "target": "esnext",
     "moduleResolution": "node",
     "allowJs": false,
-    "noEmit": true,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "noEmitOnError": true,
     "strict": true,
-    "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "lib": [ "esnext" ],
@@ -13,8 +16,8 @@
   },
 
   "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
+    "src/tedious.ts",
+    "src/lite.ts",
   ],
 
   "typedocOptions": {
