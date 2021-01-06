@@ -331,6 +331,10 @@ class BulkLoad extends EventEmitter {
       throw new TypeError('The "options.lockTable" property must be of type boolean.');
     }
 
+    if (typeof order !== 'object') {
+      throw new TypeError('The "options.order" property must be of type object.');
+    }
+
     super();
 
     this.error = undefined;
@@ -519,6 +523,9 @@ class BulkLoad extends EventEmitter {
       const orderColumns = [];
 
       for (const column in this.bulkOptions.order) {
+        if (typeof column !== 'string') {
+          throw new TypeError('The "options.order.columnName" property must be of type string.');
+        }
         // Ensure column exists as a specified column, otherwise we ignore.
         orderColumns.push(`${column} ${this.bulkOptions.order[column]}`);
       }
