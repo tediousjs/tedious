@@ -48,7 +48,7 @@ interface InternalOptions {
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
-  order: {columnName: string, direction: 'ASC' | 'DESC'}[];
+  order: { [columnName: string]: 'ASC' | 'DESC' };
 }
 
 export interface Options {
@@ -313,7 +313,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
-    order = [],
+    order = {},
   }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
@@ -515,18 +515,16 @@ class BulkLoad extends EventEmitter {
       addOptions.push('TABLOCK');
     }
 
-    if (this.bulkOptions.order.length) {
+    if (this.bulkOptions.order) {
       const orderColumns = [];
 
-      for (const column of this.bulkOptions.order) {
+      for (const column in this.bulkOptions.order) {
         // Ensure column exists as a specified column, otherwise we ignore.
-        if (column.columnName && this.columnsByName[column.columnName] !== null) {
-          orderColumns.push(`${column.columnName} ${column.direction}`);
-        }
+        orderColumns.push(`${column} ${this.bulkOptions.order[column]}`);
       }
 
       if (orderColumns.length) {
-        addOptions.push(`ORDER (${orderColumns.join(',')})`);
+        addOptions.push(`ORDER (${orderColumns.join(', ')})`);
       }
     }
 

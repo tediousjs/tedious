@@ -270,7 +270,7 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should bulkload verify ORDER', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: [{ columnName: 'nnn', direction: 'ASC' }, { columnName: 'sss', direction: 'DESC' }] }, function(
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'nnn': 'ASC', 'sss': 'DESC' } }, function(
       err,
       rowCount
     ) {
@@ -321,7 +321,7 @@ describe('Bulk Load Tests', function() {
         sss: 'one zero five',
         ddd: new Date()
       });
-      assert(bulkLoad.getBulkInsertSql().includes('ORDER (nnn ASC,sss DESC)'));
+      assert(bulkLoad.getBulkInsertSql().includes('ORDER (nnn ASC, sss DESC)'));
       connection.execBulkLoad(bulkLoad);
     });
     connection.execSqlBatch(request);
