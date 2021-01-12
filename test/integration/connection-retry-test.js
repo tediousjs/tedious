@@ -33,7 +33,7 @@ describe('Connection Retry Test', function() {
   it('should retry specified number of times on transient errors', function(done) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+    if (config.authentication && config.authentication.type !== 'default') {
       return done();
     }
 
@@ -47,19 +47,19 @@ describe('Connection Retry Test', function() {
       assert.ok(true);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 
   it('should no retries on non-transient errors', function(done) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+    if (config.authentication && config.authentication.type !== 'default') {
       return done();
     }
 
@@ -73,19 +73,19 @@ describe('Connection Retry Test', function() {
       assert.ok(false);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 
   it('should no retries if connection timeout fires', function(done) {
     const config = getConfig();
 
-    if (config.authentication && config.authentication.type === 'azure-active-directory-password') {
+    if (config.authentication && config.authentication.type !== 'default') {
       return done();
     }
 
@@ -108,13 +108,13 @@ describe('Connection Retry Test', function() {
       clock.tick(config.options.connectTimeout + 1);
     });
 
-    connection.on('connect', (err) => {
-      assert.ok(err);
-    });
-
     connection.on('end', (info) => {
       clock.restore();
       done();
+    });
+
+    connection.connect((err) => {
+      assert.ok(err);
     });
   });
 });

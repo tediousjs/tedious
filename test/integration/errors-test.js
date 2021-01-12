@@ -31,7 +31,7 @@ function execSql(done, sql, requestCallback) {
     connection.close();
   });
 
-  connection.on('connect', function(err) {
+  connection.connect(function(err) {
     if (err) {
       return done(err);
     }
@@ -130,7 +130,7 @@ describe('Errors Test', function() {
       }
     );
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       if (err) {
         return done(err);
       }
@@ -159,7 +159,7 @@ describe('Errors Test', function() {
       connection.close();
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       if (err) {
         return done(err);
       }

@@ -9,10 +9,8 @@ import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { Readable } from 'readable-stream';
 
 import {
-  loginWithUsernamePassword,
   loginWithVmMSI,
   loginWithAppServiceMSI,
-  loginWithServicePrincipalSecret,
   UserTokenCredentials,
   MSIVmTokenCredentials,
   MSIAppServiceTokenCredentials,
@@ -44,6 +42,7 @@ import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 
 import depd from 'depd';
+import { MemoryCache } from 'adal-node';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -254,6 +253,11 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
+
+    /**
+     * Optional parameter for specific Azure tenant ID
+     */
+    domain: string;
   };
 }
 
@@ -367,6 +371,7 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  validateBulkLoadParameters: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
@@ -396,12 +401,12 @@ interface State {
 }
 
 type Authentication = DefaultAuthentication |
-                      NtlmAuthentication |
-                      AzureActiveDirectoryPasswordAuthentication |
-                      AzureActiveDirectoryMsiAppServiceAuthentication |
-                      AzureActiveDirectoryMsiVmAuthentication |
-                      AzureActiveDirectoryAccessTokenAuthentication |
-                      AzureActiveDirectoryServicePrincipalSecret;
+  NtlmAuthentication |
+  AzureActiveDirectoryPasswordAuthentication |
+  AzureActiveDirectoryMsiAppServiceAuthentication |
+  AzureActiveDirectoryMsiVmAuthentication |
+  AzureActiveDirectoryAccessTokenAuthentication |
+  AzureActiveDirectoryServicePrincipalSecret;
 
 type AuthenticationType = Authentication['type'];
 
@@ -445,7 +450,7 @@ interface DebugOptions {
    * (default: `false`)
    */
   token: boolean;
-  }
+}
 
 interface AuthenticationOptions {
   /**
@@ -454,19 +459,19 @@ interface AuthenticationOptions {
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
    * or `azure-active-directory-service-principal-secret`
    */
-   type?: AuthenticationType;
-   /**
-    * Different options for authentication types:
-    *
-    * * `default`: [[DefaultAuthentication.options]]
-    * * `ntlm` :[[NtlmAuthentication]]
-    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
-    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
-    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
-    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
-    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
-    */
-   options?: any;
+  type?: AuthenticationType;
+  /**
+   * Different options for authentication types:
+   *
+   * * `default`: [[DefaultAuthentication.options]]
+   * * `ntlm` :[[NtlmAuthentication]]
+   * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
+   * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
+   * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
+   * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
+   * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   */
+  options?: any;
 }
 
 interface ConnectionOptions {
@@ -542,7 +547,7 @@ interface ConnectionOptions {
    *
    * (default: `{}`)
    */
-  cryptoCredentialsDetails?: {};
+  cryptoCredentialsDetails?: SecureContextOptions;
 
   /**
    * Database to connect to (default: dependent on server configuration).
@@ -598,7 +603,7 @@ interface ConnectionOptions {
    * See [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017)
    * for more details.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
   enableArithAbort?: boolean;
 
@@ -804,6 +809,13 @@ interface ConnectionOptions {
    * (default: `true`).
    */
   useUTC?: boolean;
+
+  /**
+   * A boolean determining whether BulkLoad parameters should be validated.
+   *
+   * (default: `false`).
+   */
+  validateBulkLoadParameters?: boolean;
 
   /**
    * The workstation ID (WSID) of the client, default os.hostname().
@@ -1087,6 +1099,7 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
+            domain: options.domain,
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -1236,6 +1249,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
+        validateBulkLoadParameters: false,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1630,6 +1644,16 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.validateBulkLoadParameters !== undefined) {
+        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
+          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
+      } else {
+        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
+      }
+
       if (config.options.workstationId !== undefined) {
         if (typeof config.options.workstationId !== 'string') {
           throw new TypeError('The "config.options.workstationId" property must be of type string.');
@@ -1703,7 +1727,18 @@ class Connection extends EventEmitter {
     }
 
     if (connectListener) {
-      this.once('connect', connectListener);
+      const onConnect = (err?: Error) => {
+        this.removeListener('error', onError);
+        connectListener(err);
+      };
+
+      const onError = (err: Error) => {
+        this.removeListener('connect', onConnect);
+        connectListener(err);
+      };
+
+      this.once('connect', onConnect);
+      this.once('error', onError);
     }
 
     this.transitionTo(this.STATE.CONNECTING);
@@ -2218,6 +2253,9 @@ class Connection extends EventEmitter {
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      this.messageIo.on('error', (error) => {
+        this.socketError(error);
+      });
 
       this.socket = socket;
       this.socketConnect();
@@ -3235,6 +3273,8 @@ class Connection extends EventEmitter {
 export default Connection;
 module.exports = Connection;
 
+const authenticationCache = new MemoryCache();
+
 Connection.prototype.STATE = {
   INITIALIZED: {
     name: 'Initialized',
@@ -3499,16 +3539,23 @@ Connection.prototype.STATE = {
                 return callback(err);
               }
 
-              credentials!.getToken().then((tokenResponse) => {
+              credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
                 callback(null, tokenResponse.accessToken);
               }, callback);
             };
 
             if (authentication.type === 'azure-active-directory-password') {
-              loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
-                clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                tokenAudience: fedAuthInfoToken.spn
-              }, getTokenFromCredentials);
+              const credentials = new UserTokenCredentials(
+                '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                authentication.options.domain ?? 'common',
+                authentication.options.userName,
+                authentication.options.password,
+                fedAuthInfoToken.spn,
+                undefined, // environment
+                authenticationCache
+              );
+
+              getTokenFromCredentials(undefined, credentials);
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
                 clientId: authentication.options.clientId,
@@ -3519,16 +3566,20 @@ Connection.prototype.STATE = {
               loginWithAppServiceMSI({
                 msiEndpoint: authentication.options.msiEndpoint,
                 msiSecret: authentication.options.msiSecret,
-                resource: fedAuthInfoToken.spn
+                resource: fedAuthInfoToken.spn,
+                clientId: authentication.options.clientId
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-              loginWithServicePrincipalSecret(
+              const credentials = new ApplicationTokenCredentials(
                 authentication.options.clientId,
+                authentication.options.tenantId, // domain
                 authentication.options.clientSecret,
-                authentication.options.tenantId,
-                { tokenAudience: fedAuthInfoToken.spn },
-                getTokenFromCredentials
+                fedAuthInfoToken.spn,
+                undefined, // environment
+                authenticationCache
               );
+
+              getTokenFromCredentials(undefined, credentials);
             }
           };
 
