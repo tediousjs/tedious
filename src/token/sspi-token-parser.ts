@@ -1,10 +1,9 @@
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
 import { InternalConnectionOptions } from '../connection';
 
 import { SSPIToken } from './token';
 
-type Data = {
+interface Data {
   magic: string;
   type: number;
   domainLen: number;
@@ -19,7 +18,7 @@ type Data = {
   oddData: Buffer;
   domain: string;
   target: Buffer;
-};
+}
 
 function parseChallenge(buffer: Buffer) {
   const challenge: Partial<Data> = {};
@@ -42,7 +41,7 @@ function parseChallenge(buffer: Buffer) {
   return challenge as Data;
 }
 
-function sspiParser(parser: Parser, _colMetadata: ColumnMetadata[], _options: InternalConnectionOptions, callback: (token: SSPIToken) => void) {
+function sspiParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: SSPIToken) => void) {
   parser.readUsVarByte((buffer) => {
     callback(new SSPIToken(parseChallenge(buffer), buffer));
   });

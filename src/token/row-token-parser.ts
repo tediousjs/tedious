@@ -8,15 +8,15 @@ import { RowToken } from './token';
 
 import valueParse from '../value-parser';
 
-type Column = {
+interface Column {
   value: unknown;
   metadata: ColumnMetadata;
-};
+}
 
-function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
   const columns: Column[] = [];
 
-  const len = colMetadata.length;
+  const len = parser.colMetadata.length;
   let i = 0;
 
   function next(done: () => void) {
@@ -24,11 +24,10 @@ function rowParser(parser: Parser, colMetadata: ColumnMetadata[], options: Inter
       return done();
     }
 
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
+    valueParse(parser, parser.colMetadata[i], options, (value) => {
       columns.push({
         value: value,
-        metadata: columnMetaData
+        metadata: parser.externalColMetadata[i]
       });
 
       i++;

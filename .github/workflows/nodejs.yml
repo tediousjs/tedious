@@ -1,0 +1,257 @@
+name: Node CI
+
+on:
+  push:
+    branches: [ master ]
+
+  pull_request:
+    branches: [ master ]
+
+env:
+  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js 12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+    - run: npm run lint
+
+    - name: Prepare Commitlint (pull_request)
+      if: ${{ github.event_name == 'pull_request' }}
+      run: |
+        echo "::set-env name=TRAVIS_PULL_REQUEST_SLUG::${{ github.event.pull_request.head.repo.full_name }}"
+        echo "::set-env name=TRAVIS_COMMIT_RANGE::HEAD~..HEAD"
+
+    - name: Prepare Commitlint (push)
+      if: ${{ github.event_name == 'push' }}
+      run:  |
+        echo "::set-env name=TRAVIS_PULL_REQUEST_SLUG::"
+        echo "::set-env name=TRAVIS_COMMIT_RANGE::${{ github.event.before }}..${{ github.event.after }}"
+
+    - run: npx commitlint-travis
+      env:
+        TRAVIS: "true"
+        CI: "true"
+        TRAVIS_EVENT_TYPE: "${{ github.event_name }}"
+        TRAVIS_REPO_SLUG: "${{ github.repository }}"
+        TRAVIS_COMMIT: "${{ github.sha }}"
+
+  test:
+    name: SQL Server Linux / Node.js ${{ matrix.node-version }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [6.x, 8.x, 10.x, 12.x, 14.x]
+      fail-fast: false
+
+    services:
+      sqlserver:
+        image: microsoft/mssql-server-linux
+        ports:
+          - 1433:1433
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "yourStrong(!)Password"
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Set up CI configuration
+      run: |
+        mkdir ~/.tedious
+        echo '{
+          "config": {
+            "server": "localhost",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "sa",
+                "password": "yourStrong(!)Password"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "master",
+              "trustServerCertificate": true
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: Upgrade npm
+      run: npm install -g npm
+      if: ${{ matrix.node-version == '6.x' }}
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - name: run unit tests
+      run: npx nyc --reporter=lcov npm run test && npx codecov
+
+    - name: run integration tests (TDS 7.4)
+      env:
+        TEDIOUS_TDS_VERSION: 7_4
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+    - name: run integration tests (TDS 7.3B)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_B
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+    - name: run integration tests (TDS 7.3A)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_A
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+    - name: run integration tests (TDS 7.2)
+      env:
+        TEDIOUS_TDS_VERSION: 7_2
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+    - name: run integration tests (TDS 7.1)
+      env:
+        TEDIOUS_TDS_VERSION: 7_1
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+  azure:
+    name: Azure SQL Server / Node.js 12.x
+    runs-on: ubuntu-latest
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js 12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - run: mkdir ~/.tedious
+
+    - name: Set up CI configuration (SQL Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "${{ secrets.AZURE_USERNAME }}",
+                "password": "${{ secrets.AZURE_PASSWORD }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+    - name: Set up CI configuration (AD Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "azure-active-directory-password",
+              "options": {
+                "userName": "${{ secrets.AZURE_AD_USERNAME }}",
+                "password": "${{ secrets.AZURE_AD_PASSWORD }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+
+  pre-release:
+    name: Pre-Release
+    needs: [test, azure]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js 12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npm run semantic-release

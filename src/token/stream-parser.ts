@@ -19,6 +19,16 @@ import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 
+import { typeByName } from '../data-type';
+
+import BitN from '../data-types/bitn';
+import DateTimeN from '../data-types/datetimen';
+import DecimalN from '../data-types/decimaln';
+import FloatN from '../data-types/floatn';
+import IntN from '../data-types/intn';
+import MoneyN from '../data-types/moneyn';
+import NumericN from '../data-types/numericn';
+
 const tokenParsers = {
   [TYPE.COLMETADATA]: colMetadataParser,
   [TYPE.DONE]: doneParser,
@@ -40,9 +50,96 @@ const tokenParsers = {
 
 class EndOfMessageMarker {}
 
+function mapInternalToExternalDataType(id: number, dataLength: number | undefined) {
+  switch (id) {
+    case BitN.id: {
+      if (dataLength === 1) {
+        return typeByName.Bit;
+      } else {
+        throw new Error('Invalid dataLength `' + dataLength + '` for `BitN`');
+      }
+    }
+
+    case DateTimeN.id: {
+      switch (dataLength) {
+        case 4:
+          return typeByName.SmallDateTime;
+
+        case 8:
+          return typeByName.DateTime;
+
+        default:
+          throw new Error('Invalid dataLength `' + dataLength + '` for `DateTimeN`');
+      }
+    }
+
+    case DecimalN.id: {
+      if (dataLength === 17) {
+        return typeByName.Decimal;
+      } else {
+        throw new Error('Invalid dataLength `' + dataLength + '` for `DecimalN`');
+      }
+    }
+
+    case FloatN.id: {
+      switch (dataLength) {
+        case 4:
+          return typeByName.Real;
+
+        case 8:
+          return typeByName.Float;
+
+        default:
+          throw new Error('Invalid dataLength `' + dataLength + '` for `FloatN`');
+      }
+    }
+
+    case IntN.id: {
+      switch (dataLength) {
+        case 1:
+          return typeByName.TinyInt;
+
+        case 2:
+          return typeByName.SmallInt;
+
+        case 4:
+          return typeByName.Int;
+
+        case 8:
+          return typeByName.BigInt;
+
+        default:
+          throw new Error('Invalid dataLength `' + dataLength + '` for `IntN`');
+      }
+    }
+
+    case MoneyN.id: {
+      switch (dataLength) {
+        case 4:
+          return typeByName.SmallMoney;
+
+        case 8:
+          return typeByName.Money;
+
+        default:
+          throw new Error('Invalid dataLength `' + dataLength + '` for `MoneyN`');
+      }
+    }
+
+    case NumericN.id: {
+      if (dataLength === 17) {
+        return typeByName.Numeric;
+      } else {
+        throw new Error('Invalid dataLength `' + dataLength + '` for `NumericN`');
+      }
+    }
+  }
+}
+
 class Parser extends Transform {
   debug: Debug;
-  colMetadata: ColumnMetadata[];
+  internalColMetadata: ColumnMetadata[];
+  externalColMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
   endOfMessageMarker: EndOfMessageMarker;
 
@@ -51,11 +148,13 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, colMetadata: ColumnMetadata[], options: InternalConnectionOptions) {
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     super({ objectMode: true });
 
     this.debug = debug;
-    this.colMetadata = colMetadata;
+    this.internalColMetadata = [];
+    this.externalColMetadata = [];
+
     this.options = options;
     this.endOfMessageMarker = new EndOfMessageMarker();
 
@@ -63,6 +162,19 @@ class Parser extends Transform {
     this.position = 0;
     this.suspended = false;
     this.next = undefined;
+  }
+
+  set colMetadata(colMetadata: ColumnMetadata[]) {
+    this.internalColMetadata = colMetadata;
+
+    this.externalColMetadata = colMetadata.map((col) => {
+      const externalType = mapInternalToExternalDataType(col.type.id, col.dataLength);
+      return externalType ? { ...col, type: externalType } : col;
+    });
+  }
+
+  get colMetadata() {
+    return this.internalColMetadata;
   }
 
   _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
@@ -111,7 +223,7 @@ class Parser extends Transform {
       this.position += 1;
 
       if (tokenParsers[type]) {
-        tokenParsers[type](this, this.colMetadata, this.options, doneParsing);
+        tokenParsers[type](this, this.options, doneParsing);
       } else {
         this.emit('error', new Error('Unknown type: ' + type));
       }

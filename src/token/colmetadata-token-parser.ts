@@ -6,8 +6,12 @@ import { ColMetadataToken } from './token';
 
 import { typeByName } from '../data-type';
 
-export type ColumnMetadata = Metadata & {
+export interface ColumnMetadata extends Metadata {
+  /**
+   * The column's name。
+   */
   colName: string;
+
   tableName?: string | string[];
   typeName?: string;
 };

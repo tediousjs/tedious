@@ -54,7 +54,9 @@ describe('Sender send to IP address', function() {
       this.createSocketStub = sinon.stub(Dgram, 'createSocket');
       this.createSocketStub.withArgs(udpVersion).returns(this.testSocket);
 
-      this.sender = new Sender(ipAddress, anyPort, anyRequest);
+      this.sender = new Sender(ipAddress, anyPort, function lookup() {
+
+      }, anyRequest);
     }
 
     function sendToIpCommonTestValidation(ipAddress) {
@@ -152,12 +154,11 @@ function sendToHostCommonTestSetup(lookupError) {
   this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
   this.strategyCancelStub.withArgs();
 
-  this.sender = new Sender(anyHost, anyPort, anyRequest);
+  this.lookupSpy = sinon.spy(function lookup(string, options, callback) {
+    process.nextTick(callback, lookupError, this.addresses);
+  }.bind(this));
 
-  // Stub out the lookupAll method to prevent network activity from doing a DNS
-  // lookup. Succeeds or fails depending on lookupError.
-  this.lookupAllStub = sinon.stub(this.sender, 'invokeLookupAll');
-  this.lookupAllStub.callsArgWithAsync(1, lookupError, this.addresses);
+  this.sender = new Sender(anyHost, anyPort, this.lookupSpy, anyRequest);
 
   // Stub the create strategy method for the test to return a strategy object created
   // exactly like the method would but with a few methods stubbed.
@@ -195,7 +196,7 @@ describe('Sender send to hostnam', function() {
       const lookupError = null;
       sendToHostCommonTestSetup.call(glob, lookupError);
 
-      assert.isOk(glob.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupSpy.calledOnce);
 
       const validate = () => {
         assert.isOk(glob.createStrategyStub.calledOnce);
@@ -210,7 +211,7 @@ describe('Sender send to hostnam', function() {
       const lookupError = null;
       sendToHostCommonTestSetup.call(glob, lookupError);
 
-      assert.isOk(glob.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupSpy.calledOnce);
 
       const validate = () => {
         assert.isOk(glob.createStrategyStub.calledOnce);
@@ -229,7 +230,7 @@ describe('Sender send to hostnam', function() {
 
       sendToHostCommonTestSetup.call(glob, lookupError);
 
-      assert.isOk(glob.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupSpy.calledOnce);
 
       const validate = () => {
         // Strategy object should not be created on lookup error.
@@ -247,7 +248,7 @@ describe('Sender send to hostnam', function() {
       sendToHostCommonTestSetup.call(glob, lookupError);
       glob.sender.cancel();
 
-      assert.isOk(glob.lookupAllStub.calledOnce);
+      assert.isOk(glob.lookupSpy.calledOnce);
 
       const validate = () => {
         // Strategy object should not be created on lookup error.

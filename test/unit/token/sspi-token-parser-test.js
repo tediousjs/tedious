@@ -22,7 +22,7 @@ describe('sspi token parser', () => {
     source.writeString('domain', 'ucs2'); // domain
     source.writeInt32BE(11259375); // target == 'abcdef'
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, {});
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
     parser.write(data);

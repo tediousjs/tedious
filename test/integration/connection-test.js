@@ -4,6 +4,7 @@ const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
+const os = require('os');
 
 function getConfig() {
   const config = JSON.parse(
@@ -227,6 +228,55 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
+  it('should allow connecting by calling `.connect` on the returned connection', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+  });
+
+  it('should not allow calling `.connect` on a connected connection', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      process.nextTick(() => {
+        connection.close();
+      });
+
+      assert.throws(() => {
+        connection.connect();
+      }, '`.connect` can not be called on a Connection in `LoggedIn` state.');
+    });
+  });
+
+  it('should allow calling `.connect` without a callback', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.on('end', () => { done(); });
+      connection.close();
+    });
+    connection.connect();
+  });
+
   it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
@@ -243,6 +293,62 @@ describe('Initiate Connect Test', function() {
     });
 
     connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('should use the local hostname as the default workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, os.hostname());
+    });
+
+    let connection = new Connection(config);
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('should allow specifying a custom workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, 'foo.bar.baz');
+    });
+
+    let connection = new Connection({ ...config, options: { ...config.options, workstationId: 'foo.bar.baz' } });
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
       done();
     });
   });
