@@ -14,7 +14,7 @@ export interface ColumnMetadata extends Metadata {
 
   tableName?: string | string[];
   typeName?: string;
-};
+}
 
 const dataTypeSpecific: { [key: string]: (dataLength: number) => string | undefined } = {
   /* BitN */
@@ -173,7 +173,7 @@ export function specifyDataType(columns: ColumnMetadata[]): ColumnMetadata[] {
   });
 }
 
-export default function colMetadataParser(parser: Parser, _colMetadata: ColumnMetadata[], options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
+export default function colMetadataParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
   parser.readUInt16LE((columnCount) => {
     const columns: ColumnMetadata[] = [];
 
