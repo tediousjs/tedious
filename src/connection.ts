@@ -5,6 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
+import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { Readable } from 'readable-stream';
 
 import {
@@ -39,7 +40,6 @@ import Message from './message';
 import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
@@ -2056,12 +2056,14 @@ class Connection extends EventEmitter {
       this.emit('rollbackTransaction');
     });
 
+
     tokenStreamParser.on('columnMetadata', (token) => {
       const request = this.request;
       if (request) {
         if (!request.canceled) {
+          let columns: any;
           if (this.config.options.useColumnNames) {
-            const columns: { [key: string]: ColumnMetadata } = {};
+            columns = {} as { [key: string]: ColumnMetadata };
 
             for (let j = 0, len = token.columns.length; j < len; j++) {
               const col = token.columns[j];
@@ -2069,11 +2071,10 @@ class Connection extends EventEmitter {
                 columns[col.colName] = col;
               }
             }
-
-            request.emit('columnMetadata', columns);
           } else {
-            request.emit('columnMetadata', token.columns);
+            columns = token.columns as ColumnMetadata[];
           }
+          request.emit('columnMetadata', columns);
         }
       } else {
         this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));

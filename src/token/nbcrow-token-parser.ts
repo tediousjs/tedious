@@ -18,8 +18,8 @@ interface Column {
 }
 
 function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
-  const columnsMetaData = parser.colMetadata;
-  const length = Math.ceil(columnsMetaData.length / 8);
+  const length = Math.ceil(parser.colMetadata.length / 8);
+
   parser.readBuffer(length, (bytes) => {
     const bitmap: boolean[] = [];
 
@@ -31,7 +31,7 @@ function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callba
     }
 
     const columns: Column[] = [];
-    const len = columnsMetaData.length;
+    const len = parser.colMetadata.length;
     let i = 0;
 
     function next(done: () => void) {
@@ -39,12 +39,10 @@ function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callba
         return done();
       }
 
-      const columnMetaData = columnsMetaData[i];
-
-      (bitmap[i] ? nullHandler : valueParse)(parser, columnMetaData, options, (value) => {
+      (bitmap[i] ? nullHandler : valueParse)(parser, parser.colMetadata[i], options, (value) => {
         columns.push({
           value: value,
-          metadata: columnMetaData
+          metadata: parser.externalColMetadata[i]
         });
 
         i++;

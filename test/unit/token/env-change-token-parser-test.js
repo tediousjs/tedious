@@ -18,7 +18,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, {});
     parser.write(data);
     const token = parser.read();
 
@@ -42,7 +42,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, {});
     parser.write(data);
     const token = parser.read();
 
@@ -61,7 +61,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, {});
+    const parser = new Parser({ token() { } }, {});
     parser.write(data);
     const token = parser.read();
 

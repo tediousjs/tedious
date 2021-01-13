@@ -39,7 +39,7 @@ export class ColMetadataToken extends Token {
   declare name: 'COLMETADATA';
   declare event: 'columnMetadata';
 
-  columns: ColumnMetadata[]
+  columns: ColumnMetadata[];
 
   constructor(columns: ColumnMetadata[]) {
     super('COLMETADATA', 'columnMetadata');

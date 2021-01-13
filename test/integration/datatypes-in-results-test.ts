@@ -73,6 +73,8 @@ describe('Datatypes in results test', function() {
           const request = new Request(sql, done);
 
           request.on('row', function(columns) {
+            assert.strictEqual(columns[0].metadata.type, expectedType);
+
             const expectedRowVal = (expectedValue instanceof Array) ? expectedValue[rowProcessed++] : expectedValue;
             if (expectedRowVal instanceof Date) {
               assert.strictEqual(columns[0].value.getTime(), expectedRowVal.getTime());
@@ -249,7 +251,7 @@ describe('Datatypes in results test', function() {
     ],
 
     'should test datetimeoffset null': [
-      'select cast(null as datetimeoffset)', null
+      'select cast(null as datetimeoffset)', null, '7_3_A'
     ]
   });
 
@@ -490,23 +492,27 @@ describe('Datatypes in results test', function() {
     ],
 
     'should test variant nvarchar': [
-      "select N'abcdШ' as sql_variant",
-      'abcdШ'
+      "select cast(N'abcdШ' as sql_variant)",
+      'abcdШ',
+      '7_2'
     ],
 
     'should test variant decimal': [
       'select cast(cast(3148.29 as decimal(20,8)) as sql_variant)',
-      3148.29
+      3148.29,
+      '7_2'
     ],
 
     'should test variant uniqueidentifier': [
       "select cast(cast('01234567-89AB-CDEF-0123-456789ABCDEF' as uniqueidentifier) as sql_variant)",
-      '01234567-89AB-CDEF-0123-456789ABCDEF'
+      '01234567-89AB-CDEF-0123-456789ABCDEF',
+      '7_2'
     ],
 
     'should test variant datetime': [
       "select cast(cast('2011-12-4 10:04:23' as datetime) as sql_variant)",
-      new Date('December 4, 2011 10:04:23 GMT')
+      new Date('December 4, 2011 10:04:23 GMT'),
+      '7_2'
     ],
 
     'should test variant null': [
@@ -568,17 +574,22 @@ describe('Datatypes in results test', function() {
     })()
   });
 
+  // UDT types were added in SQL Server 2005 (TDS 7.2), but the `geography` type was
+  // added in SQL Server 2008 (7.3A). When connecting to SQL Server 2008 and later
+  // using TDS 7.2 or earlier, the geography type is returned not as a UDT, but as a
+  // `varbinary` type instead. This is why we only run these tests when using TDS 7.3A
+  // and later versions.
   testDataType(TYPES.UDT, {
     'should test udt': [
       "select geography::STGeomFromText('LINESTRING(-122.360 47.656, -122.343 47.656 )', 4326) as geo",
       Buffer.from([
         230, 16, 0, 0, 1, 20, 135, 22, 217, 206, 247, 211, 71, 64, 215, 163, 112, 61, 10, 151, 94, 192, 135, 22, 217, 206, 247, 211, 71, 64, 203, 161, 69, 182, 243, 149, 94, 192
       ]),
-      '7_2'
+      '7_3_A'
     ],
 
     'should test udt null': [
-      'select cast(null as geography)', null, '7_2'
+      'select cast(null as geography)', null, '7_3_A'
     ]
   });
 });

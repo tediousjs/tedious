@@ -103,10 +103,10 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       { type: SmallMoney },
       { type: Money },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN }
+      { type: MoneyN, dataLength: 8 },
+      { type: MoneyN, dataLength: 8 },
+      { type: MoneyN, dataLength: 8 },
+      { type: MoneyN, dataLength: 8 }
     ];
     const value = 123.456;
     const valueLarge = 123456789012345.11;
@@ -478,18 +478,18 @@ describe('Row Token Parser', () => {
 
   it('should write intN', () => {
     const colMetadata = [
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN }
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 },
+      { type: IntN, dataLength: 8 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -497,105 +497,17 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(
       Buffer.from([
         0,
-        8,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        1,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        8,
-        2,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        254,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        8,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        255,
-        127,
-        8,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        128,
-        8,
-        10,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        100,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        232,
-        3,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        8,
-        16,
-        39,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        8, 0, 0, 0, 0, 0, 0, 0, 0,
+        8, 1, 0, 0, 0, 0, 0, 0, 0,
+        8, 255, 255, 255, 255, 255, 255, 255, 255,
+        8, 2, 0, 0, 0, 0, 0, 0, 0,
+        8, 254, 255, 255, 255, 255, 255, 255, 255,
+        8, 255, 255, 255, 255, 255, 255, 255, 127,
+        8, 0, 0, 0, 0, 0, 0, 0, 128,
+        8, 10, 0, 0, 0, 0, 0, 0, 0,
+        8, 100, 0, 0, 0, 0, 0, 0, 0,
+        8, 232, 3, 0, 0, 0, 0, 0, 0,
+        8, 16, 39, 0, 0, 0, 0, 0, 0
       ])
     );
     // console.log(buffer.data)
@@ -714,9 +626,9 @@ describe('Row Token Parser', () => {
 
   it('should write floatN', () => {
     const colMetadata = [
-      { type: FloatN },
-      { type: FloatN },
-      { type: FloatN }
+      { type: FloatN, dataLength: 8 },
+      { type: FloatN, dataLength: 8 },
+      { type: FloatN, dataLength: 8 }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -793,7 +705,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write datetimeN', () => {
-    const colMetadata = [{ type: DateTimeN }];
+    const colMetadata = [{ type: DateTimeN, dataLength: 8 }];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
@@ -815,6 +727,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 3,
         scale: 1
       }
@@ -844,6 +757,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 3,
         scale: 1
       }
@@ -873,6 +787,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 13,
         scale: 1
       }
@@ -903,6 +818,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 23,
         scale: 1
       }
@@ -934,6 +850,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 33,
         scale: 1
       }
@@ -971,6 +888,7 @@ describe('Row Token Parser', () => {
     const colMetadata = [
       {
         type: NumericN,
+        dataLength: 17,
         precision: 3,
         scale: 1
       }
