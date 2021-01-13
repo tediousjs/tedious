@@ -34,7 +34,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">= 6"
+    "node": ">= 10"
   },
   "publishConfig": {
     "tag": "next"
@@ -105,7 +105,7 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 6
+            "node": 10
           }
         }
       ],
