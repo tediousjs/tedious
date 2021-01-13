@@ -1705,18 +1705,6 @@ class Connection extends EventEmitter {
     this.transientErrorLookup = new TransientErrorLookup();
 
     this.state = this.STATE.INITIALIZED;
-
-    process.nextTick(() => {
-      if (this.state === this.STATE.INITIALIZED) {
-        const message = 'In the next major version of `tedious`, creating a new ' +
-          '`Connection` instance will no longer establish a connection to the ' +
-          'server automatically. Please use the new `connect` helper function or ' +
-          'call the `.connect` method on the newly created `Connection` object to ' +
-          'silence this message.';
-        deprecate(message);
-        this.connect();
-      }
-    });
   }
 
   connect(connectListener?: (err?: Error) => void) {
