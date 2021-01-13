@@ -1249,7 +1249,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
-        validateBulkLoadParameters: false,
+        validateBulkLoadParameters: true,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1650,8 +1650,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
-      } else {
-        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.workstationId !== undefined) {
