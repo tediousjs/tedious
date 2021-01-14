@@ -937,7 +937,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  STATE!: {
+  declare STATE: {
     INITIALIZED: State;
     CONNECTING: State;
     SENT_PRELOGIN: State;
