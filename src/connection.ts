@@ -114,6 +114,7 @@ type ResetCallback =
    */
   (err: Error | null | undefined) => void;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type TransactionCallback<T extends (err: Error | null | undefined, ...args: any[]) => void> =
   /**
    * The callback is called when the request to start a transaction (or create a savepoint, in
@@ -936,7 +937,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  STATE!: {
+  declare STATE: {
     INITIALIZED: State;
     CONNECTING: State;
     SENT_PRELOGIN: State;
@@ -2419,7 +2420,7 @@ class Connection extends EventEmitter {
    * @private
    */
   dispatchEvent<T extends keyof State['events']>(eventName: T, ...args: Parameters<NonNullable<State['events'][T]>>) {
-    const handler = this.state.events[eventName] as Function | undefined;
+    const handler = this.state.events[eventName] as ((this: Connection, ...args: any[]) => void) | undefined;
     if (handler) {
       handler.apply(this, args);
     } else {

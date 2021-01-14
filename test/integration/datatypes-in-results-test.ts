@@ -5,10 +5,12 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { typeByName as TYPES } from '../../src/data-type';
 
+import { homedir } from 'os';
+
 const debug = false;
 
 const config = JSON.parse(
-  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
+  fs.readFileSync(homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 config.options.textsize = 8 * 1024;
 

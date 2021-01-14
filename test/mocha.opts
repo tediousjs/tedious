@@ -1,1 +1,0 @@
---require test/setup.js --timeout 5000 --extension js,ts
