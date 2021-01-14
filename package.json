@@ -153,6 +153,11 @@
       ]
     }
   },
+  "mocha": {
+    "require": "test/setup.js",
+    "timeout": 5000,
+    "extension": ["js", "ts"]
+  },
   "nyc": {
     "sourceMap": false,
     "instrument": false,
