@@ -82,7 +82,7 @@
     "nyc": "^14.1.1",
     "rimraf": "^3.0.2",
     "semantic-release": "^17.3.2",
-    "sinon": "^7.5.0",
+    "sinon": "^9.2.3",
     "typedoc": "^0.17.0-3",
     "typescript": "^3.9.7"
   },
@@ -156,7 +156,10 @@
   "mocha": {
     "require": "test/setup.js",
     "timeout": 5000,
-    "extension": ["js", "ts"]
+    "extension": [
+      "js",
+      "ts"
+    ]
   },
   "nyc": {
     "sourceMap": false,
