@@ -16,7 +16,7 @@ export class InstanceLookup {
     return new Sender(host, port, lookup, request);
   }
 
-  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction }, callback: (message: string | undefined, port?: number) => void) {
+  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction }, callback: (err: Error | undefined, port?: number) => void) {
     const server = options.server;
     if (typeof server !== 'string') {
       throw new TypeError('Invalid arguments: "server" must be a string');
@@ -76,8 +76,7 @@ export class InstanceLookup {
           }
 
           if (err) {
-            callback('Failed to lookup instance on ' + server + ' - ' + err.message);
-
+            callback(new Error('Failed to lookup instance on ' + server + ' - ' + err.message));
           } else {
             const message = response!.toString('ascii', MYSTERY_HEADER_LENGTH);
             const port = this.parseBrowserResponse(message, instanceName);
@@ -85,12 +84,12 @@ export class InstanceLookup {
             if (port) {
               callback(undefined, port);
             } else {
-              callback('Port for ' + instanceName + ' not found in ' + options.server);
+              callback(new Error('Port for ' + instanceName + ' not found in ' + options.server));
             }
           }
         });
       } else {
-        callback('Failed to get response from SQL Server Browser on ' + server);
+        callback(new Error('Failed to get response from SQL Server Browser on ' + server));
       }
     };
 

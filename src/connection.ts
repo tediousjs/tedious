@@ -1882,13 +1882,13 @@ class Connection extends EventEmitter {
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout
-      }, (message, port) => {
+      }, (err, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
         }
 
-        if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+        if (err) {
+          this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port!, this.config.options.multiSubnetFailover);
         }
