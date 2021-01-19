@@ -1,5 +1,7 @@
-import { Sender } from './sender';
 import dns from 'dns';
+import AbortController from 'node-abort-controller';
+
+import { Sender } from './sender';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -11,11 +13,6 @@ type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 export class InstanceLookup {
-  // Wrapper allows for stubbing Sender when unit testing instance-lookup.
-  createSender(host: string, port: number, lookup: LookupFunction, request: Buffer) {
-    return new Sender(host, port, lookup, request);
-  }
-
   instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction }, callback: (err: Error | undefined, port?: number) => void) {
     const server = options.server;
     if (typeof server !== 'string') {
@@ -57,8 +54,10 @@ export class InstanceLookup {
       let sender: Sender;
       let timer: NodeJS.Timeout;
 
+      const controller = new AbortController();
+
       const onTimeout = () => {
-        sender.cancel();
+        controller.abort();
         makeAttempt();
       };
 
@@ -66,7 +65,7 @@ export class InstanceLookup {
         retriesLeft--;
 
         const request = Buffer.from([0x02]);
-        sender = this.createSender(options.server, port, lookup, request);
+        sender = new Sender(options.server, port, lookup, controller.signal, request);
         timer = setTimeout(onTimeout, timeout);
         sender.execute((err, response) => {
           clearTimeout(timer);

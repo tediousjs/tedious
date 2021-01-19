@@ -5,8 +5,6 @@ import * as punycode from 'punycode';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
-import AbortController from 'node-abort-controller';
-
 class AbortError extends Error {
   code: string;
 
@@ -94,15 +92,14 @@ export class Sender {
   port: number;
   request: Buffer;
   lookup: LookupFunction;
-  controller: AbortController;
+  signal: AbortSignal;
 
-  constructor(host: string, port: number, lookup: LookupFunction, request: Buffer) {
+  constructor(host: string, port: number, lookup: LookupFunction, signal: AbortSignal, request: Buffer) {
     this.host = host;
     this.port = port;
     this.request = request;
     this.lookup = lookup;
-
-    this.controller = new AbortController();
+    this.signal = signal;
   }
 
   execute(cb: (error: Error | null, message?: Buffer) => void) {
@@ -133,11 +130,7 @@ export class Sender {
   }
 
   executeForAddresses(addresses: dns.LookupAddress[], cb: (error: Error | null, message?: Buffer) => void) {
-    const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.controller.signal, this.request);
+    const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.signal, this.request);
     parallelSendStrategy.send(cb);
-  }
-
-  cancel() {
-    this.controller.abort();
   }
 }

@@ -1,6 +1,7 @@
 const dgram = require('dgram');
 const { assert } = require('chai');
 const dns = require('dns');
+const AbortController = require('node-abort-controller');
 
 const { Sender } = require('../../src/sender');
 
@@ -60,7 +61,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute(done);
     });
 
@@ -75,7 +77,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err) => {
         assert.strictEqual(err, expectedError);
 
@@ -92,7 +95,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender(address, port, dns.lookup, expectedRequest);
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
       sender.execute(done);
     });
 
@@ -103,7 +107,8 @@ describe('Sender', function() {
         server.send(expectedResponse, rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender(address, port, dns.lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err, message) => {
         if (err) {
           return done(err);
@@ -115,9 +120,9 @@ describe('Sender', function() {
       });
     });
 
-    it('can be canceled during the DNS lookup', function(done) {
+    it('can be aborted during the DNS lookup', function(done) {
       function lookup(hostname, options, callback) {
-        sender.cancel();
+        controller.abort();
 
         callback(undefined, [
           { address: address, family: 4 }
@@ -128,7 +133,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err) => {
         assert.instanceOf(err, Error);
         assert.strictEqual(err.name, 'AbortError');
@@ -137,10 +143,10 @@ describe('Sender', function() {
       });
     });
 
-    it('can be canceled after the DNS lookup', function(done) {
+    it('can be aborted after the DNS lookup', function(done) {
       function lookup(hostname, options, callback) {
         process.nextTick(() => {
-          sender.cancel();
+          controller.abort();
         });
 
         callback(undefined, [
@@ -152,7 +158,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err) => {
         assert.instanceOf(err, Error);
         assert.strictEqual(err.name, 'AbortError');
@@ -161,14 +168,15 @@ describe('Sender', function() {
       });
     });
 
-    it('can be canceled before receiving a response', function(done) {
+    it('can be aborted before receiving a response', function(done) {
       const expectedRequest = Buffer.from([0x02]);
 
       server.once('message', (message, rinfo) => {
-        sender.cancel();
+        controller.abort();
       });
 
-      const sender = new Sender(address, port, dns.lookup, expectedRequest);
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
       sender.execute((err) => {
         assert.instanceOf(err, Error);
         assert.strictEqual(err.name, 'AbortError');
@@ -233,7 +241,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute(done);
     });
 
@@ -248,7 +257,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err) => {
         assert.strictEqual(err, expectedError);
 
@@ -265,7 +275,8 @@ describe('Sender', function() {
         server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender(address, port, dns.lookup, expectedRequest);
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
       sender.execute(done);
     });
 
@@ -276,7 +287,8 @@ describe('Sender', function() {
         server.send(expectedResponse, rinfo.port, rinfo.address);
       });
 
-      const sender = new Sender(address, port, dns.lookup, Buffer.from([0x02]));
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
       sender.execute((err, message) => {
         if (err) {
           return done(err);
@@ -354,7 +366,8 @@ describe('Sender', function() {
         });
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, expectedRequest);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
       sender.execute((err) => {
         if (err) {
           return done(err);
@@ -391,7 +404,8 @@ describe('Sender', function() {
         });
       });
 
-      const sender = new Sender('foo.bar.baz', port, lookup, expectedRequest);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
       sender.execute((err, response) => {
         if (err) {
           return done(err);
