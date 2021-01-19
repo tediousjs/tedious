@@ -5,6 +5,19 @@ import * as punycode from 'punycode';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
+import AbortController from 'node-abort-controller';
+
+class AbortError extends Error {
+  code: string;
+
+  constructor() {
+    super('The operation was aborted');
+
+    this.code = 'ABORT_ERR';
+    this.name = 'AbortError';
+  }
+}
+
 export class ParallelSendStrategy {
   addresses: dns.LookupAddress[];
   port: number;
@@ -15,8 +28,9 @@ export class ParallelSendStrategy {
 
   onMessage: ((message: Buffer) => void) | null;
   onError: ((err: Error) => void) | null;
+  signal: AbortSignal;
 
-  constructor(addresses: dns.LookupAddress[], port: number, request: Buffer) {
+  constructor(addresses: dns.LookupAddress[], port: number, signal: AbortSignal, request: Buffer) {
     this.addresses = addresses;
     this.port = port;
     this.request = request;
@@ -25,6 +39,8 @@ export class ParallelSendStrategy {
     this.socketV6 = null;
     this.onError = null;
     this.onMessage = null;
+
+    this.signal = signal;
   }
 
   clearSockets() {
@@ -46,21 +62,37 @@ export class ParallelSendStrategy {
   }
 
   send(cb: (error: Error | null, message?: Buffer) => void) {
+    if (this.signal.aborted) {
+      return cb(new AbortError());
+    }
+
     let errorCount = 0;
 
     const onError = (err: Error) => {
       errorCount++;
 
       if (errorCount === this.addresses.length) {
+        this.signal.removeEventListener('abort', onAbort);
         this.clearSockets();
+
         cb(err);
       }
     };
 
     const onMessage = (message: Buffer) => {
+      this.signal.removeEventListener('abort', onAbort);
       this.clearSockets();
+
       cb(null, message);
     };
+
+    const onAbort = () => {
+      this.clearSockets();
+
+      cb(new AbortError());
+    };
+
+    this.signal.addEventListener('abort', onAbort, { once: true });
 
     const createDgramSocket = (udpType: 'udp4' | 'udp6', onError: (err: Error) => void, onMessage: (message: Buffer) => void) => {
       const socket = dgram.createSocket(udpType);
@@ -97,18 +129,14 @@ export class ParallelSendStrategy {
     this.onError = onError;
     this.onMessage = onMessage;
   }
-
-  cancel() {
-    this.clearSockets();
-  }
 }
 
 export class Sender {
   host: string;
   port: number;
   request: Buffer;
-  parallelSendStrategy: ParallelSendStrategy | null;
   lookup: LookupFunction;
+  controller: AbortController;
 
   constructor(host: string, port: number, lookup: LookupFunction, request: Buffer) {
     this.host = host;
@@ -116,7 +144,7 @@ export class Sender {
     this.request = request;
     this.lookup = lookup;
 
-    this.parallelSendStrategy = null;
+    this.controller = new AbortController();
   }
 
   execute(cb: (error: Error | null, message?: Buffer) => void) {
@@ -146,20 +174,12 @@ export class Sender {
     });
   }
 
-  // Wrapper for stubbing creation of Strategy object. Sinon support for constructors
-  // seems limited.
-  createParallelSendStrategy(addresses: dns.LookupAddress[], port: number, request: Buffer) {
-    return new ParallelSendStrategy(addresses, port, request);
-  }
-
   executeForAddresses(addresses: dns.LookupAddress[], cb: (error: Error | null, message?: Buffer) => void) {
-    this.parallelSendStrategy = this.createParallelSendStrategy(addresses, this.port, this.request);
-    this.parallelSendStrategy.send(cb);
+    const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.controller.signal, this.request);
+    parallelSendStrategy.send(cb);
   }
 
   cancel() {
-    if (this.parallelSendStrategy) {
-      this.parallelSendStrategy.cancel();
-    }
+    this.controller.abort();
   }
 }

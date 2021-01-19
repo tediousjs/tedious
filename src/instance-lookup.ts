@@ -70,6 +70,11 @@ export class InstanceLookup {
         timer = setTimeout(onTimeout, timeout);
         sender.execute((err, response) => {
           clearTimeout(timer);
+
+          if (err?.name === 'AbortError') {
+            return;
+          }
+
           if (err) {
             callback('Failed to lookup instance on ' + server + ' - ' + err.message);
 

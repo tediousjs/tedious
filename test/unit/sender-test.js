@@ -114,6 +114,68 @@ describe('Sender', function() {
         done();
       });
     });
+
+    it('can be canceled during the DNS lookup', function(done) {
+      function lookup(hostname, options, callback) {
+        sender.cancel();
+
+        callback(undefined, [
+          { address: address, family: 4 }
+        ]);
+      }
+
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
+
+      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
+
+        done();
+      });
+    });
+
+    it('can be canceled after the DNS lookup', function(done) {
+      function lookup(hostname, options, callback) {
+        process.nextTick(() => {
+          sender.cancel();
+        });
+
+        callback(undefined, [
+          { address: address, family: 4 }
+        ]);
+      }
+
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
+
+      const sender = new Sender('foo.bar.baz', port, lookup, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
+
+        done();
+      });
+    });
+
+    it('can be canceled before receiving a response', function(done) {
+      const expectedRequest = Buffer.from([0x02]);
+
+      server.once('message', (message, rinfo) => {
+        sender.cancel();
+      });
+
+      const sender = new Sender(address, port, dns.lookup, expectedRequest);
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
+
+        done();
+      });
+    });
   });
 
   describe('with a single IPv6 address', function() {
