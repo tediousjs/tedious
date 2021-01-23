@@ -2225,7 +2225,8 @@ class Connection extends EventEmitter {
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
+    const controller = new AbortController();
+    new Connector(connectOpts, controller.signal, multiSubnetFailover).execute((err, socket) => {
       if (err) {
         return this.socketError(err);
       }
