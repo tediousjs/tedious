@@ -44,6 +44,8 @@ import { ColumnMetadata } from './token/colmetadata-token-parser';
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
+import AbortController from 'node-abort-controller';
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
 
@@ -1878,10 +1880,13 @@ class Connection extends EventEmitter {
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
     } else {
+      const controller = new AbortController();
+
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout
+        timeout: this.config.options.connectTimeout,
+        signal: controller.signal
       }, (err, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
@@ -2220,7 +2225,8 @@ class Connection extends EventEmitter {
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
+    const controller = new AbortController();
+    new Connector(connectOpts, controller.signal, multiSubnetFailover).execute((err, socket) => {
       if (err) {
         return this.socketError(err);
       }
