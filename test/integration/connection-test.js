@@ -366,6 +366,31 @@ describe('Initiate Connect Test', function() {
     setTimeout(() => { done(); }, 500);
   });
 
+  it('should not leave any dangling sockets after connection timeout', function(done) {
+    // 192.0.2.0/24 is an IP address block reserved for documentation.
+    //
+    // Opening a connection to an address in that block should never be successfull
+    // and fail after a while with `ETIMEDOUT`.
+    //
+    // This test is supposed to show that we correctly clean up the socket(s)
+    // that got created after the `connectTimeout` was reached and no
+    // errors happen at a later time.
+    const conn = new Connection({
+      server: '192.0.2.1',
+      options: {
+        connectTimeout: 3000
+      }
+    });
+
+    conn.connect((err) => {
+      conn.close();
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+
+      done();
+    });
+  });
 });
 
 
