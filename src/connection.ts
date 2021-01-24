@@ -1875,27 +1875,25 @@ class Connection extends EventEmitter {
    * @private
    */
   initialiseConnection() {
-    this.createConnectTimer();
+    const signal = this.createConnectTimer();
 
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
     } else {
-      const controller = new AbortController();
-
       return new InstanceLookup().instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
-        signal: controller.signal
+        signal: signal
       }, (err, port) => {
-        if (this.state === this.STATE.FINAL) {
-          return;
-        }
-
         if (err) {
+          if (err.name === 'AbortError') {
+            return;
+          }
+
           this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
         } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover);
+          this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
         }
       });
     }
@@ -2218,30 +2216,29 @@ class Connection extends EventEmitter {
     return tokenStreamParser;
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean) {
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
       localAddress: this.config.options.localAddress
     };
 
-    const controller = new AbortController();
-    new Connector(connectOpts, controller.signal, multiSubnetFailover).execute((err, socket) => {
+    new Connector(connectOpts, signal, multiSubnetFailover).execute((err, socket) => {
       if (err) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+
         return this.socketError(err);
       }
 
-      if (this.state === this.STATE.FINAL) {
-        socket!.destroy();
-        return;
-      }
+      socket = socket!;
+      socket.on('error', (error) => { this.socketError(error); });
+      socket.on('close', () => { this.socketClose(); });
+      socket.on('end', () => { this.socketEnd(); });
+      socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
-      socket!.on('error', (error) => { this.socketError(error); });
-      socket!.on('close', () => { this.socketClose(); });
-      socket!.on('end', () => { this.socketEnd(); });
-      socket!.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-      this.messageIo = new MessageIO(socket!, this.config.options.packetSize, this.debug);
+      this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
@@ -2267,9 +2264,12 @@ class Connection extends EventEmitter {
    * @private
    */
   createConnectTimer() {
+    const controller = new AbortController();
     this.connectTimer = setTimeout(() => {
+      controller.abort();
       this.connectTimeout();
     }, this.config.options.connectTimeout);
+    return controller.signal;
   }
 
   /**
