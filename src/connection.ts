@@ -1929,16 +1929,18 @@ class Connection extends EventEmitter {
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
-      }, (err, port) => {
-        if (err) {
+      }).then((port) => {
+        process.nextTick(() => {
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
+        });
+      }, (err) => {
+        process.nextTick(() => {
           if (err.name === 'AbortError') {
             return;
           }
 
           this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
-        }
+        });
       });
     }
   }

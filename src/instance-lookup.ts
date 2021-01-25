@@ -24,7 +24,7 @@ class AbortError extends Error {
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 export class InstanceLookup {
-  instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction, signal: AbortSignal }, callback: (err: Error | undefined, port?: number) => void) {
+  async instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction, signal: AbortSignal }): Promise<number> {
     const server = options.server;
     if (typeof server !== 'string') {
       throw new TypeError('Invalid arguments: "server" must be a string');
@@ -40,7 +40,7 @@ export class InstanceLookup {
       throw new TypeError('Invalid arguments: "timeout" must be a number');
     }
 
-    const retries = options.retries === undefined ? RETRIES : options.retries;
+    let retries = options.retries === undefined ? RETRIES : options.retries;
     if (typeof retries !== 'number') {
       throw new TypeError('Invalid arguments: "retries" must be a number');
     }
@@ -57,66 +57,56 @@ export class InstanceLookup {
 
     const signal = options.signal;
 
-    if (typeof callback !== 'function') {
-      throw new TypeError('Invalid arguments: "callback" must be a function');
-    }
-
     if (signal.aborted) {
-      return process.nextTick(callback, new AbortError());
+      throw new AbortError();
     }
 
-    let retriesLeft = retries;
+    while (retries >= 0) {
+      retries--;
 
-    const makeAttempt = () => {
-      if (retriesLeft >= 0) {
-        retriesLeft--;
+      const controller = new AbortController();
 
-        const controller = new AbortController();
+      const abortCurrentAttempt = () => { controller.abort(); };
 
-        const abortCurrentAttempt = () => {
-          controller.abort();
-        };
+      // If the overall instance lookup is aborted,
+      // forward the abort to the controller of the current
+      // lookup attempt.
+      signal.addEventListener('abort', abortCurrentAttempt, { once: true });
 
-        // If the overall instance lookup is aborted,
-        // forward the abort to the controller of the current
-        // lookup attempt.
-        signal.addEventListener('abort', abortCurrentAttempt, { once: true });
+      const request = Buffer.from([0x02]);
+      const sender = new Sender(options.server, port, lookup, controller.signal, request);
+      const timer = setTimeout(abortCurrentAttempt, timeout);
 
-        const request = Buffer.from([0x02]);
-        const sender = new Sender(options.server, port, lookup, controller.signal, request);
-        const timer = setTimeout(abortCurrentAttempt, timeout);
-        sender.execute((err, response) => {
-          clearTimeout(timer);
+      let response;
+      try {
+        response = await sender.execute();
+      } catch (err) {
+        clearTimeout(timer);
 
-          if (err) {
-            if (err?.name === 'AbortError') {
-              // If the overall instance lookup was aborted,
-              // do not perform any further attempts.
-              if (signal.aborted) {
-                return callback(new AbortError());
-              }
-
-              return makeAttempt();
-            }
-
-            return callback(new Error('Failed to lookup instance on ' + server + ' - ' + err.message));
+        if (err?.name === 'AbortError') {
+          // If the overall instance lookup was aborted,
+          // do not perform any further attempts.
+          if (signal.aborted) {
+            throw new AbortError();
           }
 
-          const message = response!.toString('ascii', MYSTERY_HEADER_LENGTH);
-          const port = this.parseBrowserResponse(message, instanceName);
+          continue;
+        }
 
-          if (port) {
-            callback(undefined, port);
-          } else {
-            callback(new Error('Port for ' + instanceName + ' not found in ' + options.server));
-          }
-        });
-      } else {
-        callback(new Error('Failed to get response from SQL Server Browser on ' + server));
+        throw new Error('Failed to lookup instance on ' + server + ' - ' + err.message);
       }
-    };
 
-    makeAttempt();
+      const message = response.toString('ascii', MYSTERY_HEADER_LENGTH);
+      const foundPort = this.parseBrowserResponse(message, instanceName);
+
+      if (foundPort) {
+        return foundPort;
+      }
+
+      throw new Error('Port for ' + instanceName + ' not found in ' + options.server);
+    }
+
+    throw new Error('Failed to get response from SQL Server Browser on ' + server);
   }
 
   parseBrowserResponse(response: string, instanceName: string) {

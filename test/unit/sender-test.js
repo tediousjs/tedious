@@ -47,7 +47,7 @@ describe('Sender', function() {
       }
     });
 
-    it('uses the given lookup function to resolve host names', function(done) {
+    it('uses the given lookup function to resolve host names', async function() {
       function lookup(hostname, options, callback) {
         assert.strictEqual(hostname, 'foo.bar.baz');
         assert.deepEqual(options, { all: true });
@@ -63,10 +63,10 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute(done);
+      await sender.execute();
     });
 
-    it('forwards any errors happening during lookup', function(done) {
+    it('forwards any errors happening during lookup', async function() {
       const expectedError = new Error('fail');
 
       function lookup(hostname, options, callback) {
@@ -79,14 +79,18 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err) => {
-        assert.strictEqual(err, expectedError);
 
-        done();
-      });
+      let error;
+      try {
+        await sender.execute();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error, expectedError);
     });
 
-    it('sends the given request to the remote server', function(done) {
+    it('sends the given request to the remote server', async function() {
       const expectedRequest = Buffer.from([0x02]);
 
       server.once('message', (message, rinfo) => {
@@ -97,10 +101,10 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
-      sender.execute(done);
+      await sender.execute();
     });
 
-    it('calls the given callback with the received response', function(done) {
+    it('calls the given callback with the received response', async function() {
       const expectedResponse = Buffer.from('response');
 
       server.once('message', (message, rinfo) => {
@@ -109,18 +113,12 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err, message) => {
-        if (err) {
-          return done(err);
-        }
 
-        assert.deepEqual(message, expectedResponse);
-
-        done();
-      });
+      const message = await sender.execute();
+      assert.deepEqual(message, expectedResponse);
     });
 
-    it('can be aborted during the DNS lookup', function(done) {
+    it('can be aborted during the DNS lookup', async function() {
       function lookup(hostname, options, callback) {
         controller.abort();
 
@@ -135,15 +133,19 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err) => {
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.name, 'AbortError');
 
-        done();
-      });
+      let error;
+      try {
+        await sender.execute();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.name, 'AbortError');
     });
 
-    it('can be aborted after the DNS lookup', function(done) {
+    it('can be aborted after the DNS lookup', async function() {
       function lookup(hostname, options, callback) {
         process.nextTick(() => {
           controller.abort();
@@ -160,15 +162,19 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err) => {
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.name, 'AbortError');
 
-        done();
-      });
+      let error;
+      try {
+        await sender.execute();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.name, 'AbortError');
     });
 
-    it('can be aborted before receiving a response', function(done) {
+    it('can be aborted before receiving a response', async function() {
       const expectedRequest = Buffer.from([0x02]);
 
       server.once('message', (message, rinfo) => {
@@ -177,12 +183,16 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
-      sender.execute((err) => {
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.name, 'AbortError');
 
-        done();
-      });
+      let error;
+      try {
+        await sender.execute();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.name, 'AbortError');
     });
   });
 
@@ -227,7 +237,7 @@ describe('Sender', function() {
       }
     });
 
-    it('uses the given lookup function to resolve host names', function(done) {
+    it('uses the given lookup function to resolve host names', async function() {
       function lookup(hostname, options, callback) {
         assert.strictEqual(hostname, 'foo.bar.baz');
         assert.deepEqual(options, { all: true });
@@ -243,10 +253,10 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute(done);
+      await sender.execute();
     });
 
-    it('forwards any errors happening during lookup', function(done) {
+    it('forwards any errors happening during lookup', async function() {
       const expectedError = new Error('fail');
 
       function lookup(hostname, options, callback) {
@@ -259,14 +269,18 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err) => {
-        assert.strictEqual(err, expectedError);
 
-        done();
-      });
+      let error;
+      try {
+        await sender.execute();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error, expectedError);
     });
 
-    it('sends the given request to the remote server', function(done) {
+    it('sends the given request to the remote server', async function() {
       const expectedRequest = Buffer.from([0x02]);
 
       server.once('message', (message, rinfo) => {
@@ -277,10 +291,10 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
-      sender.execute(done);
+      await sender.execute();
     });
 
-    it('calls the given callback with the received response', function(done) {
+    it('calls the given callback with the received response', async function() {
       const expectedResponse = Buffer.from('response');
 
       server.once('message', (message, rinfo) => {
@@ -289,15 +303,9 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
-      sender.execute((err, message) => {
-        if (err) {
-          return done(err);
-        }
+      const message = await sender.execute();
 
-        assert.deepEqual(message, expectedResponse);
-
-        done();
-      });
+      assert.deepEqual(message, expectedResponse);
     });
   });
 
@@ -347,7 +355,7 @@ describe('Sender', function() {
       });
     });
 
-    it('sends the request to all servers', function(done) {
+    it('sends the request to all servers', async function() {
       function lookup(hostname, options, callback) {
         process.nextTick(callback, undefined, addresses.map((address) => {
           return { address: address, family: 4 };
@@ -368,22 +376,16 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
-      sender.execute((err) => {
-        if (err) {
-          return done(err);
-        }
+      await sender.execute();
 
-        assert.deepEqual([
-          [ '127.0.0.1', expectedRequest ],
-          [ '127.0.0.2', expectedRequest ],
-          [ '127.0.0.3', expectedRequest ]
-        ], messages);
-
-        done();
-      });
+      assert.deepEqual([
+        [ '127.0.0.1', expectedRequest ],
+        [ '127.0.0.2', expectedRequest ],
+        [ '127.0.0.3', expectedRequest ]
+      ], messages);
     });
 
-    it('calls the given callback with the first received response', function(done) {
+    it('calls the given callback with the first received response', async function() {
       function lookup(hostname, options, callback) {
         process.nextTick(callback, undefined, addresses.map((address) => {
           return { address: address, family: 4 };
@@ -406,16 +408,10 @@ describe('Sender', function() {
 
       const controller = new AbortController();
       const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
-      sender.execute((err, response) => {
-        if (err) {
-          return done(err);
-        }
+      const response = await sender.execute();
 
-        assert.strictEqual(messages.length, 3);
-        assert.deepEqual(response, Buffer.from('response #3'));
-
-        done();
-      });
+      assert.strictEqual(messages.length, 3);
+      assert.deepEqual(response, Buffer.from('response #3'));
     });
   });
 });

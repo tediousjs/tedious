@@ -31,60 +31,62 @@ export class ParallelSendStrategy {
     this.signal = signal;
   }
 
-  send(cb: (error: Error | null, message?: Buffer) => void) {
-    const signal = this.signal;
+  send(): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const signal = this.signal;
 
-    if (signal.aborted) {
-      return cb(new AbortError());
-    }
+      if (signal.aborted) {
+        return reject(new AbortError());
+      }
 
-    const sockets: dgram.Socket[] = [];
+      const sockets: dgram.Socket[] = [];
 
-    let errorCount = 0;
+      let errorCount = 0;
 
-    const onError = (err: Error) => {
-      errorCount++;
+      const onError = (err: Error) => {
+        errorCount++;
 
-      if (errorCount === this.addresses.length) {
+        if (errorCount === this.addresses.length) {
+          signal.removeEventListener('abort', onAbort);
+          clearSockets();
+
+          reject(err);
+        }
+      };
+
+      const onMessage = (message: Buffer) => {
         signal.removeEventListener('abort', onAbort);
         clearSockets();
 
-        cb(err);
+        resolve(message);
+      };
+
+      const onAbort = () => {
+        clearSockets();
+
+        reject(new AbortError());
+      };
+
+      const clearSockets = () => {
+        for (const socket of sockets) {
+          socket.removeListener('error', onError);
+          socket.removeListener('message', onMessage);
+          socket.close();
+        }
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      for (let j = 0; j < this.addresses.length; j++) {
+        const udpType = this.addresses[j].family === 6 ? 'udp6' : 'udp4';
+
+        const socket = dgram.createSocket(udpType);
+        sockets.push(socket);
+        socket.on('error', onError);
+        socket.on('message', onMessage);
+        socket.send(this.request, 0, this.request.length, this.port, this.addresses[j].address);
       }
-    };
-
-    const onMessage = (message: Buffer) => {
-      signal.removeEventListener('abort', onAbort);
-      clearSockets();
-
-      cb(null, message);
-    };
-
-    const onAbort = () => {
-      clearSockets();
-
-      cb(new AbortError());
-    };
-
-    const clearSockets = () => {
-      for (const socket of sockets) {
-        socket.removeListener('error', onError);
-        socket.removeListener('message', onMessage);
-        socket.close();
-      }
-    };
-
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    for (let j = 0; j < this.addresses.length; j++) {
-      const udpType = this.addresses[j].family === 6 ? 'udp6' : 'udp4';
-
-      const socket = dgram.createSocket(udpType);
-      sockets.push(socket);
-      socket.on('error', onError);
-      socket.on('message', onMessage);
-      socket.send(this.request, 0, this.request.length, this.port, this.addresses[j].address);
-    }
+    });
   }
 }
 
@@ -103,35 +105,36 @@ export class Sender {
     this.signal = signal;
   }
 
-  execute(cb: (error: Error | null, message?: Buffer) => void) {
+  execute(): Promise<Buffer> {
     if (net.isIP(this.host)) {
-      this.executeForIP(cb);
+      return this.executeForIP();
     } else {
-      this.executeForHostname(cb);
+      return this.executeForHostname();
     }
   }
 
-  executeForIP(cb: (error: Error | null, message?: Buffer) => void) {
-    this.executeForAddresses([{ address: this.host, family: net.isIPv6(this.host) ? 6 : 4 }], cb);
+  executeForIP(): Promise<Buffer> {
+    return this.executeForAddresses([
+      { address: this.host, family: net.isIPv6(this.host) ? 6 : 4 }
+    ]);
   }
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
-  invokeLookupAll(host: string, cb: (error: Error | null, addresses?: dns.LookupAddress[]) => void) {
-    this.lookup.call(null, punycode.toASCII(host), { all: true }, cb);
-  }
-
-  executeForHostname(cb: (error: Error | null, message?: Buffer) => void) {
-    this.invokeLookupAll(this.host, (err, addresses) => {
-      if (err) {
-        return cb(err);
-      }
-
-      this.executeForAddresses(addresses!, cb);
+  invokeLookupAll(host: string): Promise<dns.LookupAddress[]> {
+    return new Promise((resolve, reject) => {
+      this.lookup.call(null, punycode.toASCII(host), { all: true }, (err, addresses) => {
+        err ? reject(err) : resolve(addresses);
+      });
     });
   }
 
-  executeForAddresses(addresses: dns.LookupAddress[], cb: (error: Error | null, message?: Buffer) => void) {
+  async executeForHostname(): Promise<Buffer> {
+    const addresses = await this.invokeLookupAll(this.host);
+    return this.executeForAddresses(addresses);
+  }
+
+  executeForAddresses(addresses: dns.LookupAddress[]): Promise<Buffer> {
     const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.signal, this.request);
-    parallelSendStrategy.send(cb);
+    return parallelSendStrategy.send();
   }
 }
