@@ -29,7 +29,6 @@ const Bit: DataType = {
 
   toBuffer: function(parameter) {
     const value = parameter.value;
-
     if (value != null) {
       const val = value as boolean;
       const result = Buffer.alloc(8);

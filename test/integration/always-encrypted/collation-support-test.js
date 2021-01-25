@@ -478,7 +478,6 @@ describe('always encrypted', function() {
       }
       const val = 131;
       // const val = deterministicCollations.length;
-      console.log('>>> VAL ', val);
       const temp = [];
       for (let i = 0; i < val; i++) {
         temp.push(deterministicCollations[i]);
@@ -518,12 +517,9 @@ describe('always encrypted', function() {
     let sql = 'create table ' + charDeterminiticTable + ' (';
 
     for (let i = 0; i < deterministicCollations.length; i++) {
-      console.log('>>> ', deterministicCollations[i]);
       sql += 'Determinized' + i + ' nvarchar(50) COLLATE ' + deterministicCollations[i] + " ENCRYPTED WITH (ENCRYPTION_TYPE = DETERMINISTIC, ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', COLUMN_ENCRYPTION_KEY = [CEK1]) NULL,";
     }
     sql += ');';
-
-    console.log('>> ', sql);
 
     const request = new Request(sql, (err) => {
       if (err) {
@@ -613,17 +609,14 @@ describe('always encrypted', function() {
   it('should test randomized char table', function(done) {
     generateAllRandomizedCollations((err) => {
       if (err) {
-        console.log('!!! 1');
         return done(err);
       }
       createRandomizedCharTable((err) => {
         if (err) {
-          console.log('!!! 2');
           return done(err);
         }
         populateRandomizedCharTable((err) => {
           if (err) {
-            console.log('!!! 3');
             return done(err);
           }
 
@@ -631,7 +624,6 @@ describe('always encrypted', function() {
 
           const request = new Request('select TOP 1 * from ' + charRandomizedTable, (err) => {
             if (err) {
-              console.log('!!! 4');
               return done(err);
             }
             for (let i = 0; i < randomizedCollations.length; i++) {
@@ -653,28 +645,24 @@ describe('always encrypted', function() {
     });
   });
 
-  xit('should test deterministic char table', function(done) {
+  it('should test deterministic char table', function(done) {
     generateAllDeterministicCollations((err) => {
       if (err) {
-        console.log('!!! 1');
 
         return done(err);
       }
       createDeterministicCharTable((err) => {
         if (err) {
-          console.log('!!! 2');
 
           return done(err);
         }
         populateDeterminzedCharTable((err) => {
           if (err) {
-            console.log('!!! 3');
             return done(err);
           }
           const result = [];
           const request = new Request('select TOP 1 * from ' + charDeterminiticTable, (err) => {
             if (err) {
-              console.log('!!! 4');
               return done(err);
             }
             for (let i = 0; i < deterministicCollations.length; i++) {

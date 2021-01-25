@@ -333,7 +333,7 @@ export interface InternalConnectionOptions {
   cancelTimeout: number;
   columnEncryptionKeyCacheTTL: number;
   columnEncryptionSetting: boolean;
-  columnNameReplacer: undefined| ((colName: string, index: number, metadata: Metadata) => string);
+  columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -2914,6 +2914,7 @@ class Connection extends EventEmitter {
       getParameterEncryptionMetadata(this, request, (error?: Error) => {
         if (error != null) {
           process.nextTick(() => {
+            this.transitionTo(this.STATE.LOGGED_IN);
             this.debug.log(error.message);
             request.callback(error);
           });

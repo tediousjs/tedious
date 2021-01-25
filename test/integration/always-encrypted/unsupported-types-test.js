@@ -153,7 +153,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support image datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] image
       ENCRYPTED WITH (
@@ -173,7 +173,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support xml datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] xml
       ENCRYPTED WITH (
@@ -193,7 +193,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support sysname datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] sysname
       ENCRYPTED WITH (
@@ -213,7 +213,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support timestamp datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] timestamp
       ENCRYPTED WITH (
@@ -233,7 +233,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support sql_variant datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] sql_variant
       ENCRYPTED WITH (
@@ -253,7 +253,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support hierarchyid datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] hierarchyid
       ENCRYPTED WITH (
@@ -273,7 +273,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support geometry datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] geometry
       ENCRYPTED WITH (
@@ -293,7 +293,7 @@ describe('always encrypted', function() {
     connection.execSql(request);
   });
 
-  it('should not support ntext datatype for encryption', function(done) {
+  it('should not support geography datatype for encryption', function(done) {
     const request = new Request(`CREATE TABLE test_always_encrypted (
       [col1] geography
       ENCRYPTED WITH (

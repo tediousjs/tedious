@@ -153,7 +153,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
         for (let i = 0, len = parameters.length; i < len; i++) {
           const type = parameters[i].type;
-          if (parameters[i].cryptoMetadata && parameters[i].value) {
+          const paramValue = parameters[i].value;
+          if (parameters[i].cryptoMetadata && (paramValue !== undefined && paramValue !== null)) {
             if (!type.toBuffer) {
               throw new Error(`Column encryption error. Cannot convert type ${type.name} to buffer.`);
             }
