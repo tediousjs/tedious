@@ -9,48 +9,36 @@ var config = {
       userName: 'test',
       password: 'test'
     }
+  },
+  options: {
+    port: 1433 // Default Port
   }
-  /*
-  ,options: {
-    debug: {
-      packet: true,
-      data: true,
-      payload: true,
-      token: false,
-      log: true
-    },
-    database: 'DBName',
-    encrypt: true // for Azure users
-  }
-  */
 };
 
-var connection = new Connection(config);
+const connection = new Connection(config);
 
-connection.connect(function(err) {
-    // If no error, then good to go...
-    executeStatement();
+connection.on('connect', (err) => {
+  if (err) {
+    console.log('Connection Failed');
+    throw err;
   }
-);
 
-connection.on('debug', function(text) {
-    //console.log(text);
-  }
-);
+  executeStatement();
+});
 
 function executeStatement() {
-  request = new Request("select 42, 'hello world'", function(err, rowCount) {
+  const request = new Request('select * from MyTable', (err, rowCount) => {
     if (err) {
-      console.log(err);
-    } else {
-      console.log(rowCount + ' rows');
+      throw err;
     }
 
+    console.log('DONE!');
     connection.close();
   });
 
-  request.on('row', function(columns) {
-    columns.forEach(function(column) {
+  // Emits a 'DoneInProc' event when completed.
+  request.on('row', (columns) => {
+    columns.forEach((column) => {
       if (column.value === null) {
         console.log('NULL');
       } else {
@@ -59,7 +47,11 @@ function executeStatement() {
     });
   });
 
-  request.on('done', function(rowCount, more) {
+  request.on('done', (rowCount) => {
+    console.log('Done is called!');
+  });
+
+  request.on('doneInProc', (rowCount, more) => {
     console.log(rowCount + ' rows returned');
   });
 
