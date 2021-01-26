@@ -141,7 +141,7 @@ class Parser extends Transform {
 
     while (!this.suspended && this.activeBuffer().availableLength() > 0 && this.processingQueue === 0) {
       this.processingStarted();
-      await new Promise((resolve) => {
+      await new Promise<void>((resolve) => {
         this.readUInt8((type) => {
           if (tokenParsers[type]) {
             tokenParsers[type](this, this.options, (token: Token | undefined) => {
