@@ -284,7 +284,7 @@ describe('SequentialConnectionStrategy', function() {
     mitm.disable();
   });
 
-  it('tries to connect to all addresses in sequence', function(done) {
+  it('tries to connect to all addresses in sequence', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -318,30 +318,24 @@ describe('SequentialConnectionStrategy', function() {
       }
     });
 
-    strategy.connect(function(err) {
-      if (err) {
-        return done(err);
-      }
+    await strategy.connect();
 
-      assert.strictEqual(attemptedConnections.length, 3);
+    assert.strictEqual(attemptedConnections.length, 3);
 
-      assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-      assert.strictEqual(attemptedConnections[0].port, 12345);
-      assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
-      assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
-      assert.strictEqual(attemptedConnections[1].port, 12345);
-      assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
+    assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
+    assert.strictEqual(attemptedConnections[1].port, 12345);
+    assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
 
-      assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
-      assert.strictEqual(attemptedConnections[2].port, 12345);
-      assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
-
-      done();
-    });
+    assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+    assert.strictEqual(attemptedConnections[2].port, 12345);
+    assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
   });
 
-  it('passes the first succesfully connected socket to the callback', function(done) {
+  it('passes the first succesfully connected socket to the callback', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -362,14 +356,12 @@ describe('SequentialConnectionStrategy', function() {
       }
     });
 
-    strategy.connect(function(err, socket) {
-      assert.strictEqual(expectedSocket, socket);
+    const socket = await strategy.connect();
 
-      done();
-    });
+    assert.strictEqual(expectedSocket, socket);
   });
 
-  it('only attempts new connections until the first successful connection', function(done) {
+  it('only attempts new connections until the first successful connection', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -387,22 +379,16 @@ describe('SequentialConnectionStrategy', function() {
       attemptedConnections.push(options);
     });
 
-    strategy.connect(function(err) {
-      if (err) {
-        return done(err);
-      }
+    await strategy.connect();
 
-      assert.strictEqual(attemptedConnections.length, 1);
+    assert.strictEqual(attemptedConnections.length, 1);
 
-      assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-      assert.strictEqual(attemptedConnections[0].port, 12345);
-      assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
-
-      done();
-    });
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
   });
 
-  it('fails if all sequential connections fail', function(done) {
+  it('fails if all sequential connections fail', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -420,14 +406,18 @@ describe('SequentialConnectionStrategy', function() {
       });
     });
 
-    strategy.connect(function(err, socket) {
-      assert.equal('Could not connect (sequence)', err.message);
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.equal(error.message, 'Could not connect (sequence)');
   });
 
-  it('destroys all sockets except for the first succesfully connected socket', function(done) {
+  it('destroys all sockets except for the first succesfully connected socket', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -451,20 +441,14 @@ describe('SequentialConnectionStrategy', function() {
       }
     });
 
-    strategy.connect(function(err, socket) {
-      if (err) {
-        return done(err);
-      }
+    await strategy.connect();
 
-      assert.isOk(attemptedSockets[0].destroyed);
-      assert.isOk(attemptedSockets[1].destroyed);
-      assert.isOk(!attemptedSockets[2].destroyed);
-
-      done();
-    });
+    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(!attemptedSockets[2].destroyed);
   });
 
-  it('will immediately abort when called with an aborted signal', function(done) {
+  it('will immediately abort when called with an aborted signal', async function() {
     const controller = new AbortController();
     controller.abort();
 
@@ -482,15 +466,18 @@ describe('SequentialConnectionStrategy', function() {
       assert.fail('no connections expected');
     });
 
-    strategy.connect(function(err, socket) {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
   });
 
-  it('can be aborted while trying to connect', function(done) {
+  it('can be aborted while trying to connect', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
       [
@@ -511,15 +498,18 @@ describe('SequentialConnectionStrategy', function() {
       });
     });
 
-    strategy.connect(function(err, socket) {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      assert.lengthOf(attemptedSockets, 1);
-      assert.isOk(attemptedSockets[0].destroyed);
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
 
-      done();
-    });
+    assert.lengthOf(attemptedSockets, 1);
+    assert.isOk(attemptedSockets[0].destroyed);
   });
 });
 
@@ -535,7 +525,7 @@ describe('ParallelConnectionStrategy', function() {
     mitm.disable();
   });
 
-  it('tries to connect to all addresses in parallel', function(done) {
+  it('tries to connect to all addresses in parallel', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
       [
@@ -557,28 +547,22 @@ describe('ParallelConnectionStrategy', function() {
       });
     });
 
-    strategy.connect(function(err, socket) {
-      if (err) {
-        return done(err);
-      }
+    await strategy.connect();
 
-      assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-      assert.strictEqual(attemptedConnections[0].port, 12345);
-      assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
-      assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
-      assert.strictEqual(attemptedConnections[1].port, 12345);
-      assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
+    assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
+    assert.strictEqual(attemptedConnections[1].port, 12345);
+    assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
 
-      assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
-      assert.strictEqual(attemptedConnections[2].port, 12345);
-      assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
-
-      done();
-    });
+    assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+    assert.strictEqual(attemptedConnections[2].port, 12345);
+    assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
   });
 
-  it('fails if all parallel connections fail', function(done) {
+  it('fails if all parallel connections fail', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
       [
@@ -596,14 +580,18 @@ describe('ParallelConnectionStrategy', function() {
       });
     });
 
-    strategy.connect(function(err, socket) {
-      assert.equal('Could not connect (parallel)', err.message);
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.equal(error.message, 'Could not connect (parallel)');
   });
 
-  it('passes the first succesfully connected socket to the callback', function(done) {
+  it('passes the first succesfully connected socket to the callback', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
       [
@@ -626,18 +614,11 @@ describe('ParallelConnectionStrategy', function() {
       }
     });
 
-    strategy.connect(function(err, socket) {
-      if (err) {
-        return done(err);
-      }
-
-      assert.strictEqual(expectedSocket, socket);
-
-      done();
-    });
+    const socket = await strategy.connect();
+    assert.strictEqual(expectedSocket, socket);
   });
 
-  it('destroys all sockets except for the first succesfully connected socket', function(done) {
+  it('destroys all sockets except for the first succesfully connected socket', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
       [
@@ -655,20 +636,14 @@ describe('ParallelConnectionStrategy', function() {
       attemptedSockets.push(socket);
     });
 
-    strategy.connect(function(err, socket) {
-      if (err) {
-        return done(err);
-      }
+    await strategy.connect();
 
-      assert.isOk(!attemptedSockets[0].destroyed);
-      assert.isOk(attemptedSockets[1].destroyed);
-      assert.isOk(attemptedSockets[2].destroyed);
-
-      done();
-    });
+    assert.isOk(!attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(attemptedSockets[2].destroyed);
   });
 
-  it('will immediately abort when called with an aborted signal', function(done) {
+  it('will immediately abort when called with an aborted signal', async function() {
     const controller = new AbortController();
     controller.abort();
 
@@ -686,15 +661,18 @@ describe('ParallelConnectionStrategy', function() {
       assert.fail('no connections expected');
     });
 
-    strategy.connect(function(err, socket) {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
   });
 
-  it('can be aborted while trying to connect', function(done) {
+  it('can be aborted while trying to connect', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
       [
@@ -715,16 +693,19 @@ describe('ParallelConnectionStrategy', function() {
       });
     });
 
-    strategy.connect(function(err, socket) {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await strategy.connect();
+    } catch (err) {
+      error = err;
+    }
 
-      assert.lengthOf(attemptedSockets, 3);
-      assert.isOk(attemptedSockets[0].destroyed);
-      assert.isOk(attemptedSockets[1].destroyed);
-      assert.isOk(attemptedSockets[2].destroyed);
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
 
-      done();
-    });
+    assert.lengthOf(attemptedSockets, 3);
+    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(attemptedSockets[2].destroyed);
   });
 });
