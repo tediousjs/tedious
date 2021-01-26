@@ -107,8 +107,8 @@ describe('InstanceLookup', function() {
         timeout: 500,
         retries: 1,
       }, (err) => {
-        assert.isOk(err);
-        assert.match(err, /^Failed to get response from SQL Server Browser/);
+        assert.instanceOf(err, Error);
+        assert.match(err.message, /^Failed to get response from SQL Server Browser/);
         assert.isTrue(timedOut);
 
         errored = true;
@@ -163,8 +163,8 @@ describe('InstanceLookup', function() {
         timeout: 500,
         retries: 1,
       }, (err) => {
-        assert.isOk(err);
-        assert.match(err, /^Port for other not found/);
+        assert.instanceOf(err, Error);
+        assert.match(err.message, /^Port for other not found/);
 
         done();
       });
@@ -184,8 +184,8 @@ describe('InstanceLookup', function() {
         timeout: 500,
         retries: 1,
       }, (err) => {
-        assert.isOk(err);
-        assert.match(err, /^Port for other not found/);
+        assert.instanceOf(err, Error);
+        assert.match(err.message, /^Port for other not found/);
 
         done();
       });

@@ -62,7 +62,7 @@ export class Parser extends EventEmitter {
     });
   }
 
-  on!: (
+  declare on: (
     ((event: 'infoMessage', listener: (token: InfoMessageToken) => void) => this) &
     ((event: 'errorMessage', listener: (token: ErrorMessageToken) => void) => this) &
     ((event: 'sspichallenge', listener: (token: SSPIToken) => void) => this) &

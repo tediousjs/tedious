@@ -117,6 +117,7 @@ type ResetCallback =
    */
   (err: Error | null | undefined) => void;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type TransactionCallback<T extends (err: Error | null | undefined, ...args: any[]) => void> =
   /**
    * The callback is called when the request to start a transaction (or create a savepoint, in
@@ -954,7 +955,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  STATE!: {
+  declare STATE: {
     INITIALIZED: State;
     CONNECTING: State;
     SENT_PRELOGIN: State;
@@ -1273,7 +1274,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true,
-        validateBulkLoadParameters: false,
+        validateBulkLoadParameters: true,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1693,8 +1694,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
-      } else {
-        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
       }
 
       if (config.options.workstationId !== undefined) {
@@ -1795,18 +1794,6 @@ class Connection extends EventEmitter {
     this.transientErrorLookup = new TransientErrorLookup();
 
     this.state = this.STATE.INITIALIZED;
-
-    process.nextTick(() => {
-      if (this.state === this.STATE.INITIALIZED) {
-        const message = 'In the next major version of `tedious`, creating a new ' +
-          '`Connection` instance will no longer establish a connection to the ' +
-          'server automatically. Please use the new `connect` helper function or ' +
-          'call the `.connect` method on the newly created `Connection` object to ' +
-          'silence this message.';
-        deprecate(message);
-        this.connect();
-      }
-    });
   }
 
   connect(connectListener?: (err?: Error) => void) {
@@ -1983,13 +1970,13 @@ class Connection extends EventEmitter {
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout
-      }, (message, port) => {
+      }, (err, port) => {
         if (this.state === this.STATE.FINAL) {
           return;
         }
 
-        if (message) {
-          this.emit('connect', ConnectionError(message, 'EINSTLOOKUP'));
+        if (err) {
+          this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port!, this.config.options.multiSubnetFailover);
         }
@@ -2530,7 +2517,7 @@ class Connection extends EventEmitter {
    * @private
    */
   dispatchEvent<T extends keyof State['events']>(eventName: T, ...args: Parameters<NonNullable<State['events'][T]>>) {
-    const handler = this.state.events[eventName] as Function | undefined;
+    const handler = this.state.events[eventName] as ((this: Connection, ...args: any[]) => void) | undefined;
     if (handler) {
       handler.apply(this, args);
     } else {

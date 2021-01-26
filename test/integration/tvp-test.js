@@ -54,6 +54,12 @@ describe('calling a procedure that takes and returns a TVP', function() {
   });
 
   afterEach(function() {
+    const config = getConfig();
+
+    if (config.options.tdsVersion < '7_3_A') {
+      this.skip();
+    }
+
     connection.close();
   });
 
