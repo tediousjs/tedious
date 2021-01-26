@@ -27,7 +27,7 @@ describe('Connector', function() {
       sinon.restore();
     });
 
-    it('connects directly if given an IP v4 address', function(done) {
+    it('connects directly if given an IP v4 address', async function() {
       const hostIp = '127.0.0.1';
       const localIp = '192.168.0.1';
 
@@ -53,18 +53,11 @@ describe('Connector', function() {
         });
       });
 
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(socket, expectedSocket);
-
-        done();
-      });
+      const socket = await connector.execute();
+      assert.strictEqual(socket, expectedSocket);
     });
 
-    it('connects directly if given an IP v6 address', function(done) {
+    it('connects directly if given an IP v6 address', async function() {
       const hostIp = '::1';
       const localIp = '2002:20:0:0:0:0:1:2';
 
@@ -90,35 +83,21 @@ describe('Connector', function() {
         });
       });
 
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(socket, expectedSocket);
-
-        done();
-      });
+      const socket = await connector.execute();
+      assert.strictEqual(socket, expectedSocket);
     });
 
-    it('uses a parallel connection strategy', function(done) {
+    it('uses a parallel connection strategy', async function() {
       const controller = new AbortController();
       const connector = new Connector({ host: 'localhost', port: 12345 }, controller.signal, true);
 
       const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
 
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(spy.callCount, 1);
-
-        done();
-      });
+      await connector.execute();
+      assert.strictEqual(spy.callCount, 1);
     });
 
-    it('will immediately abort when called with an aborted signal', function(done) {
+    it('will immediately abort when called with an aborted signal', async function() {
       const controller = new AbortController();
       const connector = new Connector({ host: 'localhost', port: 12345 }, controller.signal, true);
 
@@ -126,17 +105,20 @@ describe('Connector', function() {
 
       controller.abort();
 
-      connector.execute(function(err, socket) {
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.name, 'AbortError');
+      let error;
+      try {
+        await connector.execute();
+      } catch (err) {
+        error = err;
+      }
 
-        sinon.assert.callCount(spy, 0);
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.name, 'AbortError');
 
-        done();
-      });
+      sinon.assert.callCount(spy, 0);
     });
 
-    it('can be aborted during DNS lookup', function(done) {
+    it('can be aborted during DNS lookup', async function() {
       const lookup = sinon.spy(function lookup(hostname, options, callback) {
         controller.abort();
 
@@ -154,14 +136,17 @@ describe('Connector', function() {
 
       const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
 
-      connector.execute((err) => {
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.name, 'AbortError');
+      let error;
+      try {
+        await connector.execute();
+      } catch (err) {
+        error = err;
+      }
 
-        sinon.assert.callCount(spy, 0);
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.name, 'AbortError');
 
-        done();
-      });
+      sinon.assert.callCount(spy, 0);
     });
   });
 
@@ -181,7 +166,7 @@ describe('Connector', function() {
       sinon.restore();
     });
 
-    it('connects directly if given an IP address', function(done) {
+    it('connects directly if given an IP address', async function() {
       const connectionOptions = {
         host: '127.0.0.1',
         port: 12345,
@@ -203,18 +188,11 @@ describe('Connector', function() {
         });
       });
 
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(socket, expectedSocket);
-
-        done();
-      });
+      const socket = await connector.execute();
+      assert.strictEqual(socket, expectedSocket);
     });
 
-    it('uses a sequential connection strategy', function(done) {
+    it('uses a sequential connection strategy', async function() {
       const controller = new AbortController();
       const connector = new Connector({ host: 'localhost', port: 12345 }, controller.signal, false);
 
@@ -223,51 +201,48 @@ describe('Connector', function() {
         'connect'
       );
 
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(spy.callCount, 1);
-
-        done();
-      });
+      await connector.execute();
+      assert.strictEqual(spy.callCount, 1);
     });
   });
 
   describe('Test unicode SQL Server name', function() {
-    it('test IDN Server name', function(done) {
+    it('test IDN Server name', async function() {
       const lookup = sinon.spy(function lookup(hostname, options, callback) {
-        callback([{ address: '127.0.0.1', family: 4 }]);
+        callback(null, [{ address: '127.0.0.1', family: 4 }]);
       });
 
       const server = '本地主机.ad';
       const controller = new AbortController();
       const connector = new Connector({ host: server, port: 12345, lookup: lookup }, controller.signal, true);
 
-      connector.execute(() => {
-        assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-        assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
+      try {
+        await connector.execute();
+      } catch (err) {
+        // Ignore
+      }
 
-        done();
-      });
+      assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+      assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
     });
 
-    it('test ASCII Server name', function(done) {
+    it('test ASCII Server name', async function() {
       const lookup = sinon.spy(function lookup(hostname, options, callback) {
-        callback([{ address: '127.0.0.1', family: 4 }]);
+        callback(null, [{ address: '127.0.0.1', family: 4 }]);
       });
 
       const server = 'localhost';
       const controller = new AbortController();
       const connector = new Connector({ host: server, port: 12345, lookup: lookup }, controller.signal, true);
 
-      connector.execute(() => {
-        assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-        assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
+      try {
+        await connector.execute();
+      } catch (err) {
+        // Ignore
+      }
 
-        done();
-      });
+      assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+      assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
     });
   });
 });

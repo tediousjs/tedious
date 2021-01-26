@@ -169,42 +169,38 @@ export class Connector {
     this.multiSubnetFailover = multiSubnetFailover;
   }
 
-  execute(cb: (err: Error | null, socket?: net.Socket) => void) {
+  async execute(): Promise<net.Socket> {
     if (this.signal.aborted) {
-      return process.nextTick(cb, new AbortError());
+      throw new AbortError();
     }
 
-    this.lookupAllAddresses(this.options.host, (err, addresses) => {
-      if (this.signal.aborted) {
-        return cb(new AbortError());
-      }
+    const addresses = await this.lookupAllAddresses(this.options.host);
 
-      if (err) {
-        return cb(err);
-      }
+    let strategy;
+    if (this.multiSubnetFailover) {
+      strategy = new ParallelConnectionStrategy(addresses, this.signal, this.options);
+    } else {
+      strategy = new SequentialConnectionStrategy(addresses, this.signal, this.options);
+    }
 
-      let strategy;
-      if (this.multiSubnetFailover) {
-        strategy = new ParallelConnectionStrategy(addresses, this.signal, this.options);
-      } else {
-        strategy = new SequentialConnectionStrategy(addresses, this.signal, this.options);
-      }
-
-      strategy.connect().then((socket) => {
-        process.nextTick(cb, null, socket);
-      }, (err) => {
-        process.nextTick(cb, err);
-      });
-    });
+    return strategy.connect();
   }
 
-  lookupAllAddresses(host: string, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) {
+  lookupAllAddresses(host: string): Promise<dns.LookupAddress[]> {
     if (net.isIPv6(host)) {
-      process.nextTick(callback, null, [{ address: host, family: 6 }]);
+      return Promise.resolve([{ address: host, family: 6 }]);
     } else if (net.isIPv4(host)) {
-      process.nextTick(callback, null, [{ address: host, family: 4 }]);
+      return Promise.resolve([{ address: host, family: 4 }]);
     } else {
-      this.lookup.call(null, punycode.toASCII(host), { all: true }, callback);
+      return new Promise((resolve, reject) => {
+        this.lookup.call(null, punycode.toASCII(host), { all: true }, (err, addresses) => {
+          if (this.signal.aborted) {
+            return reject(new AbortError());
+          }
+
+          err ? reject(err) : resolve(addresses);
+        });
+      });
     }
   }
 }
