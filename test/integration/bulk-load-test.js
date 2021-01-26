@@ -28,7 +28,6 @@ function getConfig() {
 }
 
 describe('Bulk Load Tests', function() {
-  this.timeout(60000);
   let connection;
 
   beforeEach(function(done) {
@@ -351,9 +350,7 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should test stream bulk load', function(done) {
-    this.timeout(200000);
-
-    const totalRows = 500000;
+    const totalRows = 20;
     const tableName = '#streamingBulkLoadTest';
 
     connection.on('error', done);
@@ -377,25 +374,19 @@ describe('Bulk Load Tests', function() {
       const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
       const rowStream = bulkLoad.getRowStream();
+
       connection.execBulkLoad(bulkLoad);
 
-      let rowCount = 0;
-      const rowSource = new Readable({
-        objectMode: true,
+      const rowSource = Readable.from((async function*() {
+        let rowCount = 0;
+        while (rowCount < totalRows) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
 
-        read() {
-          while (rowCount < totalRows) {
-            const i = rowCount++;
-            const row = [i];
-
-            if (!this.push(row)) {
-              return;
-            }
-          }
-
-          this.push(null);
+          yield [rowCount++];
         }
-      });
+      })(), { objectMode: true });
 
       rowSource.pipe(rowStream);
     }
@@ -415,6 +406,7 @@ describe('Bulk Load Tests', function() {
         from ${tableName} a
         inner join ${tableName} b on a.i = b.i - 1
       `, completeVerifyTableContent);
+      request.setTimeout(30000);
       request.on('row', (row) => {
         assert.equal(row[0].value, totalRows - 1);
       });
@@ -432,9 +424,7 @@ describe('Bulk Load Tests', function() {
   });
 
   it('should test streaming bulk load with cancel', function(done) {
-    this.timeout(50000);
-
-    const totalRows = 500000;
+    const totalRows = 20;
 
     startCreateTable();
 
@@ -460,33 +450,24 @@ describe('Bulk Load Tests', function() {
       connection.execBulkLoad(bulkLoad);
 
       let rowCount = 0;
-      const rowSource = new Readable({
-        objectMode: true,
+      const rowSource = Readable.from((async function*() {
+        while (rowCount < totalRows) {
+          if (rowCount === 10) {
+            bulkLoad.cancel();
+          }
 
-        read() {
-          process.nextTick(() => {
-            while (rowCount < totalRows) {
-              if (rowCount === 10000) {
-                bulkLoad.cancel();
-              }
-
-              const i = rowCount++;
-              const row = [i];
-
-              if (!this.push(row)) {
-                return;
-              }
-            }
-
-            this.push(null);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
           });
+
+          yield [rowCount++];
         }
-      });
+      })(), { objectMode: true });
 
       pipeline(rowSource, rowStream, function(err) {
         assert.ok(err);
         assert.strictEqual(err.message, 'Canceled.');
-        assert.strictEqual(rowCount, 10000);
+        assert.strictEqual(rowCount, 10);
       });
     }
 
@@ -518,6 +499,118 @@ describe('Bulk Load Tests', function() {
 
       assert.equal(rowCount, 1);
 
+      done();
+    }
+  });
+
+  it('should throw `RequestError: Canceled` after 10ms', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.name, 'RequestError');
+      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 10ms');
+
+      done();
+    });
+
+    bulkLoad.setTimeout(10);
+
+    bulkLoad.addColumn('id', TYPES.Int, {
+      nullable: true
+    });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      for (let i = 0; i < 100000; i++) {
+        bulkLoad.addRow({ id: 1234 });
+      }
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('should throw `RequestError: Connection closed before request completed` after 2000ms', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.name, 'RequestError');
+      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 2000ms');
+
+      done();
+    });
+
+    bulkLoad.setTimeout(2000);
+
+    bulkLoad.addColumn('id', TYPES.Int, {
+      nullable: true
+    });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      for (let i = 0; i < 900000; i++) {
+        bulkLoad.addRow({ id: 1234 });
+      }
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('should correctly time out on streaming bulk loads', function(done) {
+    startCreateTable();
+
+    function startCreateTable() {
+      const sql = 'create table #stream_test (i int not null primary key)';
+      const request = new Request(sql, completeCreateTable);
+      connection.execSqlBatch(request);
+    }
+
+    function completeCreateTable(err) {
+      if (err) {
+        return done(err);
+      }
+
+      startBulkLoad();
+    }
+
+    function startBulkLoad() {
+      const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+      bulkLoad.setTimeout(200);
+
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      const rowStream = bulkLoad.getRowStream();
+
+      connection.execBulkLoad(bulkLoad);
+
+      const rowSource = Readable.from((async function*() {
+        yield [1];
+
+        await new Promise((resolve) => {
+          setTimeout(resolve, 500);
+        });
+
+        yield [2];
+      })(), { objectMode: true });
+
+      pipeline(rowSource, rowStream, function(err) {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+      });
+    }
+
+    function completeBulkLoad(err, rowCount) {
+      assert.ok(err);
+      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
+
+      assert.isUndefined(rowCount);
       done();
     }
   });
