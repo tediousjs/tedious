@@ -1,5 +1,7 @@
 import { DataType } from '../data-type';
 
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
+
 const Text: DataType = {
   id: 0x23,
   type: 'TEXT',
@@ -22,26 +24,29 @@ const Text: DataType = {
   },
 
   generateTypeInfo(parameter, _options) {
-    const buffer = Buffer.alloc(5);
+    const buffer = Buffer.alloc(10);
     buffer.writeUInt8(this.id, 0);
     buffer.writeInt32LE(parameter.length!, 1);
+    // TODO: Collation handling
+    return buffer;
+  },
+
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
+    }
+
+    const buffer = Buffer.alloc(4);
+    buffer.writeInt32LE(parameter.length!, 0);
     return buffer;
   },
 
   generateParameterData: function*(parameter, options) {
-    yield Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
-
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(4);
-      buffer.writeInt32LE(parameter.length!, 0);
-      yield buffer;
-
-      yield Buffer.from(parameter.value.toString(), 'ascii');
-    } else {
-      const buffer = Buffer.alloc(4);
-      buffer.writeInt32LE(parameter.length!, 0);
-      yield buffer;
+    if (parameter.value == null) {
+      return;
     }
+
+    yield Buffer.from(parameter.value.toString(), 'ascii');
   },
 
   validate: function(value): string | null | TypeError {

@@ -1,6 +1,6 @@
 import { DataType } from '../data-type';
 
-const NULL = (1 << 16) - 1;
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 
 const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
@@ -53,23 +53,24 @@ const Char: { maximumLength: number } & DataType = {
     return buffer;
   },
 
-  *generateParameterData(parameter, options) {
-    let value = parameter.value as any; // Temporary solution. Remove 'any' later.
-
-    if (value != null) {
-      value = value.toString();
-      const length = Buffer.byteLength(value, 'ascii');
-
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(length, 0);
-      yield buffer;
-
-      yield Buffer.alloc(length, parameter.value, 'ascii');
-    } else {
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(NULL, 0);
-      yield buffer;
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    const length = Buffer.byteLength(parameter.value.toString(), 'ascii');
+
+    const buffer = Buffer.alloc(2);
+    buffer.writeUInt16LE(length, 0);
+    return buffer;
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    yield Buffer.from(parameter.value, 'ascii');
   },
 
   validate: function(value): null | string | TypeError {
