@@ -34,7 +34,6 @@ config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('always encrypted', function() {
   const rowCount = 5;
-  this.timeout(100000);
   let connection;
 
   const p1 = 'nvarchar_determ_test_val123';
@@ -123,7 +122,11 @@ describe('always encrypted', function() {
 
   beforeEach(function(done) {
     connection = new Connection(config);
-    connection.on('connect', () => {
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
       dropKeys((err) => {
         if (err) {
           return done(err);

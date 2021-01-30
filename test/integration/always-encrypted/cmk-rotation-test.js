@@ -3,22 +3,11 @@ const Request = require('../../../src/request');
 const TYPES = require('../../../src/data-type').typeByName;
 
 const { assert } = require('chai');
+const fs = require('fs');
 
-const config = {
-  'server': 'localhost',
-  'authentication': {
-    'type': 'default',
-    'options': {
-      'userName': 'sa',
-      'password': 'Password1'
-    }
-  },
-  'options': {
-    'port': 1433,
-    'database': 'master',
-    'trustServerCertificate': true
-  }
-};
+const config = JSON.parse(
+  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
+).config;
 
 config.options.debug = {
   packet: true,
@@ -44,7 +33,6 @@ config.options.encryptionKeyStoreProviders = [{
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('always encrypted', function() {
-  this.timeout(100000);
   let connection;
 
   before(function() {
@@ -111,11 +99,16 @@ describe('always encrypted', function() {
   beforeEach(function(done) {
     connection = new Connection(config);
     // connection.on('debug', (msg) => console.log(msg));
-    connection.on('connect', () => {
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
       dropKeys((err) => {
         if (err) {
           return done(err);
         }
+
         createKeys(done);
       });
     });

@@ -73,7 +73,6 @@ const dropKeys = (connection, numberOfKeys, done, cb) => {
 describe('always encrypted', function() {
   const numberOfKeys = 45;
 
-  this.timeout(100000);
   let connection;
 
   before(function() {
@@ -84,7 +83,11 @@ describe('always encrypted', function() {
 
   beforeEach(function(done) {
     connection = new Connection(config);
-    connection.on('connect', () => {
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
       const request = new Request('IF OBJECT_ID(\'dbo.test_always_encrypted\', \'U\') IS NOT NULL DROP TABLE dbo.test_always_encrypted;', (err) => {
         if (err) {
           return done(err);

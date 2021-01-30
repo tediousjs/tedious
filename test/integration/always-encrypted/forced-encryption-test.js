@@ -32,7 +32,6 @@ config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 
 describe('forced encryption test', function() {
-  this.timeout(100000);
   let connection;
 
 
@@ -264,18 +263,26 @@ describe('forced encryption test', function() {
 
   beforeEach(function(done) {
     connection = new Connection(config);
-    connection.on('connect', () => {
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
       dropTables((err) => {
         if (err) {
           return done(err);
-        } dropKeys((err) => {
+        }
+
+        dropKeys((err) => {
           if (err) {
             return done(err);
           }
+
           createKeys((err) => {
             if (err) {
               return done(err);
             }
+
             createTables(done);
           });
         });

@@ -33,7 +33,6 @@ config.options.encryptionKeyStoreProviders = [{
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('always encrypted', function() {
-  this.timeout(100000);
   let connection;
   const table1 = 'test_always_encrypted';
   const cekName = 'CEK1';
@@ -95,7 +94,11 @@ describe('always encrypted', function() {
   beforeEach(function(done) {
     connection = new Connection(config);
     // connection.on('debug', (msg) => console.log(msg));
-    connection.on('connect', () => {
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
       dropKeys((err) => {
         if (err) {
           return done(err);
