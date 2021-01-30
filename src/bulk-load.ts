@@ -177,6 +177,7 @@ class RowTransform extends Transform {
         value: row[i]
       };
 
+      this.push(c.type.generateParameterLength(parameter, this.mainOptions));
       for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
         this.push(chunk);
       }

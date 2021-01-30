@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x04]);
+
 const Int: DataType = {
   id: 0x38,
   type: 'INT4',
@@ -14,18 +17,22 @@ const Int: DataType = {
     return Buffer.from([IntN.id, 0x04]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(1);
-      buffer.writeUInt8(4, 0);
-      yield buffer;
-
-      const buffer2 = Buffer.alloc(4);
-      buffer2.writeInt32LE(Number(parameter.value), 0);
-      yield buffer2;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    return DATA_LENGTH;
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(4);
+    buffer.writeInt32LE(Number(parameter.value), 0);
+    yield buffer;
   },
 
   toBuffer: function(parameter) {

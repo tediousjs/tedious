@@ -17,6 +17,10 @@ const NumericN: DataType = {
     throw new Error('not implemented');
   },
 
+  generateParameterLength() {
+    throw new Error('not implemented');
+  },
+
   generateParameterData() {
     throw new Error('not implemented');
   },

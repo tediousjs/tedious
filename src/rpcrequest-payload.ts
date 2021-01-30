@@ -61,7 +61,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     const parameters = this.request.parameters;
     const encryptedParams = await this._encryptParameters(parameters);
     for (let i = 0; i < parameters.length; i++) {
-      yield * this.generateParameter(encryptedParams[i], this.options);
+      yield * this.generateParameter(encryptedParams[i]);
     }
   }
 
@@ -69,7 +69,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  *generateParameter(parameter: Parameter, options: any) {
+  *generateParameter(parameter: Parameter) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
     buffer.writeBVarchar('@' + parameter.name);
 
@@ -86,11 +86,11 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     if (parameter.cryptoMetadata) {
       yield* this._generateEncryptedParameter(parameter);
     } else {
-      yield* this.generateParameterData(parameter, options, true);
+      yield* this.generateParameterData(parameter, true);
     }
   }
 
-  *generateParameterData(parameter: Parameter, options: any, writeValue: boolean) {
+  *generateParameterData(parameter: Parameter, writeValue: boolean) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
     const param: ParameterData = {
       value: parameter.value,
@@ -128,7 +128,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     const typeINfo = type.generateTypeInfo(param, this.options);
     yield typeINfo;
     if (writeValue) {
-      yield* type.generateParameterData(param, options);
+      yield type.generateParameterLength(param, this.options);
+      yield * type.generateParameterData(param, this.options);
     }
   }
 
@@ -140,8 +141,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       name: parameter.name,
       forceEncrypt: parameter.forceEncrypt
     };
-    yield* this.generateParameterData(encryptedParam, null, true);
-    yield* this.generateParameterData(parameter, null, false);
+    yield* this.generateParameterData(encryptedParam, true);
+    yield* this.generateParameterData(parameter, false);
     yield* this._writeEncryptionMetadata(parameter.cryptoMetadata);
 
   }

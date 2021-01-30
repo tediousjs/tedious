@@ -1,6 +1,6 @@
 import { DataType } from '../data-type';
 
-const NULL = (1 << 16) - 1;
+const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 
 const NChar: DataType & { maximumLength: number } = {
   id: 0xEF,
@@ -54,31 +54,38 @@ const NChar: DataType & { maximumLength: number } = {
     return buffer;
   },
 
-  *generateParameterData(parameter, options) {
-    let value = parameter.value;
-    if (parameter.value != null) {
-      if (value instanceof Buffer) {
-        const length = value.length;
-        const buffer = Buffer.alloc(2);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
+    }
 
-        buffer.writeUInt16LE(length, 0);
-
-        yield buffer;
-        yield value;
-
-      } else {
-        value = value.toString();
-        const length = Buffer.byteLength(value, 'ucs2');
-        const buffer = Buffer.alloc(2);
-
-        buffer.writeUInt16LE(length, 0);
-        yield buffer;
-        yield Buffer.from(value, 'ucs2');
-      }
-    } else {
+    const { value } = parameter;
+    if (value instanceof Buffer) {
+      const length = value.length;
       const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(NULL, 0);
-      yield buffer;
+
+      buffer.writeUInt16LE(length, 0);
+
+      return buffer;
+    } else {
+      const length = Buffer.byteLength(value.toString(), 'ucs2');
+
+      const buffer = Buffer.alloc(2);
+      buffer.writeUInt16LE(length, 0);
+      return buffer;
+    }
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const value = parameter.value;
+    if (value instanceof Buffer) {
+      yield value;
+    } else {
+      yield Buffer.from(value, 'ucs2');
     }
   },
 

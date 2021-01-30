@@ -26,6 +26,8 @@ connection.on('connect', (err) => {
   executeStatement();
 });
 
+connection.connect();
+
 function executeStatement() {
   const request = new Request('select * from MyTable', (err, rowCount) => {
     if (err) {

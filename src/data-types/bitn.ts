@@ -13,7 +13,11 @@ const BitN: DataType = {
     throw new Error('not implemented');
   },
 
-  *generateParameterData() {
+  generateParameterLength() {
+    throw new Error('not implemented');
+  },
+
+  * generateParameterData() {
     throw new Error('not implemented');
   },
 
