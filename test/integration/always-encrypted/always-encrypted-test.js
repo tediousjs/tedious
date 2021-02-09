@@ -179,6 +179,7 @@ describe('always encrypted', function() {
         if (err) {
           return done(err);
         }
+
         let values = [];
         const request = new Request('SELECT TOP 1 [nvarchar_determ_test], [nvarchar_rand_test], [int_test], [plaintext], [date_test], [datetime_test], [datetime2_test], [datetimeoffset_test] FROM test_always_encrypted', (err) => {
           if (err) {

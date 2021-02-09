@@ -230,7 +230,6 @@ class Request extends EventEmitter {
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
-
   /**
    * Indicates the completion status of a stored procedure. This is also generated for stored procedures
    * executed through SQL statements.\

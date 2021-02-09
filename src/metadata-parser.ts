@@ -1,5 +1,5 @@
 import { codepageBySortId, codepageByLcid } from './collation';
-import Parser from './token/stream-parser';
+import Parser, { IParser } from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
@@ -62,7 +62,7 @@ export type Metadata = {
   cryptoMetadata?: CryptoMetadata;
 } & BaseMetadata;
 
-function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
+function readCollation(parser: IParser, callback: (collation: Collation | undefined) => void) {
   // s2.2.5.1.2
   parser.readBuffer(5, (collationData) => {
     let lcid = (collationData[2] & 0x0F) << 16;

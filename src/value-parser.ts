@@ -1,7 +1,9 @@
-import Parser from './token/stream-parser';
+import Parser, { IParser } from './token/stream-parser';
 import { Metadata, readCollation } from './metadata-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
+import JSBI from 'jsbi';
+import { EventEmitter } from 'events';
 
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
@@ -17,39 +19,39 @@ const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const DEFAULT_ENCODING = 'utf8';
 
-function readTinyInt(parser: Parser, callback: (value: unknown) => void) {
+function readTinyInt(parser: IParser, callback: (value: unknown) => void) {
   parser.readUInt8(callback);
 }
 
-function readSmallInt(parser: Parser, callback: (value: unknown) => void) {
+function readSmallInt(parser: IParser, callback: (value: unknown) => void) {
   parser.readInt16LE(callback);
 }
 
-function readInt(parser: Parser, callback: (value: unknown) => void) {
+function readInt(parser: IParser, callback: (value: unknown) => void) {
   parser.readInt32LE(callback);
 }
 
-function readBigInt(parser: Parser, callback: (value: unknown) => void) {
+function readBigInt(parser: IParser, callback: (value: unknown) => void) {
   parser.readBigInt64LE((value) => {
     callback(value.toString());
   });
 }
 
-function readReal(parser: Parser, callback: (value: unknown) => void) {
+function readReal(parser: IParser, callback: (value: unknown) => void) {
   parser.readFloatLE(callback);
 }
 
-function readFloat(parser: Parser, callback: (value: unknown) => void) {
+function readFloat(parser: IParser, callback: (value: unknown) => void) {
   parser.readDoubleLE(callback);
 }
 
-function readSmallMoney(parser: Parser, callback: (value: unknown) => void) {
+function readSmallMoney(parser: IParser, callback: (value: unknown) => void) {
   parser.readInt32LE((value) => {
     callback(value / MONEY_DIVISOR);
   });
 }
 
-function readMoney(parser: Parser, callback: (value: unknown) => void) {
+function readMoney(parser: IParser, callback: (value: unknown) => void) {
   parser.readInt32LE((high) => {
     parser.readUInt32LE((low) => {
       callback((low + (0x100000000 * high)) / MONEY_DIVISOR);
@@ -57,7 +59,7 @@ function readMoney(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function readBit(parser: Parser, callback: (value: unknown) => void) {
+function readBit(parser: IParser, callback: (value: unknown) => void) {
   parser.readUInt8((value) => {
     callback(!!value);
   });
@@ -357,13 +359,13 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
   }
 }
 
-function readUniqueIdentifier(parser: Parser, options: InternalConnectionOptions, callback: (value: unknown) => void) {
+function readUniqueIdentifier(parser: IParser, options: InternalConnectionOptions, callback: (value: unknown) => void) {
   parser.readBuffer(0x10, (data) => {
     callback(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data));
   });
 }
 
-function readNumeric(parser: Parser, dataLength: number, _precision: number, scale: number, callback: (value: unknown) => void) {
+function readNumeric(parser: IParser, dataLength: number, _precision: number, scale: number, callback: (value: unknown) => void) {
   parser.readUInt8((sign) => {
     sign = sign === 1 ? 1 : -1;
 
@@ -386,7 +388,7 @@ function readNumeric(parser: Parser, dataLength: number, _precision: number, sca
   });
 }
 
-function readVariant(parser: Parser, options: InternalConnectionOptions, dataLength: number, callback: (value: unknown) => void) {
+function readVariant(parser: IParser, options: InternalConnectionOptions, dataLength: number, callback: (value: unknown) => void) {
   return parser.readUInt8((baseType) => {
     const type = TYPE[baseType];
 
@@ -485,11 +487,11 @@ function readVariant(parser: Parser, options: InternalConnectionOptions, dataLen
   });
 }
 
-function readBinary(parser: Parser, dataLength: number, callback: (value: unknown) => void) {
+function readBinary(parser: IParser, dataLength: number, callback: (value: unknown) => void) {
   return parser.readBuffer(dataLength, callback);
 }
 
-function readChars(parser: Parser, dataLength: number, codepage: string, callback: (value: unknown) => void) {
+function readChars(parser: IParser, dataLength: number, codepage: string, callback: (value: unknown) => void) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
@@ -499,17 +501,17 @@ function readChars(parser: Parser, dataLength: number, codepage: string, callbac
   });
 }
 
-function readNChars(parser: Parser, dataLength: number, callback: (value: unknown) => void) {
+function readNChars(parser: IParser, dataLength: number, callback: (value: unknown) => void) {
   parser.readBuffer(dataLength, (data) => {
     callback(data.toString('ucs2'));
   });
 }
 
-function readMaxBinary(parser: Parser, callback: (value: unknown) => void) {
+function readMaxBinary(parser: IParser, callback: (value: unknown) => void) {
   return readMax(parser, callback);
 }
 
-function readMaxChars(parser: Parser, codepage: string, callback: (value: unknown) => void) {
+function readMaxChars(parser: IParser, codepage: string, callback: (value: unknown) => void) {
   if (codepage == null) {
     codepage = DEFAULT_ENCODING;
   }
@@ -523,7 +525,7 @@ function readMaxChars(parser: Parser, codepage: string, callback: (value: unknow
   });
 }
 
-function readMaxNChars(parser: Parser, callback: (value: string | null) => void) {
+function readMaxNChars(parser: IParser, callback: (value: string | null) => void) {
   readMax(parser, (data) => {
     if (data) {
       callback(data.toString('ucs2'));
@@ -533,7 +535,7 @@ function readMaxNChars(parser: Parser, callback: (value: string | null) => void)
   });
 }
 
-function readMax(parser: Parser, callback: (value: null | Buffer) => void) {
+function readMax(parser: IParser, callback: (value: null | Buffer) => void) {
   parser.readBuffer(8, (type) => {
     if (type.equals(PLP_NULL)) {
       return callback(null);
@@ -553,7 +555,7 @@ function readMax(parser: Parser, callback: (value: null | Buffer) => void) {
   });
 }
 
-function readMaxKnownLength(parser: Parser, totalLength: number, callback: (value: null | Buffer) => void) {
+function readMaxKnownLength(parser: IParser, totalLength: number, callback: (value: null | Buffer) => void) {
   const data = Buffer.alloc(totalLength, 0);
 
   let offset = 0;
@@ -581,7 +583,7 @@ function readMaxKnownLength(parser: Parser, totalLength: number, callback: (valu
   });
 }
 
-function readMaxUnknownLength(parser: Parser, callback: (value: null | Buffer) => void) {
+function readMaxUnknownLength(parser: IParser, callback: (value: null | Buffer) => void) {
   const chunks: Buffer[] = [];
 
   let length = 0;
@@ -605,7 +607,7 @@ function readMaxUnknownLength(parser: Parser, callback: (value: null | Buffer) =
   });
 }
 
-function readSmallDateTime(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
+function readSmallDateTime(parser: IParser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readUInt16LE((days) => {
     parser.readUInt16LE((minutes) => {
       let value;
@@ -619,7 +621,7 @@ function readSmallDateTime(parser: Parser, useUTC: boolean, callback: (value: Da
   });
 }
 
-function readDateTime(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
+function readDateTime(parser: IParser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readInt32LE((days) => {
     parser.readUInt32LE((threeHundredthsOfSecond) => {
       const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
@@ -640,7 +642,7 @@ interface DateWithNanosecondsDelta extends Date {
   nanosecondsDelta: number;
 }
 
-function readTime(parser: Parser, dataLength: number, scale: number, useUTC: boolean, callback: (value: DateWithNanosecondsDelta) => void) {
+function readTime(parser: IParser, dataLength: number, scale: number, useUTC: boolean, callback: (value: DateWithNanosecondsDelta) => void) {
   let readValue: any;
   switch (dataLength) {
     case 3:
@@ -674,7 +676,7 @@ function readTime(parser: Parser, dataLength: number, scale: number, useUTC: boo
   });
 }
 
-function readDate(parser: Parser, useUTC: boolean, callback: (value: Date) => void) {
+function readDate(parser: IParser, useUTC: boolean, callback: (value: Date) => void) {
   parser.readUInt24LE((days) => {
     if (useUTC) {
       callback(new Date(Date.UTC(2000, 0, days - 730118)));
@@ -684,7 +686,7 @@ function readDate(parser: Parser, useUTC: boolean, callback: (value: Date) => vo
   });
 }
 
-function readDateTime2(parser: Parser, dataLength: number, scale: number, useUTC: boolean, callback: (value: DateWithNanosecondsDelta) => void) {
+function readDateTime2(parser: IParser, dataLength: number, scale: number, useUTC: boolean, callback: (value: DateWithNanosecondsDelta) => void) {
   readTime(parser, dataLength - 3, scale, useUTC, (time) => { // TODO: 'input' is 'time', but TypeScript cannot find "time.nanosecondsDelta";
     parser.readUInt24LE((days) => {
       let date;
@@ -702,7 +704,7 @@ function readDateTime2(parser: Parser, dataLength: number, scale: number, useUTC
   });
 }
 
-function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, callback: (value: DateWithNanosecondsDelta) => void) {
+function readDateTimeOffset(parser: IParser, dataLength: number, scale: number, callback: (value: DateWithNanosecondsDelta) => void) {
   readTime(parser, dataLength - 5, scale, true, (time) => {
     parser.readUInt24LE((days) => {
       // offset
@@ -718,12 +720,257 @@ function readDateTimeOffset(parser: Parser, dataLength: number, scale: number, c
   });
 }
 
-function readEncryptedBinary(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
+class PreBufferedParser extends EventEmitter implements IParser {
+  buffer: Buffer;
+  position: number;
+
+  constructor(buffer: Buffer) {
+    super();
+    this.buffer = buffer;
+    this.position = 0;
+  }
+
+  readInt8(callback: (data: number) => void) {
+    const data = this.buffer.readInt8(this.position);
+    this.position += 1;
+    callback(data);
+  }
+
+  readUInt8(callback: (data: number) => void) {
+    const data = this.buffer.readUInt8(this.position);
+    this.position += 1;
+    callback(data);
+  }
+
+  readInt16LE(callback: (data: number) => void) {
+    const data = this.buffer.readInt16LE(this.position);
+    this.position += 2;
+    callback(data);
+  }
+
+  readInt16BE(callback: (data: number) => void) {
+    const data = this.buffer.readInt16BE(this.position);
+    this.position += 2;
+    callback(data);
+  }
+
+  readUInt16LE(callback: (data: number) => void) {
+    const data = this.buffer.readUInt16LE(this.position);
+    this.position += 2;
+    callback(data);
+  }
+
+  readUInt16BE(callback: (data: number) => void) {
+    const data = this.buffer.readUInt16BE(this.position);
+    this.position += 2;
+    callback(data);  }
+
+  readInt32LE(callback: (data: number) => void) {
+    const data = this.buffer.readInt32LE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readInt32BE(callback: (data: number) => void) {
+    const data = this.buffer.readInt32BE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readUInt32LE(callback: (data: number) => void) {
+    const data = this.buffer.readUInt32LE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readUInt32BE(callback: (data: number) => void) {
+    const data = this.buffer.readUInt32BE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readBigInt64LE(callback: (data: JSBI) => void) {
+    const result = JSBI.add(
+      JSBI.leftShift(
+        JSBI.BigInt(
+          this.buffer[this.position + 4] +
+          this.buffer[this.position + 5] * 2 ** 8 +
+          this.buffer[this.position + 6] * 2 ** 16 +
+          (this.buffer[this.position + 7] << 24) // Overflow
+        ),
+        JSBI.BigInt(32)
+      ),
+      JSBI.BigInt(
+        this.buffer[this.position] +
+        this.buffer[this.position + 1] * 2 ** 8 +
+        this.buffer[this.position + 2] * 2 ** 16 +
+        this.buffer[this.position + 3] * 2 ** 24
+      )
+    );
+
+    this.position += 8;
+
+    callback(result);
+  }
+
+  readInt64LE(callback: (data: number) => void) {
+    const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
+    this.position += 8;
+    callback(data);
+  }
+
+  readInt64BE(callback: (data: number) => void) {
+    const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
+    this.position += 8;
+    callback(data);
+  }
+
+  readBigUInt64LE(callback: (data: JSBI) => void) {
+    const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
+    const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
+
+    this.position += 8;
+
+    callback(JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32))));
+  }
+
+  readUInt64LE(callback: (data: number) => void) {
+    const data = Math.pow(2, 32) * this.buffer.readUInt32LE(this.position + 4) + this.buffer.readUInt32LE(this.position);
+    this.position += 8;
+    callback(data);
+  }
+
+  readUInt64BE(callback: (data: number) => void) {
+    const data = Math.pow(2, 32) * this.buffer.readUInt32BE(this.position) + this.buffer.readUInt32BE(this.position + 4);
+    this.position += 8;
+    callback(data);
+  }
+
+  readFloatLE(callback: (data: number) => void) {
+    const data = this.buffer.readFloatLE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readFloatBE(callback: (data: number) => void) {
+    const data = this.buffer.readFloatBE(this.position);
+    this.position += 4;
+    callback(data);
+  }
+
+  readDoubleLE(callback: (data: number) => void) {
+    const data = this.buffer.readDoubleLE(this.position);
+    this.position += 8;
+    callback(data);
+  }
+
+  readDoubleBE(callback: (data: number) => void) {
+    const data = this.buffer.readDoubleBE(this.position);
+    this.position += 8;
+    callback(data);
+  }
+
+  readUInt24LE(callback: (data: number) => void) {
+    const low = this.buffer.readUInt16LE(this.position);
+    const high = this.buffer.readUInt8(this.position + 2);
+
+    this.position += 3;
+
+    callback(low | (high << 16));
+  }
+
+  readUInt40LE(callback: (data: number) => void) {
+    const low = this.buffer.readUInt32LE(this.position);
+    const high = this.buffer.readUInt8(this.position + 4);
+
+    this.position += 5;
+
+    callback((0x100000000 * high) + low);
+  }
+
+  readUNumeric64LE(callback: (data: number) => void) {
+    const low = this.buffer.readUInt32LE(this.position);
+    const high = this.buffer.readUInt32LE(this.position + 4);
+
+    this.position += 8;
+
+    callback((0x100000000 * high) + low);
+  }
+
+  readUNumeric96LE(callback: (data: number) => void) {
+    const dword1 = this.buffer.readUInt32LE(this.position);
+    const dword2 = this.buffer.readUInt32LE(this.position + 4);
+    const dword3 = this.buffer.readUInt32LE(this.position + 8);
+
+    this.position += 12;
+
+    callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3));
+  }
+
+  readUNumeric128LE(callback: (data: number) => void) {
+    const dword1 = this.buffer.readUInt32LE(this.position);
+    const dword2 = this.buffer.readUInt32LE(this.position + 4);
+    const dword3 = this.buffer.readUInt32LE(this.position + 8);
+    const dword4 = this.buffer.readUInt32LE(this.position + 12);
+
+    this.position += 16;
+
+    callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4));
+
+  }
+
+  // Variable length data
+
+  readBuffer(length: number, callback: (data: Buffer) => void) {
+    const data = this.buffer.slice(this.position, this.position + length);
+    this.position += length;
+    callback(data);
+  }
+
+  // Read a Unicode String (BVARCHAR)
+  readBVarChar(callback: (data: string) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
+    this.readUInt8((length) => {
+      this.readBuffer(length * 2, (data) => {
+        callback(data.toString('ucs2'));
+      });
+    });
+  }
+
+  // Read a Unicode String (USVARCHAR)
+  readUsVarChar(callback: (data: string) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
+    this.readUInt16LE((length) => {
+      this.readBuffer(length * 2, (data) => {
+        callback(data.toString('ucs2'));
+      });
+    });
+  }
+
+  // Read binary data (BVARBYTE)
+  readBVarByte(callback: (data: Buffer) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
+    this.readUInt8((length) => {
+      this.readBuffer(length, callback);
+    });
+  }
+
+  // Read binary data (USVARBYTE)
+  readUsVarByte(callback: (data: Buffer) => void) {
+    // read the length and buffer separately to ensure it awaits data correctly
+    this.readUInt16LE((length) => {
+      this.readBuffer(length, callback);
+    });
+  }
+
+}
+
+function readEncryptedBinary(parser: IParser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
   const cryptoMetadata: CryptoMetadata = metadata.cryptoMetadata!;
   const { normalizationRuleVersion } = cryptoMetadata;
   const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
-  if (!normalizationRuleVersion.equals(Buffer.from([ 0x01 ]))) {
+  if (!normalizationRuleVersion.equals(Buffer.from([0x01]))) {
     return parser.emit('error', new Error(
       `Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`,
     )) as never;
@@ -751,25 +998,11 @@ function readEncryptedBinary(parser: Parser, metadata: Metadata, options: Intern
       return callback(null);
     }
 
-    parser.pushIntermediateBuffer(decryptedValue);
-    let hasProcessedIntermediateBuffer = false;
+    const bufferedParser = new PreBufferedParser(decryptedValue);
 
-    try {
-      return denormalizedValue(parser, decryptedValue.length, baseMetadata, options, (value) => {
-        if (!hasProcessedIntermediateBuffer) {
-          parser.popIntermediateBuffer();
-          hasProcessedIntermediateBuffer = true;
-        }
-
-        return callback(value);
-      });
-    } catch {
-      // should not happen in practice, but here just in case
-      if (!hasProcessedIntermediateBuffer) {
-        parser.popIntermediateBuffer();
-        hasProcessedIntermediateBuffer = true;
-      }
-    }
+    return denormalizedValue(bufferedParser, decryptedValue.length, baseMetadata, options, (value) => {
+      return callback(value);
+    });
   };
 
   const callbackAE = (encryptedValue: Buffer) =>
@@ -793,7 +1026,7 @@ function readEncryptedBinary(parser: Parser, metadata: Metadata, options: Intern
   }
 }
 
-function denormalizedValue(parser: Parser, valueLength: number, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void) {
+function denormalizedValue(parser: IParser, valueLength: number, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void) {
   // there are a few notes to be aware of in this implementation:
   // 1. for most encrypted blobs, the metadata data-length will not match the
   //    decrypted value-length, so the parsers here are more lenient for that
