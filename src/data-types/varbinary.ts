@@ -49,7 +49,7 @@ const VarBinary: { maximumLength: number } & DataType = {
     buffer.writeUInt8(this.id, 0);
 
     if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength, 1);
+      buffer.writeUInt16LE(parameter.length!, 1);
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }

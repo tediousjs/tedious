@@ -1324,7 +1324,7 @@ describe('VarBinary', function() {
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
       // Length <= Maximum Length
-      const expected = Buffer.from([0xA5, 0x40, 0x1F]);
+      const expected = Buffer.from([0xA5, 0x01, 0x00]);
 
       const result = TYPES.VarBinary.generateTypeInfo({ length: 1 });
       assert.deepEqual(result, expected);
@@ -1392,7 +1392,7 @@ describe('VarChar', function() {
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
       // Length <= Maximum Length
-      const expected = Buffer.from('a7401f0000000000', 'hex');
+      const expected = Buffer.from('a7010000000000000', 'hex');
 
       const result = TYPES.VarChar.generateTypeInfo({ length: 1 });
       assert.deepEqual(result, expected);
