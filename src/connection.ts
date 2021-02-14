@@ -395,7 +395,6 @@ interface State {
     reconnect?(this: Connection): void;
     featureExtAck?(this: Connection, token: FeatureExtAckToken): void;
     fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void;
-    endOfMessageMarkerReceived?(this: Connection): void;
     loginFailed?(this: Connection): void;
     attention?(this: Connection): void;
   };
@@ -2194,12 +2193,6 @@ class Connection extends EventEmitter {
       }
     });
 
-    tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
-      if (this.state === this.STATE.SENT_CLIENT_REQUEST) {
-        this.dispatchEvent('endOfMessageMarkerReceived');
-      }
-    });
-
     tokenStreamParser.on('resetConnection', () => {
       this.emit('resetConnection');
     });
@@ -3130,6 +3123,12 @@ class Connection extends EventEmitter {
   makeRequest(request: BulkLoad, packetType: number): void
   makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
   makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
+    if (this.request) {
+      return process.nextTick(() => {
+        request.callback(RequestError('Another request is currently in progress.'));
+      });
+    }
+
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3154,6 +3153,8 @@ class Connection extends EventEmitter {
       let message: Message;
 
       const onCancel = () => {
+        console.log('cancel received', this.isRequestActive(request), message.writable);
+
         // There's three ways to handle request cancelation:
         if (!this.isRequestActive(request)) {
           // Cancel was called on a request that is no longer active on this connection
@@ -3166,8 +3167,8 @@ class Connection extends EventEmitter {
         } else {
           // - but if the message has been ended (and thus has been fully sent off),
           //   we need to send an `ATTENTION` message to the server
-          this.messageIo.sendMessage(TYPE.ATTENTION);
-          this.transitionTo(this.STATE.SENT_ATTENTION);
+          // this.messageIo.sendMessage(TYPE.ATTENTION);
+          // this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
         this.clearRequestTimer();
@@ -3190,11 +3191,9 @@ class Connection extends EventEmitter {
           request.rowToPacketTransform.end();
         }
         this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
       } else {
         message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
         this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
         message.once('finish', () => {
           this.resetConnectionOnNextRequest = false;
@@ -3209,6 +3208,15 @@ class Connection extends EventEmitter {
 
         Readable.from(payload!).pipe(message);
       }
+
+      message.once('finish', () => {
+        if (request.canceled && !message.ignore) {
+          this.messageIo.sendMessage(TYPE.ATTENTION);
+          this.transitionTo(this.STATE.SENT_ATTENTION);
+        } else {
+          this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+        }
+      });
     }
   }
 
@@ -3668,9 +3676,7 @@ Connection.prototype.STATE = {
             this.messageIo.pause();
 
             await new Promise<void>((resolve) => {
-              this.tokenStreamParser.parser.on('drain', () => {
-                resolve();
-              });
+              this.tokenStreamParser.parser.once('drain', resolve);
             });
 
             // Bridge the release of backpressure from the token stream parser
@@ -3679,12 +3685,22 @@ Connection.prototype.STATE = {
           }
         }
 
+        const onParsingDone = new Promise<void>((resolve) => {
+          this.tokenStreamParser.once('endOfMessage', resolve);
+        });
+
         // We have to channel the 'message' (EOM) event through the token stream
         // parser transform, to keep it in line with the flow of the tokens, when
         // the incoming data flow is paused and resumed.
         this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
+
+        await onParsingDone;
+
+        // if the request was canceled during parsing of the response, abort any processing here.
+        if (this.request?.canceled) {
+          return;
+        }
+
         this.transitionTo(this.STATE.LOGGED_IN);
         const sqlRequest = this.request as Request;
         this.request = undefined;
@@ -3714,8 +3730,32 @@ Connection.prototype.STATE = {
       },
       message: async function(message) {
         for await (const data of message) {
-          this.sendDataToTokenStreamParser(data);
+          const ret = this.sendDataToTokenStreamParser(data);
+          if (ret === false) {
+            // Bridge backpressure from the token stream parser transform to the
+            // packet stream transform.
+            this.messageIo.pause();
+
+            await new Promise<void>((resolve) => {
+              this.tokenStreamParser.parser.once('drain', resolve);
+            });
+
+            // Bridge the release of backpressure from the token stream parser
+            // transform to the packet stream transform.
+            this.messageIo.resume();
+          }
         }
+
+        const onParsingDone = new Promise<void>((resolve) => {
+          this.tokenStreamParser.once('endOfMessage', resolve);
+        });
+
+        // We have to channel the 'message' (EOM) event through the token stream
+        // parser transform, to keep it in line with the flow of the tokens, when
+        // the incoming data flow is paused and resumed.
+        this.tokenStreamParser.addEndOfMessageMarker();
+
+        await onParsingDone;
 
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
