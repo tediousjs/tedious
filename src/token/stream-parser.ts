@@ -123,6 +123,10 @@ class Parser extends Transform {
     this.next = next;
   }
 
+  availableBytes() {
+    return this.buffer.length - this.position;
+  }
+
   awaitData(length: number, callback: () => void) {
     if (this.position + length <= this.buffer.length) {
       callback();
