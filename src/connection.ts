@@ -2821,7 +2821,14 @@ class Connection extends EventEmitter {
    */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
+
+    const onCancel = () => {
+      request.cancel();
+    };
+
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
+      bulkLoad.removeListener('cancel', onCancel);
+
       if (error) {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
@@ -2834,9 +2841,7 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD);
     });
 
-    bulkLoad.once('cancel', () => {
-      request.cancel();
-    });
+    bulkLoad.once('cancel', onCancel);
 
     this.execSqlBatch(request);
   }
@@ -3129,22 +3134,21 @@ class Connection extends EventEmitter {
 
       let message: Message;
 
-      request.once('cancel', () => {
-        if (message.writable) {
-          // - if the message is still writable, we'll set the ignore bit
-          //   and end the message.
-          message.ignore = true;
-          message.end();
+      const onCancel = () => {
+        // set the ignore bit and end the message.
+        message.ignore = true;
+        message.end();
 
-          this.clearRequestTimer();
-          this.createCancelTimer();
+        this.clearRequestTimer();
+        this.createCancelTimer();
 
-          if (request instanceof Request && request.paused) {
-            // resume the request if it was paused so we can read the remaining tokens
-            request.resume();
-          }
+        if (request instanceof Request && request.paused) {
+          // resume the request if it was paused so we can read the remaining tokens
+          request.resume();
         }
-      });
+      };
+
+      request.once('cancel', onCancel);
 
       this.createRequestTimer();
 
@@ -3178,6 +3182,10 @@ class Connection extends EventEmitter {
         });
 
         Readable.from(payload!).pipe(message);
+
+        message.once('finish', () => {
+          request.removeListener('cancel', onCancel);
+        });
       }
     }
   }
