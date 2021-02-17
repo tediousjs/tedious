@@ -2,7 +2,7 @@ const Parser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
-function parse(status, curCmd, doneRowCount) {
+async function parse(status, curCmd, doneRowCount) {
   var doneRowCountLow = doneRowCount % 0x100000000;
   var doneRowCountHi = ~~(doneRowCount / 0x100000000);
 
@@ -16,40 +16,43 @@ function parse(status, curCmd, doneRowCount) {
 
   var parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
   parser.write(buffer.data);
-  return parser.read();
+
+  for await (const token of parser) {
+    return token;
+  }
 }
 
-describe('Done Token Parser', () => {
-  it('should done', () => {
+describe('Done Token Parser', function() {
+  it('should done', async function() {
     const status = 0x0000;
     const curCmd = 1;
     const doneRowCount = 2;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const token = await parse(status, curCmd, doneRowCount);
 
     assert.isOk(!token.more);
     assert.strictEqual(token.curCmd, curCmd);
     assert.isOk(!token.rowCount);
   });
 
-  it('should more', () => {
+  it('should more', async function() {
     const status = 0x0001;
     const curCmd = 1;
     const doneRowCount = 2;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const token = await parse(status, curCmd, doneRowCount);
 
     assert.isOk(token.more);
     assert.strictEqual(token.curCmd, curCmd);
     assert.isOk(!token.rowCount);
   });
 
-  it('should done row count', () => {
+  it('should done row count', async function() {
     const status = 0x0010;
     const curCmd = 1;
     const doneRowCount = 0x1200000034;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const token = await parse(status, curCmd, doneRowCount);
 
     assert.isOk(!token.more);
     assert.strictEqual(token.curCmd, 1);

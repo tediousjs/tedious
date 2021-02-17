@@ -18,5 +18,9 @@ function main({ n, tokenCount }) {
     parser.addBuffer(data);
   }
 
-  bench.end(n);
+  parser.parser.on('end', () => {
+    bench.end(n);
+  });
+
+  parser.parser.end();
 }

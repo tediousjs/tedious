@@ -41,6 +41,16 @@ const tokenParsers = {
 class EndOfMessageMarker {}
 
 class Parser extends Transform {
+  waitForPromise<T>(promise: Promise<T>, callback: (value: T) => void) {
+    this.suspended2 = promise.then((value) => {
+      this.suspended2 = undefined;
+
+      callback(value);
+
+      this.parseTokens();
+    });
+  }
+
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
@@ -49,6 +59,7 @@ class Parser extends Transform {
   buffer: Buffer;
   position: number;
   suspended: boolean;
+  suspended2: Promise<void> | undefined;
   next?: () => void;
 
   constructor(debug: Debug, options: InternalConnectionOptions) {
@@ -62,11 +73,20 @@ class Parser extends Transform {
     this.buffer = Buffer.alloc(0);
     this.position = 0;
     this.suspended = false;
+    this.suspended2 = undefined;
     this.next = undefined;
   }
 
   _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
+
     if (input instanceof EndOfMessageMarker) {
+
+      if (this.suspended2) {
+        return this.suspended2.then(() => {
+          done(undefined, new EndOfMessageToken());
+        });
+      }
+
       return done(undefined, new EndOfMessageToken());
     }
 
@@ -76,6 +96,14 @@ class Parser extends Transform {
       this.buffer = Buffer.concat([this.buffer.slice(this.position), input]);
     }
     this.position = 0;
+
+    if (this.suspended2) {
+      return this.suspended2.then(() => {
+        this.parseTokens();
+
+        done();
+      });
+    }
 
     if (this.suspended) {
       // Unsuspend and continue from where ever we left off.
@@ -100,12 +128,11 @@ class Parser extends Transform {
         if (token instanceof ColMetadataToken) {
           this.colMetadata = token.columns;
         }
-
         this.push(token);
       }
     };
 
-    while (!this.suspended && this.position + 1 <= this.buffer.length) {
+    while (!this.suspended && !this.suspended2 && this.position + 1 <= this.buffer.length) {
       const type = this.buffer.readUInt8(this.position);
 
       this.position += 1;
