@@ -335,6 +335,16 @@ class BulkLoad extends EventEmitter {
       throw new TypeError('The "options.order" property must be of type object.');
     }
 
+    for (const [column, direction] of Object.entries(order)) {
+      if (typeof column !== 'string') {
+        throw new TypeError('The "options.order.columnName" property must be of type string.');
+      }
+
+      if (direction !== 'ASC' && direction !== 'DESC') {
+        throw new TypeError('The direction of ORDER must either be ASC or DESC.');
+      }
+    }
+
     super();
 
     this.error = undefined;
@@ -522,12 +532,8 @@ class BulkLoad extends EventEmitter {
     if (this.bulkOptions.order) {
       const orderColumns = [];
 
-      for (const column in this.bulkOptions.order) {
-        if (typeof column !== 'string') {
-          throw new TypeError('The "options.order.columnName" property must be of type string.');
-        }
-        // Ensure column exists as a specified column, otherwise we ignore.
-        orderColumns.push(`${column} ${this.bulkOptions.order[column]}`);
+      for (const [column, direction] of Object.entries(this.bulkOptions.order)) {
+        orderColumns.push(`${column} ${direction}`);
       }
 
       if (orderColumns.length) {
