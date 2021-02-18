@@ -272,6 +272,8 @@ class Request extends EventEmitter {
   on(event: 'requestCompleted', listener: () => void): this
 
   on(event: 'cancel', listener: () => void): this
+  on(event: 'pause', listener: () => void): this
+  on(event: 'resume', listener: () => void): this
 
   on(event: string | symbol, listener: (...args: any[]) => void) {
     return super.on(event, listener);
@@ -317,6 +319,14 @@ class Request extends EventEmitter {
    * @private
    */
   emit(event: 'cancel'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'pause'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'resume'): boolean
   /**
    * @private
    */
@@ -534,10 +544,8 @@ class Request extends EventEmitter {
     if (this.paused) {
       return;
     }
+    this.emit('pause');
     this.paused = true;
-    if (this.connection) {
-      this.connection.pauseRequest(this);
-    }
   }
 
   /**
@@ -548,10 +556,8 @@ class Request extends EventEmitter {
     if (!this.paused) {
       return;
     }
+    this.emit('resume');
     this.paused = false;
-    if (this.connection) {
-      this.connection.resumeRequest(this);
-    }
   }
 
   /**
