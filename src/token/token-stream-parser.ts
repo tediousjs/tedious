@@ -29,6 +29,9 @@ import {
   DoneToken
 } from './token';
 
+import { Readable } from 'readable-stream';
+import Message from '../message';
+
 /*
   Buffers are thrown at the parser (by calling addBuffer).
   Tokens are parsed from the buffer until there are no more tokens in
@@ -42,15 +45,15 @@ import {
 export class Parser extends EventEmitter {
   debug: Debug;
   options: InternalConnectionOptions;
-  parser: StreamParser;
+  parser: Readable;
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
+  constructor(message: Message, debug: Debug, options: InternalConnectionOptions) {
     super();
 
     this.debug = debug;
     this.options = options;
 
-    this.parser = new StreamParser(this.debug, this.options);
+    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options)) as Readable;
     this.parser.on('data', (token: Token) => {
       if (token.event) {
         this.emit(token.event, token);

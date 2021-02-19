@@ -2,8 +2,7 @@ import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
-import { Transform } from 'readable-stream';
-import { TYPE, Token, ColMetadataToken } from './token';
+import { TYPE, Token, ColMetadataToken, DoneToken, DoneInProcToken, DoneProcToken, DatabaseEnvChangeToken, LanguageEnvChangeToken, CharsetEnvChangeToken, PacketSizeEnvChangeToken, BeginTransactionEnvChangeToken, CommitTransactionEnvChangeToken, RollbackTransactionEnvChangeToken, RoutingEnvChangeToken, DatabaseMirroringPartnerEnvChangeToken, ResetConnectionEnvChangeToken, CollationChangeToken, ErrorMessageToken, FedAuthInfoToken, FeatureExtAckToken, InfoMessageToken, LoginAckToken, OrderToken, ReturnStatusToken, ReturnValueToken, RowToken, NBCRowToken, SSPIToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
@@ -38,7 +37,9 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
-class Parser extends Transform {
+type AnyToken = DoneToken | DoneInProcToken | DoneProcToken | ColMetadataToken | DatabaseEnvChangeToken | LanguageEnvChangeToken | CharsetEnvChangeToken | PacketSizeEnvChangeToken | BeginTransactionEnvChangeToken | CommitTransactionEnvChangeToken | RollbackTransactionEnvChangeToken | RoutingEnvChangeToken | DatabaseMirroringPartnerEnvChangeToken | ResetConnectionEnvChangeToken | CollationChangeToken | ErrorMessageToken | FedAuthInfoToken | FeatureExtAckToken | InfoMessageToken | LoginAckToken | OrderToken | ReturnStatusToken | ReturnValueToken | RowToken | NBCRowToken | SSPIToken;
+
+class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
@@ -48,9 +49,62 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
-    super({ objectMode: true });
+  static async * parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions) {
+    const parser = new Parser(debug, options);
 
+    let token: Token | undefined;
+
+    for await (const chunk of iterable) {
+      if (parser.position === parser.buffer.length) {
+        parser.buffer = chunk;
+      } else {
+        parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), chunk]);
+      }
+      parser.position = 0;
+
+      if (parser.suspended) {
+        // Unsuspend and continue from where ever we left off.
+        parser.suspended = false;
+        const next = parser.next!;
+
+        next();
+
+        if (token) {
+          // If we found a token after unsuspending, yield it
+          yield token;
+          token = undefined;
+        } else {
+          // Go to the next chunk
+          continue;
+        }
+      }
+
+      // Start the parser
+      while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
+        const type = parser.buffer.readUInt8(parser.position);
+
+        parser.position += 1;
+
+        if (tokenParsers[type]) {
+          tokenParsers[type](parser, parser.options, (t: undefined | AnyToken) => { token = t; });
+
+          // If `token` was set, we parsed a full token and can yield it
+          if (token) {
+            if (token instanceof ColMetadataToken) {
+              parser.colMetadata = token.columns;
+            }
+
+            yield token;
+            token = undefined;
+          }
+        } else {
+          throw new Error('Unknown type: ' + type);
+        }
+      }
+    }
+  }
+
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;
@@ -59,55 +113,6 @@ class Parser extends Transform {
     this.position = 0;
     this.suspended = false;
     this.next = undefined;
-  }
-
-  _transform(input: Buffer, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
-    if (this.position === this.buffer.length) {
-      this.buffer = input;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), input]);
-    }
-    this.position = 0;
-
-    if (this.suspended) {
-      // Unsuspend and continue from where ever we left off.
-      this.suspended = false;
-      const next = this.next!;
-
-      next();
-    }
-
-    // If we're no longer suspended, parse new tokens
-    if (!this.suspended) {
-      // Start the parser
-      this.parseTokens();
-    }
-
-    done();
-  }
-
-  parseTokens() {
-    const doneParsing = (token: Token | undefined) => {
-      if (token) {
-        if (token instanceof ColMetadataToken) {
-          this.colMetadata = token.columns;
-        }
-
-        this.push(token);
-      }
-    };
-
-    while (!this.suspended && this.position + 1 <= this.buffer.length) {
-      const type = this.buffer.readUInt8(this.position);
-
-      this.position += 1;
-
-      if (tokenParsers[type]) {
-        tokenParsers[type](this, this.options, doneParsing);
-      } else {
-        this.emit('error', new Error('Unknown type: ' + type));
-      }
-    }
   }
 
   suspend(next: () => void) {

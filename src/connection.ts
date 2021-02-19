@@ -1935,8 +1935,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser() {
-    const tokenStreamParser = new TokenStreamParser(this.debug, this.config.options);
+  createTokenStreamParser(message: Message) {
+    const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
       this.emit('infoMessage', token);
@@ -3373,9 +3373,7 @@ Connection.prototype.STATE = {
         }
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.pipe(tokenStreamParser.parser);
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.parser.once('end', () => {
           if (this.loggedIn) {
@@ -3410,9 +3408,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.pipe(tokenStreamParser.parser);
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.parser.once('end', () => {
           if (this.ntlmpacket) {
@@ -3466,9 +3462,7 @@ Connection.prototype.STATE = {
         this.fedAuthInfoToken = token;
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.pipe(tokenStreamParser.parser);
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.parser.once('end', () => {
           if (this.loggedIn) {
@@ -3575,10 +3569,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.pipe(tokenStreamParser.parser);
-
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.parser.once('end', () => {
           this.transitionTo(this.STATE.LOGGED_IN);
@@ -3612,8 +3603,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser();
-        message.pipe(tokenStreamParser.parser);
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         const onResume = () => {
           tokenStreamParser.parser.resume();
@@ -3706,10 +3696,7 @@ Connection.prototype.STATE = {
         this.attentionReceived = true;
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.pipe(tokenStreamParser.parser);
-
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.parser.once('end', () => {
           // 3.2.5.7 Sent Attention State
