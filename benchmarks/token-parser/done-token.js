@@ -7,16 +7,20 @@ const bench = createBenchmark(main, {
   tokenCount: [10, 100, 1000, 10000]
 });
 
-function main({ n, tokenCount }) {
-  const parser = new Parser({ token: function() { } }, {}, {});
+async function* repeat(buffer, n) {
+  for (let i = 0; i < n; i++) {
+    yield buffer;
+  }
+}
 
+function main({ n, tokenCount }) {
   const data = Buffer.from('FE0000E0000000000000000000'.repeat(tokenCount), 'hex');
+
+  const parser = new Parser(repeat(data, n), { token: function() { } }, {}, {});
 
   bench.start();
 
-  for (let i = 0; i < n; i++) {
-    parser.addBuffer(data);
-  }
-
-  bench.end(n);
+  parser.once('end', () => {
+    bench.end(n);
+  });
 }

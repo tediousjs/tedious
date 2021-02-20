@@ -39,6 +39,101 @@ const tokenParsers = {
 
 type AnyToken = DoneToken | DoneInProcToken | DoneProcToken | ColMetadataToken | DatabaseEnvChangeToken | LanguageEnvChangeToken | CharsetEnvChangeToken | PacketSizeEnvChangeToken | BeginTransactionEnvChangeToken | CommitTransactionEnvChangeToken | RollbackTransactionEnvChangeToken | RoutingEnvChangeToken | DatabaseMirroringPartnerEnvChangeToken | ResetConnectionEnvChangeToken | CollationChangeToken | ErrorMessageToken | FedAuthInfoToken | FeatureExtAckToken | InfoMessageToken | LoginAckToken | OrderToken | ReturnStatusToken | ReturnValueToken | RowToken | NBCRowToken | SSPIToken;
 
+class NotEnoughDataError extends Error {
+  constructor() {
+    super('not enough data');
+  }
+}
+
+class StreamingBuffer {
+  iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
+  data: Buffer;
+  position: number;
+
+  constructor(iterable: AsyncIterable<Buffer> | Iterable<Buffer>) {
+    this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] ?? (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
+    this.data = Buffer.alloc(0);
+    this.position = 0;
+  }
+
+  async awaitChunk() {
+    const result = await this.iterator.next();
+
+    if (result.done) {
+      throw new NotEnoughDataError();
+    }
+
+    if (this.position) {
+      this.data = Buffer.concat([this.data.slice(this.position), result.value]);
+    } else {
+      this.data = Buffer.concat([this.data, result.value]);
+    }
+    this.position = 0;
+  }
+
+  async awaitData(length: number) {
+    while (this.data.length < this.position + length) {
+      const result = await this.iterator.next();
+
+      if (result.done) {
+        throw new NotEnoughDataError();
+      }
+
+      if (this.position) {
+        this.data = Buffer.concat([this.data.slice(this.position), result.value]);
+      } else {
+        this.data = Buffer.concat([this.data, result.value]);
+      }
+      this.position = 0;
+    }
+  }
+
+  availableBytes(): number {
+    return this.data.length - this.position;
+  }
+
+  assertEnoughBytes(length: number) {
+    if (this.availableBytes() < length) {
+      throw new NotEnoughDataError();
+    }
+  }
+
+  readUInt8() {
+    this.assertEnoughBytes(1);
+
+    const value = this.data.readUInt8(this.position);
+    this.position += 1;
+    return value;
+  }
+
+  readUInt16LE() {
+    this.assertEnoughBytes(2);
+
+    const value = this.data.readUInt16LE(this.position);
+    this.position += 2;
+    return value;
+  }
+
+  readUInt32LE() {
+    this.assertEnoughBytes(4);
+
+    const value = this.data.readUInt32LE(this.position);
+    this.position += 4;
+    return value;
+  }
+
+  readBigUInt64LE(): JSBI {
+    this.assertEnoughBytes(8);
+
+    const low = JSBI.BigInt(this.data.readUInt32LE(this.position));
+    const high = JSBI.BigInt(this.data.readUInt32LE(this.position + 4));
+
+    this.position += 8;
+
+    return JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32)));
+  }
+}
+
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
@@ -50,56 +145,64 @@ class Parser {
   next?: () => void;
 
   static async * parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions) {
+    const sb = new StreamingBuffer(iterable);
+
     const parser = new Parser(debug, options);
 
-    let token: Token | undefined;
-
-    for await (const chunk of iterable) {
-      if (parser.position === parser.buffer.length) {
-        parser.buffer = chunk;
-      } else {
-        parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), chunk]);
-      }
-      parser.position = 0;
-
-      if (parser.suspended) {
-        // Unsuspend and continue from where ever we left off.
-        parser.suspended = false;
-        const next = parser.next!;
-
-        next();
-
-        if (token) {
-          // If we found a token after unsuspending, yield it
-          yield token;
-          token = undefined;
-        } else {
-          // Go to the next chunk
-          continue;
-        }
-      }
-
-      // Start the parser
-      while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
-        const type = parser.buffer.readUInt8(parser.position);
-
-        parser.position += 1;
-
-        if (tokenParsers[type]) {
-          tokenParsers[type](parser, parser.options, (t: undefined | AnyToken) => { token = t; });
-
-          // If `token` was set, we parsed a full token and can yield it
-          if (token) {
-            if (token instanceof ColMetadataToken) {
-              parser.colMetadata = token.columns;
-            }
-
-            yield token;
-            token = undefined;
+    while (true) {
+      if (sb.availableBytes() < 1) {
+        try {
+          await sb.awaitData(1);
+        } catch (err) {
+          if (err instanceof NotEnoughDataError) {
+            return;
           }
-        } else {
-          throw new Error('Unknown type: ' + type);
+
+          throw err;
         }
+      }
+
+      const type = sb.readUInt8();
+
+      if (tokenParsers[type]) {
+        parser.position = sb.position;
+        parser.buffer = sb.data;
+
+        let token: AnyToken | undefined;
+        let finished = false;
+
+        tokenParsers[type](parser, parser.options, (t: undefined | AnyToken) => {
+          finished = true;
+          token = t;
+        });
+
+        // Did we finish parsing? If not, we need to wait for more data and resume parsing
+        while (!finished) {
+          sb.position = parser.position;
+
+          await sb.awaitChunk();
+
+          // Update our position and continue parsing until we're done
+          parser.position = sb.position;
+          parser.buffer = sb.data;
+
+          parser.suspended = false;
+          const next = parser.next!;
+          next();
+        }
+
+        // We're done with parsing. Check if there was a token and yield it back
+        if (token) {
+          if (token instanceof ColMetadataToken) {
+            parser.colMetadata = token.columns;
+          }
+
+          yield token;
+        }
+
+        sb.position = parser.position;
+      } else {
+        throw new Error('Unknown type: ' + type);
       }
     }
   }

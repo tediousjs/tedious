@@ -59,6 +59,9 @@ export class Parser extends EventEmitter {
         this.emit(token.event, token);
       }
     });
+    this.parser.once('end', () => {
+      this.emit('end');
+    });
   }
 
   declare on: (
