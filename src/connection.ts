@@ -2596,40 +2596,6 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * This is an internal method that is called from [[Request.pause]].
-   * It has to check whether the passed Request object represents the currently
-   * active request, because the application might have called [[Request.pause]]
-   * on an old inactive Request object.
-   *
-   * @private
-   */
-  pauseRequest(request: Request | BulkLoad) {
-    if (this.isRequestActive(request)) {
-      this.tokenStreamParser.pause();
-    }
-  }
-
-  /**
-   * This is an internal method that is called from [[Request.resume]].
-   *
-   * @private
-   */
-  resumeRequest(request: Request | BulkLoad) {
-    if (this.isRequestActive(request)) {
-      this.tokenStreamParser.resume();
-    }
-  }
-
-  /**
-   * Returns true if the passed request is the currently active request of the connection.
-   *
-   * @private
-   */
-  isRequestActive(request: Request | BulkLoad) {
-    return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
-  }
-
-  /**
    * @private
    */
   sendInitialSql() {
@@ -3175,10 +3141,6 @@ class Connection extends EventEmitter {
           this.debug.payload(function() {
             return payload!.toString('  ');
           });
-
-          if (request.paused) { // Request.pause() has been called before the request was started
-            this.pauseRequest(request);
-          }
         });
 
         Readable.from(payload!).pipe(message);
@@ -3772,7 +3734,21 @@ Connection.prototype.STATE = {
             // resume the request if it was paused so we can read the remaining tokens
             this.request?.resume();
           }
+
         } else {
+          const onResume = () => { this.tokenStreamParser.resume(); };
+          const onPause = () => {
+            this.tokenStreamParser.pause();
+
+            this.request?.once('resume', onResume);
+          };
+
+          this.request?.on('pause', onPause);
+
+          if (this.request instanceof Request && this.request.paused) {
+            onPause();
+          }
+
           const onCancel = () => {
             this.tokenStreamParser.removeListener('endOfMessage', onEndOfMessage);
             this.tokenStreamParser.once('endOfMessage', () => {
@@ -3786,10 +3762,15 @@ Connection.prototype.STATE = {
               // resume the request if it was paused so we can read the remaining tokens
               this.request?.resume();
             }
+
+            this.request?.removeListener('pause', onPause);
+            this.request?.removeListener('resume', onResume);
           };
 
           const onEndOfMessage = () => {
             this.request?.removeListener('cancel', onCancel);
+            this.request?.removeListener('pause', onPause);
+            this.request?.removeListener('resume', onResume);
 
             this.transitionTo(this.STATE.LOGGED_IN);
             const sqlRequest = this.request as Request;
