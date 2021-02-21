@@ -60,6 +60,55 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('does not leak memory via EventEmitter listeners when reusing a request many times', function(done) {
+    const config = getConfig();
+
+    let eventEmitterLeak = false;
+    const onWarning = (warning) => {
+      if (warning.name === 'MaxListenersExceededWarning') {
+        eventEmitterLeak = true;
+      }
+    };
+    process.on('warning', onWarning);
+
+    let count = 0;
+    const request = new Request('select 1', function(err) {
+      assert.ifError(err);
+
+      if (count < 20) {
+        count += 1;
+
+        connection.execute(request);
+      } else {
+        connection.close();
+      }
+    });
+
+    const connection = new Connection(config);
+
+    request.on('prepared', function() {
+      connection.execute(request);
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function(info) {
+      process.removeListener('warning', onWarning);
+
+      if (eventEmitterLeak) {
+        assert.fail('EventEmitter memory leak detected');
+      }
+
+      done();
+    });
+  });
+
   it('should test unprepare', function(done) {
     const config = getConfig();
     const request = new Request('select 3', function(err) {
