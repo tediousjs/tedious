@@ -2,7 +2,6 @@ import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
-import { Transform } from 'readable-stream';
 import { TYPE, Token, ColMetadataToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
@@ -38,7 +37,7 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
-class Parser extends Transform {
+class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
@@ -48,9 +47,75 @@ class Parser extends Transform {
   suspended: boolean;
   next?: () => void;
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
-    super({ objectMode: true });
+  static async *parseTokens(iterable: AsyncIterable<Buffer>, debug: Debug, options: InternalConnectionOptions) {
+    const iterator = iterable[Symbol.asyncIterator]();
 
+    const parser = new Parser(debug, options);
+
+    let token: Token | undefined;
+
+    while (true) {
+      const result = await iterator.next();
+      if (result.done) {
+        if (parser.position === parser.buffer.length) {
+          return;
+        }
+
+        throw new Error('unexpected end of data');
+      }
+
+      const input = result.value;
+
+      if (parser.position === parser.buffer.length) {
+        parser.buffer = input;
+      } else {
+        parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), input]);
+      }
+      parser.position = 0;
+
+      if (parser.suspended) {
+        // Unsuspend and continue from where ever we left off.
+        parser.suspended = false;
+        const next = parser.next!;
+
+        next();
+
+        // Check if a new token was parsed after unsuspension.
+        if (token) {
+          if (token instanceof ColMetadataToken) {
+            parser.colMetadata = token.columns;
+          }
+
+          yield token;
+          token = undefined;
+        }
+      }
+
+      while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
+        const type = parser.buffer.readUInt8(parser.position);
+
+        parser.position += 1;
+
+        if (tokenParsers[type]) {
+          tokenParsers[type](parser, parser.options, (t: Token | undefined) => { token = t; });
+
+          // Check if a token was parsed.
+          if (token) {
+            if (token instanceof ColMetadataToken) {
+              parser.colMetadata = token.columns;
+            }
+
+            yield token;
+            token = undefined;
+          }
+        } else {
+          throw new Error('Unknown type: ' + type);
+        }
+      }
+    }
+  }
+
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;
@@ -59,55 +124,6 @@ class Parser extends Transform {
     this.position = 0;
     this.suspended = false;
     this.next = undefined;
-  }
-
-  _transform(input: Buffer, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
-    if (this.position === this.buffer.length) {
-      this.buffer = input;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), input]);
-    }
-    this.position = 0;
-
-    if (this.suspended) {
-      // Unsuspend and continue from where ever we left off.
-      this.suspended = false;
-      const next = this.next!;
-
-      next();
-    }
-
-    // If we're no longer suspended, parse new tokens
-    if (!this.suspended) {
-      // Start the parser
-      this.parseTokens();
-    }
-
-    done();
-  }
-
-  parseTokens() {
-    const doneParsing = (token: Token | undefined) => {
-      if (token) {
-        if (token instanceof ColMetadataToken) {
-          this.colMetadata = token.columns;
-        }
-
-        this.push(token);
-      }
-    };
-
-    while (!this.suspended && this.position + 1 <= this.buffer.length) {
-      const type = this.buffer.readUInt8(this.position);
-
-      this.position += 1;
-
-      if (tokenParsers[type]) {
-        tokenParsers[type](this, this.options, doneParsing);
-      } else {
-        this.emit('error', new Error('Unknown type: ' + type));
-      }
-    }
   }
 
   suspend(next: () => void) {

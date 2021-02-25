@@ -1935,8 +1935,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser() {
-    const tokenStreamParser = new TokenStreamParser(this.debug, this.config.options);
+  createTokenStreamParser(message: Message) {
+    const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
       this.emit('infoMessage', token);
@@ -3373,26 +3373,7 @@ Connection.prototype.STATE = {
         }
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.once('end', () => {
           if (this.loggedIn) {
@@ -3427,26 +3408,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.once('end', () => {
           if (this.ntlmpacket) {
@@ -3500,26 +3462,7 @@ Connection.prototype.STATE = {
         this.fedAuthInfoToken = token;
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.once('end', () => {
           if (this.loggedIn) {
@@ -3626,26 +3569,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.once('end', () => {
           this.transitionTo(this.STATE.LOGGED_IN);
@@ -3679,26 +3603,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         // If the request was canceled after the request was sent, but before
         // we started receiving a message, we send an attention message, fully
@@ -3734,14 +3639,6 @@ Connection.prototype.STATE = {
           const onCancel = () => {
             tokenStreamParser.removeListener('end', onEndOfMessage);
 
-            this.messageIo.sendMessage(TYPE.ATTENTION);
-            // Don't wait for the `tokenStreamParser` to end before switching
-            // to the `SENT_ATTENTION` state. The `end` event is delayed and
-            // we would switch to the new state after the attention acknowledgement
-            // message was received.
-            this.transitionTo(this.STATE.SENT_ATTENTION);
-            this.createCancelTimer();
-
             if (this.request instanceof Request && this.request.paused) {
               // resume the request if it was paused so we can read the remaining tokens
               this.request?.resume();
@@ -3749,6 +3646,10 @@ Connection.prototype.STATE = {
 
             this.request?.removeListener('pause', onPause);
             this.request?.removeListener('resume', onResume);
+
+            this.messageIo.sendMessage(TYPE.ATTENTION);
+            this.transitionTo(this.STATE.SENT_ATTENTION);
+            this.createCancelTimer();
           };
 
           const onEndOfMessage = () => {
@@ -3789,26 +3690,7 @@ Connection.prototype.STATE = {
         this.attentionReceived = true;
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser();
-
-        message.on('data', (data) => {
-          const ret = tokenStreamParser.write(data);
-          if (ret === false) {
-            // Bridge backpressure from the token stream parser transform to the
-            // packet stream transform.
-            this.messageIo.pause();
-
-            tokenStreamParser.once('drain', () => {
-              // Bridge the release of backpressure from the token stream parser
-              // transform to the packet stream transform.
-              this.messageIo.resume();
-            });
-          }
-        });
-
-        message.once('end', () => {
-          tokenStreamParser.end();
-        });
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
         tokenStreamParser.once('end', () => {
           // 3.2.5.7 Sent Attention State
