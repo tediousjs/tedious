@@ -346,7 +346,7 @@ function main({ n }) {
   bench.start();
 
   for (let i = 0; i < n; i++) {
-    parser.addBuffer(data);
+    parser.write(data);
   }
 
   bench.end(n);

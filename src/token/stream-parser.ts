@@ -3,7 +3,7 @@ import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
 import { Transform } from 'readable-stream';
-import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
+import { TYPE, Token, ColMetadataToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
@@ -38,13 +38,10 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
-class EndOfMessageMarker {}
-
 class Parser extends Transform {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
-  endOfMessageMarker: EndOfMessageMarker;
 
   buffer: Buffer;
   position: number;
@@ -57,7 +54,6 @@ class Parser extends Transform {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;
-    this.endOfMessageMarker = new EndOfMessageMarker();
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
@@ -65,11 +61,7 @@ class Parser extends Transform {
     this.next = undefined;
   }
 
-  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
-    if (input instanceof EndOfMessageMarker) {
-      return done(undefined, new EndOfMessageToken());
-    }
-
+  _transform(input: Buffer, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
     if (this.position === this.buffer.length) {
       this.buffer = input;
     } else {

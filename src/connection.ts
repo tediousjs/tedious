@@ -3376,7 +3376,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3391,13 +3391,10 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
-        tokenStreamParser.once('endOfMessage', () => {
+        tokenStreamParser.once('end', () => {
           if (this.loggedIn) {
             if (this.routingData) {
               this.transitionTo(this.STATE.REROUTING);
@@ -3433,7 +3430,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3448,13 +3445,10 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
-        tokenStreamParser.once('endOfMessage', () => {
+        tokenStreamParser.once('end', () => {
           if (this.ntlmpacket) {
             const authentication = this.config.authentication as NtlmAuthentication;
 
@@ -3509,7 +3503,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3524,13 +3518,10 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
-        tokenStreamParser.once('endOfMessage', () => {
+        tokenStreamParser.once('end', () => {
           if (this.loggedIn) {
             if (this.routingData) {
               this.transitionTo(this.STATE.REROUTING);
@@ -3638,7 +3629,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3653,13 +3644,10 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
-        tokenStreamParser.once('endOfMessage', () => {
+        tokenStreamParser.once('end', () => {
           this.transitionTo(this.STATE.LOGGED_IN);
           this.processedInitialSql();
         });
@@ -3694,7 +3682,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3709,21 +3697,19 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
         // If the request was canceled after the request was sent, but before
         // we started receiving a message, we send an attention message, fully
         // consume the current message, and then switch the next state.
         if (this.request?.canceled) {
-          tokenStreamParser.once('endOfMessage', () => {
-            this.transitionTo(this.STATE.SENT_ATTENTION);
-          });
-
           this.messageIo.sendMessage(TYPE.ATTENTION);
+          // Don't wait for the `tokenStreamParser` to end before switching
+          // to the `SENT_ATTENTION` state. The `end` event is delayed and
+          // we would switch to the new state after the attention acknowledgement
+          // message was received.
+          this.transitionTo(this.STATE.SENT_ATTENTION);
           this.createCancelTimer();
 
           if (this.request instanceof Request && this.request.paused) {
@@ -3746,12 +3732,14 @@ Connection.prototype.STATE = {
           }
 
           const onCancel = () => {
-            tokenStreamParser.removeListener('endOfMessage', onEndOfMessage);
-            tokenStreamParser.once('endOfMessage', () => {
-              this.transitionTo(this.STATE.SENT_ATTENTION);
-            });
+            tokenStreamParser.removeListener('end', onEndOfMessage);
 
             this.messageIo.sendMessage(TYPE.ATTENTION);
+            // Don't wait for the `tokenStreamParser` to end before switching
+            // to the `SENT_ATTENTION` state. The `end` event is delayed and
+            // we would switch to the new state after the attention acknowledgement
+            // message was received.
+            this.transitionTo(this.STATE.SENT_ATTENTION);
             this.createCancelTimer();
 
             if (this.request instanceof Request && this.request.paused) {
@@ -3777,7 +3765,7 @@ Connection.prototype.STATE = {
             sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
           };
 
-          tokenStreamParser.once('endOfMessage', onEndOfMessage);
+          tokenStreamParser.once('end', onEndOfMessage);
           this.request?.once('cancel', onCancel);
         }
       }
@@ -3804,7 +3792,7 @@ Connection.prototype.STATE = {
         const tokenStreamParser = this.createTokenStreamParser();
 
         message.on('data', (data) => {
-          const ret = tokenStreamParser.addBuffer(data);
+          const ret = tokenStreamParser.write(data);
           if (ret === false) {
             // Bridge backpressure from the token stream parser transform to the
             // packet stream transform.
@@ -3819,13 +3807,10 @@ Connection.prototype.STATE = {
         });
 
         message.once('end', () => {
-          // We have to channel the 'message' (EOM) event through the token stream
-          // parser transform, to keep it in line with the flow of the tokens, when
-          // the incoming data flow is paused and resumed.
-          tokenStreamParser.addEndOfMessageMarker();
+          tokenStreamParser.end();
         });
 
-        tokenStreamParser.once('endOfMessage', () => {
+        tokenStreamParser.once('end', () => {
           // 3.2.5.7 Sent Attention State
           // Discard any data contained in the response, until we receive the attention response
           if (this.attentionReceived) {
