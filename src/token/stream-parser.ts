@@ -47,25 +47,12 @@ class Parser {
   suspended: boolean;
   next?: () => void;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer>, debug: Debug, options: InternalConnectionOptions) {
-    const iterator = iterable[Symbol.asyncIterator]();
-
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions) {
     const parser = new Parser(debug, options);
 
     let token: Token | undefined;
 
-    while (true) {
-      const result = await iterator.next();
-      if (result.done) {
-        if (parser.position === parser.buffer.length) {
-          return;
-        }
-
-        throw new Error('unexpected end of data');
-      }
-
-      const input = result.value;
-
+    for await (const input of iterable) {
       if (parser.position === parser.buffer.length) {
         parser.buffer = input;
       } else {
@@ -112,6 +99,10 @@ class Parser {
           throw new Error('Unknown type: ' + type);
         }
       }
+    }
+
+    if (parser.suspended) {
+      throw new Error('unexpected end of data');
     }
   }
 
