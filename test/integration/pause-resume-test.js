@@ -97,34 +97,6 @@ describe('Pause-Resume Test', function() {
     connection.execSql(request);
   });
 
-  it('should test pausing request pauses transforms', function(done) {
-    const sql = `
-          with cte1 as
-            (select 1 as i union all select i + 1 from cte1 where i < 20000)
-          select i from cte1 option (maxrecursion 0)
-        `;
-
-    const request = new Request(sql, (error) => {
-      assert.ifError(error);
-
-      done();
-    });
-
-    request.on('row', (columns) => {
-      if (columns[0].value === 1000) {
-        request.pause();
-
-        setTimeout(() => {
-          //assert.ok(connection.messageIo.incomingMessageStream.isPaused());
-
-          request.resume();
-        }, 3000);
-      }
-    });
-
-    connection.execSql(request);
-  });
-
   it('should test paused request can be cancelled', function(done) {
     connection.on('error', (err) => {
       assert.ifError(err);
@@ -150,7 +122,7 @@ describe('Pause-Resume Test', function() {
 
           setTimeout(() => {
             connection.cancel();
-          }, 50);
+          }, 200);
         } else if (columns[0].value > 1000) {
           assert.ok(false, 'Received rows after pause');
         }
@@ -173,30 +145,30 @@ describe('Pause-Resume Test', function() {
     });
   });
 
-  // it('should test immediately paused request does not emit rows until resumed', function(done) {
-  //   connection.on('error', (err) => {
-  //     assert.ifError(err);
-  //   });
+  it('should test immediately paused request does not emit rows until resumed', function(done) {
+    connection.on('error', (err) => {
+      assert.ifError(err);
+    });
 
-  //   const request = new Request('SELECT 1', (error) => {
-  //     assert.ifError(error);
-  //     done();
-  //   });
+    const request = new Request('SELECT 1', (error) => {
+      assert.ifError(error);
+      done();
+    });
 
-  //   let paused = true;
-  //   request.pause();
+    let paused = true;
+    request.pause();
 
-  //   request.on('row', (columns) => {
-  //     assert.ok(!paused);
+    request.on('row', (columns) => {
+      assert.ok(!paused);
 
-  //     assert.strictEqual(columns[0].value, 1);
-  //   });
+      assert.strictEqual(columns[0].value, 1);
+    });
 
-  //   connection.execSql(request);
+    connection.execSql(request);
 
-  //   setTimeout(() => {
-  //     paused = false;
-  //     request.resume();
-  //   }, 200);
-  // });
+    setTimeout(() => {
+      paused = false;
+      request.resume();
+    }, 200);
+  });
 });
