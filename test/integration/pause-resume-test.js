@@ -116,7 +116,6 @@ describe('Pause-Resume Test', function() {
 
         setTimeout(() => {
           assert.ok(connection.messageIo.incomingMessageStream.isPaused());
-          assert.ok(connection.tokenStreamParser.parser.isPaused());
 
           request.resume();
         }, 3000);

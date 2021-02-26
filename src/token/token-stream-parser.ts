@@ -26,8 +26,7 @@ import {
   ReturnValueToken,
   DoneInProcToken,
   DoneProcToken,
-  DoneToken,
-  EndOfMessageToken
+  DoneToken
 } from './token';
 
 /*
@@ -57,8 +56,13 @@ export class Parser extends EventEmitter {
         this.emit(token.event, token);
       }
     });
+
     this.parser.on('drain', () => {
       this.emit('drain');
+    });
+
+    this.parser.on('end', () => {
+      this.emit('end');
     });
   }
 
@@ -85,25 +89,16 @@ export class Parser extends EventEmitter {
     ((event: 'done', listener: (token: DoneToken) => void) => this) &
     ((event: 'doneInProc', listener: (token: DoneInProcToken) => void) => this) &
     ((event: 'doneProc', listener: (token: DoneProcToken) => void) => this) &
-    ((event: 'endOfMessage', listener: (token: EndOfMessageToken) => void) => this) &
     ((event: string | symbol, listener: (...args: any[]) => void) => this)
   );
 
   // Returns false to apply backpressure.
-  addBuffer(buffer: Buffer) {
+  write(buffer: Buffer) {
     return this.parser.write(buffer);
   }
 
-  // Writes an end-of-message (EOM) marker into the parser transform input
-  // queue. StreamParser will emit a 'data' event with an 'endOfMessage'
-  // pseudo token when the EOM marker has passed through the transform stream.
-  // Returns false to apply backpressure.
-  addEndOfMessageMarker() {
-    return this.parser.write(this.parser.endOfMessageMarker);
-  }
-
-  isEnd() {
-    return this.parser.buffer.length === this.parser.position;
+  end() {
+    this.parser.end();
   }
 
   // Temporarily suspends the token stream parser transform from emitting events.
