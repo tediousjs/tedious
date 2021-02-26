@@ -51,6 +51,7 @@ class Parser {
     const parser = new Parser(debug, options);
 
     let token: Token | undefined;
+    const onDoneParsing = (t: Token | undefined) => { token = t; };
 
     for await (const input of iterable) {
       if (parser.position === parser.buffer.length) {
@@ -68,13 +69,12 @@ class Parser {
         next();
 
         // Check if a new token was parsed after unsuspension.
-        if (token) {
+        if (!parser.suspended && token) {
           if (token instanceof ColMetadataToken) {
             parser.colMetadata = token.columns;
           }
 
           yield token;
-          token = undefined;
         }
       }
 
@@ -84,16 +84,15 @@ class Parser {
         parser.position += 1;
 
         if (tokenParsers[type]) {
-          tokenParsers[type](parser, parser.options, (t: Token | undefined) => { token = t; });
+          tokenParsers[type](parser, parser.options, onDoneParsing);
 
-          // Check if a token was parsed.
-          if (token) {
+          // Check if a new token was parsed after unsuspension.
+          if (!parser.suspended && token) {
             if (token instanceof ColMetadataToken) {
               parser.colMetadata = token.columns;
             }
 
             yield token;
-            token = undefined;
           }
         } else {
           throw new Error('Unknown type: ' + type);
