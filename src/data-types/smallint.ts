@@ -35,6 +35,15 @@ const SmallInt: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      // Always Encrypted length must be normalized to 8 bytes for smallint
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt16LE(Number(parameter.value), 0);
+      return buffer;
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

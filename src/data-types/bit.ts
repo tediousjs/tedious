@@ -33,6 +33,15 @@ const Bit: DataType = {
     yield parameter.value ? Buffer.from([0x01]) : Buffer.from([0x00]);
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      // Always Encrypted length must be normalized to 8 bytes for bit
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt8(parameter.value ? 1 : 0, 0);
+      return buffer;
+    }
+  },
+
   validate: function(value): null | boolean {
     if (value == null) {
       return null;

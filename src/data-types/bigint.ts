@@ -36,6 +36,14 @@ const BigInt: DataType = {
     yield buffer.data;
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeInt64LE(Number(parameter.value));
+      return buffer.data;
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

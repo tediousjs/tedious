@@ -71,6 +71,49 @@ const DateTime: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date;
+
+    if (value != null) {
+      let date;
+      if (options.useUTC) {
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      } else {
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      }
+
+      let days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+
+      let milliseconds, threeHundredthsOfSecond;
+      if (options.useUTC) {
+        let seconds = value.getUTCHours() * 60 * 60;
+        seconds += value.getUTCMinutes() * 60;
+        seconds += value.getUTCSeconds();
+        milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
+      } else {
+        let seconds = value.getHours() * 60 * 60;
+        seconds += value.getMinutes() * 60;
+        seconds += value.getSeconds();
+        milliseconds = (seconds * 1000) + value.getMilliseconds();
+      }
+
+      threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
+      threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+
+      // 25920000 equals one day
+      if (threeHundredthsOfSecond === 25920000) {
+        days += 1;
+        threeHundredthsOfSecond = 0;
+      }
+
+      const buffer = Buffer.alloc(8);
+      buffer.writeUInt32LE(days, 0);
+      buffer.writeUInt32LE(threeHundredthsOfSecond, 4);
+
+      return buffer;
+    }
+  },
+
   // TODO: type 'any' needs to be revisited.
   validate: function(value): null | number | TypeError {
     if (value == null) {

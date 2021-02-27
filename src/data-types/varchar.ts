@@ -124,6 +124,13 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    }
+  },
+
   validate: function(value): string | null | TypeError {
     if (value == null) {
       return null;

@@ -48,6 +48,25 @@ const Date: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date;
+
+    if (value != null) {
+      let date;
+      if (options.useUTC) {
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      } else {
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      }
+
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+      const buffer = new WritableTrackingBuffer(3);
+      buffer.writeUInt24LE(days);
+
+      return buffer.data;
+    }
+  },
+
   // TODO: value is techincally of type 'unknown'.
   validate: function(value): null | Date | TypeError {
     if (value == null) {

@@ -35,6 +35,15 @@ const TinyInt: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      // Always Encrypted length must be normalized to 8 bytes for tinyint
+      const result = Buffer.alloc(8);
+      result.writeUInt8(Number(parameter.value), 0);
+      return result;
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;

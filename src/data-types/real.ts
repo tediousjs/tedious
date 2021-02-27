@@ -35,6 +35,14 @@ const Real: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      const buffer = Buffer.alloc(4);
+      buffer.writeFloatLE(parseFloat(parameter.value), 0);
+      return buffer;
+    }
+  },
+
   validate: function(value): null | number | TypeError {
     if (value == null) {
       return null;

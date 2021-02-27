@@ -41,6 +41,16 @@ const Money: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter) {
+    if (parameter.value != null) {
+      const value = parameter.value * 10000;
+      const buffer = Buffer.alloc(8);
+      buffer.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
+      buffer.writeInt32LE(value & -1, 4);
+      return buffer;
+    }
+  },
+
   validate: function(value): number | null | TypeError {
     if (value == null) {
       return null;
