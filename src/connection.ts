@@ -1649,6 +1649,10 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
         }
 
+        if (config.options.validateBulkLoadParameters === false) {
+          deprecate('Setting the "config.options.validateBulkLoadParameters" to `false` is deprecated and will no longer work in the next major version of `tedious`. Set the value to `true` and update your use of BulkLoad functionality to silence this message.');
+        }
+
         this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
       }
 
