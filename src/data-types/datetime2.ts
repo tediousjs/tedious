@@ -102,7 +102,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     yield buffer.data;
   },
 
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
@@ -112,7 +112,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

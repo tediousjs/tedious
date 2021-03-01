@@ -35,7 +35,7 @@ const SmallInt: DataType = {
     yield buffer;
   },
 
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
@@ -45,11 +45,11 @@ const SmallInt: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
 
     if (value < -32768 || value > 32767) {
-      return new TypeError('Value must be between -32768 and 32767, inclusive.');
+      throw new TypeError('Value must be between -32768 and 32767, inclusive.');
     }
 
     return value | 0;

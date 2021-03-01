@@ -37,21 +37,21 @@ const UniqueIdentifier: DataType = {
     yield Buffer.from(guidToArray(parameter.value));
   },
 
-  validate: function(value): string | null | TypeError {
+  validate: function(value): string | null {
     if (value == null) {
       return null;
     }
 
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+        throw new TypeError('Invalid string.');
       }
 
       value = value.toString();
     }
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-      return TypeError('Invalid GUID.');
+      throw new TypeError('Invalid GUID.');
     }
 
     return value;
