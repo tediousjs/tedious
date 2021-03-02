@@ -86,7 +86,7 @@ const Time: DataType = {
     yield buffer.data;
   },
 
-  validate: function(value): null | number | TypeError | Date {
+  validate: function(value): null | number | Date {
     if (value == null) {
       return null;
     }
@@ -96,7 +96,7 @@ const Time: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid time.');
+      throw new TypeError('Invalid time.');
     }
 
     return value;

@@ -2724,14 +2724,16 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSql(request: Request) {
-    request.transformIntoExecuteSqlRpc();
+    try {
+      request.transformIntoExecuteSqlRpc();
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);
       });
+
       return;
     }
 
@@ -2834,10 +2836,11 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters: { [key: string]: unknown }) {
-    request.transformIntoExecuteRpc(parameters);
+    try {
+      request.transformIntoExecuteRpc(parameters);
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);

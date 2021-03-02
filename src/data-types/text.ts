@@ -49,13 +49,13 @@ const Text: DataType = {
     yield Buffer.from(parameter.value.toString(), 'ascii');
   },
 
-  validate: function(value): string | null | TypeError {
+  validate: function(value): string | null {
     if (value == null) {
       return null;
     }
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+        throw new TypeError('Invalid string.');
       }
       value = value.toString();
     }
