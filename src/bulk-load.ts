@@ -163,9 +163,10 @@ class RowTransform extends Transform {
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
+      let value = row[i];
       if (this.bulkLoad.options.validateBulkLoadParameters) {
         try {
-          c.type.validate(row[i]);
+          value = c.type.validate(value);
         } catch (error) {
           return callback(error);
         }
@@ -174,7 +175,7 @@ class RowTransform extends Transform {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
-        value: row[i]
+        value: value
       };
 
       this.push(c.type.generateParameterLength(parameter, this.mainOptions));
@@ -425,15 +426,6 @@ class BulkLoad extends EventEmitter {
   }
 
   /**
-   * @private
-   */
-  colTypeValidation(column: Column, value: any) {
-    if (this.options.validateBulkLoadParameters) {
-      column.type.validate(value);
-    }
-  }
-
-  /**
    * Adds a row to the bulk insert. This method accepts arguments in three different formats:
    *
    * ```js
@@ -468,18 +460,24 @@ class BulkLoad extends EventEmitter {
 
     // write each column
     if (Array.isArray(row)) {
-      this.columns.forEach((column, i) => {
-        this.colTypeValidation(column, row[i]);
-      });
+      this.rowToPacketTransform.write(this.columns.map((column, i) => {
+        let value = row[i];
 
-      this.rowToPacketTransform.write(row);
+        if (this.options.validateBulkLoadParameters) {
+          value = column.type.validate(value);
+        }
+
+        return value;
+      }));
     } else {
-      this.columns.forEach((column) => {
-        this.colTypeValidation(column, row[column.objName]);
-      });
-
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        return row[column.objName];
+        let value = row[column.objName];
+
+        if (this.options.validateBulkLoadParameters) {
+          value = column.type.validate(value);
+        }
+
+        return value;
       }));
     }
   }
