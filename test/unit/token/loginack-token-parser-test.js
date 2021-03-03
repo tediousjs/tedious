@@ -32,12 +32,12 @@ describe('Loginack Token Parser', () => {
 
     const parser = StreamParser.parseTokens([data], { tdsVersion: '7_2' });
 
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.interface, 'SQL_TSQL');
-      assert.strictEqual(token.tdsVersion, '7_2');
-      assert.strictEqual(token.progName, progName);
-      assert.deepEqual(token.progVersion, progVersion);
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.interface, 'SQL_TSQL');
+    assert.strictEqual(token.tdsVersion, '7_2');
+    assert.strictEqual(token.progName, progName);
+    assert.deepEqual(token.progVersion, progVersion);
   });
 });

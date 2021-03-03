@@ -23,9 +23,9 @@ describe('Feature Ext Praser', () => {
     buffer.writeUInt8(0xFF); // terminator
 
     const parser = StreamParser.parseTokens([buffer.data], {}, {});
-
-    for await (let token of parser) { // (4)
-      assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
   });
 });

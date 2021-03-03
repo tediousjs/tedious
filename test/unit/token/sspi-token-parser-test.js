@@ -43,10 +43,11 @@ describe('sspi token parser', () => {
       domain: 'domain',
       target: Buffer.from([0x00, 0xab, 0xcd, 0xef])
     };
-    for await (let token of parser) { // (4)
-      assert.deepEqual(token.ntlmpacket, expected);
-      // Skip token (first byte) and length of VarByte (2 bytes).
-      assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.deepEqual(token.ntlmpacket, expected);
+    // Skip token (first byte) and length of VarByte (2 bytes).
+    assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
   });
 });

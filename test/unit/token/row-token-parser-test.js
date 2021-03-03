@@ -24,15 +24,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write bigint', async () => {
@@ -47,15 +46,14 @@ describe('Row Token Parser', () => {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 2);
-      assert.strictEqual('1', token.columns[0].value);
-      assert.strictEqual('9223372036854775807', token.columns[1].value);
-    }
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual('1', token.columns[0].value);
+    assert.strictEqual('9223372036854775807', token.columns[1].value);
   });
 
   it('should write real', async () => {
@@ -66,16 +64,15 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     // console.log(token)
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write float', async () => {
@@ -88,15 +85,14 @@ describe('Row Token Parser', () => {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write Money', async () => {
@@ -126,19 +122,18 @@ describe('Row Token Parser', () => {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 6);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[1].value, value);
-      assert.strictEqual(token.columns[2].value, null);
-      assert.strictEqual(token.columns[3].value, value);
-      assert.strictEqual(token.columns[4].value, value);
-      assert.strictEqual(token.columns[5].value, valueLarge);
-    }
+    assert.strictEqual(token.columns.length, 6);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[1].value, value);
+    assert.strictEqual(token.columns[2].value, null);
+    assert.strictEqual(token.columns[3].value, value);
+    assert.strictEqual(token.columns[4].value, value);
+    assert.strictEqual(token.columns[5].value, valueLarge);
   });
 
   it('should write varchar without code page', async () => {
@@ -158,15 +153,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varchar with code page', async () => {
@@ -186,15 +180,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write nvarchar', async () => {
@@ -207,15 +200,14 @@ describe('Row Token Parser', () => {
     buffer.writeString(value);
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varBinary', async () => {
@@ -228,16 +220,15 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
 
-      assert.strictEqual(token.columns.length, 1);
-      assert.deepEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write binary', async () => {
@@ -250,16 +241,15 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
 
-      assert.strictEqual(token.columns.length, 1);
-      assert.deepEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varcharMaxNull', async () => {
@@ -280,16 +270,14 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varcharMaxUnkownLength', async () => {
@@ -316,16 +304,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varcharMaxKnownLength', async () => {
@@ -351,16 +337,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
-
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varcharmaxWithCodePage', async () => {
@@ -385,23 +369,24 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varcharMaxKnownLengthWrong', async () => {
     const colMetadata = [
       {
         type: dataTypeByName.VarChar,
-        dataLength: 65535
+        dataLength: 65535,
+        collation: {
+          codepage: 'WINDOWS-1252'
+        }
       }
     ];
     const value = 'abcdef';
@@ -416,18 +401,17 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
 
-    for await (let token of parser) {
-      try {
-        assert.isOk(false);
-      } catch {
-        //???
-      }
+    let error;
+    try {
+      await parser.next();
+    } catch (err) {
+      error = err;
     }
 
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
   });
 
   it('should write varBinaryMaxNull', async () => {
@@ -445,17 +429,14 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
-
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write varBinaryMaxUnknownLength', async () => {
@@ -478,15 +459,14 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.deepEqual(token.columns[0].value, value);
-      assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
   });
 
   it('should write intN', async () => {
@@ -613,26 +593,24 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 12);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.strictEqual('0', token.columns[1].value);
-      assert.strictEqual('1', token.columns[2].value);
-      assert.strictEqual('-1', token.columns[3].value);
-      assert.strictEqual('2', token.columns[4].value);
-      assert.strictEqual('-2', token.columns[5].value);
-      assert.strictEqual('9223372036854775807', token.columns[6].value);
-      assert.strictEqual('-9223372036854775808', token.columns[7].value);
-      assert.strictEqual('10', token.columns[8].value);
-      assert.strictEqual('100', token.columns[9].value);
-      assert.strictEqual('1000', token.columns[10].value);
-      assert.strictEqual('10000', token.columns[11].value);
-    }
+    assert.strictEqual(token.columns.length, 12);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual('0', token.columns[1].value);
+    assert.strictEqual('1', token.columns[2].value);
+    assert.strictEqual('-1', token.columns[3].value);
+    assert.strictEqual('2', token.columns[4].value);
+    assert.strictEqual('-2', token.columns[5].value);
+    assert.strictEqual('9223372036854775807', token.columns[6].value);
+    assert.strictEqual('-9223372036854775808', token.columns[7].value);
+    assert.strictEqual('10', token.columns[8].value);
+    assert.strictEqual('100', token.columns[9].value);
+    assert.strictEqual('1000', token.columns[10].value);
+    assert.strictEqual('10000', token.columns[11].value);
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async () => {
@@ -668,18 +646,17 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], { lowerCaseGuids: false }, options, parserObj)
+    const parser = Parser.parseTokens([buffer.data], { lowerCaseGuids: false }, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 2);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.deepEqual(
-        '67452301-AB89-EFCD-0123-456789ABCDEF',
-        token.columns[1].value
-      );
-    }
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.deepEqual(
+      '67452301-AB89-EFCD-0123-456789ABCDEF',
+      token.columns[1].value
+    );
 
   });
 
@@ -714,20 +691,17 @@ describe('Row Token Parser', () => {
       ])
     );
 
+    const parser = Parser.parseTokens([buffer.data], {}, { ...options, lowerCaseGuids: true }, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], Object.assign({ lowerCaseGuids: true }), options, parserObj);
-
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 2);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.deepEqual(
-        '67452301-ab89-efcd-0123-456789abcdef',
-        token.columns[1].value
-      );
-    }
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.deepEqual(
+      '67452301-ab89-efcd-0123-456789abcdef',
+      token.columns[1].value
+    );
   });
 
   it('should write floatN', async () => {
@@ -760,17 +734,15 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-
-      assert.strictEqual(token.columns.length, 3);
-      assert.strictEqual(token.columns[0].value, null);
-      assert.strictEqual(9.5, token.columns[1].value);
-      assert.strictEqual(9.5, token.columns[2].value);
-    }
+    assert.strictEqual(token.columns.length, 3);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(9.5, token.columns[1].value);
+    assert.strictEqual(9.5, token.columns[2].value);
   });
 
   it('should write datetime', async () => {
@@ -786,39 +758,39 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(threeHundredthsOfSecond);
     // console.log(buffer)
 
+    {
+      const parser = Parser.parseTokens([buffer.data], {}, { ...options, useUTC: false }, colMetadata);
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, { useUTC: false }, parserObj);
-    const parser2 = Parser.parseTokens([buffer.data], {}, { useUTC: true }, parserObj);
+      let result = await parser.next();
+      assert.isFalse(result.done);
 
-    // for await (let token of parser) {
-    //   assert.strictEqual(token.columns.length, 1);
-    //   assert.strictEqual(
-    //     token.columns[0].value.getTime(),
-    //     new Date('January 3, 1900 00:00:45').getTime()
-    //   );
-    // }
+      const token = result.value;
+      assert.strictEqual(token.columns.length, 1);
+      assert.strictEqual(
+        token.columns[0].value.getTime(),
+        new Date('January 3, 1900 00:00:45').getTime()
+      );
 
-    for await (let token of parser2) {
+      result = await parser.next();
+      assert.isTrue(result.done);
+    }
+
+    {
+      const parser = Parser.parseTokens([buffer.data], {}, { ...options, useUTC: true }, colMetadata);
+
+      let result = await parser.next();
+      assert.isFalse(result.done);
+
+      const token = result.value;
       assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
         token.columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45 GMT').getTime()
       );
+
+      result = await parser.next();
+      assert.isTrue(result.done);
     }
-
-    // parser = new Parser({ token() { } }, { useUTC: true });
-    // parser.colMetadata = colMetadata;
-    // parser.write(buffer.data);
-    // token = parser.read();
-    // // console.log(token)
-
-    // assert.strictEqual(token.columns.length, 1);
-    // assert.strictEqual(
-    //   token.columns[0].value.getTime(),
-    //   new Date('January 3, 1900 00:00:45 GMT').getTime()
-    // );
   });
 
   it('should write datetimeN', async () => {
@@ -830,15 +802,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     // console.log(token)
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, null);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
   });
 
   it('should write numeric4Bytes', async () => {
@@ -860,16 +831,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     // console.log(token)
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-    }
-
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
   });
 
   it('should write numeric4BytesNegative', async () => {
@@ -891,14 +860,13 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
   });
 
   it('should write numeric8Bytes', async () => {
@@ -921,17 +889,15 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
 
     // console.log(token)
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-    }
-
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
   });
 
   it('should write numeric12Bytes', async () => {
@@ -955,16 +921,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
     // console.log(token)
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-    }
-
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
   });
 
   it('should write numeric16Bytes', async () => {
@@ -994,15 +958,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
     // console.log(token)
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, value);
-    }
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
   });
 
   it('should write numericNull', async () => {
@@ -1019,13 +982,13 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parserObj = new Parser({}, options);
-    parserObj.colMetadata = colMetadata;
-    const parser = Parser.parseTokens([buffer.data], {}, options, parserObj);
+    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+    const result = await parser.next();
     // console.log(token)
-    for await (let token of parser) {
-      assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(token.columns[0].value, null);
-    }
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
   });
 });

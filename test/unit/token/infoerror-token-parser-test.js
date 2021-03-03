@@ -28,14 +28,15 @@ describe('Infoerror token parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
 
     const parser = StreamParser.parseTokens([data], {}, { tdsVersion: '7_2' });
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.number, number);
-      assert.strictEqual(token.state, state);
-      assert.strictEqual(token.class, class_);
-      assert.strictEqual(token.message, message);
-      assert.strictEqual(token.serverName, serverName);
-      assert.strictEqual(token.procName, procName);
-      assert.strictEqual(token.lineNumber, lineNumber);
-     }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.number, number);
+    assert.strictEqual(token.state, state);
+    assert.strictEqual(token.class, class_);
+    assert.strictEqual(token.message, message);
+    assert.strictEqual(token.serverName, serverName);
+    assert.strictEqual(token.procName, procName);
+    assert.strictEqual(token.lineNumber, lineNumber);
   });
 });

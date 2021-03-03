@@ -18,10 +18,10 @@ describe('Fedauth Info Parser', () => {
     buffer.writeString('stsurl');
 
     const parser = StreamParser.parseTokens([buffer.data], {}, {});
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.stsurl, 'stsurl');
-      assert.strictEqual(token.spn, 'spn');
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.stsurl, 'stsurl');
+    assert.strictEqual(token.spn, 'spn');
   });
 });

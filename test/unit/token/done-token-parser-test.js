@@ -31,13 +31,13 @@ describe('Done Token Parser', () => {
     const doneRowCount = 2;
 
     const parser = parse(status, curCmd, doneRowCount);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) { // (4)
-
-      assert.isOk(!token.more);
-      assert.strictEqual(token.curCmd, curCmd);
-      assert.isOk(!token.rowCount);
-    }
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
   });
 
   it('should more', async () => {
@@ -46,13 +46,13 @@ describe('Done Token Parser', () => {
     const doneRowCount = 2;
 
     const parser = parse(status, curCmd, doneRowCount);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-    for await (let token of parser) { // (4)
-
-      assert.isOk(token.more);
-      assert.strictEqual(token.curCmd, curCmd);
-      assert.isOk(!token.rowCount);
-    }
+    assert.isOk(token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
   });
 
   it('should done row count', async () => {
@@ -61,11 +61,12 @@ describe('Done Token Parser', () => {
     const doneRowCount = 0x1200000034;
 
     const parser = parse(status, curCmd, doneRowCount);
-    for await (let token of parser) { // (4)
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
-      assert.isOk(!token.more);
-      assert.strictEqual(token.curCmd, 1);
-      assert.strictEqual(token.rowCount, doneRowCount);
-    }
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, 1);
+    assert.strictEqual(token.rowCount, doneRowCount);
   });
 });

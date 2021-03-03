@@ -1,4 +1,3 @@
-import StreamParser from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
@@ -39,7 +38,7 @@ const tokenParsers = {
 };
 
 class Parser {
-  debug: StreamParser;
+  debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
 
@@ -48,73 +47,66 @@ class Parser {
   suspended: boolean;
   next?: () => void;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, parser?: Parser) {
-    try {
-      if (!parser) {
-        parser = new Parser(debug, options);
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {
+    const parser = new Parser(debug, options);
+    parser.colMetadata = colMetadata;
+
+    let token: Token | undefined;
+    const onDoneParsing = (t: Token | undefined) => { token = t; };
+
+    for await (const input of iterable) {
+      if (parser.position === parser.buffer.length) {
+        parser.buffer = input;
+      } else {
+        parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), input]);
+      }
+      parser.position = 0;
+
+      if (parser.suspended) {
+        // Unsuspend and continue from where ever we left off.
+        parser.suspended = false;
+        const next = parser.next!;
+
+        next();
+
+        // Check if a new token was parsed after unsuspension.
+        if (!parser.suspended && token) {
+          if (token instanceof ColMetadataToken) {
+            parser.colMetadata = token.columns;
+          }
+
+          yield token;
+        }
       }
 
-      let token: Token | undefined;
-      const onDoneParsing = (t: Token | undefined) => { token = t; };
+      while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
+        const type = parser.buffer.readUInt8(parser.position);
 
-      for await (const input of iterable) {
-        if (parser.position === parser.buffer.length) {
-          parser.buffer = input;
-        } else {
-          parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), input]);
-        }
-        parser.position = 0;
+        parser.position += 1;
 
-        if (parser.suspended) {
-          // Unsuspend and continue from where ever we left off.
-          parser.suspended = false;
-          const next = parser.next!;
-
-          next();
+        if (tokenParsers[type]) {
+          tokenParsers[type](parser, parser.options, onDoneParsing);
 
           // Check if a new token was parsed after unsuspension.
           if (!parser.suspended && token) {
             if (token instanceof ColMetadataToken) {
               parser.colMetadata = token.columns;
             }
-
             yield token;
+            token = undefined;
           }
-        }
-
-        while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
-          const type = parser.buffer.readUInt8(parser.position);
-
-          parser.position += 1;
-
-          if (tokenParsers[type]) {
-            tokenParsers[type](parser, parser.options, onDoneParsing);
-
-            // Check if a new token was parsed after unsuspension.
-            if (!parser.suspended && token) {
-              if (token instanceof ColMetadataToken) {
-                parser.colMetadata = token.columns;
-              }
-              yield token;
-              token = undefined;
-            } else {
-              yield null;
-            }
-          } else {
-            throw new Error('Unknown type: ' + type);
-          }
+        } else {
+          throw new Error('Unknown type: ' + type);
         }
       }
+    }
 
-      if (parser.suspended) {
-        throw new Error('unexpected end of data');
-      }
-    } catch (err) {
-      throw new Error('Stream parser error: ' + err)
+    if (parser.suspended) {
+      throw new Error('unexpected end of data');
     }
   }
 
-  constructor(debug: StreamParser, options: InternalConnectionOptions) {
+  constructor(debug: Debug, options: InternalConnectionOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;

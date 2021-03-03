@@ -19,12 +19,12 @@ describe('Env Change Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
 
     const parser = StreamParser.parseTokens([data], {}, {});
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.type, 'DATABASE');
-      assert.strictEqual(token.oldValue, 'old');
-      assert.strictEqual(token.newValue, 'new');
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.type, 'DATABASE');
+    assert.strictEqual(token.oldValue, 'old');
+    assert.strictEqual(token.newValue, 'new');
   });
 
   it('should write with correct packet size', async () => {
@@ -40,16 +40,16 @@ describe('Env Change Token Parser', () => {
     buffer.writeBVarchar(oldSize);
 
     const data = buffer.data;
-    data.writeUInt16LE(data.length - 3, 1)
+    data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([], {}, {});
+    const parser = StreamParser.parseTokens([data], {}, {});
     // const token = parser.read();
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.type, 'PACKET_SIZE');
-      assert.strictEqual(token.oldValue, 1024);
-      assert.strictEqual(token.newValue, 2048);
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.type, 'PACKET_SIZE');
+    assert.strictEqual(token.oldValue, 1024);
+    assert.strictEqual(token.newValue, 2048);
   });
 
   it('should be of bad type', async () => {
@@ -63,9 +63,7 @@ describe('Env Change Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
 
     const parser = StreamParser.parseTokens([data], {}, {});
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token, null);
-    }
+    const result = await parser.next();
+    assert.isTrue(result.done);
   });
 });

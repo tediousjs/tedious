@@ -16,11 +16,11 @@ describe('Order Token Parser', () => {
     // console.log(buffer.data)
 
     const parser = StreamParser.parseTokens([buffer.data], {}, { tdsVersion: '7_2' });
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.orderColumns.length, 1);
-      assert.strictEqual(token.orderColumns[0], column);
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.orderColumns.length, 1);
+    assert.strictEqual(token.orderColumns[0], column);
   });
 
   it('should have two columns', async () => {
@@ -38,11 +38,11 @@ describe('Order Token Parser', () => {
     // console.log(buffer.data)
 
     const parser = StreamParser.parseTokens([buffer.data], {}, { tdsVersion: '7_2' });
-
-    for await (let token of parser) { // (4)
-      assert.strictEqual(token.orderColumns.length, 2);
-      assert.strictEqual(token.orderColumns[0], column1);
-      assert.strictEqual(token.orderColumns[1], column2);
-    }
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual(token.orderColumns.length, 2);
+    assert.strictEqual(token.orderColumns[0], column1);
+    assert.strictEqual(token.orderColumns[1], column2);
   });
 });

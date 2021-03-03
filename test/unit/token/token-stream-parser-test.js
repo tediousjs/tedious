@@ -41,14 +41,8 @@ describe('Token Stream Parser', () => {
 
   it('should split token across buffers', (done) => {
     var buffer = createDbChangeBuffer();
-    
-    const asyncIterable = {
-      async*[Symbol.asyncIterator]() {
-        yield buffer.slice(0, 6);
-        yield buffer.slice(6);
-      }
-    };
-    var parser = new Parser(asyncIterable, debug);
+
+    var parser = new Parser([buffer.slice(0, 6), buffer.slice(6)], debug);
 
     parser.on('databaseChange', function(event) {
       assert.isOk(event);
