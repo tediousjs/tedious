@@ -92,7 +92,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeInt16LE(offset);
     yield buffer.data;
   },
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
@@ -102,7 +102,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

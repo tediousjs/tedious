@@ -72,7 +72,7 @@ const DateTime: DataType = {
   },
 
   // TODO: type 'any' needs to be revisited.
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
@@ -82,7 +82,7 @@ const DateTime: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

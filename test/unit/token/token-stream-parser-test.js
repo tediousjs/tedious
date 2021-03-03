@@ -34,11 +34,10 @@ describe('Token Stream Parser', () => {
       assert.isOk(event);
     });
 
-    parser.addBuffer(buffer);
+    parser.write(buffer);
+    parser.end();
 
-    assert.isOk(parser.isEnd());
-
-    done();
+    parser.on('end', done);
   });
 
   it('should split token across buffers', (done) => {
@@ -49,11 +48,10 @@ describe('Token Stream Parser', () => {
       assert.isOk(event);
     });
 
-    parser.addBuffer(buffer.slice(0, 6));
-    parser.addBuffer(buffer.slice(6));
+    parser.write(buffer.slice(0, 6));
+    parser.write(buffer.slice(6));
+    parser.end();
 
-    assert.isOk(parser.isEnd());
-
-    done();
+    parser.on('end', done);
   });
 });

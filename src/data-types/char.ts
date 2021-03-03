@@ -73,13 +73,13 @@ const Char: { maximumLength: number } & DataType = {
     yield Buffer.from(parameter.value, 'ascii');
   },
 
-  validate: function(value): null | string | TypeError {
+  validate: function(value): null | string {
     if (value == null) {
       return null;
     }
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+        throw new TypeError('Invalid string.');
       }
       value = value.toString();
     }

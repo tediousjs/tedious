@@ -46,12 +46,12 @@ const Image: DataType = {
     yield parameter.value;
   },
 
-  validate: function(value): null | TypeError | Buffer {
+  validate: function(value): null | Buffer {
     if (value == null) {
       return null;
     }
     if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+      throw new TypeError('Invalid buffer.');
     }
     return value;
   }
