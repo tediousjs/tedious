@@ -222,12 +222,11 @@ class RowTransform extends Transform {
  * bulkLoad.addColumn('myInt', TYPES.Int, { nullable: false });
  * bulkLoad.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
  *
- * // add rows
- * bulkLoad.addRow({ myInt: 7, myString: 'hello' });
- * bulkLoad.addRow({ myInt: 23, myString: 'world' });
- *
  * // execute
- * connection.execBulkLoad(bulkLoad);
+ * connection.execBulkLoad(bulkLoad, [
+ *   { myInt: 7, myString: 'hello' },
+ *   { myInt: 23, myString: 'world' }
+ * ]);
  * ```
  */
 class BulkLoad extends EventEmitter {
@@ -375,7 +374,7 @@ class BulkLoad extends EventEmitter {
    * @param __namedParameters Additional column type information. At a minimum, `nullable` must be set to true or false.
    * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
    * @param nullable Indicates whether the column accepts NULL values.
-   * @param objName  If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]], then you can use this option to specify the property name.
+   * @param objName If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]] or [[Connection.execBulkLoad]], then you can use this option to specify the property name.
    * @param precision For Numeric, Decimal.
    * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
   */
@@ -426,6 +425,9 @@ class BulkLoad extends EventEmitter {
    * ```
    *
    * @param row An object of key/value pairs representing column name (or objName) and value.
+   *
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   addRow(row: { [columnName: string]: unknown }): void
 
@@ -438,6 +440,9 @@ class BulkLoad extends EventEmitter {
    *
    * @param row If there are at least two columns, values can be passed as multiple arguments instead of an array. They
    *   must be in the same order the columns were added in.
+   *
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   addRow(...row: unknown[]): void
 
@@ -449,6 +454,9 @@ class BulkLoad extends EventEmitter {
    * ```
    *
    * @param row An array representing the values of each column in the same order which they were added to the bulkLoad object.
+   *
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   addRow(row: unknown[]): void
 
@@ -660,6 +668,11 @@ class BulkLoad extends EventEmitter {
    *
    * After that, the stream emits a ['drain' event](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain)
    * when it is ready to resume data transfer.
+   *
+   * @deprecated
+   *   This method is deprecated. Instead of writing rows to the stream returned by this method,
+   *   you can pass any object that implements the `Iterable` or `AsyncIterable` interface (e.g. a `Readable`
+   *   stream or an `AsyncGenerator`) when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   getRowStream() {
     if (this.firstRowWritten) {
