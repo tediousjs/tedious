@@ -29,28 +29,30 @@ describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
     var buffer = createDbChangeBuffer();
 
-    var parser = new Parser(debug);
+    var parser = new Parser([buffer], debug);
     parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
 
-    parser.write(buffer);
-    parser.end();
+    // parser.end();
 
     parser.on('end', done);
   });
 
   it('should split token across buffers', (done) => {
     var buffer = createDbChangeBuffer();
+    
+    const asyncIterable = {
+      async*[Symbol.asyncIterator]() {
+        yield buffer.slice(0, 6);
+        yield buffer.slice(6);
+      }
+    };
+    var parser = new Parser(asyncIterable, debug);
 
-    var parser = new Parser(debug);
     parser.on('databaseChange', function(event) {
       assert.isOk(event);
     });
-
-    parser.write(buffer.slice(0, 6));
-    parser.write(buffer.slice(6));
-    parser.end();
 
     parser.on('end', done);
   });
