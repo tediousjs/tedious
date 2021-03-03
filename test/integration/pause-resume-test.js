@@ -97,34 +97,6 @@ describe('Pause-Resume Test', function() {
     connection.execSql(request);
   });
 
-  it('should test pausing request pauses transforms', function(done) {
-    const sql = `
-          with cte1 as
-            (select 1 as i union all select i + 1 from cte1 where i < 20000)
-          select i from cte1 option (maxrecursion 0)
-        `;
-
-    const request = new Request(sql, (error) => {
-      assert.ifError(error);
-
-      done();
-    });
-
-    request.on('row', (columns) => {
-      if (columns[0].value === 1000) {
-        request.pause();
-
-        setTimeout(() => {
-          assert.ok(connection.messageIo.incomingMessageStream.isPaused());
-
-          request.resume();
-        }, 3000);
-      }
-    });
-
-    connection.execSql(request);
-  });
-
   it('should test paused request can be cancelled', function(done) {
     connection.on('error', (err) => {
       assert.ifError(err);
