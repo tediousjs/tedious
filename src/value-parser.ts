@@ -96,7 +96,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readBigInt(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for IntN');
         }
       });
 
@@ -118,7 +118,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readFloat(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for FloatN');
         }
       });
 
@@ -140,7 +140,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readMoney(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
         }
       });
 
@@ -157,7 +157,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readBit(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for BitN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for BitN');
         }
       });
 
@@ -270,7 +270,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readDateTime(parser, options.useUTC, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
         }
       });
 
@@ -330,7 +330,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readUniqueIdentifier(parser, options, callback);
 
           default:
-            return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength! - 1)));
+            throw new Error(sprintf('Unsupported guid size %d', dataLength! - 1));
         }
       });
 
@@ -347,7 +347,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
       });
 
     default:
-      parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+      throw new Error(sprintf('Unrecognised type %s', type.name));
   }
 }
 
@@ -371,7 +371,7 @@ function readNumeric(parser: Parser, dataLength: number, _precision: number, sca
     } else if (dataLength === 17) {
       readValue = parser.readUNumeric128LE;
     } else {
-      return parser.emit('error', new Error(sprintf('Unsupported numeric dataLength %d', dataLength)));
+      throw new Error(sprintf('Unsupported numeric dataLength %d', dataLength));
     }
 
     readValue.call(parser, (value) => {
@@ -568,7 +568,7 @@ function readMaxKnownLength(parser: Parser, totalLength: number, callback: (valu
 
   next(() => {
     if (offset !== totalLength) {
-      parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes'));
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes');
     }
 
     callback(data);

@@ -1,9 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
 describe('Feature Ext Praser', () => {
-  it('should be fed authentication', () => {
+  it('should be fed authentication', async () => {
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
@@ -22,11 +22,11 @@ describe('Feature Ext Praser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = new Parser({ token() { } }, {}, {});
-    parser.write(buffer.data);
-
-    const token = parser.read();
-
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
     assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
+    assert.isTrue((await parser.next()).done);
   });
 });
