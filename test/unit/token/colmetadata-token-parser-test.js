@@ -25,12 +25,15 @@ describe('Colmetadata Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
+
     assert.isOk(!token.error);
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].userType, 2);
     assert.strictEqual(token.columns[0].flags, 3);
     assert.strictEqual(token.columns[0].type.name, 'Int');
     assert.strictEqual(token.columns[0].colName, 'name');
+
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should varchar', async () => {

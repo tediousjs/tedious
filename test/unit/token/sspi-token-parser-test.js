@@ -49,5 +49,7 @@ describe('sspi token parser', () => {
     assert.deepEqual(token.ntlmpacket, expected);
     // Skip token (first byte) and length of VarByte (2 bytes).
     assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
+
+    assert.isTrue((await parser.next()).done);
   });
 });

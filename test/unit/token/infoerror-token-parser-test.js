@@ -38,5 +38,7 @@ describe('Infoerror token parser', () => {
     assert.strictEqual(token.serverName, serverName);
     assert.strictEqual(token.procName, procName);
     assert.strictEqual(token.lineNumber, lineNumber);
+
+    assert.isTrue((await parser.next()).done);
   });
 });

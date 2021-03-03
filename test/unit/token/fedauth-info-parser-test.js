@@ -23,5 +23,7 @@ describe('Fedauth Info Parser', () => {
     const token = result.value;
     assert.strictEqual(token.stsurl, 'stsurl');
     assert.strictEqual(token.spn, 'spn');
+
+    assert.isTrue((await parser.next()).done);
   });
 });

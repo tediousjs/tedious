@@ -43,10 +43,10 @@ describe('Env Change Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
 
     const parser = StreamParser.parseTokens([data], {}, {});
-    // const token = parser.read();
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
+
     assert.strictEqual(token.type, 'PACKET_SIZE');
     assert.strictEqual(token.oldValue, 1024);
     assert.strictEqual(token.newValue, 2048);

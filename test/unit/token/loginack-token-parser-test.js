@@ -39,5 +39,7 @@ describe('Loginack Token Parser', () => {
     assert.strictEqual(token.tdsVersion, '7_2');
     assert.strictEqual(token.progName, progName);
     assert.deepEqual(token.progVersion, progVersion);
+
+    assert.isTrue((await parser.next()).done);
   });
 });

@@ -20,6 +20,7 @@ describe('Order Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
     assert.strictEqual(token.orderColumns.length, 1);
+
     assert.strictEqual(token.orderColumns[0], column);
   });
 
@@ -44,5 +45,7 @@ describe('Order Token Parser', () => {
     assert.strictEqual(token.orderColumns.length, 2);
     assert.strictEqual(token.orderColumns[0], column1);
     assert.strictEqual(token.orderColumns[1], column2);
+
+    assert.isTrue((await parser.next()).done);
   });
 });

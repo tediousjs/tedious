@@ -1,3 +1,4 @@
+import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
@@ -16,7 +17,6 @@ import returnValueParser from './returnvalue-token-parser';
 import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
-import Debug from '../debug';
 
 const tokenParsers = {
   [TYPE.COLMETADATA]: colMetadataParser,
@@ -93,7 +93,6 @@ class Parser {
               parser.colMetadata = token.columns;
             }
             yield token;
-            token = undefined;
           }
         } else {
           throw new Error('Unknown type: ' + type);

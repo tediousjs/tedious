@@ -32,6 +32,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write bigint', async () => {
@@ -54,6 +55,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 2);
     assert.strictEqual('1', token.columns[0].value);
     assert.strictEqual('9223372036854775807', token.columns[1].value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write real', async () => {
@@ -73,6 +75,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write float', async () => {
@@ -93,6 +96,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write Money', async () => {
@@ -134,6 +138,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[3].value, value);
     assert.strictEqual(token.columns[4].value, value);
     assert.strictEqual(token.columns[5].value, valueLarge);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varchar without code page', async () => {
@@ -161,6 +166,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varchar with code page', async () => {
@@ -188,6 +194,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write nvarchar', async () => {
@@ -208,6 +215,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varBinary', async () => {
@@ -229,6 +237,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.deepEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write binary', async () => {
@@ -250,6 +259,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.deepEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varcharMaxNull', async () => {
@@ -278,6 +288,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varcharMaxUnkownLength', async () => {
@@ -312,6 +323,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varcharMaxKnownLength', async () => {
@@ -345,6 +357,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varcharmaxWithCodePage', async () => {
@@ -377,6 +390,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varcharMaxKnownLengthWrong', async () => {
@@ -412,6 +426,7 @@ describe('Row Token Parser', () => {
 
     assert.instanceOf(error, Error);
     assert.strictEqual(error.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varBinaryMaxNull', async () => {
@@ -437,6 +452,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write varBinaryMaxUnknownLength', async () => {
@@ -467,6 +483,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns.length, 1);
     assert.deepEqual(token.columns[0].value, value);
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write intN', async () => {
@@ -611,6 +628,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual('100', token.columns[9].value);
     assert.strictEqual('1000', token.columns[10].value);
     assert.strictEqual('10000', token.columns[11].value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async () => {
@@ -657,6 +675,7 @@ describe('Row Token Parser', () => {
       '67452301-AB89-EFCD-0123-456789ABCDEF',
       token.columns[1].value
     );
+    assert.isTrue((await parser.next()).done);
 
   });
 
@@ -702,6 +721,7 @@ describe('Row Token Parser', () => {
       '67452301-ab89-efcd-0123-456789abcdef',
       token.columns[1].value
     );
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write floatN', async () => {
@@ -743,6 +763,7 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].value, null);
     assert.strictEqual(9.5, token.columns[1].value);
     assert.strictEqual(9.5, token.columns[2].value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write datetime', async () => {
@@ -773,6 +794,7 @@ describe('Row Token Parser', () => {
 
       result = await parser.next();
       assert.isTrue(result.done);
+      assert.isTrue((await parser.next()).done);
     }
 
     {
@@ -790,6 +812,7 @@ describe('Row Token Parser', () => {
 
       result = await parser.next();
       assert.isTrue(result.done);
+      assert.isTrue((await parser.next()).done);
     }
   });
 
@@ -810,6 +833,7 @@ describe('Row Token Parser', () => {
     // console.log(token)
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numeric4Bytes', async () => {
@@ -839,6 +863,7 @@ describe('Row Token Parser', () => {
     // console.log(token)
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numeric4BytesNegative', async () => {
@@ -867,6 +892,7 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numeric8Bytes', async () => {
@@ -898,6 +924,7 @@ describe('Row Token Parser', () => {
     // console.log(token)
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numeric12Bytes', async () => {
@@ -929,6 +956,7 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numeric16Bytes', async () => {
@@ -966,6 +994,7 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, value);
+    assert.isTrue((await parser.next()).done);
   });
 
   it('should write numericNull', async () => {
@@ -990,5 +1019,6 @@ describe('Row Token Parser', () => {
 
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].value, null);
+    assert.isTrue((await parser.next()).done);
   });
 });

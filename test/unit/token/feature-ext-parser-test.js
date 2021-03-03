@@ -27,5 +27,6 @@ describe('Feature Ext Praser', () => {
     assert.isFalse(result.done);
     const token = result.value;
     assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
+    assert.isTrue((await parser.next()).done);
   });
 });

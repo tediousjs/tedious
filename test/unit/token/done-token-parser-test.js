@@ -14,13 +14,7 @@ function parse(status, curCmd, doneRowCount) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  const asyncIterable = {
-    async*[Symbol.asyncIterator]() {
-      yield buffer.data;
-    }
-  };
-
-  var parser = StreamParser.parseTokens(asyncIterable, {}, { tdsVersion: '7_2' });
+  var parser = StreamParser.parseTokens([buffer.data], {}, { tdsVersion: '7_2' });
   return parser;
 }
 
