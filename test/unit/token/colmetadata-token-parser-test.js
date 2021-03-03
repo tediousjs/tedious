@@ -5,7 +5,7 @@ const assert = require('chai').assert;
 const Readable = require('readable-stream').Readable;
 
 describe('Colmetadata Token Parser', () => {
-  it('should int', (done) => {
+  it('should int', async () => {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -23,20 +23,17 @@ describe('Colmetadata Token Parser', () => {
 
     const parser = StreamParser.parseTokens([buffer.data], {}, {});
 
-    (async () => {
-      for await (let token of parser) { // (4)
-        assert.isOk(!token.error);
-        assert.strictEqual(token.columns.length, 1);
-        assert.strictEqual(token.columns[0].userType, 2);
-        assert.strictEqual(token.columns[0].flags, 3);
-        assert.strictEqual(token.columns[0].type.name, 'Int');
-        assert.strictEqual(token.columns[0].colName, 'name');
-        done();
-      }
-    })()
+    for await (let token of parser) { // (4)
+      assert.isOk(!token.error);
+      assert.strictEqual(token.columns.length, 1);
+      assert.strictEqual(token.columns[0].userType, 2);
+      assert.strictEqual(token.columns[0].flags, 3);
+      assert.strictEqual(token.columns[0].type.name, 'Int');
+      assert.strictEqual(token.columns[0].colName, 'name');
+    }
   });
 
-  it('should varchar', (done) => {
+  it('should varchar', async () => {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -59,22 +56,19 @@ describe('Colmetadata Token Parser', () => {
 
     const parser = StreamParser.parseTokens([buffer.data], {}, {});
 
-    (async () => {
-      for await (let token of parser) { // (4)
-        assert.isOk(!token.error);
-        assert.strictEqual(token.columns.length, 1);
-        assert.strictEqual(token.columns[0].userType, 2);
-        assert.strictEqual(token.columns[0].flags, 3);
-        assert.strictEqual(token.columns[0].type.name, 'VarChar');
-        assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
-        assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
-        assert.strictEqual(token.columns[0].collation.flags, 0x57);
-        assert.strictEqual(token.columns[0].collation.version, 0x8);
-        assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
-        assert.strictEqual(token.columns[0].colName, 'name');
-        assert.strictEqual(token.columns[0].dataLength, length);
-        done();
-      }
-    })()
+    for await (let token of parser) { // (4)
+      assert.isOk(!token.error);
+      assert.strictEqual(token.columns.length, 1);
+      assert.strictEqual(token.columns[0].userType, 2);
+      assert.strictEqual(token.columns[0].flags, 3);
+      assert.strictEqual(token.columns[0].type.name, 'VarChar');
+      assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
+      assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
+      assert.strictEqual(token.columns[0].collation.flags, 0x57);
+      assert.strictEqual(token.columns[0].collation.version, 0x8);
+      assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
+      assert.strictEqual(token.columns[0].colName, 'name');
+      assert.strictEqual(token.columns[0].dataLength, length);
+    }
   })
 });
