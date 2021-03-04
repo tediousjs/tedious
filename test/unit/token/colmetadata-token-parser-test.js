@@ -1,10 +1,10 @@
 const dataTypeByName = require('../../../src/data-type').typeByName;
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
-const TokenStreamParser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const assert = require('chai').assert;
 
 describe('Colmetadata Token Parser', () => {
-  it('should int', () => {
+  it('should int', async () => {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -20,10 +20,11 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer.data)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
-    parser.write(buffer.data);
-    const token = parser.read();
-    // console.log(token)
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     assert.isOk(!token.error);
     assert.strictEqual(token.columns.length, 1);
@@ -31,9 +32,11 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].flags, 3);
     assert.strictEqual(token.columns[0].type.name, 'Int');
     assert.strictEqual(token.columns[0].colName, 'name');
+
+    assert.isTrue((await parser.next()).done);
   });
 
-  it('should varchar', () => {
+  it('should varchar', async () => {
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -53,11 +56,11 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer)
 
-    const parser = new TokenStreamParser({ token() { } }, {}, {});
-    parser.write(buffer.data);
-    const token = parser.read();
-    // console.log(token)
 
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
     assert.isOk(!token.error);
     assert.strictEqual(token.columns.length, 1);
     assert.strictEqual(token.columns[0].userType, 2);

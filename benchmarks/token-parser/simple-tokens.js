@@ -6,9 +6,13 @@ const bench = createBenchmark(main, {
   n: [10, 100, 1000]
 });
 
-function main({ n }) {
-  const parser = new Parser({ token: function() { } }, {}, {});
+async function * repeat(data, n) {
+  for (let i = 0; i < n; i++) {
+    yield data;
+  }
+}
 
+function main({ n }) {
   const data = Buffer.from([
     '810300000000001000380269006400000000000900E7C8000904D00034046E00',
     '61006D006500000000000900E7FFFF0904D000340B6400650073006300720069',
@@ -343,11 +347,11 @@ function main({ n }) {
     '1100C10064000000000000007900000000FE0000E0000000000000000000'
   ].join(''), 'hex');
 
+  const parser = new Parser(repeat(data, n), { token: function() { } }, {}, {});
+
   bench.start();
 
-  for (let i = 0; i < n; i++) {
-    parser.write(data);
-  }
-
-  bench.end(n);
+  parser.on('end', () => {
+    bench.end(n);
+  });
 }

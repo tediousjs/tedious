@@ -28,29 +28,21 @@ import {
   DoneProcToken,
   DoneToken
 } from './token';
+import { Readable } from 'readable-stream';
+import Message from '../message';
 
-/*
-  Buffers are thrown at the parser (by calling addBuffer).
-  Tokens are parsed from the buffer until there are no more tokens in
-  the buffer, or there is just a partial token left.
-  If there is a partial token left over, then it is kept until another
-  buffer is added, which should contain the remainder of the partial
-  token, along with (perhaps) more tokens.
-  The partial token and the new buffer are concatenated, and the token
-  parsing resumes.
- */
 export class Parser extends EventEmitter {
   debug: Debug;
   options: InternalConnectionOptions;
-  parser: StreamParser;
+  parser: Readable;
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
+  constructor(message: Message, debug: Debug, options: InternalConnectionOptions) {
     super();
 
     this.debug = debug;
     this.options = options;
 
-    this.parser = new StreamParser(this.debug, this.options);
+    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options)) as Readable;
     this.parser.on('data', (token: Token) => {
       if (token.event) {
         this.emit(token.event, token);
@@ -89,25 +81,15 @@ export class Parser extends EventEmitter {
     ((event: 'done', listener: (token: DoneToken) => void) => this) &
     ((event: 'doneInProc', listener: (token: DoneInProcToken) => void) => this) &
     ((event: 'doneProc', listener: (token: DoneProcToken) => void) => this) &
+    ((event: 'end', listener: () => void) => this) &
     ((event: string | symbol, listener: (...args: any[]) => void) => this)
   );
 
-  // Returns false to apply backpressure.
-  write(buffer: Buffer) {
-    return this.parser.write(buffer);
-  }
-
-  end() {
-    this.parser.end();
-  }
-
-  // Temporarily suspends the token stream parser transform from emitting events.
   pause() {
-    this.parser.pause();
+    return this.parser.pause();
   }
 
-  // Resumes the token stream parser transform.
   resume() {
-    this.parser.resume();
+    return this.parser.resume();
   }
 }

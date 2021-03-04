@@ -1,9 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WriteBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
 describe('sspi token parser', () => {
-  it('should parse challenge', () => {
+  it('should parse challenge', async () => {
     const source = new WriteBuffer(68);
     source.writeUInt8(0xed);
     source.writeUInt16LE(0);
@@ -22,11 +22,10 @@ describe('sspi token parser', () => {
     source.writeString('domain', 'ucs2'); // domain
     source.writeInt32BE(11259375); // target == 'abcdef'
 
-    const parser = new Parser({ token() { } }, {}, {});
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
-    parser.write(data);
-    const challenge = parser.read();
+    const parser = StreamParser.parseTokens([data], {}, { tdsVersion: '7_2' });
+
 
     const expected = {
       magic: 'NTLMSSP\0',
@@ -44,10 +43,13 @@ describe('sspi token parser', () => {
       domain: 'domain',
       target: Buffer.from([0x00, 0xab, 0xcd, 0xef])
     };
-
-    assert.deepEqual(challenge.ntlmpacket, expected);
-
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.deepEqual(token.ntlmpacket, expected);
     // Skip token (first byte) and length of VarByte (2 bytes).
-    assert.isOk(challenge.ntlmpacketBuffer.equals(data.slice(3)));
+    assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
+
+    assert.isTrue((await parser.next()).done);
   });
 });
