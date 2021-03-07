@@ -1005,6 +1005,11 @@ class Connection extends EventEmitter {
   retryTimer: undefined | NodeJS.Timeout;
 
   /**
+   * @private
+   */
+  _cancelAfterRequestSent: () => void;
+
+  /**
    * Note: be aware of the different options field:
    * 1. config.authentication.options
    * 2. config.options
@@ -1700,6 +1705,13 @@ class Connection extends EventEmitter {
     this.transientErrorLookup = new TransientErrorLookup();
 
     this.state = this.STATE.INITIALIZED;
+
+    this._cancelAfterRequestSent = () => {
+      this.messageIo.sendMessage(TYPE.ATTENTION);
+
+      this.transitionTo(this.STATE.SENT_ATTENTION);
+      this.createCancelTimer();
+    };
   }
 
   connect(connectListener?: (err?: Error) => void) {
@@ -2165,14 +2177,7 @@ class Connection extends EventEmitter {
           this.dispatchEvent('attention');
         }
 
-        if (request.canceled) {
-          // If we received a `DONE` token with `DONE_ERROR`, but no previous `ERROR` token,
-          // We assume this is the indication that an in-flight request was canceled.
-          if (token.sqlError && !request.error) {
-            this.clearCancelTimer();
-            request.error = RequestError('Canceled.', 'ECANCEL');
-          }
-        } else {
+        if (!request.canceled) {
           if (token.sqlError && !request.error) {
             // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
             request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
@@ -3134,6 +3139,7 @@ class Connection extends EventEmitter {
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
+        request.once('cancel', this._cancelAfterRequestSent);
       });
     }
   }
@@ -3605,24 +3611,6 @@ Connection.prototype.STATE = {
 
         const tokenStreamParser = this.createTokenStreamParser(message);
 
-        // If the request was canceled after the request was sent, but before
-        // we started receiving a message, we send an attention message, fully
-        // consume the current message, and then switch the next state.
-        if (this.request?.canceled) {
-          this.messageIo.sendMessage(TYPE.ATTENTION);
-          // Don't wait for the `tokenStreamParser` to end before switching
-          // to the `SENT_ATTENTION` state. The `end` event is delayed and
-          // we would switch to the new state after the attention acknowledgement
-          // message was received.
-          this.transitionTo(this.STATE.SENT_ATTENTION);
-          this.createCancelTimer();
-
-          if (this.request instanceof Request && this.request.paused) {
-            // resume the request if it was paused so we can read the remaining tokens
-            this.request?.resume();
-          }
-
-        } else {
         const onResume = () => { tokenStreamParser.resume(); };
         const onPause = () => {
           tokenStreamParser.pause();
@@ -3640,19 +3628,16 @@ Connection.prototype.STATE = {
           tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
-              // resume the request if it was paused so we can read the remaining tokens
-              this.request?.resume();
+            // resume the request if it was paused so we can read the remaining tokens
+            this.request.resume();
           }
 
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
-
-            this.messageIo.sendMessage(TYPE.ATTENTION);
-            this.transitionTo(this.STATE.SENT_ATTENTION);
-            this.createCancelTimer();
         };
 
         const onEndOfMessage = () => {
+          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
@@ -3669,7 +3654,6 @@ Connection.prototype.STATE = {
         tokenStreamParser.once('end', onEndOfMessage);
         this.request?.once('cancel', onCancel);
       }
-    }
     }
   },
   SENT_ATTENTION: {
@@ -3696,6 +3680,8 @@ Connection.prototype.STATE = {
           // 3.2.5.7 Sent Attention State
           // Discard any data contained in the response, until we receive the attention response
           if (this.attentionReceived) {
+            this.attentionReceived = false;
+
             this.clearCancelTimer();
 
             const sqlRequest = this.request!;

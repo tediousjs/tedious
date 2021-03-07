@@ -480,7 +480,7 @@ describe('BulkLoad', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Canceled.');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
       startVerifyTableContent();
     }
 
@@ -521,7 +521,7 @@ describe('BulkLoad', function() {
         assert.ok(err);
         assert.strictEqual(err.message, 'Canceled.');
 
-        assert.isUndefined(rowCount);
+        assert.strictEqual(rowCount, 0);
       });
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
@@ -667,7 +667,7 @@ describe('BulkLoad', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
 
       done();
     }
