@@ -3094,9 +3094,6 @@ class Connection extends EventEmitter {
         message.ignore = true;
         message.end();
 
-        this.clearRequestTimer();
-        this.createCancelTimer();
-
         if (request instanceof Request && request.paused) {
           // resume the request if it was paused so we can read the remaining tokens
           request.resume();

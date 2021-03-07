@@ -508,6 +508,60 @@ describe('BulkLoad', function() {
     }
   });
 
+  it('should not close the connection due to cancelTimeout if streaming bulk load is cancelled', function(done) {
+    const totalRows = 20;
+
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const bulkLoad = connection.newBulkLoad('#stream_test', (err, rowCount) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+
+        assert.isUndefined(rowCount);
+      });
+
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      const rowStream = bulkLoad.getRowStream();
+      connection.execBulkLoad(bulkLoad);
+
+      let rowCount = 0;
+      const rowSource = Readable.from((async function*() {
+        while (rowCount < totalRows) {
+          if (rowCount === 10) {
+            bulkLoad.cancel();
+
+            setTimeout(() => {
+              assert.strictEqual(connection.state.name, 'LoggedIn');
+
+              const request = new Request('select 1', done);
+
+              connection.execSql(request);
+            }, connection.config.options.cancelTimeout + 100);
+          }
+
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+
+          yield [rowCount++];
+        }
+      })(), { objectMode: true });
+
+      pipeline(rowSource, rowStream, (err) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+        assert.strictEqual(rowCount, 10);
+      });
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('cancels any bulk load that takes longer than the given timeout', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, Error);
