@@ -3133,11 +3133,11 @@ class Connection extends EventEmitter {
         });
 
         Readable.from(payload!).pipe(message);
-
-        message.once('finish', () => {
-          request.removeListener('cancel', onCancel);
-        });
       }
+
+      message.once('finish', () => {
+        request.removeListener('cancel', onCancel);
+      });
     }
   }
 
@@ -3626,53 +3626,53 @@ Connection.prototype.STATE = {
           }
 
         } else {
-          const onResume = () => { tokenStreamParser.resume(); };
-          const onPause = () => {
-            tokenStreamParser.pause();
+        const onResume = () => { tokenStreamParser.resume(); };
+        const onPause = () => {
+          tokenStreamParser.pause();
 
-            this.request?.once('resume', onResume);
-          };
+          this.request?.once('resume', onResume);
+        };
 
-          this.request?.on('pause', onPause);
+        this.request?.on('pause', onPause);
+
+        if (this.request instanceof Request && this.request.paused) {
+          onPause();
+        }
+
+        const onCancel = () => {
+          tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
-            onPause();
-          }
-
-          const onCancel = () => {
-            tokenStreamParser.removeListener('end', onEndOfMessage);
-
-            if (this.request instanceof Request && this.request.paused) {
               // resume the request if it was paused so we can read the remaining tokens
               this.request?.resume();
-            }
+          }
 
-            this.request?.removeListener('pause', onPause);
-            this.request?.removeListener('resume', onResume);
+          this.request?.removeListener('pause', onPause);
+          this.request?.removeListener('resume', onResume);
 
             this.messageIo.sendMessage(TYPE.ATTENTION);
             this.transitionTo(this.STATE.SENT_ATTENTION);
             this.createCancelTimer();
-          };
+        };
 
-          const onEndOfMessage = () => {
-            this.request?.removeListener('cancel', onCancel);
-            this.request?.removeListener('pause', onPause);
-            this.request?.removeListener('resume', onResume);
+        const onEndOfMessage = () => {
+          this.request?.removeListener('cancel', onCancel);
+          this.request?.removeListener('pause', onPause);
+          this.request?.removeListener('resume', onResume);
 
-            this.transitionTo(this.STATE.LOGGED_IN);
-            const sqlRequest = this.request as Request;
-            this.request = undefined;
-            if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
-              this.inTransaction = false;
-            }
-            sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
-          };
+          this.transitionTo(this.STATE.LOGGED_IN);
+          const sqlRequest = this.request as Request;
+          this.request = undefined;
+          if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+            this.inTransaction = false;
+          }
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+        };
 
-          tokenStreamParser.once('end', onEndOfMessage);
-          this.request?.once('cancel', onCancel);
-        }
+        tokenStreamParser.once('end', onEndOfMessage);
+        this.request?.once('cancel', onCancel);
       }
+    }
     }
   },
   SENT_ATTENTION: {
