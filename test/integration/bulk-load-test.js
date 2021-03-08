@@ -14,6 +14,8 @@ function getConfig() {
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
+  config.options.cancelTimeout = 1000;
+
   if (debugMode) {
     config.options.debug = {
       packet: true,
@@ -320,6 +322,38 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('should not close the connection due to cancelTimeout if canceled after completion', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      bulkLoad.cancel();
+
+      setTimeout(() => {
+        assert.strictEqual(connection.state.name, 'LoggedIn');
+
+        const request = new Request('select 1', done);
+
+        connection.execSql(request);
+      }, connection.config.options.cancelTimeout + 100);
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    bulkLoad.addRow({ id: 1234 });
+
+    const createTableRequest = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(createTableRequest);
+  });
+
   it('supports streaming bulk load inserts', function(done) {
     const totalRows = 20;
     const tableName = '#streamingBulkLoadTest';
@@ -446,7 +480,7 @@ describe('BulkLoad', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Canceled.');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
       startVerifyTableContent();
     }
 
@@ -472,6 +506,60 @@ describe('BulkLoad', function() {
 
       done();
     }
+  });
+
+  it('should not close the connection due to cancelTimeout if streaming bulk load is cancelled', function(done) {
+    const totalRows = 20;
+
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const bulkLoad = connection.newBulkLoad('#stream_test', (err, rowCount) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+
+        assert.strictEqual(rowCount, 0);
+      });
+
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      const rowStream = bulkLoad.getRowStream();
+      connection.execBulkLoad(bulkLoad);
+
+      let rowCount = 0;
+      const rowSource = Readable.from((async function*() {
+        while (rowCount < totalRows) {
+          if (rowCount === 10) {
+            bulkLoad.cancel();
+
+            setTimeout(() => {
+              assert.strictEqual(connection.state.name, 'LoggedIn');
+
+              const request = new Request('select 1', done);
+
+              connection.execSql(request);
+            }, connection.config.options.cancelTimeout + 100);
+          }
+
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+
+          yield [rowCount++];
+        }
+      })(), { objectMode: true });
+
+      pipeline(rowSource, rowStream, (err) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+        assert.strictEqual(rowCount, 10);
+      });
+    });
+
+    connection.execSqlBatch(request);
   });
 
   it('cancels any bulk load that takes longer than the given timeout', function(done) {
@@ -579,7 +667,7 @@ describe('BulkLoad', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
 
       done();
     }
