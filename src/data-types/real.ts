@@ -49,13 +49,13 @@ const Real: DataType = {
     }
   },
 
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
     value = parseFloat(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
     return value;
   }

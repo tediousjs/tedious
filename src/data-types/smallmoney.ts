@@ -51,16 +51,16 @@ const SmallMoney: DataType = {
     }
   },
 
-  validate: function(value): null | number | TypeError {
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
     value = parseFloat(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
     if (value < -214748.3648 || value > 214748.3647) {
-      return new TypeError('Value must be between -214748.3648 and 214748.3647.');
+      throw new TypeError('Value must be between -214748.3648 and 214748.3647.');
     }
     return value;
   }

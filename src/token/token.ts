@@ -494,12 +494,3 @@ export class SSPIToken extends Token {
     this.ntlmpacketBuffer = ntlmpacketBuffer;
   }
 }
-
-export class EndOfMessageToken extends Token {
-  declare name: 'EOM';
-  declare event: 'endOfMessage';
-
-  constructor() {
-    super('EOM', 'endOfMessage');
-  }
-}

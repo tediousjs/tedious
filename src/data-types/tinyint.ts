@@ -49,7 +49,7 @@ const TinyInt: DataType = {
     }
   },
 
-  validate: function(value): number | null | TypeError {
+  validate: function(value): number | null {
     if (value == null) {
       return null;
     }
@@ -59,11 +59,11 @@ const TinyInt: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
 
     if (value < 0 || value > 255) {
-      return new TypeError('Value must be between 0 and 255, inclusive.');
+      throw new TypeError('Value must be between 0 and 255, inclusive.');
     }
 
     return value | 0;

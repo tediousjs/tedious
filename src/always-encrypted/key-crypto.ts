@@ -38,14 +38,14 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
   return cipherText;
 };
 
-export const decryptWithKey = async (cipherText: Buffer, md: CryptoMetadata, options: ConnectionOptions): Promise<Buffer> => {
+export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: ConnectionOptions): Buffer => {
   if (!options.trustedServerNameAE) {
-    throw new Error('Server name should npt be null in DecryptWithKey');
+    throw new Error('Server name should not be null in DecryptWithKey');
   }
 
-  if (!md.cipherAlgorithm) {
-    await decryptSymmetricKey(md, options);
-  }
+  // if (!md.cipherAlgorithm) {
+  //   await decryptSymmetricKey(md, options);
+  // }
 
   if (!md.cipherAlgorithm) {
     throw new Error('Cipher Algorithm should not be null in DecryptWithKey');

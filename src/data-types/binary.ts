@@ -71,13 +71,13 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): Buffer | null | TypeError {
+  validate: function(value): Buffer | null {
     if (value == null) {
       return null;
     }
 
     if (!Buffer.isBuffer(value)) {
-      return new TypeError('Invalid buffer.');
+      throw new TypeError('Invalid buffer.');
     }
 
     return value;

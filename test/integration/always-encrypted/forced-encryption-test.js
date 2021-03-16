@@ -215,6 +215,7 @@ describe('forced encryption test', function() {
       if (err) {
         return done(err);
       }
+
       const request = new Request(call_sql, (err) => {
         if (err) {
           if (expError) {
@@ -263,6 +264,7 @@ describe('forced encryption test', function() {
 
   beforeEach(function(done) {
     connection = new Connection(config);
+    // connection.on('debug', console.log)
     connection.connect((err) => {
       if (err) {
         return done(err);
@@ -327,9 +329,9 @@ describe('forced encryption test', function() {
     const experrMsg = 'Cannot execute statement or procedure insert into [dbo].[mixedEncTable] values (@p0, @p1, @p2, @p3, @p4, @p5, @p6) because Force Encryption was set as true for parameter 3 and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.';
 
     forceEncryptTest([], sql, values, expected, array1, false, '', mixedEncTable, addParamsArray, done, () => {
-      forceEncryptTest([], sql, values, expected, array2, false, '', mixedEncTable, addParamsArray, done, () => {
+     forceEncryptTest([], sql, values, expected, array2, false, '', mixedEncTable, addParamsArray, done, () => {
         forceEncryptTest([], sql, values, expected, array3, true, experrMsg, mixedEncTable, addParamsArray, done, done);
-      });
+     });
     });
   });
 

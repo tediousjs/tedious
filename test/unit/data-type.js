@@ -1960,10 +1960,10 @@ describe('UniqueIdentifier', function() {
       assert.strictEqual(actual, expected);
     });
 
-    it('returns a TypeError for values that don\'t matcht the UUID format', function() {
-      const result = TYPES.UniqueIdentifier.validate('invalid');
-      assert.instanceOf(result, TypeError);
-      assert.strictEqual(result.message, 'Invalid GUID.');
+    it("returns a TypeError for values that don't match the UUID format", function() {
+      assert.throws(() => {
+        TYPES.UniqueIdentifier.validate('invalid');
+      }, TypeError, 'Invalid GUID.');
     });
   });
 });
@@ -2112,7 +2112,7 @@ describe('VarChar', function() {
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
       // Length <= Maximum Length
-      const expected = Buffer.from('a7401f0000000000', 'hex');
+      const expected = Buffer.from('a7010000000000000', 'hex');
 
       const result = TYPES.VarChar.generateTypeInfo({ length: 1 });
       assert.deepEqual(result, expected);

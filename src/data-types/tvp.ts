@@ -99,21 +99,21 @@ const TVP: DataType = {
     yield TVP_END_TOKEN;
   },
 
-  validate: function(value): Buffer | null | TypeError {
+  validate: function(value): Buffer | null {
     if (value == null) {
       return null;
     }
 
     if (typeof value !== 'object') {
-      return new TypeError('Invalid table.');
+      throw new TypeError('Invalid table.');
     }
 
     if (!Array.isArray(value.columns)) {
-      return new TypeError('Invalid table.');
+      throw new TypeError('Invalid table.');
     }
 
     if (!Array.isArray(value.rows)) {
-      return new TypeError('Invalid table.');
+      throw new TypeError('Invalid table.');
     }
 
     return value;

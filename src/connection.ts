@@ -405,14 +405,11 @@ interface State {
     socketError?(this: Connection, err: Error): void;
     connectTimeout?(this: Connection): void;
     socketConnect?(this: Connection): void;
-    data?(this: Connection, data: Buffer): void;
-    message?(this: Connection): void;
+    message?(this: Connection, message: Message): void;
     retry?(this: Connection): void;
-    routingChange?(this: Connection): void;
     reconnect?(this: Connection): void;
     featureExtAck?(this: Connection, token: FeatureExtAckToken): void;
     fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void;
-    endOfMessageMarkerReceived?(this: Connection): void;
     loginFailed?(this: Connection): void;
     attention?(this: Connection): void;
   };
@@ -941,10 +938,6 @@ class Connection extends EventEmitter {
    * @private
    */
   debug: Debug;
-  /**
-   * @private
-   */
-  tokenStreamParser: TokenStreamParser;
   /**
    * @private
    */
@@ -1777,7 +1770,6 @@ class Connection extends EventEmitter {
     this.secureContext = createSecureContext(credentialsDetails);
 
     this.debug = this.createDebug();
-    this.tokenStreamParser = this.createTokenStreamParser();
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
 
@@ -2031,8 +2023,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser() {
-    const tokenStreamParser = new TokenStreamParser(this.debug, this.config.options);
+  createTokenStreamParser(message: Message) {
+    const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
       this.emit('infoMessage', token);
@@ -2128,7 +2120,6 @@ class Connection extends EventEmitter {
 
     tokenStreamParser.on('routingChange', (token) => {
       this.routingData = token.newValue;
-      this.dispatchEvent('routingChange');
     });
 
     tokenStreamParser.on('packetSizeChange', (token) => {
@@ -2206,7 +2197,7 @@ class Connection extends EventEmitter {
           if (this.config.options.rowCollectionOnDone) {
             request.rst!.push(token.columns);
           }
-          if (!(this.state === this.STATE.SENT_ATTENTION && request.paused)) {
+          if (!request.canceled) {
             request.emit('row', token.columns);
           }
         }
@@ -2296,18 +2287,8 @@ class Connection extends EventEmitter {
       }
     });
 
-    tokenStreamParser.on('endOfMessage', () => { // EOM pseudo token received
-      this.dispatchEvent('endOfMessageMarkerReceived');
-    });
-
     tokenStreamParser.on('resetConnection', () => {
       this.emit('resetConnection');
-    });
-
-    tokenStreamParser.on('drain', () => {
-      // Bridge the release of backpressure from the token stream parser
-      // transform to the packet stream transform.
-      this.messageIo.resume();
     });
 
     return tokenStreamParser;
@@ -2336,8 +2317,7 @@ class Connection extends EventEmitter {
       socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
       this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
-      this.messageIo.on('message', () => { this.dispatchEvent('message'); });
+      this.messageIo.on('data', (message) => { this.dispatchEvent('message', message); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
       this.messageIo.on('error', (error) => {
         this.socketError(error);
@@ -2703,49 +2683,6 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Returns false to apply backpressure.
-   *
-   * @private
-   */
-  sendDataToTokenStreamParser(data: Buffer) {
-    return this.tokenStreamParser.addBuffer(data);
-  }
-
-  /**
-   * This is an internal method that is called from [[Request.pause]].
-   * It has to check whether the passed Request object represents the currently
-   * active request, because the application might have called [[Request.pause]]
-   * on an old inactive Request object.
-   *
-   * @private
-   */
-  pauseRequest(request: Request | BulkLoad) {
-    if (this.isRequestActive(request)) {
-      this.tokenStreamParser.pause();
-    }
-  }
-
-  /**
-   * This is an internal method that is called from [[Request.resume]].
-   *
-   * @private
-   */
-  resumeRequest(request: Request | BulkLoad) {
-    if (this.isRequestActive(request)) {
-      this.tokenStreamParser.resume();
-    }
-  }
-
-  /**
-   * Returns true if the passed request is the currently active request of the connection.
-   *
-   * @private
-   */
-  isRequestActive(request: Request | BulkLoad) {
-    return request === this.request && this.state === this.STATE.SENT_CLIENT_REQUEST;
-  }
-
-  /**
    * @private
    */
   sendInitialSql() {
@@ -2873,19 +2810,22 @@ class Connection extends EventEmitter {
   }
 
   _execSql(request: Request) {
-    request.transformIntoExecuteSqlRpc();
+    try {
+      request.transformIntoExecuteSqlRpc();
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);
       });
-      return;
+
+      return
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
+
   /**
    *  Execute the SQL represented by [[Request]].
    *
@@ -2955,7 +2895,14 @@ class Connection extends EventEmitter {
    */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
+
+    const onCancel = () => {
+      request.cancel();
+    };
+
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
+      bulkLoad.removeListener('cancel', onCancel);
+
       if (error) {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
@@ -2968,9 +2915,7 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD);
     });
 
-    bulkLoad.once('cancel', () => {
-      request.cancel();
-    });
+    bulkLoad.once('cancel', onCancel);
 
     this.execSqlBatch(request);
   }
@@ -3011,10 +2956,11 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters: { [key: string]: unknown }) {
-    request.transformIntoExecuteRpc(parameters);
+    try {
+      request.transformIntoExecuteRpc(parameters);
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);
@@ -3263,26 +3209,21 @@ class Connection extends EventEmitter {
 
       let message: Message;
 
-      request.once('cancel', () => {
-        // There's three ways to handle request cancelation:
-        if (!this.isRequestActive(request)) {
-          // Cancel was called on a request that is no longer active on this connection
-          return;
-        } else if (message.writable) {
-          // - if the message is still writable, we'll set the ignore bit
-          //   and end the message.
-          message.ignore = true;
-          message.end();
-        } else {
-          // - but if the message has been ended (and thus has been fully sent off),
-          //   we need to send an `ATTENTION` message to the server
-          this.messageIo.sendMessage(TYPE.ATTENTION);
-          this.transitionTo(this.STATE.SENT_ATTENTION);
-        }
+      const onCancel = () => {
+        // set the ignore bit and end the message.
+        message.ignore = true;
+        message.end();
 
         this.clearRequestTimer();
         this.createCancelTimer();
-      });
+
+        if (request instanceof Request && request.paused) {
+          // resume the request if it was paused so we can read the remaining tokens
+          request.resume();
+        }
+      };
+
+      request.once('cancel', onCancel);
 
       this.createRequestTimer();
 
@@ -3309,13 +3250,13 @@ class Connection extends EventEmitter {
           this.debug.payload(function() {
             return payload!.toString('  ');
           });
-
-          if (request.paused) { // Request.pause() has been called before the request was started
-            this.pauseRequest(request);
-          }
         });
 
         Readable.from(payload!).pipe(message);
+
+        message.once('finish', () => {
+          request.removeListener('cancel', onCancel);
+        });
       }
     }
   }
@@ -3419,40 +3360,40 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.addToMessageBuffer(data);
-      },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        const preloginPayload = new PreloginPayload(this.messageBuffer);
-        this.debug.payload(function() {
-          return preloginPayload.toString('  ');
+      message: function(message) {
+        message.on('data', (data) => {
+          this.addToMessageBuffer(data);
         });
 
-        if (preloginPayload.fedAuthRequired === 1) {
-          this.fedAuthRequired = true;
-        }
+        message.once('end', () => {
+          const preloginPayload = new PreloginPayload(this.messageBuffer);
+          this.debug.payload(function() {
+            return preloginPayload.toString('  ');
+          });
 
-        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-          if (!this.config.options.encrypt) {
-            this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-            return this.close();
+          if (preloginPayload.fedAuthRequired === 1) {
+            this.fedAuthRequired = true;
           }
 
-          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-        } else {
-          this.sendLogin7Packet();
+          if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+            if (!this.config.options.encrypt) {
+              this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+              return this.close();
+            }
 
-          const { authentication } = this.config;
-          if (authentication.type === 'ntlm') {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
           } else {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            this.sendLogin7Packet();
+
+            const { authentication } = this.config;
+            if (authentication.type === 'ntlm') {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            } else {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            }
           }
-        }
+        });
       }
     }
   },
@@ -3504,26 +3445,26 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.messageIo.tlsHandshakeData(data);
-      },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        if (this.messageIo.tlsNegotiationComplete) {
-          this.sendLogin7Packet();
+      message: function(message) {
+        message.on('data', (data) => {
+          this.messageIo.tlsHandshakeData(data);
+        });
 
-          const { authentication } = this.config;
+        message.once('end', () => {
+          if (this.messageIo.tlsNegotiationComplete) {
+            this.sendLogin7Packet();
 
-          if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-          } else if (authentication.type === 'ntlm') {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          } else {
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            const { authentication } = this.config;
+
+            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            } else if (authentication.type === 'ntlm') {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            } else {
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            }
           }
-        }
+        });
       }
     }
   },
@@ -3535,12 +3476,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
       },
       featureExtAck: function(token) {
         if (token.columnEncryption) {
@@ -3564,24 +3499,29 @@ Connection.prototype.STATE = {
           this.loggedIn = false;
         }
       },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        if (this.loggedIn) {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else if (this.loginError) {
-          if (this.loginError.isTransient) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+      message: function(message) {
+        const tokenStreamParser = this.createTokenStreamParser(message);
+
+        tokenStreamParser.once('end', () => {
+          if (this.loggedIn) {
+            if (this.routingData) {
+              this.transitionTo(this.STATE.REROUTING);
+            } else {
+              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+            }
+          } else if (this.loginError) {
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else {
-            this.emit('connect', this.loginError);
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
-        } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-          this.transitionTo(this.STATE.FINAL);
-        }
+        });
       }
     }
   },
@@ -3594,43 +3534,45 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        if (this.ntlmpacket) {
-          const authentication = this.config.authentication as NtlmAuthentication;
+      message: function(message) {
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
-          const payload = new NTLMResponsePayload({
-            domain: authentication.options.domain,
-            userName: authentication.options.userName,
-            password: authentication.options.password,
-            ntlmpacket: this.ntlmpacket
-          });
+        tokenStreamParser.once('end', () => {
+          if (this.ntlmpacket) {
+            const authentication = this.config.authentication as NtlmAuthentication;
 
-          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-          this.debug.payload(function() {
-            return payload.toString('  ');
-          });
+            const payload = new NTLMResponsePayload({
+              domain: authentication.options.domain,
+              userName: authentication.options.userName,
+              password: authentication.options.password,
+              ntlmpacket: this.ntlmpacket
+            });
 
-          this.ntlmpacket = undefined;
-        } else if (this.loggedIn) {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        } else if (this.loginError) {
-          if (this.loginError.isTransient) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+            this.debug.payload(function() {
+              return payload.toString('  ');
+            });
+
+            this.ntlmpacket = undefined;
+          } else if (this.loggedIn) {
+            if (this.routingData) {
+              this.transitionTo(this.STATE.REROUTING);
+            } else {
+              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+            }
+          } else if (this.loginError) {
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
+              this.emit('connect', this.loginError);
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else {
-            this.emit('connect', this.loginError);
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
-        } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-          this.transitionTo(this.STATE.FINAL);
-        }
+        });
       }
     }
   },
@@ -3643,96 +3585,101 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      routingChange: function() {
-        this.transitionTo(this.STATE.REROUTING);
-      },
       fedAuthInfo: function(token) {
         this.fedAuthInfoToken = token;
       },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        const fedAuthInfoToken = this.fedAuthInfoToken;
+      message: function(message) {
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
-        if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+        tokenStreamParser.once('end', () => {
+          if (this.loggedIn) {
+            if (this.routingData) {
+              this.transitionTo(this.STATE.REROUTING);
+            } else {
+              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+            }
 
-          const getToken = (callback: (error: Error | null, token?: string) => void) => {
-            const getTokenFromCredentials = (err: Error | undefined, credentials?: UserTokenCredentials | MSIAppServiceTokenCredentials | MSIVmTokenCredentials | ApplicationTokenCredentials) => {
-              if (err) {
-                return callback(err);
+            return;
+          }
+
+          const fedAuthInfoToken = this.fedAuthInfoToken;
+
+          if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+            const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+
+            const getToken = (callback: (error: Error | null, token?: string) => void) => {
+              const getTokenFromCredentials = (err: Error | undefined, credentials?: UserTokenCredentials | MSIAppServiceTokenCredentials | MSIVmTokenCredentials | ApplicationTokenCredentials) => {
+                if (err) {
+                  return callback(err);
+                }
+
+                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
+                  callback(null, tokenResponse.accessToken);
+                }, callback);
+              };
+
+              if (authentication.type === 'azure-active-directory-password') {
+                const credentials = new UserTokenCredentials(
+                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
+                  authentication.options.domain ?? 'common',
+                  authentication.options.userName,
+                  authentication.options.password,
+                  fedAuthInfoToken.spn,
+                  undefined, // environment
+                  authenticationCache
+                );
+
+                getTokenFromCredentials(undefined, credentials);
+              } else if (authentication.type === 'azure-active-directory-msi-vm') {
+                loginWithVmMSI({
+                  clientId: authentication.options.clientId,
+                  msiEndpoint: authentication.options.msiEndpoint,
+                  resource: fedAuthInfoToken.spn
+                }, getTokenFromCredentials);
+              } else if (authentication.type === 'azure-active-directory-msi-app-service') {
+                loginWithAppServiceMSI({
+                  msiEndpoint: authentication.options.msiEndpoint,
+                  msiSecret: authentication.options.msiSecret,
+                  resource: fedAuthInfoToken.spn,
+                  clientId: authentication.options.clientId
+                }, getTokenFromCredentials);
+              } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
+                const credentials = new ApplicationTokenCredentials(
+                  authentication.options.clientId,
+                  authentication.options.tenantId, // domain
+                  authentication.options.clientSecret,
+                  fedAuthInfoToken.spn,
+                  undefined, // environment
+                  authenticationCache
+                );
+
+                getTokenFromCredentials(undefined, credentials);
               }
-
-              credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
-                callback(null, tokenResponse.accessToken);
-              }, callback);
             };
 
-            if (authentication.type === 'azure-active-directory-password') {
-              const credentials = new UserTokenCredentials(
-                '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                authentication.options.domain ?? 'common',
-                authentication.options.userName,
-                authentication.options.password,
-                fedAuthInfoToken.spn,
-                undefined, // environment
-                authenticationCache
-              );
+            getToken((err, token) => {
+              if (err) {
+                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+                this.emit('connect', this.loginError);
+                this.transitionTo(this.STATE.FINAL);
+                return;
+              }
 
-              getTokenFromCredentials(undefined, credentials);
-            } else if (authentication.type === 'azure-active-directory-msi-vm') {
-              loginWithVmMSI({
-                clientId: authentication.options.clientId,
-                msiEndpoint: authentication.options.msiEndpoint,
-                resource: fedAuthInfoToken.spn
-              }, getTokenFromCredentials);
-            } else if (authentication.type === 'azure-active-directory-msi-app-service') {
-              loginWithAppServiceMSI({
-                msiEndpoint: authentication.options.msiEndpoint,
-                msiSecret: authentication.options.msiSecret,
-                resource: fedAuthInfoToken.spn,
-                clientId: authentication.options.clientId
-              }, getTokenFromCredentials);
-            } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-              const credentials = new ApplicationTokenCredentials(
-                authentication.options.clientId,
-                authentication.options.tenantId, // domain
-                authentication.options.clientSecret,
-                fedAuthInfoToken.spn,
-                undefined, // environment
-                authenticationCache
-              );
-
-              getTokenFromCredentials(undefined, credentials);
-            }
-          };
-
-          getToken((err, token) => {
-            if (err) {
-              this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+              this.sendFedAuthTokenMessage(token!);
+            });
+          } else if (this.loginError) {
+            if (this.loginError.isTransient) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            } else {
               this.emit('connect', this.loginError);
               this.transitionTo(this.STATE.FINAL);
-              return;
             }
-
-            this.sendFedAuthTokenMessage(token!);
-          });
-        } else if (this.loginError) {
-          if (this.loginError.isTransient) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', this.loginError);
+            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
-        } else {
-          this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-          this.transitionTo(this.STATE.FINAL);
-        }
+        });
       }
     }
   },
@@ -3748,15 +3695,13 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        this.transitionTo(this.STATE.LOGGED_IN);
-        this.processedInitialSql();
+      message: function(message) {
+        const tokenStreamParser = this.createTokenStreamParser(message);
+
+        tokenStreamParser.once('end', () => {
+          this.transitionTo(this.STATE.LOGGED_IN);
+          this.processedInitialSql();
+        });
       }
     }
   },
@@ -3772,9 +3717,6 @@ Connection.prototype.STATE = {
     name: 'SentClientRequest',
     exit: function(nextState) {
       this.clearRequestTimer();
-      if (nextState !== this.STATE.FINAL) {
-        this.tokenStreamParser.resume();
-      }
     },
     events: {
       socketError: function(err) {
@@ -3784,29 +3726,76 @@ Connection.prototype.STATE = {
 
         sqlRequest.callback(err);
       },
-      data: function(data) {
-        this.clearRequestTimer(); // request timer is stopped on first data package
-        const ret = this.sendDataToTokenStreamParser(data);
-        if (ret === false) {
-          // Bridge backpressure from the token stream parser transform to the
-          // packet stream transform.
-          this.messageIo.pause();
+      message: function(message) {
+        // request timer is stopped on first data package
+        this.clearRequestTimer();
+
+        const tokenStreamParser = this.createTokenStreamParser(message);
+
+        // If the request was canceled after the request was sent, but before
+        // we started receiving a message, we send an attention message, fully
+        // consume the current message, and then switch the next state.
+        if (this.request?.canceled) {
+          this.messageIo.sendMessage(TYPE.ATTENTION);
+          // Don't wait for the `tokenStreamParser` to end before switching
+          // to the `SENT_ATTENTION` state. The `end` event is delayed and
+          // we would switch to the new state after the attention acknowledgement
+          // message was received.
+          this.transitionTo(this.STATE.SENT_ATTENTION);
+          this.createCancelTimer();
+
+          if (this.request instanceof Request && this.request.paused) {
+            // resume the request if it was paused so we can read the remaining tokens
+            this.request?.resume();
+          }
+
+        } else {
+          const onResume = () => { tokenStreamParser.resume(); };
+          const onPause = () => {
+            tokenStreamParser.pause();
+
+            this.request?.once('resume', onResume);
+          };
+
+          this.request?.on('pause', onPause);
+
+          if (this.request instanceof Request && this.request.paused) {
+            onPause();
+          }
+
+          const onCancel = () => {
+            tokenStreamParser.removeListener('end', onEndOfMessage);
+
+            if (this.request instanceof Request && this.request.paused) {
+              // resume the request if it was paused so we can read the remaining tokens
+              this.request?.resume();
+            }
+
+            this.request?.removeListener('pause', onPause);
+            this.request?.removeListener('resume', onResume);
+
+            this.messageIo.sendMessage(TYPE.ATTENTION);
+            this.transitionTo(this.STATE.SENT_ATTENTION);
+            this.createCancelTimer();
+          };
+
+          const onEndOfMessage = () => {
+            this.request?.removeListener('cancel', onCancel);
+            this.request?.removeListener('pause', onPause);
+            this.request?.removeListener('resume', onResume);
+
+            this.transitionTo(this.STATE.LOGGED_IN);
+            const sqlRequest = this.request as Request;
+            this.request = undefined;
+            if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+              this.inTransaction = false;
+            }
+            sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+          };
+
+          tokenStreamParser.once('end', onEndOfMessage);
+          this.request?.once('cancel', onCancel);
         }
-      },
-      message: function() {
-        // We have to channel the 'message' (EOM) event through the token stream
-        // parser transform, to keep it in line with the flow of the tokens, when
-        // the incoming data flow is paused and resumed.
-        this.tokenStreamParser.addEndOfMessageMarker();
-      },
-      endOfMessageMarkerReceived: function() {
-        this.transitionTo(this.STATE.LOGGED_IN);
-        const sqlRequest = this.request as Request;
-        this.request = undefined;
-        if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
-          this.inTransaction = false;
-        }
-        sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
       }
     }
   },
@@ -3824,31 +3813,29 @@ Connection.prototype.STATE = {
 
         sqlRequest.callback(err);
       },
-      data: function(data) {
-        this.sendDataToTokenStreamParser(data);
-      },
       attention: function() {
         this.attentionReceived = true;
       },
-      endOfMessageMarkerReceived: function() {
-        // 3.2.5.7 Sent Attention State
-        // Discard any data contained in the response, until we receive the attention response
-        if (this.attentionReceived) {
-          this.clearCancelTimer();
+      message: function(message) {
+        const tokenStreamParser = this.createTokenStreamParser(message);
 
-          const sqlRequest = this.request!;
-          this.request = undefined;
-          this.transitionTo(this.STATE.LOGGED_IN);
+        tokenStreamParser.once('end', () => {
+          // 3.2.5.7 Sent Attention State
+          // Discard any data contained in the response, until we receive the attention response
+          if (this.attentionReceived) {
+            this.clearCancelTimer();
 
-          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-            sqlRequest.callback(sqlRequest.error);
-          } else {
-            sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            const sqlRequest = this.request!;
+            this.request = undefined;
+            this.transitionTo(this.STATE.LOGGED_IN);
+
+            if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+              sqlRequest.callback(sqlRequest.error);
+            } else {
+              sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+            }
           }
-        }
-      },
-      message: function() {
-        this.tokenStreamParser.addEndOfMessageMarker();
+        });
       }
     }
   },

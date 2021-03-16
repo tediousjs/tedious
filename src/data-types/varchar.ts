@@ -55,7 +55,7 @@ const VarChar: { maximumLength: number } & DataType = {
     buffer.writeUInt8(this.id, 0);
 
     if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(this.maximumLength, 1);
+      buffer.writeUInt16LE(parameter.length!, 1);
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }
@@ -164,13 +164,13 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  validate: function(value): string | null | TypeError {
+  validate: function(value): string | null {
     if (value == null) {
       return null;
     }
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+        throw new TypeError('Invalid string.');
       }
       value = value.toString();
     }

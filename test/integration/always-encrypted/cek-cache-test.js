@@ -195,7 +195,6 @@ describe('always encrypted', function() {
             if (err) {
               return done(err);
             }
-
             values.forEach((result) => assert.strictEqual(result, value));
 
             return done();

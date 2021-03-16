@@ -116,7 +116,7 @@ const Time: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } =
     }
   },
 
-  validate: function(value): null| number| TypeError | Date {
+  validate: function(value): null| number | Date {
     if (value == null) {
       return null;
     }
@@ -126,7 +126,7 @@ const Time: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } =
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid time.');
+      throw new TypeError('Invalid time.');
     }
 
     return value;

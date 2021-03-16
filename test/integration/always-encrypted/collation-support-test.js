@@ -452,7 +452,8 @@ describe('always encrypted', function() {
       if (err) {
         return cb(err);
       }
-      const val = randomizedCollations.length;
+      // const val = randomizedCollations.length;
+      const val = 35
       const temp = [];
       for (let i = 0; i < val; i++) {
         temp.push(randomizedCollations[i]);

@@ -49,7 +49,7 @@ const Int: DataType = {
     }
   },
 
-  validate: function(value): number | null | TypeError {
+  validate: function(value): number | null {
     if (value == null) {
       return null;
     }
@@ -59,11 +59,11 @@ const Int: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
 
     if (value < -2147483648 || value > 2147483647) {
-      return new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
+      throw new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
     }
 
     return value | 0;

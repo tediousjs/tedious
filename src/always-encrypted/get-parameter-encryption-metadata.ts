@@ -15,19 +15,76 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     return callback();
   }
 
-  const decryptSymmetricKeyPromises: Promise<void>[] = [];
-  let paramCount = 0;
   const metadataRequest = new Request('sp_describe_parameter_encryption', (error) => {
     if (error) {
       return callback(error);
     }
+
+    const decryptSymmetricKeyPromises: Promise<void>[] = [];
+    const cekList: CEKEntry[] = [];
+    let paramCount = 0;
+
+    for (const columns of resultRows) {
+      try {
+        const isFirstRecordSet = columns.some((col: any) => (col && col.metadata && col.metadata.colName) === 'database_id');
+        if (isFirstRecordSet === true) {
+          const currentOrdinal = columns[DescribeParameterEncryptionResultSet1.KeyOrdinal].value;
+          let cekEntry: CEKEntry;
+          if (!cekList[currentOrdinal]) {
+            cekEntry = new CEKEntry(currentOrdinal);
+            cekList[cekEntry.ordinal] = cekEntry;
+          } else {
+            cekEntry = cekList[currentOrdinal];
+          }
+          cekEntry.add(columns[DescribeParameterEncryptionResultSet1.EncryptedKey].value,
+                      columns[DescribeParameterEncryptionResultSet1.DbId].value,
+                      columns[DescribeParameterEncryptionResultSet1.KeyId].value,
+                      columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
+                      columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
+                      columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
+                      columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
+                      columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
+        } else {
+          paramCount++;
+          const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
+          const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
+          const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
+          const cekEntry: CEKEntry = cekList[cekOrdinal];
+
+          if (cekEntry && cekList.length < cekOrdinal) {
+            return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
+          }
+
+          const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
+          if (SQLServerEncryptionType.PlainText !== encType) {
+            request.parameters[paramIndex].cryptoMetadata = {
+              cekEntry: cekEntry,
+              ordinal: cekOrdinal,
+              cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
+              encryptionType: encType,
+              normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
+            };
+            decryptSymmetricKeyPromises.push(decryptSymmetricKey(request.parameters[paramIndex].cryptoMetadata as CryptoMetadata, connection.config.options));
+          } else if (request.parameters[paramIndex].forceEncrypt === true) {
+            return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
+          }
+        }
+      } catch {
+        return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
+      }
+    }
+
     if (paramCount !== request.parameters.length) {
+      console.log('>> resultRows.length = ', resultRows.length, ', request.param.length = ', request.parameters.length);
       return callback(new Error(`Internal error. Metadata for some parameters in statement or procedure "${request.sqlTextOrProcedure}" is missing in the resultset returned by sp_describe_parameter_encryption.`));
     }
+
     return Promise.all(decryptSymmetricKeyPromises).then(() => {
       request.cryptoMetadataLoaded = true;
-      callback();
-    }).catch(callback);
+      process.nextTick(callback);
+    }, (error) => {
+      process.nextTick(callback, error);
+    });
   });
 
   metadataRequest.originalParameters = request.parameters;
@@ -36,55 +93,10 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
   }
 
-  const cekList: CEKEntry[] = [];
+  const resultRows: any[] = [];
+
   metadataRequest.on('row', (columns: any) => {
-    try {
-      const isFirstRecordSet = columns.some((col: any) => (col && col.metadata && col.metadata.colName) === 'database_id');
-      if (isFirstRecordSet === true) {
-        const currentOrdinal = columns[DescribeParameterEncryptionResultSet1.KeyOrdinal].value;
-        let cekEntry: CEKEntry;
-        if (!cekList[currentOrdinal]) {
-          cekEntry = new CEKEntry(currentOrdinal);
-          cekList[cekEntry.ordinal] = cekEntry;
-        } else {
-          cekEntry = cekList[currentOrdinal];
-        }
-        cekEntry.add(columns[DescribeParameterEncryptionResultSet1.EncryptedKey].value,
-                     columns[DescribeParameterEncryptionResultSet1.DbId].value,
-                     columns[DescribeParameterEncryptionResultSet1.KeyId].value,
-                     columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
-                     columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
-                     columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
-                     columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
-                     columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
-      } else {
-        paramCount++;
-        const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
-        const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
-        const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
-        const cekEntry: CEKEntry = cekList[cekOrdinal];
-
-        if (cekEntry && cekList.length < cekOrdinal) {
-          return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
-        }
-
-        const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
-        if (SQLServerEncryptionType.PlainText !== encType) {
-          request.parameters[paramIndex].cryptoMetadata = {
-            cekEntry: cekEntry,
-            ordinal: cekOrdinal,
-            cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
-            encryptionType: encType,
-            normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
-          };
-          decryptSymmetricKeyPromises.push(decryptSymmetricKey(request.parameters[paramIndex].cryptoMetadata as CryptoMetadata, connection.config.options));
-        } else if (request.parameters[paramIndex].forceEncrypt === true) {
-          return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
-        }
-      }
-    } catch {
-      return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));
-    }
+    resultRows.push(columns);
   });
 
   connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest, connection.currentTransactionDescriptor(), connection.config.options));

@@ -289,6 +289,10 @@ class Request extends EventEmitter {
 
   on(event: 'cancel', listener: () => void): this
 
+  on(event: 'pause', listener: () => void): this
+
+  on(event: 'resume', listener: () => void): this
+
   on(event: string | symbol, listener: (...args: any[]) => void) {
     return super.on(event, listener);
   }
@@ -333,6 +337,14 @@ class Request extends EventEmitter {
    * @private
    */
   emit(event: 'cancel'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'pause'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'resume'): boolean
   /**
    * @private
    */
@@ -471,9 +483,7 @@ class Request extends EventEmitter {
    * @private
    */
   transformIntoExecuteSqlRpc() {
-    if (this.validateParameters()) {
-      return;
-    }
+    this.validateParameters();
 
     this.originalParameters = this.parameters;
     this.parameters = [];
@@ -531,9 +541,7 @@ class Request extends EventEmitter {
       this.parameters.push(parameter);
     }
 
-    if (this.validateParameters()) {
-      return;
-    }
+    this.validateParameters();
 
     this.sqlTextOrProcedure = 'sp_execute';
   }
@@ -544,13 +552,13 @@ class Request extends EventEmitter {
   validateParameters() {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
-      const value = parameter.type.validate(parameter.value);
-      if (value instanceof TypeError) {
-        return this.error = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + value.message, 'EPARAM');
+
+      try {
+        parameter.value = parameter.type.validate(parameter.value);
+      } catch (error) {
+        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
       }
-      parameter.value = value;
     }
-    return null;
   }
 
   /**
@@ -561,10 +569,8 @@ class Request extends EventEmitter {
     if (this.paused) {
       return;
     }
+    this.emit('pause');
     this.paused = true;
-    if (this.connection) {
-      this.connection.pauseRequest(this);
-    }
   }
 
   /**
@@ -576,9 +582,7 @@ class Request extends EventEmitter {
       return;
     }
     this.paused = false;
-    if (this.connection) {
-      this.connection.resumeRequest(this);
-    }
+    this.emit('resume');
   }
 
   /**

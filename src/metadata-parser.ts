@@ -142,7 +142,7 @@ function metadataParse(parser: Parser, options: InternalConnectionOptions, callb
         const type: DataType = TYPE[typeNumber];
 
         if (!type) {
-          return parser.emit('error', new Error(sprintf('Unrecognised data type 0x%02X', typeNumber)));
+          throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber));
         }
 
         switch (type.name) {
@@ -343,7 +343,7 @@ function metadataParse(parser: Parser, options: InternalConnectionOptions, callb
             });
 
           default:
-            return parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+            throw new Error(sprintf('Unrecognised type %s', type.name));
         }
       });
     });

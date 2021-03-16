@@ -57,13 +57,13 @@ const Money: DataType = {
     }
   },
 
-  validate: function(value): number | null | TypeError {
+  validate: function(value): number | null {
     if (value == null) {
       return null;
     }
     value = parseFloat(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
     return value;
   }

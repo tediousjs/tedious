@@ -75,7 +75,7 @@ const SmallDateTime: DataType = {
     }
   },
 
-  validate: function(value): null | Date | TypeError {
+  validate: function(value): null | Date {
     if (value == null) {
       return null;
     }
@@ -85,7 +85,7 @@ const SmallDateTime: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

@@ -10,7 +10,7 @@ const cache = new LRU<string, SymmetricKey>(0);
 
 export const getKey = async (keyInfo: EncryptionKeyInfo, options: ConnectionOptions): Promise<SymmetricKey> => {
   if (!options.trustedServerNameAE) {
-    throw new Error('Server name should npt be null in getKey');
+    throw new Error('Server name should not be null in getKey');
   }
 
   const serverName: string = options.trustedServerNameAE;

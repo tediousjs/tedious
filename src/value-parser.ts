@@ -100,7 +100,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readBigInt(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for IntN');
         }
       });
 
@@ -122,7 +122,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readFloat(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for FloatN');
         }
       });
 
@@ -144,7 +144,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readMoney(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
         }
       });
 
@@ -161,7 +161,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readBit(parser, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for BitN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for BitN');
         }
       });
 
@@ -278,7 +278,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readDateTime(parser, options.useUTC, callback);
 
           default:
-            return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN'));
+            throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
         }
       });
 
@@ -338,7 +338,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
             return readUniqueIdentifier(parser, options, callback);
 
           default:
-            return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength! - 1)));
+            throw new Error(sprintf('Unsupported guid size %d', dataLength! - 1));
         }
       });
 
@@ -355,7 +355,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
       });
 
     default:
-      parser.emit('error', new Error(sprintf('Unrecognised type %s', type.name)));
+      throw new Error(sprintf('Unrecognised type %s', type.name));
   }
 }
 
@@ -379,7 +379,7 @@ function readNumeric(parser: IParser, dataLength: number, _precision: number, sc
     } else if (dataLength === 17) {
       readValue = parser.readUNumeric128LE;
     } else {
-      return parser.emit('error', new Error(sprintf('Unsupported numeric dataLength %d', dataLength)));
+      throw new Error(sprintf('Unsupported numeric dataLength %d', dataLength));
     }
 
     readValue.call(parser, (value) => {
@@ -576,7 +576,7 @@ function readMaxKnownLength(parser: IParser, totalLength: number, callback: (val
 
   next(() => {
     if (offset !== totalLength) {
-      parser.emit('error', new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes'));
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + totalLength + ', but got ' + offset + ' bytes');
     }
 
     callback(data);
@@ -763,7 +763,8 @@ class PreBufferedParser extends EventEmitter implements IParser {
   readUInt16BE(callback: (data: number) => void) {
     const data = this.buffer.readUInt16BE(this.position);
     this.position += 2;
-    callback(data);  }
+    callback(data);
+  }
 
   readInt32LE(callback: (data: number) => void) {
     const data = this.buffer.readInt32LE(this.position);
@@ -971,9 +972,7 @@ function readEncryptedBinary(parser: IParser, metadata: Metadata, options: Inter
   const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
   if (!normalizationRuleVersion.equals(Buffer.from([0x01]))) {
-    return parser.emit('error', new Error(
-      `Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`,
-    )) as never;
+    throw new Error(`Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`)
   }
 
   const isNullValue = (decryptedValue: Buffer, metadata: Metadata): boolean => {
@@ -1005,23 +1004,19 @@ function readEncryptedBinary(parser: IParser, metadata: Metadata, options: Inter
     });
   };
 
-  const callbackAE = (encryptedValue: Buffer) =>
-    decryptWithKey(encryptedValue, cryptoMetadata, options)
-      .then(callbackDecrypted)
-      .catch((error) => parser.emit('error', error));
-
-  // satisfy typing in callbacks:
-  const callbackTyped = callbackAE as (value: unknown) => void;
-
   if (metadata.dataLength === MAX) {
-    return readMaxBinary(parser, callbackTyped);
+    return readMaxBinary(parser, (encryptedValue) => {
+      callbackDecrypted(decryptWithKey(encryptedValue as Buffer, cryptoMetadata, options));
+    });
   } else {
     return parser.readUInt16LE((dataLength) => {
       if (dataLength === NULL) {
         return callback(null);
       }
 
-      readBinary(parser, dataLength, callbackTyped);
+      readBinary(parser, dataLength, (encryptedValue) => {
+        callbackDecrypted(decryptWithKey(encryptedValue as Buffer, cryptoMetadata, options));
+      });
     });
   }
 }
@@ -1069,7 +1064,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readBigInt(parser, callback);
 
         default:
-          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for IntN'));
+          throw new Error('Unsupported dataLength ' + dataLength + ' for IntN');
       }
 
     case 'Real':
@@ -1089,7 +1084,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readFloat(parser, callback);
 
         default:
-          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for FloatN'));
+          throw new Error('Unsupported dataLength ' + dataLength + ' for FloatN');
       }
 
     case 'SmallMoney':
@@ -1116,7 +1111,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readMoney(parser, callback);
 
         default:
-          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for MoneyN'));
+          throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
       }
 
     case 'Bit':
@@ -1131,7 +1126,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readBit(parser, callback);
 
         default:
-          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for BitN'));
+          throw new Error('Unsupported dataLength ' + dataLength + ' for BitN');
       }
 
     case 'VarChar':
@@ -1168,7 +1163,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readDateTime(parser, options.useUTC, callback);
 
         default:
-          return parser.emit('error', new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN'));
+          new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
       }
 
     case 'Time':
@@ -1232,7 +1227,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
           return readUniqueIdentifier(parser, options, callback);
 
         default:
-          return parser.emit('error', new Error(sprintf('Unsupported guid size %d', dataLength - 1)));
+          throw new Error(sprintf('Unsupported guid size %d', dataLength - 1));
       }
 
     case 'Text':
@@ -1241,10 +1236,10 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
     case 'Xml':
     case 'UDT':
     case 'Variant':
-      return parser.emit('error', new Error(sprintf('Unsupported encrypted type %s', metadata.type.name)));
+      throw new Error(sprintf('Unsupported encrypted type %s', metadata.type.name));
 
     default:
-      return parser.emit('error', new Error(sprintf('Unrecognised type %s', metadata.type.name)));
+      throw new Error(sprintf('Unrecognised type %s', metadata.type.name));
   }
 }
 

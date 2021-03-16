@@ -29,12 +29,12 @@ function featureExtAckParser(parser: Parser, _options: InternalConnectionOptions
           }
           if (featureId === FEATURE_ID.COLUMNENCRYPTION) {
             if (1 > featureData.length) {
-              parser.emit('error', new Error(`Unsupported featureDataLength ${featureData.length} for feature type ${featureId}`));
+              throw new Error(`Unsupported featureDataLength ${featureData.length} for feature type ${featureId}`);
             }
 
             const supportedTceVersion = featureData[0];
             if (0 === supportedTceVersion || supportedTceVersion > 0x01) {
-              parser.emit('error', new Error(`Unsupported TceVersion ${supportedTceVersion}`));
+              throw new Error(`Unsupported TceVersion ${supportedTceVersion}`);
             }
 
             columnEncryption = true;
