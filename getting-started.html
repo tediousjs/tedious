@@ -17,7 +17,7 @@ title: Getting started
   var Connection = require('tedious').Connection;
 
   var config = {
-    server: "192.168.1.210",
+    server: "192.168.1.210", // or "localhost"
     options: {},
     authentication: {
       type: "default",
@@ -30,6 +30,7 @@ title: Getting started
 
   var connection = new Connection(config);
 
+  // Setup event handler when the connection is established. 
   connection.on('connect', function(err) {
     if(err) {
       console.log('Error: ', err)
@@ -37,6 +38,9 @@ title: Getting started
     // If no error, then good to go...
     executeStatement();
   });
+
+  // Initialize the connection.
+  connection.connect();
 {% endhighlight %}
 
 <p>
