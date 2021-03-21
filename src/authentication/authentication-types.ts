@@ -76,13 +76,9 @@ export function isFedAuthAuthenticationType(authenticationType: AuthenticationTy
 export function isAADAuthenticationType(authenticationType: AuthenticationType): boolean {
   switch (authenticationType) {
     case AzureActiveDirectoryAccessTokenAuthenticationType:
-    case AzureActiveDirectoryMsiAppServiceAuthenticationType:
-    case AzureActiveDirectoryMsiVmAuthenticationType:
-    case AzureActiveDirectoryPasswordAuthenticationType:
-    case AzureActiveDirectoryServicePrincipalSecretType:
       return true;
 
     default:
-      return false;
+      return isFedAuthAuthenticationType(authenticationType);
   }
 }
