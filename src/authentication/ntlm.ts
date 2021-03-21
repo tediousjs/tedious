@@ -52,7 +52,7 @@ export function parseNtlmOptions(authentication: NtlmAuthentication): NtlmAuthen
     options: {
       userName: options.userName,
       password: options.password,
-      domain: options.domain?.toUpperCase(),
+      domain: options.domain && options.domain.toUpperCase(),
     },
   };
 }

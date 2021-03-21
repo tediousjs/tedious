@@ -2363,7 +2363,7 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'ntlm':
+      case NtlmAuthenticationType:
         payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
         break;
 
@@ -3090,7 +3090,7 @@ Connection.prototype.STATE = {
             this.sendLogin7Packet();
 
             const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
+            if (authentication.type === NtlmAuthenticationType) {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
