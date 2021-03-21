@@ -35,6 +35,10 @@ export function validateAADPasswordOptions(authentication: AzureActiveDirectoryP
   if (options.password !== undefined && typeof options.password !== 'string') {
     throw new TypeError('The "config.authentication.options.password" property must be of type string.');
   }
+
+  if (options.domain !== undefined && typeof options.domain !== 'string') {
+    throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+  }
 }
 
 /**
