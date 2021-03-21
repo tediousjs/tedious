@@ -214,7 +214,7 @@ const AADAuthenticationTypes = [
   AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret,
 ];
 
-const FedAuthAuthentications = [
+const FedAuthAuthenticationTypes = [
   AuthenticationTypes.AzureActiveDirectoryPassword,
   AuthenticationTypes.AzureActiveDirectoryMsiVm,
   AuthenticationTypes.AzureActiveDirectoryMsiAppService,
@@ -3365,7 +3365,7 @@ Connection.prototype.STATE = {
 
             const { authentication } = this.config;
 
-            if (FedAuthAuthentications.includes(authentication.type)) {
+            if (FedAuthAuthenticationTypes.includes(authentication.type)) {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (authentication.type === AuthenticationTypes.Ntlm) {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
