@@ -196,8 +196,33 @@ const DEFAULT_LANGUAGE = 'us_english';
  */
 const DEFAULT_DATEFORMAT = 'mdy';
 
-interface AzureActiveDirectoryMsiAppServiceAuthentication {
-  type: 'azure-active-directory-msi-app-service';
+export enum AuthenticationTypes {
+  AzureActiveDirectoryMsiAppService = 'azure-active-directory-msi-app-service',
+  AzureActiveDirectoryMsiVm = 'azure-active-directory-msi-vm',
+  AzureActiveDirectoryAccessToken = 'azure-active-directory-access-token',
+  AzureActiveDirectoryPassword = 'azure-active-directory-password',
+  AzureActiveDirectoryServicePrincipalSecret = 'azure-active-directory-service-principal-secret',
+  Ntlm = 'ntlm',
+  Default = 'default',
+}
+
+const AADAuthenticationTypes = [
+  AuthenticationTypes.AzureActiveDirectoryPassword,
+  AuthenticationTypes.AzureActiveDirectoryAccessToken,
+  AuthenticationTypes.AzureActiveDirectoryMsiVm,
+  AuthenticationTypes.AzureActiveDirectoryMsiAppService,
+  AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret,
+];
+
+const FedAuthAuthentications = [
+  AuthenticationTypes.AzureActiveDirectoryPassword,
+  AuthenticationTypes.AzureActiveDirectoryMsiVm,
+  AuthenticationTypes.AzureActiveDirectoryMsiAppService,
+  AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret,
+];
+
+export interface AzureActiveDirectoryMsiAppServiceAuthentication {
+  type: AuthenticationTypes.AzureActiveDirectoryMsiAppService;
   options: {
     /**
      * If you user want to connect to an Azure app service using a specific client account
@@ -217,8 +242,8 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   };
 }
 
-interface AzureActiveDirectoryMsiVmAuthentication {
-  type: 'azure-active-directory-msi-vm';
+export interface AzureActiveDirectoryMsiVmAuthentication {
+  type: AuthenticationTypes.AzureActiveDirectoryMsiVm;
   options: {
     /**
      * If you user want to connect to an Azure app service using a specific client account
@@ -234,8 +259,8 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   };
 }
 
-interface AzureActiveDirectoryAccessTokenAuthentication {
-  type: 'azure-active-directory-access-token';
+export interface AzureActiveDirectoryAccessTokenAuthentication {
+  type: AuthenticationTypes.AzureActiveDirectoryAccessToken;
   options: {
     /**
      * A user need to provide `token` which they retrived else where
@@ -245,8 +270,8 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   };
 }
 
-interface AzureActiveDirectoryPasswordAuthentication {
-  type: 'azure-active-directory-password';
+export interface AzureActiveDirectoryPasswordAuthentication {
+  type: AuthenticationTypes.AzureActiveDirectoryPassword;
   options: {
     /**
      * A user need to provide `userName` asscoiate to their account.
@@ -264,8 +289,8 @@ interface AzureActiveDirectoryPasswordAuthentication {
   };
 }
 
-interface AzureActiveDirectoryServicePrincipalSecret {
-  type: 'azure-active-directory-service-principal-secret';
+export interface AzureActiveDirectoryServicePrincipalSecret {
+  type: AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret;
   options: {
     /**
      * Application (`client`) ID from your registered Azure application
@@ -282,8 +307,8 @@ interface AzureActiveDirectoryServicePrincipalSecret {
   };
 }
 
-interface NtlmAuthentication {
-  type: 'ntlm';
+export interface NtlmAuthentication {
+  type: AuthenticationTypes.Ntlm;
   options: {
     /**
      * User name from your windows account.
@@ -302,8 +327,8 @@ interface NtlmAuthentication {
   };
 }
 
-interface DefaultAuthentication {
-  type: 'default';
+export interface DefaultAuthentication {
+  type: AuthenticationTypes.Default;
   options: {
     /**
      * User name to use for sql server login.
@@ -1052,20 +1077,21 @@ class Connection extends EventEmitter {
 
       const type = config.authentication.type;
       const options = config.authentication.options === undefined ? {} : config.authentication.options;
+      const supportedAuthenticationTypes = Object.values(AuthenticationTypes);
 
       if (typeof type !== 'string') {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (!supportedAuthenticationTypes.includes(type)) {
+        throw new TypeError(`The "type" property must one of "${supportedAuthenticationTypes.join('", "')}".`);
       }
 
       if (typeof options !== 'object' || options === null) {
         throw new TypeError('The "config.authentication.options" property must be of type object.');
       }
 
-      if (type === 'ntlm') {
+      if (type === AuthenticationTypes.Ntlm) {
         if (typeof options.domain !== 'string') {
           throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
         }
@@ -1079,14 +1105,14 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'ntlm',
+          type: AuthenticationTypes.Ntlm,
           options: {
             userName: options.userName,
             password: options.password,
             domain: options.domain && options.domain.toUpperCase()
           }
         };
-      } else if (type === 'azure-active-directory-password') {
+      } else if (type === AuthenticationTypes.AzureActiveDirectoryPassword) {
         if (options.userName !== undefined && typeof options.userName !== 'string') {
           throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
@@ -1096,25 +1122,25 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'azure-active-directory-password',
+          type: AuthenticationTypes.AzureActiveDirectoryPassword,
           options: {
             userName: options.userName,
             password: options.password,
             domain: options.domain,
           }
         };
-      } else if (type === 'azure-active-directory-access-token') {
+      } else if (type === AuthenticationTypes.AzureActiveDirectoryAccessToken) {
         if (typeof options.token !== 'string') {
           throw new TypeError('The "config.authentication.options.token" property must be of type string.');
         }
 
         authentication = {
-          type: 'azure-active-directory-access-token',
+          type: AuthenticationTypes.AzureActiveDirectoryAccessToken,
           options: {
             token: options.token
           }
         };
-      } else if (type === 'azure-active-directory-msi-vm') {
+      } else if (type === AuthenticationTypes.AzureActiveDirectoryMsiVm) {
         if (options.clientId !== undefined && typeof options.clientId !== 'string') {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
@@ -1124,13 +1150,13 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'azure-active-directory-msi-vm',
+          type: AuthenticationTypes.AzureActiveDirectoryMsiVm,
           options: {
             clientId: options.clientId,
             msiEndpoint: options.msiEndpoint
           }
         };
-      } else if (type === 'azure-active-directory-msi-app-service') {
+      } else if (type === AuthenticationTypes.AzureActiveDirectoryMsiAppService) {
         if (options.clientId !== undefined && typeof options.clientId !== 'string') {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
@@ -1144,14 +1170,14 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'azure-active-directory-msi-app-service',
+          type: AuthenticationTypes.AzureActiveDirectoryMsiAppService,
           options: {
             clientId: options.clientId,
             msiEndpoint: options.msiEndpoint,
             msiSecret: options.msiSecret
           }
         };
-      } else if (type === 'azure-active-directory-service-principal-secret') {
+      } else if (type === AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret) {
         if (typeof options.clientId !== 'string') {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
@@ -1165,7 +1191,7 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'azure-active-directory-service-principal-secret',
+          type: AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret,
           options: {
             clientId: options.clientId,
             clientSecret: options.clientSecret,
@@ -1182,7 +1208,7 @@ class Connection extends EventEmitter {
         }
 
         authentication = {
-          type: 'default',
+          type: AuthenticationTypes.Default,
           options: {
             userName: options.userName,
             password: options.password
@@ -1191,7 +1217,7 @@ class Connection extends EventEmitter {
       }
     } else {
       authentication = {
-        type: 'default',
+        type: AuthenticationTypes.Default,
         options: {
           userName: undefined,
           password: undefined
@@ -2517,7 +2543,7 @@ class Connection extends EventEmitter {
 
     const { authentication } = this.config;
     switch (authentication.type) {
-      case 'azure-active-directory-password':
+      case AuthenticationTypes.AzureActiveDirectoryPassword:
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -2525,7 +2551,7 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'azure-active-directory-access-token':
+      case AuthenticationTypes.AzureActiveDirectoryAccessToken:
         payload.fedAuth = {
           type: 'SECURITYTOKEN',
           echo: this.fedAuthRequired,
@@ -2533,9 +2559,9 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'azure-active-directory-msi-vm':
-      case 'azure-active-directory-msi-app-service':
-      case 'azure-active-directory-service-principal-secret':
+      case AuthenticationTypes.AzureActiveDirectoryMsiVm:
+      case AuthenticationTypes.AzureActiveDirectoryMsiAppService:
+      case AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret:
         payload.fedAuth = {
           type: 'ADAL',
           echo: this.fedAuthRequired,
@@ -3339,9 +3365,9 @@ Connection.prototype.STATE = {
 
             const { authentication } = this.config;
 
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
+            if (FedAuthAuthentications.includes(authentication.type)) {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
+            } else if (authentication.type === AuthenticationTypes.Ntlm) {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
             } else {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -3362,7 +3388,8 @@ Connection.prototype.STATE = {
       },
       featureExtAck: function(token) {
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
+
+        if (AADAuthenticationTypes.includes(authentication.type)) {
           if (token.fedAuth === undefined) {
             this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
             this.loggedIn = false;
@@ -3497,7 +3524,7 @@ Connection.prototype.STATE = {
                 }, callback);
               };
 
-              if (authentication.type === 'azure-active-directory-password') {
+              if (authentication.type === AuthenticationTypes.AzureActiveDirectoryPassword) {
                 const credentials = new UserTokenCredentials(
                   '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
                   authentication.options.domain ?? 'common',
@@ -3509,20 +3536,20 @@ Connection.prototype.STATE = {
                 );
 
                 getTokenFromCredentials(undefined, credentials);
-              } else if (authentication.type === 'azure-active-directory-msi-vm') {
+              } else if (authentication.type === AuthenticationTypes.AzureActiveDirectoryMsiVm) {
                 loginWithVmMSI({
                   clientId: authentication.options.clientId,
                   msiEndpoint: authentication.options.msiEndpoint,
                   resource: fedAuthInfoToken.spn
                 }, getTokenFromCredentials);
-              } else if (authentication.type === 'azure-active-directory-msi-app-service') {
+              } else if (authentication.type === AuthenticationTypes.AzureActiveDirectoryMsiAppService) {
                 loginWithAppServiceMSI({
                   msiEndpoint: authentication.options.msiEndpoint,
                   msiSecret: authentication.options.msiSecret,
                   resource: fedAuthInfoToken.spn,
                   clientId: authentication.options.clientId
                 }, getTokenFromCredentials);
-              } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
+              } else if (authentication.type === AuthenticationTypes.AzureActiveDirectoryServicePrincipalSecret) {
                 const credentials = new ApplicationTokenCredentials(
                   authentication.options.clientId,
                   authentication.options.tenantId, // domain
