@@ -4,6 +4,46 @@ const StreamParser = require('../../../src/token/stream-parser');
 const assert = require('chai').assert;
 
 describe('Colmetadata Token Parser', () => {
+  describe('parsing the column metadata for a result with many columns', function() {
+    it('should parse them correctly', async function() {
+      const userType = 2;
+      const flags = 3;
+      const columnName = 'name';
+
+      const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+      buffer.writeUInt8(0x81);
+      // Column Count
+      buffer.writeUInt16LE(1024);
+
+      for (let i = 0; i < 1024; i++) {
+        buffer.writeUInt32LE(userType);
+        buffer.writeUInt16LE(flags);
+        buffer.writeUInt8(dataTypeByName.Int.id);
+        buffer.writeBVarchar(columnName);
+      }
+
+      const parser = StreamParser.parseTokens([buffer.data], {}, {});
+
+      const result = await parser.next();
+      assert.isFalse(result.done);
+      const token = result.value;
+
+      assert.isOk(!token.error);
+
+      assert.strictEqual(token.columns.length, 1024);
+
+      for (let i = 0; i < 1024; i++) {
+        assert.strictEqual(token.columns[i].userType, 2);
+        assert.strictEqual(token.columns[i].flags, 3);
+        assert.strictEqual(token.columns[i].type.name, 'Int');
+        assert.strictEqual(token.columns[i].colName, 'name');
+      }
+
+      assert.isTrue((await parser.next()).done);
+    });
+  });
+
   it('should int', async () => {
     const numberOfColumns = 1;
     const userType = 2;

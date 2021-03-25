@@ -19,7 +19,6 @@ import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 
 const tokenParsers = {
-  [TYPE.COLMETADATA]: colMetadataParser,
   [TYPE.DONE]: doneParser,
   [TYPE.DONEINPROC]: doneInProcParser,
   [TYPE.DONEPROC]: doneProcParser,
@@ -32,35 +31,64 @@ const tokenParsers = {
   [TYPE.ORDER]: orderParser,
   [TYPE.RETURNSTATUS]: returnStatusParser,
   [TYPE.RETURNVALUE]: returnValueParser,
-  [TYPE.ROW]: rowParser,
-  [TYPE.NBCROW]: nbcRowParser,
   [TYPE.SSPI]: sspiParser
 };
+
+class StreamBuffer {
+  iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
+  buffer: Buffer;
+  position: number;
+
+  constructor(iterable: AsyncIterable<Buffer> | Iterable<Buffer>) {
+    this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] || (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
+
+    this.buffer = Buffer.alloc(0);
+    this.position = 0;
+  }
+
+  async waitForChunk() {
+    const result = await this.iterator.next();
+    if (result.done) {
+      throw new Error('unexpected end of data');
+    }
+
+    if (this.position === this.buffer.length) {
+      this.buffer = result.value;
+    } else {
+      this.buffer = Buffer.concat([this.buffer.slice(this.position), result.value]);
+    }
+    this.position = 0;
+  }
+}
 
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
 
-  buffer: Buffer;
-  position: number;
   suspended: boolean;
   next?: () => void;
+  streamBuffer: StreamBuffer;
 
   static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {
-    const parser = new Parser(debug, options);
-    parser.colMetadata = colMetadata;
-
     let token: Token | undefined;
     const onDoneParsing = (t: Token | undefined) => { token = t; };
 
-    for await (const input of iterable) {
-      if (parser.position === parser.buffer.length) {
-        parser.buffer = input;
-      } else {
-        parser.buffer = Buffer.concat([parser.buffer.slice(parser.position), input]);
+    const streamBuffer = new StreamBuffer(iterable);
+
+    const parser = new Parser(streamBuffer, debug, options);
+    parser.colMetadata = colMetadata;
+
+    while (true) {
+      try {
+        await streamBuffer.waitForChunk();
+      } catch (err: unknown) {
+        if (streamBuffer.position === streamBuffer.buffer.length) {
+          return;
+        }
+
+        throw err;
       }
-      parser.position = 0;
 
       if (parser.suspended) {
         // Unsuspend and continue from where ever we left off.
@@ -84,7 +112,15 @@ class Parser {
 
         parser.position += 1;
 
-        if (tokenParsers[type]) {
+        if (type === TYPE.COLMETADATA) {
+          const token = await colMetadataParser(parser);
+          parser.colMetadata = token.columns;
+          yield token;
+        } else if (type === TYPE.ROW) {
+          yield rowParser(parser);
+        } else if (type === TYPE.NBCROW) {
+          yield nbcRowParser(parser);
+        } else if (tokenParsers[type]) {
           tokenParsers[type](parser, parser.options, onDoneParsing);
 
           // Check if a new token was parsed after unsuspension.
@@ -99,21 +135,28 @@ class Parser {
         }
       }
     }
-
-    if (parser.suspended) {
-      throw new Error('unexpected end of data');
-    }
   }
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
+  constructor(streamBuffer: StreamBuffer, debug: Debug, options: InternalConnectionOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;
 
-    this.buffer = Buffer.alloc(0);
-    this.position = 0;
+    this.streamBuffer = streamBuffer;
     this.suspended = false;
     this.next = undefined;
+  }
+
+  get buffer() {
+    return this.streamBuffer.buffer;
+  }
+
+  get position() {
+    return this.streamBuffer.position;
+  }
+
+  set position(value) {
+    this.streamBuffer.position = value;
   }
 
   suspend(next: () => void) {
