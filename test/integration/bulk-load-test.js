@@ -7,13 +7,14 @@ const assert = require('chai').assert;
 
 const debugMode = false;
 
-
 function getConfig() {
   const { config } = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   );
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+
+  config.options.cancelTimeout = 1000;
 
   if (debugMode) {
     config.options.debug = {
@@ -27,7 +28,10 @@ function getConfig() {
   return config;
 }
 
-describe('Bulk Load Tests', function() {
+describe('BulkLoad', function() {
+  /**
+   * @type {Connection}
+   */
   let connection;
 
   beforeEach(function(done) {
@@ -54,11 +58,8 @@ describe('Bulk Load Tests', function() {
     }
   });
 
-  it('should bulk load', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable', function(
-      err,
-      rowCount
-    ) {
+  it('allows bulk loading multiple rows', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         return done(err);
       }
@@ -68,115 +69,88 @@ describe('Bulk Load Tests', function() {
       done();
     });
 
-    bulkLoad.addColumn('nnn', TYPES.Int, {
-      nullable: false
-    });
-    bulkLoad.addColumn('sss', TYPES.NVarChar, {
-      length: 50,
-      nullable: true
-    });
-    bulkLoad.addColumn('ddd', TYPES.DateTime, {
-      nullable: false
-    });
-    const request = new Request(bulkLoad.getTableCreationSql(), function(err) {
+    bulkLoad.addColumn('nnn', TYPES.Int, { nullable: false });
+    bulkLoad.addColumn('sss', TYPES.NVarChar, { length: 50, nullable: true });
+    bulkLoad.addColumn('ddd', TYPES.DateTime, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
       if (err) {
         return done(err);
       }
 
-      bulkLoad.addRow({
-        nnn: 201,
-        sss: 'one zero one',
-        ddd: new Date(1986, 6, 20)
-      });
+      bulkLoad.addRow({ nnn: 201, sss: 'one zero one', ddd: new Date(1986, 6, 20) });
       bulkLoad.addRow([202, 'one zero two', new Date()]);
       bulkLoad.addRow(203, 'one zero three', new Date(2013, 7, 12));
-      bulkLoad.addRow({
-        nnn: 204,
-        sss: 'one zero four',
-        ddd: new Date()
-      });
-      bulkLoad.addRow({
-        nnn: 205,
-        sss: 'one zero five',
-        ddd: new Date()
-      });
+      bulkLoad.addRow({ nnn: 204, sss: 'one zero four', ddd: new Date() });
+      bulkLoad.addRow({ nnn: 205, sss: 'one zero five', ddd: new Date() });
+
       connection.execBulkLoad(bulkLoad);
     });
+
     connection.execSqlBatch(request);
   });
 
-  it('should bulkLoadError', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable2', function(
-      err,
-      rowCount
-    ) {
-      assert.ok(
-        err,
-        'An error should have been thrown to indicate the incorrect table format.'
-      );
+  it('fails if the column definition does not match the target table format', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
+      assert.instanceOf(err, Error, 'An error should have been thrown to indicate the incorrect table format.');
+      assert.isUndefined(rowCount);
 
       done();
     });
-    bulkLoad.addColumn('x', TYPES.Int, {
-      nullable: false
-    });
-    bulkLoad.addColumn('y', TYPES.Int, {
-      nullable: false
-    });
-    const request = new Request(
-      'CREATE TABLE #tmpTestTable2 ([id] int not null)',
-      function(err) {
-        if (err) {
-          return done(err);
-        }
 
-        bulkLoad.addRow({
-          x: 1,
-          y: 1
-        });
-        connection.execBulkLoad(bulkLoad);
-      }
-    );
-    connection.execSqlBatch(request);
-  });
+    bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
+    bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
 
-  it('should bulkload verify constraints', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, function(err, rowCount) {
-      assert.ok(
-        err,
-        'An error should have been thrown to indicate the conflict with the CHECK constraint.'
-      );
-      done();
-    });
-    bulkLoad.addColumn('id', TYPES.Int, {
-      nullable: true
-    });
-    const request = new Request(`
-    CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))
-  `, function(err) {
+    const request = new Request('CREATE TABLE #tmpTestTable2 ([id] int not null)', (err) => {
       if (err) {
         return done(err);
       }
 
-      bulkLoad.addRow({
-        id: 555
-      });
+      bulkLoad.addRow({ x: 1, y: 1 });
+
       connection.execBulkLoad(bulkLoad);
     });
+
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload verify trigger', function(done) {
-    const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, function(err, rowCount) {
+  it('checks constraints if the `checkConstraints` option is set to `true`', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, (err, rowCount) => {
+      assert.ok(err, 'An error should have been thrown to indicate the conflict with the CHECK constraint.');
+
+      assert.strictEqual(rowCount, 0);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    const request = new Request('CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))', (err) => {
       if (err) {
         return done(err);
       }
 
-      connection.execSql(request_verify);
+      bulkLoad.addRow({ id: 50 });
+      bulkLoad.addRow({ id: 555 });
+      bulkLoad.addRow({ id: 5 });
+
+      connection.execBulkLoad(bulkLoad);
     });
-    bulkLoad.addColumn('id', TYPES.Int, {
-      nullable: true
+
+    connection.execSqlBatch(request);
+  });
+
+  it('fires triggers if the `fireTriggers` option is set to `true`', function(done) {
+    const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execSql(verifyTriggerRequest);
     });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
     const createTable = 'CREATE TABLE testTable4 ([id] int);';
     const createTrigger = `
       CREATE TRIGGER bulkLoadTest on testTable4
@@ -187,15 +161,15 @@ describe('Bulk Load Tests', function() {
     const verifyTrigger = 'SELECT COUNT(*) FROM testTable4';
     const dropTable = 'DROP TABLE testTable4';
 
-    const request_table = new Request(createTable, function(err) {
+    const createTableRequest = new Request(createTable, (err) => {
       if (err) {
         return done(err);
       }
 
-      connection.execSql(request_trigger);
+      connection.execSql(createTriggerRequest);
     });
 
-    const request_trigger = new Request(createTrigger, function(err) {
+    const createTriggerRequest = new Request(createTrigger, (err) => {
       if (err) {
         return done(err);
       }
@@ -203,18 +177,19 @@ describe('Bulk Load Tests', function() {
       bulkLoad.addRow({
         id: 555
       });
+
       connection.execBulkLoad(bulkLoad);
     });
 
-    const request_verify = new Request(verifyTrigger, function(err) {
+    const verifyTriggerRequest = new Request(verifyTrigger, (err) => {
       if (err) {
         return done(err);
       }
 
-      connection.execSql(request_dropTable);
+      connection.execSql(dropTableRequest);
     });
 
-    const request_dropTable = new Request(dropTable, function(err) {
+    const dropTableRequest = new Request(dropTable, (err) => {
       if (err) {
         return done(err);
       }
@@ -222,75 +197,75 @@ describe('Bulk Load Tests', function() {
       done();
     });
 
-    request_verify.on('row', function(columns) {
+    verifyTriggerRequest.on('row', (columns) => {
       assert.deepEqual(columns[0].value, 2);
     });
 
-    connection.execSql(request_table);
+    connection.execSql(createTableRequest);
   });
 
-  it('should bulkload verify null value', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(
-      err,
-      rowCount
-    ) {
+  it('should not replace `null` values with column defaults if `keepNulls` is set to `true`', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
       }
 
-      connection.execSqlBatch(request_verifyBulkLoad);
+      connection.execSqlBatch(verifyBulkLoadRequest);
     });
-    bulkLoad.addColumn('id', TYPES.Int, {
-      nullable: true
-    });
-    const request = new Request(`
-      CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)
-    `, function(err) {
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
 
-      bulkLoad.addRow({
-        id: null
-      });
+      bulkLoad.addRow({ id: null });
+
       connection.execBulkLoad(bulkLoad);
     });
-    const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err) {
+
+    const verifyBulkLoadRequest = new Request('SELECT [id] FROM #tmpTestTable5', (err) => {
       if (err) {
         return done(err);
       }
 
       done();
     });
-    request_verifyBulkLoad.on('row', function(columns) {
+
+    verifyBulkLoadRequest.on('row', (columns) => {
       assert.deepEqual(columns[0].value, null);
     });
+
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload cancel after request send does nothing', function(done) {
-
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
-      assert.ok(err);
+  it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
+      assert.instanceOf(err, Error);
       assert.strictEqual(err.message, 'Canceled.');
 
-      connection.execSqlBatch(request_verifyBulkLoad);
+      assert.isUndefined(rowCount);
+
+      connection.execSqlBatch(verifyBulkLoadRequest);
     });
 
     bulkLoad.addColumn('id', TYPES.Int, {
       nullable: true
     });
 
-    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
       bulkLoad.addRow({ id: 1234 });
+
       connection.execBulkLoad(bulkLoad);
+
       bulkLoad.cancel();
     });
 
-    const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
+    const verifyBulkLoadRequest = new Request('SELECT [id] FROM #tmpTestTable5', (err, rowCount) => {
       if (err) {
         return done(err);
       }
@@ -300,39 +275,37 @@ describe('Bulk Load Tests', function() {
       done();
     });
 
-    request_verifyBulkLoad.on('row', function(columns) {
+    verifyBulkLoadRequest.on('row', (columns) => {
       assert.deepEqual(columns[0].value, null);
     });
 
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload cancel after request completed', function(done) {
-
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+  it('should not do anything if canceled after completion', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
       }
 
       bulkLoad.cancel();
 
-      connection.execSqlBatch(request_verifyBulkLoad);
+      connection.execSqlBatch(verifyBulkLoadRequest);
     });
 
-    bulkLoad.addColumn('id', TYPES.Int, {
-      nullable: true
-    });
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
 
-    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
 
       bulkLoad.addRow({ id: 1234 });
+
       connection.execBulkLoad(bulkLoad);
     });
 
-    const request_verifyBulkLoad = new Request('SELECT [id] FROM #tmpTestTable5', function(err, rowCount) {
+    const verifyBulkLoadRequest = new Request('SELECT [id] FROM #tmpTestTable5', (err, rowCount) => {
       if (err) {
         return done(err);
       }
@@ -342,32 +315,62 @@ describe('Bulk Load Tests', function() {
       done();
     });
 
-    request_verifyBulkLoad.on('row', function(columns) {
+    verifyBulkLoadRequest.on('row', function(columns) {
       assert.strictEqual(columns[0].value, 1234);
     });
 
     connection.execSqlBatch(request);
   });
 
-  it('should test stream bulk load', function(done) {
-    const totalRows = 20;
-    const tableName = '#streamingBulkLoadTest';
-
-    connection.on('error', done);
-    startCreateTable();
-
-    function startCreateTable() {
-      const sql = 'create table ' + tableName + ' (i int not null primary key)';
-      const request = new Request(sql, completeCreateTable);
-      connection.execSqlBatch(request);
-    }
-
-    function completeCreateTable(err) {
+  it('should not close the connection due to cancelTimeout if canceled after completion', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
       }
 
-      startBulkLoad();
+      bulkLoad.cancel();
+
+      setTimeout(() => {
+        assert.strictEqual(connection.state.name, 'LoggedIn');
+
+        const request = new Request('select 1', done);
+
+        connection.execSql(request);
+      }, connection.config.options.cancelTimeout + 100);
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    bulkLoad.addRow({ id: 1234 });
+
+    const createTableRequest = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(createTableRequest);
+  });
+
+  it('supports streaming bulk load inserts', function(done) {
+    const totalRows = 20;
+    const tableName = '#streamingBulkLoadTest';
+
+    startCreateTable();
+
+    function startCreateTable() {
+      const sql = 'create table ' + tableName + ' (i int not null primary key)';
+      const request = new Request(sql, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        startBulkLoad();
+      });
+
+      connection.execSqlBatch(request);
     }
 
     function startBulkLoad() {
@@ -406,10 +409,11 @@ describe('Bulk Load Tests', function() {
         from ${tableName} a
         inner join ${tableName} b on a.i = b.i - 1
       `, completeVerifyTableContent);
-      request.setTimeout(30000);
+
       request.on('row', (row) => {
         assert.equal(row[0].value, totalRows - 1);
       });
+
       connection.execSqlBatch(request);
     }
 
@@ -418,12 +422,13 @@ describe('Bulk Load Tests', function() {
         return done(err);
       }
 
-      assert.equal(rowCount, 1);
+      assert.strictEqual(rowCount, 1);
+
       done();
     }
   });
 
-  it('should test streaming bulk load with cancel', function(done) {
+  it('supports cancelling a streaming bulk load', function(done) {
     const totalRows = 20;
 
     startCreateTable();
@@ -464,7 +469,7 @@ describe('Bulk Load Tests', function() {
         }
       })(), { objectMode: true });
 
-      pipeline(rowSource, rowStream, function(err) {
+      pipeline(rowSource, rowStream, (err) => {
         assert.ok(err);
         assert.strictEqual(err.message, 'Canceled.');
         assert.strictEqual(rowCount, 10);
@@ -475,7 +480,7 @@ describe('Bulk Load Tests', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Canceled.');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
       startVerifyTableContent();
     }
 
@@ -503,8 +508,62 @@ describe('Bulk Load Tests', function() {
     }
   });
 
-  it('should throw `RequestError: Canceled` after 10ms', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
+  it('should not close the connection due to cancelTimeout if streaming bulk load is cancelled', function(done) {
+    const totalRows = 20;
+
+    const sql = 'create table #stream_test (i int not null primary key)';
+    const request = new Request(sql, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const bulkLoad = connection.newBulkLoad('#stream_test', (err, rowCount) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+
+        assert.strictEqual(rowCount, 0);
+      });
+
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      const rowStream = bulkLoad.getRowStream();
+      connection.execBulkLoad(bulkLoad);
+
+      let rowCount = 0;
+      const rowSource = Readable.from((async function*() {
+        while (rowCount < totalRows) {
+          if (rowCount === 10) {
+            bulkLoad.cancel();
+
+            setTimeout(() => {
+              assert.strictEqual(connection.state.name, 'LoggedIn');
+
+              const request = new Request('select 1', done);
+
+              connection.execSql(request);
+            }, connection.config.options.cancelTimeout + 100);
+          }
+
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+
+          yield [rowCount++];
+        }
+      })(), { objectMode: true });
+
+      pipeline(rowSource, rowStream, (err) => {
+        assert.ok(err);
+        assert.strictEqual(err.message, 'Canceled.');
+        assert.strictEqual(rowCount, 10);
+      });
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('cancels any bulk load that takes longer than the given timeout', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, Error);
       assert.strictEqual(err.name, 'RequestError');
       assert.strictEqual(err.message, 'Timeout: Request failed to complete in 10ms');
@@ -518,7 +577,7 @@ describe('Bulk Load Tests', function() {
       nullable: true
     });
 
-    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
@@ -533,11 +592,9 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should throw `RequestError: Connection closed before request completed` after 2000ms', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'RequestError');
-      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 2000ms');
+  it('does nothing if the timeout fires after the bulk load completes', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
+      assert.isUndefined(err);
 
       done();
     });
@@ -548,12 +605,12 @@ describe('Bulk Load Tests', function() {
       nullable: true
     });
 
-    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', function(err) {
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
 
-      for (let i = 0; i < 900000; i++) {
+      for (let i = 0; i < 100; i++) {
         bulkLoad.addRow({ id: 1234 });
       }
 
@@ -563,7 +620,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should correctly time out on streaming bulk loads', function(done) {
+  it('cancels any streaming bulk load that takes longer than the given timeout', function(done) {
     startCreateTable();
 
     function startCreateTable() {
@@ -600,7 +657,7 @@ describe('Bulk Load Tests', function() {
         yield [2];
       })(), { objectMode: true });
 
-      pipeline(rowSource, rowStream, function(err) {
+      pipeline(rowSource, rowStream, (err) => {
         assert.ok(err);
         assert.strictEqual(err.message, 'Canceled.');
       });
@@ -610,7 +667,8 @@ describe('Bulk Load Tests', function() {
       assert.ok(err);
       assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
 
-      assert.isUndefined(rowCount);
+      assert.strictEqual(rowCount, 0);
+
       done();
     }
   });
@@ -664,7 +722,7 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
       ['invalid date']
     ]);
 
-    pipeline(rowSource, rowStream, function(err) {
+    pipeline(rowSource, rowStream, (err) => {
       assert.ok(err);
       assert.strictEqual(err.message, 'Invalid date.');
     });
@@ -686,7 +744,7 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
 
     const rowSource = Readable.from([ ['invalid date'] ]);
 
-    pipeline(rowSource, rowStream, function(err) {
+    pipeline(rowSource, rowStream, (err) => {
       assert.ok(err);
       assert.strictEqual(err.message, 'Invalid date.');
     });
@@ -694,6 +752,8 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     function completeBulkLoad(err, rowCount) {
       assert.ok(err);
       assert.strictEqual(err.message, 'Invalid date.');
+
+      assert.strictEqual(rowCount, 0);
 
       const rows = [];
       const request = new Request('SELECT 1', (err) => {

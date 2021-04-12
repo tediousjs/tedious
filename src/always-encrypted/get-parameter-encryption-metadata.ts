@@ -75,7 +75,6 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     }
 
     if (paramCount !== request.parameters.length) {
-      console.log('>> resultRows.length = ', resultRows.length, ', request.param.length = ', request.parameters.length);
       return callback(new Error(`Internal error. Metadata for some parameters in statement or procedure "${request.sqlTextOrProcedure}" is missing in the resultset returned by sp_describe_parameter_encryption.`));
     }
 

@@ -17,59 +17,67 @@ interface Column {
   metadata: ColumnMetadata;
 }
 
-function nbcRowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: NBCRowToken) => void) {
-  const columnsMetaData = parser.colMetadata;
-  const length = Math.ceil(columnsMetaData.length / 8);
-  parser.readBuffer(length, (bytes) => {
-    const bitmap: boolean[] = [];
+async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
+  const colMetadata = parser.colMetadata;
+  const bitmapByteLength = Math.ceil(colMetadata.length / 8);
+  const columns: Column[] = [];
+  const bitmap: boolean[] = [];
 
-    for (let i = 0, len = bytes.length; i < len; i++) {
-      const byte = bytes[i];
-      for (let j = 0; j <= 7; j++) {
-        bitmap.push(byte & (1 << j) ? true : false);
-      }
+  while (parser.buffer.length - parser.position < bitmapByteLength) {
+    await parser.streamBuffer.waitForChunk();
+  }
+
+  const bytes = parser.buffer.slice(parser.position, parser.position + bitmapByteLength);
+  parser.position += bitmapByteLength;
+
+  for (let i = 0, len = bytes.length; i < len; i++) {
+    const byte = bytes[i];
+
+    bitmap.push(byte & 0b1 ? true : false);
+    bitmap.push(byte & 0b10 ? true : false);
+    bitmap.push(byte & 0b100 ? true : false);
+    bitmap.push(byte & 0b1000 ? true : false);
+    bitmap.push(byte & 0b10000 ? true : false);
+    bitmap.push(byte & 0b100000 ? true : false);
+    bitmap.push(byte & 0b1000000 ? true : false);
+    bitmap.push(byte & 0b10000000 ? true : false);
+  }
+
+  for (let i = 0; i < colMetadata.length; i++) {
+    const currColMetadata = colMetadata[i];
+    let value;
+    (bitmap[i] ? nullHandler : valueParse)(parser, currColMetadata, parser.options, (v) => {
+      value = v;
+    });
+
+    while (parser.suspended) {
+      await parser.streamBuffer.waitForChunk();
+
+      parser.suspended = false;
+      const next = parser.next!;
+
+      next();
     }
+    columns.push({
+      value,
+      metadata: currColMetadata
+    });
+  }
 
-    const columns: Column[] = [];
-    const len = columnsMetaData.length;
-    let i = 0;
+  if (parser.options.useColumnNames) {
+    const columnsMap: { [key: string]: Column } = {};
 
-    function next(done: () => void) {
-      if (i === len) {
-        return done();
-      }
-
-      const columnMetaData = columnsMetaData[i];
-
-      (bitmap[i] ? nullHandler : valueParse)(parser, columnMetaData, options, (value) => {
-        columns.push({
-          value: value,
-          metadata: columnMetaData
-        });
-
-        i++;
-
-        next(done);
-      });
-    }
-
-    next(() => {
-      if (options.useColumnNames) {
-        const columnsMap: { [key: string]: Column } = {};
-
-        columns.forEach((column) => {
-          const colName = column.metadata.colName;
-          if (columnsMap[colName] == null) {
-            columnsMap[colName] = column;
-          }
-        });
-
-        callback(new NBCRowToken(columnsMap));
-      } else {
-        callback(new NBCRowToken(columns));
+    columns.forEach((column) => {
+      const colName = column.metadata.colName;
+      if (columnsMap[colName] == null) {
+        columnsMap[colName] = column;
       }
     });
-  });
+
+    return new NBCRowToken(columnsMap);
+  } else {
+    return new NBCRowToken(columns);
+  }
 }
 
 export default nbcRowParser;

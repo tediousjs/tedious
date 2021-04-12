@@ -968,6 +968,7 @@ class PreBufferedParser extends EventEmitter implements IParser {
 
 function readEncryptedBinary(parser: IParser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
   const cryptoMetadata: CryptoMetadata = metadata.cryptoMetadata!;
+  // console.log('>!@ metadata', metadata)
   const { normalizationRuleVersion } = cryptoMetadata;
   const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
@@ -1015,6 +1016,7 @@ function readEncryptedBinary(parser: IParser, metadata: Metadata, options: Inter
       }
 
       readBinary(parser, dataLength, (encryptedValue) => {
+        //@ts-ignore
         callbackDecrypted(decryptWithKey(encryptedValue as Buffer, cryptoMetadata, options));
       });
     });

@@ -477,6 +477,11 @@ describe('always encrypted', function() {
         return cb(err);
       }
       const val = 131;
+      /**
+       * Note: the very last collation in deterministicCollations throws an error:
+       * "Cannot create encrypted column 'Determinized131', character strings that do not use a *_BIN2 collation cannot be encrypted"
+       * which doesn't make sense. To be reviewed at a later time.
+       */
       // const val = deterministicCollations.length;
       const temp = [];
       for (let i = 0; i < val; i++) {
