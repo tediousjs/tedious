@@ -82,6 +82,28 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
+function readColumns(columnCount: number, parser: Parser, resolved: { val: boolean }, resolve: (arg0: ColMetadataToken) => void) {
+  const columns: ColumnMetadata[] = [];
+
+  for (let i = 0; i < columnCount; i++) {
+    let column: ColumnMetadata;
+
+    readColumn(parser, parser.options, i, (c) => {
+      column = c;
+    });
+
+    if (!column!) {
+      break;
+    } else {
+      columns.push(column!);
+      if (i === columnCount - 1) {
+        resolved.val = true;
+        return resolve(new ColMetadataToken(columns));
+      }
+    }
+  }
+}
+
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   while (parser.buffer.length - parser.position < 2) {
     await parser.streamBuffer.waitForChunk();
@@ -90,27 +112,25 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   const columnCount = parser.buffer.readUInt16LE(parser.position);
   parser.position += 2;
 
-  const columns: ColumnMetadata[] = [];
-  for (let i = 0; i < columnCount; i++) {
-    let column: ColumnMetadata;
+  return new Promise((resolve) => {
+    const parser_starting_position = parser.position;
+    const resolved = { val: false };
+    let whileLoopPaused = false;
+    readColumns(columnCount, parser, resolved, resolve);
 
-    readColumn(parser, parser.options, i, (c) => {
-      column = c;
-    });
-
-    while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
-
-      parser.suspended = false;
-      const next = parser.next!;
-
-      next();
+    if (!resolved.val) {
+      while (parser.suspended && !whileLoopPaused) {
+        parser.position = parser_starting_position;
+        whileLoopPaused = true;
+        parser.streamBuffer.waitForChunk().then(() => {
+          parser.suspended = false;
+          whileLoopPaused = false;
+          readColumns(columnCount, parser, resolved, resolve);
+        });
+      }
     }
+  });
 
-    columns.push(column!);
-  }
-
-  return new ColMetadataToken(columns);
 }
 
 export default colMetadataParser;
