@@ -2863,14 +2863,16 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   callProcedure(request: Request) {
-    request.validateParameters();
+    try {
+      request.validateParameters();
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);
       });
+
       return;
     }
 
