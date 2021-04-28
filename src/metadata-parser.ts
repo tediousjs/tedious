@@ -2,6 +2,7 @@ import { codepageBySortId, codepageByLcid } from './collation';
 import Parser from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
+import { CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
 
@@ -27,7 +28,7 @@ interface UdtInfo {
   assemblyName: string;
 }
 
-export interface Metadata {
+export type BaseMetadata = {
   userType: number;
 
   flags: number;
@@ -56,6 +57,11 @@ export interface Metadata {
 
   udtInfo: UdtInfo | undefined;
 }
+
+export type Metadata = {
+  cryptoMetadata?: CryptoMetadata;
+} & BaseMetadata;
+
 
 function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
   // s2.2.5.1.2
