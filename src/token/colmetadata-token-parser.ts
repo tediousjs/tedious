@@ -1,48 +1,38 @@
 import metadataParse, { Metadata } from '../metadata-parser';
 import { CEKEntry } from '../always-encrypted/cek-entry';
 import { CryptoMetadata } from '../always-encrypted/types';
-
 import Parser from './stream-parser';
 import { InternalConnectionOptions } from '../connection';
 import { ColMetadataToken } from './token';
-
 export interface ColumnMetadata extends Metadata {
   /**
    * The column's name。
    */
   colName: string;
-
   tableName?: string | string[];
 }
-
 type cekTableEntryMetadata = {
   databaseId: number;
   cekId: number;
   cekVersion: number;
   cekMdVersion: Buffer;
 }
-
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
     if (options.tdsVersion >= '7_2') {
       parser.readUInt8((numberOfTableNameParts) => {
         const tableName: string[] = [];
-
         let i = 0;
         function next(done: () => void) {
           if (numberOfTableNameParts === i) {
             return done();
           }
-
           parser.readUsVarChar((part) => {
             tableName.push(part);
-
             i++;
-
             next(done);
           });
         }
-
         next(() => {
           callback(tableName);
         });
@@ -54,7 +44,6 @@ function readTableName(parser: Parser, options: InternalConnectionOptions, metad
     callback(undefined);
   }
 }
-
 function readColumnName(parser: Parser, options: InternalConnectionOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
   parser.readBVarChar((colName) => {
     if (options.columnNameReplacer) {
@@ -68,7 +57,6 @@ function readColumnName(parser: Parser, options: InternalConnectionOptions, inde
     }
   });
 }
-
 function readCryptoMetadataOrdinal(parser: Parser, cekList: CEKEntry[] | undefined, callback: (ordinal: number) => void) {
   if (cekList) {
     parser.readUInt16LE((ordinal) => {
@@ -78,7 +66,6 @@ function readCryptoMetadataOrdinal(parser: Parser, cekList: CEKEntry[] | undefin
     callback(0);
   }
 }
-
 function readCryptoMetadata(parser: Parser, metadata: Metadata, cekList: CEKEntry[] | undefined, options: InternalConnectionOptions, callback: (cryptoMetdata?: CryptoMetadata) => void) {
   if (options.serverSupportsColumnEncryption === true && 0x0800 === (metadata.flags & 0x0800)) {
     readCryptoMetadataOrdinal(parser, cekList, (ordinal) => {
@@ -106,7 +93,6 @@ function readCryptoMetadata(parser: Parser, metadata: Metadata, cekList: CEKEntr
     callback();
   }
 }
-
 function readCustomEncryptionMetadata(parser: Parser, algorithmId: number, callback: (algorithmName: string) => void) {
   if (algorithmId === 0) {
     parser.readUInt8((nameSize) => {
@@ -119,24 +105,15 @@ function readCustomEncryptionMetadata(parser: Parser, algorithmId: number, callb
     callback('');
   }
 }
-
 function readColumn(parser: Parser, options: InternalConnectionOptions, index: number, cekList: CEKEntry[] | undefined, callback: (column: ColumnMetadata) => void) {
-  // console.log('>> read column start')
   metadataParse(parser, options, (metadata) => {
-    // console.log('metadataParse done')
     readTableName(parser, options, metadata, (tableName) => {
-      // console.log('readTableName done')
-
       readCryptoMetadata(parser, metadata, cekList, options, (cryptoMetadata) => {
-        // console.log('readCryptoMetadata done')
-
         if (cryptoMetadata && cryptoMetadata.baseTypeInfo) {
           cryptoMetadata.baseTypeInfo.flags = metadata.flags;
           metadata.collation = cryptoMetadata.baseTypeInfo.collation;
         }
-        // console.log('>> read colname start')
         readColumnName(parser, options, index, metadata, (colName) => {
-          // console.log('>> reading col name done = ', colName)
           callback({
             userType: metadata.userType,
             flags: metadata.flags,
@@ -156,29 +133,22 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
     });
   }, true);
 }
-
 function readCEKTable(parser: Parser, options: InternalConnectionOptions, callback: (cekList?: CEKEntry[]) => void) {
-  // console.log('>> reading CEK table ', parser.position)
   if (options.serverSupportsColumnEncryption === true) {
     parser.readUInt16LE((tableSize) => {
       if (tableSize > 0) {
         const cekList: CEKEntry[] = [];
-
         let i = 0;
         function next(done: () => void) {
-          // console.log('>> readCEK Table i = ', i, ', (', tableSize, ' )', ', parser.position = ', parser.position, ', buffer lenght = ', parser.buffer.length)
           if (i === tableSize) {
             return done();
           }
-
           readCEKTableEntry(parser, (cekEntry: CEKEntry) => {
             cekList.push(cekEntry);
-
             i++;
             next(done);
           });
         }
-
         next(() => {
           callback(cekList);
         });
@@ -190,36 +160,28 @@ function readCEKTable(parser: Parser, options: InternalConnectionOptions, callba
     return callback();
   }
 }
-
 function readCEKTableEntry(parser: Parser, callback: (cekEntry: CEKEntry) => void) {
-  // console.log('>> read CEK table entry')
   parser.readUInt32LE((databaseId) => {
     parser.readUInt32LE((cekId) => {
       parser.readUInt32LE((cekVersion) => {
         parser.readBuffer(8, (cekMdVersion) => {
           parser.readUInt8((cekValueCount) => {
             const cekEntry = new CEKEntry(cekValueCount);
-
             let i = 0;
             function next(done: () => void) {
               if (i === cekValueCount) {
                 return done();
               }
-
-              readCEKValue(i, parser, cekEntry, {
+              readCEKValue(parser, cekEntry, {
                 databaseId,
                 cekId,
                 cekVersion,
                 cekMdVersion,
               }, () => {
                 i++;
-
                 next(done);
               });
             }
-
-            // console.log('>> post readCEKValue')
-
             next(() => {
               callback(cekEntry);
             });
@@ -229,9 +191,7 @@ function readCEKTableEntry(parser: Parser, callback: (cekEntry: CEKEntry) => voi
     });
   });
 }
-
-function readCEKValue(i: number, parser: Parser, cekEntry: CEKEntry, cekTableEntryMetadata: cekTableEntryMetadata, callback: () => void) {
-  // console.log('>> read CEK value')
+function readCEKValue(parser: Parser, cekEntry: CEKEntry, cekTableEntryMetadata: cekTableEntryMetadata, callback: () => void) {
   parser.readUInt16LE((encryptedCEKLength) => {
     parser.readBuffer(encryptedCEKLength, (encryptedCEK) => {
       parser.readUInt8((keyStoreNameLength) => {
@@ -244,8 +204,6 @@ function readCEKValue(i: number, parser: Parser, cekEntry: CEKEntry, cekTableEnt
                 parser.readBuffer(2 * algorithmNameLength, (algorithmNameBuffer) => {
                   const algorithmName = algorithmNameBuffer.toString('ucs2');
                   cekEntry.add(encryptedCEK, cekTableEntryMetadata.databaseId, cekTableEntryMetadata.cekId, cekTableEntryMetadata.cekVersion, cekTableEntryMetadata.cekMdVersion, keyPath, keyStoreName, algorithmName);
-                  // console.log('>> read CEK value done')
-
                   callback();
                 });
               });
@@ -255,71 +213,40 @@ function readCEKValue(i: number, parser: Parser, cekEntry: CEKEntry, cekTableEnt
       });
     });
   });
-
-  // console.log('>> ??? ', i, parser.position)
 }
-
-function readCEKTableCb(columnCount: number, parser: Parser, resolved: { val: boolean; }, resolve: (arg0: ColMetadataToken) => void, cekList?: CEKEntry[]) {
-  // console.log('>> entering readCEKTableCb, parser.position = ', parser.position, ', parser.buffer.length = ', parser.buffer.length)
-  const columns: ColumnMetadata[] = [];
-  for (let i = 0; i < columnCount; i++) {
-    // console.log(' i = ', i, ' (', columnCount, ')', ', <', parser.position, '>', ', [', parser.buffer.length, ']')
-    let column: ColumnMetadata;
-
-    readColumn(parser, parser.options, i, cekList, (c) => {
-      column = c;
-    });
-
-    if (!column!) {
-      // console.log('>> Column is ', column!, ', breaking!');
-      break;
-    }
-    else {
-      columns.push(column!);
-      if (i === columnCount - 1) {
-        // console.log('>> RESOLVING colmetdata token ')
-        resolved.val = true;
-        // console.log('>>>>> resolved? ', resolved)
-        return resolve(new ColMetadataToken(columns));
-      }
-    }
-  }
-}
-
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   while (parser.buffer.length - parser.position < 2) {
     await parser.streamBuffer.waitForChunk();
   }
-
   const columnCount = parser.buffer.readUInt16LE(parser.position);
   parser.position += 2;
+  let cekList: CEKEntry[] | undefined;
 
-  return new Promise((resolve) => {
-    const parser_starting_position = parser.position;
-    let resolved = { val: false };
-    let whileLoopPaused = false;
-    readCEKTable(parser, parser.options, (cekList?: CEKEntry[]) => {
-      readCEKTableCb(columnCount, parser, resolved, resolve, cekList);
+  readCEKTable(parser, parser.options, (c?: CEKEntry[]) => { cekList = c; });
+
+  while (parser.suspended) {
+    await parser.streamBuffer.waitForChunk();
+    parser.suspended = false;
+    const next = parser.next!;
+    next();
+  }
+
+  const columns: ColumnMetadata[] = [];
+
+  for (let i = 0; i < columnCount; i++) {
+    let column: ColumnMetadata;
+    readColumn(parser, parser.options, i, cekList, (c) => {
+      column = c;
     });
-    // console.log('>>>> resolved val = ', resolved);
-    if (!resolved.val) {
-      // console.log('>> NOT Resolved')
-      while (parser.suspended && !whileLoopPaused) {
-        // console.log('parser suspended!')
-        parser.position = parser_starting_position;
-        whileLoopPaused = true;
-        parser.streamBuffer.waitForChunk().then(() => {
-          // console.log('>> streambuffer data loadedd')
-          parser.suspended = false;
-          whileLoopPaused = false;
-          readCEKTable(parser, parser.options, (cekList?: CEKEntry[]) => {
-            readCEKTableCb(columnCount, parser, resolved, resolve, cekList);
-          });
-        })
-      }
+    while (parser.suspended) {
+      await parser.streamBuffer.waitForChunk();
+      parser.suspended = false;
+      const next = parser.next!;
+      next();
     }
-  })
+    columns.push(column!);
+  }
+  return new ColMetadataToken(columns);
 }
-
 export default colMetadataParser;
 module.exports = colMetadataParser;
