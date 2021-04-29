@@ -58,8 +58,17 @@ const NVarChar: { maximumLength: number } & DataType = {
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }
-
     return buffer;
+  },
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'ucs2');
+    } else {
+      // PLP NULL
+      return Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+    }
   },
 
   generateParameterLength(parameter, options) {

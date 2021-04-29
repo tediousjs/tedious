@@ -1,4 +1,5 @@
 import { DataType } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import MoneyN from './moneyn';
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
@@ -39,6 +40,21 @@ const Money: DataType = {
     buffer.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
     buffer.writeInt32LE(value & -1, 4);
     yield buffer;
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = parseFloat(value as string) * 10000;
+
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeMoney(val);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
 
   validate: function(value): number | null {

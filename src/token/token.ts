@@ -315,11 +315,13 @@ export class FeatureExtAckToken extends Token {
   declare event: 'featureExtAck';
 
   fedAuth: Buffer | undefined;
+  columnEncryption: boolean | undefined;
 
-  constructor(fedAuth: Buffer | undefined) {
+  constructor(featureData: { fedAuth?: Buffer, columnEncryption?: boolean }) {
     super('FEATUREEXTACK', 'featureExtAck');
 
-    this.fedAuth = fedAuth;
+    this.fedAuth = featureData.fedAuth;
+    this.columnEncryption = featureData.columnEncryption;
   }
 }
 

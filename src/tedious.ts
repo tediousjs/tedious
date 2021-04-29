@@ -1,4 +1,5 @@
 import BulkLoad from './bulk-load';
+import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import Connection, { ConnectionConfiguration } from './connection';
 import Request from './request';
 import { name } from './library';
@@ -20,6 +21,7 @@ export function connect(config: ConnectionConfiguration, connectListener?: (err?
 export {
   BulkLoad,
   Connection,
+  ColumnEncryptionAzureKeyVaultProvider,
   Request,
   library,
   ConnectionError,

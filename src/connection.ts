@@ -40,6 +40,9 @@ import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { shouldHonorAE } from './always-encrypted/utils';
+import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
@@ -331,6 +334,8 @@ export interface InternalConnectionOptions {
   appName: undefined | string;
   camelCaseColumns: boolean;
   cancelTimeout: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
   connectTimeout: number;
@@ -356,6 +361,7 @@ export interface InternalConnectionOptions {
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
   encrypt: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProviderMap;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -369,8 +375,11 @@ export interface InternalConnectionOptions {
   requestTimeout: number;
   rowCollectionOnDone: boolean;
   rowCollectionOnRequestCompletion: boolean;
+  serverName: undefined | string;
+  serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: string;
+  trustedServerNameAE?: string;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
@@ -379,9 +388,15 @@ export interface InternalConnectionOptions {
   lowerCaseGuids: boolean;
 }
 
-/**
- * @private
- */
+interface KeyStoreProvider {
+  key: string;
+  value: ColumnEncryptionAzureKeyVaultProvider;
+}
+
+interface KeyStoreProviderMap {
+  [key: string]: ColumnEncryptionAzureKeyVaultProvider;
+}
+
 interface State {
   name: string;
   enter?(this: Connection): void;
@@ -503,6 +518,8 @@ interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
+  columnEncryptionKeyCacheTTL: number;
+  columnEncryptionSetting: boolean;
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
@@ -650,6 +667,7 @@ interface ConnectionOptions {
    * (default: `false`)
    */
   encrypt?: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -1207,6 +1225,8 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
@@ -1233,6 +1253,7 @@ class Connection extends EventEmitter {
         enableQuotedIdentifier: true,
         encrypt: true,
         fallbackToDefaultDb: false,
+        encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
@@ -1245,9 +1266,12 @@ class Connection extends EventEmitter {
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
+        serverName: undefined,
+        serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
-        trustServerCertificate: false,
+        trustedServerNameAE: undefined,
+        trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true,
         validateBulkLoadParameters: true,
@@ -1645,6 +1669,25 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.columnEncryptionSetting !== undefined) {
+        if (typeof config.options.columnEncryptionSetting !== 'boolean') {
+          throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
+        }
+
+        this.config.options.columnEncryptionSetting = config.options.columnEncryptionSetting;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL <= 0) {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be greater than 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+      }
       if (config.options.validateBulkLoadParameters !== undefined) {
         if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
           throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
@@ -1668,6 +1711,51 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.encryptionKeyStoreProviders) {
+        for (const entry of config.options.encryptionKeyStoreProviders) {
+          const providerName = entry.key;
+
+          if (!providerName || providerName.length === 0) {
+            throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+          }
+
+          if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+            throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+          }
+
+          if (!entry.value) {
+            throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+          }
+
+          if (!this.config.options.encryptionKeyStoreProviders) {
+            this.config.options.encryptionKeyStoreProviders = {};
+          }
+
+          this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
+        }
+      }
+    }
+
+    let serverName = this.config.server;
+    if (!serverName) {
+      serverName = 'localhost';
+    }
+
+    const px = serverName.indexOf('\\');
+
+    if (px > 0) {
+      serverName = serverName.substring(0, px);
+    }
+
+    this.config.options.trustedServerNameAE = serverName;
+
+    if (this.config.options.instanceName) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.instanceName}`;
+    }
+
+    if (this.config.options.port) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.port}`;
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -1969,7 +2057,14 @@ class Connection extends EventEmitter {
         const request = this.request;
         if (request) {
           if (!request.canceled) {
-            const error = new RequestError(token.message, 'EREQUEST');
+            let message = token.message;
+            // Check if attempting to insert non encrypted data into encrypted table
+            if (token.message.includes('Operand type clash') && token.message.includes('encrypted with')) {
+              if (!this.config.options.columnEncryptionSetting) {
+                message = 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true';
+              }
+            }
+            const error = new RequestError(message, 'EREQUEST');
             error.number = token.number;
             error.state = token.state;
             error.class = token.class;
@@ -1989,6 +2084,10 @@ class Connection extends EventEmitter {
 
         this.loginError = error;
       }
+    });
+
+    tokenStreamParser.parser.on('error', (error) => {
+      this.emit('error', error);
     });
 
     tokenStreamParser.on('databaseChange', (token) => {
@@ -2515,6 +2614,8 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
+    payload.columnEncryption = this.config.options.columnEncryptionSetting;
+
     const { authentication } = this.config;
     switch (authentication.type) {
       case 'azure-active-directory-password':
@@ -2713,6 +2814,23 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
+  _execSql(request: Request) {
+    try {
+      request.transformIntoExecuteSqlRpc();
+    } catch (error) {
+      request.error = error;
+
+      process.nextTick(() => {
+        this.debug.log(error.message);
+        request.callback(error);
+      });
+
+      return;
+    }
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+  }
+
   /**
    *  Execute the SQL represented by [[Request]].
    *
@@ -2729,20 +2847,22 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSql(request: Request) {
-    try {
-      request.transformIntoExecuteSqlRpc();
-    } catch (error) {
-      request.error = error;
-
-      process.nextTick(() => {
-        this.debug.log(error.message);
-        request.callback(error);
+    request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
+    if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
+      getParameterEncryptionMetadata(this, request, (error?: Error) => {
+        if (error != null) {
+          process.nextTick(() => {
+            this.transitionTo(this.STATE.LOGGED_IN);
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+        this._execSql(request);
       });
-
-      return;
+    } else {
+      this._execSql(request);
     }
-
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -3071,8 +3191,8 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }): void
+  makeRequest(request: Request | BulkLoad, packetType: number, payload?: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3363,6 +3483,10 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       featureExtAck: function(token) {
+        if (token.columnEncryption) {
+          this.config.options.serverSupportsColumnEncryption = true;
+          return;
+        }
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
           if (token.fedAuth === undefined) {

@@ -13,6 +13,10 @@ const NumericN: DataType = {
     throw new Error('not implemented');
   },
 
+  toBuffer() {
+    throw new Error('not implemented');
+  },
+
   generateParameterLength() {
     throw new Error('not implemented');
   },

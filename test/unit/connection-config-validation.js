@@ -95,6 +95,13 @@ describe('Connection configuration validation', function() {
     });
   });
 
+  it('bad column encryption key cache ttl', () => {
+    config.options.columnEncryptionKeyCacheTTL = -5;
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
+
   it('bad validateBulkLoadParameters value', () => {
     const validateBulkLoadParametersVal = 'text';
     config.options.validateBulkLoadParameters = validateBulkLoadParametersVal;

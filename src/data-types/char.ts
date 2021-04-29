@@ -50,6 +50,35 @@ const Char: { maximumLength: number } & DataType = {
     const buffer = Buffer.alloc(8);
     buffer.writeUInt8(this.id, 0);
     buffer.writeUInt16LE(parameter.length!, 1);
+    const collation = Buffer.alloc(5);
+
+    if (parameter.collation != null) {
+      const { lcid, flags, version, sortId } = parameter.collation;
+      collation.writeUInt8(
+        (lcid) & 0xFF,
+        0,
+      );
+      collation.writeUInt8(
+        (lcid >> 8) & 0xFF,
+        1,
+      );
+      // byte index 2 contains data for both lcid and flags
+      collation.writeUInt8(
+        ((lcid >> 16) & 0x0F) | (((flags) & 0x0F) << 4),
+        2,
+      );
+      // byte index 3 contains data for both flags and version
+      collation.writeUInt8(
+        ((flags) & 0xF0) | ((version) & 0x0F),
+        3,
+      );
+      collation.writeUInt8(
+        (sortId) & 0xFF,
+        4,
+      );
+    }
+
+    collation.copy(buffer, collation.length);
     return buffer;
   },
 
@@ -71,6 +100,17 @@ const Char: { maximumLength: number } & DataType = {
     }
 
     yield Buffer.from(parameter.value, 'ascii');
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
   },
 
   validate: function(value): null | string {

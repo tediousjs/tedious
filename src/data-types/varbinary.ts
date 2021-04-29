@@ -48,12 +48,17 @@ const VarBinary: { maximumLength: number } & DataType = {
     const buffer = Buffer.alloc(3);
     buffer.writeUInt8(this.id, 0);
 
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(parameter.length!, 1);
+    if (parameter.length != null && isFinite(parameter.length)) {
+      const length = parameter.length;
+
+      if (length <= this.maximumLength) {
+        buffer.writeUInt16LE(length, 1);
+      } else {
+        buffer.writeUInt16LE(this.maximumLength, 1);
+      }
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }
-
     return buffer;
   },
 
@@ -115,6 +120,17 @@ const VarBinary: { maximumLength: number } & DataType = {
       }
 
       yield PLP_TERMINATOR;
+    }
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
     }
   },
 

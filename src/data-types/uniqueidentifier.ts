@@ -37,6 +37,16 @@ const UniqueIdentifier: DataType = {
     yield Buffer.from(guidToArray(parameter.value));
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string;
+
+    if (value != null) {
+      return Buffer.from(guidToArray(value));
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): string | null {
     if (value == null) {
       return null;

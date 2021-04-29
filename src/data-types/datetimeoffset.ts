@@ -1,6 +1,6 @@
 import { DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -91,6 +91,35 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     const offset = -value.getTimezoneOffset();
     buffer.writeInt16LE(offset);
     yield buffer.data;
+  },
+  toBuffer: function(parameter) {
+    const value = parameter.value as Date & { nanosecondDelta?: number | null };
+
+    if (value != null) {
+      const scale = this.resolveScale(parameter);
+
+      let timestamp;
+      timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp = Math.round(timestamp);
+
+      const date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+
+      const offset = -value.getTimezoneOffset();
+
+      // data size does not matter for encrypted datetimeoffset
+      // just choose the smallest that maintains full scale (7)
+      const buffer = new WritableTrackingBuffer(10);
+      buffer.writeUInt40LE(timestamp);
+      buffer.writeUInt24LE(days);
+      buffer.writeInt16LE(offset);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
   validate: function(value): null | number {
     if (value == null) {

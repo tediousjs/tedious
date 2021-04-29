@@ -3,8 +3,9 @@ import { typeByName as TYPES, Parameter, DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
-import { Metadata } from './metadata-parser';
+import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { Metadata } from './metadata-parser';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -35,6 +36,17 @@ interface ParameterOptions {
   length?: number;
   precision?: number;
   scale?: number;
+  collation?: {
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
+  forceEncrypt?: boolean;
+}
+
+interface RequestOptions {
+  statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
 
 /**
@@ -113,6 +125,11 @@ class Request extends EventEmitter {
    * @private
    */
   callback: CompletionCallback;
+
+  shouldHonorAE?: boolean;
+  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  cryptoMetadataLoaded: boolean;
+
 
   /**
    * This event, describing result set columns, will be emitted before row
@@ -213,7 +230,6 @@ class Request extends EventEmitter {
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
-
   /**
    * Indicates the completion status of a stored procedure. This is also generated for stored procedures
    * executed through SQL statements.\
@@ -344,7 +360,7 @@ class Request extends EventEmitter {
    * @param callback
    *   The callback to execute once the request has been fully completed.
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback) {
+  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -359,6 +375,8 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
+    this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       if (this.preparing) {
         this.preparing = false;
@@ -395,7 +413,14 @@ class Request extends EventEmitter {
       options = {};
     }
 
-    const { output = false, length, precision, scale } = options;
+    const {
+      output = false,
+      length,
+      precision,
+      scale,
+      collation,
+      forceEncrypt = false,
+    } = options;
 
     const parameter: Parameter = {
       type: type,
@@ -404,7 +429,9 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      collation: collation,
+      forceEncrypt: forceEncrypt
     };
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;
