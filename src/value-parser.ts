@@ -973,7 +973,7 @@ function readEncryptedBinary(parser: IParser, metadata: Metadata, options: Inter
   const baseMetadata = cryptoMetadata.baseTypeInfo!;
 
   if (!normalizationRuleVersion.equals(Buffer.from([0x01]))) {
-    throw new Error(`Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`)
+    throw new Error(`Normalization version "${normalizationRuleVersion[0]}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${0x01}.`);
   }
 
   const isNullValue = (decryptedValue: Buffer, metadata: Metadata): boolean => {
@@ -1016,7 +1016,6 @@ function readEncryptedBinary(parser: IParser, metadata: Metadata, options: Inter
       }
 
       readBinary(parser, dataLength, (encryptedValue) => {
-        //@ts-ignore
         callbackDecrypted(decryptWithKey(encryptedValue as Buffer, cryptoMetadata, options));
       });
     });
@@ -1167,6 +1166,7 @@ function denormalizedValue(parser: IParser, valueLength: number, metadata: Metad
         default:
           new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
       }
+      break;
 
     case 'Time':
       // no padding to worry about for Time, since it has no dataLength

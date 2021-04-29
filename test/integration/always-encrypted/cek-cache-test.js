@@ -144,7 +144,7 @@ describe('always encrypted', function() {
   });
 
   it('should correctly insert/select the encrypted data', function(done) {
-    this.timeout(30000)
+    this.timeout(30000);
     function createKeys(numberOfKeys, cb) {
       if (numberOfKeys > 0) {
         const request = new Request(`CREATE COLUMN ENCRYPTION KEY [CEK${numberOfKeys}] WITH VALUES (
@@ -165,7 +165,7 @@ describe('always encrypted', function() {
       }
     }
 
-   createKeys(numberOfKeys, () => {
+    createKeys(numberOfKeys, () => {
       let sqlTableCreate = 'create table test_always_encrypted (';
       for (let i = numberOfKeys; i > 1; i--) {
         sqlTableCreate += 'c' + i + " nvarchar(50) COLLATE Latin1_General_BIN2 ENCRYPTED WITH (ENCRYPTION_TYPE = RANDOMIZED, ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256', COLUMN_ENCRYPTION_KEY = CEK" + i + ') NULL,';

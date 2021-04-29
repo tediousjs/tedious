@@ -118,7 +118,7 @@ describe('Colmetadata Token Parser', () => {
   });
 
   it('should parse crypto-metadata', async () => {
-    const alwaysEncryptedOptionsLocal = {...alwaysEncryptedOptions}
+    const alwaysEncryptedOptionsLocal = { ...alwaysEncryptedOptions };
     const alwaysEncryptedCEK = Buffer.from([
       // decrypted column key must be 32 bytes long for AES256
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -131,7 +131,7 @@ describe('Colmetadata Token Parser', () => {
       'MSSQL_JAVA_KEYSTORE': {
         decryptColumnEncryptionKey: () => Promise.resolve(alwaysEncryptedCEK),
       },
-    }
+    };
 
     const buffer = Buffer.from([
       // -----

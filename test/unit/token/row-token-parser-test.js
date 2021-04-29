@@ -24,11 +24,11 @@ const options = {
   tdsVersion: '7_4',
 };
 
-const readTokenAsync = (parser) => new Promise((resolve, reject) => {
-  parser.on('data', resolve);
-  parser.on('close', reject);
-  parser.on('error', reject);
-});
+// const readTokenAsync = (parser) => new Promise((resolve, reject) => {
+//   parser.on('data', resolve);
+//   parser.on('close', reject);
+//   parser.on('error', reject);
+// });
 
 describe('Row Token Parser', () => {
   describe('parsing a row with many columns', function() {
@@ -664,7 +664,6 @@ describe('Row Token Parser', () => {
   });
 
 
-
   it('should write varBinary', async () => {
     const colMetadata = [{ type: dataTypeByName.VarBinary }];
     const value = Buffer.from([0x12, 0x34]);
@@ -882,7 +881,6 @@ describe('Row Token Parser', () => {
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
-
 
 
   it('should write varcharMaxKnownLength', async () => {

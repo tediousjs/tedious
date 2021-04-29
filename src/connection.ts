@@ -2825,7 +2825,7 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return
+      return;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));

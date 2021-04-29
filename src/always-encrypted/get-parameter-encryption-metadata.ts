@@ -37,13 +37,13 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
             cekEntry = cekList[currentOrdinal];
           }
           cekEntry.add(columns[DescribeParameterEncryptionResultSet1.EncryptedKey].value,
-                      columns[DescribeParameterEncryptionResultSet1.DbId].value,
-                      columns[DescribeParameterEncryptionResultSet1.KeyId].value,
-                      columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
-                      columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
-                      columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
-                      columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
-                      columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
+                       columns[DescribeParameterEncryptionResultSet1.DbId].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyId].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyVersion].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyMdVersion].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyPath].value,
+                       columns[DescribeParameterEncryptionResultSet1.ProviderName].value,
+                       columns[DescribeParameterEncryptionResultSet1.KeyEncryptionAlgorithm].value);
         } else {
           paramCount++;
           const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;

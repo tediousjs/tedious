@@ -1,6 +1,5 @@
 import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
-import ReadableTrackingBuffer from '../tracking-buffer/readable-tracking-buffer';
 import JSBI from 'jsbi';
 
 import { TYPE, Token, ColMetadataToken } from './token';
@@ -37,50 +36,50 @@ const tokenParsers = {
 };
 
 export interface IParser {
-  readInt8(callback: (data: number) => void): void
-  readUInt8(callback: (data: number) => void): void
+  readInt8(callback: (data: number) => void): void;
+  readUInt8(callback: (data: number) => void): void;
 
-  readInt16LE(callback: (data: number) => void): void
-  readInt16BE(callback: (data: number) => void): void
-  readUInt16LE(callback: (data: number) => void): void
-  readUInt16BE(callback: (data: number) => void): void
+  readInt16LE(callback: (data: number) => void): void;
+  readInt16BE(callback: (data: number) => void): void;
+  readUInt16LE(callback: (data: number) => void): void;
+  readUInt16BE(callback: (data: number) => void): void;
 
-  readInt32LE(callback: (data: number) => void): void
-  readInt32BE(callback: (data: number) => void): void
-  readUInt32LE(callback: (data: number) => void): void
-  readUInt32BE(callback: (data: number) => void): void
+  readInt32LE(callback: (data: number) => void): void;
+  readInt32BE(callback: (data: number) => void): void;
+  readUInt32LE(callback: (data: number) => void): void;
+  readUInt32BE(callback: (data: number) => void): void;
 
-  readBigInt64LE(callback: (data: JSBI) => void): void
-  readBigUInt64LE(callback: (data: JSBI) => void): void
-  readInt64LE(callback: (data: number) => void): void
-  readInt64BE(callback: (data: number) => void): void
-  readUInt64LE(callback: (data: number) => void): void
-  readUInt64BE(callback: (data: number) => void): void
+  readBigInt64LE(callback: (data: JSBI) => void): void;
+  readBigUInt64LE(callback: (data: JSBI) => void): void;
+  readInt64LE(callback: (data: number) => void): void;
+  readInt64BE(callback: (data: number) => void): void;
+  readUInt64LE(callback: (data: number) => void): void;
+  readUInt64BE(callback: (data: number) => void): void;
 
-  readFloatLE(callback: (data: number) => void): void
-  readFloatBE(callback: (data: number) => void): void
+  readFloatLE(callback: (data: number) => void): void;
+  readFloatBE(callback: (data: number) => void): void;
 
-  readDoubleLE(callback: (data: number) => void): void
-  readDoubleBE(callback: (data: number) => void): void
+  readDoubleLE(callback: (data: number) => void): void;
+  readDoubleBE(callback: (data: number) => void): void;
 
-  readUInt24LE(callback: (data: number) => void): void
+  readUInt24LE(callback: (data: number) => void): void;
 
-  readUInt40LE(callback: (data: number) => void): void
+  readUInt40LE(callback: (data: number) => void): void;
 
-  readUNumeric64LE(callback: (data: number) => void): void
+  readUNumeric64LE(callback: (data: number) => void): void;
 
-  readUNumeric96LE(callback: (data: number) => void): void
+  readUNumeric96LE(callback: (data: number) => void): void;
 
-  readUNumeric128LE(callback: (data: number) => void): void
+  readUNumeric128LE(callback: (data: number) => void): void;
 
-  readBuffer(length: number, callback: (data: Buffer) => void): void
+  readBuffer(length: number, callback: (data: Buffer) => void): void;
 
-  readBVarChar(callback: (data: string) => void): void
-  readUsVarChar(callback: (data: string) => void): void
+  readBVarChar(callback: (data: string) => void): void;
+  readUsVarChar(callback: (data: string) => void): void;
 
-  readBVarByte(callback: (data: Buffer) => void): void
+  readBVarByte(callback: (data: Buffer) => void): void;
 
-  readUsVarByte(callback: (data: Buffer) => void): void
+  readUsVarByte(callback: (data: Buffer) => void): void;
 }
 
 class StreamBuffer {
@@ -176,7 +175,7 @@ class Parser implements IParser {
 
         if (type === TYPE.COLMETADATA) {
           // console.log('>> entering colmetadataParser')
-          const token = await colMetadataParser(parser)
+          const token = await colMetadataParser(parser);
           // console.log('>> done colMetadataParser, starting Promise.all(decryptSymmetricKey)..')
           parser.colMetadata = token.columns;
           // console.log('colMetdata list = ', parser.colMetadata)
