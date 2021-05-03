@@ -2032,6 +2032,10 @@ class Connection extends EventEmitter {
     });
 
     tokenStreamParser.on('routingChange', (token) => {
+      if (token.newValue && token.newValue.server) {
+        // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
+        token.newValue.server = token.newValue.server.split('\\')[0];
+      }
       this.routingData = token.newValue;
     });
 
@@ -2462,8 +2466,7 @@ class Connection extends EventEmitter {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
-      const without_instance_name = this.routingData.server.split('\\')[0];
-      this.routingData.server = without_instance_name;
+
       this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
