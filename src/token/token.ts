@@ -298,7 +298,7 @@ export class RoutingEnvChangeToken extends Token {
   declare event: 'routingChange';
 
   type: 'ROUTING_CHANGE';
-  newValue: { protocol: number, port: number, server: string };
+  newValue: { protocol: number, port: number, server: string, instanceName?: string };
   oldValue: Buffer;
 
   constructor(newValue: { protocol: number, port: number, server: string }, oldValue: Buffer) {

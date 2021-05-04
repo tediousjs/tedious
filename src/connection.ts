@@ -2034,7 +2034,9 @@ class Connection extends EventEmitter {
     tokenStreamParser.on('routingChange', (token) => {
       if (token.newValue && token.newValue.server) {
         // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
-        token.newValue.server = token.newValue.server.split('\\')[0];
+        const split = token.newValue.server.split('\\');
+        token.newValue.server = split[0];
+        token.newValue.instanceName = split[1];
       }
       this.routingData = token.newValue;
     });
@@ -2208,6 +2210,7 @@ class Connection extends EventEmitter {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
+      instanceName: this.routingData ? this.routingData.instanceName : undefined,
       localAddress: this.config.options.localAddress
     };
 

@@ -98,10 +98,10 @@ export class ParallelConnectionStrategy {
 
 export class SequentialConnectionStrategy {
   addresses: dns.LookupAddress[];
-  options: { port: number, localAddress?: string };
+  options: { port: number, localAddress?: string, instanceName?: string };
   signal: AbortSignal;
 
-  constructor(addresses: dns.LookupAddress[], signal: AbortSignal, options: { port: number, localAddress?: string }) {
+  constructor(addresses: dns.LookupAddress[], signal: AbortSignal, options: { port: number, localAddress?: string, instanceName?: string }) {
     this.addresses = addresses;
     this.options = options;
     this.signal = signal;
@@ -162,12 +162,12 @@ export class SequentialConnectionStrategy {
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export class Connector {
-  options: { port: number, host: string, localAddress?: string };
+  options: { port: number, host: string, localAddress?: string, insanceName?: string };
   multiSubnetFailover: boolean;
   lookup: LookupFunction;
   signal: AbortSignal;
 
-  constructor(options: { port: number, host: string, localAddress?: string, lookup?: LookupFunction }, signal: AbortSignal, multiSubnetFailover: boolean) {
+  constructor(options: { port: number, host: string, localAddress?: string, instanceName?: string, lookup?: LookupFunction }, signal: AbortSignal, multiSubnetFailover: boolean) {
     this.options = options;
     this.lookup = options.lookup ?? dns.lookup;
     this.signal = signal;
