@@ -89,6 +89,7 @@ Copy the directory containg <i>tedious</i> in to your project's
       <li>Verify that the server has been setup and `tedious` is able to connect by running the query: </br>
         {% highlight javascript %}
         // file.js
+        const Request = require('tedious').Request;
         const Connection = require('tedious').Connection;
         const connection = new Connection(config);
         connection.on('connect', (err) => {
