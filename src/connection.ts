@@ -1891,6 +1891,7 @@ class Connection extends EventEmitter {
         signal: signal
       }, (err, port) => {
         if (err) {
+          this.clearConnectTimer();
           if (err.name === 'AbortError') {
             return;
           }
@@ -2209,6 +2210,7 @@ class Connection extends EventEmitter {
 
     new Connector(connectOpts, signal, multiSubnetFailover).execute((err, socket) => {
       if (err) {
+        this.clearConnectTimer();
         if (err.name === 'AbortError') {
           return;
         }
