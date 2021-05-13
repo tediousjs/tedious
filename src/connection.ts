@@ -1904,6 +1904,7 @@ class Connection extends EventEmitter {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
         });
       }, (err) => {
+        this.clearConnectTimer();
         if (err.name === 'AbortError') {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
@@ -1991,6 +1992,7 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.SENT_PRELOGIN);
       });
     }, (err) => {
+      this.clearConnectTimer();
       if (err.name === 'AbortError') {
         return;
       }
