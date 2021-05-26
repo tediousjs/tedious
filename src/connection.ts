@@ -843,6 +843,11 @@ const CLEANUP_TYPE = {
   RETRY: 2
 };
 
+interface RoutingData {
+  server: string;
+  port: number;
+}
+
 /**
  * A [[Connection]] instance represents a single connection to a database server.
  *
@@ -952,7 +957,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  routingData: any;
+  routingData: undefined | RoutingData;
+
   /**
    * @private
    */
@@ -2032,7 +2038,12 @@ class Connection extends EventEmitter {
     });
 
     tokenStreamParser.on('routingChange', (token) => {
-      this.routingData = token.newValue;
+      // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
+      const [ server ] = token.newValue.server.split('\\');
+
+      this.routingData = {
+        server, port: token.newValue.port
+      };
     });
 
     tokenStreamParser.on('packetSizeChange', (token) => {
@@ -2461,7 +2472,8 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+
       this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
