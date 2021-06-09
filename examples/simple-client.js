@@ -1,8 +1,8 @@
-var Connection = require('../lib/tedious').Connection;
-var Request = require('../lib/tedious').Request;
-var fs = require('fs');
+const fs = require('fs');
 
-var config = JSON.parse(fs.readFileSync(require('os').homedir()+ '/.tedious/test-connection.json', 'utf8')).config;
+const { Connection, Request } = require('../lib/tedious');
+
+const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
 
 config.options.requestTimeout = 30 * 1000;
 config.options.debug = {
@@ -11,9 +11,9 @@ config.options.debug = {
   token: false,
   packet: true,
   log: true
-}
+};
 
-var connection = new Connection(config);
+const connection = new Connection(config);
 
 connection.connect(connected);
 connection.on('infoMessage', infoError);
@@ -27,15 +27,15 @@ function connected(err) {
     process.exit(1);
   }
 
-  //console.log('connected');
+  // console.log('connected');
 
   process.stdin.resume();
 
-  process.stdin.on('data', function (chunk) {
+  process.stdin.on('data', function(chunk) {
     exec(chunk);
   });
 
-  process.stdin.on('end', function () {
+  process.stdin.on('end', function() {
     process.exit(0);
   });
 }
@@ -43,16 +43,16 @@ function connected(err) {
 function exec(sql) {
   sql = sql.toString();
 
-  request = new Request(sql, statementComplete)
+  const request = new Request(sql, statementComplete);
   request.on('columnMetadata', columnMetadata);
-    request.on('row', row);
-    request.on('done', requestDone);
+  request.on('row', row);
+  request.on('done', requestDone);
 
   connection.execSql(request);
 }
 
 function requestDone(rowCount, more) {
-  //console.log(rowCount + ' rows');
+  // console.log(rowCount + ' rows');
 }
 
 function statementComplete(err, rowCount) {
@@ -73,19 +73,20 @@ function infoError(info) {
 }
 
 function debug(message) {
-  //console.log(message);
+  // console.log(message);
 }
 
 function columnMetadata(columnsMetadata) {
-  columnsMetadata.forEach(function(column) {
-    //console.log(column);
+  columnsMetadata.forEach((column) => {
+    // console.log(column);
   });
 }
 
 function row(columns) {
-  var values = '';
+  let values = '';
+  let value;
 
-  columns.forEach(function(column) {
+  columns.forEach((column) => {
     if (column.value === null) {
       value = 'NULL';
     } else {

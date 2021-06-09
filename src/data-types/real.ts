@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x04]);
+
 const Real: DataType = {
   id: 0x3B,
   type: 'FLT4',
@@ -14,25 +17,31 @@ const Real: DataType = {
     return Buffer.from([FloatN.id, 0x04]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(5);
-      let offset = 0;
-      offset = buffer.writeUInt8(4, offset);
-      buffer.writeFloatLE(parseFloat(parameter.value), offset);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    return DATA_LENGTH;
   },
 
-  validate: function(value): null | number | TypeError {
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(4);
+    buffer.writeFloatLE(parseFloat(parameter.value), 0);
+    yield buffer;
+  },
+
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
     value = parseFloat(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
     return value;
   }
