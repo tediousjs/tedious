@@ -298,11 +298,6 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should bulkload cancel after request send does nothing', function(done) {
-
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
-      assert.ok(err);
-
   it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, Error);
