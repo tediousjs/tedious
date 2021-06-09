@@ -1,10 +1,11 @@
 import { DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x03]);
 
 const Date: DataType = {
   id: 0x28,
@@ -15,34 +16,40 @@ const Date: DataType = {
     return 'date';
   },
 
-  generateTypeInfo: function(buffer) {
+  generateTypeInfo: function() {
     return Buffer.from([this.id]);
   },
 
-  *generateParameterData(parameter, options) {
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
+    }
+
+    return DATA_LENGTH;
+  },
+
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
-    if (value != null) {
-      const buffer = new WritableTrackingBuffer(16);
-      buffer.writeUInt8(3);
-
-      let date;
-      if (options.useUTC) {
-        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
-      } else {
-        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
-      }
-
-      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
-      buffer.writeUInt24LE(days);
-      yield buffer.data;
+    let date;
+    if (options.useUTC) {
+      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
     } else {
-      yield Buffer.from([0x00]);
+      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
     }
+
+    const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+    const buffer = Buffer.alloc(3);
+    buffer.writeUIntLE(days, 0, 3);
+    yield buffer;
   },
 
   // TODO: value is techincally of type 'unknown'.
-  validate: function(value): null | Date | TypeError {
+  validate: function(value): null | Date {
     if (value == null) {
       return null;
     }
@@ -52,7 +59,7 @@ const Date: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

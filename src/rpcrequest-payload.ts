@@ -56,7 +56,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const parameters = this.request.parameters;
     for (let i = 0; i < parameters.length; i++) {
-      yield* this.generateParameterData(parameters[i], this.options);
+      yield * this.generateParameterData(parameters[i]);
     }
   }
 
@@ -64,7 +64,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  * generateParameterData(parameter: Parameter, options: any) {
+  * generateParameterData(parameter: Parameter) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
     buffer.writeBVarchar('@' + parameter.name);
 
@@ -101,7 +101,8 @@ class RpcRequestPayload implements Iterable<Buffer> {
     }
 
     yield type.generateTypeInfo(param, this.options);
-    yield* type.generateParameterData(param, options);
+    yield type.generateParameterLength(param, this.options);
+    yield * type.generateParameterData(param, this.options);
   }
 }
 

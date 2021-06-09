@@ -1,411 +1,421 @@
-const Dgram = require('dgram');
-const Sender = require('../../src/sender').Sender;
-const ParallelSendStrategy = require('../../src/sender').ParallelSendStrategy;
-const sinon = require('sinon');
-const assert = require('chai').assert;
+const dgram = require('dgram');
+const { assert } = require('chai');
+const dns = require('dns');
+const AbortController = require('node-abort-controller');
 
-const anyPort = 1234;
-const anyIpv4 = '1.2.3.4';
-const anyIpv6 = '2002:20:0:0:0:0:1:3';
-const anyHost = 'myhostname';
-const anyRequest = Buffer.alloc(0x02);
+const { Sender } = require('../../src/sender');
 
-const udpIpv4 = 'udp4';
-const udpIpv6 = 'udp6';
+describe('Sender', function() {
+  describe('with a single IPv4 address', function() {
+    /**
+     * @type {dgram.Socket}
+     */
+    let server;
 
-const sendResultSuccess = 0;
-const sendResultError = 1;
-const sendResultCancel = 2;
+    /**
+     * @type {string}
+     */
+    const address = '127.0.0.1';
 
-// Stub function to mimic socket emitting 'error' and 'message' events.
-function emitEvent() {
-  if (this.sendResult === sendResultError) {
-    if (this.listeners('error') && this.listeners('error').length > 0) {
-      this.emit('error', this);
-    }
-  } else if (this.listeners('message') && this.listeners('message').length > 0) {
-    this.emit('message', this);
-  }
-}
+    /**
+     * @type {number}
+     */
+    let port;
 
-// Stub function to mimic socket 'send' without causing network activity.
-function sendStub(buffer, offset, length, port, ipAddress) {
-  process.nextTick(emitEvent.bind(this));
-}
+    beforeEach(function(done) {
+      const onError = () => {
+        server = undefined;
+        this.skip();
+      };
 
-// TODO: Refactor functions above ^^^^^^^
+      server = dgram.createSocket('udp4');
+      server.on('error', onError);
+      server.bind(0, address, () => {
+        server.removeListener('error', onError);
 
-describe('Sender send to IP address', function() {
-  describe('Send', function() {
-    let glob;
+        port = server.address().port;
 
-    function sendToIpCommonTestSetup(ipAddress, udpVersion, sendResult) {
-      // Create socket exactly like the Sender class would create while stubbing
-      // some methods for unit testing.
-      this.testSocket = Dgram.createSocket(udpVersion);
-      this.socketSendStub = sinon.stub(this.testSocket, 'send').callsFake(sendStub);
-      this.socketCloseSpy = sinon.spy(this.testSocket, 'close');
-
-      // This allows the emitEvent method to emit the right event for the given test.
-      this.testSocket.sendResult = sendResult;
-
-      // Stub createSocket method to return a socket created exactly like the
-      // method would but with a few methods stubbed out above.
-      this.createSocketStub = sinon.stub(Dgram, 'createSocket');
-      this.createSocketStub.withArgs(udpVersion).returns(this.testSocket);
-
-      this.sender = new Sender(ipAddress, anyPort, function lookup() {
-
-      }, anyRequest);
-    }
-
-    function sendToIpCommonTestValidation(ipAddress) {
-      assert.isOk(this.createSocketStub.calledOnce);
-      assert.isOk(
-        this.socketSendStub.withArgs(
-          anyRequest,
-          0,
-          anyRequest.length,
-          anyPort,
-          ipAddress
-        ).calledOnce
-      );
-    }
-
-    beforeEach(function() {
-      glob = {};
-    });
-
-    afterEach(function() {
-      sinon.restore();
-    });
-
-    it('should send to IPv4', function(done) {
-
-      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultSuccess);
-
-      glob.sender.execute((error, message) => {
-        assert.strictEqual(error, null);
-        assert.strictEqual(message, glob.testSocket);
-
-        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
         done();
       });
-
-      sendToIpCommonTestValidation.call(glob, anyIpv4);
     });
 
-    it('should sent to IPv6', function(done) {
-      sendToIpCommonTestSetup.call(glob, anyIpv6, udpIpv6, sendResultSuccess);
+    afterEach(function(done) {
+      if (server) {
+        server.close(done);
+      } else {
+        this.skip();
+      }
+    });
 
-      glob.sender.execute((error, message) => {
-        assert.strictEqual(error, null);
-        assert.strictEqual(message, glob.testSocket);
+    it('uses the given lookup function to resolve host names', function(done) {
+      function lookup(hostname, options, callback) {
+        assert.strictEqual(hostname, 'foo.bar.baz');
+        assert.deepEqual(options, { all: true });
 
-        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
-        done();
+        process.nextTick(callback, undefined, [
+          { address: address, family: 4 }
+        ]);
+      }
+
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      sendToIpCommonTestValidation.call(glob, anyIpv6);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute(done);
     });
 
-    it('should send fails', function(done) {
-      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultError);
+    it('forwards any errors happening during lookup', function(done) {
+      const expectedError = new Error('fail');
 
-      glob.sender.execute((error, message) => {
-        assert.strictEqual(error, glob.testSocket);
-        assert.strictEqual(message, undefined);
+      function lookup(hostname, options, callback) {
+        process.nextTick(callback, expectedError);
+      }
 
-        assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
-        done();
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      sendToIpCommonTestValidation.call(glob, anyIpv4);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.strictEqual(err, expectedError);
+
+        done();
+      });
     });
 
-    it('should send cancel', function(done) {
-      sendToIpCommonTestSetup.call(glob, anyIpv4, udpIpv4, sendResultCancel);
+    it('sends the given request to the remote server', function(done) {
+      const expectedRequest = Buffer.from([0x02]);
 
-      glob.sender.execute((error, message) => {
-        assert.isOk(false, 'Should never get here.');
+      server.once('message', (message, rinfo) => {
+        assert.deepEqual(message, Buffer.from([0x02]));
+
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      sendToIpCommonTestValidation.call(glob, anyIpv4);
-
-      glob.sender.cancel();
-      assert.isOk(glob.socketCloseSpy.withArgs().calledOnce);
-      done();
-    });
-  });
-});
-
-function sendToHostCommonTestSetup(lookupError) {
-  // Since we're testing Sender class, we just want to verify that the 'send'/'cancel'
-  // method(s) on the ParallelSendStrategy class are/is being invoked. So we stub out
-  // the methods to validate they're invoked correctly.
-  const testStrategy = new ParallelSendStrategy(
-    this.addresses,
-    anyPort,
-    anyRequest
-  );
-  const callback = () => { };
-  this.strategySendStub = sinon.stub(testStrategy, 'send');
-  this.strategySendStub.withArgs(callback);
-  this.strategyCancelStub = sinon.stub(testStrategy, 'cancel');
-  this.strategyCancelStub.withArgs();
-
-  this.lookupSpy = sinon.spy(function lookup(string, options, callback) {
-    process.nextTick(callback, lookupError, this.addresses);
-  }.bind(this));
-
-  this.sender = new Sender(anyHost, anyPort, this.lookupSpy, anyRequest);
-
-  // Stub the create strategy method for the test to return a strategy object created
-  // exactly like the method would but with a few methods stubbed.
-  this.createStrategyStub = sinon.stub(
-    this.sender,
-    'createParallelSendStrategy'
-  );
-  this.createStrategyStub
-    .withArgs(this.addresses, anyPort, anyRequest)
-    .returns(testStrategy);
-
-  this.sender.execute(callback);
-}
-
-describe('Sender send to hostnam', function() {
-  describe('Send', function() {
-    let glob;
-
-    beforeEach(function() {
-      // Set of IP addresses to be returned by stubbed out lookupAll method.
-      glob = {
-        addresses: [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ]
-      };
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
+      sender.execute(done);
     });
 
-    afterEach(function() {
-      sinon.restore();
-    });
+    it('calls the given callback with the received response', function(done) {
+      const expectedResponse = Buffer.from('response');
 
-    it('should send basic', function(done) {
-      const lookupError = null;
-      sendToHostCommonTestSetup.call(glob, lookupError);
+      server.once('message', (message, rinfo) => {
+        server.send(expectedResponse, rinfo.port, rinfo.address);
+      });
 
-      assert.isOk(glob.lookupSpy.calledOnce);
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err, message) => {
+        if (err) {
+          return done(err);
+        }
 
-      const validate = () => {
-        assert.isOk(glob.createStrategyStub.calledOnce);
-        assert.isOk(glob.strategySendStub.calledOnce);
+        assert.deepEqual(message, expectedResponse);
+
         done();
-      };
-
-      process.nextTick(validate);
+      });
     });
 
-    it('should send cancel', function(done) {
-      const lookupError = null;
-      sendToHostCommonTestSetup.call(glob, lookupError);
+    it('can be aborted during the DNS lookup', function(done) {
+      function lookup(hostname, options, callback) {
+        controller.abort();
 
-      assert.isOk(glob.lookupSpy.calledOnce);
+        callback(undefined, [
+          { address: address, family: 4 }
+        ]);
+      }
 
-      const validate = () => {
-        assert.isOk(glob.createStrategyStub.calledOnce);
-        assert.isOk(glob.strategySendStub.calledOnce);
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
 
-        glob.sender.cancel();
-        assert.isOk(glob.strategyCancelStub.calledOnce);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
+
         done();
-      };
-
-      process.nextTick(validate);
+      });
     });
 
-    it('should look up error', function(done) {
-      const lookupError = new Error('some error.');
+    it('can be aborted after the DNS lookup', function(done) {
+      function lookup(hostname, options, callback) {
+        process.nextTick(() => {
+          controller.abort();
+        });
 
-      sendToHostCommonTestSetup.call(glob, lookupError);
+        callback(undefined, [
+          { address: address, family: 4 }
+        ]);
+      }
 
-      assert.isOk(glob.lookupSpy.calledOnce);
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
 
-      const validate = () => {
-        // Strategy object should not be created on lookup error.
-        assert.strictEqual(glob.createStrategyStub.callCount, 0);
-        assert.strictEqual(glob.strategySendStub.callCount, 0);
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
+
         done();
-      };
-
-      process.nextTick(validate);
+      });
     });
 
-    it('should send cancel on lookup error', function(done) {
-      const lookupError = new Error('some error.');
+    it('can be aborted before receiving a response', function(done) {
+      const expectedRequest = Buffer.from([0x02]);
 
-      sendToHostCommonTestSetup.call(glob, lookupError);
-      glob.sender.cancel();
+      server.once('message', (message, rinfo) => {
+        controller.abort();
+      });
 
-      assert.isOk(glob.lookupSpy.calledOnce);
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
+      sender.execute((err) => {
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.name, 'AbortError');
 
-      const validate = () => {
-        // Strategy object should not be created on lookup error.
-        assert.strictEqual(glob.createStrategyStub.callCount, 0);
-        assert.strictEqual(glob.strategySendStub.callCount, 0);
-        assert.strictEqual(glob.strategyCancelStub.callCount, 0);
         done();
-      };
-
-      process.nextTick(validate);
+      });
     });
   });
 
-});
+  describe('with a single IPv6 address', function() {
+    /**
+     * @type {dgram.Socket}
+     */
+    let server;
 
-describe('Parallel Send Strategy', function() {
-  describe('Send', function() {
-    let glob;
+    /**
+     * @type {string}
+     */
+    const address = '::1';
 
-    function commonStrategyTestSetup() {
-      // IP addresses returned by DNS reverse lookup and passed to the Strategy.
-      this.testData = [
-        { address: '1.2.3.4', udpVersion: udpIpv4, family: 4 },
-        { address: '2002:20:0:0:0:0:1:3', udpVersion: udpIpv6, family: 6 },
-        { address: '2002:30:0:0:0:0:2:4', udpVersion: udpIpv6, family: 6 },
-        { address: '5.6.7.8', udpVersion: udpIpv4, family: 4 }
-      ];
+    /**
+     * @type {number}
+     */
+    let port;
 
-      // Create sockets for IPv4 and IPv6 with send and close stubbed out to
-      // prevent network activity.
-      this.testSockets = {};
-      this.testSockets[udpIpv4] = Dgram.createSocket(udpIpv4);
-      this.testSockets[udpIpv6] = Dgram.createSocket(udpIpv6);
+    beforeEach(function(done) {
+      const onError = () => {
+        server = undefined;
+        this.skip();
+      };
 
-      for (const key in this.testSockets) {
-        this.testSockets[key].socketSendStub = sinon.stub(this.testSockets[key], 'send').callsFake(sendStub);
-        this.testSockets[key].socketCloseSpy = sinon.spy(this.testSockets[key], 'close');
+      server = dgram.createSocket('udp6');
+      server.on('error', onError);
+      server.bind(0, address, () => {
+        server.removeListener('error', onError);
 
-        // This allows emitEvent method to fire an 'error' or 'message' event appropriately.
-        // A given test may overwrite this value for specific sockets to test different
-        // scenarios.
-        this.testSockets[key].sendResult = sendResultSuccess;
+        port = server.address().port;
+
+        done();
+      });
+    });
+
+    afterEach(function(done) {
+      if (server) {
+        server.close(done);
+      } else {
+        this.skip();
+      }
+    });
+
+    it('uses the given lookup function to resolve host names', function(done) {
+      function lookup(hostname, options, callback) {
+        assert.strictEqual(hostname, 'foo.bar.baz');
+        assert.deepEqual(options, { all: true });
+
+        process.nextTick(callback, undefined, [
+          { address: address, family: 6 }
+        ]);
       }
 
-      for (let j = 0; j < this.testData.length; j++) {
-        this.testData[j].testSocket = this.testSockets[this.testData[j].udpVersion];
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
+
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute(done);
+    });
+
+    it('forwards any errors happening during lookup', function(done) {
+      const expectedError = new Error('fail');
+
+      function lookup(hostname, options, callback) {
+        process.nextTick(callback, expectedError);
       }
 
-      // Stub createSocket method to returns a socket created exactly like the
-      // method would but with a few methods stubbed out above.
-      this.createSocketStub = sinon.stub(Dgram, 'createSocket');
-      this.createSocketStub.withArgs(udpIpv4).returns(this.testSockets[udpIpv4]);
-      this.createSocketStub.withArgs(udpIpv6).returns(this.testSockets[udpIpv6]);
+      server.once('message', (message, rinfo) => {
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
 
-      this.parallelSendStrategy = new ParallelSendStrategy(
-        this.testData,
-        anyPort,
-        anyRequest
-      );
-    }
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err) => {
+        assert.strictEqual(err, expectedError);
 
-    function commonStrategyTestValidation(done) {
-      for (const key in this.testSockets) {
-        assert.strictEqual(this.testSockets[key].socketSendStub.callCount, 2);
-        assert.strictEqual(this.testSockets[key].socketCloseSpy.callCount, 1);
-      }
+        done();
+      });
+    });
 
-      assert.strictEqual(this.createSocketStub.callCount, 2);
+    it('sends the given request to the remote server', function(done) {
+      const expectedRequest = Buffer.from([0x02]);
 
-      done();
-    }
+      server.once('message', (message, rinfo) => {
+        assert.deepEqual(message, Buffer.from([0x02]));
+
+        server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+      });
+
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
+      sender.execute(done);
+    });
+
+    it('calls the given callback with the received response', function(done) {
+      const expectedResponse = Buffer.from('response');
+
+      server.once('message', (message, rinfo) => {
+        server.send(expectedResponse, rinfo.port, rinfo.address);
+      });
+
+      const controller = new AbortController();
+      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
+      sender.execute((err, message) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.deepEqual(message, expectedResponse);
+
+        done();
+      });
+    });
+  });
+
+  describe('with multiple addresses', function() {
+    /**
+     * @type {dgram.Socket[]}
+     */
+    let servers;
+
+    /**
+     * @type {string}
+     */
+    const addresses = ['127.0.0.1', '127.0.0.2', '127.0.0.3'];
+
+    /**
+     * @type {number}
+     */
+    let port;
 
     beforeEach(function() {
-      glob = {};
-      commonStrategyTestSetup.call(glob);
+      servers = [];
+      port = 0;
     });
 
-    afterEach(function() {
-      for (const key in glob.testSockets) {
-        glob.testSockets[key].socketSendStub.restore();
-        glob.testSockets[key].socketCloseSpy.restore();
-        glob.createSocketStub.restore();
+    addresses.forEach((address) => {
+      beforeEach(function(done) {
+        const onError = () => {
+          this.skip();
+        };
+
+        const server = dgram.createSocket('udp4');
+        server.on('error', onError);
+        server.bind(port, address, () => {
+          server.removeListener('error', onError);
+
+          port = server.address().port;
+          servers.push(server);
+
+          done();
+        });
+      });
+    });
+
+    afterEach(() => {
+      servers.forEach((server) => {
+        server.close();
+      });
+    });
+
+    it('sends the request to all servers', function(done) {
+      function lookup(hostname, options, callback) {
+        process.nextTick(callback, undefined, addresses.map((address) => {
+          return { address: address, family: 4 };
+        }));
       }
-    });
 
-    it('should send all IPs success', function(done) {
-      glob.parallelSendStrategy.send((error, message) => {
-        assert.strictEqual(error, null);
+      const expectedRequest = Buffer.from([0x02]);
 
-        // We should get the message only on the first socket, which is Ipv4.
-        assert.strictEqual(glob.testData[0].udpVersion, udpIpv4);
-        assert.strictEqual(message, glob.testSockets[udpIpv4]);
-        commonStrategyTestValidation.call(glob, done);
+      const messages = [];
+
+      servers.forEach((server) => {
+        server.on('message', (message, rinfo) => {
+          messages.push([server.address().address, message]);
+
+          server.send(Buffer.from('response'), rinfo.port, rinfo.address);
+        });
+      });
+
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
+      sender.execute((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.deepEqual([
+          [ '127.0.0.1', expectedRequest ],
+          [ '127.0.0.2', expectedRequest ],
+          [ '127.0.0.3', expectedRequest ]
+        ], messages);
+
+        done();
       });
     });
 
-    it('should send IPv4 fail', function(done) {
-      // Setup sends to fail on Ipv4 socket.
-      glob.testSockets[udpIpv4].sendResult = sendResultError;
+    it('calls the given callback with the first received response', function(done) {
+      function lookup(hostname, options, callback) {
+        process.nextTick(callback, undefined, addresses.map((address) => {
+          return { address: address, family: 4 };
+        }));
+      }
 
-      glob.parallelSendStrategy.send((error, message) => {
-        // Even though the IPv4 socket sends fail, we should not get an error
-        // as the other sockets succeed.
-        assert.strictEqual(error, null);
+      const expectedRequest = Buffer.from([0x02]);
 
-        // We setup the IPv4 socket sends to fail. So we should get the message on the
-        // Ipv6 socket.
-        assert.strictEqual(message, glob.testSockets[udpIpv6]);
+      const messages = [];
 
-        commonStrategyTestValidation.call(glob, done);
-      });
-    });
+      servers.forEach((server) => {
+        server.on('message', (message, rinfo) => {
+          messages.push([server.address().address, message]);
 
-    it('should send IPV6 fail', function(done) {
-      // Setup sends to fail on Ipv6 socket.
-      glob.testSockets[udpIpv6].sendResult = sendResultError;
-
-      glob.parallelSendStrategy.send((error, message) => {
-        // Even though the IPv6 socket sends fail, we should not get an error
-        // as the other sockets succeed.
-        assert.strictEqual(error, null);
-
-        // We setup the IPv6 socket sends to fail. So we should get the message on the
-        // Ipv4 socket.
-        assert.strictEqual(message, glob.testSockets[udpIpv4]);
-
-        commonStrategyTestValidation.call(glob, done);
-      });
-    });
-
-    it('should send all IPs fail', function(done) {
-      // Setup IPv4 and IPv6 sockets to fail on socket send.
-      glob.testSockets[udpIpv4].sendResult = sendResultError;
-      glob.testSockets[udpIpv6].sendResult = sendResultError;
-
-      glob.parallelSendStrategy.send((error, message) => {
-        // All socket sends fail. We should get an error on the last socket fail.
-        assert.strictEqual(
-          error,
-          glob.testSockets[glob.testData[glob.testData.length - 1].udpVersion]
-        );
-
-        assert.strictEqual(message, undefined);
-
-        commonStrategyTestValidation.call(glob, done);
-      });
-    });
-
-    it('should send cancel', function(done) {
-      glob.parallelSendStrategy.send((error, message) => {
-        // We should not get a callback as the send got cancelled.
-        assert.isOk(false, 'Should never get here.');
+          if (messages.length === 3) {
+            server.send(Buffer.from(`response #${messages.length}`), rinfo.port, rinfo.address);
+          }
+        });
       });
 
-      glob.parallelSendStrategy.cancel();
+      const controller = new AbortController();
+      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
+      sender.execute((err, response) => {
+        if (err) {
+          return done(err);
+        }
 
-      commonStrategyTestValidation.call(glob, done);
+        assert.strictEqual(messages.length, 3);
+        assert.deepEqual(response, Buffer.from('response #3'));
+
+        done();
+      });
     });
   });
 });

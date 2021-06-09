@@ -1,4 +1,4 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
@@ -14,42 +14,50 @@ function parse(status, curCmd, doneRowCount) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  var parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
-  parser.write(buffer.data);
-  return parser.read();
+  var parser = StreamParser.parseTokens([buffer.data], {}, { tdsVersion: '7_2' });
+  return parser;
 }
 
 describe('Done Token Parser', () => {
-  it('should done', () => {
+  it('should done', async () => {
     const status = 0x0000;
     const curCmd = 1;
     const doneRowCount = 2;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const parser = parse(status, curCmd, doneRowCount);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     assert.isOk(!token.more);
     assert.strictEqual(token.curCmd, curCmd);
     assert.isOk(!token.rowCount);
   });
 
-  it('should more', () => {
+  it('should more', async () => {
     const status = 0x0001;
     const curCmd = 1;
     const doneRowCount = 2;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const parser = parse(status, curCmd, doneRowCount);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     assert.isOk(token.more);
     assert.strictEqual(token.curCmd, curCmd);
     assert.isOk(!token.rowCount);
   });
 
-  it('should done row count', () => {
+  it('should done row count', async () => {
     const status = 0x0010;
     const curCmd = 1;
     const doneRowCount = 0x1200000034;
 
-    const token = parse(status, curCmd, doneRowCount);
+    const parser = parse(status, curCmd, doneRowCount);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
 
     assert.isOk(!token.more);
     assert.strictEqual(token.curCmd, 1);

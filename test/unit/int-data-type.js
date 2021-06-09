@@ -12,7 +12,7 @@ describe('integer-data-types', function() {
     params.forEach(function(item) {
       it('test valid parameter values', function() {
         const buffer = Buffer.concat([...Int.generateParameterData(item.param, {})]);
-        assert.equal(buffer.readInt32LE(1), item.expected);
+        assert.equal(buffer.readInt32LE(0), item.expected);
       });
     });
   });
@@ -27,7 +27,7 @@ describe('integer-data-types', function() {
     params.forEach(function(item) {
       it('test valid parameter values', function() {
         const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, {})]);
-        assert.equal(buffer.readInt16LE(1), item.expected);
+        assert.equal(buffer.readInt16LE(0), item.expected);
       });
     });
   });
@@ -42,7 +42,7 @@ describe('integer-data-types', function() {
     params.forEach(function(item) {
       it('test valid parameter values', function() {
         const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, {})]);
-        assert.equal(buffer.readInt8(1), item.expected);
+        assert.equal(buffer.readInt8(0), item.expected);
       });
     });
   });

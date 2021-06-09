@@ -1,9 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
 describe('Infoerror token parser', () => {
-  it('should have correct info', () => {
+  it('should have correct info', async () => {
     const number = 3;
     const state = 4;
     const class_ = 5;
@@ -27,10 +27,10 @@ describe('Infoerror token parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
-    parser.write(data);
-    const token = parser.read();
-
+    const parser = StreamParser.parseTokens([data], {}, { tdsVersion: '7_2' });
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
     assert.strictEqual(token.number, number);
     assert.strictEqual(token.state, state);
     assert.strictEqual(token.class, class_);
@@ -38,5 +38,7 @@ describe('Infoerror token parser', () => {
     assert.strictEqual(token.serverName, serverName);
     assert.strictEqual(token.procName, procName);
     assert.strictEqual(token.lineNumber, lineNumber);
+
+    assert.isTrue((await parser.next()).done);
   });
 });
