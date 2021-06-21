@@ -71,7 +71,7 @@ export interface DataType {
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
-  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  validate(value: any, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
 

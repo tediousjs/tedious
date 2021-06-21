@@ -246,6 +246,28 @@ describe('DateTime', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are below January 1, 1753', function() {
+      assert.throws(() => {
+        TYPES.DateTime.validate(new Date('January 1, 1752'));
+      }, TypeError, 'Out of range.');
+    });
+
+    it('returns a TypeError for dates that are greater than December 31, 9999', function() {
+      assert.throws(() => {
+        TYPES.DateTime.validate(new Date('December 31, 10000'));
+      }, TypeError, 'Out of range.');
+    });
+
+    // it('returns a TypeError for dates that are below January 1, 1753', function() {
+    //   console.log('UTC = ', new Date('1 Jan 1753 00:00:00 CET').toUTCString)
+    //   assert.throws(() => {
+    //     TYPES.DateTime.validate(new Date('1 Jan 1753 00:00:00 CET'), { useUTC: true });
+    //   }, TypeError, 'Out of range.');
+    // })
+
+  });
 });
 
 describe('DateTime2', function() {
@@ -829,7 +851,7 @@ describe('NVarChar', function() {
 
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
-    // Length <= Maximum Length
+      // Length <= Maximum Length
       const type = TYPES.NVarChar;
       const expected = Buffer.from([0xE7, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
@@ -917,6 +939,32 @@ describe('SmallDateTime', function() {
       const result = TYPES.SmallDateTime.generateTypeInfo();
 
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('throws Invalid Date error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate('string');
+      }, TypeError, 'Invalid date.');
+    });
+
+    it('throws Out of Range error for dates out of range', function() {
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('January 1, 1899'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('January 1, 2080'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('July 1, 2079'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('June 7, 2079'));
+      }, TypeError, 'Out of range.');
     });
   });
 });
@@ -1152,7 +1200,7 @@ describe('TVP', function() {
         TYPES.TVP.generateParameterLength({
           value: {
             columns: [{ name: 'user_id', type: TYPES.Int }],
-            rows: [[ 15 ], [ 16 ]]
+            rows: [[15], [16]]
           }
         }),
         Buffer.from([0x01, 0x00])
@@ -1164,7 +1212,7 @@ describe('TVP', function() {
     it('correctly converts TVP table values', function() {
       const value = {
         columns: [{ name: 'user_id', type: TYPES.Int }],
-        rows: [[ 15 ]]
+        rows: [[15]]
       };
       const expected = Buffer.from('0000000000002604000001040f00000000', 'hex');
       const parameterValue = { value };

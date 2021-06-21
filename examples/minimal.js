@@ -1,19 +1,20 @@
-var Connection = require('../lib/tedious').Connection;
-var Request = require('../lib/tedious').Request;
+const { Connection, Request, TYPES } = require('../lib/tedious');
 
 var config = {
-  server: '192.168.1.212',
-  authentication: {
-    type: 'default',
-    options: {
-      userName: 'test',
-      password: 'test'
+  "server": "localhost",
+  "authentication": {
+    "type": "default",
+    "options": {
+      "userName": "sa",
+      "password": "Password1"
     }
   },
-  options: {
-    port: 1433 // Default Port
+  "options": {
+    "port": 1433,
+    "database": "master",
+    "trustServerCertificate": true
   }
-};
+}
 
 const connection = new Connection(config);
 
@@ -29,8 +30,9 @@ connection.on('connect', (err) => {
 connection.connect();
 
 function executeStatement() {
-  const request = new Request('select * from MyTable', (err, rowCount) => {
+  const request = new Request('select CAST(@param as smalldatetime(max))', (err, rowCount) => {
     if (err) {
+      console.log('>>> ERROR CAUGHT')
       throw err;
     }
 
@@ -38,16 +40,7 @@ function executeStatement() {
     connection.close();
   });
 
-  // Emits a 'DoneInProc' event when completed.
-  request.on('row', (columns) => {
-    columns.forEach((column) => {
-      if (column.value === null) {
-        console.log('NULL');
-      } else {
-        console.log(column.value);
-      }
-    });
-  });
+  request.addParameter('param', TYPES.SmallDateTime, 'January 1, 1899 10:04:00')
 
   request.on('done', (rowCount) => {
     console.log('Done is called!');
