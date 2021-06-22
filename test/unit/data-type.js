@@ -259,14 +259,6 @@ describe('DateTime', function() {
         TYPES.DateTime.validate(new Date('December 31, 10000'));
       }, TypeError, 'Out of range.');
     });
-
-    // it('returns a TypeError for dates that are below January 1, 1753', function() {
-    //   console.log('UTC = ', new Date('1 Jan 1753 00:00:00 CET').toUTCString)
-    //   assert.throws(() => {
-    //     TYPES.DateTime.validate(new Date('1 Jan 1753 00:00:00 CET'), { useUTC: true });
-    //   }, TypeError, 'Out of range.');
-    // })
-
   });
 });
 
