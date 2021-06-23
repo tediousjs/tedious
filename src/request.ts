@@ -4,6 +4,7 @@ import { RequestError } from './errors';
 
 import Connection from './connection';
 import { Metadata } from './metadata-parser';
+import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 /**
@@ -35,6 +36,10 @@ interface ParameterOptions {
   length?: number;
   precision?: number;
   scale?: number;
+}
+
+interface RequestOptions {
+  statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
 
 /**
@@ -113,6 +118,11 @@ class Request extends EventEmitter {
    * @private
    */
   callback: CompletionCallback;
+
+
+  shouldHonorAE?: boolean;
+  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  cryptoMetadataLoaded: boolean;
 
   /**
    * This event, describing result set columns, will be emitted before row
@@ -344,7 +354,7 @@ class Request extends EventEmitter {
    * @param callback
    *   The callback to execute once the request has been fully completed.
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback) {
+  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -359,6 +369,8 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
+    this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       if (this.preparing) {
         this.preparing = false;
