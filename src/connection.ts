@@ -48,6 +48,8 @@ import AbortController, { AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 
+import { version } from '../package.json';
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
 
@@ -2512,9 +2514,13 @@ class Connection extends EventEmitter {
    * @private
    */
   sendPreLogin() {
+    const [ , major, minor, build ] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [ '0.0.0', '0', '0', '0' ];
+
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt
+      encrypt: this.config.options.encrypt,
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
+
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
       return payload.toString('  ');
