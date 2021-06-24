@@ -2,9 +2,9 @@ const PreloginPayload = require('../../src/prelogin-payload');
 const assert = require('chai').assert;
 
 function assertPayload(payload, encryptionString) {
-  assert.strictEqual(payload.version.major, 0);
+  assert.strictEqual(payload.version.major, 11);
   assert.strictEqual(payload.version.minor, 0);
-  assert.strictEqual(payload.version.patch, 0);
+  assert.strictEqual(payload.version.patch, 9);
   assert.strictEqual(payload.version.trivial, 1);
   assert.strictEqual(payload.version.subbuild, 1);
 

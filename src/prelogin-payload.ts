@@ -4,10 +4,10 @@ import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 
 const optionBufferSize = 20;
 
-/*
-  This value must reflect the current driver version (written in UInt32BE).
-*/
-const VERSION = 90001001; // version 11.0.9 in hexidecimal, big endian
+/**
+ * version 11.0.9 with trivial version 1 in 32 bit hex = 0B000901
+ */
+const VERSION = 0x0B000901;
 
 const SUBBUILD = 0x0001;
 
