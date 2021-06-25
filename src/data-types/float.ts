@@ -1,6 +1,8 @@
 import { DataType } from '../data-type';
 import FloatN from './floatn';
 
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const Float: DataType = {
   id: 0x3E,
   type: 'FLT8',
@@ -14,24 +16,31 @@ const Float: DataType = {
     return Buffer.from([FloatN.id, 0x08]);
   },
 
-  *generateParameterData(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(9);
-      buffer.writeUInt8(8, 0);
-      buffer.writeDoubleLE(parseFloat(parameter.value), 1);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    return Buffer.from([0x08]);
   },
 
-  validate: function(value): number | null | TypeError {
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(8);
+    buffer.writeDoubleLE(parseFloat(parameter.value), 0);
+    yield buffer;
+  },
+
+  validate: function(value): number | null {
     if (value == null) {
       return null;
     }
     value = parseFloat(value);
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
     return value;
   }

@@ -2,7 +2,6 @@
 
 import Parser from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { InternalConnectionOptions } from '../connection';
 
 import { RowToken } from './token';
 
@@ -13,47 +12,46 @@ interface Column {
   metadata: ColumnMetadata;
 }
 
-function rowParser(parser: Parser, options: InternalConnectionOptions, callback: (token: RowToken) => void) {
+async function rowParser(parser: Parser): Promise<RowToken> {
   const colMetadata = parser.colMetadata;
+  const length = colMetadata.length;
   const columns: Column[] = [];
 
-  const len = colMetadata.length;
-  let i = 0;
+  for (let i = 0; i < length; i++) {
+    const currColMetadata = colMetadata[i];
+    let value;
+    valueParse(parser, currColMetadata, parser.options, (v) => {
+      value = v;
+    });
 
-  function next(done: () => void) {
-    if (i === len) {
-      return done();
+    while (parser.suspended) {
+      await parser.streamBuffer.waitForChunk();
+
+      parser.suspended = false;
+      const next = parser.next!;
+
+      next();
     }
-
-    const columnMetaData = colMetadata[i];
-    valueParse(parser, columnMetaData, options, (value) => {
-      columns.push({
-        value: value,
-        metadata: columnMetaData
-      });
-
-      i++;
-
-      next(done);
+    columns.push({
+      value,
+      metadata: currColMetadata
     });
   }
 
-  next(() => {
-    if (options.useColumnNames) {
-      const columnsMap: { [key: string]: Column } = {};
+  if (parser.options.useColumnNames) {
+    const columnsMap: { [key: string]: Column } = {};
 
-      columns.forEach((column) => {
-        const colName = column.metadata.colName;
-        if (columnsMap[colName] == null) {
-          columnsMap[colName] = column;
-        }
-      });
+    columns.forEach((column) => {
+      const colName = column.metadata.colName;
+      if (columnsMap[colName] == null) {
+        columnsMap[colName] = column;
+      }
+    });
 
-      callback(new RowToken(columnsMap));
-    } else {
-      callback(new RowToken(columns));
-    }
-  });
+    return new RowToken(columnsMap);
+  } else {
+    return new RowToken(columns);
+  }
 }
 
 export default rowParser;

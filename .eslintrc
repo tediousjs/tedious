@@ -101,7 +101,6 @@ rules:
   no-this-before-super: "error"
   no-throw-literal: "error"
   no-trailing-spaces: 2
-  no-undef: ["error", { typeof: true }]
   no-undef-init: "error"
   no-unexpected-multiline: 2
   no-unreachable: "error"
@@ -161,11 +160,9 @@ overrides:
       - '*.ts'
     rules:
       "@typescript-eslint/adjacent-overload-signatures": "error"
-      "@typescript-eslint/ban-ts-ignore": "error"
+      "@typescript-eslint/ban-ts-comment": "error"
       "@typescript-eslint/ban-types": "error"
-      "@typescript-eslint/class-name-casing": "error"
       "@typescript-eslint/consistent-type-assertions": "error"
-      "@typescript-eslint/interface-name-prefix": "error"
       "@typescript-eslint/member-delimiter-style": ["error", {
         "multiline": {
           "delimiter": "semi",
@@ -179,6 +176,7 @@ overrides:
       "no-array-constructor": "off"
       "@typescript-eslint/no-array-constructor": "error"
       "@typescript-eslint/no-empty-interface": "error"
+      "@typescript-eslint/no-extra-non-null-assertion": "error"
       "@typescript-eslint/no-inferrable-types": "error"
       "@typescript-eslint/no-misused-new": "error"
       "@typescript-eslint/no-namespace": "error"

@@ -143,7 +143,7 @@ function readNewAndOldValue(parser: Parser, length: number, type: { name: string
           const protocol = routePacket.readUInt8(0);
 
           if (protocol !== 0) {
-            return parser.emit('error', new Error('Unknown protocol byte in routing change event'));
+            throw new Error('Unknown protocol byte in routing change event');
           }
 
           const port = routePacket.readUInt16LE(1);

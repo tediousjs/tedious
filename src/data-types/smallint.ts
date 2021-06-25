@@ -1,6 +1,9 @@
 import { DataType } from '../data-type';
 import IntN from './intn';
 
+const DATA_LENGTH = Buffer.from([0x02]);
+const NULL_LENGTH = Buffer.from([0x00]);
+
 const SmallInt: DataType = {
   id: 0x34,
   type: 'INT2',
@@ -14,18 +17,25 @@ const SmallInt: DataType = {
     return Buffer.from([IntN.id, 0x02]);
   },
 
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = Buffer.alloc(3);
-      buffer.writeUInt8(2, 0);
-      buffer.writeInt16LE(Number(parameter.value), 1);
-      yield buffer;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    return DATA_LENGTH;
   },
 
-  validate: function(value): null | number | TypeError {
+  * generateParameterData(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    const buffer = Buffer.alloc(2);
+    buffer.writeInt16LE(Number(parameter.value), 0);
+    yield buffer;
+  },
+
+  validate: function(value): null | number {
     if (value == null) {
       return null;
     }
@@ -35,11 +45,11 @@ const SmallInt: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid number.');
+      throw new TypeError('Invalid number.');
     }
 
     if (value < -32768 || value > 32767) {
-      return new TypeError('Value must be between -32768 and 32767, inclusive.');
+      throw new TypeError('Value must be between -32768 and 32767, inclusive.');
     }
 
     return value | 0;

@@ -366,6 +366,31 @@ describe('Initiate Connect Test', function() {
     setTimeout(() => { done(); }, 500);
   });
 
+  it('should not leave any dangling sockets after connection timeout', function(done) {
+    // 192.0.2.0/24 is an IP address block reserved for documentation.
+    //
+    // Opening a connection to an address in that block should never be successfull
+    // and fail after a while with `ETIMEDOUT`.
+    //
+    // This test is supposed to show that we correctly clean up the socket(s)
+    // that got created after the `connectTimeout` was reached and no
+    // errors happen at a later time.
+    const conn = new Connection({
+      server: '192.0.2.1',
+      options: {
+        connectTimeout: 3000
+      }
+    });
+
+    conn.connect((err) => {
+      conn.close();
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+
+      done();
+    });
+  });
 });
 
 
@@ -1088,59 +1113,79 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should cancel request', function(done) {
+  it('should support cancelling a request while it is processed on the server', function(done) {
     const config = getConfig();
 
-    const request = new Request(
-      "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
-      function(err, rowCount, rows) {
-        assert.strictEqual(err.message, 'Canceled.');
+    let cancelledAt;
 
-        connection.close();
-      }
-    );
+    const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Canceled.');
 
-    request.on('doneInProc', function(rowCount, more) {
+      assert.isUndefined(rowCount);
+
+      // Ensure that not too much time has passed since the cancellation was requested.
+      const [seconds, nanoSeconds] = process.hrtime(cancelledAt);
+      assert.strictEqual(seconds, 0);
+      assert.isBelow(nanoSeconds, 500 * 1000 * 1000);
+
+      // Ensure that the connection is still usable after the cancelTimeout has passed.
+      setTimeout(() => {
+        const request = new Request('select 1', (err) => {
+          assert.ifError(err);
+
+          connection.close();
+        });
+
+        connection.execSql(request);
+      }, config.options.cancelTimeout + 100);
+    });
+
+    request.on('doneInProc', (rowCount, more) => {
       assert.ok(false);
     });
 
-    request.on('doneProc', function(rowCount, more) {
+    request.on('doneProc', (rowCount, more) => {
       assert.ok(false);
     });
 
-    request.on('done', function(rowCount, more, rows) {
+    request.on('done', (rowCount, more, rows) => {
       assert.ok(false);
     });
 
-    request.on('columnMetadata', function(columnsMetadata) {
+    request.on('columnMetadata', (columnsMetadata) => {
       assert.ok(false);
     });
 
-    request.on('row', function(columns) {
+    request.on('row', (columns) => {
       assert.ok(false);
     });
 
-    let connection = new Connection(config);
+    const connection = new Connection({ ...config, options: { ...config.options, cancelTimeout: 500 } });
 
-    connection.connect(function(err) {
+    connection.connect((err) => {
       connection.execSql(request);
-      setTimeout(connection.cancel.bind(connection), 2000);
+
+      setTimeout(() => {
+        cancelledAt = process.hrtime();
+        request.cancel();
+      }, 2000);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', (info) => {
       done();
     });
 
-    connection.on('infoMessage', function(info) {
+    connection.on('infoMessage', (info) => {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
+    connection.on('debug', (text) => {
+      // console.log(text);
     });
   });
 
-  it('should request timeout', function(done) {
+  it('should request timeout', (done) => {
     const config = getConfig();
     config.options.requestTimeout = 1000;
 

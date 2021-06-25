@@ -1,6 +1,8 @@
 import { DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+
+const NULL_LENGTH = Buffer.from([0x00]);
+const DATA_LENGTH = Buffer.from([0x10]);
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -19,32 +21,37 @@ const UniqueIdentifier: DataType = {
     return Buffer.from([this.id, 0x10]);
   },
 
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value != null) {
-      const buffer = new WritableTrackingBuffer(1);
-      buffer.writeUInt8(0x10);
-      buffer.writeBuffer(Buffer.from(guidToArray(parameter.value)));
-      yield buffer.data;
-    } else {
-      yield Buffer.from([0x00]);
+  generateParameterLength(parameter, options) {
+    if (parameter.value == null) {
+      return NULL_LENGTH;
     }
+
+    return DATA_LENGTH;
   },
 
-  validate: function(value): string | null | TypeError {
+  generateParameterData: function*(parameter, options) {
+    if (parameter.value == null) {
+      return;
+    }
+
+    yield Buffer.from(guidToArray(parameter.value));
+  },
+
+  validate: function(value): string | null {
     if (value == null) {
       return null;
     }
 
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
-        return TypeError('Invalid string.');
+        throw new TypeError('Invalid string.');
       }
 
       value = value.toString();
     }
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-      return TypeError('Invalid GUID.');
+      throw new TypeError('Invalid GUID.');
     }
 
     return value;
