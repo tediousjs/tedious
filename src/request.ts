@@ -1,9 +1,10 @@
 import { EventEmitter } from 'events';
-import { typeByName as TYPES, Parameter, DataType } from './data-type';
+import { Parameter, DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
 import { Metadata } from './metadata-parser';
+import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 /**
@@ -37,6 +38,10 @@ interface ParameterOptions {
   scale?: number;
 }
 
+interface RequestOptions {
+  statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
+}
+
 /**
  * ```js
  * const { Request } = require('tedious');
@@ -59,10 +64,6 @@ class Request extends EventEmitter {
    * @private
    */
   parametersByName: { [key: string]: Parameter };
-  /**
-   * @private
-   */
-  originalParameters: Parameter[];
   /**
    * @private
    */
@@ -113,6 +114,11 @@ class Request extends EventEmitter {
    * @private
    */
   callback: CompletionCallback;
+
+
+  shouldHonorAE?: boolean;
+  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  cryptoMetadataLoaded: boolean;
 
   /**
    * This event, describing result set columns, will be emitted before row
@@ -273,6 +279,10 @@ class Request extends EventEmitter {
 
   on(event: 'cancel', listener: () => void): this
 
+  on(event: 'pause', listener: () => void): this
+
+  on(event: 'resume', listener: () => void): this
+
   on(event: string | symbol, listener: (...args: any[]) => void) {
     return super.on(event, listener);
   }
@@ -320,6 +330,14 @@ class Request extends EventEmitter {
   /**
    * @private
    */
+  emit(event: 'pause'): boolean
+  /**
+   * @private
+   */
+  emit(event: 'resume'): boolean
+  /**
+   * @private
+   */
   emit(event: 'order', orderColumns: number[]): boolean
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
@@ -332,13 +350,12 @@ class Request extends EventEmitter {
    * @param callback
    *   The callback to execute once the request has been fully completed.
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback) {
+  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
-    this.originalParameters = [];
     this.preparing = false;
     this.handle = undefined;
     this.canceled = false;
@@ -347,6 +364,8 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
+    this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       if (this.preparing) {
         this.preparing = false;
@@ -443,87 +462,16 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  transformIntoExecuteSqlRpc() {
-    if (this.validateParameters()) {
-      return;
-    }
-
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addParameter('statement', TYPES.NVarChar, this.sqlTextOrProcedure);
-    if (this.originalParameters.length) {
-      this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    }
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      this.parameters.push(parameter);
-    }
-    this.sqlTextOrProcedure = 'sp_executesql';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoPrepareRpc() {
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addOutputParameter('handle', TYPES.Int, undefined);
-    this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
-    this.sqlTextOrProcedure = 'sp_prepare';
-    this.preparing = true;
-    this.on('returnValue', (name: string, value: any) => {
-      if (name === 'handle') {
-        this.handle = value;
-      } else {
-        this.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
-      }
-    });
-  }
-
-  /**
-   * @private
-   */
-  transformIntoUnprepareRpc() {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-    this.sqlTextOrProcedure = 'sp_unprepare';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoExecuteRpc(parameters: { [key: string]: unknown }) {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      parameter.value = parameters[parameter.name];
-      this.parameters.push(parameter);
-    }
-
-    if (this.validateParameters()) {
-      return;
-    }
-
-    this.sqlTextOrProcedure = 'sp_execute';
-  }
-
-  /**
-   * @private
-   */
   validateParameters() {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
-      const value = parameter.type.validate(parameter.value);
-      if (value instanceof TypeError) {
-        return this.error = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + value.message, 'EPARAM');
+
+      try {
+        parameter.value = parameter.type.validate(parameter.value);
+      } catch (error) {
+        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
       }
-      parameter.value = value;
     }
-    return null;
   }
 
   /**
@@ -534,10 +482,8 @@ class Request extends EventEmitter {
     if (this.paused) {
       return;
     }
+    this.emit('pause');
     this.paused = true;
-    if (this.connection) {
-      this.connection.pauseRequest(this);
-    }
   }
 
   /**
@@ -549,9 +495,7 @@ class Request extends EventEmitter {
       return;
     }
     this.paused = false;
-    if (this.connection) {
-      this.connection.resumeRequest(this);
-    }
+    this.emit('resume');
   }
 
   /**

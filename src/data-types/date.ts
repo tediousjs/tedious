@@ -49,7 +49,7 @@ const Date: DataType = {
   },
 
   // TODO: value is techincally of type 'unknown'.
-  validate: function(value): null | Date | TypeError {
+  validate: function(value): null | Date {
     if (value == null) {
       return null;
     }
@@ -59,7 +59,7 @@ const Date: DataType = {
     }
 
     if (isNaN(value)) {
-      return new TypeError('Invalid date.');
+      throw new TypeError('Invalid date.');
     }
 
     return value;

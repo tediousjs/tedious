@@ -1,9 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
 describe('Fedauth Info Parser', () => {
-  it('should contain fed auth info', () => {
+  it('should contain fed auth info', async () => {
     const buffer = new WritableTrackingBuffer(50, 'ucs-2');
     buffer.writeUInt8('0xEE');
     buffer.writeUInt32LE(40);
@@ -17,11 +17,13 @@ describe('Fedauth Info Parser', () => {
     buffer.writeString('spn');
     buffer.writeString('stsurl');
 
-    const parser = new Parser({ token() { } }, {}, {});
-    parser.write(buffer.data);
-    const token = parser.read();
-
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
     assert.strictEqual(token.stsurl, 'stsurl');
     assert.strictEqual(token.spn, 'spn');
+
+    assert.isTrue((await parser.next()).done);
   });
 });

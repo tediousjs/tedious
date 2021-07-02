@@ -1,6 +1,5 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import Request from './request';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
 
@@ -19,15 +18,15 @@ const STATUS = {
   s2.2.6.5
  */
 class RpcRequestPayload implements Iterable<Buffer> {
-  request: Request;
   procedure: string | number;
+  parameters: Parameter[];
 
   options: InternalConnectionOptions;
   txnDescriptor: Buffer;
 
-  constructor(request: Request, txnDescriptor: Buffer, options: InternalConnectionOptions) {
-    this.request = request;
-    this.procedure = this.request.sqlTextOrProcedure!;
+  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
+    this.procedure = procedure;
+    this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
   }
@@ -54,9 +53,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
     buffer.writeUInt16LE(optionFlags);
     yield buffer.data;
 
-    const parameters = this.request.parameters;
-    for (let i = 0; i < parameters.length; i++) {
-      yield * this.generateParameterData(parameters[i]);
+    const parametersLength = this.parameters.length;
+    for (let i = 0; i < parametersLength; i++) {
+      yield * this.generateParameterData(this.parameters[i]);
     }
   }
 

@@ -164,9 +164,9 @@ class RowTransform extends Transform {
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
       if (this.bulkLoad.options.validateBulkLoadParameters) {
-        const error = c.type.validate(row[i]);
-
-        if (error instanceof TypeError) {
+        try {
+          c.type.validate(row[i]);
+        } catch (error) {
           return callback(error);
         }
       }
@@ -429,10 +429,7 @@ class BulkLoad extends EventEmitter {
    */
   colTypeValidation(column: Column, value: any) {
     if (this.options.validateBulkLoadParameters) {
-      const error = column.type.validate(value);
-      if (error instanceof TypeError) {
-        throw error;
-      }
+      column.type.validate(value);
     }
   }
 

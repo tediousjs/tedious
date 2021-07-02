@@ -2,8 +2,7 @@ import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
 import JSBI from 'jsbi';
 
-import { Transform } from 'readable-stream';
-import { TYPE, Token, EndOfMessageToken, ColMetadataToken } from './token';
+import { TYPE, Token, ColMetadataToken } from './token';
 
 import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
@@ -20,7 +19,6 @@ import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 
 const tokenParsers = {
-  [TYPE.COLMETADATA]: colMetadataParser,
   [TYPE.DONE]: doneParser,
   [TYPE.DONEINPROC]: doneInProcParser,
   [TYPE.DONEPROC]: doneProcParser,
@@ -33,89 +31,132 @@ const tokenParsers = {
   [TYPE.ORDER]: orderParser,
   [TYPE.RETURNSTATUS]: returnStatusParser,
   [TYPE.RETURNVALUE]: returnValueParser,
-  [TYPE.ROW]: rowParser,
-  [TYPE.NBCROW]: nbcRowParser,
   [TYPE.SSPI]: sspiParser
 };
 
-class EndOfMessageMarker {}
-
-class Parser extends Transform {
-  debug: Debug;
-  colMetadata: ColumnMetadata[];
-  options: InternalConnectionOptions;
-  endOfMessageMarker: EndOfMessageMarker;
-
+class StreamBuffer {
+  iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
   buffer: Buffer;
   position: number;
-  suspended: boolean;
-  next?: () => void;
 
-  constructor(debug: Debug, options: InternalConnectionOptions) {
-    super({ objectMode: true });
-
-    this.debug = debug;
-    this.colMetadata = [];
-    this.options = options;
-    this.endOfMessageMarker = new EndOfMessageMarker();
+  constructor(iterable: AsyncIterable<Buffer> | Iterable<Buffer>) {
+    this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] || (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
+  }
+
+  async waitForChunk() {
+    const result = await this.iterator.next();
+    if (result.done) {
+      throw new Error('unexpected end of data');
+    }
+
+    if (this.position === this.buffer.length) {
+      this.buffer = result.value;
+    } else {
+      this.buffer = Buffer.concat([this.buffer.slice(this.position), result.value]);
+    }
+    this.position = 0;
+  }
+}
+
+class Parser {
+  debug: Debug;
+  colMetadata: ColumnMetadata[];
+  options: InternalConnectionOptions;
+
+  suspended: boolean;
+  next?: () => void;
+  streamBuffer: StreamBuffer;
+
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {
+    let token: Token | undefined;
+    const onDoneParsing = (t: Token | undefined) => { token = t; };
+
+    const streamBuffer = new StreamBuffer(iterable);
+
+    const parser = new Parser(streamBuffer, debug, options);
+    parser.colMetadata = colMetadata;
+
+    while (true) {
+      try {
+        await streamBuffer.waitForChunk();
+      } catch (err: unknown) {
+        if (streamBuffer.position === streamBuffer.buffer.length) {
+          return;
+        }
+
+        throw err;
+      }
+
+      if (parser.suspended) {
+        // Unsuspend and continue from where ever we left off.
+        parser.suspended = false;
+        const next = parser.next!;
+
+        next();
+
+        // Check if a new token was parsed after unsuspension.
+        if (!parser.suspended && token) {
+          if (token instanceof ColMetadataToken) {
+            parser.colMetadata = token.columns;
+          }
+
+          yield token;
+        }
+      }
+
+      while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
+        const type = parser.buffer.readUInt8(parser.position);
+
+        parser.position += 1;
+
+        if (type === TYPE.COLMETADATA) {
+          const token = await colMetadataParser(parser);
+          parser.colMetadata = token.columns;
+          yield token;
+        } else if (type === TYPE.ROW) {
+          yield rowParser(parser);
+        } else if (type === TYPE.NBCROW) {
+          yield nbcRowParser(parser);
+        } else if (tokenParsers[type]) {
+          tokenParsers[type](parser, parser.options, onDoneParsing);
+
+          // Check if a new token was parsed after unsuspension.
+          if (!parser.suspended && token) {
+            if (token instanceof ColMetadataToken) {
+              parser.colMetadata = token.columns;
+            }
+            yield token;
+          }
+        } else {
+          throw new Error('Unknown type: ' + type);
+        }
+      }
+    }
+  }
+
+  constructor(streamBuffer: StreamBuffer, debug: Debug, options: InternalConnectionOptions) {
+    this.debug = debug;
+    this.colMetadata = [];
+    this.options = options;
+
+    this.streamBuffer = streamBuffer;
     this.suspended = false;
     this.next = undefined;
   }
 
-  _transform(input: Buffer | EndOfMessageMarker, _encoding: string, done: (error?: Error | undefined, token?: Token) => void) {
-    if (input instanceof EndOfMessageMarker) {
-      return done(undefined, new EndOfMessageToken());
-    }
-
-    if (this.position === this.buffer.length) {
-      this.buffer = input;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), input]);
-    }
-    this.position = 0;
-
-    if (this.suspended) {
-      // Unsuspend and continue from where ever we left off.
-      this.suspended = false;
-      const next = this.next!;
-
-      next();
-    }
-
-    // If we're no longer suspended, parse new tokens
-    if (!this.suspended) {
-      // Start the parser
-      this.parseTokens();
-    }
-
-    done();
+  get buffer() {
+    return this.streamBuffer.buffer;
   }
 
-  parseTokens() {
-    const doneParsing = (token: Token | undefined) => {
-      if (token) {
-        if (token instanceof ColMetadataToken) {
-          this.colMetadata = token.columns;
-        }
+  get position() {
+    return this.streamBuffer.position;
+  }
 
-        this.push(token);
-      }
-    };
-
-    while (!this.suspended && this.position + 1 <= this.buffer.length) {
-      const type = this.buffer.readUInt8(this.position);
-
-      this.position += 1;
-
-      if (tokenParsers[type]) {
-        tokenParsers[type](this, this.options, doneParsing);
-      } else {
-        this.emit('error', new Error('Unknown type: ' + type));
-      }
-    }
+  set position(value) {
+    this.streamBuffer.position = value;
   }
 
   suspend(next: () => void) {
