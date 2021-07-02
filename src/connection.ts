@@ -2825,13 +2825,9 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Execute the SQL batch represented by [[Request]] .
-   * There is no param support, and unlike [[execSql]],
-   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   * Executes a [[BulkLoad]].
    *
-   * In almost all cases, [[execSql]] will be a better choice.
-   *
-   * @param bulkLoad A previously prepared [[Request]] .
+   * @param bulkLoad
    */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
