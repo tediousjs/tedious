@@ -63,12 +63,12 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x]
+        node-version: [10.x, 12.x, 14.x, 16.x]
       fail-fast: false
 
     services:
       sqlserver:
-        image: microsoft/mssql-server-linux
+        image: mcr.microsoft.com/mssql/server
         ports:
           - 1433:1433
         env:
@@ -123,32 +123,56 @@ jobs:
     - run: npm ci
 
     - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test && npx codecov
+      run: npx nyc --reporter=lcov npm run test
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: run integration tests (TDS 7.4)
       env:
         TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: run integration tests (TDS 7.3B)
       env:
         TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: run integration tests (TDS 7.3A)
       env:
         TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: run integration tests (TDS 7.2)
       env:
         TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: run integration tests (TDS 7.1)
       env:
         TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   azure:
     name: Azure SQL Server / Node.js 12.x
@@ -200,7 +224,11 @@ jobs:
         }' > ~/.tedious/test-connection.json
 
     - name: run integration tests
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Set up CI configuration (AD Authentication)
       run: |
@@ -222,7 +250,11 @@ jobs:
         }' > ~/.tedious/test-connection.json
 
     - name: run integration tests
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Set up CI configuration (AD Service Principal Authentication)
       run: |
@@ -245,7 +277,11 @@ jobs:
         }' > ~/.tedious/test-connection.json
 
     - name: run integration tests
-      run: npx nyc --reporter=lcov npm run test-integration && npx codecov
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   pre-release:
     name: Pre-Release

@@ -82,28 +82,35 @@ function readColumn(parser: Parser, options: InternalConnectionOptions, index: n
   });
 }
 
-function colMetadataParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ColMetadataToken) => void) {
-  parser.readUInt16LE((columnCount) => {
-    const columns: ColumnMetadata[] = [];
+async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
+  while (parser.buffer.length - parser.position < 2) {
+    await parser.streamBuffer.waitForChunk();
+  }
 
-    let i = 0;
-    function next(done: () => void) {
-      if (i === columnCount) {
-        return done();
-      }
+  const columnCount = parser.buffer.readUInt16LE(parser.position);
+  parser.position += 2;
 
-      readColumn(parser, options, i, (column) => {
-        columns.push(column);
+  const columns: ColumnMetadata[] = [];
+  for (let i = 0; i < columnCount; i++) {
+    let column: ColumnMetadata;
 
-        i++;
-        next(done);
-      });
+    readColumn(parser, parser.options, i, (c) => {
+      column = c;
+    });
+
+    while (parser.suspended) {
+      await parser.streamBuffer.waitForChunk();
+
+      parser.suspended = false;
+      const next = parser.next!;
+
+      next();
     }
 
-    next(() => {
-      callback(new ColMetadataToken(columns));
-    });
-  });
+    columns.push(column!);
+  }
+
+  return new ColMetadataToken(columns);
 }
 
 export default colMetadataParser;
