@@ -45,6 +45,7 @@ import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
 import AbortController from 'node-abort-controller';
+import { Parameter, TYPES } from './data-type';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -823,7 +824,7 @@ interface ConnectionOptions {
   /**
    * A boolean determining whether BulkLoad parameters should be validated.
    *
-   * (default: `false`).
+   * (default: `true`).
    */
   validateBulkLoadParameters?: boolean;
 
@@ -1670,6 +1671,10 @@ class Connection extends EventEmitter {
       if (config.options.validateBulkLoadParameters !== undefined) {
         if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
           throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        if (config.options.validateBulkLoadParameters === false) {
+          deprecate('Setting the "config.options.validateBulkLoadParameters" to `false` is deprecated and will no longer work in the next major version of `tedious`. Set the value to `true` and update your use of BulkLoad functionality to silence this message.');
         }
 
         this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
@@ -2758,7 +2763,7 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.transformIntoExecuteSqlRpc();
+      request.validateParameters();
     } catch (error) {
       request.error = error;
 
@@ -2770,7 +2775,33 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'statement',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    if (request.parameters.length) {
+      parameters.push({
+        type: TYPES.NVarChar,
+        name: 'params',
+        value: request.makeParamsParameter(request.parameters),
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined
+      });
+
+      parameters.push(...request.parameters);
+    }
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2798,13 +2829,9 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Execute the SQL batch represented by [[Request]] .
-   * There is no param support, and unlike [[execSql]],
-   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   * Executes a [[BulkLoad]].
    *
-   * In almost all cases, [[execSql]] will be a better choice.
-   *
-   * @param bulkLoad A previously prepared [[Request]] .
+   * @param bulkLoad
    */
   execBulkLoad(bulkLoad: BulkLoad) {
     bulkLoad.executionStarted = true;
@@ -2843,8 +2870,49 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
-    request.transformIntoPrepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      value: undefined,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'params',
+      value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'stmt',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    request.preparing = true;
+    // TODO: We need to clean up this event handler, otherwise this leaks memory
+    request.on('returnValue', (name: string, value: any) => {
+      if (name === 'handle') {
+        request.handle = value;
+      } else {
+        request.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+      }
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2855,8 +2923,20 @@ class Connection extends EventEmitter {
    *   Parameter values are ignored.
    */
   unprepare(request: Request) {
-    request.transformIntoUnprepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2869,8 +2949,28 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters: { [key: string]: unknown }) {
+    const executeParameters: Parameter[] = [];
+
+    executeParameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
     try {
-      request.transformIntoExecuteRpc(parameters);
+      for (let i = 0, len = request.parameters.length; i < len; i++) {
+        const parameter = request.parameters[i];
+
+        executeParameters.push({
+          ...parameter,
+          value: parameter.type.validate(parameters[parameter.name])
+        });
+      }
     } catch (error) {
       request.error = error;
 
@@ -2882,7 +2982,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2904,7 +3004,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
