@@ -217,7 +217,9 @@ describe('BulkLoad', function() {
 
   it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
-      assert.instanceOf(err, Error, 'An error should have been thrown to indicate the incorrect table format.');
+      assert.instanceOf(err, RequestError, 'An error should have been thrown to indicate the incorrect table format.');
+      assert.strictEqual(/** @type {RequestError} */(err).message, 'An unknown error has occurred. This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.');
+
       assert.isUndefined(rowCount);
 
       done();
