@@ -95,6 +95,126 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  describe('.addColumn', function() {
+    it('throws an error if called after first row has been written', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
+
+      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ x: 1, y: 1 });
+
+        assert.throws(() => {
+          bulkLoad.addColumn('z', TYPES.Int, { nullable: false });
+        }, Error, 'Columns cannot be added to bulk insert after the first row has been written.');
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('throws an error if called after streaming bulk load has started', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
+
+      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        connection.execBulkLoad(bulkLoad, (function*() {
+          yield [1, 1];
+
+          assert.throws(() => {
+            bulkLoad.addColumn('z', TYPES.Int, { nullable: false });
+          }, Error, 'Columns cannot be added to bulk insert after execution has started.');
+        })());
+      });
+
+      connection.execSqlBatch(request);
+    });
+  });
+
+  describe('.getRowStream', function() {
+    it('throws an error if called after first row has been written', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
+
+      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ x: 1, y: 1 });
+
+        assert.throws(() => {
+          bulkLoad.getRowStream();
+        }, Error, 'BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('throws an error if called after streaming bulk load has started', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
+
+      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        connection.execBulkLoad(bulkLoad, (function*() {
+          yield [1, 1];
+
+          assert.throws(() => {
+            bulkLoad.getRowStream();
+          }, Error, 'BulkLoad cannot be switched to streaming mode after execution has started.');
+        })());
+      });
+
+      connection.execSqlBatch(request);
+    });
+  });
+
   it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
       assert.instanceOf(err, Error, 'An error should have been thrown to indicate the incorrect table format.');
