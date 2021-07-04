@@ -198,6 +198,19 @@ class RowTransform extends Transform {
 }
 
 /**
+ * Escape an identifier according to SQL Server identifier naming rules.
+ *
+ * Does not perform validation of the identifier, only escapes the characters so it can safely be embedded into a
+ * T-SQL statement.
+ *
+ * @param identifier a table name, column name, etc.
+ * @returns the escaped identifier
+ */
+function escapeIdentifier(identifier: string) {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+/**
  * A BulkLoad instance is used to perform a bulk insert.
  *
  * Use [[Connection.newBulkLoad]] to create a new instance, and [[Connection.execBulkLoad]] to execute it.
@@ -515,13 +528,13 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   getBulkInsertSql() {
-    let sql = 'insert bulk ' + this.table + '(';
+    let sql = 'insert bulk ' + escapeIdentifier(this.table) + ' (';
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
       if (i !== 0) {
         sql += ', ';
       }
-      sql += '[' + c.name + '] ' + (c.type.declaration(c));
+      sql += escapeIdentifier(c.name) + ' ' + (c.type.declaration(c));
     }
     sql += ')';
 
@@ -541,13 +554,13 @@ class BulkLoad extends EventEmitter {
    * you'll need to use the same connection and execute your requests using [[Connection.execSqlBatch]] instead of [[Connection.execSql]]
    */
   getTableCreationSql() {
-    let sql = 'CREATE TABLE ' + this.table + '(\n';
+    let sql = 'CREATE TABLE ' + escapeIdentifier(this.table) + ' (\n';
     for (let i = 0, len = this.columns.length; i < len; i++) {
       const c = this.columns[i];
       if (i !== 0) {
         sql += ',\n';
       }
-      sql += '[' + c.name + '] ' + (c.type.declaration(c));
+      sql += escapeIdentifier(c.name) + ' ' + (c.type.declaration(c));
       if (c.nullable !== undefined) {
         sql += ' ' + (c.nullable ? 'NULL' : 'NOT NULL');
       }
