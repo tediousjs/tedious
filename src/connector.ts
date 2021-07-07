@@ -2,6 +2,7 @@ import net from 'net';
 import dns from 'dns';
 
 import * as punycode from 'punycode';
+import { AbortSignal } from 'node-abort-controller';
 
 class AbortError extends Error {
   code: string;
