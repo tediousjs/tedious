@@ -82,7 +82,7 @@
     "codecov": "^3.8.2",
     "eslint": "^7.17.0",
     "mitm": "^1.7.1",
-    "mocha": "^8.2.1",
+    "mocha": "^8.4.0",
     "nyc": "^15.1.0",
     "rimraf": "^3.0.2",
     "semantic-release": "^17.4.4",
