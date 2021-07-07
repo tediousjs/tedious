@@ -48,7 +48,7 @@ class MessageIO extends EventEmitter {
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
     this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(this.socket);
+    this.outgoingMessageStream.pipe(this.socket as unknown as import('readable-stream').Writable);
   }
 
   packetSize(...args: [number]) {
@@ -107,14 +107,14 @@ class MessageIO extends EventEmitter {
     securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
     securePair.encrypted.removeAllListeners('data');
 
-    this.outgoingMessageStream.unpipe(this.socket);
+    this.outgoingMessageStream.unpipe(this.socket as unknown as import('readable-stream').Writable);
     this.socket.unpipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
 
     this.socket.pipe(securePair.encrypted);
     securePair.encrypted.pipe(this.socket);
 
     securePair.cleartext.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(securePair.cleartext);
+    this.outgoingMessageStream.pipe(securePair.cleartext as unknown as import('readable-stream').Writable);
 
     this.tlsNegotiationComplete = true;
   }

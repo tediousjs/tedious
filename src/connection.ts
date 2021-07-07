@@ -44,7 +44,7 @@ import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keysto
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
-import AbortController from 'node-abort-controller';
+import AbortController, { AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2627,7 +2627,7 @@ class Connection extends EventEmitter {
 
     const message = new Message({ type: TYPE.SQL_BATCH });
     this.messageIo.outgoingMessageStream.write(message);
-    Readable.from(payload).pipe(message);
+    (Readable as any).from(payload).pipe(message);
   }
 
   /**
@@ -3264,7 +3264,7 @@ class Connection extends EventEmitter {
           });
         });
 
-        Readable.from(payload!).pipe(message);
+        (Readable as any).from(payload!).pipe(message);
       }
 
       message.once('finish', () => {
