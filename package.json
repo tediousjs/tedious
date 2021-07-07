@@ -70,7 +70,7 @@
     "@types/chai": "^4.2.14",
     "@types/depd": "^1.1.32",
     "@types/lru-cache": "^5.1.0",
-    "@types/mocha": "^8.2.0",
+    "@types/mocha": "^8.2.3",
     "@types/node": "^14.14.20",
     "@types/readable-stream": "^2.3.9",
     "@types/sprintf-js": "^1.1.2",
