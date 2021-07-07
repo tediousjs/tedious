@@ -47,7 +47,7 @@
     "adal-node": "^0.2.1",
     "bl": "^4.0.3",
     "depd": "^2.0.0",
-    "iconv-lite": "^0.6.2",
+    "iconv-lite": "^0.6.3",
     "jsbi": "^3.1.5",
     "native-duplexpair": "^1.0.0",
     "node-abort-controller": "^1.1.0",
