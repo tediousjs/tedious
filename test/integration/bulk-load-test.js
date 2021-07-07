@@ -634,6 +634,144 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(createTableRequest);
   });
 
+  it('supports streaming bulk load rows from an Iterable', function(done) {
+    const totalRows = 20;
+    const tableName = '#bulk_load_test';
+
+    connection.on('error', done);
+    startCreateTable();
+
+    function startCreateTable() {
+      const sql = 'create table ' + tableName + ' (i int not null primary key)';
+      const request = new Request(sql, completeCreateTable);
+      connection.execSqlBatch(request);
+    }
+
+    function completeCreateTable(err) {
+      if (err) {
+        return done(err);
+      }
+
+      startBulkLoad();
+    }
+
+    function startBulkLoad() {
+      const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      connection.execBulkLoad(bulkLoad, (function*() {
+        let rowCount = 0;
+        while (rowCount < totalRows) {
+          yield [rowCount++];
+        }
+      })());
+    }
+
+    function completeBulkLoad(err, rowCount) {
+      if (err) {
+        return done(err);
+      }
+
+      assert.equal(rowCount, totalRows);
+      startVerifyTableContent();
+    }
+
+    function startVerifyTableContent() {
+      const request = new Request(`
+        select count(*)
+        from ${tableName} a
+        inner join ${tableName} b on a.i = b.i - 1
+      `, completeVerifyTableContent);
+
+      request.setTimeout(30000);
+
+      request.on('row', (row) => {
+        assert.equal(row[0].value, totalRows - 1);
+      });
+      connection.execSqlBatch(request);
+    }
+
+    function completeVerifyTableContent(err, rowCount) {
+      if (err) {
+        return done(err);
+      }
+
+      assert.equal(rowCount, 1);
+      done();
+    }
+  });
+
+  it('supports streaming bulk load rows from an AsyncIterable', function(done) {
+    const totalRows = 20;
+    const tableName = '#bulk_load_test';
+
+    connection.on('error', done);
+    startCreateTable();
+
+    function startCreateTable() {
+      const sql = 'create table ' + tableName + ' (i int not null primary key)';
+      const request = new Request(sql, completeCreateTable);
+      connection.execSqlBatch(request);
+    }
+
+    function completeCreateTable(err) {
+      if (err) {
+        return done(err);
+      }
+
+      startBulkLoad();
+    }
+
+    function startBulkLoad() {
+      const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
+      bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+      connection.execBulkLoad(bulkLoad, (async function*() {
+        let rowCount = 0;
+        while (rowCount < totalRows) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+
+          yield [rowCount++];
+        }
+      })());
+    }
+
+    function completeBulkLoad(err, rowCount) {
+      if (err) {
+        return done(err);
+      }
+
+      assert.equal(rowCount, totalRows);
+      startVerifyTableContent();
+    }
+
+    function startVerifyTableContent() {
+      const request = new Request(`
+        select count(*)
+        from ${tableName} a
+        inner join ${tableName} b on a.i = b.i - 1
+      `, completeVerifyTableContent);
+
+      request.setTimeout(30000);
+
+      request.on('row', (row) => {
+        assert.equal(row[0].value, totalRows - 1);
+      });
+      connection.execSqlBatch(request);
+    }
+
+    function completeVerifyTableContent(err, rowCount) {
+      if (err) {
+        return done(err);
+      }
+
+      assert.equal(rowCount, 1);
+      done();
+    }
+  });
+
   it('supports streaming bulk load inserts', function(done) {
     const totalRows = 20;
     const tableName = '#streamingBulkLoadTest';

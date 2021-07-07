@@ -4,11 +4,8 @@ import Connection, { InternalConnectionOptions } from './connection';
 
 import { Transform } from 'readable-stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
-import Message from './message';
-import { TYPE as PACKET_TYPE } from './packet';
 
 import { DataType, Parameter } from './data-type';
-import { RequestError } from './errors';
 
 /**
  * @private
@@ -170,6 +167,7 @@ class RowTransform extends Transform {
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
       let value = row[i];
+
       if (this.bulkLoad.options.validateBulkLoadParameters) {
         try {
           value = c.type.validate(value);
@@ -177,6 +175,7 @@ class RowTransform extends Transform {
           return callback(error);
         }
       }
+
       const parameter = {
         length: c.length,
         scale: c.scale,
@@ -296,7 +295,6 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   rowToPacketTransform: RowTransform;
-  message: Message;
 
   /**
    * @private
@@ -371,28 +369,6 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = false;
 
     this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
-    this.message = new Message({ type: PACKET_TYPE.BULK_LOAD });
-    this.rowToPacketTransform.pipe(this.message);
-
-    this.rowToPacketTransform.once('finish', () => {
-      this.removeListener('cancel', onCancel);
-    });
-
-    this.rowToPacketTransform.once('error', (err) => {
-      this.rowToPacketTransform.unpipe(this.message);
-
-      this.error = err;
-
-      this.message.ignore = true;
-      this.message.end();
-    });
-
-    const onCancel = () => {
-      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
-      this.rowToPacketTransform.destroy();
-    };
-
-    this.once('cancel', onCancel);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
@@ -697,13 +673,6 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = true;
 
     return this.rowToPacketTransform;
-  }
-
-  /**
-   * @private
-   */
-  getMessageStream() {
-    return this.message;
   }
 
   /**
