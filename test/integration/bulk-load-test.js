@@ -272,6 +272,254 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  describe('`order` option', function() {
+    it('allows specifying the order for bulk loaded data', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 6);
+
+        done();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "id" int NOT NULL,
+          "name" nvarchar(255) NOT NULL,
+          PRIMARY KEY CLUSTERED ("id")
+        )
+      `, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
+        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
+        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+
+        bulkLoad.addRow({ id: 4, name: 'Charmander' });
+        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
+        bulkLoad.addRow({ id: 6, name: 'Charizard' });
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('is ignored if the value is `undefined`', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: undefined }, (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 6);
+
+        done();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "id" int NOT NULL,
+          "name" nvarchar(255) NOT NULL,
+          PRIMARY KEY CLUSTERED ("id")
+        )
+      `, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
+        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
+        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+
+        bulkLoad.addRow({ id: 4, name: 'Charmander' });
+        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
+        bulkLoad.addRow({ id: 6, name: 'Charizard' });
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('throws an error if the value is invalid', function() {
+      assert.throws(() => {
+        connection.newBulkLoad('#tmpTestTable', { order: 'foo' }, () => {});
+      }, 'The "options.order" property must be of type object.');
+
+      assert.throws(() => {
+        connection.newBulkLoad('#tmpTestTable', { order: null }, () => {});
+      }, 'The "options.order" property must be of type object.');
+
+      assert.throws(() => {
+        connection.newBulkLoad('#tmpTestTable', { order: 123 }, () => {});
+      }, 'The "options.order" property must be of type object.');
+
+      assert.throws(() => {
+        connection.newBulkLoad('#tmpTestTable', { order: { foo: 'bar' } }, () => {});
+      }, 'The value of the "foo" key in the "options.order" object must be either "ASC" or "DESC".');
+    });
+
+    it('aborts the bulk load if data is provided in a different order than specified', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
+        const expectedMessage = [
+          'Cannot bulk load.',
+          'The bulk data stream was incorrectly specified as sorted or the data violates a uniqueness constraint imposed by the target table.',
+          'Sort order incorrect for the following two rows: primary key of first row: (6), primary key of second row: (5).'
+        ].join(' ');
+
+        assert.instanceOf(err, Error);
+        assert.strictEqual(err.message, expectedMessage);
+
+        assert.strictEqual(rowCount, 0);
+
+        done();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "id" int NOT NULL,
+          "name" nvarchar(255) NOT NULL,
+          PRIMARY KEY CLUSTERED ("id")
+        )
+      `, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
+        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
+        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+
+        bulkLoad.addRow({ id: 6, name: 'Charizard' });
+        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
+        bulkLoad.addRow({ id: 4, name: 'Charmander' });
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('ignores the order if the target table does not have a clustered key', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 6);
+
+        done();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "id" int NOT NULL,
+          "name" nvarchar(255) NOT NULL
+        )
+      `, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
+        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
+        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+
+        bulkLoad.addRow({ id: 6, name: 'Charizard' });
+        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
+        bulkLoad.addRow({ id: 4, name: 'Charmander' });
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it("ignores the order if the target table's clustered key and the specified order don't match", function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'name': 'ASC' } }, (err, rowCount) => {
+        assert.isUndefined(err);
+
+        assert.strictEqual(rowCount, 6);
+
+        done();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "id" int NOT NULL,
+          "name" nvarchar(255) NOT NULL,
+          PRIMARY KEY CLUSTERED ("name")
+        )
+      `, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
+        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
+        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+
+        bulkLoad.addRow({ id: 6, name: 'Charizard' });
+        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
+        bulkLoad.addRow({ id: 4, name: 'Charmander' });
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+
+    it('supports exotic column names in the order option', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { '😀': 'ASC' } }, function(err, rowCount) {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
+
+        done();
+      });
+
+      bulkLoad.addColumn('😀', TYPES.Int, { nullable: false });
+
+      const request = new Request(`
+        CREATE TABLE "#tmpTestTable" (
+          "😀" int NOT NULL
+          PRIMARY KEY CLUSTERED ("😀")
+        )
+      `, function(err) {
+        if (err) {
+          return done(err);
+        }
+
+        bulkLoad.addRow({ '😀': 1 });
+        bulkLoad.addRow({ '😀': 2 });
+        bulkLoad.addRow({ '😀': 3 });
+        bulkLoad.addRow({ '😀': 4 });
+        bulkLoad.addRow({ '😀': 5 });
+
+        assert.include(bulkLoad.getBulkInsertSql(), 'ORDER ("😀" ASC)');
+
+        connection.execBulkLoad(bulkLoad);
+      });
+
+      connection.execSqlBatch(request);
+    });
+  });
+
   it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, Error);

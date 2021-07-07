@@ -48,6 +48,7 @@ interface InternalOptions {
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
+  order: { [columnName: string]: 'ASC' | 'DESC' };
 }
 
 export interface Options {
@@ -72,6 +73,11 @@ export interface Options {
    * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
    */
   lockTable?: InternalOptions['lockTable'];
+
+  /**
+   * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
+   */
+  order?: InternalOptions['order'];
 }
 
 
@@ -322,6 +328,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
+    order = {},
   }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
@@ -337,6 +344,16 @@ class BulkLoad extends EventEmitter {
 
     if (typeof lockTable !== 'boolean') {
       throw new TypeError('The "options.lockTable" property must be of type boolean.');
+    }
+
+    if (typeof order !== 'object' || order === null) {
+      throw new TypeError('The "options.order" property must be of type object.');
+    }
+
+    for (const [column, direction] of Object.entries(order)) {
+      if (direction !== 'ASC' && direction !== 'DESC') {
+        throw new TypeError('The value of the "' + column + '" key in the "options.order" object must be either "ASC" or "DESC".');
+      }
     }
 
     super();
@@ -377,7 +394,7 @@ class BulkLoad extends EventEmitter {
 
     this.once('cancel', onCancel);
 
-    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
+    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
 
   /**
@@ -515,6 +532,18 @@ class BulkLoad extends EventEmitter {
 
     if (this.bulkOptions.lockTable) {
       addOptions.push('TABLOCK');
+    }
+
+    if (this.bulkOptions.order) {
+      const orderColumns = [];
+
+      for (const [column, direction] of Object.entries(this.bulkOptions.order)) {
+        orderColumns.push(`${escapeIdentifier(column)} ${direction}`);
+      }
+
+      if (orderColumns.length) {
+        addOptions.push(`ORDER (${orderColumns.join(', ')})`);
+      }
     }
 
     if (addOptions.length > 0) {
