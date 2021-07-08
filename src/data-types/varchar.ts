@@ -60,6 +60,17 @@ const VarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt16LE(MAX, 1);
     }
 
+    if (parameter.collation) {
+      const { lcid, flags, version, sortId } = parameter.collation;
+      buffer.writeUInt8((lcid) & 0xFF, 3);
+      buffer.writeUInt8((lcid >> 8) & 0xFF, 4);
+      // byte index 5 contains data for both lcid and flags
+      buffer.writeUInt8(((lcid >> 16) & 0x0F) | (((flags) & 0x0F) << 4), 5);
+      // byte index 6 contains data for both flags and version
+      buffer.writeUInt8(((flags) & 0xF0) | ((version) & 0x0F), 6);
+      buffer.writeUInt8((sortId) & 0xFF, 7);
+    }
+
     return buffer;
   },
 

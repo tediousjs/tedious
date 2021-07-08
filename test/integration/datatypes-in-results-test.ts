@@ -584,3 +584,90 @@ describe('Datatypes in results test', function() {
     ]
   });
 });
+
+describe('Collation LCID test', function() {
+  let connection: Connection;
+
+  beforeEach(function(done) {
+    connection = new Connection(config);
+
+    connection.on('errorMessage', function(error) {
+      console.log(`${error.number} : ${error.message}`);
+    });
+
+    connection.on('debug', function(message) {
+      if (debug) {
+        console.log(message);
+      }
+    });
+
+    connection.connect(done);
+  });
+
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
+    } else {
+      done();
+    }
+  });
+
+  it('should recieve correct column collation after sending different collation char and varchar', function(done) {
+    const remove_table_request = new Request('IF OBJECT_ID(\'dbo.temp_collation\', \'U\') IS NOT NULL DROP TABLE dbo.temp_collation;', (err) => {
+      if (err) {
+        return done(err);
+      }
+      const create_table_request = new Request('create table temp_collation (CharCol char(4) COLLATE Latin1_General_100_CI_AI_SC, CharCol2 varchar(4) COLLATE Latin1_General_100_CI_AI_SC)', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const insert_sql = new Request('insert into temp_collation values (@p1, @p2)', (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          const select_sql = new Request('select * from temp_collation ', (err) => {
+            if (err) {
+              return done(err);
+            }
+            return done();
+          });
+
+          select_sql.on('row', (columns) => {
+            columns.forEach((column: any) => {
+              assert.strictEqual(1033, column.metadata.collation.lcid);
+              assert.strictEqual('S?ao', column.value);
+            });
+          });
+
+          connection.execSql(select_sql);
+        });
+
+        insert_sql.addParameter('p1', TYPES.Char, 'こんにちは', {
+          collation: {
+            lcid: 1041,
+            flags: 0,
+            version: 0,
+            sortId: 0,
+          }
+        });
+
+        insert_sql.addParameter('p2', TYPES.VarChar, 'こんにちは', {
+          collation: {
+            lcid: 1041,
+            flags: 0,
+            version: 0,
+            sortId: 0,
+          }
+        });
+
+        connection.execSql(insert_sql);
+      });
+
+      connection.execSql(create_table_request);
+    });
+    connection.execSql(remove_table_request);
+  });
+});

@@ -99,6 +99,10 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.scale = type.resolveScale(parameter);
     }
 
+    if (parameter.collation) {
+      param.collation = parameter.collation;
+    }
+
     yield type.generateTypeInfo(param, this.options);
     yield type.generateParameterLength(param, this.options);
     yield * type.generateParameterData(param, this.options);
