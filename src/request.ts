@@ -145,6 +145,7 @@ class Request extends EventEmitter {
    */
   on(event: 'error', listener: (err: Error) => void): this
 
+  on(event: 'errorMessage', listener: (err: Error) => void): this
   /**
    * A row resulting from execution of the SQL statement.
    */
@@ -302,6 +303,10 @@ class Request extends EventEmitter {
   /**
    * @private
    */
+  emit(event: 'errorMessage', tokenName: string, tokenMessage: string): boolean
+  /**
+   * @private
+   */
   emit(event: 'row', columns: any): boolean
   /**
    * @private
@@ -339,6 +344,7 @@ class Request extends EventEmitter {
    * @private
    */
   emit(event: 'order', orderColumns: number[]): boolean
+
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
   }
