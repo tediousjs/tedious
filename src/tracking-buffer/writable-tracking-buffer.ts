@@ -134,8 +134,36 @@ class WritableTrackingBuffer {
     this.buffer[this.position++] = hi;
   }
 
+  private writeBigU_Int64BE(value: JSBI) {
+    this.makeRoomFor(8);
+
+    let lo = JSBI.toNumber(JSBI.bitwiseAnd(JSBI.signedRightShift(value, JSBI.BigInt(32)), JSBI.BigInt(0xffffffff)));
+
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+
+    let hi = JSBI.toNumber(JSBI.bitwiseAnd(value, JSBI.BigInt(0xffffffff)));
+
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
+  }
+
   writeInt64LE(value: number) {
     this.writeBigInt64LE(JSBI.BigInt(value));
+  }
+
+  writeInt64BE(value:number) {
+    this.writeBigU_Int64BE(JSBI.BigInt(value));
   }
 
   writeUInt32BE(value: number) {
@@ -299,8 +327,7 @@ class WritableTrackingBuffer {
   }
 
   writeMoney(value: number) {
-    this.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32));
-    this.writeInt32LE(value & -1);
+    this.writeInt64BE(value);
   }
 }
 
