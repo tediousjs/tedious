@@ -2,6 +2,9 @@ export interface ConnectionError extends Error {
   message: string;
   code?: string;
   isTransient?: boolean;
+  number?: number;
+  state?: number;
+  class?: number;
 }
 
 export declare var ConnectionError: {
