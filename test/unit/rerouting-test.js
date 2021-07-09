@@ -108,7 +108,7 @@ describe('Connecting to a server that sends a re-routing information', function(
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -165,7 +165,7 @@ describe('Connecting to a server that sends a re-routing information', function(
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -256,7 +256,7 @@ describe('Connecting to a server that sends a re-routing information', function(
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -313,7 +313,7 @@ describe('Connecting to a server that sends a re-routing information', function(
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);

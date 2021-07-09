@@ -98,7 +98,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -176,7 +176,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -339,7 +339,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);

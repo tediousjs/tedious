@@ -1,12 +1,11 @@
 const PreloginPayload = require('../../src/prelogin-payload');
 const assert = require('chai').assert;
 
-function assertPayload(payload, encryptionString) {
-  assert.strictEqual(payload.version.major, 0);
-  assert.strictEqual(payload.version.minor, 0);
-  assert.strictEqual(payload.version.patch, 0);
-  assert.strictEqual(payload.version.trivial, 1);
-  assert.strictEqual(payload.version.subbuild, 1);
+function assertPayload(payload, encryptionString, { major, minor, build, subbuild }) {
+  assert.strictEqual(payload.version.major, major);
+  assert.strictEqual(payload.version.minor, minor);
+  assert.strictEqual(payload.version.build, build);
+  assert.strictEqual(payload.version.subbuild, subbuild);
 
   assert.strictEqual(payload.encryptionString, encryptionString);
   assert.strictEqual(payload.instance, 0);
@@ -18,17 +17,17 @@ function assertPayload(payload, encryptionString) {
 describe('prelogin-payload-assert', function() {
   it('should not encrypt', function() {
     const payload = new PreloginPayload();
-    assertPayload(payload, 'NOT_SUP');
+    assertPayload(payload, 'NOT_SUP', { major: 0, minor: 0, build: 0, subbuild: 0 });
   });
 
   it('should encrypt', function() {
-    const payload = new PreloginPayload({ encrypt: true });
-    assertPayload(payload, 'ON');
+    const payload = new PreloginPayload({ encrypt: true, version: { major: 11, minor: 3, build: 2, subbuild: 0 } });
+    assertPayload(payload, 'ON', { major: 11, minor: 3, build: 2, subbuild: 0 });
   });
 
   it('should create from buffer', function() {
     const payload = new PreloginPayload();
     new PreloginPayload(payload.data);
-    assertPayload(payload, 'NOT_SUP');
+    assertPayload(payload, 'NOT_SUP', { major: 0, minor: 0, build: 0, subbuild: 0 });
   });
 });
