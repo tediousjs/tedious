@@ -119,6 +119,8 @@ interface ColumnOptions {
   nullable?: boolean;
 }
 
+const rowTokenBuffer = Buffer.from([ TOKEN_TYPE.ROW ]);
+
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
   /**
@@ -160,9 +162,7 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
-    buf.writeUInt8(TOKEN_TYPE.ROW);
-    this.push(buf.data);
+    this.push(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
