@@ -708,6 +708,72 @@ describe('BulkLoad', function() {
     }
   });
 
+  it('allows using objects or arrays for streaming bulk loads', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, 6);
+
+      const results = [];
+      const request = new Request(`
+        SELECT id, name FROM #tmpTestTable ORDER BY id
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
+
+          { id: 4, name: 'Charmander' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 6, name: 'Charizard' }
+        ]);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ id: row[0].value, name: row[1].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+    bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        "id" int NOT NULL,
+        "name" nvarchar(255) NOT NULL,
+        PRIMARY KEY CLUSTERED ("id")
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      Readable.from([
+        { id: 1, name: 'Bulbasaur' },
+        [ 2, 'Ivysaur' ],
+        { id: 3, name: 'Venusaur' },
+
+        [ 4, 'Charmander' ],
+        { id: 5, name: 'Charmeleon' },
+        [ 6, 'Charizard' ]
+      ]).pipe(bulkLoad.getRowStream());
+
+      connection.execBulkLoad(bulkLoad);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('supports cancelling a streaming bulk load', function(done) {
     const totalRows = 20;
 
