@@ -7,6 +7,10 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
+// we are using this when sending type info in order to support
+// all BMP characters in varchar columns.
+const NVARCHAR_TYPE_ID = 0xE7;
+
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
   type: 'BIGVARCHR',
@@ -52,10 +56,10 @@ const VarChar: { maximumLength: number } & DataType = {
 
   generateTypeInfo(parameter) {
     const buffer = Buffer.alloc(8);
-    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt8(NVARCHAR_TYPE_ID, 0);
 
     if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(parameter.length!, 1);
+      buffer.writeUInt16LE(parameter.length! * 2, 1);
     } else {
       buffer.writeUInt16LE(MAX, 1);
     }
@@ -78,7 +82,7 @@ const VarChar: { maximumLength: number } & DataType = {
         value = value.toString();
       }
 
-      const length = Buffer.byteLength(value, 'ascii');
+      const length = Buffer.byteLength(value, 'ucs2');
 
       const buffer = Buffer.alloc(2);
       buffer.writeUInt16LE(length, 0);
@@ -103,10 +107,10 @@ const VarChar: { maximumLength: number } & DataType = {
       if (Buffer.isBuffer(value)) {
         yield value;
       } else {
-        yield Buffer.from(value, 'ascii');
+        yield Buffer.from(value, 'ucs2');
       }
     } else {
-      const length = Buffer.byteLength(value, 'ascii');
+      const length = Buffer.byteLength(value, 'ucs2');
 
       if (length > 0) {
         const buffer = Buffer.alloc(4);
@@ -116,7 +120,7 @@ const VarChar: { maximumLength: number } & DataType = {
         if (Buffer.isBuffer(value)) {
           yield value;
         } else {
-          yield Buffer.from(value, 'ascii');
+          yield Buffer.from(value, 'ucs2');
         }
       }
 

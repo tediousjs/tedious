@@ -2,6 +2,11 @@ import { DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 
+
+// we are using this when sending type info in order to support
+// all BMP characters in char columns.
+const NCHAR_TYPE_ID = 0xEF;
+
 const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
   type: 'BIGCHAR',
@@ -48,7 +53,7 @@ const Char: { maximumLength: number } & DataType = {
 
   generateTypeInfo(parameter) {
     const buffer = Buffer.alloc(8);
-    buffer.writeUInt8(this.id, 0);
+    buffer.writeUInt8(NCHAR_TYPE_ID, 0);
     buffer.writeUInt16LE(parameter.length!, 1);
     return buffer;
   },
@@ -58,7 +63,7 @@ const Char: { maximumLength: number } & DataType = {
       return NULL_LENGTH;
     }
 
-    const length = Buffer.byteLength(parameter.value.toString(), 'ascii');
+    const length = Buffer.byteLength(parameter.value.toString(), 'ucs2');
 
     const buffer = Buffer.alloc(2);
     buffer.writeUInt16LE(length, 0);
@@ -70,7 +75,7 @@ const Char: { maximumLength: number } & DataType = {
       return;
     }
 
-    yield Buffer.from(parameter.value, 'ascii');
+    yield Buffer.from(parameter.value, 'ucs2');
   },
 
   validate: function(value): null | string {
