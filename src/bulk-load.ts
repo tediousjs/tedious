@@ -156,7 +156,7 @@ class RowTransform extends Transform {
   /**
    * @private
    */
-  _transform(row: Array<any>, _encoding: string, callback: (error?: Error) => void) {
+  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
@@ -166,7 +166,7 @@ class RowTransform extends Transform {
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
-      let value = row[i];
+      let value = Array.isArray(row) ? row[i] : row[c.objName];
 
       if (this.bulkLoad.options.validateBulkLoadParameters) {
         try {
