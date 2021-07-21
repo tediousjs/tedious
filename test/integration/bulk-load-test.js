@@ -90,38 +90,6 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports exotic table and column names', function(done) {
-    const bulkLoad = connection.newBulkLoad('#[😀]', (err, rowCount) => {
-      if (err) {
-        return done(err);
-      }
-
-      assert.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
-
-      done();
-    });
-
-    bulkLoad.addColumn('column # @ []', TYPES.Int, { nullable: false });
-    bulkLoad.addColumn('foo"bar"baz', TYPES.NVarChar, { length: 50, nullable: true });
-    bulkLoad.addColumn('😀', TYPES.DateTime, { nullable: false });
-
-    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
-      if (err) {
-        return done(err);
-      }
-
-      bulkLoad.addRow({ 'column # @ []': 201, 'foo"bar"baz': 'one zero one', '😀': new Date(1986, 6, 20) });
-      bulkLoad.addRow([202, 'one zero two', new Date()]);
-      bulkLoad.addRow(203, 'one zero three', new Date(2013, 7, 12));
-      bulkLoad.addRow({ 'column # @ []': 204, 'foo"bar"baz': 'one zero four', '😀': new Date() });
-      bulkLoad.addRow({ 'column # @ []': 205, 'foo"bar"baz': 'one zero five', '😀': new Date() });
-
-      connection.execBulkLoad(bulkLoad);
-    });
-
-    connection.execSqlBatch(request);
-  });
-
   it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
       assert.instanceOf(err, Error, 'An error should have been thrown to indicate the incorrect table format.');
@@ -475,43 +443,6 @@ describe('BulkLoad', function() {
         bulkLoad.addRow({ id: 6, name: 'Charizard' });
         bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
         bulkLoad.addRow({ id: 4, name: 'Charmander' });
-
-        connection.execBulkLoad(bulkLoad);
-      });
-
-      connection.execSqlBatch(request);
-    });
-
-    it('supports exotic column names in the order option', function(done) {
-      const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { '😀': 'ASC' } }, function(err, rowCount) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(rowCount, 5, 'Incorrect number of rows inserted.');
-
-        done();
-      });
-
-      bulkLoad.addColumn('😀', TYPES.Int, { nullable: false });
-
-      const request = new Request(`
-        CREATE TABLE "#tmpTestTable" (
-          "😀" int NOT NULL
-          PRIMARY KEY CLUSTERED ("😀")
-        )
-      `, function(err) {
-        if (err) {
-          return done(err);
-        }
-
-        bulkLoad.addRow({ '😀': 1 });
-        bulkLoad.addRow({ '😀': 2 });
-        bulkLoad.addRow({ '😀': 3 });
-        bulkLoad.addRow({ '😀': 4 });
-        bulkLoad.addRow({ '😀': 5 });
-
-        assert.include(bulkLoad.getBulkInsertSql(), 'ORDER ("😀" ASC)');
 
         connection.execBulkLoad(bulkLoad);
       });
