@@ -1,9 +1,14 @@
+// @ts-check
+
 const fs = require('fs');
-const { pipeline, Readable } = require('readable-stream');
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
-const TYPES = require('../../src/data-type').typeByName;
+const { pipeline, Readable } = require('stream');
 const assert = require('chai').assert;
+
+const TYPES = require('../../src/data-type').typeByName;
+
+import Connection from '../../src/connection';
+import { RequestError } from '../../src/errors';
+import Request from '../../src/request';
 
 const debugMode = false;
 
@@ -317,19 +322,19 @@ describe('BulkLoad', function() {
 
     it('throws an error if the value is invalid', function() {
       assert.throws(() => {
-        connection.newBulkLoad('#tmpTestTable', { order: 'foo' }, () => {});
+        connection.newBulkLoad('#tmpTestTable', /** @type {any} */({ order: 'foo' }), () => {});
       }, 'The "options.order" property must be of type object.');
 
       assert.throws(() => {
-        connection.newBulkLoad('#tmpTestTable', { order: null }, () => {});
+        connection.newBulkLoad('#tmpTestTable', /** @type {any} */({ order: null }), () => {});
       }, 'The "options.order" property must be of type object.');
 
       assert.throws(() => {
-        connection.newBulkLoad('#tmpTestTable', { order: 123 }, () => {});
+        connection.newBulkLoad('#tmpTestTable', /** @type {any} */({ order: 123 }), () => {});
       }, 'The "options.order" property must be of type object.');
 
       assert.throws(() => {
-        connection.newBulkLoad('#tmpTestTable', { order: { foo: 'bar' } }, () => {});
+        connection.newBulkLoad('#tmpTestTable', /** @type {any} */({ order: { foo: 'bar' } }), () => {});
       }, 'The value of the "foo" key in the "options.order" object must be either "ASC" or "DESC".');
     });
 
@@ -341,8 +346,8 @@ describe('BulkLoad', function() {
           'Sort order incorrect for the following two rows: primary key of first row: (6), primary key of second row: (5).'
         ].join(' ');
 
-        assert.instanceOf(err, Error);
-        assert.strictEqual(err.message, expectedMessage);
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(err).message, expectedMessage);
 
         assert.strictEqual(rowCount, 0);
 
@@ -453,8 +458,8 @@ describe('BulkLoad', function() {
 
   it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.message, 'Canceled.');
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -602,9 +607,13 @@ describe('BulkLoad', function() {
         }
       })(), { objectMode: true });
 
-      rowSource.pipe(rowStream);
+      rowSource.pipe(/** @type {NodeJS.WritableStream} */(/** @type {any} */(rowStream)));
     }
 
+    /**
+     * @param {Error | undefined | null} err
+     * @param {number | undefined} rowCount
+     */
     function completeBulkLoad(err, rowCount) {
       if (err) {
         return done(err);
@@ -628,6 +637,10 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     }
 
+    /**
+     * @param {Error | undefined | null} err
+     * @param {number | undefined} rowCount
+     */
     function completeVerifyTableContent(err, rowCount) {
       if (err) {
         return done(err);
@@ -647,6 +660,7 @@ describe('BulkLoad', function() {
 
       assert.strictEqual(rowCount, 6);
 
+      /** @type {unknown[]} */
       const results = [];
       const request = new Request(`
         SELECT id, name FROM #tmpTestTable ORDER BY id
@@ -697,7 +711,7 @@ describe('BulkLoad', function() {
         [ 4, 'Charmander' ],
         { id: 5, name: 'Charmeleon' },
         [ 6, 'Charizard' ]
-      ]).pipe(bulkLoad.getRowStream());
+      ]).pipe(/** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream())));
 
       connection.execBulkLoad(bulkLoad);
     });
@@ -716,6 +730,9 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     }
 
+    /**
+     * @param {Error | null| undefined} err
+     */
     function completeCreateTable(err) {
       if (err) {
         return done(err);
@@ -728,7 +745,7 @@ describe('BulkLoad', function() {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
+      const rowStream = /** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream()));
       connection.execBulkLoad(bulkLoad);
 
       let rowCount = 0;
@@ -747,15 +764,19 @@ describe('BulkLoad', function() {
       })(), { objectMode: true });
 
       pipeline(rowSource, rowStream, (err) => {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'Canceled.');
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
         assert.strictEqual(rowCount, 10);
       });
     }
 
+    /**
+     * @param {Error | null | undefined} err
+     * @param {undefined | number} rowCount
+     */
     function completeBulkLoad(err, rowCount) {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Canceled.');
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
 
       assert.strictEqual(rowCount, 0);
       startVerifyTableContent();
@@ -774,6 +795,10 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     }
 
+    /**
+     * @param {Error | null | undefined} err
+     * @param {undefined | number} rowCount
+     */
     function completeVerifyTableContent(err, rowCount) {
       if (err) {
         return done(err);
@@ -795,15 +820,15 @@ describe('BulkLoad', function() {
       }
 
       const bulkLoad = connection.newBulkLoad('#stream_test', (err, rowCount) => {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'Canceled.');
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
 
         assert.strictEqual(rowCount, 0);
       });
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
+      const rowStream = /** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream()));
       connection.execBulkLoad(bulkLoad);
 
       let rowCount = 0;
@@ -830,8 +855,8 @@ describe('BulkLoad', function() {
       })(), { objectMode: true });
 
       pipeline(rowSource, rowStream, (err) => {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'Canceled.');
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
         assert.strictEqual(rowCount, 10);
       });
     });
@@ -841,9 +866,8 @@ describe('BulkLoad', function() {
 
   it('cancels any bulk load that takes longer than the given timeout', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'RequestError');
-      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 10ms');
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).message, 'Timeout: Request failed to complete in 10ms');
 
       done();
     });
@@ -906,6 +930,9 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     }
 
+    /**
+     * @param {Error | null | undefined} err
+     */
     function completeCreateTable(err) {
       if (err) {
         return done(err);
@@ -920,7 +947,7 @@ describe('BulkLoad', function() {
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
+      const rowStream = /** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream()));
 
       connection.execBulkLoad(bulkLoad);
 
@@ -935,14 +962,18 @@ describe('BulkLoad', function() {
       })(), { objectMode: true });
 
       pipeline(rowSource, rowStream, (err) => {
-        assert.ok(err);
-        assert.strictEqual(err.message, 'Canceled.');
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
       });
     }
 
+    /**
+     * @param {Error | null | undefined} err
+     * @param {undefined | number} rowCount
+     */
     function completeBulkLoad(err, rowCount) {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).message, 'Timeout: Request failed to complete in 200ms');
 
       assert.strictEqual(rowCount, 0);
 
@@ -952,6 +983,9 @@ describe('BulkLoad', function() {
 });
 
 describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`', () => {
+  /**
+   * @type {Connection}
+   */
   let connection;
 
   beforeEach(function(done) {
@@ -992,7 +1026,7 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
     bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
-    const rowStream = bulkLoad.getRowStream();
+    const rowStream = /** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream()));
     connection.execBulkLoad(bulkLoad);
 
     const rowSource = Readable.from([
@@ -1000,13 +1034,17 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     ]);
 
     pipeline(rowSource, rowStream, (err) => {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Invalid date.');
+      assert.instanceOf(err, TypeError);
+      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
     });
 
+    /**
+     * @param {Error | undefined | null} err
+     * @param {undefined | number} rowCount
+     */
     function completeBulkLoad(err, rowCount) {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Invalid date.');
+      assert.instanceOf(err, TypeError);
+      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
 
       done();
     }
@@ -1016,22 +1054,29 @@ describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`'
     const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
     bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
-    const rowStream = bulkLoad.getRowStream();
+    const rowStream = /** @type {NodeJS.WritableStream} */(/** @type {any} */(bulkLoad.getRowStream()));
     connection.execBulkLoad(bulkLoad);
 
     const rowSource = Readable.from([ ['invalid date'] ]);
 
     pipeline(rowSource, rowStream, (err) => {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Invalid date.');
+      assert.instanceOf(err, TypeError);
+      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
     });
 
+    /**
+     * @param {Error | undefined | null} err
+     * @param {undefined | number} rowCount
+     */
     function completeBulkLoad(err, rowCount) {
-      assert.ok(err);
-      assert.strictEqual(err.message, 'Invalid date.');
+      assert.instanceOf(err, TypeError);
+      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
 
       assert.strictEqual(rowCount, 0);
 
+      /**
+       * @type {unknown[]}
+       */
       const rows = [];
       const request = new Request('SELECT 1', (err) => {
         assert.ifError(err);
