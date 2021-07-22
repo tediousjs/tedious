@@ -2966,7 +2966,7 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }) {
     const executeParameters: Parameter[] = [];
 
     executeParameters.push({
@@ -2986,7 +2986,7 @@ class Connection extends EventEmitter {
 
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters[parameter.name])
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null)
         });
       }
     } catch (error) {
