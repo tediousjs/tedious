@@ -1824,6 +1824,11 @@ class Connection extends EventEmitter {
   on(event: 'languageChange', listener: (languageName: string) => void): this
 
   /**
+   * The connection was reset.
+   */
+  on(event: 'resetConnection', listener: () => void): this
+
+  /**
    * A secure connection has been established.
    */
   on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
