@@ -1,8 +1,11 @@
+// @ts-check
+
 const fs = require('fs');
-const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
-const AbortController = require('node-abort-controller');
+import AbortController from 'node-abort-controller';
+
+const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
