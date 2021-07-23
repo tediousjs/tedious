@@ -31,7 +31,7 @@ type CompletionCallback =
   // TODO: Figure out how to type the `rows` parameter here.
   (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-interface ParameterOptions {
+export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
