@@ -1,8 +1,11 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const fs = require('fs');
 const TYPES = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   const config = JSON.parse(
@@ -51,7 +54,7 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -64,6 +67,10 @@ describe('Prepare Execute Statement', function() {
     const config = getConfig();
 
     let eventEmitterLeak = false;
+
+    /**
+     * @type {NodeJS.WarningListener}
+     */
     const onWarning = (warning) => {
       if (warning.name === 'MaxListenersExceededWarning') {
         eventEmitterLeak = true;
@@ -98,7 +105,7 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       process.removeListener('warning', onWarning);
 
       if (eventEmitterLeak) {
@@ -128,7 +135,7 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
