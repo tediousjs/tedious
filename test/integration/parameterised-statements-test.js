@@ -1,8 +1,11 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const fs = require('fs');
-const TYPES = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
+const TYPES = require('../../src/data-type').typeByName;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   const config = JSON.parse(
@@ -22,7 +25,21 @@ function getConfig() {
   return config;
 }
 
+/**
+ * @typedef {typeof import('../../src/data-type').typeByName} TYPES
+ */
 
+/**
+ * @param {Mocha.Done} done
+ * @param {TYPES[keyof TYPES]} type
+ * @param {unknown} value
+ * @param {'7_0' | '7_1' | '7_2' | '7_3_A' | '7_3_A' | '7_4' | null} [tdsVersion]
+ * @param {import('../../src/request').ParameterOptions | null} [options]
+ * @param {unknown} [expectedValue]
+ * @param {boolean} [cast]
+ * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @returns {void}
+ */
 function execSql(done, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
   var config = getConfig();
   // config.options.packetSize = 32768
@@ -59,7 +76,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     } else if (expectedValue instanceof Date) {
       assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
-      assert.strictEqual(columns[0].value, expectedValue.toString());
+      assert.strictEqual(columns[0].value, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier) {
       assert.deepEqual(columns[0].value, expectedValue);
     } else {
@@ -75,7 +92,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     connection.execSql(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function() {
     done();
   });
 
@@ -88,6 +105,14 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
   });
 }
 
+/**
+ * @param {Mocha.Done} done
+ * @param {TYPES[keyof TYPES]} type
+ * @param {unknown} value
+ * @param {unknown} [expectedValue]
+ * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @returns {void}
+ */
 function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
   var config = getConfig();
 
@@ -112,10 +137,10 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
       expectedValue = value;
     }
 
-    if (value instanceof Date) {
+    if (expectedValue instanceof Date && returnValue instanceof Date) {
       assert.strictEqual(returnValue.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
-      assert.strictEqual(returnValue, expectedValue.toString());
+      assert.strictEqual(returnValue, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier) {
       assert.deepEqual(returnValue, expectedValue);
     } else {
@@ -133,7 +158,7 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
     connection.execSql(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function() {
     done();
   });
 
@@ -423,49 +448,49 @@ describe('Parameterised Statements Test', function() {
 
   describe('´time´', function() {
     it('should handle `null` values', function(done) {
-      execSql(done, TYPES.Time, null, '7_3', null);
+      execSql(done, TYPES.Time, null, '7_3_A', null);
     });
 
     it('ignores the date part of given `Date` values', function(done) {
-      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3', null, new Date('1970-01-01T12:34:56Z'));
+      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3_A', null, new Date('1970-01-01T12:34:56Z'));
     });
 
     it('should handle `string` values', function(done) {
-      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3', null, '12:34:56.0000000', true);
+      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3_A', null, '12:34:56.0000000', true);
     });
 
     const testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
 
     it('should test time', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', null, '00:00:00.1111111', true);
     });
 
     it('should test time1', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 1 }, '00:00:00.1', true);
     });
 
     it('should test time2', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 2 }, '00:00:00.11', true);
     });
 
     it('should test time3', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 3 }, '00:00:00.111', true);
     });
 
     it('should test time4', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 4 }, '00:00:00.1111', true);
     });
 
     it('should test time5', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 5 }, '00:00:00.11111', true);
     });
 
     it('should test time 6', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 6 }, '00:00:00.111111', true);
     });
 
     it('should test time7', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 7 }, '00:00:00.1111111', true);
     });
   });
 
@@ -972,7 +997,7 @@ describe('Parameterised Statements Test', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -1055,7 +1080,7 @@ end')\
       connection.execSqlBatch(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
