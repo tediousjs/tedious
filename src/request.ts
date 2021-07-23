@@ -397,7 +397,7 @@ class Request extends EventEmitter {
    *   Additional type options. Optional.
    */
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: DataType, value: unknown, options?: ParameterOptions) {
+  addParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions | null) {
     if (options == null) {
       options = {};
     }
