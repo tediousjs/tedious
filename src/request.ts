@@ -31,7 +31,7 @@ type CompletionCallback =
   // TODO: Figure out how to type the `rows` parameter here.
   (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-interface ParameterOptions {
+export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
@@ -397,7 +397,7 @@ class Request extends EventEmitter {
    *   Additional type options. Optional.
    */
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: DataType, value: unknown, options?: ParameterOptions) {
+  addParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions | null) {
     if (options == null) {
       options = {};
     }

@@ -1,10 +1,13 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const TYPES = require('../../src/tedious').TYPES;
 const fs = require('fs');
 const async = require('async');
 
 const { assert } = require('chai');
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   var config = JSON.parse(
@@ -27,6 +30,7 @@ function getConfig() {
 describe('calling a procedure that takes and returns a TVP', function() {
   this.timeout(5000);
 
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {

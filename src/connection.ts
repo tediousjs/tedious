@@ -488,7 +488,7 @@ interface AuthenticationOptions {
   options?: any;
 }
 
-interface ConnectionOptions {
+export interface ConnectionOptions {
   /**
    * A boolean determining whether to rollback a transaction automatically if any error is encountered
    * during the given transaction's execution. This sets the value for `SET XACT_ABORT` during the
@@ -1824,6 +1824,11 @@ class Connection extends EventEmitter {
   on(event: 'languageChange', listener: (languageName: string) => void): this
 
   /**
+   * The connection was reset.
+   */
+  on(event: 'resetConnection', listener: () => void): this
+
+  /**
    * A secure connection has been established.
    */
   on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
@@ -2966,7 +2971,7 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }) {
     const executeParameters: Parameter[] = [];
 
     executeParameters.push({
@@ -2986,7 +2991,7 @@ class Connection extends EventEmitter {
 
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters[parameter.name])
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null)
         });
       }
     } catch (error) {

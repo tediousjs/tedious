@@ -1,8 +1,11 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const TYPES = require('../../src/data-type').typeByName;
 const fs = require('fs');
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   const config = JSON.parse(
@@ -22,7 +25,12 @@ function getConfig() {
   return config;
 }
 
+/**
+ * @typedef {typeof import('../../src/data-type').typeByName} TYPES
+ */
+
 describe('RPC test', function() {
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {
@@ -52,6 +60,11 @@ describe('RPC test', function() {
     }
   });
 
+  /**
+   * @param {Connection} connection
+   * @param {string} sql
+   * @param {() => void} done
+   */
   function execSqlBatch(connection, sql, done) {
     const request = new Request(sql, function(err) {
       if (err) {
@@ -65,6 +78,12 @@ describe('RPC test', function() {
     connection.execSqlBatch(request);
   }
 
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
   function testProc(done, type, typeAsString, value) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
@@ -105,8 +124,13 @@ select @param\
     );
   }
 
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
   function testProcOutput(done, type, typeAsString, value) {
-
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 
@@ -127,7 +151,7 @@ select @param\
 
     request.on('returnValue', function(name, returnValue, metadata) {
       assert.strictEqual(name, 'paramOut');
-      if (value instanceof Date) {
+      if (value instanceof Date && returnValue instanceof Date) {
         assert.strictEqual(returnValue.getTime(), value.getTime());
       } else {
         assert.strictEqual(returnValue, value);
@@ -321,7 +345,7 @@ set @paramOut = @paramIn\
       connection.callProcedure(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -375,7 +399,7 @@ set @paramOut = @paramIn\
       );
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
