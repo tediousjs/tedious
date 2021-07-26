@@ -283,7 +283,7 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-  pre-release:
+  release:
     name: Pre-Release
     needs: [test, azure]
     if: ${{ github.event_name == 'push' }}
@@ -313,4 +313,4 @@ jobs:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npm run semantic-release --dry-run
+      run: npx semantic-release --dry-run
