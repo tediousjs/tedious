@@ -105,7 +105,7 @@ jobs:
         }' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
-      run: npm install -g npm
+      run: npm install -g npm@latest-6
       if: ${{ matrix.node-version == '6.x' }}
 
     - name: Determine npm cache directory
