@@ -174,8 +174,121 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-  azure:
+  azure-node-6:
+    name: Azure SQL Server / Node.js 6.x
+    runs-on: ubuntu-latest
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Use Node.js 6
+      uses: actions/setup-node@v1
+      with:
+        node-version: 6
+
+    - name: Upgrade npm
+      run: npm install -g npm@latest-6
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - run: mkdir ~/.tedious
+
+    - name: Set up CI configuration (SQL Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "${{ secrets.AZURE_USERNAME }}",
+                "password": "${{ secrets.AZURE_PASSWORD }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Set up CI configuration (AD Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "azure-active-directory-password",
+              "options": {
+                "userName": "${{ secrets.AZURE_AD_USERNAME }}",
+                "password": "${{ secrets.AZURE_AD_PASSWORD }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Set up CI configuration (AD Service Principal Authentication)
+      run: |
+        echo '{
+          "config": {
+            "server": "${{ secrets.AZURE_SERVER }}",
+            "authentication": {
+              "type": "azure-active-directory-service-principal-secret",
+              "options": {
+                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
+                "tenantId": "${{ secrets.AZURE_AD_SP_TENANT_ID }}",
+                "clientSecret": "${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "tedious"
+            }
+          }
+        }' > ~/.tedious/test-connection.json
+
+    - name: run integration tests
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  azure-node-12:
     name: Azure SQL Server / Node.js 12.x
+    needs: [azure-node-6]
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
@@ -285,7 +398,7 @@ jobs:
 
   release:
     name: Pre-Release
-    needs: [test, azure]
+    needs: [test, azure-node-6, azure-node-12]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
 
