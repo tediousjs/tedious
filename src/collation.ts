@@ -104,7 +104,8 @@ export const codepageByLcid: { [key: number]: string | undefined } = {
   [0x41F]: 'CP1254',
   [0x422]: 'CP1251',
   [0x420]: 'CP1256',
-  [0x42A]: 'CP1258'
+  [0x42A]: 'CP1258',
+  [0x42F]: 'CP1251'
 };
 
 export const codepageBySortId: { [key: number]: string | undefined } = {
