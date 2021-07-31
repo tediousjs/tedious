@@ -1,5 +1,5 @@
 import BufferList from 'bl';
-import { Duplex } from 'readable-stream';
+import { Duplex } from 'stream';
 
 import Debug from './debug';
 import Message from './message';

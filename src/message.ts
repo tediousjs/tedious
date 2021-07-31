@@ -1,4 +1,4 @@
-import { PassThrough } from 'readable-stream';
+import { PassThrough } from 'stream';
 
 class Message extends PassThrough {
   type: number;

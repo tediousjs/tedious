@@ -5,7 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { Readable, Stream } from 'readable-stream';
+import { Readable } from 'stream';
 
 import {
   loginWithVmMSI,
@@ -2639,7 +2639,7 @@ class Connection extends EventEmitter {
 
     const message = new Message({ type: TYPE.SQL_BATCH });
     this.messageIo.outgoingMessageStream.write(message);
-    (Readable as any).from(payload).pipe(message);
+    Readable.from(payload).pipe(message);
   }
 
   /**
@@ -3274,7 +3274,7 @@ class Connection extends EventEmitter {
         });
       });
 
-      const payloadStream = (Readable as any).from(payload!) as Stream;
+      const payloadStream = Readable.from(payload);
       payloadStream.once('error', (error) => {
         payloadStream.unpipe(message);
 
