@@ -419,29 +419,40 @@ class BulkLoad extends EventEmitter {
   }
 
   /**
-   * Adds a row to the bulk insert. This method accepts arguments in three different formats:
+   * Adds a row to the bulk insert.
    *
    * ```js
-   * bulkLoad.addRow( rowObj )
-   * bulkLoad.addRow( columnArray )
-   * bulkLoad.addRow( col0, col1, ... colN )`
+   * bulkLoad.addRow({ first_name: 'Bill', last_name: 'Gates' });
    * ```
-   * * `rowObj`
    *
-   *    An object of key/value pairs representing column name (or objName) and value.
-   *
-   * * `columnArray`
-   *
-   *    An array representing the values of each column in the same order which they were added to the bulkLoad object.
-   *
-   * * `col0, col1, ... colN`
-   *
-   *    If there are at least two columns, values can be passed as multiple arguments instead of an array. They
-   *    must be in the same order the columns were added in.
-   *
-   * @param input
+   * @param row An object of key/value pairs representing column name (or objName) and value.
    */
-  addRow(...input: [{ [key: string]: any }] | Array<any>) {
+  addRow(row: { [columnName: string]: unknown }): void
+
+  /**
+   * Adds a row to the bulk insert.
+   *
+   * ```js
+   * bulkLoad.addRow('Bill', 'Gates');
+   * ```
+   *
+   * @param row If there are at least two columns, values can be passed as multiple arguments instead of an array. They
+   *   must be in the same order the columns were added in.
+   */
+  addRow(...row: unknown[]): void
+
+  /**
+   * Adds a row to the bulk insert.
+   *
+   * ```js
+   * bulkLoad.addRow(['Bill', 'Gates']);
+   * ```
+   *
+   * @param row An array representing the values of each column in the same order which they were added to the bulkLoad object.
+   */
+  addRow(row: unknown[]): void
+
+  addRow(...input: [ { [key: string]: unknown } ] | unknown[]) {
     this.firstRowWritten = true;
 
     let row: any;
