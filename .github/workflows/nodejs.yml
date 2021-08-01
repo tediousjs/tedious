@@ -2,10 +2,10 @@ name: Node CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ "master", "alpha", "beta", "*.x" ]
 
   pull_request:
-    branches: [ master ]
+    branches: [ "master", "alpha", "beta", "*.x" ]
 
 env:
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
