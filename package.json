@@ -52,7 +52,6 @@
     "native-duplexpair": "^1.0.0",
     "node-abort-controller": "^2.0.0",
     "punycode": "^2.1.0",
-    "readable-stream": "^3.6.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
@@ -73,7 +72,6 @@
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^8.2.3",
     "@types/node": "^14.14.20",
-    "@types/readable-stream": "^2.3.10",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^4.28.2",
     "@typescript-eslint/parser": "^4.28.2",

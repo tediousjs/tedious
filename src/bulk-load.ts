@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import Connection, { InternalConnectionOptions } from './connection';
 
-import { Transform } from 'readable-stream';
+import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { DataType, Parameter } from './data-type';

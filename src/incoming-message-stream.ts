@@ -1,5 +1,5 @@
 import BufferList from 'bl';
-import { Transform } from 'readable-stream';
+import { Transform } from 'stream';
 
 import Debug from './debug';
 import Message from './message';
