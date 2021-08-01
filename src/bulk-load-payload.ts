@@ -16,9 +16,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       this.bulkLoad.removeListener('cancel', onCancel);
     });
 
-    const onCancel = () => {
-      this.bulkLoad.rowToPacketTransform.destroy(new RequestError('Canceled.', 'ECANCEL'));
-    };
+    let onCancel: () => void;
+    if (this.bulkLoad.streamingMode) {
+      onCancel = () => {
+        this.bulkLoad.rowToPacketTransform.destroy(new RequestError('Canceled.', 'ECANCEL'));
+      };
+    } else {
+      onCancel = () => {
+        this.bulkLoad.rowToPacketTransform.destroy();
+      };
+    }
 
     this.bulkLoad.once('cancel', onCancel);
   }
