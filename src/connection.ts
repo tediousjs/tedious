@@ -2841,14 +2841,106 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Executes a [[BulkLoad]].
+   * Execute a [[BulkLoad]].
    *
-   * @param bulkLoad
+   * ```js
+   * // We want to perform a bulk load into a table with the following format:
+   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
+   *
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // ...
+   * });
+   *
+   * // First, we need to specify the columns that we want to write to,
+   * // and their definitions. These definitions must match the actual table,
+   * // otherwise the bulk load will fail.
+   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   *
+   * // Now, we can specify each row to be written.
+   * //
+   * // Note that these rows are held in memory until the
+   * // bulk load was performed, so if you need to write a large
+   * // number of rows (e.g. by reading from a CSV file),
+   * // using a streaming bulk load is advisable to keep memory usage low.
+   * bulkLoad.addRow({ 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') });
+   * bulkLoad.addRow({ 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') });
+   *
+   * connection.execBulkLoad(bulkLoad);
+   * ```
+   *
+   * @param bulkLoad A previously created [[BulkLoad]].
+   *
+   * @deprecated Adding rows to a [[BulkLoad]] via [[BulkLoad.addRow]] or [[BulkLoad.getRowStream]]
+   *   is deprecated and will be removed in the future. You should migrate to calling [[Connection.execBulkLoad]]
+   *   with a `Iterable` or `AsyncIterable` as the second argument instead.
    */
-  execBulkLoad(bulkLoad: BulkLoad) {
+  execBulkLoad(bulkLoad: BulkLoad): void
+
+  /**
+   * Execute a [[BulkLoad]].
+   *
+   * ```js
+   * // We want to perform a bulk load into a table with the following format:
+   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
+   *
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // ...
+   * });
+   *
+   * // First, we need to specify the columns that we want to write to,
+   * // and their definitions. These definitions must match the actual table,
+   * // otherwise the bulk load will fail.
+   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   *
+   * // Execute a bulk load with a predefined list of rows.
+   * //
+   * // Note that these rows are held in memory until the
+   * // bulk load was performed, so if you need to write a large
+   * // number of rows (e.g. by reading from a CSV file),
+   * // passing an `AsyncIterable` is advisable to keep memory usage low.
+   * connection.execBulkLoad(bulkLoad, [
+   *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') },
+   *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') }
+   * ]);
+   * ```
+   *
+   * @param bulkLoad A previously created [[BulkLoad]].
+   * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
+   */
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
 
-    if (!bulkLoad.streamingMode) {
+    if (rows) {
+      if (bulkLoad.streamingMode) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
+      }
+
+      if (bulkLoad.firstRowWritten) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
+      }
+
+      const rowStream = Readable.from(rows);
+
+      // Destroy the packet transform if an error happens in the row stream,
+      // e.g. if an error is thrown from within a generator or stream.
+      rowStream.on('error', (err) => {
+        bulkLoad.rowToPacketTransform.destroy(err);
+      });
+
+      // Destroy the row stream if an error happens in the packet transform,
+      // e.g. if the bulk load is cancelled.
+      bulkLoad.rowToPacketTransform.on('error', (err) => {
+        rowStream.destroy(err);
+      });
+
+      rowStream.pipe(bulkLoad.rowToPacketTransform);
+    } else if (!bulkLoad.streamingMode) {
       // If the bulkload was not put into streaming mode by the user,
       // we end the rowToPacketTransform here for them.
       //
@@ -3280,6 +3372,8 @@ class Connection extends EventEmitter {
 
         // Only set a request error if no error was set yet.
         request.error ??= error;
+
+        payloadStream.unpipe(message);
 
         message.ignore = true;
         message.end();
