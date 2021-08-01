@@ -2563,27 +2563,11 @@ class Connection extends EventEmitter {
   execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
 
-    const rowStream = Readable.from(rows);
-
-    // Destroy the packet transform if an error happens in the row stream,
-    // e.g. if an error is thrown from within a generator or stream.
-    rowStream.on('error', (err) => {
-      bulkLoad.rowToPacketTransform.destroy(err);
-    });
-
-    // Destroy the row stream if an error happens in the packet transform,
-    // e.g. if the bulk load is cancelled.
-    bulkLoad.rowToPacketTransform.on('error', (err) => {
-      rowStream.destroy(err);
-    });
-
-    rowStream.pipe(bulkLoad.rowToPacketTransform);
-
     const onCancel = () => {
       request.cancel();
     };
 
-    const payload = new BulkLoadPayload(bulkLoad);
+    const payload = new BulkLoadPayload(bulkLoad, rows);
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);
