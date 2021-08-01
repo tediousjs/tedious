@@ -1,6 +1,5 @@
 import { Readable, Transform, pipeline } from 'stream';
 import BulkLoad from './bulk-load';
-import { RequestError } from './errors';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
@@ -48,47 +47,40 @@ const textPointerAndTimestampBuffer = Buffer.from([
 ]);
 const textPointerNullBuffer = Buffer.from([0x00]);
 
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  /**
-   * @private
-   */
-  columnMetadataWritten: boolean;
-  /**
-   * @private
-   */
+export class BulkLoadPayload extends Transform {
   bulkLoad: BulkLoad;
-  /**
-   * @private
-   */
+  rowStream: Readable;
+
   mainOptions: BulkLoad['options'];
-  /**
-   * @private
-   */
   columns: BulkLoad['columns'];
 
-  /**
-   * @private
-   */
-  constructor(bulkLoad: BulkLoad) {
+  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     super({ writableObjectMode: true });
 
     this.bulkLoad = bulkLoad;
     this.mainOptions = bulkLoad.options;
     this.columns = bulkLoad.columns;
 
-    this.columnMetadataWritten = false;
+    this.rowStream = Readable.from(rows);
+
+    // Destroy the packet transform if an error happens in the row stream,
+    // e.g. if an error is thrown from within a generator or stream.
+    this.rowStream.on('error', (err) => {
+      this.destroy(err);
+    });
+
+    this.push(this.getColMetaData());
+
+    this.rowStream.pipe(this);
   }
 
-  /**
-   * @private
-   */
-  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
-    if (!this.columnMetadataWritten) {
-      this.push(this.getColMetaData());
-      this.columnMetadataWritten = true;
-    }
+  _flush(callback: () => void) {
+    this.push(this.createDoneToken());
 
+    process.nextTick(callback);
+  }
+
+  _transform(row: unknown[] | { [colName: string]: unknown }, _encoding: string, callback: (err?: Error) => void) {
     this.push(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
@@ -126,18 +118,18 @@ class RowTransform extends Transform {
     process.nextTick(callback);
   }
 
-  /**
-   * @private
-   */
-  _flush(callback: () => void) {
-    this.push(this.createDoneToken());
+  _destroy(err: Error | null, callback: (error: Error | null) => void) {
+    // Destroy the row stream if an error happens in the packet transform,
+    // e.g. if the bulk load is cancelled.
+    if (err) {
+      this.rowStream.destroy(err);
+    } else {
+      this.rowStream.destroy();
+    }
 
-    process.nextTick(callback);
+    callback(err);
   }
 
-  /**
-   * @private
-   */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
     const tBuf = new WritableTrackingBuffer(this.mainOptions.tdsVersion < '7_2' ? 9 : 13);
@@ -152,9 +144,6 @@ class RowTransform extends Transform {
     return tBuf.data;
   }
 
-  /**
-   * @private
-   */
   getColMetaData() {
     const tBuf = new WritableTrackingBuffer(100, null, true);
     // TokenType
@@ -192,51 +181,6 @@ class RowTransform extends Transform {
       tBuf.writeBVarchar(c.name, 'ucs2');
     }
     return tBuf.data;
-  }
-}
-
-export class BulkLoadPayload implements AsyncIterable<Buffer> {
-  bulkLoad: BulkLoad;
-  iterator: AsyncIterableIterator<Buffer>;
-
-  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
-    this.bulkLoad = bulkLoad;
-
-    const rowToPacketTransform = new RowTransform(bulkLoad);
-
-    // We need to grab the iterator here so that `error` event handlers are set up
-    // as early as possible (and are not potentially lost).
-    this.iterator = rowToPacketTransform[Symbol.asyncIterator]();
-
-    const rowStream = Readable.from(rows);
-
-    // Destroy the packet transform if an error happens in the row stream,
-    // e.g. if an error is thrown from within a generator or stream.
-    rowStream.on('error', (err) => {
-      rowToPacketTransform.destroy(err);
-    });
-
-    // Destroy the row stream if an error happens in the packet transform,
-    // e.g. if the bulk load is cancelled.
-    rowToPacketTransform.on('error', (err) => {
-      rowStream.destroy(err);
-    });
-
-    rowStream.pipe(rowToPacketTransform);
-
-    rowToPacketTransform.once('finish', () => {
-      bulkLoad.removeListener('cancel', onCancel);
-    });
-
-    const onCancel = () => {
-      rowToPacketTransform.destroy(new RequestError('Canceled.', 'ECANCEL'));
-    };
-
-    bulkLoad.once('cancel', onCancel);
-  }
-
-  [Symbol.asyncIterator]() {
-    return this.iterator;
   }
 
   toString(indent = '') {

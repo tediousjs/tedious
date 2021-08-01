@@ -2567,8 +2567,6 @@ class Connection extends EventEmitter {
       request.cancel();
     };
 
-    const payload = new BulkLoadPayload(bulkLoad, rows);
-
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);
 
@@ -2581,7 +2579,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, new BulkLoadPayload(bulkLoad, rows));
     });
 
     bulkLoad.once('cancel', onCancel);
@@ -2950,6 +2948,10 @@ class Connection extends EventEmitter {
       request.rst! = [];
 
       const onCancel = () => {
+        if (request instanceof BulkLoad) {
+          return payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        }
+
         payloadStream.unpipe(message);
 
         // set the ignore bit and end the message.
@@ -2987,11 +2989,10 @@ class Connection extends EventEmitter {
         // Only set a request error if no error was set yet.
         request.error ??= error;
 
-        payloadStream.unpipe(message);
-
         message.ignore = true;
         message.end();
       });
+
       payloadStream.pipe(message);
     }
   }
