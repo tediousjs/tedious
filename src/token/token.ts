@@ -316,10 +316,16 @@ export class FeatureExtAckToken extends Token {
 
   fedAuth: Buffer | undefined;
 
-  constructor(fedAuth: Buffer | undefined) {
+  /** Value of UTF8_SUPPORT acknowledgement.
+   *
+   * undefined when UTF8_SUPPORT not included in token. */
+  utf8Support: boolean | undefined;
+
+  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined) {
     super('FEATUREEXTACK', 'featureExtAck');
 
     this.fedAuth = fedAuth;
+    this.utf8Support = utf8Support;
   }
 }
 
