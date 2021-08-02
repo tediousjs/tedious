@@ -1,4 +1,5 @@
 import { sprintf } from 'sprintf-js';
+import { versions } from './tds-versions';
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -409,6 +410,17 @@ class Login7Payload {
 
           break;
       }
+    }
+
+    if (this.tdsVersion >= versions['7_4']) {
+      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+      const buf = Buffer.alloc(6);
+      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+      buf.writeUInt32LE(1, 1);
+      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+      buffers.push(buf);
     }
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
