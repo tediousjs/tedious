@@ -613,7 +613,7 @@ describe('Collation LCID test', function() {
     }
   });
 
-  it('should recieve correct column collation after sending different collation char and varchar', function(done) {
+  it('should receive correct column collation after sending different collation char and varchar', function(done) {
     const remove_table_request = new Request('IF OBJECT_ID(\'dbo.temp_collation\', \'U\') IS NOT NULL DROP TABLE dbo.temp_collation;', (err) => {
       if (err) {
         return done(err);
