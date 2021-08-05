@@ -168,12 +168,10 @@ class RowTransform extends Transform {
       const c = this.columns[i];
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
-      if (this.bulkLoad.options.validateBulkLoadParameters) {
-        try {
-          value = c.type.validate(value);
-        } catch (error) {
-          return callback(error);
-        }
+      try {
+        value = c.type.validate(value);
+      } catch (error) {
+        return callback(error);
       }
 
       const parameter = {
@@ -473,23 +471,11 @@ class BulkLoad extends EventEmitter {
     // write each column
     if (Array.isArray(row)) {
       this.rowToPacketTransform.write(this.columns.map((column, i) => {
-        let value = row[i];
-
-        if (this.options.validateBulkLoadParameters) {
-          value = column.type.validate(value);
-        }
-
-        return value;
+        return column.type.validate(row[i]);
       }));
     } else {
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        let value = row[column.objName];
-
-        if (this.options.validateBulkLoadParameters) {
-          value = column.type.validate(value);
-        }
-
-        return value;
+        return column.type.validate(row[column.objName]);
       }));
     }
   }
