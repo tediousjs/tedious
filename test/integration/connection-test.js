@@ -1423,6 +1423,194 @@ describe('Language Insert Test', function() {
   });
 });
 
+describe('custom textsize value', function() {
+  it('should set the textsize to the given value', function(done) {
+    const config = getConfig();
+    config.options.textsize = 123456;
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 123456);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should fail if the textsize is below -1', function() {
+    const config = getConfig();
+    config.options.textsize = -2;
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" can\'t be smaller than -1.');
+  });
+
+  it('should fail if the textsize is above 2147483647', function() {
+    const config = getConfig();
+    config.options.textsize = 2147483648;
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" can\'t be greater than 2147483647.');
+  });
+
+  it('should fail if the textsize is not a number', function() {
+    const config = getConfig();
+    config.options.textsize = 'textSize';
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" property must be of type number or null.');
+  });
+
+  it('should default to 2147483647', function(done) {
+    const config = getConfig();
+    config.options.textsize = undefined;
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 2147483647);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should allow setting it to -1', function(done) {
+    const config = getConfig();
+    config.options.textsize = -1;
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        if (connection.config.options.tdsVersion <= '7_2') {
+          assert.strictEqual(textsize, 2147483647);
+        } else {
+          assert.strictEqual(textsize, -1);
+        }
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should allow setting it to 0 and reset to server defaults', function(done) {
+    const config = getConfig();
+    config.options.textsize = 0;
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 4096);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('truncates floating point numbers', function(done) {
+    const config = getConfig();
+    config.options.textsize = 1000.0123;
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 1000);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+});
+
 describe('should test date format', function() {
   /**
    * @param {Mocha.Done} done
