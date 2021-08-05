@@ -178,7 +178,7 @@ const DEFAULT_PACKET_SIZE = 4 * 1024;
 /**
  * @private
  */
-const DEFAULT_TEXTSIZE = '2147483647';
+const DEFAULT_TEXTSIZE = 2147483647;
 /**
  * @private
  */
@@ -379,7 +379,7 @@ export interface InternalConnectionOptions {
   serverName: undefined | string;
   serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
-  textsize: string;
+  textsize: number;
   trustedServerNameAE?: string;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
@@ -1644,7 +1644,13 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.textsize" property must be of type number or null.');
         }
 
-        this.config.options.textsize = config.options.textsize;
+        if (config.options.textsize > 2147483647) {
+          throw new TypeError('The "config.options.textsize" can\'t be greater than 2147483647.');
+        } else if (config.options.textsize < -1) {
+          throw new TypeError('The "config.options.textsize" can\'t be smaller than -1.');
+        }
+
+        this.config.options.textsize = config.options.textsize | 0;
       }
 
       if (config.options.trustServerCertificate !== undefined) {
