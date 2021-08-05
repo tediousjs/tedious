@@ -1536,117 +1536,86 @@ describe('BulkLoad', function() {
       done();
     }
   });
-});
 
-describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`', () => {
-  /**
-   * @type {Connection}
-   */
-  let connection;
+  describe('validation errors', function() {
+    beforeEach(function(done) {
+      const request = new Request('create table #stream_test ([value] date)', (err) => {
+        done(err);
+      });
 
-  beforeEach(function(done) {
-    const config = getConfig();
-    config.options = { ...config.options, validateBulkLoadParameters: true };
-    connection = new Connection(config);
-    connection.connect(done);
-
-    if (debugMode) {
-      connection.on('debug', (message) => console.log(message));
-      connection.on('infoMessage', (info) =>
-        console.log('Info: ' + info.number + ' - ' + info.message)
-      );
-      connection.on('errorMessage', (error) =>
-        console.log('Error: ' + error.number + ' - ' + error.message)
-      );
-    }
-  });
-
-  beforeEach(function(done) {
-    const request = new Request('create table #stream_test ([value] date)', (err) => {
-      done(err);
+      connection.execSqlBatch(request);
     });
 
-    connection.execSqlBatch(request);
-  });
+    it('should handle validation errors during streaming bulk loads', (done) => {
+      const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+      bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
-  afterEach(function(done) {
-    if (!connection.closed) {
-      connection.on('end', done);
-      connection.close();
-    } else {
-      done();
-    }
-  });
+      const rowStream = bulkLoad.getRowStream();
+      connection.execBulkLoad(bulkLoad);
 
-  it('should handle validation errors during streaming bulk loads', (done) => {
-    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
-    bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
+      const rowSource = Readable.from([
+        ['invalid date']
+      ]);
 
-    const rowStream = bulkLoad.getRowStream();
-    connection.execBulkLoad(bulkLoad);
-
-    const rowSource = Readable.from([
-      ['invalid date']
-    ]);
-
-    pipeline(rowSource, rowStream, (err) => {
-      assert.instanceOf(err, TypeError);
-      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-    });
-
-    /**
-     * @param {Error | undefined | null} err
-     * @param {undefined | number} rowCount
-     */
-    function completeBulkLoad(err, rowCount) {
-      assert.instanceOf(err, TypeError);
-      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-
-      done();
-    }
-  });
-
-  it('should allow reusing the connection after validation errors during streaming bulk loads', (done) => {
-    const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
-    bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
-
-    const rowStream = bulkLoad.getRowStream();
-    connection.execBulkLoad(bulkLoad);
-
-    const rowSource = Readable.from([ ['invalid date'] ]);
-
-    pipeline(rowSource, rowStream, (err) => {
-      assert.instanceOf(err, TypeError);
-      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-    });
-
-    /**
-     * @param {Error | undefined | null} err
-     * @param {undefined | number} rowCount
-     */
-    function completeBulkLoad(err, rowCount) {
-      assert.instanceOf(err, TypeError);
-      assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-
-      assert.strictEqual(rowCount, 0);
+      pipeline(rowSource, rowStream, (err) => {
+        assert.instanceOf(err, TypeError);
+        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
+      });
 
       /**
-       * @type {unknown[]}
+       * @param {Error | undefined | null} err
+       * @param {undefined | number} rowCount
        */
-      const rows = [];
-      const request = new Request('SELECT 1', (err) => {
-        assert.ifError(err);
-
-        assert.deepEqual([1], rows);
+      function completeBulkLoad(err, rowCount) {
+        assert.instanceOf(err, TypeError);
+        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
 
         done();
+      }
+    });
+
+    it('should allow reusing the connection after validation errors during streaming bulk loads', (done) => {
+      const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
+      bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
+
+      const rowStream = bulkLoad.getRowStream();
+      connection.execBulkLoad(bulkLoad);
+
+      const rowSource = Readable.from([ ['invalid date'] ]);
+
+      pipeline(rowSource, rowStream, (err) => {
+        assert.instanceOf(err, TypeError);
+        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
       });
 
-      request.on('row', (row) => {
-        rows.push(row[0].value);
-      });
+      /**
+       * @param {Error | undefined | null} err
+       * @param {undefined | number} rowCount
+       */
+      function completeBulkLoad(err, rowCount) {
+        assert.instanceOf(err, TypeError);
+        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
 
-      connection.execSql(request);
-    }
+        assert.strictEqual(rowCount, 0);
+
+        /**
+         * @type {unknown[]}
+         */
+        const rows = [];
+        const request = new Request('SELECT 1', (err) => {
+          assert.ifError(err);
+
+          assert.deepEqual([1], rows);
+
+          done();
+        });
+
+        request.on('row', (row) => {
+          rows.push(row[0].value);
+        });
+
+        connection.execSql(request);
+      }
+    });
   });
 });
