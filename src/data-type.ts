@@ -40,6 +40,7 @@ import Variant from './data-types/sql-variant';
 import { CryptoMetadata } from './always-encrypted/types';
 
 import { InternalConnectionOptions } from './connection';
+import { Collation } from './collation';
 
 export interface Parameter {
   type: DataType;
@@ -51,12 +52,6 @@ export interface Parameter {
   length?: number;
   precision?: number;
   scale?: number;
-  collation?: {
-    lcid: number;
-    flags: number;
-    version: number;
-    sortId: number;
-  };
 
   nullable?: boolean;
 
@@ -70,6 +65,8 @@ export interface ParameterData<T = any> {
   length?: number;
   scale?: number;
   precision?: number;
+
+  collation?: Collation;
 
   value: T;
 }

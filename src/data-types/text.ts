@@ -27,7 +27,11 @@ const Text: DataType = {
     const buffer = Buffer.alloc(10);
     buffer.writeUInt8(this.id, 0);
     buffer.writeInt32LE(parameter.length!, 1);
-    // TODO: Collation handling
+
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 5, 0, 5);
+    }
+
     return buffer;
   },
 
@@ -53,6 +57,7 @@ const Text: DataType = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
         throw new TypeError('Invalid string.');

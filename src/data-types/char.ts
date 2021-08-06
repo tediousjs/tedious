@@ -50,6 +50,11 @@ const Char: { maximumLength: number } & DataType = {
     const buffer = Buffer.alloc(8);
     buffer.writeUInt8(this.id, 0);
     buffer.writeUInt16LE(parameter.length!, 1);
+
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
+    }
+
     return buffer;
   },
 
