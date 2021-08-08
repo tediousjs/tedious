@@ -1,9 +1,227 @@
 // http://technet.microsoft.com/en-us/library/aa176553(v=sql.80).aspx
 export const codepageByLcid: { [key: number]: string | undefined } = {
-  [0x436]: 'CP1252',
-  [0x401]: 'CP1256',
-  [0x801]: 'CP1256',
-  [0xC01]: 'CP1256',
+  // Arabic_*
+  [0x0401]: 'CP1256',
+
+  // Chinese_Taiwan_Stroke_*
+  // Chinese_Traditional_Stroke_Count_*
+  [0x0404]: 'CP950',
+
+  // Czech_*
+  [0x0405]: 'CP1250',
+
+  // Danish_Greenlandic_*
+  // Danish_Norwegian_*
+  [0x0406]: 'CP1252',
+
+  // Greek_*
+  [0x0408]: 'CP1253',
+
+  // Latin1_General_*
+  [0x0409]: 'CP1252',
+
+  // Traditional_Spanish_*
+  [0x040A]: 'CP1252',
+
+  // Finnish_Swedish_*
+  [0x040B]: 'CP1252',
+
+  // French_*
+  [0x040C]: 'CP1252',
+
+  // Hebrew_*
+  [0x040D]: 'CP1255',
+
+  // Hungarian_*
+  [0x040E]: 'CP1250',
+
+  // Icelandic_*
+  [0x040F]: 'CP1252',
+
+  // Japanese_*
+  // Japanese_XJIS_*
+  [0x0411]: 'CP932',
+
+  // Korean_*
+  // Korean_Wansung_*
+  [0x0412]: 'CP949',
+
+  // Norwegian_*
+  [0x0414]: 'CP1252',
+
+  // Polish_*
+  [0x0415]: 'CP1250',
+
+  // Romansh_*
+  [0x0417]: 'CP1252',
+
+  // Romanian_*
+  [0x0418]: 'CP1250',
+
+  // Cyrillic_*
+  [0x0419]: 'CP1251',
+
+  // Croatian_*
+  [0x041A]: 'CP1250',
+
+  // Slovak_*
+  [0x041B]: 'CP1250',
+
+  // Albanian_*
+  [0x041C]: 'CP1250',
+
+  // Thai_*
+  [0x041E]: 'CP874',
+
+  // Turkish_*
+  [0x041F]: 'CP1254',
+
+  // Urdu_*
+  [0x0420]: 'CP1256',
+
+  // Ukrainian_*
+  [0x0422]: 'CP1251',
+
+  // Slovenian_*
+  [0x0424]: 'CP1250',
+
+  // Estonian_*
+  [0x0425]: 'CP1257',
+
+  // Latvian_BIN
+  [0x0426]: 'CP1257',
+
+  // Lithuanian_BIN
+  [0x0427]: 'CP1257',
+
+  // Persian_100_BIN
+  [0x0429]: 'CP1256',
+
+  // Vietnamese_BIN
+  [0x042A]: 'CP1258',
+
+  // Azeri_Latin_100_BIN
+  [0x042C]: 'CP1254',
+
+  // Upper_Sorbian_100_BIN
+  [0x042E]: 'CP1252',
+
+  // Macedonian_FYROM_90_BIN
+  [0x042F]: 'CP1251',
+
+  // Sami_Norway_100_BIN
+  [0x043B]: 'CP1252',
+
+  // Kazakh_90_BIN
+  [0x043F]: 'CP1251',
+
+  // Turkmen_100_BIN
+  [0x0442]: 'CP1250',
+
+  // Uzbek_Latin_90_BIN
+  [0x0443]: 'CP1254',
+
+  // Tatar_90_BIN
+  [0x0444]: 'CP1251',
+
+  // Welsh_100_BIN
+  [0x0452]: 'CP1252',
+
+  // Frisian_100_BIN
+  [0x0462]: 'CP1252',
+
+  // Bashkir_100_BIN
+  [0x046D]: 'CP1251',
+
+  // Mapudungan_100_BIN
+  [0x047A]: 'CP1252',
+
+  // Mohawk_100_BIN
+  [0x047C]: 'CP1252',
+
+  // Breton_100_BIN
+  [0x047E]: 'CP1252',
+
+  // Uighur_100_BIN
+  [0x0480]: 'CP1256',
+
+  // Corsican_100_BIN
+  [0x0483]: 'CP1252',
+
+  // Yakut_100_BIN
+  [0x0485]: 'CP1251',
+
+  // Dari_100_BIN
+  [0x048C]: 'CP1256',
+
+  // Chinese_PRC_BIN
+  // Chinese_Simplified_Pinyin_100_BIN
+  [0x0804]: 'CP936',
+
+  // Serbian_Latin_100_BIN
+  [0x081A]: 'CP1250',
+
+  // Azeri_Cyrillic_100_BIN
+  [0x082C]: 'CP1251',
+
+  // Sami_Sweden_Finland_100_BIN
+  [0x083B]: 'CP1252',
+
+  // Tamazight_100_BIN
+  [0x085F]: 'CP1252',
+
+  // Chinese_Hong_Kong_Stroke_90_BIN
+  [0x0C04]: 'CP950',
+
+  // Modern_Spanish_BIN
+  [0x0C0A]: 'CP1252',
+
+  // Serbian_Cyrillic_100_BIN
+  [0x0C1A]: 'CP1251',
+
+  // Chinese_Traditional_Pinyin_100_BIN
+  [0x1404]: 'CP950',
+
+  // Bosnian_Latin_100_BIN
+  [0x141A]: 'CP1250',
+
+  // Bosnian_Cyrillic_100_BIN
+  [0x201A]: 'CP1251',
+
+  // German
+  [0x0407]: 'CP1252',
+
+  // German_PhoneBook_BIN
+  [0x10407]: 'CP1252',
+
+  // Hungarian_Technical_BIN
+  [0x1040E]: 'CP1250',
+
+  // Japanese_Unicode_BIN
+  [0x10411]: 'CP932',
+
+  // Georgian_Modern_Sort_BIN
+  [0x10437]: 'CP1252',
+
+  // Chinese_PRC_Stroke_BIN
+  // Chinese_Simplified_Stroke_Order_100_BIN
+  [0x20804]: 'CP936',
+
+  // Chinese_Traditional_Stroke_Order_100_BIN
+  [0x21404]: 'CP950',
+
+  // Chinese_Taiwan_Bopomofo_BIN
+  // Chinese_Traditional_Bopomofo_100_BIN
+  [0x30404]: 'CP950',
+
+  // Japanese_Bushu_Kakusu_100_BIN
+  [0x40411]: 'CP932',
+
+  // These LCIDs might not actually be supported by SQL Server
+
+  [0x0436]: 'CP1252',
+  [0x0801]: 'CP1256',
+  [0x0C01]: 'CP1256',
   [0x1001]: 'CP1256',
   [0x1401]: 'CP1256',
   [0x1801]: 'CP1256',
@@ -21,17 +239,9 @@ export const codepageByLcid: { [key: number]: string | undefined } = {
   [0x423]: 'CP1251',
   [0x402]: 'CP1251',
   [0x403]: 'CP1252',
-  [0x30404]: 'CP950',
-  [0x404]: 'CP950',
-  [0x804]: 'CP936',
-  [0x20804]: 'CP936',
   [0x1004]: 'CP936',
-  [0x41a]: 'CP1250',
-  [0x405]: 'CP1250',
-  [0x406]: 'CP1252',
   [0x413]: 'CP1252',
   [0x813]: 'CP1252',
-  [0x409]: 'CP1252',
   [0x809]: 'CP1252',
   [0x1009]: 'CP1252',
   [0x1409]: 'CP1252',
@@ -40,52 +250,25 @@ export const codepageByLcid: { [key: number]: string | undefined } = {
   [0x1C09]: 'CP1252',
   [0x2409]: 'CP1252',
   [0x2009]: 'CP1252',
-  [0x425]: 'CP1257',
   [0x0438]: 'CP1252',
-  [0x429]: 'CP1256',
-  [0x40B]: 'CP1252',
-  [0x40C]: 'CP1252',
   [0x80C]: 'CP1252',
   [0x100C]: 'CP1252',
   [0xC0C]: 'CP1252',
   [0x140C]: 'CP1252',
-  [0x10437]: 'CP1252',
-  [0x10407]: 'CP1252',
-  [0x407]: 'CP1252',
   [0x807]: 'CP1252',
   [0xC07]: 'CP1252',
   [0x1007]: 'CP1252',
   [0x1407]: 'CP1252',
-  [0x408]: 'CP1253',
-  [0x40D]: 'CP1255',
   [0x439]: 'CPUTF8',
-  [0x40E]: 'CP1250',
   [0x104E]: 'CP1250',
-  [0x40F]: 'CP1252',
   [0x421]: 'CP1252',
   [0x410]: 'CP1252',
   [0x810]: 'CP1252',
-  [0x411]: 'CP932',
-  [0x10411]: 'CP932',
-  [0x412]: 'CP949',
-  [0x426]: 'CP1257',
-  [0x427]: 'CP1257',
   [0x827]: 'CP1257',
-  [0x41C]: 'CP1251',
-  [0x414]: 'CP1252',
   [0x814]: 'CP1252',
-  [0x415]: 'CP1250',
   [0x816]: 'CP1252',
   [0x416]: 'CP1252',
-  [0x418]: 'CP1250',
-  [0x419]: 'CP1251',
-  [0x81A]: 'CP1251',
-  [0xC1A]: 'CP1251',
-  [0x41B]: 'CP1250',
-  [0x424]: 'CP1250',
   [0x80A]: 'CP1252',
-  [0x40A]: 'CP1252',
-  [0xC0A]: 'CP1252',
   [0x100A]: 'CP1252',
   [0x140A]: 'CP1252',
   [0x180A]: 'CP1252',
@@ -100,11 +283,6 @@ export const codepageByLcid: { [key: number]: string | undefined } = {
   [0x3C0A]: 'CP1252',
   [0x400A]: 'CP1252',
   [0x41D]: 'CP1252',
-  [0x41E]: 'CP874',
-  [0x41F]: 'CP1254',
-  [0x422]: 'CP1251',
-  [0x420]: 'CP1256',
-  [0x42A]: 'CP1258'
 };
 
 export const codepageBySortId: { [key: number]: string | undefined } = {
