@@ -34,7 +34,7 @@ const Image: DataType = {
     }
 
     const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(parameter.length!, 0);
+    buffer.writeInt32LE(parameter.value.length!, 0);
     return buffer;
   },
 

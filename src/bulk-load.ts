@@ -120,6 +120,17 @@ interface ColumnOptions {
 }
 
 const rowTokenBuffer = Buffer.from([ TOKEN_TYPE.ROW ]);
+const textPointerAndTimestampBuffer = Buffer.from([
+  // TextPointer length
+  0x10,
+
+  // TextPointer
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+  // Timestamp
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+]);
+const textPointerNullBuffer = Buffer.from([0x00]);
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
@@ -182,6 +193,14 @@ class RowTransform extends Transform {
         precision: c.precision,
         value: value
       };
+
+        if (value == null) {
+          this.push(textPointerNullBuffer);
+          continue;
+        }
+
+        this.push(textPointerAndTimestampBuffer);
+      }
 
       this.push(c.type.generateParameterLength(parameter, this.mainOptions));
       for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
@@ -610,6 +629,11 @@ class BulkLoad extends EventEmitter {
 
       // TYPE_INFO
       tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+
+      // TableName
+      if (c.type.hasTableName) {
+        tBuf.writeUsVarchar(this.table, 'ucs2');
+      }
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');

@@ -1536,6 +1536,109 @@ describe('BulkLoad', function() {
       done();
     }
   });
+
+  it('supports bulk loading into a `text` column', function(done) {
+    const expectedRows = [
+      { value: 'some text' },
+      { value: null }
+    ];
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, expectedRows.length);
+
+      /** @type {unknown[]} */
+      const results = [];
+      const request = new Request(`
+        SELECT value FROM #tmpTestTable
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, expectedRows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ value: row[0].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('value', TYPES.Text, { nullable: true });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        [value] text NULL
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, Readable.from(expectedRows));
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('supports bulk loading into a `image` column', function(done) {
+    const expectedRows = [
+      { value: Buffer.from([0xDE, 0xAD, 0xBE, 0xEF]) },
+      { value: null }
+    ];
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, expectedRows.length);
+
+      /** @type {unknown[]} */
+      const results = [];
+
+      const request = new Request(`
+        SELECT value FROM #tmpTestTable
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, expectedRows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ value: row[0].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('value', TYPES.Image, { nullable: true });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        [value] image NULL
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, Readable.from(expectedRows));
+    });
+
+    connection.execSqlBatch(request);
+  });
 });
 
 describe('Bulk Loads when `config.options.validateBulkLoadParameters` is `true`', () => {
