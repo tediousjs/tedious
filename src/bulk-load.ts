@@ -194,6 +194,7 @@ class RowTransform extends Transform {
         value: value
       };
 
+      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
           this.push(textPointerNullBuffer);
           continue;
