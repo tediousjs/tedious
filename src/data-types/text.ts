@@ -1,3 +1,5 @@
+import iconv from 'iconv-lite';
+
 import { DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
@@ -50,10 +52,16 @@ const Text: DataType = {
       return;
     }
 
-    yield Buffer.from(parameter.value.toString(), 'ascii');
+    const value = parameter.value;
+
+    if (Buffer.isBuffer(value)) {
+      yield value;
+    } else {
+      yield Buffer.from(value.toString(), 'ascii');
+    }
   },
 
-  validate: function(value): string | null {
+  validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;
     }
@@ -64,7 +72,16 @@ const Text: DataType = {
       }
       value = value.toString();
     }
-    return value;
+
+    if (!collation) {
+      throw new Error('No collation was set by the server for the current connection.');
+    }
+
+    if (!collation.codepage) {
+      throw new Error('The collation set by the server has no associated encoding.');
+    }
+
+    return iconv.encode(value, collation.codepage);
   }
 };
 
