@@ -1,18 +1,10 @@
-import { codepageBySortId, codepageByLcid } from './collation';
+import { Collation } from './collation';
 import Parser from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
-
-interface Collation {
-  lcid: number;
-  flags: number;
-  version: number;
-  sortId: number;
-  codepage: string;
-}
 
 interface XmlSchema {
   dbname: string;
@@ -63,25 +55,10 @@ export type Metadata = {
 } & BaseMetadata;
 
 
-function readCollation(parser: Parser, callback: (collation: Collation | undefined) => void) {
+function readCollation(parser: Parser, callback: (collation: Collation) => void) {
   // s2.2.5.1.2
   parser.readBuffer(5, (collationData) => {
-    let lcid = (collationData[2] & 0x0F) << 16;
-    lcid |= collationData[1] << 8;
-    lcid |= collationData[0];
-
-    // This may not be extracting the correct nibbles in the correct order.
-    let flags = collationData[3] >> 4;
-    flags |= collationData[2] & 0xF0;
-
-    // This may not be extracting the correct nibble.
-    const version = collationData[3] & 0x0F;
-
-    const sortId = collationData[4];
-
-    const codepage = codepageBySortId[sortId] || codepageByLcid[lcid] || 'CP1252';
-
-    callback({ lcid, flags, version, sortId, codepage });
+    callback(Collation.fromBuffer(collationData));
   });
 }
 
