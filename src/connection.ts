@@ -524,8 +524,10 @@ export interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
-  columnEncryptionKeyCacheTTL: number;
-  columnEncryptionSetting: boolean;
+
+  columnEncryptionKeyCacheTTL?: number;
+
+  columnEncryptionSetting?: boolean;
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
