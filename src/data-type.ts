@@ -65,6 +65,7 @@ export interface Parameter {
   encryptedVal?: Buffer;
 }
 
+
 export interface ParameterData<T = any> {
   length?: number;
   scale?: number;

@@ -4,10 +4,6 @@ import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 
 const optionBufferSize = 20;
 
-const VERSION = 0x000000001;
-
-const SUBBUILD = 0x0001;
-
 const TOKEN = {
   VERSION: 0x00,
   ENCRYPTION: 0x01,
@@ -44,9 +40,14 @@ for (const name in MARS) {
   marsByValue[value] = name;
 }
 
-
 interface Options {
   encrypt: boolean;
+  version: {
+    major: number;
+    minor: number;
+    build: number;
+    subbuild: number;
+  };
 }
 
 /*
@@ -59,8 +60,7 @@ class PreloginPayload {
   version!: {
     major: number;
     minor: number;
-    patch: number;
-    trivial: number;
+    build: number;
     subbuild: number;
   };
 
@@ -75,10 +75,10 @@ class PreloginPayload {
   marsString!: string;
   fedAuthRequired!: number;
 
-  constructor(bufferOrOptions: Buffer | Options = { encrypt: false }) {
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
-      this.options = { encrypt: false };
+      this.options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } };
     } else {
       this.options = bufferOrOptions;
       this.createOptions();
@@ -121,8 +121,10 @@ class PreloginPayload {
 
   createVersionOption() {
     const buffer = new WritableTrackingBuffer(optionBufferSize);
-    buffer.writeUInt32BE(VERSION);
-    buffer.writeUInt16BE(SUBBUILD);
+    buffer.writeUInt8(this.options.version.major);
+    buffer.writeUInt8(this.options.version.minor);
+    buffer.writeUInt16BE(this.options.version.build);
+    buffer.writeUInt16BE(this.options.version.subbuild);
     return {
       token: TOKEN.VERSION,
       data: buffer.data
@@ -214,8 +216,7 @@ class PreloginPayload {
     this.version = {
       major: this.data.readUInt8(offset + 0),
       minor: this.data.readUInt8(offset + 1),
-      patch: this.data.readUInt8(offset + 2),
-      trivial: this.data.readUInt8(offset + 3),
+      build: this.data.readUInt16BE(offset + 2),
       subbuild: this.data.readUInt16BE(offset + 4)
     };
   }
@@ -244,8 +245,8 @@ class PreloginPayload {
 
   toString(indent = '') {
     return indent + 'PreLogin - ' + sprintf(
-      'version:%d.%d.%d.%d %d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
-      this.version.major, this.version.minor, this.version.patch, this.version.trivial, this.version.subbuild,
+      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
+      this.version.major, this.version.minor, this.version.build, this.version.subbuild,
       this.encryption ? this.encryption : 0,
       this.encryptionString ? this.encryptionString : '',
       this.instance ? this.instance : 0,

@@ -5,7 +5,7 @@ import { Socket } from 'net';
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 
-import { Readable } from 'readable-stream';
+import { Readable } from 'stream';
 
 import {
   loginWithVmMSI,
@@ -43,11 +43,14 @@ import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { shouldHonorAE } from './always-encrypted/utils';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
-
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
-import AbortController from 'node-abort-controller';
+import AbortController, { AbortSignal } from 'node-abort-controller';
+import { Parameter, TYPES } from './data-type';
+import { BulkLoadPayload } from './bulk-load-payload';
+
+import { version } from '../package.json';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -177,7 +180,7 @@ const DEFAULT_PACKET_SIZE = 4 * 1024;
 /**
  * @private
  */
-const DEFAULT_TEXTSIZE = '2147483647';
+const DEFAULT_TEXTSIZE = 2147483647;
 /**
  * @private
  */
@@ -378,7 +381,7 @@ export interface InternalConnectionOptions {
   serverName: undefined | string;
   serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
-  textsize: string;
+  textsize: number;
   trustedServerNameAE?: string;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
@@ -397,6 +400,9 @@ interface KeyStoreProviderMap {
   [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
+/**
+ * @private
+ */
 interface State {
   name: string;
   enter?(this: Connection): void;
@@ -489,7 +495,7 @@ interface AuthenticationOptions {
   options?: any;
 }
 
-interface ConnectionOptions {
+export interface ConnectionOptions {
   /**
    * A boolean determining whether to rollback a transaction automatically if any error is encountered
    * during the given transaction's execution. This sets the value for `SET XACT_ABORT` during the
@@ -831,7 +837,7 @@ interface ConnectionOptions {
   /**
    * A boolean determining whether BulkLoad parameters should be validated.
    *
-   * (default: `false`).
+   * (default: `true`).
    */
   validateBulkLoadParameters?: boolean;
 
@@ -860,6 +866,11 @@ const CLEANUP_TYPE = {
   REDIRECT: 1,
   RETRY: 2
 };
+
+interface RoutingData {
+  server: string;
+  port: number;
+}
 
 /**
  * A [[Connection]] instance represents a single connection to a database server.
@@ -970,7 +981,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  routingData: any;
+  routingData: undefined | RoutingData;
+
   /**
    * @private
    */
@@ -1642,7 +1654,13 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.textsize" property must be of type number or null.');
         }
 
-        this.config.options.textsize = config.options.textsize;
+        if (config.options.textsize > 2147483647) {
+          throw new TypeError('The "config.options.textsize" can\'t be greater than 2147483647.');
+        } else if (config.options.textsize < -1) {
+          throw new TypeError('The "config.options.textsize" can\'t be smaller than -1.');
+        }
+
+        this.config.options.textsize = config.options.textsize | 0;
       }
 
       if (config.options.trustServerCertificate !== undefined) {
@@ -1691,6 +1709,10 @@ class Connection extends EventEmitter {
       if (config.options.validateBulkLoadParameters !== undefined) {
         if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
           throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        if (config.options.validateBulkLoadParameters === false) {
+          deprecate('Setting the "config.options.validateBulkLoadParameters" to `false` is deprecated and will no longer work in the next major version of `tedious`. Set the value to `true` and update your use of BulkLoad functionality to silence this message.');
         }
 
         this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
@@ -1880,6 +1902,11 @@ class Connection extends EventEmitter {
    * The server has reported that the language has changed.
    */
   on(event: 'languageChange', listener: (languageName: string) => void): this
+
+  /**
+   * The connection was reset.
+   */
+  on(event: 'resetConnection', listener: () => void): this
 
   /**
    * A secure connection has been established.
@@ -2131,7 +2158,12 @@ class Connection extends EventEmitter {
     });
 
     tokenStreamParser.on('routingChange', (token) => {
-      this.routingData = token.newValue;
+      // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
+      const [ server ] = token.newValue.server.split('\\');
+
+      this.routingData = {
+        server, port: token.newValue.port
+      };
     });
 
     tokenStreamParser.on('packetSizeChange', (token) => {
@@ -2560,7 +2592,8 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData.server + ':' + this.routingData.port);
+      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+
       this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
@@ -2577,9 +2610,13 @@ class Connection extends EventEmitter {
    * @private
    */
   sendPreLogin() {
+    const [ , major, minor, build ] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [ '0.0.0', '0', '0', '0' ];
+
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt
+      encrypt: this.config.options.encrypt,
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
+
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
       return payload.toString('  ');
@@ -2816,7 +2853,7 @@ class Connection extends EventEmitter {
 
   _execSql(request: Request) {
     try {
-      request.transformIntoExecuteSqlRpc();
+      request.validateParameters();
     } catch (error) {
       request.error = error;
 
@@ -2828,7 +2865,33 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'statement',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    if (request.parameters.length) {
+      parameters.push({
+        type: TYPES.NVarChar,
+        name: 'params',
+        value: request.makeParamsParameter(request.parameters),
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined
+      });
+
+      parameters.push(...request.parameters);
+    }
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2890,20 +2953,119 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Execute the SQL batch represented by [[Request]] .
-   * There is no param support, and unlike [[execSql]],
-   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   * Execute a [[BulkLoad]].
    *
-   * In almost all cases, [[execSql]] will be a better choice.
+   * ```js
+   * // We want to perform a bulk load into a table with the following format:
+   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
    *
-   * @param bulkLoad A previously prepared [[Request]] .
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // ...
+   * });
+   *
+   * // First, we need to specify the columns that we want to write to,
+   * // and their definitions. These definitions must match the actual table,
+   * // otherwise the bulk load will fail.
+   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   *
+   * // Now, we can specify each row to be written.
+   * //
+   * // Note that these rows are held in memory until the
+   * // bulk load was performed, so if you need to write a large
+   * // number of rows (e.g. by reading from a CSV file),
+   * // using a streaming bulk load is advisable to keep memory usage low.
+   * bulkLoad.addRow({ 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') });
+   * bulkLoad.addRow({ 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') });
+   *
+   * connection.execBulkLoad(bulkLoad);
+   * ```
+   *
+   * @param bulkLoad A previously created [[BulkLoad]].
+   *
+   * @deprecated Adding rows to a [[BulkLoad]] via [[BulkLoad.addRow]] or [[BulkLoad.getRowStream]]
+   *   is deprecated and will be removed in the future. You should migrate to calling [[Connection.execBulkLoad]]
+   *   with a `Iterable` or `AsyncIterable` as the second argument instead.
    */
-  execBulkLoad(bulkLoad: BulkLoad) {
+  execBulkLoad(bulkLoad: BulkLoad): void
+
+  /**
+   * Execute a [[BulkLoad]].
+   *
+   * ```js
+   * // We want to perform a bulk load into a table with the following format:
+   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
+   *
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // ...
+   * });
+   *
+   * // First, we need to specify the columns that we want to write to,
+   * // and their definitions. These definitions must match the actual table,
+   * // otherwise the bulk load will fail.
+   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   *
+   * // Execute a bulk load with a predefined list of rows.
+   * //
+   * // Note that these rows are held in memory until the
+   * // bulk load was performed, so if you need to write a large
+   * // number of rows (e.g. by reading from a CSV file),
+   * // passing an `AsyncIterable` is advisable to keep memory usage low.
+   * connection.execBulkLoad(bulkLoad, [
+   *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') },
+   *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') }
+   * ]);
+   * ```
+   *
+   * @param bulkLoad A previously created [[BulkLoad]].
+   * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
+   */
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
+
+    if (rows) {
+      if (bulkLoad.streamingMode) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
+      }
+
+      if (bulkLoad.firstRowWritten) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
+      }
+
+      const rowStream = Readable.from(rows);
+
+      // Destroy the packet transform if an error happens in the row stream,
+      // e.g. if an error is thrown from within a generator or stream.
+      rowStream.on('error', (err) => {
+        bulkLoad.rowToPacketTransform.destroy(err);
+      });
+
+      // Destroy the row stream if an error happens in the packet transform,
+      // e.g. if the bulk load is cancelled.
+      bulkLoad.rowToPacketTransform.on('error', (err) => {
+        rowStream.destroy(err);
+      });
+
+      rowStream.pipe(bulkLoad.rowToPacketTransform);
+    } else if (!bulkLoad.streamingMode) {
+      // If the bulkload was not put into streaming mode by the user,
+      // we end the rowToPacketTransform here for them.
+      //
+      // If it was put into streaming mode, it's the user's responsibility
+      // to end the stream.
+      bulkLoad.rowToPacketTransform.end();
+    }
 
     const onCancel = () => {
       request.cancel();
     };
+
+    const payload = new BulkLoadPayload(bulkLoad);
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);
@@ -2917,7 +3079,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
     });
 
     bulkLoad.once('cancel', onCancel);
@@ -2935,8 +3097,49 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
-    request.transformIntoPrepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      value: undefined,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'params',
+      value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'stmt',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    request.preparing = true;
+    // TODO: We need to clean up this event handler, otherwise this leaks memory
+    request.on('returnValue', (name: string, value: any) => {
+      if (name === 'handle') {
+        request.handle = value;
+      } else {
+        request.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+      }
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2947,8 +3150,20 @@ class Connection extends EventEmitter {
    *   Parameter values are ignored.
    */
   unprepare(request: Request) {
-    request.transformIntoUnprepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2960,9 +3175,29 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }) {
+    const executeParameters: Parameter[] = [];
+
+    executeParameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
     try {
-      request.transformIntoExecuteRpc(parameters);
+      for (let i = 0, len = request.parameters.length; i < len; i++) {
+        const parameter = request.parameters[i];
+
+        executeParameters.push({
+          ...parameter,
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null)
+        });
+      }
     } catch (error) {
       request.error = error;
 
@@ -2974,7 +3209,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2983,18 +3218,20 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   callProcedure(request: Request) {
-    request.validateParameters();
+    try {
+      request.validateParameters();
+    } catch (error) {
+      request.error = error;
 
-    const error = request.error;
-    if (error != null) {
       process.nextTick(() => {
         this.debug.log(error.message);
         request.callback(error);
       });
+
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -3188,9 +3425,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3212,9 +3447,9 @@ class Connection extends EventEmitter {
       request.rows! = [];
       request.rst! = [];
 
-      let message: Message;
-
       const onCancel = () => {
+        payloadStream.unpipe(message);
+
         // set the ignore bit and end the message.
         message.ignore = true;
         message.end();
@@ -3229,38 +3464,33 @@ class Connection extends EventEmitter {
 
       this.createRequestTimer();
 
-      if (request instanceof BulkLoad) {
-        message = request.getMessageStream();
-
-        // If the bulkload was not put into streaming mode by the user,
-        // we end the rowToPacketTransform here for them.
-        //
-        // If it was put into streaming mode, it's the user's responsibility
-        // to end the stream.
-        if (!request.streamingMode) {
-          request.rowToPacketTransform.end();
-        }
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      } else {
-        message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-        message.once('finish', () => {
-          this.resetConnectionOnNextRequest = false;
-          this.debug.payload(function() {
-            return payload!.toString('  ');
-          });
-        });
-
-        Readable.from(payload!).pipe(message);
-      }
+      const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+      this.messageIo.outgoingMessageStream.write(message);
+      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
         request.once('cancel', this._cancelAfterRequestSent);
+
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload!.toString('  ');
+        });
       });
+
+      const payloadStream = Readable.from(payload);
+      payloadStream.once('error', (error) => {
+        payloadStream.unpipe(message);
+
+        // Only set a request error if no error was set yet.
+        request.error ??= error;
+
+        payloadStream.unpipe(message);
+
+        message.ignore = true;
+        message.end();
+      });
+      payloadStream.pipe(message);
     }
   }
 

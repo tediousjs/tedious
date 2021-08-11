@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events';
-import { typeByName as TYPES, Parameter, DataType } from './data-type';
+import { Parameter, DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
+import { Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
-import { Metadata } from './metadata-parser';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -31,7 +31,7 @@ type CompletionCallback =
   // TODO: Figure out how to type the `rows` parameter here.
   (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-interface ParameterOptions {
+export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
@@ -71,10 +71,6 @@ class Request extends EventEmitter {
    * @private
    */
   parametersByName: { [key: string]: Parameter };
-  /**
-   * @private
-   */
-  originalParameters: Parameter[];
   /**
    * @private
    */
@@ -129,7 +125,6 @@ class Request extends EventEmitter {
   shouldHonorAE?: boolean;
   statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
   cryptoMetadataLoaded: boolean;
-
 
   /**
    * This event, describing result set columns, will be emitted before row
@@ -366,7 +361,6 @@ class Request extends EventEmitter {
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
-    this.originalParameters = [];
     this.preparing = false;
     this.handle = undefined;
     this.canceled = false;
@@ -408,7 +402,7 @@ class Request extends EventEmitter {
    *   Additional type options. Optional.
    */
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: DataType, value: unknown, options?: ParameterOptions) {
+  addParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions | null) {
     if (options == null) {
       options = {};
     }
@@ -477,73 +471,6 @@ class Request extends EventEmitter {
       }
     }
     return paramsParameter;
-  }
-
-  /**
-   * @private
-   */
-  transformIntoExecuteSqlRpc() {
-    this.validateParameters();
-
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addParameter('statement', TYPES.NVarChar, this.sqlTextOrProcedure);
-    if (this.originalParameters.length) {
-      this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    }
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      this.parameters.push(parameter);
-    }
-    this.sqlTextOrProcedure = 'sp_executesql';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoPrepareRpc() {
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addOutputParameter('handle', TYPES.Int, undefined);
-    this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
-    this.sqlTextOrProcedure = 'sp_prepare';
-    this.preparing = true;
-    this.on('returnValue', (name: string, value: any) => {
-      if (name === 'handle') {
-        this.handle = value;
-      } else {
-        this.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
-      }
-    });
-  }
-
-  /**
-   * @private
-   */
-  transformIntoUnprepareRpc() {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-    this.sqlTextOrProcedure = 'sp_unprepare';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoExecuteRpc(parameters: { [key: string]: unknown }) {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      parameter.value = parameters[parameter.name];
-      this.parameters.push(parameter);
-    }
-
-    this.validateParameters();
-
-    this.sqlTextOrProcedure = 'sp_execute';
   }
 
   /**

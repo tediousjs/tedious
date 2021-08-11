@@ -86,10 +86,9 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     });
   });
 
-  metadataRequest.originalParameters = request.parameters;
   metadataRequest.addParameter('tsql', TYPES.NVarChar, request.sqlTextOrProcedure);
-  if (metadataRequest.originalParameters && metadataRequest.originalParameters.length) {
-    metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
+  if (request.parameters.length) {
+    metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(request.parameters));
   }
 
   const resultRows: any[] = [];
@@ -98,5 +97,5 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     resultRows.push(columns);
   });
 
-  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest, connection.currentTransactionDescriptor(), connection.config.options));
+  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters, connection.currentTransactionDescriptor(), connection.config.options));
 };

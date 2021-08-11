@@ -1,9 +1,12 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
-const TYPES = require('../../src/data-type').typeByName;
+// @ts-check
 
 const fs = require('fs');
 const { assert } = require('chai');
+
+const TYPES = require('../../src/data-type').typeByName;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
@@ -47,7 +50,9 @@ describe('inserting binary data', function() {
           return done(err);
         }
 
+        /** @type {unknown[]} */
         const values = [];
+
         const request = new Request('SELECT [data] FROM #test', (err) => {
           if (err) {
             return done(err);

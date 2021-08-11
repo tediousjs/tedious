@@ -1,10 +1,20 @@
+// @ts-check
+
 const { assert } = require('chai');
 const net = require('net');
 const Connection = require('../../src/tedious').Connection;
 const ConnectionError = require('../../src/errors').ConnectionError;
 
 describe('Connecting to a server that sends invalid packet data', function() {
-  let server, sockets;
+  /**
+   * @type {net.Server}
+   */
+  let server;
+
+  /**
+   * @type {net.Socket[]}
+   */
+  let sockets;
 
   beforeEach(function(done) {
     sockets = [];
@@ -40,7 +50,7 @@ describe('Connecting to a server that sends invalid packet data', function() {
       socket.write(packet);
     });
 
-    const addressInfo = server.address();
+    const addressInfo = /** @type {net.AddressInfo} */(server.address());
     const connection = new Connection({
       server: addressInfo.address,
       options: {
@@ -50,7 +60,7 @@ describe('Connecting to a server that sends invalid packet data', function() {
 
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);
-      assert.equal(err.message, 'Connection lost - Unable to process incoming packet');
+      assert.equal(/** @type {ConnectionError} */(err).message, 'Connection lost - Unable to process incoming packet');
 
       done();
     });

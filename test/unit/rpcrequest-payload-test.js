@@ -1,7 +1,6 @@
 const { assert } = require('chai');
 
 const RpcRequestPayload = require('../../src/rpcrequest-payload');
-const Request = require('../../src/request');
 const { typeByName } = require('../../src/data-type');
 const {
   alwaysEncryptedOptions
@@ -39,8 +38,7 @@ const sampleCryptoMetadata = {
 
 describe('RpcRequestPayload', () => {
   it('get data', async function() {
-    const req = new Request('SELECT 1', () => { });
-    const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
+    const payload = new RpcRequestPayload('sp_executesql', [], Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
 
     const expectedData = Buffer.from([
       // headers
@@ -52,13 +50,16 @@ describe('RpcRequestPayload', () => {
       0x01, 0x00, 0x00, 0x00,
 
       // sql query length
-      0x08, 0x00,
+      0x0d, 0x00,
 
       // sql query
-      0x53, 0x00, 0x45, 0x00,
-      0x4C, 0x00, 0x45, 0x00,
-      0x43, 0x00, 0x54, 0x00,
-      0x20, 0x00, 0x31, 0x00,
+      0x73, 0x00, 0x70, 0x00,
+      0x5f, 0x00, 0x65, 0x00,
+      0x78, 0x00, 0x65, 0x00,
+      0x63, 0x00, 0x75, 0x00,
+      0x74, 0x00, 0x65, 0x00,
+      0x73, 0x00, 0x71, 0x00,
+      0x6c, 0x00,
 
       // option flags
       0x00, 0x00,
@@ -74,10 +75,17 @@ describe('RpcRequestPayload', () => {
   });
 
   it('get data with param', async function() {
-    const req = new Request('SELECT @param', () => { });
-    req.addParameter('param', typeByName.Int, 1);
-
-    const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
+    const payload = new RpcRequestPayload('SELECT @param', [
+      {
+        type: typeByName.Int,
+        name: 'param',
+        value: 1,
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined
+      }
+    ], Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), options);
 
     const expectedData = Buffer.from([
       // headers
@@ -124,16 +132,22 @@ describe('RpcRequestPayload', () => {
   });
 
   it('get data with encrypted param', async function() {
-    const req = new Request('SELECT @param', () => { });
+    const payload = new RpcRequestPayload('SELECT @param', [
+      {
+        type: typeByName.Int,
+        name: 'param',
+        value: 1,
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined,
 
-    req.addParameter('param', typeByName.Int, 1);
-
-    req.parameters[0].cryptoMetadata = {
-      ...sampleCryptoMetadata,
-      baseTypeInfo: { type: typeByName.Int },
-    };
-
-    const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), alwaysEncryptedOptions);
+        cryptoMetadata: {
+          ...sampleCryptoMetadata,
+          baseTypeInfo: { type: typeByName.Int },
+        }
+      }
+    ], Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), alwaysEncryptedOptions);
 
     const expectedData = Buffer.from([
       // headers
@@ -193,22 +207,37 @@ describe('RpcRequestPayload', () => {
   });
 
   it('get data with 2 encrypted param', async function() {
-    const req = new Request('SELECT @param1, @param2', () => { });
+    const payload = new RpcRequestPayload('SELECT @param1, @param2', [
+      {
+        type: typeByName.Int,
+        name: 'param1',
+        value: 1,
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined,
 
-    req.addParameter('param1', typeByName.Int, 1);
-    req.addParameter('param2', typeByName.Int, 2);
+        cryptoMetadata: {
+          ...sampleCryptoMetadata,
+          baseTypeInfo: { type: typeByName.Int },
+        }
+      },
 
-    req.parameters[0].cryptoMetadata = {
-      ...sampleCryptoMetadata,
-      baseTypeInfo: { type: typeByName.Int },
-    };
+      {
+        type: typeByName.Int,
+        name: 'param2',
+        value: 2,
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined,
 
-    req.parameters[1].cryptoMetadata = {
-      ...sampleCryptoMetadata,
-      baseTypeInfo: { type: typeByName.Int },
-    };
-
-    const payload = new RpcRequestPayload(req, Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), alwaysEncryptedOptions);
+        cryptoMetadata: {
+          ...sampleCryptoMetadata,
+          baseTypeInfo: { type: typeByName.Int },
+        }
+      }
+    ], Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]), alwaysEncryptedOptions);
 
     const expectedData = Buffer.from([
       // headers

@@ -2,6 +2,7 @@ import dgram from 'dgram';
 import dns from 'dns';
 import net from 'net';
 import * as punycode from 'punycode';
+import { AbortSignal } from 'node-abort-controller';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 

@@ -1,8 +1,10 @@
+// @ts-check
+
 const fs = require('fs');
 const { assert } = require('chai');
 
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   const config = JSON.parse(
@@ -22,7 +24,12 @@ function getConfig() {
   return config;
 }
 
+/**
+ * @typedef {import('net').Socket} Socket
+ */
+
 describe('A `error` on the network socket', function() {
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {
@@ -52,7 +59,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 
@@ -68,7 +75,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 
@@ -92,7 +99,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 });

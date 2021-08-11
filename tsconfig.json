@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "esnext",
     "moduleResolution": "node",
-    "allowJs": false,
+    "allowJs": true,
     "noEmit": true,
     "strict": true,
     "isolatedModules": true,
@@ -10,11 +10,13 @@
     "allowSyntheticDefaultImports": true,
     "lib": [ "esnext" ],
     "skipLibCheck": true,
+    "resolveJsonModule": true
   },
 
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "test/**/*.js",
   ],
 
   "typedocOptions": {

@@ -28,7 +28,7 @@ import {
   DoneProcToken,
   DoneToken
 } from './token';
-import { Readable } from 'readable-stream';
+import { Readable } from 'stream';
 import Message from '../message';
 
 export class Parser extends EventEmitter {
@@ -42,7 +42,7 @@ export class Parser extends EventEmitter {
     this.debug = debug;
     this.options = options;
 
-    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options)) as Readable;
+    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
     this.parser.on('data', (token: Token) => {
       // console.log(token);
       if (token.event) {

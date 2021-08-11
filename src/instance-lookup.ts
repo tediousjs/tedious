@@ -1,5 +1,5 @@
 import dns from 'dns';
-import AbortController from 'node-abort-controller';
+import AbortController, { AbortSignal } from 'node-abort-controller';
 
 import { Sender } from './sender';
 

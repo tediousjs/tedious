@@ -2,13 +2,10 @@ import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import Connection, { InternalConnectionOptions } from './connection';
 
-import { Transform } from 'readable-stream';
+import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
-import Message from './message';
-import { TYPE as PACKET_TYPE } from './packet';
 
 import { DataType, Parameter } from './data-type';
-import { RequestError } from './errors';
 
 /**
  * @private
@@ -48,6 +45,7 @@ interface InternalOptions {
   fireTriggers: boolean;
   keepNulls: boolean;
   lockTable: boolean;
+  order: { [columnName: string]: 'ASC' | 'DESC' };
 }
 
 export interface Options {
@@ -72,6 +70,11 @@ export interface Options {
    * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
    */
   lockTable?: InternalOptions['lockTable'];
+
+  /**
+   * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
+   */
+  order?: InternalOptions['order'];
 }
 
 
@@ -116,6 +119,19 @@ interface ColumnOptions {
   nullable?: boolean;
 }
 
+const rowTokenBuffer = Buffer.from([ TOKEN_TYPE.ROW ]);
+const textPointerAndTimestampBuffer = Buffer.from([
+  // TextPointer length
+  0x10,
+
+  // TextPointer
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+  // Timestamp
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+]);
+const textPointerNullBuffer = Buffer.from([0x00]);
+
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
   /**
@@ -151,31 +167,41 @@ class RowTransform extends Transform {
   /**
    * @private
    */
-  _transform(row: Array<any>, _encoding: string, callback: (error?: Error) => void) {
+  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
       this.push(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
     }
 
-    const buf = new WritableTrackingBuffer(64, 'ucs2', true);
-    buf.writeUInt8(TOKEN_TYPE.ROW);
-    this.push(buf.data);
+    this.push(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
+      let value = Array.isArray(row) ? row[i] : row[c.objName];
+
       if (this.bulkLoad.options.validateBulkLoadParameters) {
         try {
-          c.type.validate(row[i]);
+          value = c.type.validate(value);
         } catch (error) {
           return callback(error);
         }
       }
+
       const parameter = {
         length: c.length,
         scale: c.scale,
         precision: c.precision,
-        value: row[i]
+        value: value
       };
+
+      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
+        if (value == null) {
+          this.push(textPointerNullBuffer);
+          continue;
+        }
+
+        this.push(textPointerAndTimestampBuffer);
+      }
 
       this.push(c.type.generateParameterLength(parameter, this.mainOptions));
       for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
@@ -216,12 +242,11 @@ class RowTransform extends Transform {
  * bulkLoad.addColumn('myInt', TYPES.Int, { nullable: false });
  * bulkLoad.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
  *
- * // add rows
- * bulkLoad.addRow({ myInt: 7, myString: 'hello' });
- * bulkLoad.addRow({ myInt: 23, myString: 'world' });
- *
  * // execute
- * connection.execBulkLoad(bulkLoad);
+ * connection.execBulkLoad(bulkLoad, [
+ *   { myInt: 7, myString: 'hello' },
+ *   { myInt: 23, myString: 'world' }
+ * ]);
  * ```
  */
 class BulkLoad extends EventEmitter {
@@ -276,7 +301,6 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   rowToPacketTransform: RowTransform;
-  message: Message;
 
   /**
    * @private
@@ -308,6 +332,7 @@ class BulkLoad extends EventEmitter {
     fireTriggers = false,
     keepNulls = false,
     lockTable = false,
+    order = {},
   }: Options, callback: Callback) {
     if (typeof checkConstraints !== 'boolean') {
       throw new TypeError('The "options.checkConstraints" property must be of type boolean.');
@@ -325,6 +350,16 @@ class BulkLoad extends EventEmitter {
       throw new TypeError('The "options.lockTable" property must be of type boolean.');
     }
 
+    if (typeof order !== 'object' || order === null) {
+      throw new TypeError('The "options.order" property must be of type object.');
+    }
+
+    for (const [column, direction] of Object.entries(order)) {
+      if (direction !== 'ASC' && direction !== 'DESC') {
+        throw new TypeError('The value of the "' + column + '" key in the "options.order" object must be either "ASC" or "DESC".');
+      }
+    }
+
     super();
 
     this.error = undefined;
@@ -340,30 +375,8 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = false;
 
     this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
-    this.message = new Message({ type: PACKET_TYPE.BULK_LOAD });
-    this.rowToPacketTransform.pipe(this.message);
 
-    this.rowToPacketTransform.once('finish', () => {
-      this.removeListener('cancel', onCancel);
-    });
-
-    this.rowToPacketTransform.once('error', (err) => {
-      this.rowToPacketTransform.unpipe(this.message);
-
-      this.error = err;
-
-      this.message.ignore = true;
-      this.message.end();
-    });
-
-    const onCancel = () => {
-      this.rowToPacketTransform.emit('error', RequestError('Canceled.', 'ECANCEL'));
-      this.rowToPacketTransform.destroy();
-    };
-
-    this.once('cancel', onCancel);
-
-    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable };
+    this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
 
   /**
@@ -378,10 +391,10 @@ class BulkLoad extends EventEmitter {
    *
    * @param name The name of the column.
    * @param type One of the supported `data types`.
-   * @param __namedParameters Type [[ColumnOptions]]<p> Additional column type information. At a minimum, `nullable` must be set to true or false.
+   * @param __namedParameters Additional column type information. At a minimum, `nullable` must be set to true or false.
    * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
    * @param nullable Indicates whether the column accepts NULL values.
-   * @param objName  If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]], then you can use this option to specify the property name.
+   * @param objName If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]] or [[Connection.execBulkLoad]], then you can use this option to specify the property name.
    * @param precision For Numeric, Decimal.
    * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
   */
@@ -425,38 +438,49 @@ class BulkLoad extends EventEmitter {
   }
 
   /**
-   * @private
-   */
-  colTypeValidation(column: Column, value: any) {
-    if (this.options.validateBulkLoadParameters) {
-      column.type.validate(value);
-    }
-  }
-
-  /**
-   * Adds a row to the bulk insert. This method accepts arguments in three different formats:
+   * Adds a row to the bulk insert.
    *
    * ```js
-   * bulkLoad.addRow( rowObj )
-   * bulkLoad.addRow( columnArray )
-   * bulkLoad.addRow( col0, col1, ... colN )`
+   * bulkLoad.addRow({ first_name: 'Bill', last_name: 'Gates' });
    * ```
-   * * `rowObj`
    *
-   *    An object of key/value pairs representing column name (or objName) and value.
+   * @param row An object of key/value pairs representing column name (or objName) and value.
    *
-   * * `columnArray`
-   *
-   *    An array representing the values of each column in the same order which they were added to the bulkLoad object.
-   *
-   * * `col0, col1, ... colN`
-   *
-   *    If there are at least two columns, values can be passed as multiple arguments instead of an array. They
-   *    must be in the same order the columns were added in.
-   *
-   * @param input
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
-  addRow(...input: [{ [key: string]: any }] | Array<any>) {
+  addRow(row: { [columnName: string]: unknown }): void
+
+  /**
+   * Adds a row to the bulk insert.
+   *
+   * ```js
+   * bulkLoad.addRow('Bill', 'Gates');
+   * ```
+   *
+   * @param row If there are at least two columns, values can be passed as multiple arguments instead of an array. They
+   *   must be in the same order the columns were added in.
+   *
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
+   */
+  addRow(...row: unknown[]): void
+
+  /**
+   * Adds a row to the bulk insert.
+   *
+   * ```js
+   * bulkLoad.addRow(['Bill', 'Gates']);
+   * ```
+   *
+   * @param row An array representing the values of each column in the same order which they were added to the bulkLoad object.
+   *
+   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
+   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
+   */
+  addRow(row: unknown[]): void
+
+  addRow(...input: [ { [key: string]: unknown } ] | unknown[]) {
     this.firstRowWritten = true;
 
     let row: any;
@@ -468,18 +492,24 @@ class BulkLoad extends EventEmitter {
 
     // write each column
     if (Array.isArray(row)) {
-      this.columns.forEach((column, i) => {
-        this.colTypeValidation(column, row[i]);
-      });
+      this.rowToPacketTransform.write(this.columns.map((column, i) => {
+        let value = row[i];
 
-      this.rowToPacketTransform.write(row);
+        if (this.options.validateBulkLoadParameters) {
+          value = column.type.validate(value);
+        }
+
+        return value;
+      }));
     } else {
-      this.columns.forEach((column) => {
-        this.colTypeValidation(column, row[column.objName]);
-      });
-
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        return row[column.objName];
+        let value = row[column.objName];
+
+        if (this.options.validateBulkLoadParameters) {
+          value = column.type.validate(value);
+        }
+
+        return value;
       }));
     }
   }
@@ -504,6 +534,18 @@ class BulkLoad extends EventEmitter {
 
     if (this.bulkOptions.lockTable) {
       addOptions.push('TABLOCK');
+    }
+
+    if (this.bulkOptions.order) {
+      const orderColumns = [];
+
+      for (const [column, direction] of Object.entries(this.bulkOptions.order)) {
+        orderColumns.push(`${column} ${direction}`);
+      }
+
+      if (orderColumns.length) {
+        addOptions.push(`ORDER (${orderColumns.join(', ')})`);
+      }
     }
 
     if (addOptions.length > 0) {
@@ -589,6 +631,11 @@ class BulkLoad extends EventEmitter {
       // TYPE_INFO
       tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
 
+      // TableName
+      if (c.type.hasTableName) {
+        tBuf.writeUsVarchar(this.table, 'ucs2');
+      }
+
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');
     }
@@ -646,6 +693,11 @@ class BulkLoad extends EventEmitter {
    *
    * After that, the stream emits a ['drain' event](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain)
    * when it is ready to resume data transfer.
+   *
+   * @deprecated
+   *   This method is deprecated. Instead of writing rows to the stream returned by this method,
+   *   you can pass any object that implements the `Iterable` or `AsyncIterable` interface (e.g. a `Readable`
+   *   stream or an `AsyncGenerator`) when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   getRowStream() {
     if (this.firstRowWritten) {
@@ -657,13 +709,6 @@ class BulkLoad extends EventEmitter {
     this.streamingMode = true;
 
     return this.rowToPacketTransform;
-  }
-
-  /**
-   * @private
-   */
-  getMessageStream() {
-    return this.message;
   }
 
   /**
