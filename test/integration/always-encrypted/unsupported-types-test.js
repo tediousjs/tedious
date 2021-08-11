@@ -308,7 +308,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.match(err.message, /Cannot create( or alter)? encrypted column \'col1\' because( data)? type \'sys.geography\' is not supported for encryption./);
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'sys.geography' is not supported for encryption./);
         return done();
       }
 
