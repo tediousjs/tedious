@@ -291,6 +291,7 @@ describe('always encrypted', function() {
       case 'Latin1_General_BIN2':
       case 'Latin1_General_100_BIN':
       case 'Latin1_General_100_BIN2':
+      case 'Latin1_General_100_BIN2_UTF8':
         return 'latin';
       case 'Latvian_BIN':
       case 'Latvian_BIN2':
