@@ -128,7 +128,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'text\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'text' is not supported for encryption./);
         return done();
       }
 
@@ -148,7 +148,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'ntext\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'ntext' is not supported for encryption./);
         return done();
       }
 
@@ -168,7 +168,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'image\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'image' is not supported for encryption./);
         return done();
       }
 
@@ -188,7 +188,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'xml\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'xml' is not supported for encryption./);
         return done();
       }
 
@@ -208,7 +208,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'sysname\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'sysname' is not supported for encryption./);
         return done();
       }
 
@@ -228,7 +228,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'timestamp\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'timestamp' is not supported for encryption./);
         return done();
       }
 
@@ -248,7 +248,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'sql_variant\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'sql_variant' is not supported for encryption./);
         return done();
       }
 
@@ -268,7 +268,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'sys.hierarchyid\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'sys.hierarchyid' is not supported for encryption./);
         return done();
       }
 
@@ -288,7 +288,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'sys.geometry\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column 'col1' because( data)? type 'sys.geometry' is not supported for encryption./);
         return done();
       }
 
@@ -308,7 +308,7 @@ describe('always encrypted', function() {
     );`, (err) => {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
-        assert.strictEqual(err.message, 'Cannot create encrypted column \'col1\' because type \'sys.geography\' is not supported for encryption.');
+        assert.match(err.message, /Cannot create( or alter)? encrypted column \'col1\' because( data)? type \'sys.geography\' is not supported for encryption./);
         return done();
       }
 
