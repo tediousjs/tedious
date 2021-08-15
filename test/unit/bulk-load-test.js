@@ -10,7 +10,7 @@ describe('BulkLoad', function() {
   });
 
   it('throws an error when adding row with a value has the wrong data type', function() {
-    const request = new BulkLoad('tablename', { tdsVersion: '7_2', validateBulkLoadParameters: true }, { });
+    const request = new BulkLoad('tablename', { tdsVersion: '7_2' }, { });
     request.addColumn('columnName', TYPES.Date, { nullable: true });
     assert.throws(() => {
       request.addRow({ columnName: 'Wrong Input' });
