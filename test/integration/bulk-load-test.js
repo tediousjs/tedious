@@ -1537,6 +1537,160 @@ describe('BulkLoad', function() {
     }
   });
 
+  it('supports bulk loading into a `text` column', function(done) {
+    const expectedRows = [
+      { value: 'some text' },
+      { value: null }
+    ];
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, expectedRows.length);
+
+      /** @type {unknown[]} */
+      const results = [];
+      const request = new Request(`
+        SELECT value FROM #tmpTestTable
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, expectedRows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ value: row[0].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('value', TYPES.Text, { nullable: true });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        [value] text NULL
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, Readable.from(expectedRows));
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('supports bulk loading into a `ntext` column', function(done) {
+    const expectedRows = [
+      { value: 'some text 中文' },
+      { value: null }
+    ];
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, expectedRows.length);
+
+      /** @type {unknown[]} */
+      const results = [];
+      const request = new Request(`
+        SELECT value FROM #tmpTestTable
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, expectedRows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ value: row[0].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('value', TYPES.NText, { nullable: true });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        [value] ntext NULL
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, Readable.from(expectedRows));
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('supports bulk loading into a `image` column', function(done) {
+    const expectedRows = [
+      { value: Buffer.from([0xDE, 0xAD, 0xBE, 0xEF]) },
+      { value: null }
+    ];
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        done(err);
+      }
+
+      assert.strictEqual(rowCount, expectedRows.length);
+
+      /** @type {unknown[]} */
+      const results = [];
+
+      const request = new Request(`
+        SELECT value FROM #tmpTestTable
+      `, (err) => {
+        if (err) {
+          done(err);
+        }
+
+        assert.deepEqual(results, expectedRows);
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        results.push({ value: row[0].value });
+      });
+
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('value', TYPES.Image, { nullable: true });
+
+    const request = new Request(`
+      CREATE TABLE "#tmpTestTable" (
+        [value] image NULL
+      )
+    `, (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, Readable.from(expectedRows));
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   describe('validation errors', function() {
     beforeEach(function(done) {
       const request = new Request('create table #stream_test ([value] date)', (err) => {
