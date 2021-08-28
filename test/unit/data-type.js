@@ -1284,7 +1284,8 @@ describe('VarBinary', function() {
     it('correctly converts `number` values (Length <= Maximum Length)', function() {
       const value = 1;
       const length = 1;
-      const expected = Buffer.from('3100', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('3100', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
@@ -1350,19 +1351,21 @@ describe('VarChar', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts `string` values (Length <= Maximum Length)', function() {
-      const value = 'hello world';
+    it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
+      const value = Buffer.from('hello world');
       const length = 1;
-      const expected = Buffer.from('68656c6c6f20776f726c64', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('68656c6c6f20776f726c64', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function() {
-      const value = 'hello world';
+    it('correctly converts `Buffer` values (Length > Maximum Length)', function() {
+      const value = Buffer.from('hello world');
       const length = 9000;
-      const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
@@ -1378,7 +1381,7 @@ describe('VarChar', function() {
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function() {
+    it('correctly converts `null` values (Length > Maximum Length)', function() {
       const value = null;
       const length = 9000;
       const expected = Buffer.from([]);

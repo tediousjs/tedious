@@ -47,6 +47,7 @@ import { MemoryCache } from 'adal-node';
 import AbortController, { AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
+import { Collation } from './collation';
 
 import { version } from '../package.json';
 
@@ -1020,6 +1021,11 @@ class Connection extends EventEmitter {
    * @private
    */
   _cancelAfterRequestSent: () => void;
+
+  /**
+   * @private
+   */
+  databaseCollation: Collation | undefined;
 
   /**
    * Note: be aware of the different options field:
@@ -2023,6 +2029,10 @@ class Connection extends EventEmitter {
       this.emit('charsetChange', token.newValue);
     });
 
+    tokenStreamParser.on('sqlCollationChange', (token) => {
+      this.databaseCollation = token.newValue;
+    });
+
     tokenStreamParser.on('fedAuthInfo', (token) => {
       this.dispatchEvent('fedAuthInfo', token);
     });
@@ -2760,7 +2770,7 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.validateParameters();
+      request.validateParameters(this.databaseCollation);
     } catch (error) {
       request.error = error;
 
@@ -2798,7 +2808,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2822,7 +2832,7 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.config.options, options, callback);
+    return new BulkLoad(table, this.databaseCollation, this.config.options, options, callback);
   }
 
   /**
@@ -3012,7 +3022,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3036,7 +3046,7 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3068,7 +3078,7 @@ class Connection extends EventEmitter {
 
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null)
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
         });
       }
     } catch (error) {
@@ -3082,7 +3092,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3092,7 +3102,7 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters();
+      request.validateParameters(this.databaseCollation);
     } catch (error) {
       request.error = error;
 
@@ -3104,7 +3114,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
