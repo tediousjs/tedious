@@ -16,13 +16,13 @@ const VarChar: { maximumLength: number } & DataType = {
   maximumLength: 8000,
 
   declaration: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (value != null) {
-      length = value!.toString().length || 1;
+      length = value.length || 1;
     } else if (value === null && !parameter.output) {
       length = 1;
     } else {
@@ -37,16 +37,12 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   resolveLength: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     if (parameter.length != null) {
       return parameter.length;
     } else if (value != null) {
-      if (Buffer.isBuffer(parameter.value)) {
-        return value.length || 1;
-      } else {
-        return value.toString().length || 1;
-      }
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -70,7 +66,9 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       if (parameter.length! <= this.maximumLength) {
         return NULL_LENGTH;
       } else {
@@ -78,16 +76,9 @@ const VarChar: { maximumLength: number } & DataType = {
       }
     }
 
-    let value = parameter.value;
     if (parameter.length! <= this.maximumLength) {
-      if (!Buffer.isBuffer(value)) {
-        value = value.toString();
-      }
-
-      const length = Buffer.byteLength(value, 'ascii');
-
       const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(length, 0);
+      buffer.writeUInt16LE(value.length, 0);
       return buffer;
     } else {
       return UNKNOWN_PLP_LEN;
@@ -95,35 +86,21 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   *generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return;
     }
 
-    let value = parameter.value;
-
-    if (!Buffer.isBuffer(value)) {
-      value = value.toString();
-    }
-
     if (parameter.length! <= this.maximumLength) {
-      if (Buffer.isBuffer(value)) {
-        yield value;
-      } else {
-        yield Buffer.from(value, 'ascii');
-      }
+      yield value;
     } else {
-      const length = Buffer.byteLength(value, 'ascii');
-
-      if (length > 0) {
+      if (value.length > 0) {
         const buffer = Buffer.alloc(4);
-        buffer.writeUInt32LE(length, 0);
+        buffer.writeUInt32LE(value.length, 0);
         yield buffer;
 
-        if (Buffer.isBuffer(value)) {
-          yield value;
-        } else {
-          yield Buffer.from(value, 'ascii');
-        }
+        yield value;
       }
 
       yield PLP_TERMINATOR;

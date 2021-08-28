@@ -16,7 +16,7 @@ const Text: DataType = {
   },
 
   resolveLength: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     if (value != null) {
       return value.length;
@@ -38,27 +38,25 @@ const Text: DataType = {
   },
 
   generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return NULL_LENGTH;
     }
 
     const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(parameter.value.length!, 0);
+    buffer.writeInt32LE(value.length, 0);
     return buffer;
   },
 
   generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return;
     }
 
-    const value = parameter.value;
-
-    if (Buffer.isBuffer(value)) {
-      yield value;
-    } else {
-      yield Buffer.from(value.toString(), 'ascii');
-    }
+    yield value;
   },
 
   validate: function(value, collation): Buffer | null {

@@ -10,14 +10,13 @@ const Char: { maximumLength: number } & DataType = {
   maximumLength: 8000,
 
   declaration: function(parameter) {
-    // const value = parameter.value as null | string | { toString(): string };
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (value != null) {
-      length = value.toString().length || 1;
+      length = value.length || 1;
     } else if (value === null && !parameter.output) {
       length = 1;
     } else {
@@ -33,15 +32,12 @@ const Char: { maximumLength: number } & DataType = {
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   resolveLength: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
+
     if (parameter.length != null) {
       return parameter.length;
     } else if (value != null) {
-      if (Buffer.isBuffer(value)) {
-        return value.length || 1;
-      } else {
-        return value.toString().length || 1;
-      }
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -60,14 +56,14 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return NULL_LENGTH;
     }
 
-    const length = Buffer.byteLength(parameter.value.toString(), 'ascii');
-
     const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(length, 0);
+    buffer.writeUInt16LE(value.length, 0);
     return buffer;
   },
 
@@ -79,7 +75,7 @@ const Char: { maximumLength: number } & DataType = {
     yield Buffer.from(parameter.value, 'ascii');
   },
 
-  validate: function(value, collation): null | Buffer {
+  validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;
     }
