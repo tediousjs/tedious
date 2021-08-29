@@ -6,6 +6,7 @@ import Connection from './connection';
 import { Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { Collation } from './collation';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -462,12 +463,12 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  validateParameters() {
+  validateParameters(collation: Collation | undefined) {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
 
       try {
-        parameter.value = parameter.type.validate(parameter.value);
+        parameter.value = parameter.type.validate(parameter.value, collation);
       } catch (error) {
         throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
       }

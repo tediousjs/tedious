@@ -26,7 +26,8 @@ import {
   ReturnValueToken,
   DoneInProcToken,
   DoneProcToken,
-  DoneToken
+  DoneToken,
+  CollationChangeToken
 } from './token';
 import { Readable } from 'stream';
 import Message from '../message';
@@ -65,6 +66,7 @@ export class Parser extends EventEmitter {
     ((event: 'databaseChange', listener: (token: DatabaseEnvChangeToken) => void) => this) &
     ((event: 'languageChange', listener: (token: LanguageEnvChangeToken) => void) => this) &
     ((event: 'charsetChange', listener: (token: CharsetEnvChangeToken) => void) => this) &
+    ((event: 'sqlCollationChange', listener: (token: CollationChangeToken) => void) => this) &
     ((event: 'fedAuthInfo', listener: (token: FedAuthInfoToken) => void) => this) &
     ((event: 'featureExtAck', listener: (token: FeatureExtAckToken) => void) => this) &
     ((event: 'loginack', listener: (token: LoginAckToken) => void) => this) &

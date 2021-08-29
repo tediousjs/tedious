@@ -1,3 +1,4 @@
+import { Collation } from '../collation';
 import { Metadata } from '../metadata-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
 
@@ -281,10 +282,10 @@ export class CollationChangeToken extends Token {
   declare event: 'sqlCollationChange';
 
   type: 'SQL_COLLATION';
-  oldValue: Buffer;
-  newValue: Buffer;
+  oldValue: Collation | undefined;
+  newValue: Collation | undefined;
 
-  constructor(newValue: Buffer, oldValue: Buffer) {
+  constructor(newValue: Collation | undefined, oldValue: Collation | undefined) {
     super('ENVCHANGE', 'sqlCollationChange');
 
     this.type = 'SQL_COLLATION';
