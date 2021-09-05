@@ -55,13 +55,13 @@
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.14.8",
-    "@babel/core": "^7.14.8",
-    "@babel/node": "^7.14.7",
+    "@babel/cli": "^7.15.4",
+    "@babel/core": "^7.15.5",
+    "@babel/node": "^7.15.4",
     "@babel/plugin-proposal-class-properties": "^7.14.5",
-    "@babel/preset-env": "^7.14.8",
-    "@babel/preset-typescript": "^7.14.5",
-    "@babel/register": "^7.14.5",
+    "@babel/preset-env": "^7.15.4",
+    "@babel/preset-typescript": "^7.15.0",
+    "@babel/register": "^7.15.3",
     "@commitlint/cli": "^12.1.4",
     "@commitlint/config-conventional": "^12.1.4",
     "@commitlint/travis-cli": "^12.1.4",
@@ -134,6 +134,12 @@
       ],
       [
         "@babel/plugin-proposal-private-methods",
+        {
+          "loose": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-private-property-in-object",
         {
           "loose": true
         }
