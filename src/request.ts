@@ -56,7 +56,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure?: string;
+  sqlTextOrProcedure?: string | number;
   /**
    * @private
    */
