@@ -43,7 +43,6 @@
     "@azure/identity": "^1.5.2",
     "@azure/keyvault-keys": "^4.3.0",
     "@js-joda/core": "^4.0.0",
-    "adal-node": "^0.2.2",
     "bl": "^5.0.0",
     "depd": "^2.0.0",
     "iconv-lite": "^0.6.3",
