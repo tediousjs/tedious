@@ -2771,7 +2771,7 @@ class Connection extends EventEmitter {
   execSql(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3081,7 +3081,7 @@ class Connection extends EventEmitter {
           value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3103,7 +3103,7 @@ class Connection extends EventEmitter {
   callProcedure(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
