@@ -44,7 +44,7 @@ import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keysto
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
-import AbortController, { AbortSignal } from 'node-abort-controller';
+import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
