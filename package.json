@@ -79,7 +79,7 @@
     "babel-plugin-istanbul": "^6.0.0",
     "chai": "^4.3.4",
     "codecov": "^3.8.3",
-    "eslint": "^7.31.0",
+    "eslint": "^7.32.0",
     "mitm": "^1.7.2",
     "mocha": "^9.1.1",
     "nyc": "^15.1.0",
