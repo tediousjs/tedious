@@ -1,7 +1,7 @@
 const dgram = require('dgram');
 const { assert } = require('chai');
 const dns = require('dns');
-const AbortController = require('node-abort-controller');
+const { AbortController } = require('node-abort-controller');
 
 const { Sender } = require('../../src/sender');
 

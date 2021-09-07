@@ -85,7 +85,7 @@ export const decryptSymmetricKey = async (md: CryptoMetadata, options: Connectio
         encryptionKeyInfoChosen = CEKValue;
         break;
       }
-    } catch (error) {
+    } catch (error: any) {
       lastError = error;
     }
   }

@@ -44,7 +44,7 @@ import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keysto
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
-import AbortController, { AbortSignal } from 'node-abort-controller';
+import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
@@ -2771,7 +2771,7 @@ class Connection extends EventEmitter {
   execSql(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3081,7 +3081,7 @@ class Connection extends EventEmitter {
           value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3103,7 +3103,7 @@ class Connection extends EventEmitter {
   callProcedure(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {

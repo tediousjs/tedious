@@ -183,7 +183,7 @@ class RowTransform extends Transform {
 
       try {
         value = c.type.validate(value, c.collation);
-      } catch (error) {
+      } catch (error: any) {
         return callback(error);
       }
 

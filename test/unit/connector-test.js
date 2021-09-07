@@ -2,7 +2,7 @@ const Mitm = require('mitm');
 const sinon = require('sinon');
 const punycode = require('punycode');
 const assert = require('chai').assert;
-const AbortController = require('node-abort-controller');
+const { AbortController } = require('node-abort-controller');
 
 const {
   ParallelConnectionStrategy,

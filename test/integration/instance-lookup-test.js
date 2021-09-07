@@ -3,7 +3,7 @@
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
-import AbortController from 'node-abort-controller';
+import { AbortController } from 'node-abort-controller';
 
 const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 
