@@ -142,7 +142,7 @@ describe('always encrypted', function() {
     const test_insert_request = new Request(`insert into ${table1} (DeterministicVarchar) values ('hello world')`, (err) => {
       if (err) {
         try {
-          assert.equal(err.message, 'Operand type clash: varchar is incompatible with varchar(8000) encrypted with (encryption_type = \'DETERMINISTIC\', encryption_algorithm_name = \'AEAD_AES_256_CBC_HMAC_SHA_256\', column_encryption_key_name = \'CEK1\', column_encryption_key_database_name = \'master\') collation_name = \'SQL_Latin1_General_CP1_CI_AS\'');
+          assert.equal(err.message, `Operand type clash: varchar is incompatible with varchar(8000) encrypted with (encryption_type = 'DETERMINISTIC', encryption_algorithm_name = 'AEAD_AES_256_CBC_HMAC_SHA_256', column_encryption_key_name = 'CEK1', column_encryption_key_database_name = '${config.options.database ?? 'master'}') collation_name = 'SQL_Latin1_General_CP1_CI_AS'`);
           assert.instanceOf(err, RequestError);
           return done();
         } catch (err) {
@@ -166,7 +166,7 @@ describe('always encrypted', function() {
     const test_insert_request = new Request(`select * from ${table1} where DeterministicVarchar='hello world'`, (err) => {
       if (err) {
         try {
-          assert.equal(err.message, 'Operand type clash: varchar is incompatible with varchar(8000) encrypted with (encryption_type = \'DETERMINISTIC\', encryption_algorithm_name = \'AEAD_AES_256_CBC_HMAC_SHA_256\', column_encryption_key_name = \'CEK1\', column_encryption_key_database_name = \'master\') collation_name = \'SQL_Latin1_General_CP1_CI_AS\'');
+          assert.equal(err.message, `Operand type clash: varchar is incompatible with varchar(8000) encrypted with (encryption_type = 'DETERMINISTIC', encryption_algorithm_name = 'AEAD_AES_256_CBC_HMAC_SHA_256', column_encryption_key_name = 'CEK1', column_encryption_key_database_name = '${config.options.database ?? 'master'}') collation_name = 'SQL_Latin1_General_CP1_CI_AS'`);
           assert.instanceOf(err, RequestError);
           return done();
         } catch (err) {
@@ -202,7 +202,7 @@ describe('always encrypted', function() {
       const create_procedure1_request = new Request(sql, (err) => {
         if (err) {
           try {
-            assert.equal(err.message, 'The data types varchar(50) encrypted with (encryption_type = \'DETERMINISTIC\', encryption_algorithm_name = \'AEAD_AES_256_CBC_HMAC_SHA_256\', column_encryption_key_name = \'CEK1\', column_encryption_key_database_name = \'master\') collation_name = \'Latin1_General_BIN2\' and varchar are incompatible in the equal to operator.');
+            assert.equal(err.message, `The data types varchar(50) encrypted with (encryption_type = 'DETERMINISTIC', encryption_algorithm_name = 'AEAD_AES_256_CBC_HMAC_SHA_256', column_encryption_key_name = 'CEK1', column_encryption_key_database_name = '${config.options.database ?? 'master'}') collation_name = 'Latin1_General_BIN2' and varchar are incompatible in the equal to operator.`);
             assert.instanceOf(err, RequestError);
             return done();
           } catch (err) {
@@ -241,7 +241,7 @@ describe('always encrypted', function() {
       const create_procedure1_request = new Request(sql, (err) => {
         if (err) {
           try {
-            assert.equal(err.message, 'Operand type clash: varchar is incompatible with varchar(50) encrypted with (encryption_type = \'DETERMINISTIC\', encryption_algorithm_name = \'AEAD_AES_256_CBC_HMAC_SHA_256\', column_encryption_key_name = \'CEK1\', column_encryption_key_database_name = \'master\') collation_name = \'Latin1_General_BIN2\'');
+            assert.equal(err.message, `Operand type clash: varchar is incompatible with varchar(50) encrypted with (encryption_type = 'DETERMINISTIC', encryption_algorithm_name = 'AEAD_AES_256_CBC_HMAC_SHA_256', column_encryption_key_name = 'CEK1', column_encryption_key_database_name = '${config.options.database ?? 'master'}') collation_name = 'Latin1_General_BIN2'`);
             assert.instanceOf(err, RequestError);
             return done();
           } catch (err) {
