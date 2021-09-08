@@ -19,7 +19,7 @@ config.options.debug = {
 
 
 config.options.columnEncryptionSetting = true;
-config.options.encrypt = false;
+
 const alwaysEncryptedCEK = Buffer.from([
   // decrypted column key must be 32 bytes long for AES256
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
