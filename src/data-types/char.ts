@@ -1,3 +1,4 @@
+import iconv from 'iconv-lite';
 import { DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
@@ -9,14 +10,13 @@ const Char: { maximumLength: number } & DataType = {
   maximumLength: 8000,
 
   declaration: function(parameter) {
-    // const value = parameter.value as null | string | { toString(): string };
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (value != null) {
-      length = value.toString().length || 1;
+      length = value.length || 1;
     } else if (value === null && !parameter.output) {
       length = 1;
     } else {
@@ -32,15 +32,12 @@ const Char: { maximumLength: number } & DataType = {
 
   // ParameterData<any> is temporary solution. TODO: need to understand what type ParameterData<...> can be.
   resolveLength: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
+
     if (parameter.length != null) {
       return parameter.length;
     } else if (value != null) {
-      if (Buffer.isBuffer(value)) {
-        return value.length || 1;
-      } else {
-        return value.toString().length || 1;
-      }
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -50,47 +47,23 @@ const Char: { maximumLength: number } & DataType = {
     const buffer = Buffer.alloc(8);
     buffer.writeUInt8(this.id, 0);
     buffer.writeUInt16LE(parameter.length!, 1);
-    const collation = Buffer.alloc(5);
 
-    if (parameter.collation != null) {
-      const { lcid, flags, version, sortId } = parameter.collation;
-      collation.writeUInt8(
-        (lcid) & 0xFF,
-        0,
-      );
-      collation.writeUInt8(
-        (lcid >> 8) & 0xFF,
-        1,
-      );
-      // byte index 2 contains data for both lcid and flags
-      collation.writeUInt8(
-        ((lcid >> 16) & 0x0F) | (((flags) & 0x0F) << 4),
-        2,
-      );
-      // byte index 3 contains data for both flags and version
-      collation.writeUInt8(
-        ((flags) & 0xF0) | ((version) & 0x0F),
-        3,
-      );
-      collation.writeUInt8(
-        (sortId) & 0xFF,
-        4,
-      );
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
     }
 
-    collation.copy(buffer, collation.length);
     return buffer;
   },
 
   generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return NULL_LENGTH;
     }
 
-    const length = Buffer.byteLength(parameter.value.toString(), 'ascii');
-
     const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(length, 0);
+    buffer.writeUInt16LE(value.length, 0);
     return buffer;
   },
 
@@ -103,27 +76,37 @@ const Char: { maximumLength: number } & DataType = {
   },
 
   toBuffer: function(parameter) {
-    const value = parameter.value as string | Buffer;
+    const value = parameter.value as Buffer | null;
 
     if (value != null) {
-      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+      return value;
     } else {
       // PLP NULL
       return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
     }
   },
 
-  validate: function(value): null | string {
+  validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
         throw new TypeError('Invalid string.');
       }
       value = value.toString();
     }
-    return value;
+
+    if (!collation) {
+      throw new Error('No collation was set by the server for the current connection.');
+    }
+
+    if (!collation.codepage) {
+      throw new Error('The collation set by the server has no associated encoding.');
+    }
+
+    return iconv.encode(value, collation.codepage);
   }
 };
 

@@ -3,7 +3,7 @@ const sinon = require('sinon');
 const punycode = require('punycode');
 const assert = require('chai').assert;
 const dgram = require('dgram');
-const AbortController = require('node-abort-controller');
+const { AbortController } = require('node-abort-controller');
 
 describe('instanceLookup invalid args', function() {
   let instanceLookup;

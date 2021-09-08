@@ -259,24 +259,9 @@ describe('DataType.toBuffer', () => {
       { ...undefinedValueCase, expected: plpNullBuffer },
       { ...nullValueCase, expected: plpNullBuffer },
       {
-        name: 'value is empty string',
-        parameter: { value: '' },
-        expected: emptyBuffer,
-      },
-      {
         name: 'value is empty buffer',
         parameter: { value: emptyBuffer },
         expected: emptyBuffer,
-      },
-      {
-        name: 'value is printable string',
-        parameter: { value: 'test' },
-        expected: Buffer.from('test'),
-      },
-      {
-        name: 'value is binary string',
-        parameter: { value: '\x12\x34\x56\x78' },
-        expected: Buffer.from([0x12, 0x34, 0x56, 0x78]),
       },
       {
         name: 'value is binary buffer',
@@ -296,24 +281,9 @@ describe('DataType.toBuffer', () => {
       { ...undefinedValueCase, expected: plpNullBuffer },
       { ...nullValueCase, expected: plpNullBuffer },
       {
-        name: 'value is empty string',
-        parameter: { value: '' },
-        expected: emptyBuffer,
-      },
-      {
         name: 'value is empty buffer',
         parameter: { value: emptyBuffer },
         expected: emptyBuffer,
-      },
-      {
-        name: 'value is printable string',
-        parameter: { value: 'test' },
-        expected: Buffer.from('test'),
-      },
-      {
-        name: 'value is binary string',
-        parameter: { value: '\x12\x34\x56\x78' },
-        expected: Buffer.from([0x12, 0x34, 0x56, 0x78]),
       },
       {
         name: 'value is binary buffer',
@@ -2004,7 +1974,8 @@ describe('VarBinary', function() {
     it('correctly converts `number` values (Length <= Maximum Length)', function() {
       const value = 1;
       const length = 1;
-      const expected = Buffer.from('3100', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('3100', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
@@ -2070,19 +2041,21 @@ describe('VarChar', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts `string` values (Length <= Maximum Length)', function() {
-      const value = 'hello world';
+    it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
+      const value = Buffer.from('hello world');
       const length = 1;
-      const expected = Buffer.from('68656c6c6f20776f726c64', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('68656c6c6f20776f726c64', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function() {
-      const value = 'hello world';
+    it('correctly converts `Buffer` values (Length > Maximum Length)', function() {
+      const value = Buffer.from('hello world');
       const length = 9000;
-      const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex'); const parameterValue = { value, length };
+      const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex');
+      const parameterValue = { value, length };
 
       const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
@@ -2098,7 +2071,7 @@ describe('VarChar', function() {
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `string` values (Length > Maximum Length)', function() {
+    it('correctly converts `null` values (Length > Maximum Length)', function() {
       const value = null;
       const length = 9000;
       const expected = Buffer.from([]);

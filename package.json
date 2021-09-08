@@ -34,61 +34,61 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">= 12"
   },
   "publishConfig": {
     "tag": "next"
   },
   "dependencies": {
-    "@azure/identity": "^1.3.0",
-    "@azure/keyvault-keys": "^4.1.0",
-    "@azure/ms-rest-nodeauth": "^3.0.6",
-    "@js-joda/core": "^3.2.0",
-    "adal-node": "^0.2.1",
+    "@azure/identity": "^1.5.2",
+    "@azure/keyvault-keys": "^4.3.0",
+    "@azure/ms-rest-nodeauth": "^3.0.10",
+    "@js-joda/core": "^4.0.0",
+    "adal-node": "^0.2.2",
     "bl": "^5.0.0",
     "depd": "^2.0.0",
     "lru-cache": "^5.1.1",
     "iconv-lite": "^0.6.3",
-    "jsbi": "^3.1.5",
+    "jsbi": "^3.2.1",
     "native-duplexpair": "^1.0.0",
-    "node-abort-controller": "^2.0.0",
+    "node-abort-controller": "^3.0.0",
     "punycode": "^2.1.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.14.8",
-    "@babel/core": "^7.14.8",
-    "@babel/node": "^7.14.7",
+    "@babel/cli": "^7.15.4",
+    "@babel/core": "^7.15.5",
+    "@babel/node": "^7.15.4",
     "@babel/plugin-proposal-class-properties": "^7.14.5",
-    "@babel/preset-env": "^7.14.8",
-    "@babel/preset-typescript": "^7.14.5",
-    "@babel/register": "^7.14.5",
-    "@commitlint/cli": "^12.1.4",
-    "@commitlint/config-conventional": "^12.1.4",
-    "@commitlint/travis-cli": "^12.1.4",
+    "@babel/preset-env": "^7.15.4",
+    "@babel/preset-typescript": "^7.15.0",
+    "@babel/register": "^7.15.3",
+    "@commitlint/cli": "^13.1.0",
+    "@commitlint/config-conventional": "^13.1.0",
+    "@commitlint/travis-cli": "^13.1.0",
     "@types/async": "^3.2.7",
     "@types/bl": "^5.0.1",
-    "@types/chai": "^4.2.20",
+    "@types/chai": "^4.2.21",
     "@types/depd": "^1.1.32",
     "@types/lru-cache": "^5.1.0",
-    "@types/mocha": "^8.2.3",
+    "@types/mocha": "^9.0.0",
     "@types/node": "^14.14.20",
     "@types/sprintf-js": "^1.1.2",
-    "@typescript-eslint/eslint-plugin": "^4.28.2",
-    "@typescript-eslint/parser": "^4.28.2",
-    "async": "^3.2.0",
+    "@typescript-eslint/eslint-plugin": "^4.30.0",
+    "@typescript-eslint/parser": "^4.30.0",
+    "async": "^3.2.1",
     "babel-plugin-istanbul": "^6.0.0",
     "chai": "^4.3.4",
     "codecov": "^3.8.3",
-    "eslint": "^7.31.0",
+    "eslint": "^7.32.0",
     "mitm": "^1.7.2",
-    "mocha": "^8.4.0",
+    "mocha": "^9.1.1",
     "nyc": "^15.1.0",
     "rimraf": "^3.0.2",
-    "semantic-release": "^17.4.4",
-    "sinon": "^11.1.1",
-    "typedoc": "^0.20.37",
-    "typescript": "^4.2.4"
+    "semantic-release": "^17.4.7",
+    "sinon": "^11.1.2",
+    "typedoc": "^0.21.9",
+    "typescript": "^4.4.2"
   },
   "scripts": {
     "docs": "typedoc",
@@ -109,7 +109,7 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 10
+            "node": 12
           }
         }
       ],
@@ -135,6 +135,12 @@
       ],
       [
         "@babel/plugin-proposal-private-methods",
+        {
+          "loose": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-private-property-in-object",
         {
           "loose": true
         }

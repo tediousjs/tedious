@@ -132,7 +132,7 @@ describe('Login7Payload', function() {
     describe('for a login payload with active directory authentication', function() {
       it('generates the expected data', function() {
         const payload = new Login7Payload({
-          tdsVersion: 0x72090002,
+          tdsVersion: 0x74000004,
           packetSize: 1024,
           clientProgVer: 0,
           clientPid: 12345,
@@ -175,7 +175,7 @@ describe('Login7Payload', function() {
           2 + 2 + (2 * payload.changePassword.length) +
           4 + // cbSSPILong
           4 + // Extension offset
-          1 + 1 + 4 + 1 + 1; // Feature ext
+          1 + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT unlike prior versions
 
         assert.lengthOf(data, expectedLength);
       });

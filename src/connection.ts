@@ -46,9 +46,10 @@ import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter
 import depd from 'depd';
 import { MemoryCache } from 'adal-node';
 
-import AbortController, { AbortSignal } from 'node-abort-controller';
+import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
+import { Collation } from './collation';
 
 import { version } from '../package.json';
 
@@ -386,7 +387,6 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
-  validateBulkLoadParameters: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
@@ -837,13 +837,6 @@ export interface ConnectionOptions {
   useUTC?: boolean;
 
   /**
-   * A boolean determining whether BulkLoad parameters should be validated.
-   *
-   * (default: `true`).
-   */
-  validateBulkLoadParameters?: boolean;
-
-  /**
    * The workstation ID (WSID) of the client, default os.hostname().
    * Used for identifying a specific client in profiling, logging or
    * tracing client activity in SQLServer.
@@ -1040,6 +1033,11 @@ class Connection extends EventEmitter {
    * @private
    */
   _cancelAfterRequestSent: () => void;
+
+  /**
+   * @private
+   */
+  databaseCollation: Collation | undefined;
 
   /**
    * Note: be aware of the different options field:
@@ -1288,7 +1286,6 @@ class Connection extends EventEmitter {
         trustServerCertificate: true,
         useColumnNames: false,
         useUTC: true,
-        validateBulkLoadParameters: true,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1708,17 +1705,6 @@ class Connection extends EventEmitter {
 
         this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
       }
-      if (config.options.validateBulkLoadParameters !== undefined) {
-        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
-          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
-        }
-
-        if (config.options.validateBulkLoadParameters === false) {
-          deprecate('Setting the "config.options.validateBulkLoadParameters" to `false` is deprecated and will no longer work in the next major version of `tedious`. Set the value to `true` and update your use of BulkLoad functionality to silence this message.');
-        }
-
-        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
-      }
 
       if (config.options.workstationId !== undefined) {
         if (typeof config.options.workstationId !== 'string') {
@@ -2129,6 +2115,10 @@ class Connection extends EventEmitter {
 
     tokenStreamParser.on('charsetChange', (token) => {
       this.emit('charsetChange', token.newValue);
+    });
+
+    tokenStreamParser.on('sqlCollationChange', (token) => {
+      this.databaseCollation = token.newValue;
     });
 
     tokenStreamParser.on('fedAuthInfo', (token) => {
@@ -2855,8 +2845,8 @@ class Connection extends EventEmitter {
 
   _execSql(request: Request) {
     try {
-      request.validateParameters();
-    } catch (error) {
+      request.validateParameters(this.databaseCollation);
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -2893,7 +2883,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2951,7 +2941,7 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.config.options, options, callback);
+    return new BulkLoad(table, this.databaseCollation, this.config.options, options, callback);
   }
 
   /**
@@ -3141,7 +3131,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3165,7 +3155,7 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3197,10 +3187,10 @@ class Connection extends EventEmitter {
 
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null)
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3211,7 +3201,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3221,8 +3211,8 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters();
-    } catch (error) {
+      request.validateParameters(this.databaseCollation);
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -3233,7 +3223,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3726,10 +3716,10 @@ Connection.prototype.STATE = {
             this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
             this.loggedIn = false;
           }
-        } else if (token.fedAuth === undefined) {
+        } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
           this.loginError = ConnectionError('Received acknowledgement for unknown feature');
           this.loggedIn = false;
-        } else {
+        } else if (token.fedAuth) {
           this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
           this.loggedIn = false;
         }

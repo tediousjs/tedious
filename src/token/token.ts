@@ -1,3 +1,4 @@
+import { Collation } from '../collation';
 import { Metadata } from '../metadata-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
 
@@ -281,10 +282,10 @@ export class CollationChangeToken extends Token {
   declare event: 'sqlCollationChange';
 
   type: 'SQL_COLLATION';
-  oldValue: Buffer;
-  newValue: Buffer;
+  oldValue: Collation | undefined;
+  newValue: Collation | undefined;
 
-  constructor(newValue: Buffer, oldValue: Buffer) {
+  constructor(newValue: Collation | undefined, oldValue: Collation | undefined) {
     super('ENVCHANGE', 'sqlCollationChange');
 
     this.type = 'SQL_COLLATION';
@@ -317,11 +318,17 @@ export class FeatureExtAckToken extends Token {
   fedAuth: Buffer | undefined;
   columnEncryption: boolean | undefined;
 
-  constructor(featureData: { fedAuth?: Buffer, columnEncryption?: boolean }) {
+  /** Value of UTF8_SUPPORT acknowledgement.
+   *
+   * undefined when UTF8_SUPPORT not included in token. */
+  utf8Support: boolean | undefined;
+
+  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined, columnEncryption: boolean | undefined) {
     super('FEATUREEXTACK', 'featureExtAck');
 
-    this.fedAuth = featureData.fedAuth;
-    this.columnEncryption = featureData.columnEncryption;
+    this.fedAuth = fedAuth;
+    this.utf8Support = utf8Support;
+    this.columnEncryption = columnEncryption;
   }
 }
 

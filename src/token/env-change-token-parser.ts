@@ -1,5 +1,6 @@
 import Parser from './stream-parser';
 import { InternalConnectionOptions } from '../connection';
+import { Collation } from '../collation';
 
 import {
   DatabaseEnvChangeToken,
@@ -114,8 +115,12 @@ function readNewAndOldValue(parser: Parser, length: number, type: { name: string
       return parser.readBVarByte((newValue) => {
         parser.readBVarByte((oldValue) => {
           switch (type.name) {
-            case 'SQL_COLLATION':
-              return callback(new CollationChangeToken(newValue, oldValue));
+            case 'SQL_COLLATION': {
+              const newCollation = newValue.length ? Collation.fromBuffer(newValue) : undefined;
+              const oldCollation = oldValue.length ? Collation.fromBuffer(oldValue) : undefined;
+
+              return callback(new CollationChangeToken(newCollation, oldCollation));
+            }
 
             case 'BEGIN_TXN':
               return callback(new BeginTransactionEnvChangeToken(newValue, oldValue));

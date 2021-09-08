@@ -110,8 +110,8 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].type.name, 'VarChar');
     assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
     assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
-    assert.strictEqual(token.columns[0].collation.flags, 0x57);
-    assert.strictEqual(token.columns[0].collation.version, 0x8);
+    assert.strictEqual(token.columns[0].collation.flags, 0x85);
+    assert.strictEqual(token.columns[0].collation.version, 0x7);
     assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
     assert.strictEqual(token.columns[0].colName, 'name');
     assert.strictEqual(token.columns[0].dataLength, length);
@@ -360,8 +360,8 @@ describe('Colmetadata Token Parser', () => {
     assert.isNotNull(column.collation);
     const columnCollation = column.collation;
     assert.strictEqual(columnCollation.lcid, 0x0409);
-    assert.strictEqual(columnCollation.flags, 0x00);
-    assert.strictEqual(columnCollation.version, 0x02);
+    assert.strictEqual(columnCollation.flags, 0x20);
+    assert.strictEqual(columnCollation.version, 0x00);
     assert.strictEqual(columnCollation.sortId, 0x00);
     assert.strictEqual(columnCollation.codepage, 'CP1252');
 
@@ -415,8 +415,8 @@ describe('Colmetadata Token Parser', () => {
     assert.isNotNull(columnCryptoBaseTypeInfo.collation);
     const columnCryptoBaseTypeCollation = columnCryptoBaseTypeInfo.collation;
     assert.strictEqual(columnCryptoBaseTypeCollation.lcid, 0x0409);
-    assert.strictEqual(columnCryptoBaseTypeCollation.flags, 0x00);
-    assert.strictEqual(columnCryptoBaseTypeCollation.version, 0x02);
+    assert.strictEqual(columnCryptoBaseTypeCollation.flags, 0x20);
+    assert.strictEqual(columnCryptoBaseTypeCollation.version, 0x00);
     assert.strictEqual(columnCryptoBaseTypeCollation.sortId, 0x00);
     assert.strictEqual(columnCryptoBaseTypeCollation.codepage, 'CP1252');
 

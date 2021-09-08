@@ -5,6 +5,7 @@ import { InternalConnectionOptions } from './connection';
 import { encryptWithKey } from './always-encrypted/key-crypto';
 import VarBinary from './data-types/varbinary';
 import { CryptoMetadata } from './always-encrypted/types';
+import { Collation } from './collation';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -27,12 +28,14 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
   options: InternalConnectionOptions;
   txnDescriptor: Buffer;
+  collation: Collation | undefined;
 
-  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
+  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
     this.procedure = procedure;
     this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
+    this.collation = collation;
   }
 
   [Symbol.asyncIterator]() {
@@ -119,8 +122,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       param.scale = type.resolveScale(parameter);
     }
 
-    if (parameter.collation) {
-      param.collation = parameter.collation;
+    if (this.collation) {
+      param.collation = this.collation;
     }
 
     const typeINfo = type.generateTypeInfo(param, this.options);

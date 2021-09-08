@@ -6,6 +6,7 @@ import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { DataType, Parameter } from './data-type';
+import { Collation } from './collation';
 
 /**
  * @private
@@ -88,6 +89,7 @@ export type Callback =
 
 interface Column extends Parameter {
   objName: string;
+  collation: Collation | undefined;
 }
 
 interface ColumnOptions {
@@ -179,12 +181,10 @@ class RowTransform extends Transform {
       const c = this.columns[i];
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
-      if (this.bulkLoad.options.validateBulkLoadParameters) {
-        try {
-          value = c.type.validate(value);
-        } catch (error) {
-          return callback(error);
-        }
+      try {
+        value = c.type.validate(value, c.collation);
+      } catch (error: any) {
+        return callback(error);
       }
 
       const parameter = {
@@ -322,12 +322,14 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  rowCount?: number;;
+  rowCount?: number;
+
+  collation: Collation | undefined;
 
   /**
    * @private
    */
-  constructor(table: string, connectionOptions: InternalConnectionOptions, {
+  constructor(table: string, collation: Collation | undefined, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
@@ -365,6 +367,8 @@ class BulkLoad extends EventEmitter {
     this.error = undefined;
     this.canceled = false;
     this.executionStarted = false;
+
+    this.collation = collation;
 
     this.table = table;
     this.options = connectionOptions;
@@ -406,7 +410,7 @@ class BulkLoad extends EventEmitter {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
 
-    const column = {
+    const column: Column = {
       type: type,
       name: name,
       value: null,
@@ -415,7 +419,8 @@ class BulkLoad extends EventEmitter {
       precision: precision,
       scale: scale,
       objName: objName,
-      nullable: nullable
+      nullable: nullable,
+      collation: this.collation
     };
 
     if ((type.id & 0x30) === 0x20) {
@@ -493,23 +498,11 @@ class BulkLoad extends EventEmitter {
     // write each column
     if (Array.isArray(row)) {
       this.rowToPacketTransform.write(this.columns.map((column, i) => {
-        let value = row[i];
-
-        if (this.options.validateBulkLoadParameters) {
-          value = column.type.validate(value);
-        }
-
-        return value;
+        return column.type.validate(row[i], column.collation);
       }));
     } else {
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        let value = row[column.objName];
-
-        if (this.options.validateBulkLoadParameters) {
-          value = column.type.validate(value);
-        }
-
-        return value;
+        return column.type.validate(row[column.objName], column.collation);
       }));
     }
   }
