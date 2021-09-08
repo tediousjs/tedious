@@ -75,6 +75,17 @@ const Char: { maximumLength: number } & DataType = {
     yield Buffer.from(parameter.value, 'ascii');
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as Buffer | null;
+
+    if (value != null) {
+      return value;
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
+  },
+
   validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;

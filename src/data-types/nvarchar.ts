@@ -66,6 +66,17 @@ const NVarChar: { maximumLength: number } & DataType = {
     return buffer;
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value, 'ucs2');
+    } else {
+      // PLP NULL
+      return Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+    }
+  },
+
   generateParameterLength(parameter, options) {
     if (parameter.value == null) {
       if (parameter.length! <= this.maximumLength) {
@@ -137,12 +148,14 @@ const NVarChar: { maximumLength: number } & DataType = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
       if (typeof value.toString !== 'function') {
         throw new TypeError('Invalid string.');
       }
       value = value.toString();
     }
+
     return value;
   }
 };

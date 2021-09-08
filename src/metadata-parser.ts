@@ -1,5 +1,5 @@
 import { Collation } from './collation';
-import Parser from './token/stream-parser';
+import Parser, { IParser } from './token/stream-parser';
 import { InternalConnectionOptions } from './connection';
 import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
@@ -54,8 +54,7 @@ export type Metadata = {
   cryptoMetadata?: CryptoMetadata;
 } & BaseMetadata;
 
-
-function readCollation(parser: Parser, callback: (collation: Collation) => void) {
+function readCollation(parser: IParser, callback: (collation: Collation) => void) {
   // s2.2.5.1.2
   parser.readBuffer(5, (collationData) => {
     callback(Collation.fromBuffer(collationData));
@@ -103,9 +102,19 @@ function readUDTInfo(parser: Parser, callback: (udtInfo: UdtInfo | undefined) =>
   });
 }
 
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
-  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+function readFlags(parser: Parser, shouldReadFlags: boolean, callback: (flags: number) => void) {
+  if (shouldReadFlags === false) {
+    callback(0);
+  } else {
     parser.readUInt16LE((flags) => {
+      callback(flags);
+    });
+  }
+}
+
+function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void, shouldReadFlags = true) {
+  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
+    readFlags(parser, shouldReadFlags, (flags) => {
       parser.readUInt8((typeNumber) => {
         const type: DataType = TYPE[typeNumber];
 

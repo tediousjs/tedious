@@ -60,6 +60,17 @@ const Binary: { maximumLength: number } & DataType = {
     yield parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength);
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value as string | Buffer;
+
+    if (value != null) {
+      return Buffer.isBuffer(value) ? value : Buffer.from(value);
+    } else {
+      // PLP NULL
+      return Buffer.from([ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ]);
+    }
+  },
+
   validate: function(value): Buffer | null {
     if (value == null) {
       return null;
