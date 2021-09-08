@@ -37,9 +37,9 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { CryptoMetadata } from './always-encrypted/types';
 
 import { InternalConnectionOptions } from './connection';
+import { CryptoMetadata } from './always-encrypted/types';
 import { Collation } from './collation';
 
 export interface Parameter {
@@ -69,6 +69,8 @@ export interface ParameterData<T = any> {
   collation?: Collation;
 
   value: T;
+
+  cryptoMetadata?: CryptoMetadata;
 }
 
 export interface DataType {
@@ -87,6 +89,8 @@ export interface DataType {
   resolveLength?: (parameter: Parameter) => number;
   resolvePrecision?: (parameter: Parameter) => number;
   resolveScale?: (parameter: Parameter) => number;
+
+  toBuffer?: (parameter: Parameter, options: InternalConnectionOptions) => Buffer | undefined;
 }
 
 export const TYPE = {

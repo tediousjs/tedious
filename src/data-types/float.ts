@@ -34,6 +34,20 @@ const Float: DataType = {
     yield buffer;
   },
 
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = parseFloat(value as string);
+      const result = Buffer.alloc(8);
+      result.writeDoubleLE(val, 0);
+
+      return result;
+    } else {
+      return Buffer.from([]);
+    }
+  },
+
   validate: function(value): number | null {
     if (value == null) {
       return null;

@@ -47,6 +47,7 @@
     "adal-node": "^0.2.2",
     "bl": "^5.0.0",
     "depd": "^2.0.0",
+    "lru-cache": "^5.1.1",
     "iconv-lite": "^0.6.3",
     "jsbi": "^3.2.1",
     "native-duplexpair": "^1.0.0",
@@ -92,9 +93,9 @@
   "scripts": {
     "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "mocha test/integration/",
-    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "mocha 'test/unit/**/*.{ts,js}'",
+    "test-integration": "mocha 'test/integration/**/*.{ts,js}'",
+    "test-all": "mocha 'test/**/*.{ts,js}'",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"

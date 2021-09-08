@@ -28,6 +28,10 @@ describe('Request', function() {
   let connection: Connection;
 
   beforeEach(function(done) {
+    if (config.options.tdsVersion < '7_2') {
+      this.skip();
+    }
+
     connection = new Connection(config);
 
     connection.on('errorMessage', function(error) {
@@ -44,6 +48,10 @@ describe('Request', function() {
   });
 
   afterEach(function(done) {
+    if (config.options.tdsVersion < '7_2') {
+      this.skip();
+    }
+
     if (!connection.closed) {
       connection.on('end', done);
       connection.close();
