@@ -428,6 +428,28 @@ describe('Parameterised Statements Test', function() {
     execSql(done, TYPES.NChar, null);
   });
 
+  describe('`ntext`', function() {
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.NText, null);
+    });
+
+    it('should handle empty strings', function(done) {
+      execSql(done, TYPES.NText, '');
+    });
+
+    it('should handle short strings', function(done) {
+      execSql(done, TYPES.NText, 'small');
+    });
+
+    it('should handle large strings', function(done) {
+      execSql(done, TYPES.NText, new Array(500000).join('x'));
+    });
+
+    it('should handle multibyte characters', function(done) {
+      execSql(done, TYPES.NText, 'some text 中文');
+    });
+  });
+
   it('should test textNull', function(done) {
     execSql(done, TYPES.Text, null);
   });

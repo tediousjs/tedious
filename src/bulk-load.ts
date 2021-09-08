@@ -6,6 +6,7 @@ import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { DataType, Parameter } from './data-type';
+import { Collation } from './collation';
 
 /**
  * @private
@@ -88,6 +89,7 @@ export type Callback =
 
 interface Column extends Parameter {
   objName: string;
+  collation: Collation | undefined;
 }
 
 interface ColumnOptions {
@@ -120,6 +122,17 @@ interface ColumnOptions {
 }
 
 const rowTokenBuffer = Buffer.from([ TOKEN_TYPE.ROW ]);
+const textPointerAndTimestampBuffer = Buffer.from([
+  // TextPointer length
+  0x10,
+
+  // TextPointer
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+  // Timestamp
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+]);
+const textPointerNullBuffer = Buffer.from([0x00]);
 
 // A transform that converts rows to packets.
 class RowTransform extends Transform {
@@ -169,8 +182,8 @@ class RowTransform extends Transform {
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
       try {
-        value = c.type.validate(value);
-      } catch (error) {
+        value = c.type.validate(value, c.collation);
+      } catch (error: any) {
         return callback(error);
       }
 
@@ -180,6 +193,15 @@ class RowTransform extends Transform {
         precision: c.precision,
         value: value
       };
+
+      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
+        if (value == null) {
+          this.push(textPointerNullBuffer);
+          continue;
+        }
+
+        this.push(textPointerAndTimestampBuffer);
+      }
 
       this.push(c.type.generateParameterLength(parameter, this.mainOptions));
       for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
@@ -300,12 +322,14 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  rowCount?: number;;
+  rowCount?: number;
+
+  collation: Collation | undefined;
 
   /**
    * @private
    */
-  constructor(table: string, connectionOptions: InternalConnectionOptions, {
+  constructor(table: string, collation: Collation | undefined, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
@@ -343,6 +367,8 @@ class BulkLoad extends EventEmitter {
     this.error = undefined;
     this.canceled = false;
     this.executionStarted = false;
+
+    this.collation = collation;
 
     this.table = table;
     this.options = connectionOptions;
@@ -384,7 +410,7 @@ class BulkLoad extends EventEmitter {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
 
-    const column = {
+    const column: Column = {
       type: type,
       name: name,
       value: null,
@@ -393,7 +419,8 @@ class BulkLoad extends EventEmitter {
       precision: precision,
       scale: scale,
       objName: objName,
-      nullable: nullable
+      nullable: nullable,
+      collation: this.collation
     };
 
     if ((type.id & 0x30) === 0x20) {
@@ -471,11 +498,11 @@ class BulkLoad extends EventEmitter {
     // write each column
     if (Array.isArray(row)) {
       this.rowToPacketTransform.write(this.columns.map((column, i) => {
-        return column.type.validate(row[i]);
+        return column.type.validate(row[i], column.collation);
       }));
     } else {
       this.rowToPacketTransform.write(this.columns.map((column) => {
-        return column.type.validate(row[column.objName]);
+        return column.type.validate(row[column.objName], column.collation);
       }));
     }
   }
@@ -596,6 +623,11 @@ class BulkLoad extends EventEmitter {
 
       // TYPE_INFO
       tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+
+      // TableName
+      if (c.type.hasTableName) {
+        tBuf.writeUsVarchar(this.table, 'ucs2');
+      }
 
       // ColName
       tBuf.writeBVarchar(c.name, 'ucs2');

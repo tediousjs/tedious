@@ -59,6 +59,10 @@ const NVarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt16LE(MAX, 1);
     }
 
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
+    }
+
     return buffer;
   },
 

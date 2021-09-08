@@ -40,6 +40,7 @@ import Variant from './data-types/sql-variant';
 import { CryptoMetadata } from './always-encrypted/types';
 
 import { InternalConnectionOptions } from './connection';
+import { Collation } from './collation';
 
 export interface Parameter {
   type: DataType;
@@ -51,12 +52,6 @@ export interface Parameter {
   length?: number;
   precision?: number;
   scale?: number;
-  collation?: {
-    lcid: number;
-    flags: number;
-    version: number;
-    sortId: number;
-  };
 
   nullable?: boolean;
 
@@ -71,6 +66,8 @@ export interface ParameterData<T = any> {
   scale?: number;
   precision?: number;
 
+  collation?: Collation;
+
   value: T;
 }
 
@@ -83,7 +80,7 @@ export interface DataType {
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
-  validate(value: any): any; // TODO: Refactor 'any' and replace with more specific type.
+  validate(value: any, collation: Collation | undefined): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
 

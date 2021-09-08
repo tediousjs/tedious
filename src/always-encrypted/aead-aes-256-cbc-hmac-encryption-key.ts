@@ -53,7 +53,7 @@ export class AeadAes256CbcHmac256EncryptionKey extends SymmetricKey {
       const ivKeyBuff = deriveKey(rootKey, this.ivKeySaltFormat);
 
       this.ivKey = new SymmetricKey(ivKeyBuff);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Key extraction failed : ${error.message}.`);
     }
   }

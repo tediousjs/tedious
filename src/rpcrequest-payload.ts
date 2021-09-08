@@ -2,6 +2,7 @@ import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
 import { Parameter, ParameterData } from './data-type';
 import { InternalConnectionOptions } from './connection';
+import { Collation } from './collation';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -23,12 +24,14 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
   options: InternalConnectionOptions;
   txnDescriptor: Buffer;
+  collation: Collation | undefined;
 
-  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
+  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
     this.procedure = procedure;
     this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
+    this.collation = collation;
   }
 
   [Symbol.iterator]() {
@@ -97,6 +100,10 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.scale = parameter.scale;
     } else if (type.resolveScale) {
       param.scale = type.resolveScale(parameter);
+    }
+
+    if (this.collation) {
+      param.collation = this.collation;
     }
 
     yield type.generateTypeInfo(param, this.options);

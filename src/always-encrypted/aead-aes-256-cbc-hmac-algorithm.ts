@@ -87,7 +87,7 @@ export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
     try {
       plainText = decipher.update(cipherText.slice(cipherTextOffset, cipherTextOffset + cipherTextCount));
       plainText = Buffer.concat([plainText, decipher.final()]);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Internal error while decryption: ${error.message}`);
     }
 
