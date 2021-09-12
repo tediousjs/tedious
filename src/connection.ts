@@ -8,13 +8,11 @@ import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
-  loginWithVmMSI,
-  loginWithAppServiceMSI,
-  UserTokenCredentials,
-  MSIVmTokenCredentials,
-  MSIAppServiceTokenCredentials,
-  ApplicationTokenCredentials
-} from '@azure/ms-rest-nodeauth';
+  ClientSecretCredential,
+  ManagedIdentityCredential,
+  TokenCredential,
+  UsernamePasswordCredential,
+} from '@azure/identity';
 
 import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
@@ -42,7 +40,6 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import depd from 'depd';
-import { MemoryCache } from 'adal-node';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
@@ -50,6 +47,7 @@ import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 
 import { version } from '../package.json';
+import { URL } from 'url';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -211,14 +209,6 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
      * This is optional for retrieve token from azure web app service
      */
     clientId?: string;
-    /**
-     * A msi app service environment need to provide `msiEndpoint` for retriving the accesstoken.
-     */
-    msiEndpoint?: string;
-    /**
-     * A msi app service environment need to provide `msiSecret` for retriving the accesstoken.
-     */
-    msiSecret?: string;
   };
 }
 
@@ -232,10 +222,6 @@ interface AzureActiveDirectoryMsiVmAuthentication {
      * This is optional for retrieve token from azure web app service
      */
     clientId?: string;
-    /**
-     * A user need to provide `msiEndpoint` for retriving the accesstoken.
-     */
-    msiEndpoint?: string;
   };
 }
 
@@ -1137,22 +1123,10 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
 
-        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
-        }
-
-        if (options.msiEndpoint !== undefined && options.msiEndpoint !== process.env.MSI_ENDPOINT) {
-          deprecate(
-            'The `config.authentication.options.msiEndpoint` property is deprecated and will be removed in the next major release. ' +
-            'To silence this message, ensure that `process.env.MSI_ENDPOINT` and `config.authentication.options.msiEndpoint` are set to the same value.'
-          );
-        }
-
         authentication = {
           type: 'azure-active-directory-msi-vm',
           options: {
-            clientId: options.clientId,
-            msiEndpoint: options.msiEndpoint
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-msi-app-service') {
@@ -1160,34 +1134,10 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
 
-        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
-        }
-
-        if (options.msiSecret !== undefined && typeof options.msiSecret !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiSecret" property must be of type string.');
-        }
-
-        if (options.msiEndpoint !== undefined && options.msiEndpoint !== process.env.MSI_ENDPOINT) {
-          deprecate(
-            'The `config.authentication.options.msiEndpoint` property is deprecated and will be removed in the next major release. ' +
-            'To silence this message, ensure that `process.env.MSI_ENDPOINT` and `config.authentication.options.msiEndpoint` are set to the same value.'
-          );
-        }
-
-        if (options.msiSecret !== undefined && options.msiSecret !== process.env.MSI_SECRET) {
-          deprecate(
-            'The `config.authentication.options.msiSecret` property is deprecated and will be removed in the next major release. ' +
-            'To silence this message, ensure that `process.env.MSI_SECRET` and `config.authentication.options.msiSecret` are set to the same value.'
-          );
-        }
-
         authentication = {
           type: 'azure-active-directory-msi-app-service',
           options: {
-            clientId: options.clientId,
-            msiEndpoint: options.msiEndpoint,
-            msiSecret: options.msiSecret
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-service-principal-secret') {
@@ -3460,8 +3410,6 @@ class Connection extends EventEmitter {
 export default Connection;
 module.exports = Connection;
 
-const authenticationCache = new MemoryCache();
-
 Connection.prototype.STATE = {
   INITIALIZED: {
     name: 'Initialized',
@@ -3739,54 +3687,37 @@ Connection.prototype.STATE = {
 
           if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
             const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+            const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
             const getToken = (callback: (error: Error | null, token?: string) => void) => {
-              const getTokenFromCredentials = (err: Error | undefined, credentials?: UserTokenCredentials | MSIAppServiceTokenCredentials | MSIVmTokenCredentials | ApplicationTokenCredentials) => {
-                if (err) {
-                  return callback(err);
-                }
-
-                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
-                  callback(null, tokenResponse.accessToken);
+              const getTokenFromCredentials = (credentials: TokenCredential) => {
+                credentials.getToken(tokenScope).then((tokenResponse) => {
+                  callback(null, tokenResponse?.token);
                 }, callback);
               };
 
               if (authentication.type === 'azure-active-directory-password') {
-                const credentials = new UserTokenCredentials(
-                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                  authentication.options.domain ?? 'common',
+                const credentials = new UsernamePasswordCredential(
+                  authentication.options.domain ?? 'common',  // tenantId
+                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',     // clientId
                   authentication.options.userName,
-                  authentication.options.password,
-                  fedAuthInfoToken.spn,
-                  undefined, // environment
-                  authenticationCache
+                  authentication.options.password
                 );
 
-                getTokenFromCredentials(undefined, credentials);
-              } else if (authentication.type === 'azure-active-directory-msi-vm') {
-                loginWithVmMSI({
-                  clientId: authentication.options.clientId,
-                  msiEndpoint: authentication.options.msiEndpoint,
-                  resource: fedAuthInfoToken.spn
-                }, getTokenFromCredentials);
-              } else if (authentication.type === 'azure-active-directory-msi-app-service') {
-                loginWithAppServiceMSI({
-                  msiEndpoint: authentication.options.msiEndpoint,
-                  msiSecret: authentication.options.msiSecret,
-                  resource: fedAuthInfoToken.spn,
-                  clientId: authentication.options.clientId
-                }, getTokenFromCredentials);
+                getTokenFromCredentials(credentials);
+              } else if (authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
+                const msiArgs = authentication.options.clientId ? [ authentication.options.clientId, {} ] : [ {} ];
+                const credentials = new ManagedIdentityCredential(...msiArgs);
+
+                getTokenFromCredentials(credentials);
               } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-                const credentials = new ApplicationTokenCredentials(
+                const credentials = new ClientSecretCredential(
+                  authentication.options.tenantId,
                   authentication.options.clientId,
-                  authentication.options.tenantId, // domain
-                  authentication.options.clientSecret,
-                  fedAuthInfoToken.spn,
-                  undefined, // environment
-                  authenticationCache
+                  authentication.options.clientSecret
                 );
 
-                getTokenFromCredentials(undefined, credentials);
+                getTokenFromCredentials(credentials);
               }
             };
 
