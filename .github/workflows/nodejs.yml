@@ -287,7 +287,6 @@ jobs:
   pre-release:
     name: Pre-Release
     needs: [test, azure]
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -311,7 +310,16 @@ jobs:
 
     - run: npm ci
 
-    - env:
+    - name: Run `semantic-release --dry-run`
+      if: ${{ github.event_name == 'pull_request' }}
+      env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npm run semantic-release
+      run: npx semantic-release --dry-run
+
+    - name: Run `semantic-release`
+      if: ${{ github.event_name == 'push' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: npx semantic-release
