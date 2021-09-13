@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 import Connection, { InternalConnectionOptions } from './connection';
 
 import { DataType, Parameter } from './data-type';
-import { Collation } from './collation';
 
 /**
  * @private
@@ -55,7 +54,6 @@ export type Callback =
 
 interface Column extends Parameter {
   objName: string;
-  collation: Collation | undefined;
 }
 
 interface ColumnOptions {
@@ -176,12 +174,10 @@ class BulkLoad extends EventEmitter {
    */
   rowCount: number | undefined;
 
-  collation: Collation | undefined;
-
   /**
    * @private
    */
-  constructor(table: string, collation: Collation | undefined, connectionOptions: InternalConnectionOptions, {
+  constructor(table: string, connectionOptions: InternalConnectionOptions, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
@@ -219,8 +215,6 @@ class BulkLoad extends EventEmitter {
     this.error = undefined;
     this.canceled = false;
     this.executionStarted = false;
-
-    this.collation = collation;
 
     this.table = table;
     this.options = connectionOptions;
@@ -264,8 +258,7 @@ class BulkLoad extends EventEmitter {
       precision: precision,
       scale: scale,
       objName: objName,
-      nullable: nullable,
-      collation: this.collation
+      nullable: nullable
     };
 
     if ((type.id & 0x30) === 0x20) {

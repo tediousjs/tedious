@@ -2524,7 +2524,7 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.databaseCollation, this.config.options, options, callback);
+    return new BulkLoad(table, this.config.options, options, callback);
   }
 
   /**
@@ -2579,7 +2579,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, new BulkLoadPayload(bulkLoad, rows));
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, new BulkLoadPayload(bulkLoad, rows, this.databaseCollation));
     });
 
     bulkLoad.once('cancel', onCancel);

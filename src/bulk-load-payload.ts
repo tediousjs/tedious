@@ -1,8 +1,9 @@
-import { Readable, Transform, pipeline } from 'stream';
+import { Readable, Transform } from 'stream';
 import BulkLoad from './bulk-load';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
+import { Collation } from './collation';
 
 /**
  * @private
@@ -53,13 +54,15 @@ export class BulkLoadPayload extends Transform {
 
   mainOptions: BulkLoad['options'];
   columns: BulkLoad['columns'];
+  collation: Collation | undefined;
 
-  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
+  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, collation: Collation | undefined) {
     super({ writableObjectMode: true });
 
     this.bulkLoad = bulkLoad;
     this.mainOptions = bulkLoad.options;
     this.columns = bulkLoad.columns;
+    this.collation = collation;
 
     this.rowStream = Readable.from(rows);
 
@@ -88,7 +91,7 @@ export class BulkLoadPayload extends Transform {
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
       try {
-        value = c.type.validate(value, c.collation);
+        value = c.type.validate(value, this.collation);
       } catch (error: any) {
         return callback(error);
       }
