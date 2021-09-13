@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import Connection, { InternalConnectionOptions } from './connection';
+import Connection from './connection';
 
 import { DataType, Parameter } from './data-type';
 
@@ -137,10 +137,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  options: InternalConnectionOptions;
-  /**
-   * @private
-   */
   callback: Callback;
 
   /**
@@ -177,7 +173,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  constructor(table: string, connectionOptions: InternalConnectionOptions, {
+  constructor(table: string, {
     checkConstraints = false,
     fireTriggers = false,
     keepNulls = false,
@@ -217,7 +213,6 @@ class BulkLoad extends EventEmitter {
     this.executionStarted = false;
 
     this.table = table;
-    this.options = connectionOptions;
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};

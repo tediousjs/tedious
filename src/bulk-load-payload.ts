@@ -4,6 +4,7 @@ import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
 import { Collation } from './collation';
+import { InternalConnectionOptions } from './connection';
 
 /**
  * @private
@@ -52,15 +53,15 @@ export class BulkLoadPayload extends Transform {
   bulkLoad: BulkLoad;
   rowStream: Readable;
 
-  mainOptions: BulkLoad['options'];
+  mainOptions: InternalConnectionOptions;
   columns: BulkLoad['columns'];
   collation: Collation | undefined;
 
-  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, collation: Collation | undefined) {
+  constructor(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, options: InternalConnectionOptions, collation: Collation | undefined) {
     super({ writableObjectMode: true });
 
     this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
+    this.mainOptions = options;
     this.columns = bulkLoad.columns;
     this.collation = collation;
 
