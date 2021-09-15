@@ -37,6 +37,8 @@ export interface ParameterOptions {
   length?: number;
   precision?: number;
   scale?: number;
+
+  forceEncrypt?: boolean;
 }
 
 interface RequestOptions {
@@ -115,7 +117,6 @@ class Request extends EventEmitter {
    * @private
    */
   callback: CompletionCallback;
-
 
   shouldHonorAE?: boolean;
   statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
@@ -220,7 +221,6 @@ class Request extends EventEmitter {
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
-
   /**
    * Indicates the completion status of a stored procedure. This is also generated for stored procedures
    * executed through SQL statements.\
@@ -403,7 +403,13 @@ class Request extends EventEmitter {
       options = {};
     }
 
-    const { output = false, length, precision, scale } = options;
+    const {
+      output = false,
+      length,
+      precision,
+      scale,
+      forceEncrypt = false,
+    } = options;
 
     const parameter: Parameter = {
       type: type,
@@ -412,7 +418,8 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      forceEncrypt: forceEncrypt
     };
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;

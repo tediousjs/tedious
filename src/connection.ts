@@ -38,7 +38,9 @@ import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { shouldHonorAE } from './always-encrypted/utils';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 import depd from 'depd';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
@@ -375,6 +377,11 @@ export interface InternalConnectionOptions {
   lowerCaseGuids: boolean;
 }
 
+interface KeyStoreProvider {
+  key: string;
+  value: ColumnEncryptionAzureKeyVaultProvider;
+}
+
 interface KeyStoreProviderMap {
   [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
@@ -503,6 +510,10 @@ export interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
+
+  columnEncryptionKeyCacheTTL?: number;
+
+  columnEncryptionSetting?: boolean;
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
@@ -650,6 +661,7 @@ export interface ConnectionOptions {
    * (default: `false`)
    */
   encrypt?: boolean;
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -1645,6 +1657,26 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.columnEncryptionSetting !== undefined) {
+        if (typeof config.options.columnEncryptionSetting !== 'boolean') {
+          throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
+        }
+
+        this.config.options.columnEncryptionSetting = config.options.columnEncryptionSetting;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL <= 0) {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be greater than 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+      }
+
       if (config.options.workstationId !== undefined) {
         if (typeof config.options.workstationId !== 'string') {
           throw new TypeError('The "config.options.workstationId" property must be of type string.');
@@ -1660,6 +1692,51 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.encryptionKeyStoreProviders) {
+        for (const entry of config.options.encryptionKeyStoreProviders) {
+          const providerName = entry.key;
+
+          if (!providerName || providerName.length === 0) {
+            throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+          }
+
+          if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+            throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+          }
+
+          if (!entry.value) {
+            throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+          }
+
+          if (!this.config.options.encryptionKeyStoreProviders) {
+            this.config.options.encryptionKeyStoreProviders = {};
+          }
+
+          this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
+        }
+      }
+    }
+
+    let serverName = this.config.server;
+    if (!serverName) {
+      serverName = 'localhost';
+    }
+
+    const px = serverName.indexOf('\\');
+
+    if (px > 0) {
+      serverName = serverName.substring(0, px);
+    }
+
+    this.config.options.trustedServerNameAE = serverName;
+
+    if (this.config.options.instanceName) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.instanceName}`;
+    }
+
+    if (this.config.options.port) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.port}`;
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -1966,7 +2043,14 @@ class Connection extends EventEmitter {
         const request = this.request;
         if (request) {
           if (!request.canceled) {
-            const error = new RequestError(token.message, 'EREQUEST');
+            let message = token.message;
+            // Check if attempting to insert non encrypted data into encrypted table
+            if (token.message.includes('Operand type clash') && token.message.includes('encrypted with')) {
+              if (!this.config.options.columnEncryptionSetting) {
+                message = 'Attempting to insert non-encrypted data into an encrypted table. Ensure config.options.columnEncryptionSetting is set to true';
+              }
+            }
+            const error = new RequestError(message, 'EREQUEST');
             error.number = token.number;
             error.state = token.state;
             error.class = token.class;
@@ -1986,6 +2070,10 @@ class Connection extends EventEmitter {
 
         this.loginError = error;
       }
+    });
+
+    tokenStreamParser.parser.on('error', (error) => {
+      this.emit('error', error);
     });
 
     tokenStreamParser.on('databaseChange', (token) => {
@@ -2526,6 +2614,8 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
+    payload.columnEncryption = this.config.options.columnEncryptionSetting;
+
     const { authentication } = this.config;
     switch (authentication.type) {
       case 'azure-active-directory-password':
@@ -2724,22 +2814,7 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
-  /**
-   *  Execute the SQL represented by [[Request]].
-   *
-   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
-   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
-   * for the first execution. This may also result in SQL server treating the request like a stored procedure
-   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
-   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
-   *
-   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
-   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
-   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
-   *
-   * @param request A [[Request]] object representing the request.
-   */
-  execSql(request: Request) {
+  _execSql(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {
@@ -2780,6 +2855,40 @@ class Connection extends EventEmitter {
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+  }
+
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSql(request: Request) {
+    request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
+    if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
+      getParameterEncryptionMetadata(this, request, (error?: Error) => {
+        if (error != null) {
+          process.nextTick(() => {
+            this.transitionTo(this.STATE.LOGGED_IN);
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+        this._execSql(request);
+      });
+    } else {
+      this._execSql(request);
+    }
   }
 
   /**
@@ -3563,6 +3672,10 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       featureExtAck: function(token) {
+        if (token.columnEncryption) {
+          this.config.options.serverSupportsColumnEncryption = true;
+          return;
+        }
         const { authentication } = this.config;
         if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
           if (token.fedAuth === undefined) {

@@ -1,6 +1,6 @@
 import { DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -100,6 +100,43 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
     buffer.writeUInt24LE(days);
     yield buffer.data;
+  },
+
+  toBuffer: function(parameter, options) {
+    const value = parameter.value as Date & { nanosecondDelta?: number | null };
+
+    if (value != null) {
+      const scale = this.resolveScale(parameter);
+
+      let timestamp;
+      if (options.useUTC) {
+        timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
+      } else {
+        timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
+      }
+      timestamp = timestamp * Math.pow(10, scale - 3);
+      timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
+      timestamp = Math.round(timestamp);
+
+
+      let date;
+      if (options.useUTC) {
+        date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      } else {
+        date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      }
+
+      const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+
+      // encrypted datetime2 must be 8 bytes: 5 for time, 3 for date
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeUInt40LE(timestamp);
+      buffer.writeUInt24LE(days);
+
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
 
   validate: function(value): null | number {

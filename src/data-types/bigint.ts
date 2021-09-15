@@ -1,3 +1,4 @@
+import JSBI from 'jsbi';
 import { DataType } from '../data-type';
 import IntN from './intn';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
@@ -34,6 +35,19 @@ const BigInt: DataType = {
     const buffer = new WritableTrackingBuffer(8);
     buffer.writeInt64LE(Number(parameter.value));
     yield buffer.data;
+  },
+
+  toBuffer: function(parameter) {
+    const value = parameter.value;
+
+    if (value != null) {
+      const val = typeof value !== 'number' ? parseInt(value as string) : value;
+      const buffer = new WritableTrackingBuffer(8);
+      buffer.writeBigInt64LE(JSBI.BigInt(val));
+      return buffer.data;
+    } else {
+      return Buffer.from([]);
+    }
   },
 
   validate: function(value): null | number {
