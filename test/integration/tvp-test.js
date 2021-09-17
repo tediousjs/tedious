@@ -112,7 +112,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
       assert.strictEqual(+columns[9].value, +new Date(Date.UTC(2014, 0, 1)));
     });
 
-    var table = {
+    const table = {
       columns: [
         {
           name: 'a',
@@ -162,6 +162,83 @@ describe('calling a procedure that takes and returns a TVP', function() {
         [
           false,
           1,
+          2,
+          3,
+          4,
+          5.5,
+          6.6,
+          'asdf',
+          'asdf',
+          new Date(Date.UTC(2014, 0, 1))
+        ]
+      ]
+    };
+
+    request.addParameter('tvp', TYPES.TVP, table, {});
+
+    connection.callProcedure(request);
+  });
+
+  it('correctly handles validation errors', function(done) {
+    const request = new Request('__tediousTvpTest', (err) => {
+      assert.instanceOf(err, TypeError);
+      assert.strictEqual(err?.message, 'Value must be between 0 and 255, inclusive.');
+
+      const request = new Request('SELECT 1', done);
+      connection.execSql(request);
+    });
+
+    const table = {
+      columns: [
+        {
+          name: 'a',
+          type: TYPES.Bit
+        },
+        {
+          name: 'b',
+          type: TYPES.TinyInt
+        },
+        {
+          name: 'c',
+          type: TYPES.SmallInt
+        },
+        {
+          name: 'd',
+          type: TYPES.Int
+        },
+        {
+          name: 'e',
+          type: TYPES.BigInt
+        },
+        {
+          name: 'f',
+          type: TYPES.Real
+        },
+        {
+          name: 'g',
+          type: TYPES.Float
+        },
+        {
+          name: 'h',
+          type: TYPES.VarChar,
+          length: 100
+        },
+        {
+          name: 'i',
+          type: TYPES.NVarChar,
+          length: 100
+        },
+        {
+          name: 'j',
+          type: TYPES.DateTime,
+          length: 100
+        }
+      ],
+      rows: [
+        [
+          false,
+          // This value is outside of `tinyint` range
+          1123,
           2,
           3,
           4,
