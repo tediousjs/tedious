@@ -67,7 +67,7 @@ class Parser {
   options: InternalConnectionOptions;
 
   suspended: boolean;
-  next?: () => void;
+  next: (() => void) | undefined;
   streamBuffer: StreamBuffer;
 
   static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {

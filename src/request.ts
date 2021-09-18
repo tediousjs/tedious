@@ -56,7 +56,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure?: string;
+  sqlTextOrProcedure: string | undefined;
   /**
    * @private
    */
@@ -84,19 +84,19 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  handle?: number;
+  handle: number | undefined;
   /**
    * @private
    */
-  error?: Error;
+  error: Error | undefined;
   /**
    * @private
    */
-  connection?: Connection;
+  connection: Connection | undefined;
   /**
    * @private
    */
-  timeout?: number;
+  timeout: number | undefined;
 
   /**
    * @private

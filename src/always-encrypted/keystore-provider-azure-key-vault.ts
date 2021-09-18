@@ -9,7 +9,7 @@ import { parse } from 'url';
 interface ParsedKeyPath {
   vaultUrl: string;
   name: string;
-  version?: string;
+  version?: string | undefined;
 }
 
 export class ColumnEncryptionAzureKeyVaultProvider {
@@ -201,7 +201,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
 
     this.createKeyClient(keyParts.vaultUrl);
 
-    return (this.keyClient as KeyClient).getKey(keyParts.name, { version: keyParts.version });
+    return (this.keyClient as KeyClient).getKey(keyParts.name, keyParts.version ? { version: keyParts.version } : {});
   }
 
   private createKeyClient(keyVaultUrl: string): void {
