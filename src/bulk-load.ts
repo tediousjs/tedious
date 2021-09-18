@@ -55,27 +55,27 @@ export interface Options {
    * [CHECK_CONSTRAINTS](https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx).
    * (default: `false`)
    */
-  checkConstraints?: InternalOptions['checkConstraints'];
+  checkConstraints?: InternalOptions['checkConstraints'] | undefined;
 
   /**
    * Honors insert triggers during bulk load, using the T-SQL [FIRE_TRIGGERS](https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx). (default: `false`)
    */
-  fireTriggers?: InternalOptions['fireTriggers'];
+  fireTriggers?: InternalOptions['fireTriggers'] | undefined;
 
   /**
    * Honors null value passed, ignores the default values set on table, using T-SQL [KEEP_NULLS](https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx). (default: `false`)
    */
-  keepNulls?: InternalOptions['keepNulls'];
+  keepNulls?: InternalOptions['keepNulls'] | undefined;
 
   /**
    * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
    */
-  lockTable?: InternalOptions['lockTable'];
+  lockTable?: InternalOptions['lockTable'] | undefined;
 
   /**
    * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
    */
-  order?: InternalOptions['order'];
+  order?: InternalOptions['order'] | undefined;
 }
 
 
@@ -253,7 +253,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  error?: Error;
+  error: Error | undefined;
   /**
    * @private
    */
@@ -273,7 +273,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  timeout?: number
+  timeout: number | undefined;
 
   /**
    * @private
@@ -310,19 +310,19 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  connection?: Connection;
+  connection: Connection | undefined;
   /**
    * @private
    */
-  rows?: Array<any>;
+  rows: Array<any> | undefined;
   /**
    * @private
    */
-  rst?: Array<any>;
+  rst: Array<any> | undefined;
   /**
    * @private
    */
-  rowCount?: number;
+  rowCount: number | undefined;
 
   collation: Collation | undefined;
 

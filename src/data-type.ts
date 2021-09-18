@@ -49,24 +49,24 @@ export interface Parameter {
   value: unknown;
 
   output: boolean;
-  length?: number;
-  precision?: number;
-  scale?: number;
+  length?: number | undefined;
+  precision?: number | undefined;
+  scale?: number | undefined;
 
-  nullable?: boolean;
+  nullable?: boolean | undefined;
 
-  forceEncrypt?: boolean;
-  cryptoMetadata?: CryptoMetadata;
-  encryptedVal?: Buffer;
+  forceEncrypt?: boolean | undefined;
+  cryptoMetadata?: CryptoMetadata | undefined;
+  encryptedVal?: Buffer | undefined;
 }
 
 
 export interface ParameterData<T = any> {
-  length?: number;
-  scale?: number;
-  precision?: number;
+  length?: number | undefined;
+  scale?: number | undefined;
+  precision?: number | undefined;
 
-  collation?: Collation;
+  collation?: Collation | undefined;
 
   value: T;
 }

@@ -299,11 +299,11 @@ interface DefaultAuthentication {
     /**
      * User name to use for sql server login.
      */
-    userName?: string;
+    userName?: string | undefined;
     /**
      * Password to use for sql server login.
      */
-    password?: string;
+    password?: string | undefined;
   };
 }
 
@@ -349,7 +349,7 @@ export interface InternalConnectionOptions {
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
   encrypt: boolean;
-  encryptionKeyStoreProviders?: KeyStoreProviderMap;
+  encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -367,7 +367,7 @@ export interface InternalConnectionOptions {
   serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: number;
-  trustedServerNameAE?: string;
+  trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
