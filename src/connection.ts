@@ -2074,7 +2074,7 @@ class Connection extends EventEmitter {
       if (request) {
         if (!request.canceled) {
           if (this.config.options.useColumnNames) {
-            const columns: { [key: string]: ColumnMetadata } = {};
+            const columns: { [key: string]: ColumnMetadata } = Object.create(null);
 
             for (let j = 0, len = token.columns.length; j < len; j++) {
               const col = token.columns[j];
