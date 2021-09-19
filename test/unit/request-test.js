@@ -1,4 +1,5 @@
 const { assert } = require('chai');
+const { TYPES } = require('../../src/data-type');
 
 const Request = require('../../src/request');
 
@@ -34,6 +35,22 @@ describe('Request', function() {
       request.cancel();
 
       assert.strictEqual(eventEmitted, false);
+    });
+  });
+
+  describe('#addOutputParameter', function() {
+    it('does not modify the passed in options object', function() {
+      const request = new Request('', () => {});
+
+      request.addOutputParameter('foo', TYPES.NVarChar, 'test', Object.freeze({ length: 10 }));
+    });
+  });
+
+  describe('#addParameter', function() {
+    it('does not modify the passed in options object', function() {
+      const request = new Request('', () => { });
+
+      request.addParameter('foo', TYPES.NVarChar, 'test', Object.freeze({ length: 10 }));
     });
   });
 });
