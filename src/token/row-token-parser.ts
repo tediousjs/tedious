@@ -39,7 +39,7 @@ async function rowParser(parser: Parser): Promise<RowToken> {
   }
 
   if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = {};
+    const columnsMap: { [key: string]: Column } = Object.create(null);
 
     columns.forEach((column) => {
       const colName = column.metadata.colName;

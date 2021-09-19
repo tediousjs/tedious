@@ -591,86 +591,121 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should numeric column name', function(done) {
-    const config = getConfig();
-    config.options.useColumnNames = true;
+  describe('when `useColumnNames` is `true`', function() {
+    it('should support numeric column names', function(done) {
+      const config = getConfig();
+      config.options.useColumnNames = true;
 
-    const request = new Request('select 8 as [123]', function(err, rowCount) {
-      assert.ifError(err);
-      assert.strictEqual(rowCount, 1);
+      const connection = new Connection(config);
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
 
-      connection.close();
+        const request = new Request('select 8 as [123]', (err, rowCount) => {
+          assert.ifError(err);
+          assert.strictEqual(rowCount, 1);
+
+          connection.close();
+        });
+
+        request.on('columnMetadata', (columnsMetadata) => {
+          assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+        });
+
+        request.on('row', (columns) => {
+          assert.strictEqual(Object.keys(columns).length, 1);
+          assert.strictEqual(columns[123].value, 8);
+        });
+
+        connection.execSql(request);
+      });
+
+      connection.on('end', () => {
+        done();
+      });
     });
 
-    request.on('columnMetadata', function(columnsMetadata) {
-      assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+    it('supports duplicate column names', function(done) {
+      const config = getConfig();
+      config.options.useColumnNames = true;
+
+      const connection = new Connection(config);
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request("select 1 as abc, 2 as xyz, '3' as abc", (err, rowCount) => {
+          assert.ifError(err);
+          assert.strictEqual(rowCount, 1);
+
+          connection.close();
+        });
+
+        request.on('columnMetadata', (columnsMetadata) => {
+          assert.strictEqual(Object.keys(columnsMetadata).length, 2);
+        });
+
+        request.on('row', (columns) => {
+          assert.strictEqual(Object.keys(columns).length, 2);
+
+          assert.strictEqual(columns.abc.value, 1);
+          assert.strictEqual(columns.xyz.value, 2);
+        });
+
+        connection.execSql(request);
+      });
+
+      connection.on('end', () => {
+        done();
+      });
     });
 
-    request.on('row', function(columns) {
-      assert.strictEqual(Object.keys(columns).length, 1);
-      assert.strictEqual(columns[123].value, 8);
-    });
+    describe('with a polluted `Object` prototype', function() {
+      beforeEach(function() {
+        ({}).constructor.prototype.foo = 'bar';
+      });
 
-    let connection = new Connection(config);
+      afterEach(function() {
+        delete ({}).constructor.prototype.foo;
+      });
 
-    connection.connect(function(err) {
-      connection.execSql(request);
-    });
+      it('should not have column metadata or rows be affected by the pollution', function(done) {
+        const config = getConfig();
+        config.options.useColumnNames = true;
 
-    connection.on('end', function() {
-      done();
-    });
+        const connection = new Connection(config);
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
 
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
+          const request = new Request('select 1 as abc', (err, rowCount) => {
+            assert.ifError(err);
+            assert.strictEqual(rowCount, 1);
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
-  });
+            connection.close();
+          });
 
-  it('should duplicate column name', function(done) {
-    const config = getConfig();
-    config.options.useColumnNames = true;
+          request.on('columnMetadata', (columnsMetadata) => {
+            assert.property(columnsMetadata, 'abc');
+            assert.notProperty(columnsMetadata, 'foo');
+          });
 
-    const request = new Request("select 1 as abc, 2 as xyz, '3' as abc", function(
-      err,
-      rowCount
-    ) {
-      assert.ifError(err);
-      assert.strictEqual(rowCount, 1);
+          request.on('row', (columns) => {
+            assert.property(columns, 'abc');
+            assert.notProperty(columns, 'foo');
+          });
 
-      connection.close();
-    });
+          connection.execSql(request);
+        });
 
-    request.on('columnMetadata', function(columnsMetadata) {
-      assert.strictEqual(Object.keys(columnsMetadata).length, 2);
-    });
-
-    request.on('row', function(columns) {
-      assert.strictEqual(Object.keys(columns).length, 2);
-
-      assert.strictEqual(columns.abc.value, 1);
-      assert.strictEqual(columns.xyz.value, 2);
-    });
-
-    let connection = new Connection(config);
-
-    connection.connect(function(err) {
-      connection.execSql(request);
-    });
-
-    connection.on('end', function() {
-      done();
-    });
-
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
-
-    connection.on('debug', function(text) {
-      // console.log(text)
+        connection.on('end', () => {
+          done();
+        });
+      });
     });
   });
 
