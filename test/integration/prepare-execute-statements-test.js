@@ -63,6 +63,52 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('does not cause unexpected `returnValue` events to be emitted', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      /**
+       * @type {{ parameterName: string, value: unknown, metadata: import('../../src/metadata-parser').Metadata }[]}
+       */
+      const returnValues = [];
+
+      const request = new Request('select @param', function(err) {
+        if (err) {
+          return done(err);
+        }
+
+        assert.lengthOf(returnValues, 1);
+
+        connection.close();
+      });
+      request.addParameter('param', TYPES.Int);
+
+      request.on('prepared', function() {
+        assert.ok(request.handle);
+
+        assert.lengthOf(returnValues, 1);
+        assert.strictEqual(returnValues[0].parameterName, 'handle');
+
+        connection.execute(request, { param: 8 });
+      });
+
+      request.on('returnValue', (parameterName, value, metadata) => {
+        returnValues.push({ parameterName, value, metadata });
+      });
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
   it('does not leak memory via EventEmitter listeners when reusing a request many times', function(done) {
     const config = getConfig();
 
