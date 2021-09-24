@@ -28,6 +28,8 @@ class MessageIO extends EventEmitter {
     encrypted: Duplex;
   }
 
+  incomingMessageIterator: AsyncIterableIterator<Message>;
+
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
 
@@ -37,13 +39,7 @@ class MessageIO extends EventEmitter {
     this.tlsNegotiationComplete = false;
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageStream.on('data', (message: Message) => {
-      this.emit('data', message);
-    });
-
-    this.incomingMessageStream.on('error', (message) => {
-      this.emit('error', message);
-    });
+    this.incomingMessageIterator = this.incomingMessageStream[Symbol.asyncIterator]();
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
@@ -132,6 +128,21 @@ class MessageIO extends EventEmitter {
     message.end(data);
     this.outgoingMessageStream.write(message);
     return message;
+  }
+
+  /**
+   * Returns the next message stream sent by the server.
+   *
+   * If this is called multiple times, each call will wait for the next message to be received.
+   */
+  async readMessage() {
+    const result = await this.incomingMessageIterator.next();
+
+    if (result.done) {
+      throw new Error('Incoming Message stream ended');
+    }
+
+    return result.value;
   }
 
   // Temporarily suspends the flow of incoming packets.
