@@ -9,6 +9,7 @@ import {
   ColMetadataToken,
   CommitTransactionEnvChangeToken,
   DatabaseEnvChangeToken,
+  DatabaseMirroringPartnerEnvChangeToken,
   DoneInProcToken,
   DoneProcToken,
   DoneToken,
@@ -132,6 +133,10 @@ export class TokenHandler {
   }
 
   onDone(token: DoneToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
     throw new UnexpectedTokenError(this, token);
   }
 }
