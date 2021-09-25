@@ -683,3 +683,97 @@ export class RequestTokenHandler extends TokenHandler {
     this.connection.emit('resetConnection');
   }
 }
+
+export class AttentionTokenHandler extends TokenHandler {
+  connection: Connection;
+  request: Request | BulkLoad;
+
+  constructor(connection: Connection, request: Request | BulkLoad) {
+    super();
+
+    this.connection = connection;
+    this.request = request;
+  }
+
+  // TODO: Remove
+  onInfoMessage(token: InfoMessageToken) {
+    this.connection.emit('infoMessage', token);
+  }
+
+  // TODO: Remove
+  onErrorMessage(token: ErrorMessageToken) {
+    this.connection.emit('errorMessage', token);
+  }
+
+  // TODO: Remove
+  onDatabaseChange(token: DatabaseEnvChangeToken) {
+    this.connection.emit('databaseChange', token.newValue);
+  }
+
+  // TODO: Remove
+  onLanguageChange(token: LanguageEnvChangeToken) {
+    this.connection.emit('languageChange', token.newValue);
+  }
+
+  // TODO: Remove
+  onCharsetChange(token: CharsetEnvChangeToken) {
+    this.connection.emit('charsetChange', token.newValue);
+  }
+
+  // TODO: Remove
+  onSqlCollationChange(token: CollationChangeToken) {
+    this.connection.databaseCollation = token.newValue;
+  }
+
+  // TODO: Remove
+  onPacketSizeChange(token: PacketSizeEnvChangeToken) {
+    this.connection.messageIo.packetSize(token.newValue);
+  }
+
+  // TODO: Remove
+  onBeginTransaction(token: BeginTransactionEnvChangeToken) {
+    this.connection.transactionDescriptors.push(token.newValue);
+    this.connection.inTransaction = true;
+  }
+
+  // TODO: Remove
+  onCommitTransaction(token: CommitTransactionEnvChangeToken) {
+    this.connection.transactionDescriptors.length = 1;
+    this.connection.inTransaction = false;
+  }
+
+  // TODO: Remove
+  onRollbackTransaction(token: RollbackTransactionEnvChangeToken) {
+    this.connection.transactionDescriptors.length = 1;
+    // An outermost transaction was rolled back. Reset the transaction counter
+    this.connection.inTransaction = false;
+    this.connection.emit('rollbackTransaction');
+  }
+
+  // TODO: Remove
+  onColMetadata(token: ColMetadataToken) {}
+
+  // TODO: Remove
+  onOrder(token: OrderToken) {}
+
+  // TODO: Remove
+  onRow(token: RowToken | NBCRowToken) {}
+
+  // TODO: Remove
+  onReturnStatus(token: ReturnStatusToken) {}
+
+  // TODO: Remove
+  onReturnValue(token: ReturnValueToken) {}
+
+  // TODO: Remove
+  onDoneProc(token: DoneProcToken) {}
+
+  // TODO: Remove
+  onDoneInProc(token: DoneInProcToken) {}
+
+  onDone(token: DoneToken) {
+    if (token.attention) {
+      this.connection.attentionReceived = true;
+    }
+  }
+}

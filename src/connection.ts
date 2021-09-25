@@ -47,7 +47,7 @@ import { Collation } from './collation';
 
 import { version } from '../package.json';
 import { URL } from 'url';
-import { LegacyTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import { AttentionTokenHandler, LegacyTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -3681,11 +3681,8 @@ Connection.prototype.STATE = {
 
         sqlRequest.callback(err);
       },
-      attention: function() {
-        this.attentionReceived = true;
-      },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
+        const tokenStreamParser = this.createTokenStreamParser(message, new AttentionTokenHandler(this, this.request!));
 
         tokenStreamParser.once('end', () => {
           // 3.2.5.7 Sent Attention State
