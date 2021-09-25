@@ -47,7 +47,7 @@ import { Collation } from './collation';
 
 import { version } from '../package.json';
 import { URL } from 'url';
-import { LegacyTokenHandler, Login7TokenHandler, TokenHandler } from './token/handler';
+import { LegacyTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -3620,7 +3620,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser(message);
+        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
         const onResume = () => { tokenStreamParser.resume(); };
         const onPause = () => {
