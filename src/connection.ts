@@ -37,7 +37,6 @@ import Message from './message';
 import { Metadata } from './metadata-parser';
 import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import depd from 'depd';
 
@@ -48,6 +47,7 @@ import { Collation } from './collation';
 
 import { version } from '../package.json';
 import { URL } from 'url';
+import { LegacyTokenHandler, TokenHandler } from './token/handler';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -1944,263 +1944,110 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message) {
+  createTokenStreamParser(message: Message, handler: TokenHandler = new LegacyTokenHandler(this)) {
     const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
-      this.emit('infoMessage', token);
+      handler.onInfoMessage(token);
     });
 
     tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
-
-      this.emit('sspichallenge', token);
+      handler.onSSPI(token);
     });
 
     tokenStreamParser.on('errorMessage', (token) => {
-      this.emit('errorMessage', token);
-      if (this.loggedIn) {
-        const request = this.request;
-        if (request) {
-          if (!request.canceled) {
-            const error = new RequestError(token.message, 'EREQUEST');
-            error.number = token.number;
-            error.state = token.state;
-            error.class = token.class;
-            error.serverName = token.serverName;
-            error.procName = token.procName;
-            error.lineNumber = token.lineNumber;
-            request.error = error;
-          }
-        }
-      } else {
-        const error = ConnectionError(token.message, 'ELOGIN');
-
-        const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
-        if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          error.isTransient = true;
-        }
-
-        this.loginError = error;
-      }
+      handler.onErrorMessage(token);
     });
 
     tokenStreamParser.on('databaseChange', (token) => {
-      this.emit('databaseChange', token.newValue);
+      handler.onDatabaseChange(token);
     });
 
     tokenStreamParser.on('languageChange', (token) => {
-      this.emit('languageChange', token.newValue);
+      handler.onLanguageChange(token);
     });
 
     tokenStreamParser.on('charsetChange', (token) => {
-      this.emit('charsetChange', token.newValue);
+      handler.onCharsetChange(token);
     });
 
     tokenStreamParser.on('sqlCollationChange', (token) => {
-      this.databaseCollation = token.newValue;
+      handler.onSqlCollationChange(token);
     });
 
     tokenStreamParser.on('fedAuthInfo', (token) => {
-      this.dispatchEvent('fedAuthInfo', token);
+      handler.onFedAuthInfo(token);
     });
 
     tokenStreamParser.on('featureExtAck', (token) => {
-      this.dispatchEvent('featureExtAck', token);
+      handler.onFeatureExtAck(token);
     });
 
     tokenStreamParser.on('loginack', (token) => {
-      if (!token.tdsVersion) {
-        // unsupported TDS version
-        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
-        this.loggedIn = false;
-        return;
-      }
-
-      if (!token.interface) {
-        // unsupported interface
-        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
-        this.loggedIn = false;
-        return;
-      }
-
-      // use negotiated version
-      this.config.options.tdsVersion = token.tdsVersion;
-      this.loggedIn = true;
+      handler.onLoginAck(token);
     });
 
     tokenStreamParser.on('routingChange', (token) => {
-      // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
-      const [ server ] = token.newValue.server.split('\\');
-
-      this.routingData = {
-        server, port: token.newValue.port
-      };
+      handler.onRoutingChange(token);
     });
 
     tokenStreamParser.on('packetSizeChange', (token) => {
-      this.messageIo.packetSize(token.newValue);
+      handler.onPacketSizeChange(token);
     });
 
     // A new top-level transaction was started. This is not fired
     // for nested transactions.
     tokenStreamParser.on('beginTransaction', (token) => {
-      this.transactionDescriptors.push(token.newValue);
-      this.inTransaction = true;
+      handler.onBeginTransaction(token);
     });
 
     // A top-level transaction was committed. This is not fired
     // for nested transactions.
-    tokenStreamParser.on('commitTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      this.inTransaction = false;
+    tokenStreamParser.on('commitTransaction', (token) => {
+      handler.onCommitTransaction(token);
     });
 
     // A top-level transaction was rolled back. This is not fired
     // for nested transactions. This is also fired if a batch
     // aborting error happened that caused a rollback.
-    tokenStreamParser.on('rollbackTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      // An outermost transaction was rolled back. Reset the transaction counter
-      this.inTransaction = false;
-      this.emit('rollbackTransaction');
+    tokenStreamParser.on('rollbackTransaction', (token) => {
+      handler.onRollbackTransaction(token);
     });
 
     tokenStreamParser.on('columnMetadata', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          if (this.config.options.useColumnNames) {
-            const columns: { [key: string]: ColumnMetadata } = Object.create(null);
-
-            for (let j = 0, len = token.columns.length; j < len; j++) {
-              const col = token.columns[j];
-              if (columns[col.colName] == null) {
-                columns[col.colName] = col;
-              }
-            }
-
-            request.emit('columnMetadata', columns);
-          } else {
-            request.emit('columnMetadata', token.columns);
-          }
-        }
-      } else {
-        this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
-        this.close();
-      }
+      handler.onColMetadata(token);
     });
 
     tokenStreamParser.on('order', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('order', token.orderColumns);
-        }
-      } else {
-        this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
-        this.close();
-      }
+      handler.onOrder(token);
     });
 
     tokenStreamParser.on('row', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          if (this.config.options.rowCollectionOnRequestCompletion) {
-            request.rows!.push(token.columns);
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst!.push(token.columns);
-          }
-          if (!request.canceled) {
-            request.emit('row', token.columns);
-          }
-        }
-      } else {
-        this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
-        this.close();
-      }
+      handler.onRow(token);
     });
 
     tokenStreamParser.on('returnStatus', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          // Keep value for passing in 'doneProc' event.
-          this.procReturnStatusValue = token.value;
-        }
-      }
+      handler.onReturnStatus(token);
     });
 
     tokenStreamParser.on('returnValue', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('returnValue', token.paramName, token.value, token.metadata);
-        }
-      }
+      handler.onReturnValue(token);
     });
 
     tokenStreamParser.on('doneProc', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
-          this.procReturnStatusValue = undefined;
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
+      handler.onDoneProc(token);
     });
 
     tokenStreamParser.on('doneInProc', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('doneInProc', token.rowCount, token.more, request.rst);
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
+      handler.onDoneInProc(token);
     });
 
     tokenStreamParser.on('done', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (token.attention) {
-          this.dispatchEvent('attention');
-        }
-
-        if (!request.canceled) {
-          if (token.sqlError && !request.error) {
-            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-          }
-          request.emit('done', token.rowCount, token.more, request.rst);
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
+      handler.onDone(token);
     });
 
-    tokenStreamParser.on('resetConnection', () => {
-      this.emit('resetConnection');
+    tokenStreamParser.on('resetConnection', (token) => {
+      handler.onResetConnection(token);
     });
 
     return tokenStreamParser;
