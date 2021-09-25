@@ -964,10 +964,6 @@ class Connection extends EventEmitter {
    * @private
    */
   resetConnectionOnNextRequest: undefined | boolean;
-  /**
-   * @private
-   */
-  attentionReceived: undefined | boolean;
 
   /**
    * @private
@@ -3564,9 +3560,6 @@ Connection.prototype.STATE = {
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
-    enter: function() {
-      this.attentionReceived = false;
-    },
     events: {
       socketError: function(err) {
         const sqlRequest = this.request!;
@@ -3577,14 +3570,13 @@ Connection.prototype.STATE = {
         sqlRequest.callback(err);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message, new AttentionTokenHandler(this, this.request!));
+        const handler = new AttentionTokenHandler(this, this.request!);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
         tokenStreamParser.once('end', () => {
           // 3.2.5.7 Sent Attention State
           // Discard any data contained in the response, until we receive the attention response
-          if (this.attentionReceived) {
-            this.attentionReceived = false;
-
+          if (handler.attentionReceived) {
             this.clearCancelTimer();
 
             const sqlRequest = this.request!;

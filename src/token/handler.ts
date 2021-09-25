@@ -531,11 +531,18 @@ export class AttentionTokenHandler extends TokenHandler {
   connection: Connection;
   request: Request | BulkLoad;
 
+  /**
+   * Returns whether an attention acknowledgement was received.
+   */
+  attentionReceived: boolean;
+
   constructor(connection: Connection, request: Request | BulkLoad) {
     super();
 
     this.connection = connection;
     this.request = request;
+
+    this.attentionReceived = false;
   }
 
   // TODO: Remove
@@ -616,7 +623,7 @@ export class AttentionTokenHandler extends TokenHandler {
 
   onDone(token: DoneToken) {
     if (token.attention) {
-      this.connection.attentionReceived = true;
+      this.attentionReceived = true;
     }
   }
 }
