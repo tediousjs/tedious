@@ -411,30 +411,14 @@ export class Login7TokenHandler extends TokenHandler {
   onErrorMessage(token: ErrorMessageToken) {
     this.connection.emit('errorMessage', token);
 
-    if (this.connection.loggedIn) {
-      const request = this.connection.request;
-      if (request) {
-        if (!request.canceled) {
-          const error = new RequestError(token.message, 'EREQUEST');
-          error.number = token.number;
-          error.state = token.state;
-          error.class = token.class;
-          error.serverName = token.serverName;
-          error.procName = token.procName;
-          error.lineNumber = token.lineNumber;
-          request.error = error;
-        }
-      }
-    } else {
-      const error = ConnectionError(token.message, 'ELOGIN');
+    const error = ConnectionError(token.message, 'ELOGIN');
 
-      const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
-      if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
-        error.isTransient = true;
-      }
-
-      this.connection.loginError = error;
+    const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
+    if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
+      error.isTransient = true;
     }
+
+    this.connection.loginError = error;
   }
 
   onSSPI(token: SSPIToken) {
@@ -463,11 +447,27 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onFedAuthInfo(token: FedAuthInfoToken) {
-    this.connection.dispatchEvent('fedAuthInfo', token);
+    this.connection.fedAuthInfoToken = token;
   }
 
   onFeatureExtAck(token: FeatureExtAckToken) {
-    this.connection.dispatchEvent('featureExtAck', token);
+    const { authentication } = this.connection.config;
+
+    if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
+      if (token.fedAuth === undefined) {
+        this.connection.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+        this.connection.loggedIn = false;
+      } else if (token.fedAuth.length !== 0) {
+        this.connection.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+        this.connection.loggedIn = false;
+      }
+    } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
+      this.connection.loginError = ConnectionError('Received acknowledgement for unknown feature');
+      this.connection.loggedIn = false;
+    } else if (token.fedAuth) {
+      this.connection.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+      this.connection.loggedIn = false;
+    }
   }
 
   onLoginAck(token: LoginAckToken) {
@@ -500,26 +500,7 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onDone(token: DoneToken) {
-    const request = this.connection.request as Request;
-    if (request) {
-      if (token.attention) {
-        this.connection.dispatchEvent('attention');
-      }
-
-      if (!request.canceled) {
-        if (token.sqlError && !request.error) {
-          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-          request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-        }
-        request.emit('done', token.rowCount, token.more, request.rst);
-        if (token.rowCount !== undefined) {
-          request.rowCount! += token.rowCount;
-        }
-        if (this.connection.config.options.rowCollectionOnDone) {
-          request.rst = [];
-        }
-      }
-    }
+    // Do nothing
   }
 
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
