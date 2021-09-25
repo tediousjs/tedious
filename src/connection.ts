@@ -47,7 +47,7 @@ import { Collation } from './collation';
 
 import { version } from '../package.json';
 import { URL } from 'url';
-import { AttentionTokenHandler, LegacyTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -1944,7 +1944,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message, handler: TokenHandler = new LegacyTokenHandler(this)) {
+  createTokenStreamParser(message: Message, handler: TokenHandler) {
     const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
 
     tokenStreamParser.on('infoMessage', (token) => {
@@ -3586,7 +3586,7 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
       },
       message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
+        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
 
         tokenStreamParser.once('end', () => {
           this.transitionTo(this.STATE.LOGGED_IN);
