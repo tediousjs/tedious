@@ -394,3 +394,135 @@ export class LegacyTokenHandler extends TokenHandler {
     this.connection.emit('resetConnection');
   }
 }
+
+export class Login7TokenHandler extends TokenHandler {
+  connection: Connection;
+
+  constructor(connection: Connection) {
+    super();
+
+    this.connection = connection;
+  }
+
+  onInfoMessage(token: InfoMessageToken) {
+    this.connection.emit('infoMessage', token);
+  }
+
+  onErrorMessage(token: ErrorMessageToken) {
+    this.connection.emit('errorMessage', token);
+
+    if (this.connection.loggedIn) {
+      const request = this.connection.request;
+      if (request) {
+        if (!request.canceled) {
+          const error = new RequestError(token.message, 'EREQUEST');
+          error.number = token.number;
+          error.state = token.state;
+          error.class = token.class;
+          error.serverName = token.serverName;
+          error.procName = token.procName;
+          error.lineNumber = token.lineNumber;
+          request.error = error;
+        }
+      }
+    } else {
+      const error = ConnectionError(token.message, 'ELOGIN');
+
+      const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
+      if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
+        error.isTransient = true;
+      }
+
+      this.connection.loginError = error;
+    }
+  }
+
+  onSSPI(token: SSPIToken) {
+    if (token.ntlmpacket) {
+      this.connection.ntlmpacket = token.ntlmpacket;
+      this.connection.ntlmpacketBuffer = token.ntlmpacketBuffer;
+    }
+
+    this.connection.emit('sspichallenge', token);
+  }
+
+  onDatabaseChange(token: DatabaseEnvChangeToken) {
+    this.connection.emit('databaseChange', token.newValue);
+  }
+
+  onLanguageChange(token: LanguageEnvChangeToken) {
+    this.connection.emit('languageChange', token.newValue);
+  }
+
+  onCharsetChange(token: CharsetEnvChangeToken) {
+    this.connection.emit('charsetChange', token.newValue);
+  }
+
+  onSqlCollationChange(token: CollationChangeToken) {
+    this.connection.databaseCollation = token.newValue;
+  }
+
+  onFedAuthInfo(token: FedAuthInfoToken) {
+    this.connection.dispatchEvent('fedAuthInfo', token);
+  }
+
+  onFeatureExtAck(token: FeatureExtAckToken) {
+    this.connection.dispatchEvent('featureExtAck', token);
+  }
+
+  onLoginAck(token: LoginAckToken) {
+    if (!token.tdsVersion) {
+      // unsupported TDS version
+      this.connection.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+      this.connection.loggedIn = false;
+      return;
+    }
+
+    if (!token.interface) {
+      // unsupported interface
+      this.connection.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+      this.connection.loggedIn = false;
+      return;
+    }
+
+    // use negotiated version
+    this.connection.config.options.tdsVersion = token.tdsVersion;
+    this.connection.loggedIn = true;
+  }
+
+  onRoutingChange(token: RoutingEnvChangeToken) {
+    // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
+    const [ server ] = token.newValue.server.split('\\');
+
+    this.connection.routingData = {
+      server, port: token.newValue.port
+    };
+  }
+
+  onDone(token: DoneToken) {
+    const request = this.connection.request as Request;
+    if (request) {
+      if (token.attention) {
+        this.connection.dispatchEvent('attention');
+      }
+
+      if (!request.canceled) {
+        if (token.sqlError && !request.error) {
+          // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+          request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+        }
+        request.emit('done', token.rowCount, token.more, request.rst);
+        if (token.rowCount !== undefined) {
+          request.rowCount! += token.rowCount;
+        }
+        if (this.connection.config.options.rowCollectionOnDone) {
+          request.rst = [];
+        }
+      }
+    }
+  }
+
+  onPacketSizeChange(token: PacketSizeEnvChangeToken) {
+    this.connection.messageIo.packetSize(token.newValue);
+  }
+}
