@@ -339,6 +339,10 @@ export class Login7TokenHandler extends TokenHandler {
     };
   }
 
+  onDoneInProc(token: DoneInProcToken) {
+    // Do nothing
+  }
+
   onDone(token: DoneToken) {
     // Do nothing
   }
