@@ -141,6 +141,10 @@ export class TokenHandler {
   }
 }
 
+/**
+ * A handler for tokens received in the response message to the initial SQL Batch request
+ * that sets up different connection settings.
+ */
 export class InitialSqlTokenHandler extends TokenHandler {
   connection: Connection;
 
@@ -235,6 +239,9 @@ export class InitialSqlTokenHandler extends TokenHandler {
   }
 }
 
+/**
+ * A handler for tokens received in the response message to a Login7 message.
+ */
 export class Login7TokenHandler extends TokenHandler {
   connection: Connection;
 
@@ -356,6 +363,10 @@ export class Login7TokenHandler extends TokenHandler {
   }
 }
 
+/**
+ * A handler for tokens received in the response message to a RPC Request,
+ * a SQL Batch Request, a Bulk Load BCP Request or a Transaction Manager Request.
+ */
 export class RequestTokenHandler extends TokenHandler {
   connection: Connection;
   request: Request | BulkLoad;
@@ -536,6 +547,12 @@ export class RequestTokenHandler extends TokenHandler {
   }
 }
 
+/**
+ * A handler for the attention acknowledgement message.
+ *
+ * This message only contains a `DONE` token that acknowledges
+ * that the attention message was received by the server.
+ */
 export class AttentionTokenHandler extends TokenHandler {
   connection: Connection;
   request: Request | BulkLoad;
