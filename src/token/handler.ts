@@ -479,6 +479,11 @@ export class RequestTokenHandler extends TokenHandler {
 
   onDoneProc(token: DoneProcToken) {
     if (!this.request.canceled) {
+      if (token.sqlError && !this.request.error) {
+        // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
+        this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+      }
+
       this.request.emit('doneProc', token.rowCount, token.more, this.connection.procReturnStatusValue, this.request.rst);
 
       this.connection.procReturnStatusValue = undefined;
