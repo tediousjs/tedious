@@ -346,6 +346,10 @@ export class Login7TokenHandler extends TokenHandler {
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
     this.connection.messageIo.packetSize(token.newValue);
   }
+
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
+    // Do nothing
+  }
 }
 
 export class RequestTokenHandler extends TokenHandler {
