@@ -1962,6 +1962,10 @@ class Connection extends EventEmitter {
 
     tokenStreamParser.on('errorMessage', (token) => {
       this.emit('errorMessage', token);
+      if (this.request) {
+        this.request.emit('errorMessage', token.name, token.message);
+      }
+
       if (this.loggedIn) {
         const request = this.request;
         if (request) {

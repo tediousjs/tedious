@@ -182,4 +182,35 @@ describe('Errors Test', function() {
       done();
     });
   });
+
+  it('should emit errorMessage event on Request', function(done) {
+    const connection = new Connection(config);
+    const errorMsgs = [];
+
+    const request = new Request('create type test_type as table ( id int, primary key (code) );', (err, rowCount) => {
+      connection.close();
+    });
+
+    request.on('errorMessage', (error, errMsg) => {
+      errorMsgs.push([error, errMsg]);
+    });
+
+    connection.on('connect', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', function(info) {
+      console.log('end');
+      assert.strictEqual(errorMsgs.length, 2);
+      assert.strictEqual(errorMsgs[0][0], 'ERROR');
+      assert.strictEqual(errorMsgs[0][1], "Column name 'code' does not exist in the target table or view.");
+      assert.strictEqual(errorMsgs[1][0], 'ERROR');
+      assert.strictEqual(errorMsgs[1][1], 'Could not create constraint or index. See previous errors.');
+      done();
+    });
+  });
 });
