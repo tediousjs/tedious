@@ -20,13 +20,15 @@ class MessageIO extends EventEmitter {
 
   tlsNegotiationComplete: boolean;
 
-  incomingMessageStream: IncomingMessageStream;
+  private incomingMessageStream: IncomingMessageStream;
   outgoingMessageStream: OutgoingMessageStream;
 
   securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
   }
+
+  incomingMessageIterator: AsyncIterableIterator<Message>;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -37,13 +39,7 @@ class MessageIO extends EventEmitter {
     this.tlsNegotiationComplete = false;
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageStream.on('data', (message: Message) => {
-      this.emit('data', message);
-    });
-
-    this.incomingMessageStream.on('error', (message) => {
-      this.emit('error', message);
-    });
+    this.incomingMessageIterator = this.incomingMessageStream[Symbol.asyncIterator]();
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
@@ -132,6 +128,19 @@ class MessageIO extends EventEmitter {
     message.end(data);
     this.outgoingMessageStream.write(message);
     return message;
+  }
+
+  /**
+   * Read the next incoming message from the socket.
+   */
+  async readMessage(): Promise<Message> {
+    const result = await this.incomingMessageIterator.next();
+
+    if (result.done) {
+      throw new Error('unexpected end of message stream');
+    }
+
+    return result.value;
   }
 
   // Temporarily suspends the flow of incoming packets.
