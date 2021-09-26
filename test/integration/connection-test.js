@@ -80,6 +80,7 @@ describe('Initiate Connect Test', function() {
 
   it('should be bad credentials', function(done) {
     const config = getConfig();
+    const invalidLoginError = 18456;
 
     if (config.authentication && config.authentication.type !== 'default') {
       return done();
@@ -108,7 +109,7 @@ describe('Initiate Connect Test', function() {
     });
 
     connection.connect(function(err) {
-      assert.ok(err);
+      assert.ok(err && err.number === invalidLoginError);
 
       connection.close();
     });

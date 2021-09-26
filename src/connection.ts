@@ -1978,6 +1978,9 @@ class Connection extends EventEmitter {
         }
       } else {
         const error = ConnectionError(token.message, 'ELOGIN');
+        error.number = token.number;
+        error.state = token.state;
+        error.class = token.class;
 
         const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
         if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
