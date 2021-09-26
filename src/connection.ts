@@ -35,7 +35,7 @@ import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
 import { Metadata } from './metadata-parser';
-import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
+import { FedAuthInfoToken } from './token/token';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import depd from 'depd';
@@ -392,10 +392,6 @@ interface State {
     message?(this: Connection, message: Message): void;
     retry?(this: Connection): void;
     reconnect?(this: Connection): void;
-    featureExtAck?(this: Connection, token: FeatureExtAckToken): void;
-    fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void;
-    loginFailed?(this: Connection): void;
-    attention?(this: Connection): void;
   };
 }
 
@@ -3676,9 +3672,6 @@ Connection.prototype.STATE = {
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
     },
     events: {
-      loginFailed: function() {
-        // Do nothing. The connection was probably closed by the client code.
-      },
       connectTimeout: function() {
         // Do nothing, as the timer should be cleaned up.
       },
