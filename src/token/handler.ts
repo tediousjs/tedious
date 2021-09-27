@@ -247,6 +247,8 @@ export class Login7TokenHandler extends TokenHandler {
 
   fedAuthInfoToken: FedAuthInfoToken | undefined;
 
+  loginAckReceived = false;
+
   constructor(connection: Connection) {
     super();
 
@@ -305,17 +307,13 @@ export class Login7TokenHandler extends TokenHandler {
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
       if (token.fedAuth === undefined) {
         this.connection.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
-        this.connection.loggedIn = false;
       } else if (token.fedAuth.length !== 0) {
         this.connection.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
-        this.connection.loggedIn = false;
       }
     } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
       this.connection.loginError = ConnectionError('Received acknowledgement for unknown feature');
-      this.connection.loggedIn = false;
     } else if (token.fedAuth) {
       this.connection.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-      this.connection.loggedIn = false;
     }
   }
 
@@ -323,20 +321,19 @@ export class Login7TokenHandler extends TokenHandler {
     if (!token.tdsVersion) {
       // unsupported TDS version
       this.connection.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
-      this.connection.loggedIn = false;
       return;
     }
 
     if (!token.interface) {
       // unsupported interface
       this.connection.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
-      this.connection.loggedIn = false;
       return;
     }
 
     // use negotiated version
     this.connection.config.options.tdsVersion = token.tdsVersion;
-    this.connection.loggedIn = true;
+
+    this.loginAckReceived = true;
   }
 
   onRoutingChange(token: RoutingEnvChangeToken) {
