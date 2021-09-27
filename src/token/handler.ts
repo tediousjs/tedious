@@ -246,6 +246,7 @@ export class Login7TokenHandler extends TokenHandler {
   connection: Connection;
 
   fedAuthInfoToken: FedAuthInfoToken | undefined;
+  routingData: { server: string, port: number } | undefined;
 
   loginAckReceived = false;
 
@@ -340,7 +341,7 @@ export class Login7TokenHandler extends TokenHandler {
     // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
     const [ server ] = token.newValue.server.split('\\');
 
-    this.connection.routingData = {
+    this.routingData = {
       server, port: token.newValue.port
     };
   }

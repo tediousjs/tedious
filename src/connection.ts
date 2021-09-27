@@ -3303,7 +3303,8 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', () => {
           if (handler.loginAckReceived) {
-            if (this.routingData) {
+            if (handler.routingData) {
+              this.routingData = handler.routingData;
               this.transitionTo(this.STATE.REROUTING);
             } else {
               this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -3346,7 +3347,8 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', () => {
           if (handler.loginAckReceived) {
-            if (this.routingData) {
+            if (handler.routingData) {
+              this.routingData = handler.routingData;
               this.transitionTo(this.STATE.REROUTING);
             } else {
               this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -3411,7 +3413,8 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', () => {
           if (handler.loginAckReceived) {
-            if (this.routingData) {
+            if (handler.routingData) {
+              this.routingData = handler.routingData;
               this.transitionTo(this.STATE.REROUTING);
             } else {
               this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
