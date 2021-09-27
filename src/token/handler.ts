@@ -245,6 +245,8 @@ export class InitialSqlTokenHandler extends TokenHandler {
 export class Login7TokenHandler extends TokenHandler {
   connection: Connection;
 
+  fedAuthInfoToken: FedAuthInfoToken | undefined;
+
   constructor(connection: Connection) {
     super();
 
@@ -294,7 +296,7 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onFedAuthInfo(token: FedAuthInfoToken) {
-    this.connection.fedAuthInfoToken = token;
+    this.fedAuthInfoToken = token;
   }
 
   onFeatureExtAck(token: FeatureExtAckToken) {
