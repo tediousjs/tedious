@@ -37,7 +37,6 @@ import Message from './message';
 import { Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-import depd from 'depd';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
@@ -47,9 +46,6 @@ import { Collation } from './collation';
 import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const deprecate = depd('tedious');
 
 type BeginTransactionCallback =
   /**
@@ -1837,6 +1833,7 @@ class Connection extends EventEmitter {
    * @private
    */
   emit(event: 'sspichallenge', token: import('./token/token').SSPIToken): boolean
+
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
   }
