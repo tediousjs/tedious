@@ -230,6 +230,39 @@ describe('Database Collation Support', function() {
         { one: '中文', two: '中文', three: '中文' }
       ]);
     });
+
+    it('encodes values with the current database encoding (`addRow`)', function(done) {
+      const bulkLoad = connection.newBulkLoad('collation_test', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        let values: [string, string, string];
+        const request = new Request('SELECT * FROM collation_test', (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          assert.deepEqual(values, ['中文', '中文      ', '中文']);
+
+          done();
+        });
+
+        request.on('row', (row) => {
+          values = [row[0].value, row[1].value, row[2].value];
+        });
+
+        connection.execSql(request);
+      });
+
+      bulkLoad.addColumn('one', TYPES.VarChar, { length: 255, nullable: false });
+      bulkLoad.addColumn('two', TYPES.Char, { length: 10, nullable: false });
+      bulkLoad.addColumn('three', TYPES.Text, { nullable: false });
+
+      bulkLoad.addRow({ one: '中文', two: '中文', three: '中文' });
+
+      connection.execBulkLoad(bulkLoad);
+    });
   });
 
   describe('TVP parameter', function() {
