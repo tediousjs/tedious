@@ -488,6 +488,8 @@ class BulkLoad extends EventEmitter {
   addRow(row: unknown[]): void
 
   addRow(...input: [ { [key: string]: unknown } ] | unknown[]) {
+    emitAddRowDeprecationWarning();
+
     this.firstRowWritten = true;
 
     let row: any;
@@ -695,6 +697,8 @@ class BulkLoad extends EventEmitter {
    *   stream or an `AsyncGenerator`) when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
    */
   getRowStream() {
+    emitGetRowStreamDeprecationWarning();
+
     if (this.firstRowWritten) {
       throw new Error('BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
     }
@@ -718,6 +722,38 @@ class BulkLoad extends EventEmitter {
     this.canceled = true;
     this.emit('cancel');
   }
+}
+
+let addRowDeprecationWarningEmitted = false;
+function emitAddRowDeprecationWarning() {
+  if (addRowDeprecationWarningEmitted) {
+    return;
+  }
+
+  addRowDeprecationWarningEmitted = true;
+
+  process.emitWarning(
+    'The BulkLoad.addRow method is deprecated. Please provide the row data for ' +
+    'the bulk load as the second argument to Connection.execBulkLoad instead.',
+    'DeprecationWarning',
+    BulkLoad.prototype.addRow
+  );
+}
+
+let getRowStreamDeprecationWarningEmitted = false;
+function emitGetRowStreamDeprecationWarning() {
+  if (getRowStreamDeprecationWarningEmitted) {
+    return;
+  }
+
+  getRowStreamDeprecationWarningEmitted = true;
+
+  process.emitWarning(
+    'The BulkLoad.getRowStream method is deprecated. You can pass an Iterable, AsyncIterable or ' +
+    'stream.Readable object containing the row data as a second argument to Connection.execBulkLoad instead.',
+    'DeprecationWarning',
+    BulkLoad.prototype.getRowStream
+  );
 }
 
 export default BulkLoad;
