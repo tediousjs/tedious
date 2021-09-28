@@ -181,10 +181,12 @@ class RowTransform extends Transform {
       const c = this.columns[i];
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
-      try {
-        value = c.type.validate(value, c.collation);
-      } catch (error: any) {
-        return callback(error);
+      if (!this.bulkLoad.firstRowWritten) {
+        try {
+          value = c.type.validate(value, c.collation);
+        } catch (error: any) {
+          return callback(error);
+        }
       }
 
       const parameter = {
@@ -699,6 +701,7 @@ class BulkLoad extends EventEmitter {
     if (this.executionStarted) {
       throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
     }
+
     this.streamingMode = true;
 
     return this.rowToPacketTransform;
