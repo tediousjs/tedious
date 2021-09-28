@@ -15,8 +15,6 @@ title: API - BulkLoad
 <ul class="toc">
   <li><a href="#usage">Usage</a></li>
   <li><a href="#function_addColumn">bulkLoad.addColumn(name, type, options)</a></li>
-  <li><a href="#function_addRow">bulkLoad.addRow(row)</a></li>
-  <li><a href="#function_getRowStream">bulkLoad.getRowStream()</a></li>
   <li><a href="#function_getTableCreationSql">bulkLoad.getTableCreationSql()</a></li>
   <li><a href="#function_setTimeout">bulkLoad.setTimeout(timeout)</a></li>
 </ul>
@@ -25,10 +23,10 @@ title: API - BulkLoad
 {% highlight javascript %}
 
 // optional BulkLoad options
-var options = { keepNulls: true };
+const options = { keepNulls: true };
 
 // instantiate - provide the table where you'll be inserting to, options and a callback
-var bulkLoad = connection.newBulkLoad('MyTable', options, function (error, rowCount) {
+const bulkLoad = connection.newBulkLoad('MyTable', options, function (error, rowCount) {
   console.log('inserted %d rows', rowCount);
 });
 
@@ -36,12 +34,11 @@ var bulkLoad = connection.newBulkLoad('MyTable', options, function (error, rowCo
 bulkLoad.addColumn('myInt', TYPES.Int, { nullable: false });
 bulkLoad.addColumn('myString', TYPES.NVarChar, { length: 50, nullable: true });
 
-// add rows
-bulkLoad.addRow({ myInt: 7, myString: 'hello' });
-bulkLoad.addRow({ myInt: 23, myString: 'world' });
-
 // execute
-connection.execBulkLoad(bulkLoad);
+connection.execBulkLoad(bulkLoad, [
+  { myInt: 7, myString: 'hello' },
+  { myInt: 23, myString: 'world' }
+]);
 {% endhighlight %}
 
 <div class="argument">
@@ -114,7 +111,7 @@ bulkLoad.addColumn('MyIntColumn', TYPES.Int, { nullable: false });
         <li><code>nullable</code> indicates whether the column accepts NULL values.</li>
         <li id="objName">
           <code>objName</code> If the name of the column is different from the name of the property found on 
-          <code>rowObj</code> arguments passed to <a href="#function_addRow"></a>, then you can use this option
+          row objects passed to <a href="api-connection.html#function_execBulkLoad"></a>, then you can use this option
           to specify the property name.
         </li>
         <li><code>length</code> for VarChar, NVarChar, VarBinary. Use length as <code>Infinity</code> for VarChar(max), NVarChar(max) and VarBinary(max).</li>
@@ -124,66 +121,6 @@ bulkLoad.addColumn('MyIntColumn', TYPES.Int, { nullable: false });
     </p>
   </div>
 </div>
-
-<h2 id="function_addRow">bulkLoad.addRow(row)</h2>
-<p>
-  Adds a row to the bulk insert. This method accepts arguments in three different formats:
-</p>
-{% highlight javascript %}
-bulkLoad.addRow( rowObj )
-bulkLoad.addRow( columnArray )
-bulkLoad.addRow( col0, col1, ... colN )
-{% endhighlight %}
-<div class="argument">
-  <div class="name">rowObj</div>
-  <div class="description">
-    <p>
-      An object of key/value pairs representing column name (or <a href="#objName">objName</a>) and value.
-    </p>
-  </div>
-</div>
-<div class="argument">
-  <div class="name">columnArray</div>
-  <div class="description">
-    <p>
-      An array representing the values of each column in the same order which they were added to the 
-      bulkLoad object.
-    </p>
-  </div>
-</div>
-<div class="argument">
-  <div class="name">col0, col1, ... colN</div>
-  <div class="description">
-    <p>
-      If there are at least two columns, values can be passed as multiple arguments instead of an array. They 
-      must be in the same order the columns were added in.
-    </p>
-  </div>
-</div>
-
-<h2 id="function_getRowStream">bulkLoad.getRowStream()</h2>
-<p>
-  Switches the <code>BulkLoad</code> object into streaming mode and returns a
-  <a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_streams">writable stream</a>
-  that can be used to send a large amount of rows to the server.
-</p>
-{% highlight javascript %}
-const bulkLoad = connection.newBulkLoad(...);
-bulkLoad.addColumn(...);
-const rowStream = bulkLoad.getRowStream();
-connection.execBulkLoad(bulkLoad);
-rowSource.pipe(rowStream);
-{% endhighlight %}
-<p>
-  In streaming mode, <code>bulkLoad.addRow()</code> cannot be used. Instead all data rows must be written to the returned stream object.
-</p>
-<p>
-  The stream implementation uses data flow control to prevent memory overload.
-  <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback">stream.write()</a></code>
-  returns <code>false</code> to indicate that data transfer should be paused.
-  After that, the stream emits a <code><a href="https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain">'drain' event</a></code>
-  when it is ready to resume data transfer.
-</p>
 
 <h2 id="function_getTableCreationSql">bulkLoad.getTableCreationSql()</h2>
 <p>
