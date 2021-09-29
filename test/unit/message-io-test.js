@@ -85,7 +85,7 @@ describe('Message IO', function() {
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', (message) => {
+    io.readMessage().then((message) => {
       assert.instanceOf(message, Message);
 
       message.on('data', (data) => {
@@ -95,7 +95,7 @@ describe('Message IO', function() {
       message.on('end', () => {
         done();
       });
-    });
+    }, done);
 
     const packet = new Packet(packetType);
     packet.last(true);
@@ -108,7 +108,7 @@ describe('Message IO', function() {
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', (message) => {
+    io.readMessage().then((message) => {
       message.on('data', (data) => {
         assert.isOk(data.equals(payload));
       });
@@ -116,7 +116,7 @@ describe('Message IO', function() {
       message.on('end', function() {
         done();
       });
-    });
+    }, done);
 
     const packet = new Packet(packetType);
     packet.last(true);
@@ -134,7 +134,7 @@ describe('Message IO', function() {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', (message) => {
+    io.readMessage().then((message) => {
       message.on('data', function(data) {
         receivedPacketCount++;
 
@@ -149,7 +149,7 @@ describe('Message IO', function() {
       });
 
       message.on('end', done);
-    });
+    }, done);
 
     let packet = new Packet(packetType);
     packet.addData(payload1);
@@ -170,7 +170,7 @@ describe('Message IO', function() {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', (message) => {
+    io.readMessage().then((message) => {
       message.on('data', function(data) {
         receivedPacketCount++;
 
@@ -185,7 +185,7 @@ describe('Message IO', function() {
       });
 
       message.on('end', done);
-    });
+    }, done);
 
     const packet1 = new Packet(packetType);
     packet1.addData(payload.slice(0, 2));
@@ -207,7 +207,7 @@ describe('Message IO', function() {
     let receivedData = Buffer.alloc(0);
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.on('data', (message) => {
+    io.readMessage().then((message) => {
       message.on('data', function(data) {
         receivedData = Buffer.concat([receivedData, data]);
       });
@@ -216,7 +216,7 @@ describe('Message IO', function() {
         assert.deepEqual(payload, receivedData);
         done();
       });
-    });
+    }, done);
 
     const packet1 = new Packet(packetType);
     packet1.addData(payload.slice(0, 2));

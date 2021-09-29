@@ -238,6 +238,7 @@ jobs:
             "authentication": {
               "type": "azure-active-directory-password",
               "options": {
+                "domain": "${{ secrets.AZURE_AD_TENANT_ID }}",
                 "userName": "${{ secrets.AZURE_AD_USERNAME }}",
                 "password": "${{ secrets.AZURE_AD_PASSWORD }}"
               }

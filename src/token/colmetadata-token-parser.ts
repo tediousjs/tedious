@@ -10,7 +10,7 @@ export interface ColumnMetadata extends Metadata {
    */
   colName: string;
 
-  tableName?: string | string[];
+  tableName?: string | string[] | undefined;
 }
 
 function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {

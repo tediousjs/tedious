@@ -230,5 +230,109 @@ describe('Database Collation Support', function() {
         { one: '中文', two: '中文', three: '中文' }
       ]);
     });
+
+    it('encodes values with the current database encoding (`addRow`)', function(done) {
+      const bulkLoad = connection.newBulkLoad('collation_test', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        let values: [string, string, string];
+        const request = new Request('SELECT * FROM collation_test', (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          assert.deepEqual(values, ['中文', '中文      ', '中文']);
+
+          done();
+        });
+
+        request.on('row', (row) => {
+          values = [row[0].value, row[1].value, row[2].value];
+        });
+
+        connection.execSql(request);
+      });
+
+      bulkLoad.addColumn('one', TYPES.VarChar, { length: 255, nullable: false });
+      bulkLoad.addColumn('two', TYPES.Char, { length: 10, nullable: false });
+      bulkLoad.addColumn('three', TYPES.Text, { nullable: false });
+
+      bulkLoad.addRow({ one: '中文', two: '中文', three: '中文' });
+
+      connection.execBulkLoad(bulkLoad);
+    });
+  });
+
+  describe('TVP parameter', function() {
+    beforeEach(function() {
+      if (getConfig().options.tdsVersion < '7_3_A') {
+        this.skip();
+      }
+    });
+
+    beforeEach(function(done) {
+      const request = new Request('USE __tedious_collation_1', done);
+      connection.execSqlBatch(request);
+    });
+
+    beforeEach(function(done) {
+      const sql = 'BEGIN TRY DROP TYPE TediousTestType END TRY BEGIN CATCH END CATCH';
+      connection.execSqlBatch(new Request(sql, done));
+    });
+
+    beforeEach(function(done) {
+      connection.execSqlBatch(new Request(`
+        CREATE TYPE TediousTestType AS TABLE (
+          one varchar(10) NOT NULL,
+          two char(10) NOT NULL
+        )
+      `, done));
+    });
+
+    beforeEach(function(done) {
+      const sql = 'CREATE PROCEDURE __tediousTvpTest @tvp TediousTestType readonly AS BEGIN select * from @tvp END';
+      connection.execSqlBatch(new Request(sql, done));
+    });
+
+    it('correctly encodes `varchar` and `char` column values', function(done) {
+      const request = new Request('__tediousTvpTest', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.deepEqual(values, [
+          '中文', '中文      '
+        ]);
+
+        done();
+      });
+
+      let values: [string, string];
+      request.on('row', (row) => {
+        values = [row[0].value, row[1].value];
+      });
+
+      request.addParameter('tvp', TYPES.TVP, {
+        columns: [
+          {
+            name: 'one',
+            type: TYPES.VarChar,
+            length: 10
+          },
+          {
+            name: 'two',
+            type: TYPES.Char,
+            length: 10
+          }
+        ],
+        rows: [
+          ['中文', '中文' ]
+        ]
+      });
+
+      connection.callProcedure(request);
+    });
   });
 });

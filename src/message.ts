@@ -5,7 +5,7 @@ class Message extends PassThrough {
   resetConnection: boolean;
   ignore: boolean;
 
-  constructor({ type, resetConnection = false }: { type: number, resetConnection?: boolean }) {
+  constructor({ type, resetConnection = false }: { type: number, resetConnection?: boolean | undefined }) {
     super();
 
     this.type = type;

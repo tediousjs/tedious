@@ -42,11 +42,8 @@
   "dependencies": {
     "@azure/identity": "^1.5.2",
     "@azure/keyvault-keys": "^4.3.0",
-    "@azure/ms-rest-nodeauth": "^3.0.10",
     "@js-joda/core": "^4.0.0",
-    "adal-node": "^0.2.2",
     "bl": "^5.0.0",
-    "depd": "^2.0.0",
     "iconv-lite": "^0.6.3",
     "jsbi": "^3.2.1",
     "native-duplexpair": "^1.0.0",
@@ -71,7 +68,7 @@
     "@types/depd": "^1.1.32",
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^14.14.20",
+    "@types/node": "^12.20.25",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^4.30.0",
     "@typescript-eslint/parser": "^4.30.0",
@@ -100,6 +97,7 @@
     "semantic-release": "semantic-release"
   },
   "babel": {
+    "sourceMaps": "both",
     "ignore": [
       "./src/**/*.d.ts"
     ],
