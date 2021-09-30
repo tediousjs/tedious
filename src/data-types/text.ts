@@ -68,6 +68,8 @@ const Text: DataType = {
       if (typeof value.toString !== 'function') {
         throw new TypeError('Invalid string.');
       }
+
+      emitTypeCoercionWarning();
       value = value.toString();
     }
 
@@ -83,6 +85,20 @@ const Text: DataType = {
   }
 };
 
-
 export default Text;
 module.exports = Text;
+
+let typeCoercionWarningEmitted = false;
+function emitTypeCoercionWarning() {
+  if (typeCoercionWarningEmitted) {
+    return;
+  }
+
+  typeCoercionWarningEmitted = true;
+
+  process.emitWarning(
+    '`text` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
+    'DeprecationWarning',
+    Text.validate
+  );
+}

@@ -117,6 +117,7 @@ const VarChar: { maximumLength: number } & DataType = {
         throw new TypeError('Invalid string.');
       }
 
+      emitTypeCoercionWarning();
       value = value.toString();
     }
 
@@ -134,3 +135,18 @@ const VarChar: { maximumLength: number } & DataType = {
 
 export default VarChar;
 module.exports = VarChar;
+
+let typeCoercionWarningEmitted = false;
+function emitTypeCoercionWarning() {
+  if (typeCoercionWarningEmitted) {
+    return;
+  }
+
+  typeCoercionWarningEmitted = true;
+
+  process.emitWarning(
+    '`varchar` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
+    'DeprecationWarning',
+    VarChar.validate
+  );
+}
