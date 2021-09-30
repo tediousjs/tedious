@@ -263,7 +263,7 @@ export class Login7TokenHandler extends TokenHandler {
   onErrorMessage(token: ErrorMessageToken) {
     this.connection.emit('errorMessage', token);
 
-    const error = ConnectionError(token.message, 'ELOGIN');
+    const error = new ConnectionError(token.message, 'ELOGIN');
 
     const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
     if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
@@ -307,27 +307,27 @@ export class Login7TokenHandler extends TokenHandler {
 
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
       if (token.fedAuth === undefined) {
-        this.connection.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
+        this.connection.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
       } else if (token.fedAuth.length !== 0) {
-        this.connection.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+        this.connection.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
     } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
-      this.connection.loginError = ConnectionError('Received acknowledgement for unknown feature');
+      this.connection.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
-      this.connection.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+      this.connection.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
     }
   }
 
   onLoginAck(token: LoginAckToken) {
     if (!token.tdsVersion) {
       // unsupported TDS version
-      this.connection.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+      this.connection.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
       return;
     }
 
     if (!token.interface) {
       // unsupported interface
-      this.connection.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+      this.connection.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
       return;
     }
 
@@ -492,7 +492,7 @@ export class RequestTokenHandler extends TokenHandler {
     if (!this.request.canceled) {
       if (token.sqlError && !this.request.error) {
         // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-        this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+        this.request.error = new RequestError('An unknown error has occurred.', 'UNKNOWN');
       }
 
       this.request.emit('doneProc', token.rowCount, token.more, this.connection.procReturnStatusValue, this.request.rst);
@@ -527,7 +527,7 @@ export class RequestTokenHandler extends TokenHandler {
     if (!this.request.canceled) {
       if (token.sqlError && !this.request.error) {
         // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-        this.request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
+        this.request.error = new RequestError('An unknown error has occurred.', 'UNKNOWN');
       }
 
       this.request.emit('done', token.rowCount, token.more, this.request.rst);
