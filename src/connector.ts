@@ -200,14 +200,17 @@ function lookupAllAddresses(host: string, lookup: LookupFunction, signal: AbortS
   } else if (net.isIPv4(host)) {
     return Promise.resolve([{ address: host, family: 4 }]);
   } else {
-    return new Promise((resolve, reject) => {
-      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
-        if (signal.aborted) {
-          return reject(new AbortError());
-        }
+    // dns.lookup does not have support for AbortSignal yet
+    return Promise.race([
+      new Promise<LookupAddress[]>((resolve, reject) => {
+        lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+          err ? reject(err) : resolve(addresses);
+        });
+      }),
 
-        err ? reject(err) : resolve(addresses);
-      });
-    });
+      once(signal, 'abort').then(() => {
+        throw new AbortError();
+      })
+    ]);
   }
 }
