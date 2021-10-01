@@ -70,10 +70,10 @@ export class InstanceLookup {
       let response;
       try {
         response = await sender.execute();
-      } catch (err) {
+      } catch (err: unknown) {
         clearTimeout(timer);
 
-        if (err?.name === 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
           // If the overall instance lookup was aborted,
           // do not perform any further attempts.
           if (signal.aborted) {

@@ -1,29 +1,31 @@
 import net from 'net';
-import dns from 'dns';
+import dns, { LookupAddress } from 'dns';
 
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
+import { once } from 'events';
 
 export class ParallelConnectionStrategy {
-  addresses: dns.LookupAddress[];
-  options: { port: number, localAddress?: string | undefined };
+  lookup: LookupFunction;
+  options: { host: string, port: number, localAddress?: string | undefined };
   signal: AbortSignal;
 
-  constructor(addresses: dns.LookupAddress[], signal: AbortSignal, options: { port: number, localAddress?: string | undefined }) {
-    this.addresses = addresses;
+  constructor(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+    this.lookup = lookup;
     this.options = options;
     this.signal = signal;
   }
 
-  connect(): Promise<net.Socket> {
+  async connect(): Promise<net.Socket> {
+    const addresses = await lookupAllAddresses(this.options.host, this.lookup, this.signal);
+
     return new Promise((resolve, reject) => {
       const signal = this.signal;
       if (signal.aborted) {
         return reject(new AbortError());
       }
 
-      const addresses = this.addresses;
       const sockets = new Array(addresses.length);
 
       let errorCount = 0;
@@ -90,67 +92,72 @@ export class ParallelConnectionStrategy {
 }
 
 export class SequentialConnectionStrategy {
-  addresses: dns.LookupAddress[];
-  options: { port: number, localAddress?: string | undefined };
+  lookup: LookupFunction;
+  options: { host: string, port: number, localAddress?: string | undefined };
   signal: AbortSignal;
 
-  constructor(addresses: dns.LookupAddress[], signal: AbortSignal, options: { port: number, localAddress?: string | undefined }) {
-    this.addresses = addresses;
+  constructor(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+    this.lookup = lookup;
     this.options = options;
     this.signal = signal;
   }
 
-  connect(): Promise<net.Socket> {
-    return new Promise((resolve, reject) => {
-      if (this.signal.aborted) {
-        return reject(new AbortError());
+  async connect(): Promise<net.Socket> {
+    const addresses = await lookupAllAddresses(this.options.host, this.lookup, this.signal);
+
+    for (const address of addresses) {
+      try {
+        return await new Promise<net.Socket>((resolve, reject) => {
+          const socket = net.connect({
+            ...this.options,
+            host: address.address,
+            family: address.family
+          });
+
+          const onAbort = () => {
+            socket.removeListener('error', onError);
+            socket.removeListener('connect', onConnect);
+
+            socket.destroy();
+
+            reject(new AbortError());
+          };
+
+          const onError = (err: Error) => {
+            this.signal.removeEventListener('abort', onAbort);
+
+            socket.removeListener('error', onError);
+            socket.removeListener('connect', onConnect);
+
+            socket.destroy();
+
+            reject(err);
+          };
+
+          const onConnect = () => {
+            this.signal.removeEventListener('abort', onAbort);
+
+            socket.removeListener('error', onError);
+            socket.removeListener('connect', onConnect);
+
+            resolve(socket);
+          };
+
+          this.signal.addEventListener('abort', onAbort, { once: true });
+
+          socket.on('error', onError);
+          socket.on('connect', onConnect);
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw err;
+        }
+
+        continue;
       }
+    }
 
-      const next = this.addresses.shift();
-      if (!next) {
-        return reject(new Error('Could not connect (sequence)'));
-      }
-
-      const socket = net.connect({
-        ...this.options,
-        host: next.address,
-        family: next.family
-      });
-
-      const onAbort = () => {
-        socket.removeListener('error', onError);
-        socket.removeListener('connect', onConnect);
-
-        socket.destroy();
-
-        reject(new AbortError());
-      };
-
-      const onError = (_err: Error) => {
-        this.signal.removeEventListener('abort', onAbort);
-
-        socket.removeListener('error', onError);
-        socket.removeListener('connect', onConnect);
-
-        socket.destroy();
-
-        resolve(this.connect());
-      };
-
-      const onConnect = () => {
-        this.signal.removeEventListener('abort', onAbort);
-
-        socket.removeListener('error', onError);
-        socket.removeListener('connect', onConnect);
-
-        resolve(socket);
-      };
-
-      this.signal.addEventListener('abort', onAbort, { once: true });
-
-      socket.on('error', onError);
-      socket.on('connect', onConnect);
-    });
+    throw new Error('Could not connect (sequence)');
   }
 }
 
@@ -174,13 +181,11 @@ export class Connector {
       throw new AbortError();
     }
 
-    const addresses = await lookupAllAddresses(this.options.host, this.lookup, this.signal);
-
     let strategy;
     if (this.multiSubnetFailover) {
-      strategy = new ParallelConnectionStrategy(addresses, this.signal, this.options);
+      strategy = new ParallelConnectionStrategy(this.options, this.lookup, this.signal);
     } else {
-      strategy = new SequentialConnectionStrategy(addresses, this.signal, this.options);
+      strategy = new SequentialConnectionStrategy(this.options, this.lookup, this.signal);
     }
 
     return strategy.connect();

@@ -134,8 +134,6 @@ describe('Connector', function() {
         lookup: lookup
       }, controller.signal, true);
 
-      const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
-
       let error;
       try {
         await connector.execute();
@@ -145,8 +143,6 @@ describe('Connector', function() {
 
       assert.instanceOf(error, Error);
       assert.strictEqual(error.name, 'AbortError');
-
-      sinon.assert.callCount(spy, 0);
     });
   });
 
@@ -262,13 +258,15 @@ describe('SequentialConnectionStrategy', function() {
   it('tries to connect to all addresses in sequence', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedConnections = [];
@@ -313,13 +311,15 @@ describe('SequentialConnectionStrategy', function() {
   it('passes the first succesfully connected socket to the callback', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     let expectedSocket;
@@ -339,13 +339,15 @@ describe('SequentialConnectionStrategy', function() {
   it('only attempts new connections until the first successful connection', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedConnections = [];
@@ -366,13 +368,15 @@ describe('SequentialConnectionStrategy', function() {
   it('fails if all sequential connections fail', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     mitm.on('connect', function(socket) {
@@ -395,13 +399,15 @@ describe('SequentialConnectionStrategy', function() {
   it('destroys all sockets except for the first succesfully connected socket', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedSockets = [];
@@ -428,13 +434,15 @@ describe('SequentialConnectionStrategy', function() {
     controller.abort();
 
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     mitm.on('connect', () => {
@@ -455,13 +463,15 @@ describe('SequentialConnectionStrategy', function() {
   it('can be aborted while trying to connect', async function() {
     const controller = new AbortController();
     const strategy = new SequentialConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedSockets = [];
@@ -503,13 +513,15 @@ describe('ParallelConnectionStrategy', function() {
   it('tries to connect to all addresses in parallel', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedConnections = [];
@@ -540,13 +552,15 @@ describe('ParallelConnectionStrategy', function() {
   it('fails if all parallel connections fail', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     mitm.on('connect', function(socket) {
@@ -569,13 +583,15 @@ describe('ParallelConnectionStrategy', function() {
   it('passes the first succesfully connected socket to the callback', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     let expectedSocket;
@@ -596,13 +612,15 @@ describe('ParallelConnectionStrategy', function() {
   it('destroys all sockets except for the first succesfully connected socket', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedSockets = [];
@@ -623,13 +641,15 @@ describe('ParallelConnectionStrategy', function() {
     controller.abort();
 
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     mitm.on('connect', () => {
@@ -650,13 +670,15 @@ describe('ParallelConnectionStrategy', function() {
   it('can be aborted while trying to connect', async function() {
     const controller = new AbortController();
     const strategy = new ParallelConnectionStrategy(
-      [
-        { address: '127.0.0.2' },
-        { address: '2002:20:0:0:0:0:1:3' },
-        { address: '127.0.0.4' }
-      ],
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
       controller.signal,
-      { port: 12345, localAddress: '192.168.0.1' }
     );
 
     const attemptedSockets = [];
