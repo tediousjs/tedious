@@ -174,7 +174,7 @@ export class Connector {
       throw new AbortError();
     }
 
-    const addresses = await this.lookupAllAddresses(this.options.host);
+    const addresses = await lookupAllAddresses(this.options.host, this.lookup, this.signal);
 
     let strategy;
     if (this.multiSubnetFailover) {
@@ -185,22 +185,29 @@ export class Connector {
 
     return strategy.connect();
   }
+}
 
-  lookupAllAddresses(host: string): Promise<dns.LookupAddress[]> {
-    if (net.isIPv6(host)) {
-      return Promise.resolve([{ address: host, family: 6 }]);
-    } else if (net.isIPv4(host)) {
-      return Promise.resolve([{ address: host, family: 4 }]);
-    } else {
-      return new Promise((resolve, reject) => {
-        this.lookup.call(null, punycode.toASCII(host), { all: true }, (err, addresses) => {
-          if (this.signal.aborted) {
-            return reject(new AbortError());
-          }
+/**
+ * Look up all addresses for the given hostname.
+ */
+function lookupAllAddresses(host: string, lookup: LookupFunction, signal: AbortSignal): Promise<dns.LookupAddress[]> {
+  if (signal.aborted) {
+    return Promise.reject(new AbortError());
+  }
 
-          err ? reject(err) : resolve(addresses);
-        });
+  if (net.isIPv6(host)) {
+    return Promise.resolve([{ address: host, family: 6 }]);
+  } else if (net.isIPv4(host)) {
+    return Promise.resolve([{ address: host, family: 4 }]);
+  } else {
+    return new Promise((resolve, reject) => {
+      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+        if (signal.aborted) {
+          return reject(new AbortError());
+        }
+
+        err ? reject(err) : resolve(addresses);
       });
-    }
+    });
   }
 }
