@@ -5,218 +5,46 @@ const assert = require('chai').assert;
 const { AbortController } = require('node-abort-controller');
 
 const {
-  Connector,
+  lookupAllAddresses,
   connectInParallel,
   connectInSequence
 } = require('../../src/connector');
 
-describe('Connector', function() {
-  describe('with MultiSubnetFailover', function() {
-    let mitm;
-
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
+describe('lookupAllAddresses', function() {
+  it('test IDN Server name', async function() {
+    const lookup = sinon.spy(function lookup(hostname, options, callback) {
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
 
-    afterEach(function() {
-      mitm.disable();
-    });
+    const server = '本地主机.ad';
+    const controller = new AbortController();
 
-    afterEach(function() {
-      sinon.restore();
-    });
+    try {
+      await lookupAllAddresses(server, lookup, controller.signal);
+    } catch {
+      // Ignore
+    }
 
-    it('connects directly if given an IP v4 address', async function() {
-      const hostIp = '127.0.0.1';
-      const localIp = '192.168.0.1';
-
-      const connectionOptions = {
-        host: hostIp,
-        port: 12345,
-        localAddress: localIp
-      };
-
-      const controller = new AbortController();
-      const connector = new Connector(connectionOptions, controller.signal, true);
-
-      let expectedSocket;
-
-      mitm.once('connect', function(socket, options) {
-        expectedSocket = socket;
-
-        assert.deepEqual(options, {
-          host: hostIp,
-          port: 12345,
-          localAddress: localIp,
-          family: 4
-        });
-      });
-
-      const socket = await connector.execute();
-      assert.strictEqual(socket, expectedSocket);
-    });
-
-    it('connects directly if given an IP v6 address', async function() {
-      const hostIp = '::1';
-      const localIp = '2002:20:0:0:0:0:1:2';
-
-      const connectionOptions = {
-        host: hostIp,
-        port: 12345,
-        localAddress: localIp
-      };
-
-      const controller = new AbortController();
-      const connector = new Connector(connectionOptions, controller.signal, true);
-
-      let expectedSocket;
-
-      mitm.once('connect', function(socket, options) {
-        expectedSocket = socket;
-
-        assert.deepEqual(options, {
-          host: hostIp,
-          port: 12345,
-          localAddress: localIp,
-          family: 6
-        });
-      });
-
-      const socket = await connector.execute();
-      assert.strictEqual(socket, expectedSocket);
-    });
-
-    it('will immediately abort when called with an aborted signal', async function() {
-      const controller = new AbortController();
-      const connector = new Connector({ host: 'localhost', port: 12345 }, controller.signal, true);
-
-      mitm.on('connect', () => {
-        assert.fail('no connections expected');
-      });
-
-      controller.abort();
-
-      let error;
-      try {
-        await connector.execute();
-      } catch (err) {
-        error = err;
-      }
-
-      assert.instanceOf(error, Error);
-      assert.strictEqual(error.name, 'AbortError');
-    });
-
-    it('can be aborted during DNS lookup', async function() {
-      const lookup = sinon.spy(function lookup(hostname, options, callback) {
-        controller.abort();
-
-        process.nextTick(callback, null, [
-          { address: '127.0.0.1', family: 4 }
-        ]);
-      });
-
-      const controller = new AbortController();
-      const connector = new Connector({
-        host: 'localhost',
-        port: 12345,
-        lookup: lookup
-      }, controller.signal, true);
-
-      let error;
-      try {
-        await connector.execute();
-      } catch (err) {
-        error = err;
-      }
-
-      assert.instanceOf(error, Error);
-      assert.strictEqual(error.name, 'AbortError');
-    });
+    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
   });
 
-  describe('without MultiSubnetFailover', function() {
-    let mitm;
-
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
+  it('test ASCII Server name', async function() {
+    const lookup = sinon.spy(function lookup(hostname, options, callback) {
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
 
-    afterEach(function() {
-      mitm.disable();
-    });
+    const server = 'localhost';
+    const controller = new AbortController();
 
-    afterEach(function() {
-      sinon.restore();
-    });
+    try {
+      await lookupAllAddresses(server, lookup, controller.signal);
+    } catch {
+      // Ignore
+    }
 
-    it('connects directly if given an IP address', async function() {
-      const connectionOptions = {
-        host: '127.0.0.1',
-        port: 12345,
-        localAddress: '192.168.0.1'
-      };
-
-      const controller = new AbortController();
-      const connector = new Connector(connectionOptions, controller.signal, false);
-
-      let expectedSocket;
-      mitm.once('connect', function(socket, options) {
-        expectedSocket = socket;
-
-        assert.deepEqual(options, {
-          host: '127.0.0.1',
-          port: 12345,
-          localAddress: '192.168.0.1',
-          family: 4
-        });
-      });
-
-      const socket = await connector.execute();
-      assert.strictEqual(socket, expectedSocket);
-    });
-  });
-
-  describe('Test unicode SQL Server name', function() {
-    it('test IDN Server name', async function() {
-      const lookup = sinon.spy(function lookup(hostname, options, callback) {
-        callback(null, [{ address: '127.0.0.1', family: 4 }]);
-      });
-
-      const server = '本地主机.ad';
-      const controller = new AbortController();
-      const connector = new Connector({ host: server, port: 12345, lookup: lookup }, controller.signal, true);
-
-      try {
-        await connector.execute();
-      } catch {
-        // Ignore
-      }
-
-      assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-      assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
-    });
-
-    it('test ASCII Server name', async function() {
-      const lookup = sinon.spy(function lookup(hostname, options, callback) {
-        callback(null, [{ address: '127.0.0.1', family: 4 }]);
-      });
-
-      const server = 'localhost';
-      const controller = new AbortController();
-      const connector = new Connector({ host: server, port: 12345, lookup: lookup }, controller.signal, true);
-
-      try {
-        await connector.execute();
-      } catch {
-        // Ignore
-      }
-
-      assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-      assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
-    });
+    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
   });
 });
 

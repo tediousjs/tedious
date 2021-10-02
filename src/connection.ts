@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import os from 'os';
 import { Socket } from 'net';
+import dns from 'dns';
 
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
@@ -30,7 +31,7 @@ import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
-import { Connector } from './connector';
+import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
@@ -1999,7 +2000,9 @@ class Connection extends EventEmitter {
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, signal, multiSubnetFailover).execute().then((socket) => {
+    const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
+
+    connect(connectOpts, dns.lookup, signal).then((socket) => {
       process.nextTick(() => {
         socket.on('error', (error) => { this.socketError(error); });
         socket.on('close', () => { this.socketClose(); });

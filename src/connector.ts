@@ -6,6 +6,8 @@ import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
 import { once } from 'events';
 
+type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
+
 export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
@@ -136,46 +138,18 @@ export async function connectInSequence(options: { host: string, port: number, l
   throw new Error('Could not connect (sequence)');
 }
 
-type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
-
-export class Connector {
-  options: { port: number, host: string, localAddress?: string | undefined };
-  multiSubnetFailover: boolean;
-  lookup: LookupFunction;
-  signal: AbortSignal;
-
-  constructor(options: { port: number, host: string, localAddress?: string | undefined, lookup?: LookupFunction | undefined }, signal: AbortSignal, multiSubnetFailover: boolean) {
-    this.options = options;
-    this.lookup = options.lookup ?? dns.lookup;
-    this.signal = signal;
-    this.multiSubnetFailover = multiSubnetFailover;
-  }
-
-  async execute(): Promise<net.Socket> {
-    if (this.signal.aborted) {
-      throw new AbortError();
-    }
-
-    if (this.multiSubnetFailover) {
-      return connectInParallel(this.options, this.lookup, this.signal);
-    } else {
-      return connectInSequence(this.options, this.lookup, this.signal);
-    }
-  }
-}
-
 /**
  * Look up all addresses for the given hostname.
  */
-function lookupAllAddresses(host: string, lookup: LookupFunction, signal: AbortSignal): Promise<dns.LookupAddress[]> {
+export async function lookupAllAddresses(host: string, lookup: LookupFunction, signal: AbortSignal): Promise<dns.LookupAddress[]> {
   if (signal.aborted) {
-    return Promise.reject(new AbortError());
+    throw new AbortError();
   }
 
   if (net.isIPv6(host)) {
-    return Promise.resolve([{ address: host, family: 6 }]);
+    return [{ address: host, family: 6 }];
   } else if (net.isIPv4(host)) {
-    return Promise.resolve([{ address: host, family: 4 }]);
+    return [{ address: host, family: 4 }];
   } else {
     // dns.lookup does not have support for AbortSignal yet
     return Promise.race([
