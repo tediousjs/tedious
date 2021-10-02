@@ -101,7 +101,7 @@ describe('InstanceLookup', function() {
         retries: 1,
         signal: controller.signal
       });
-    } catch (err) {
+    } catch {
       // Ignore
     }
   });
@@ -367,7 +367,7 @@ describe('parseBrowserResponse', function() {
 
     try {
       await new InstanceLookup().instanceLookup(options);
-    } catch (err) {
+    } catch {
       // ignore
     }
 
@@ -393,7 +393,7 @@ describe('parseBrowserResponse', function() {
 
     try {
       await new InstanceLookup().instanceLookup(options);
-    } catch (err) {
+    } catch {
       // ignore
     }
 
