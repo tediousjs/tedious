@@ -6,7 +6,7 @@ import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
 import { once } from 'events';
 
-async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
   return new Promise<net.Socket>((resolve, reject) => {
@@ -78,23 +78,7 @@ async function connectInParallel(options: { host: string, port: number, localAdd
   });
 }
 
-export class ParallelConnectionStrategy {
-  lookup: LookupFunction;
-  options: { host: string, port: number, localAddress?: string | undefined };
-  signal: AbortSignal;
-
-  constructor(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
-    this.lookup = lookup;
-    this.options = options;
-    this.signal = signal;
-  }
-
-  async connect(): Promise<net.Socket> {
-    return connectInParallel(this.options, this.lookup, this.signal);
-  }
-}
-
-async function connectInSequence(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+export async function connectInSequence(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
   for (const address of addresses) {
@@ -152,22 +136,6 @@ async function connectInSequence(options: { host: string, port: number, localAdd
   throw new Error('Could not connect (sequence)');
 }
 
-export class SequentialConnectionStrategy {
-  lookup: LookupFunction;
-  options: { host: string, port: number, localAddress?: string | undefined };
-  signal: AbortSignal;
-
-  constructor(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
-    this.lookup = lookup;
-    this.options = options;
-    this.signal = signal;
-  }
-
-  async connect(): Promise<net.Socket> {
-    return connectInSequence(this.options, this.lookup, this.signal);
-  }
-}
-
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export class Connector {
@@ -188,14 +156,11 @@ export class Connector {
       throw new AbortError();
     }
 
-    let strategy;
     if (this.multiSubnetFailover) {
-      strategy = new ParallelConnectionStrategy(this.options, this.lookup, this.signal);
+      return connectInParallel(this.options, this.lookup, this.signal);
     } else {
-      strategy = new SequentialConnectionStrategy(this.options, this.lookup, this.signal);
+      return connectInSequence(this.options, this.lookup, this.signal);
     }
-
-    return strategy.connect();
   }
 }
 
