@@ -6,6 +6,8 @@ import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
 import { once } from 'events';
 
+import AggregateError from 'es-aggregate-error';
+
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
@@ -18,19 +20,20 @@ export async function connectInParallel(options: { host: string, port: number, l
 
     const sockets = new Array(addresses.length);
 
-    let errorCount = 0;
-    function onError(this: net.Socket, _err: Error) {
-      errorCount += 1;
+    const errors: Error[] = [];
+
+    function onError(this: net.Socket, err: Error) {
+      errors.push(err);
 
       this.removeListener('error', onError);
       this.removeListener('connect', onConnect);
 
       this.destroy();
 
-      if (errorCount === addresses.length) {
+      if (errors.length === addresses.length) {
         signal.removeEventListener('abort', onAbort);
 
-        reject(new Error('Could not connect (parallel)'));
+        reject(new AggregateError(errors, 'Could not connect (parallel)'));
       }
     }
 
@@ -81,6 +84,7 @@ export async function connectInParallel(options: { host: string, port: number, l
 }
 
 export async function connectInSequence(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+  const errors: any[] = [];
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
   for (const address of addresses) {
@@ -131,11 +135,13 @@ export async function connectInSequence(options: { host: string, port: number, l
         throw err;
       }
 
+      errors.push(err);
+
       continue;
     }
   }
 
-  throw new Error('Could not connect (sequence)');
+  throw new AggregateError(errors, 'Could not connect (sequence)');
 }
 
 /**

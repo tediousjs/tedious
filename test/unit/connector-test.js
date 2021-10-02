@@ -3,6 +3,7 @@ const sinon = require('sinon');
 const punycode = require('punycode');
 const assert = require('chai').assert;
 const { AbortController } = require('node-abort-controller');
+const AggregateError = require('es-aggregate-error');
 
 const {
   lookupAllAddresses,
@@ -170,9 +171,10 @@ describe('connectInSequence', function() {
   it('fails if all sequential connections fail', async function() {
     const controller = new AbortController();
 
+    let i = 0;
     mitm.on('connect', function(socket) {
       process.nextTick(() => {
-        socket.emit('error', new Error());
+        socket.emit('error', new Error(`failed connection #${i += 1}`));
       });
     });
 
@@ -193,8 +195,18 @@ describe('connectInSequence', function() {
       error = err;
     }
 
-    assert.instanceOf(error, Error);
+    assert.instanceOf(error, AggregateError);
     assert.equal(error.message, 'Could not connect (sequence)');
+    assert.lengthOf(error.errors, 3);
+
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
+
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
+
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
   it('destroys all sockets except for the first succesfully connected socket', async function() {
@@ -346,9 +358,10 @@ describe('connectInParallel', function() {
   it('fails if all parallel connections fail', async function() {
     const controller = new AbortController();
 
+    let i = 0;
     mitm.on('connect', function(socket) {
       process.nextTick(() => {
-        socket.emit('error', new Error());
+        socket.emit('error', new Error(`failed connection #${i += 1}`));
       });
     });
 
@@ -369,8 +382,18 @@ describe('connectInParallel', function() {
       error = err;
     }
 
-    assert.instanceOf(error, Error);
+    assert.instanceOf(error, AggregateError);
     assert.equal(error.message, 'Could not connect (parallel)');
+    assert.lengthOf(error.errors, 3);
+
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
+
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
+
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
   it('passes the first succesfully connected socket to the callback', async function() {
