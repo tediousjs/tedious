@@ -5,7 +5,7 @@ const homedir = require('os').homedir();
 const assert = require('chai').assert;
 import { AbortController } from 'node-abort-controller';
 
-const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
+const { instanceLookup } = require('../../src/instance-lookup');
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
@@ -36,7 +36,7 @@ describe('Instance Lookup Test', function() {
     }
 
     const controller = new AbortController();
-    const port = await new InstanceLookup().instanceLookup({
+    const port = await instanceLookup({
       server: config.server,
       instanceName: config.instanceName,
       signal: controller.signal
@@ -52,7 +52,7 @@ describe('Instance Lookup Test', function() {
 
     let error;
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: config.server,
         instanceName: 'badInstanceName',
         timeout: 100,
@@ -71,7 +71,7 @@ describe('Instance Lookup Test', function() {
 
     let error;
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: RESERVED_IP_ADDRESS,
         instanceName: 'badInstanceName',
         timeout: 100,

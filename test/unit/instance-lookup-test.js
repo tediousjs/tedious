@@ -1,21 +1,16 @@
-const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const sinon = require('sinon');
 const punycode = require('punycode');
 const assert = require('chai').assert;
 const dgram = require('dgram');
 const { AbortController } = require('node-abort-controller');
 
+const { instanceLookup, parseBrowserResponse } = require('../../src/instance-lookup');
+
 describe('instanceLookup invalid args', function() {
-  let instanceLookup;
-
-  beforeEach(function() {
-    instanceLookup = new InstanceLookup();
-  });
-
   it('invalid server', async function() {
     let error;
     try {
-      await instanceLookup.instanceLookup({ server: 4 });
+      await instanceLookup({ server: 4 });
     } catch (err) {
       error = err;
     }
@@ -27,7 +22,7 @@ describe('instanceLookup invalid args', function() {
   it('invalid instanceName', async function() {
     let error;
     try {
-      await instanceLookup.instanceLookup({ server: 'serverName', instanceName: 4 });
+      await instanceLookup({ server: 'serverName', instanceName: 4 });
     } catch (err) {
       error = err;
     }
@@ -39,7 +34,7 @@ describe('instanceLookup invalid args', function() {
   it('invalid timeout', async function() {
     let error;
     try {
-      await instanceLookup.instanceLookup({
+      await instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: 'some string'
@@ -55,7 +50,7 @@ describe('instanceLookup invalid args', function() {
   it('invalid retries', async function() {
     let error;
     try {
-      await instanceLookup.instanceLookup({
+      await instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: 1000,
@@ -93,7 +88,7 @@ describe('InstanceLookup', function() {
     const controller = new AbortController();
 
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'second',
@@ -116,7 +111,7 @@ describe('InstanceLookup', function() {
 
     let error;
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'first',
@@ -145,7 +140,7 @@ describe('InstanceLookup', function() {
 
     let error;
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'first',
@@ -176,7 +171,7 @@ describe('InstanceLookup', function() {
 
     let error;
     try {
-      await new InstanceLookup().instanceLookup({
+      await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'first',
@@ -200,7 +195,7 @@ describe('InstanceLookup', function() {
 
       let error;
       try {
-        await new InstanceLookup().instanceLookup({
+        await instanceLookup({
           server: server.address().address,
           port: server.address().port,
           instanceName: 'instance',
@@ -235,7 +230,7 @@ describe('InstanceLookup', function() {
 
       const controller = new AbortController();
 
-      const result = await new InstanceLookup().instanceLookup({
+      const result = await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'second',
@@ -264,7 +259,7 @@ describe('InstanceLookup', function() {
 
       let error;
       try {
-        await new InstanceLookup().instanceLookup({
+        await instanceLookup({
           server: server.address().address,
           port: server.address().port,
           instanceName: 'other',
@@ -291,7 +286,7 @@ describe('InstanceLookup', function() {
 
       let error;
       try {
-        await new InstanceLookup().instanceLookup({
+        await instanceLookup({
           server: server.address().address,
           port: server.address().port,
           instanceName: 'other',
@@ -310,17 +305,11 @@ describe('InstanceLookup', function() {
 });
 
 describe('parseBrowserResponse', function() {
-  let instanceLookup;
-
-  beforeEach(function() {
-    instanceLookup = new InstanceLookup();
-  });
-
   it('oneInstanceFound', () => {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesFoundInFirst', () => {
@@ -328,7 +317,7 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesFoundInSecond', () => {
@@ -336,7 +325,7 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesNotFound', () => {
@@ -344,7 +333,7 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), undefined);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), undefined);
   });
 });
 
@@ -366,7 +355,7 @@ describe('parseBrowserResponse', function() {
     };
 
     try {
-      await new InstanceLookup().instanceLookup(options);
+      await instanceLookup(options);
     } catch {
       // ignore
     }
@@ -392,7 +381,7 @@ describe('parseBrowserResponse', function() {
     };
 
     try {
-      await new InstanceLookup().instanceLookup(options);
+      await instanceLookup(options);
     } catch {
       // ignore
     }
