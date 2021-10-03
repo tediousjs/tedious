@@ -83,7 +83,7 @@ export class InstanceLookup {
           continue;
         }
 
-        throw new Error('Failed to lookup instance on ' + server + ' - ' + err.message);
+        throw err;
       }
 
       const message = response.toString('ascii', MYSTERY_HEADER_LENGTH);
