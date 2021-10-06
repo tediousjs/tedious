@@ -238,10 +238,16 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `userName` asscoiate to their account.
      */
     userName: string;
+
     /**
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
+
+    /**
+     * A client id to use.
+     */
+    clientId: string;
 
     /**
      * Optional parameter for specific Azure tenant ID
@@ -1076,12 +1082,19 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
 
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        } else {
+          emitAzureADPasswordClientIdDeprecationWarning();
+        }
+
         authentication = {
           type: 'azure-active-directory-password',
           options: {
             userName: options.userName,
             password: options.password,
-            domain: options.domain,
+            domain: options.domain ?? 'common',
+            clientId: options.clientId ?? '7f98cb04-cd1e-40df-9140-3bf7e2cea4db'
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -3143,6 +3156,22 @@ function emitSSPIChallengeEventDeprecationWarning() {
   );
 }
 
+let azureADPasswordClientIdDeprecationWarningEmitted = false;
+function emitAzureADPasswordClientIdDeprecationWarning() {
+  if (azureADPasswordClientIdDeprecationWarningEmitted) {
+    return;
+  }
+
+  azureADPasswordClientIdDeprecationWarningEmitted = true;
+
+  process.emitWarning(
+    'When using the `azure-active-directory-password` authentication method, please provide a value for the `clientId` option. ' +
+    'This option will be required in a future release.',
+    'DeprecationWarning',
+    Connection.prototype.on
+  );
+}
+
 export default Connection;
 module.exports = Connection;
 
@@ -3461,8 +3490,8 @@ Connection.prototype.STATE = {
 
               if (authentication.type === 'azure-active-directory-password') {
                 const credentials = new UsernamePasswordCredential(
-                  authentication.options.domain ?? 'common',  // tenantId
-                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',     // clientId
+                  authentication.options.domain,
+                  authentication.options.clientId,
                   authentication.options.userName,
                   authentication.options.password
                 );
