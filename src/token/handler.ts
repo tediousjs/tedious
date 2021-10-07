@@ -278,8 +278,6 @@ export class Login7TokenHandler extends TokenHandler {
       this.connection.ntlmpacket = token.ntlmpacket;
       this.connection.ntlmpacketBuffer = token.ntlmpacketBuffer;
     }
-
-    this.connection.emit('sspichallenge', token);
   }
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
