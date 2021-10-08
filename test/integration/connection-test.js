@@ -1354,7 +1354,7 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     config.options.enableAnsiNullDefault = false;
 
-    runSqlBatch(done, config, sql, function(/** @type {RequestError | null | undefined} */err) {
+    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined} */err) {
       assert.instanceOf(err, RequestError);
       assert.strictEqual(/** @type {RequestError} */(err).number, 515);
     }); // Cannot insert the value NULL

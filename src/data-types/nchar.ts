@@ -98,32 +98,14 @@ const NChar: DataType & { maximumLength: number } = {
     if (value == null) {
       return null;
     }
-    if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
 
-      emitTypeCoercionWarning();
-      value = value.toString();
+    if (typeof value !== 'string') {
+      throw new TypeError('Invalid string.');
     }
+
     return value;
   }
 };
 
 export default NChar;
 module.exports = NChar;
-
-let typeCoercionWarningEmitted = false;
-function emitTypeCoercionWarning() {
-  if (typeCoercionWarningEmitted) {
-    return;
-  }
-
-  typeCoercionWarningEmitted = true;
-
-  process.emitWarning(
-    '`nchar` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
-    'DeprecationWarning',
-    NChar.validate
-  );
-}

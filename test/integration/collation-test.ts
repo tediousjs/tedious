@@ -259,9 +259,9 @@ describe('Database Collation Support', function() {
       bulkLoad.addColumn('two', TYPES.Char, { length: 10, nullable: false });
       bulkLoad.addColumn('three', TYPES.Text, { nullable: false });
 
-      bulkLoad.addRow({ one: '中文', two: '中文', three: '中文' });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { one: '中文', two: '中文', three: '中文' }
+      ]);
     });
   });
 

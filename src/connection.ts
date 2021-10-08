@@ -1769,18 +1769,7 @@ class Connection extends EventEmitter {
    */
   on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
 
-  /**
-   * A SSPI token was send by the server.
-   *
-   * @deprecated
-   */
-  on(event: 'sspichallenge', listener: (token: import('./token/token').SSPIToken) => void): this
-
   on(event: string | symbol, listener: (...args: any[]) => void) {
-    if (event === 'sspichallenge') {
-      emitSSPIChallengeEventDeprecationWarning();
-    }
-
     return super.on(event, listener);
   }
 
@@ -1840,10 +1829,6 @@ class Connection extends EventEmitter {
    * @private
    */
   emit(event: 'rollbackTransaction'): boolean
-  /**
-   * @private
-   */
-  emit(event: 'sspichallenge', token: import('./token/token').SSPIToken): boolean
 
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
@@ -2545,44 +2530,6 @@ class Connection extends EventEmitter {
    * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
    * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
    *
-   * // Now, we can specify each row to be written.
-   * //
-   * // Note that these rows are held in memory until the
-   * // bulk load was performed, so if you need to write a large
-   * // number of rows (e.g. by reading from a CSV file),
-   * // using a streaming bulk load is advisable to keep memory usage low.
-   * bulkLoad.addRow({ 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') });
-   * bulkLoad.addRow({ 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') });
-   *
-   * connection.execBulkLoad(bulkLoad);
-   * ```
-   *
-   * @param bulkLoad A previously created [[BulkLoad]].
-   *
-   * @deprecated Adding rows to a [[BulkLoad]] via [[BulkLoad.addRow]] or [[BulkLoad.getRowStream]]
-   *   is deprecated and will be removed in the future. You should migrate to calling [[Connection.execBulkLoad]]
-   *   with a `Iterable` or `AsyncIterable` as the second argument instead.
-   */
-  execBulkLoad(bulkLoad: BulkLoad): void
-
-  /**
-   * Execute a [[BulkLoad]].
-   *
-   * ```js
-   * // We want to perform a bulk load into a table with the following format:
-   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
-   *
-   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
-   *   // ...
-   * });
-   *
-   * // First, we need to specify the columns that we want to write to,
-   * // and their definitions. These definitions must match the actual table,
-   * // otherwise the bulk load will fail.
-   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
-   *
    * // Execute a bulk load with a predefined list of rows.
    * //
    * // Note that these rows are held in memory until the
@@ -3024,6 +2971,7 @@ class Connection extends EventEmitter {
 
       const onCancel = () => {
         payloadStream.unpipe(message);
+        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
 
         // set the ignore bit and end the message.
         message.ignore = true;
@@ -3059,8 +3007,6 @@ class Connection extends EventEmitter {
 
         // Only set a request error if no error was set yet.
         request.error ??= error;
-
-        payloadStream.unpipe(message);
 
         message.ignore = true;
         message.end();
@@ -3126,21 +3072,6 @@ class Connection extends EventEmitter {
         return 'read committed';
     }
   }
-}
-
-let sspichallengeEventDeprecationWarningEmitted = false;
-function emitSSPIChallengeEventDeprecationWarning() {
-  if (sspichallengeEventDeprecationWarningEmitted) {
-    return;
-  }
-
-  sspichallengeEventDeprecationWarningEmitted = true;
-
-  process.emitWarning(
-    'The `sspichallenge` event is deprecated and will be removed.',
-    'DeprecationWarning',
-    Connection.prototype.on
-  );
 }
 
 export default Connection;

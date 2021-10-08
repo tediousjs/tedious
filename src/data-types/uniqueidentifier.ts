@@ -43,12 +43,7 @@ const UniqueIdentifier: DataType = {
     }
 
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-
-      emitTypeCoercionWarning();
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
@@ -61,18 +56,3 @@ const UniqueIdentifier: DataType = {
 
 export default UniqueIdentifier;
 module.exports = UniqueIdentifier;
-
-let typeCoercionWarningEmitted = false;
-function emitTypeCoercionWarning() {
-  if (typeCoercionWarningEmitted) {
-    return;
-  }
-
-  typeCoercionWarningEmitted = true;
-
-  process.emitWarning(
-    '`uniqueidentifier` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
-    'DeprecationWarning',
-    UniqueIdentifier.validate
-  );
-}
