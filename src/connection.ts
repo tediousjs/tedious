@@ -1878,7 +1878,7 @@ class Connection extends EventEmitter {
             return;
           }
 
-          this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
+          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
         } else {
           this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
         }
@@ -1905,7 +1905,7 @@ class Connection extends EventEmitter {
 
       const request = this.request;
       if (request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
         request.callback(err);
         this.request = undefined;
       }
@@ -2032,7 +2032,7 @@ class Connection extends EventEmitter {
   connectTimeout() {
     const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
+    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -2043,7 +2043,7 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
   }
 
   /**
@@ -2055,7 +2055,7 @@ class Connection extends EventEmitter {
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = RequestError(message, 'ETIMEOUT');
+    request.error = new RequestError(message, 'ETIMEOUT');
   }
 
   /**
@@ -2161,11 +2161,11 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
     this.dispatchEvent('socketError', error);
   }
@@ -2710,7 +2710,7 @@ class Connection extends EventEmitter {
       if (name === 'handle') {
         request.handle = value;
       } else {
-        request.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+        request.error = new RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
       }
     });
 
@@ -3004,10 +3004,10 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
       process.nextTick(() => {
-        request.callback(RequestError('Canceled.', 'ECANCEL'));
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
@@ -3200,7 +3200,7 @@ Connection.prototype.STATE = {
 
           if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
             if (!this.config.options.encrypt) {
-              this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+              this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
               return this.close();
             }
 
@@ -3341,7 +3341,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
         });
@@ -3407,7 +3407,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
         });
@@ -3486,7 +3486,7 @@ Connection.prototype.STATE = {
 
             getToken((err, token) => {
               if (err) {
-                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+                this.loginError = new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
                 this.emit('connect', this.loginError);
                 this.transitionTo(this.STATE.FINAL);
                 return;
@@ -3503,7 +3503,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
         });
@@ -3676,7 +3676,7 @@ Connection.prototype.STATE = {
             if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
               sqlRequest.callback(sqlRequest.error);
             } else {
-              sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
+              sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
             }
           }
         });

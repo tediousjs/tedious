@@ -141,6 +141,8 @@ const NVarChar: { maximumLength: number } & DataType = {
       if (typeof value.toString !== 'function') {
         throw new TypeError('Invalid string.');
       }
+
+      emitTypeCoercionWarning();
       value = value.toString();
     }
     return value;
@@ -149,3 +151,18 @@ const NVarChar: { maximumLength: number } & DataType = {
 
 export default NVarChar;
 module.exports = NVarChar;
+
+let typeCoercionWarningEmitted = false;
+function emitTypeCoercionWarning() {
+  if (typeCoercionWarningEmitted) {
+    return;
+  }
+
+  typeCoercionWarningEmitted = true;
+
+  process.emitWarning(
+    '`nvarchar` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
+    'DeprecationWarning',
+    NVarChar.validate
+  );
+}

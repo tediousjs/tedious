@@ -47,6 +47,7 @@ const UniqueIdentifier: DataType = {
         throw new TypeError('Invalid string.');
       }
 
+      emitTypeCoercionWarning();
       value = value.toString();
     }
 
@@ -60,3 +61,18 @@ const UniqueIdentifier: DataType = {
 
 export default UniqueIdentifier;
 module.exports = UniqueIdentifier;
+
+let typeCoercionWarningEmitted = false;
+function emitTypeCoercionWarning() {
+  if (typeCoercionWarningEmitted) {
+    return;
+  }
+
+  typeCoercionWarningEmitted = true;
+
+  process.emitWarning(
+    '`uniqueidentifier` type coercion from non-string type value via `.toString()` method is deprecated and will be removed.',
+    'DeprecationWarning',
+    UniqueIdentifier.validate
+  );
+}
