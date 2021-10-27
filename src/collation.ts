@@ -5,6 +5,9 @@ export const codepageByLanguageId: { [key: number]: Encoding } = {
   // Arabic_*
   [0x0401]: 'CP1256',
 
+
+
+
   // Chinese_Taiwan_Stroke_*
   // Chinese_Traditional_Stroke_Count_*
   // Chinese_Taiwan_Bopomofo_*
