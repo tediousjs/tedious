@@ -8,6 +8,7 @@ import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
+  DefaultAzureCredential,
   ClientSecretCredential,
   ManagedIdentityCredential,
   TokenCredential,
@@ -220,14 +221,28 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieve a token
      */
     clientId?: string;
   };
 }
+
+interface AzureActiveDirectoryDefaultAuthentication {
+  type: 'azure-active-directory-default';
+  options: {
+    /**
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
+     *
+     * This is optional for retrieving a token
+     */
+    clientId?: string;
+  };
+}
+
 
 interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
@@ -317,7 +332,7 @@ interface ErrorWithCode extends Error {
 
 interface InternalConnectionConfig {
   server: string;
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
   options: InternalConnectionOptions;
 }
 
@@ -405,7 +420,8 @@ type Authentication = DefaultAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
   AzureActiveDirectoryAccessTokenAuthentication |
-  AzureActiveDirectoryServicePrincipalSecret;
+  AzureActiveDirectoryServicePrincipalSecret |
+  AzureActiveDirectoryDefaultAuthentication;
 
 type AuthenticationType = Authentication['type'];
 
@@ -456,6 +472,7 @@ interface AuthenticationOptions {
    * Type of the authentication method, valid types are `default`, `ntlm`,
    * `azure-active-directory-password`, `azure-active-directory-access-token`,
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
+   * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
    */
   type?: AuthenticationType;
@@ -469,6 +486,7 @@ interface AuthenticationOptions {
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   * * `azure-active-directory-default` : [[AzureActiveDirectoryDefaultAuthentication.options]]
    */
   options?: any;
 }
@@ -1047,8 +1065,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1111,6 +1129,16 @@ class Connection extends EventEmitter {
 
         authentication = {
           type: 'azure-active-directory-msi-vm',
+          options: {
+            clientId: options.clientId
+          }
+        };
+      } else if (type === 'azure-active-directory-default') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+        authentication = {
+          type: 'azure-active-directory-default',
           options: {
             clientId: options.clientId
           }
@@ -2262,6 +2290,7 @@ class Connection extends EventEmitter {
         break;
 
       case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
         payload.fedAuth = {
@@ -3227,8 +3256,7 @@ Connection.prototype.STATE = {
             this.sendLogin7Packet();
 
             const { authentication } = this.config;
-
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
+            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
             } else if (authentication.type === 'ntlm') {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -3391,7 +3419,7 @@ Connection.prototype.STATE = {
           const fedAuthInfoToken = handler.fedAuthInfoToken;
 
           if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-            const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+            const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
             const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
             const getToken = (callback: (error: Error | null, token?: string) => void) => {
@@ -3413,6 +3441,11 @@ Connection.prototype.STATE = {
               } else if (authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
                 const msiArgs = authentication.options.clientId ? [ authentication.options.clientId, {} ] : [ {} ];
                 const credentials = new ManagedIdentityCredential(...msiArgs);
+
+                getTokenFromCredentials(credentials);
+              } else if (authentication.type === 'azure-active-directory-default') {
+                const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+                const credentials = new DefaultAzureCredential(args);
 
                 getTokenFromCredentials(credentials);
               } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
