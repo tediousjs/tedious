@@ -100,7 +100,203 @@ connection.connect();
       <dd>
         Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>,
         <code>azure-active-directory-password</code>, <code>azure-active-directory-access-token</code>, 
-        <code>azure-active-directory-msi-vm</code>, or <code>azure-active-directory-msi-app-service</code> 
+        <code>azure-active-directory-msi-vm</code>, <code>azure-active-directory-service-principal-secret</code>,
+        or <code>azure-active-directory-msi-app-service</code> 
+        <ul>
+          <li><code>azure-active-directory-password</code></li>
+{% highlight javascript %}
+"authentication": {
+  ...,
+  "options": {
+    "userName": value;
+    "password": value;
+    "domain": value; (Optional)
+  }
+}           
+{% endhighlight %}
+          <ul>
+            <li>username (string): A user need to provide `userName` associated to their account.</li>
+            <li>password (string): A user need to provide `password` associated to their account.</li>
+            <li>domain (string): Optional parameter for specific Azure tenant ID.</li>
+          </ul>
+          <li><code>azure-active-directory-access-token</code></li>
+{% highlight javascript %}
+"authentication": {
+  ...,
+  "options": {
+    "token": value;
+  }
+}         
+{% endhighlight %}
+          <ul>
+            <li>token (string): A user need to provide `token` which they retrieved elsewhere to forming the connection.</li>
+            <p><h4>How to get the token</h4></p>
+            <ul>
+              <h4>Things that need to considered before using the fallowing scripts:</h4>
+              <ul>
+                <ol>
+                    <li>
+                      Two PowerShell scripts need to be run within a msi-vm or a msi-app-service environment,since it need to pick up the specific preset environment variables from the system or reach a specific msi end point.
+                    </li>
+                    <li>
+                      An azure managed identity(user or system) must be enabled first then register to an Azure AD authentication-enabled data source. Otherwise, if you have registered an identity into for example a database and the system identity is diabled from azure for an Azure VM, you will get a connection error due to that the data source will not recognize the identity.For more detials on this, this is a <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/tutorial-windows-vm-access-sql" target="_blank"><i><b>link</b></i></a> from microsoft. 
+                    </li>
+                    <li>
+                      Tedious supports an authentication type: azure-active-directory-password. By using this authentication, tedious will handle the process for retrieving the azure token internally, so the user does not have to retrieve the azure token by themselves using the following provoded tips. The "azure-active-directory-password" should be the first choice since that Tedious will handle the token retrieve process for the users.
+                    </li>
+                </ol>
+              </ul>
+              <h4>A PowerShell script for retrieving the token within a msi-app-service:</h4>
+              Here is a <a href="https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=dotnet" target="_blank"><i><b>link</b></i></a> for microsoft side doc for retrive the token.
+{% highlight powershell %}
+# The version of the token API to be used. Please use "2019-08-01" or later 
+# (unless using Linux Consumption, which currently only offers "2017-09-01").
+$apiVersion = "2019-08-01"
+# The Azure AD resource URI of the resource for which a token should be obtained.
+# This could be one of the provide URIs within this link 
+# [https://docs.microsoft.com/en-us/azure/active-directory/
+# managed-identities-azure-resources/
+# services-support-managed-identities#
+# azure-services-that-support-azure-ad-authentication]
+# or any other resource URI.
+$resourceURI = "https://database.windows.net/"
+# IDENTITY_ENDPOINT/MSI_ENDPOINT & IDENTITY_HEADER/MSI_SECRET will be 
+# pick up from the app service's environment variables.
+$tokenAuthURI = $env:IDENTITY_ENDPOINT  `
++ "?resource=$resourceURI&api-version=$apiVersion"
+$tokenResponse = Invoke-RestMethod `
+-Method Get `
+-Headers @{"X-IDENTITY-HEADER"="$env:IDENTITY_HEADER"} `
+-Uri $tokenAuthURI
+$accessToken = $tokenResponse.access_token   
+{% endhighlight %}
+              <h4>A PowerShell script for retrieving the token within a msi-vm:</h4>
+              Here is a <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>link</b></i></a> for microsoft side doc for retrive the token.</h4>
+{% highlight powershell %}
+# The default endpoint
+$endPoint = "http://169.254.169.254/metadata/identity/oauth2/token"
+# The corresponding api-version for the endpoint
+$apiVersion = "2018-02-01"
+# The Azure AD resource URI of the resource for which a token should be obtained.
+# This could be one of the provide URIs within this link
+# [https://docs.microsoft.com/en-us/azure/active-directory/
+# managed-identities-azure-resources/
+# services-support-managed-identities#
+# azure-services-that-support-azure-ad-authentication]
+# or any other resource URI.
+$resourceURI = "https%3A%2F%2Fmanagement.azure.com%2F"
+$tokenAuthURI = $endPoint + "?resource=$resourceURI&api-version=$apiVersion"
+$tokenResponse = Invoke-RestMethod `
+-Method Get `
+-Headers @{Metadata="true"} `
+-Uri $tokenAuthURI                              
+$access_token = $tokenResponse.access_token
+echo "The managed identities for Azure resources access token is $access_token"             
+{% endhighlight %}
+              <h4>A JavaScript for retrieve the token using 'adal-node':</h4>
+              Here is a <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>link</b></i></a> for microsoft side doc for retrive the token.</h4>
+{% highlight javascript %}
+const { AuthenticationContext } = require('adal-node');
+let generateToken = () => {
+  // The Azure AD resource URI of the resource for which a token should be obtained.
+  // This could be one of the provide URIs within this link
+  // [https://docs.microsoft.com/en-us/azure/active-directory/
+  // managed-identities-azure-resources/
+  // services-support-managed-identities
+  // #azure-services-that-support-azure-ad-authentication]
+  // or any other resource URI.
+  const spn = "https://database.windows.net/";
+  // Azure AD service endpoint
+  const authorityHostUrl ="https://login.microsoftonline.com/";
+  // You Active Directory domain id and name
+  // You find this information in the Azure portal 
+  // under Azure Active Directory > Properties.
+  // Select Directory ID to see your Tenant ID
+  const tenantId ="<Your Tenant ID>";
+  const tenant ="<Your Tenant Name>";
+  //The Azure AD service endpoint is https://login.microsoftonline.com/TENANT/.
+  //Where TENANT is the Azure AD tenant ID or name.
+  const stsurl   = authorityHostUrl+tenant;
+  // If you have not set up you registered application yet, you should probally
+  // consider start setting it. You can still use 7f98cb04-cd1e-40df-9140-
+  // 3bf7e2cea4db which is a hard coded clint Id value within Tedious for
+  // now. However, this value will be deprecated soon.
+  const clientId = "<You Registered Application Tenant ID>"
+  //Your Azure Active Directory user name
+  //The format will be yourusername@tenantname
+  const azureUserName = "<Your Azure User Name>";
+  // Your Azure Active Directory user account password
+  const azurePassword = "<Your Azure User Password>";
+  const context = new AuthenticationContext(stsurl);
+  context.acquireTokenWithUsernamePassword(
+    spn, 
+    azureUserName, 
+    azurePassword, 
+    clientId, 
+    (err, tokenResponse) => {
+    if (err) {
+      console.log('well that didn\'t work: ' + err.stack);
+      return;
+    }
+    console.log(tokenResponse);
+  });
+}
+generateToken();       
+{% endhighlight %}
+          </ul>
+          </ul>
+          <li><code>azure-active-directory-msi-vm</code></li>
+{% highlight javascript %}
+"authentication": {
+  ...,
+  "options": {
+    "clientId": value;
+    "msiEndpoint": value;
+  }
+    
+}           
+{% endhighlight %}
+          <ul>
+            <li>clientId (string): If a user want to connect to an Azure app service using a specific client account he or she needs to provide a `clientId` that associate to their created identity. This is optional for retrieve token from azure web app service
+            </li>
+            <li>msiEndpoint (string):  A user need to provide `msiEndpoint` for retriving the accesstoken.</li>
+          </ul>          
+          <li><code>azure-active-directory-msi-app-service</code></li>
+{% highlight javascript %}
+"authentication": {
+  ...,
+  "options": {
+    "clientId": value;
+    "msiEndpoint": value;
+    "msiSecret": value;
+  }
+}           
+{% endhighlight %}   
+          <ul>
+            <li>clientId (string): If a user want to connect to an Azure app service using a specific client account he or she needs to provide a `clientId` that associate to their created identity. This is optional for retrieve token from azure web app service
+            </li>
+            <li>
+              msiEndpoint (string):  A msi app service environment need to provide `msiEndpoint` for retriving the accesstoken.
+            </li>
+            <li>msiSecret (string):  A msi app service environment need to provide `msiSecret` for retriving the accesstoken.</li>
+          </ul>          
+          <li><code>azure-active-directory-service-principal-secret</code></li>
+{% highlight javascript %}
+"authentication": {
+  ...,
+  "options": {
+    "clientId": value;
+    "clientSecret": value;
+    "tenantId": (Optional);
+  }
+}           
+{% endhighlight %}   
+          <ul>
+            <li>clientId (string): Application (`client`) ID from your registered Azure application.</li>
+            <li>clientSecret (string): The created `client secret` for this registered Azure application.</li>
+            <li>tenantId (string): Directory (`tenant`) ID from your registered Azure application.</li>
+          </ul>                  
+        </ul>
       </dd>
 
       <dt>
