@@ -130,6 +130,42 @@ title: F.E.Q.
     </dd>
     <br />
     <dt>
+        <h2>The Behavior Change of connect() function</h2>
+    </dt>
+    <dd>
+        <p>
+            Orginally the <code>connect()</code> is used like this: 
+{% highlight javascript %}
+    const connection = new Connection(config);
+    connection.on('connect', (err) => {});
+    connection.connect();
+{% endhighlight %}
+            It has to work with a event handler function call: <code>connectionObject.on('connect',callback())</code>. 
+            Users still have the option to use <code>connect()</code> in this fasion. 
+        </p>
+        <p>
+            However, the new <code>connect()</code> can be used like this:
+{% highlight javascript %}
+    const connection = new Connection(config);
+    connection.connect((err) => {});
+{% endhighlight %}
+            Users can pass the event handler call back function as a parameter, the <code>connect()</code> will 
+            handle the supported events : <code>connect</code> and <code>error</code> based on the call back function
+            that is passed in. 
+        </p>
+        <p>
+            The change not only make this part of code simpler, but it also target to deprecate 
+            automatically opening a connection when building a Connection instance. 
+            There are the links that realted original issue and changes:
+            <a href="https://github.com/tediousjs/tedious/pull/730" target="_blank"><i><b>730</b></i></a>
+            , <a href="https://github.com/tediousjs/tedious/pull/1069" target="_blank"><i><b>1069</b></i></a>
+            , <a href="https://github.com/tediousjs/tedious/pull/1102" target="_blank"><i><b>1102</b></i></a>
+            , <a href="https://github.com/tediousjs/tedious/pull/1145" target="_blank"><i><b>1145</b></i></a>
+            , <a href="https://github.com/tediousjs/tedious/pull/1202" target="_blank"><i><b>1202</b></i></a>
+        </p>  
+    </dd>
+    <br />
+    <dt>
         <h2>Other</h2>
     </dt>
     <dd>
