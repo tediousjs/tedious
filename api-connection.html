@@ -141,8 +141,8 @@ connection.connect();
             </p>
             <p>
               <h4>How to get the token</h4>
-              There are different approaches if a user actually in need of retriving a token. 
-              The detials can be found from microsoft side documentations. There are some examples:
+              There are different approaches if a user actually needs to retrieve a token manually.
+              The details can be found in Microsoft documentation. Here are some examples:
               <ul>
                 <li> Retrieving the token within an msi-app-service using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=dotnet" target="_blank"><i><b>here</b></i></a>.</li>
                 <li> Retrieving the token within an msi-vm using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>here</b></i></a>.</li>
@@ -864,8 +864,10 @@ connection.connect();
   <div class="description">
     <span class="function">function (err) { }</span>
     <p>
-      The callback is called when the connection is either successfully (on a <code>connect</code> event) or with an error (on a <code>error</code> event).
-      If an error occurred then <code>err</code> will describe the error.
+      The callback is called when the connection is either successfully created (on a <code>connect</code> event) or has an error (on a <code>error</code> event).
+      If an error occurs, then <code>err</code> will describe the error.
+      <p>
+      </p>
       This parameter is optional, if a user choose to not include this parameter, 
       then they have to call the <code>connection.on('connect', (err) => {});</code>
       to check the connection status. 
