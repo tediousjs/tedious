@@ -101,8 +101,8 @@ connection.connect();
       <dd>
         Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>,
         <code>azure-active-directory-password</code>, <code>azure-active-directory-access-token</code>, 
-        <code>azure-active-directory-msi-vm</code>, <code>azure-active-directory-service-principal-secret</code>,
-        or <code>azure-active-directory-msi-app-service</code> 
+        <code>azure-active-directory-msi-vm</code>, <code>azure-active-directory-msi-app-service</code>, 
+        or <code>azure-active-directory-service-principal-secret</code>
         <ul>
           <li><code>azure-active-directory-password</code></li>
 {% highlight javascript %}
@@ -227,6 +227,31 @@ connection.connect();
       </dt>
       <dd>
         Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
+      </dd>
+
+      <dt>
+        <code>authentication.options.token</code>
+      </dt>
+      <dd>
+        When using azure-active-directory-access-token authentication type, this is the access token to use for
+        authentication.
+      </dd>
+
+      <dt>
+        <code>authentication.options.clientId</code>
+      </dt>
+      <dd>
+        When using azure-active-directory-msi-app-service (optional), azure-active-directory-msi-vm (optional), 
+        or azure-active-directory-service-principal-secret authentication type, this is the Application (client) 
+        ID of the identity to use for authentication.
+      </dd>
+
+      <dt>
+        <code>authentication.options.clientSecret</code>
+      </dt>
+      <dd>
+        When using azure-active-directory-service-principal-secret authentication type, this is a secret 
+        associated with the clientId to use for authentication.
       </dd>
 
       <dt>
