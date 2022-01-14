@@ -60,12 +60,12 @@ function createTable() {
 //--------------------------------------------------------------------------------
 function loadBulkData() {
   const option = { keepNulls: true }; // option to enable null values
-  const bulkLoad = connection.newBulkLoad(table, option, (err, rowCont) => {
+  const bulkLoad = connection.newBulkLoad(table, option, (err, rowCount) => {
     if (err) {
       throw err;
     }
 
-    console.log('rows inserted :', rowCont);
+    console.log('rows inserted :', rowCount);
     console.log('DONE!');
     connection.close();
   });
@@ -74,10 +74,9 @@ function loadBulkData() {
   bulkLoad.addColumn('c1', TYPES.Int, { nullable: true });
   bulkLoad.addColumn('c2', TYPES.NVarChar, { length: 50, nullable: true });
 
-  // add rows
-  bulkLoad.addRow({ c1: 1 });
-  bulkLoad.addRow({ c1: 2, c2: 'hello' });
+  // add rows into an array
+  const rows = [{ c1: 1 }, { c1: 2, c2: 'hello' }];
 
   // perform bulk insert
-  connection.execBulkLoad(bulkLoad);
+  connection.execBulkLoad(bulkLoad, rows);
 }

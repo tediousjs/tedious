@@ -17,7 +17,7 @@ var config = {
 
 const connection = new Connection(config);
 
-connection.on('connect', (err) => {
+connection.connect((err) => {
   if (err) {
     console.log('Connection Failed');
     throw err;
@@ -25,8 +25,6 @@ connection.on('connect', (err) => {
 
   executeStatement();
 });
-
-connection.connect();
 
 function executeStatement() {
   const request = new Request('select * from MyTable', (err, rowCount) => {
