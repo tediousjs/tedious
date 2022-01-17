@@ -31,6 +31,7 @@ title: API - Connection
   <li><a href="#event_languageChange">Event: 'languageChange'</a></li>
   <li><a href="#event_charsetChange">Event: 'charsetChange'</a></li>
   <li><a href="#event_secure">Event: 'secure'</a></li>
+  <li><a href="#function_connect">connection.connect(callback)</a></li>
   <li><a href="#function_beginTransaction">connection.beginTransaction(callback, [name], [isolationLevel])</a></li>
   <li><a href="#function_callProcedure">connection.callProcedure(request)</a></li>
   <li><a href="#function_cancel">connection.cancel()</a></li>
@@ -102,6 +103,109 @@ connection.connect();
         <code>azure-active-directory-password</code>, <code>azure-active-directory-access-token</code>, 
         <code>azure-active-directory-msi-vm</code>, <code>azure-active-directory-msi-app-service</code>, 
         or <code>azure-active-directory-service-principal-secret</code>
+        <ul>
+          <li><code>azure-active-directory-password</code></li>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-password',
+  ...,
+  "options": {
+    "userName": value,
+    "password": value,
+    "domain": value (Optional)
+  }
+}           
+{% endhighlight %}
+          <ul>
+            <li>username (string): A user needs to provide the `userName` associated to their account.</li>
+            <li>password (string): A user needs to provide the `password` associated to their account.</li>
+            <li>domain (string): Optional parameter for specific Azure tenant ID.</li>
+          </ul>
+          <li><code>azure-active-directory-access-token</code></li>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-access-token',
+  ...,
+  "options": {
+    "token": value
+  }
+}         
+{% endhighlight %}
+          <ul>
+            <li>token (string): A user needs to provide the `token` which they retrieved elsewhere to forming the connection.</li>
+            <p>
+              <h4>Best Practices</h4>
+              Tedious supports an authentication type: <code>azure-active-directory-password</code>. 
+              This is the recommended method because Tedious will handle the process of retrieving the Azure token 
+              internally instead of requiring the user to manually retrieve the token as shown below.
+            </p>
+            <p>
+              <h4>How to get the token</h4>
+              There are different approaches if a user actually needs to retrieve a token manually.
+              The details can be found in Microsoft documentation. Here are some examples:
+              <ul>
+                <li> Retrieving the token within an msi-app-service using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=dotnet" target="_blank"><i><b>here</b></i></a>.</li>
+                <li> Retrieving the token within an msi-vm using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>here</b></i></a>.</li>
+                <li> Retrieving the token within a JavaScript script: <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>here</b></i></a>.</li>
+              </ul>   
+            </p>
+          </ul>
+          </ul>
+<li><code>azure-active-directory-msi-vm</code></li>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-msi-vm',
+  ...,
+  "options": {
+    "clientId": value,
+    "msiEndpoint": value
+  }
+    
+}           
+{% endhighlight %}
+          <ul>
+            <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
+            </li>
+            <li>msiEndpoint (string):  A user needs to provide the `msiEndpoint` for retriving the access token.</li>
+          </ul>          
+<li><code>azure-active-directory-msi-app-service</code></li>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-msi-app-service',
+  ...,
+  "options": {
+    "clientId": value,
+    "msiEndpoint": value,
+    "msiSecret": value
+  }
+}           
+{% endhighlight %}   
+          <ul>
+            <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
+            </li>
+            <li>
+              msiEndpoint (string):  An msi app service environment needs to provide the `msiEndpoint` to retrieve the access token.
+            </li>
+            <li>msiSecret (string):  An msi app service environment needs to provide the `msiSecret` to retrieve the access token.</li>
+          </ul>          
+<li><code>azure-active-directory-service-principal-secret</code></li>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-service-principal-secret',
+  ...,
+  "options": {
+    "clientId": value,
+    "clientSecret": value,
+    "tenantId": (Optional)
+  }
+}           
+{% endhighlight %}   
+          <ul>
+            <li>clientId (string): Application (`client`) ID from your registered Azure application.</li>
+            <li>clientSecret (string): The created `client secret` for this registered Azure application.</li>
+            <li>tenantId (string): Directory (`tenant`) ID from your registered Azure application.</li>
+          </ul>                  
+        </ul>
       </dd>
 
       <dt>
@@ -751,11 +855,33 @@ connection.connect();
   </div>
 </div>
 
-<h2 id="function_connect">connection.connect()</h2>
+<h2 id="function_connect">connection.connect(callback)</h2>
 <p>
   Initialize a connection. 
 </p>
-
+<div class="argument">
+  <div class="name">callback</div>
+  <div class="description">
+    <span class="function">function (err) { }</span>
+    <p>
+      The callback is called when the connection is either successfully created (on a <code>connect</code> event) or has an error (on a <code>error</code> event).
+      If an error occurs, then <code>err</code> will describe the error.
+      <p>
+      </p>
+      This parameter is optional, if a user choose to not include this parameter, 
+      then they have to call the <code>connection.on('connect', (err) => {});</code>
+      to check the connection status. 
+    </p>
+    <div class="argument">
+      <div class="name">err</div>
+      <div class="description">
+        <p>
+          If an error occurred, a string with details of the error.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 <h2 id="function_beginTransaction">connection.beginTransaction(callback, [name], [isolationLevel])</h2>
 <p>
   Start a transaction.
