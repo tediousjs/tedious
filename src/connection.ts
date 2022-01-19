@@ -1093,7 +1093,7 @@ class Connection extends EventEmitter {
 
         if (options.clientId !== undefined && typeof options.clientId !== 'string') {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        } else {
+        } else if (options.clientId === undefined) {
           emitAzureADPasswordClientIdDeprecationWarning();
         }
 
