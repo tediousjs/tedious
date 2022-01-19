@@ -300,8 +300,9 @@ describe('Validations', function() {
     value = TYPE.Text.validate('asdf', collation);
     assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.Text.validate(Buffer.from('asdf'), collation);
-    assert.deepEqual(value, Buffer.from('asdf'));
+    assert.throws(() => {
+      TYPE.Text.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.Text.validate({ toString: null }, collation);
@@ -318,8 +319,9 @@ describe('Validations', function() {
     value = TYPE.VarChar.validate('asdf', collation);
     assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.VarChar.validate(Buffer.from('asdf'), collation);
-    assert.deepEqual(value, Buffer.from('asdf'));
+    assert.throws(() => {
+      TYPE.VarChar.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.VarChar.validate({ toString: null }, collation);
@@ -333,8 +335,9 @@ describe('Validations', function() {
     value = TYPE.NVarChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.NVarChar.validate({ toString: null });
@@ -351,8 +354,9 @@ describe('Validations', function() {
     value = TYPE.Char.validate('asdf', collation);
     assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.Char.validate(Buffer.from('asdf'), collation);
-    assert.deepEqual(value, Buffer.from('asdf'));
+    assert.throws(() => {
+      TYPE.Char.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.Char.validate({ toString: null }, collation);
@@ -366,8 +370,9 @@ describe('Validations', function() {
     value = TYPE.NChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.NChar.validate({ toString: null });

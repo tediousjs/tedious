@@ -1,7 +1,7 @@
 // @ts-check
 
 const fs = require('fs');
-const { pipeline, Readable } = require('stream');
+const { Readable } = require('stream');
 const assert = require('chai').assert;
 
 const TYPES = require('../../src/data-type').typeByName;
@@ -83,48 +83,19 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({ nnn: 201, sss: 'one zero one', ddd: new Date(1986, 6, 20) });
-      bulkLoad.addRow([202, 'one zero two', new Date()]);
-      bulkLoad.addRow(203, 'one zero three', new Date(2013, 7, 12));
-      bulkLoad.addRow({ nnn: 204, sss: 'one zero four', ddd: new Date() });
-      bulkLoad.addRow({ nnn: 205, sss: 'one zero five', ddd: new Date() });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { nnn: 201, sss: 'one zero one', ddd: new Date(1986, 6, 20) },
+        [202, 'one zero two', new Date()],
+        [203, 'one zero three', new Date(2013, 7, 12)],
+        { nnn: 204, sss: 'one zero four', ddd: new Date() },
+        { nnn: 205, sss: 'one zero five', ddd: new Date() },
+      ]);
     });
 
     connection.execSqlBatch(request);
   });
 
   describe('.addColumn', function() {
-    it('throws an error if called after first row has been written', function(done) {
-      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
-        assert.isUndefined(err);
-
-        assert.strictEqual(rowCount, 1);
-
-        done();
-      });
-
-      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
-      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
-
-      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
-        if (err) {
-          return done(err);
-        }
-
-        bulkLoad.addRow({ x: 1, y: 1 });
-
-        assert.throws(() => {
-          bulkLoad.addColumn('z', TYPES.Int, { nullable: false });
-        }, Error, 'Columns cannot be added to bulk insert after the first row has been written.');
-
-        connection.execBulkLoad(bulkLoad);
-      });
-
-      connection.execSqlBatch(request);
-    });
-
     it('throws an error if called after streaming bulk load has started', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
         assert.isUndefined(err);
@@ -155,66 +126,6 @@ describe('BulkLoad', function() {
     });
   });
 
-  describe('.getRowStream', function() {
-    it('throws an error if called after first row has been written', function(done) {
-      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
-        assert.isUndefined(err);
-
-        assert.strictEqual(rowCount, 1);
-
-        done();
-      });
-
-      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
-      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
-
-      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
-        if (err) {
-          return done(err);
-        }
-
-        bulkLoad.addRow({ x: 1, y: 1 });
-
-        assert.throws(() => {
-          bulkLoad.getRowStream();
-        }, Error, 'BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
-
-        connection.execBulkLoad(bulkLoad);
-      });
-
-      connection.execSqlBatch(request);
-    });
-
-    it('throws an error if called after streaming bulk load has started', function(done) {
-      const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
-        assert.isUndefined(err);
-
-        assert.strictEqual(rowCount, 1);
-
-        done();
-      });
-
-      bulkLoad.addColumn('x', TYPES.Int, { nullable: false });
-      bulkLoad.addColumn('y', TYPES.Int, { nullable: false });
-
-      const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
-        if (err) {
-          return done(err);
-        }
-
-        connection.execBulkLoad(bulkLoad, (function*() {
-          yield [1, 1];
-
-          assert.throws(() => {
-            bulkLoad.getRowStream();
-          }, Error, 'BulkLoad cannot be switched to streaming mode after execution has started.');
-        })());
-      });
-
-      connection.execSqlBatch(request);
-    });
-  });
-
   it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
       assert.instanceOf(err, RequestError, 'An error should have been thrown to indicate the incorrect table format.');
@@ -233,9 +144,9 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({ x: 1, y: 1 });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { x: 1, y: 1 }
+      ]);
     });
 
     connection.execSqlBatch(request);
@@ -257,11 +168,11 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({ id: 50 });
-      bulkLoad.addRow({ id: 555 });
-      bulkLoad.addRow({ id: 5 });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: 50 },
+        { id: 555 },
+        { id: 5 }
+      ]);
     });
 
     connection.execSqlBatch(request);
@@ -301,11 +212,9 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({
-        id: 555
-      });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: 555 }
+      ]);
     });
 
     const verifyTriggerRequest = new Request(verifyTrigger, (err) => {
@@ -347,9 +256,9 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({ id: null });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: null }
+      ]);
     });
 
     const verifyBulkLoadRequest = new Request('SELECT [id] FROM #tmpTestTable5', (err) => {
@@ -391,15 +300,14 @@ describe('BulkLoad', function() {
           return done(err);
         }
 
-        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
-        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
-
-        bulkLoad.addRow({ id: 4, name: 'Charmander' });
-        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
-        bulkLoad.addRow({ id: 6, name: 'Charizard' });
-
-        connection.execBulkLoad(bulkLoad);
+        connection.execBulkLoad(bulkLoad, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
+          { id: 4, name: 'Charmander' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 6, name: 'Charizard' }
+        ]);
       });
 
       connection.execSqlBatch(request);
@@ -428,15 +336,14 @@ describe('BulkLoad', function() {
           return done(err);
         }
 
-        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
-        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
-
-        bulkLoad.addRow({ id: 4, name: 'Charmander' });
-        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
-        bulkLoad.addRow({ id: 6, name: 'Charizard' });
-
-        connection.execBulkLoad(bulkLoad);
+        connection.execBulkLoad(bulkLoad, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
+          { id: 4, name: 'Charmander' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 6, name: 'Charizard' }
+        ]);
       });
 
       connection.execSqlBatch(request);
@@ -490,15 +397,14 @@ describe('BulkLoad', function() {
           return done(err);
         }
 
-        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
-        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
-
-        bulkLoad.addRow({ id: 6, name: 'Charizard' });
-        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
-        bulkLoad.addRow({ id: 4, name: 'Charmander' });
-
-        connection.execBulkLoad(bulkLoad);
+        connection.execBulkLoad(bulkLoad, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
+          { id: 6, name: 'Charizard' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 4, name: 'Charmander' },
+        ]);
       });
 
       connection.execSqlBatch(request);
@@ -526,15 +432,14 @@ describe('BulkLoad', function() {
           return done(err);
         }
 
-        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
-        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
-
-        bulkLoad.addRow({ id: 6, name: 'Charizard' });
-        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
-        bulkLoad.addRow({ id: 4, name: 'Charmander' });
-
-        connection.execBulkLoad(bulkLoad);
+        connection.execBulkLoad(bulkLoad, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
+          { id: 6, name: 'Charizard' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 4, name: 'Charmander' }
+        ]);
       });
 
       connection.execSqlBatch(request);
@@ -563,15 +468,15 @@ describe('BulkLoad', function() {
           return done(err);
         }
 
-        bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-        bulkLoad.addRow({ id: 2, name: 'Ivysaur' });
-        bulkLoad.addRow({ id: 3, name: 'Venusaur' });
+        connection.execBulkLoad(bulkLoad, [
+          { id: 1, name: 'Bulbasaur' },
+          { id: 2, name: 'Ivysaur' },
+          { id: 3, name: 'Venusaur' },
 
-        bulkLoad.addRow({ id: 6, name: 'Charizard' });
-        bulkLoad.addRow({ id: 5, name: 'Charmeleon' });
-        bulkLoad.addRow({ id: 4, name: 'Charmander' });
-
-        connection.execBulkLoad(bulkLoad);
+          { id: 6, name: 'Charizard' },
+          { id: 5, name: 'Charmeleon' },
+          { id: 4, name: 'Charmander' }
+        ]);
       });
 
       connection.execSqlBatch(request);
@@ -596,9 +501,10 @@ describe('BulkLoad', function() {
       if (err) {
         return done(err);
       }
-      bulkLoad.addRow({ id: 1234 });
 
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: 1234 }
+      ]);
 
       bulkLoad.cancel();
     });
@@ -638,9 +544,9 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      bulkLoad.addRow({ id: 1234 });
-
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: 1234 }
+      ]);
     });
 
     const verifyBulkLoadRequest = new Request('SELECT [id] FROM #tmpTestTable5', (err, rowCount) => {
@@ -1020,80 +926,6 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('throws an error when trying to execute the bulkload with an Iterable after adding rows', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
-      assert.fail('Unexpected callback execution');
-    });
-
-    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
-    bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
-
-    const request = new Request(`
-      CREATE TABLE "#tmpTestTable" (
-        "id" int NOT NULL,
-        "name" nvarchar(255) NOT NULL,
-        PRIMARY KEY CLUSTERED ("id")
-      )
-    `, (err) => {
-      if (err) {
-        return done(err);
-      }
-
-      bulkLoad.addRow({ id: 1, name: 'Bulbasaur' });
-      bulkLoad.addRow([2, 'Ivysaur']);
-      bulkLoad.addRow({ id: 3, name: 'Venusaur' });
-
-      assert.throws(() => {
-        connection.execBulkLoad(bulkLoad, [
-          [4, 'Charmander'],
-          { id: 5, name: 'Charmeleon' },
-          [6, 'Charizard']
-        ]);
-      }, Error, "Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
-
-      done();
-    });
-
-    connection.execSqlBatch(request);
-  });
-
-
-  it('throws an error when trying to execute the bulkload with an Iterable after switching to streaming mode', function(done) {
-    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
-      assert.fail('Unexpected callback execution');
-    });
-
-    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
-    bulkLoad.addColumn('name', TYPES.NVarChar, { nullable: false });
-
-    const request = new Request(`
-      CREATE TABLE "#tmpTestTable" (
-        "id" int NOT NULL,
-        "name" nvarchar(255) NOT NULL,
-        PRIMARY KEY CLUSTERED ("id")
-      )
-    `, (err) => {
-      if (err) {
-        return done(err);
-      }
-
-      bulkLoad.getRowStream();
-
-      assert.throws(() => {
-        connection.execBulkLoad(bulkLoad, [
-          [4, 'Charmander'],
-          { id: 5, name: 'Charmeleon' },
-          [6, 'Charizard']
-        ]);
-      }, Error, "Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
-
-      done();
-    });
-
-    connection.execSqlBatch(request);
-  });
-
-
   it('should not close the connection due to cancelTimeout if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
@@ -1113,14 +945,14 @@ describe('BulkLoad', function() {
 
     bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
 
-    bulkLoad.addRow({ id: 1234 });
-
     const createTableRequest = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL DEFAULT 253565)', (err) => {
       if (err) {
         return done(err);
       }
 
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, [
+        { id: 1234 }
+      ]);
     });
 
     connection.execSqlBatch(createTableRequest);
@@ -1148,9 +980,6 @@ describe('BulkLoad', function() {
     function startBulkLoad() {
       const bulkLoad = connection.newBulkLoad(tableName, completeBulkLoad);
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
-      const rowStream = bulkLoad.getRowStream();
-
-      connection.execBulkLoad(bulkLoad);
 
       const rowSource = Readable.from((async function*() {
         let rowCount = 0;
@@ -1163,7 +992,7 @@ describe('BulkLoad', function() {
         }
       })(), { objectMode: true });
 
-      rowSource.pipe(rowStream);
+      connection.execBulkLoad(bulkLoad, rowSource);
     }
 
     /**
@@ -1259,7 +1088,7 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
-      Readable.from([
+      const rowSource = Readable.from([
         { id: 1, name: 'Bulbasaur' },
         [ 2, 'Ivysaur' ],
         { id: 3, name: 'Venusaur' },
@@ -1267,9 +1096,9 @@ describe('BulkLoad', function() {
         [ 4, 'Charmander' ],
         { id: 5, name: 'Charmeleon' },
         [ 6, 'Charizard' ]
-      ]).pipe(bulkLoad.getRowStream());
+      ]);
 
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, rowSource);
     });
 
     connection.execSqlBatch(request);
@@ -1301,9 +1130,6 @@ describe('BulkLoad', function() {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
-      connection.execBulkLoad(bulkLoad);
-
       let rowCount = 0;
       const rowSource = Readable.from((async function*() {
         while (rowCount < totalRows) {
@@ -1319,11 +1145,7 @@ describe('BulkLoad', function() {
         }
       })(), { objectMode: true });
 
-      pipeline(rowSource, rowStream, (err) => {
-        assert.instanceOf(err, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
-        assert.strictEqual(rowCount, 10);
-      });
+      connection.execBulkLoad(bulkLoad, rowSource);
     }
 
     /**
@@ -1384,9 +1206,6 @@ describe('BulkLoad', function() {
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
-      connection.execBulkLoad(bulkLoad);
-
       let rowCount = 0;
       const rowSource = Readable.from((async function*() {
         while (rowCount < totalRows) {
@@ -1410,11 +1229,7 @@ describe('BulkLoad', function() {
         }
       })(), { objectMode: true });
 
-      pipeline(rowSource, rowStream, (err) => {
-        assert.instanceOf(err, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
-        assert.strictEqual(rowCount, 10);
-      });
+      connection.execBulkLoad(bulkLoad, rowSource);
     });
 
     connection.execSqlBatch(request);
@@ -1439,11 +1254,12 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
+      const rows = [];
       for (let i = 0; i < 100000; i++) {
-        bulkLoad.addRow({ id: 1234 });
+        rows.push({ id: 1234 });
       }
 
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, rows);
     });
 
     connection.execSqlBatch(request);
@@ -1467,11 +1283,12 @@ describe('BulkLoad', function() {
         return done(err);
       }
 
+      const rows = [];
       for (let i = 0; i < 100; i++) {
-        bulkLoad.addRow({ id: 1234 });
+        rows.push({ id: 1234 });
       }
 
-      connection.execBulkLoad(bulkLoad);
+      connection.execBulkLoad(bulkLoad, rows);
     });
 
     connection.execSqlBatch(request);
@@ -1503,10 +1320,6 @@ describe('BulkLoad', function() {
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
-
-      connection.execBulkLoad(bulkLoad);
-
       const rowSource = Readable.from((async function*() {
         yield [1];
 
@@ -1517,10 +1330,7 @@ describe('BulkLoad', function() {
         yield [2];
       })(), { objectMode: true });
 
-      pipeline(rowSource, rowStream, (err) => {
-        assert.instanceOf(err, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
-      });
+      connection.execBulkLoad(bulkLoad, rowSource);
     }
 
     /**
@@ -1704,17 +1514,11 @@ describe('BulkLoad', function() {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
-      connection.execBulkLoad(bulkLoad);
-
       const rowSource = Readable.from([
         ['invalid date']
       ]);
 
-      pipeline(rowSource, rowStream, (err) => {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-      });
+      connection.execBulkLoad(bulkLoad, rowSource);
 
       /**
        * @param {Error | undefined | null} err
@@ -1732,15 +1536,9 @@ describe('BulkLoad', function() {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
-      const rowStream = bulkLoad.getRowStream();
-      connection.execBulkLoad(bulkLoad);
-
       const rowSource = Readable.from([ ['invalid date'] ]);
 
-      pipeline(rowSource, rowStream, (err) => {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
-      });
+      connection.execBulkLoad(bulkLoad, rowSource);
 
       /**
        * @param {Error | undefined | null} err

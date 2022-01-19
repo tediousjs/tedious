@@ -21,7 +21,7 @@ const storedProcedure = '[dbo].[test_sp_tvp]';
 const table = '[dbo].[test_tvp]';
 const table_type = 'TableType';
 
-connection.on('connect', (err) => {
+connection.connect((err) => {
   if (err) {
     console.log('connection err');
     throw err;
