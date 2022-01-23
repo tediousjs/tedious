@@ -84,19 +84,19 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  handle?: number;
+  handle: number | undefined;
   /**
    * @private
    */
-  error?: Error;
+  error: Error | undefined;
   /**
    * @private
    */
-  connection?: Connection;
+  connection: Connection | undefined;
   /**
    * @private
    */
-  timeout?: number;
+  timeout: number | undefined;
 
   /**
    * @private
@@ -398,12 +398,8 @@ class Request extends EventEmitter {
    *   Additional type options. Optional.
    */
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions | null) {
-    if (options == null) {
-      options = {};
-    }
-
-    const { output = false, length, precision, scale } = options;
+  addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
+    const { output = false, length, precision, scale } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -414,6 +410,7 @@ class Request extends EventEmitter {
       precision: precision,
       scale: scale
     };
+
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;
   }
@@ -433,12 +430,8 @@ class Request extends EventEmitter {
    * @param options
    *   Additional type options. Optional.
    */
-  addOutputParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions) {
-    if (options == null) {
-      options = {};
-    }
-    options.output = true;
-    this.addParameter(name, type, value, options);
+  addOutputParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
+    this.addParameter(name, type, value, { ...options, output: true });
   }
 
   /**
@@ -469,7 +462,7 @@ class Request extends EventEmitter {
 
       try {
         parameter.value = parameter.type.validate(parameter.value, collation);
-      } catch (error) {
+      } catch (error: any) {
         throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
       }
     }

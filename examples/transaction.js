@@ -19,7 +19,7 @@ const connection = new Connection(config);
 
 const table = '[dbo].[test_transact]';
 
-connection.on('connect', (err) => {
+connection.connect((err) => {
   if (err) {
     console.log('connection err');
     throw err;

@@ -18,7 +18,7 @@ const connection = new Connection(config);
 
 const table = '[dbo].[test_prepared]';
 
-connection.on('connect', (err) => {
+connection.connect((err) => {
   if (err) {
     console.log('Connection Failed!');
     throw err;
@@ -53,7 +53,6 @@ function prepareSQL() {
       throw err;
     }
 
-    executePreparedSQL(request);
   });
 
   // Must add parameters
@@ -62,6 +61,7 @@ function prepareSQL() {
 
   request.on('prepared', () => {
     console.log('request prepared');
+    executePreparedSQL(request);
   });
 
   connection.prepare(request);

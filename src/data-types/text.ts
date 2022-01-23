@@ -65,10 +65,7 @@ const Text: DataType = {
     }
 
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
 
     if (!collation) {
@@ -82,7 +79,6 @@ const Text: DataType = {
     return iconv.encode(value, collation.codepage);
   }
 };
-
 
 export default Text;
 module.exports = Text;

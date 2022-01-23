@@ -98,12 +98,11 @@ const NChar: DataType & { maximumLength: number } = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
+
     return value;
   }
 };

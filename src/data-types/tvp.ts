@@ -84,7 +84,7 @@ const TVP: DataType = {
         const value = row[k];
 
         const param = {
-          value: value,
+          value: column.type.validate(value, parameter.collation),
           length: column.length,
           scale: column.scale,
           precision: column.precision

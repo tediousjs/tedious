@@ -55,27 +55,27 @@ export interface Options {
    * [CHECK_CONSTRAINTS](https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx).
    * (default: `false`)
    */
-  checkConstraints?: InternalOptions['checkConstraints'];
+  checkConstraints?: InternalOptions['checkConstraints'] | undefined;
 
   /**
    * Honors insert triggers during bulk load, using the T-SQL [FIRE_TRIGGERS](https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx). (default: `false`)
    */
-  fireTriggers?: InternalOptions['fireTriggers'];
+  fireTriggers?: InternalOptions['fireTriggers'] | undefined;
 
   /**
    * Honors null value passed, ignores the default values set on table, using T-SQL [KEEP_NULLS](https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx). (default: `false`)
    */
-  keepNulls?: InternalOptions['keepNulls'];
+  keepNulls?: InternalOptions['keepNulls'] | undefined;
 
   /**
    * Places a bulk update(BU) lock on table while performing bulk load, using T-SQL [TABLOCK](https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx). (default: `false`)
    */
-  lockTable?: InternalOptions['lockTable'];
+  lockTable?: InternalOptions['lockTable'] | undefined;
 
   /**
    * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
    */
-  order?: InternalOptions['order'];
+  order?: InternalOptions['order'] | undefined;
 }
 
 
@@ -181,10 +181,12 @@ class RowTransform extends Transform {
       const c = this.columns[i];
       let value = Array.isArray(row) ? row[i] : row[c.objName];
 
-      try {
-        value = c.type.validate(value, c.collation);
-      } catch (error) {
-        return callback(error);
+      if (!this.bulkLoad.firstRowWritten) {
+        try {
+          value = c.type.validate(value, c.collation);
+        } catch (error: any) {
+          return callback(error);
+        }
       }
 
       const parameter = {
@@ -253,7 +255,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  error?: Error;
+  error: Error | undefined;
   /**
    * @private
    */
@@ -273,7 +275,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  timeout?: number
+  timeout: number | undefined;
 
   /**
    * @private
@@ -310,19 +312,19 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  connection?: Connection;
+  connection: Connection | undefined;
   /**
    * @private
    */
-  rows?: Array<any>;
+  rows: Array<any> | undefined;
   /**
    * @private
    */
-  rst?: Array<any>;
+  rst: Array<any> | undefined;
   /**
    * @private
    */
-  rowCount?: number;
+  rowCount: number | undefined;
 
   collation: Collation | undefined;
 
@@ -440,71 +442,6 @@ class BulkLoad extends EventEmitter {
     this.columns.push(column);
 
     this.columnsByName[name] = column;
-  }
-
-  /**
-   * Adds a row to the bulk insert.
-   *
-   * ```js
-   * bulkLoad.addRow({ first_name: 'Bill', last_name: 'Gates' });
-   * ```
-   *
-   * @param row An object of key/value pairs representing column name (or objName) and value.
-   *
-   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
-   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
-   */
-  addRow(row: { [columnName: string]: unknown }): void
-
-  /**
-   * Adds a row to the bulk insert.
-   *
-   * ```js
-   * bulkLoad.addRow('Bill', 'Gates');
-   * ```
-   *
-   * @param row If there are at least two columns, values can be passed as multiple arguments instead of an array. They
-   *   must be in the same order the columns were added in.
-   *
-   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
-   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
-   */
-  addRow(...row: unknown[]): void
-
-  /**
-   * Adds a row to the bulk insert.
-   *
-   * ```js
-   * bulkLoad.addRow(['Bill', 'Gates']);
-   * ```
-   *
-   * @param row An array representing the values of each column in the same order which they were added to the bulkLoad object.
-   *
-   * @deprecated This method is deprecated. Instead of adding rows individually, you should pass
-   *   all row objects when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
-   */
-  addRow(row: unknown[]): void
-
-  addRow(...input: [ { [key: string]: unknown } ] | unknown[]) {
-    this.firstRowWritten = true;
-
-    let row: any;
-    if (input.length > 1 || !input[0] || typeof input[0] !== 'object') {
-      row = input;
-    } else {
-      row = input[0];
-    }
-
-    // write each column
-    if (Array.isArray(row)) {
-      this.rowToPacketTransform.write(this.columns.map((column, i) => {
-        return column.type.validate(row[i], column.collation);
-      }));
-    } else {
-      this.rowToPacketTransform.write(this.columns.map((column) => {
-        return column.type.validate(row[column.objName], column.collation);
-      }));
-    }
   }
 
   /**
@@ -664,44 +601,6 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt32LE(0); // row count is 64 bits in >= TDS 7.2
     }
     return tBuf.data;
-  }
-
-  /**
-   * Switches the `BulkLoad` object into streaming mode and returns a
-   * [writable stream](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_streams)
-   * that can be used to send a large amount of rows to the server.
-   *
-   * ```js
-   * const bulkLoad = connection.newBulkLoad(...);
-   * bulkLoad.addColumn(...);
-   *
-   * const rowStream = bulkLoad.getRowStream();
-   *
-   * connection.execBulkLoad(bulkLoad);
-   * ```
-   *
-   * In streaming mode, [[addRow]] cannot be used. Instead all data rows must be written to the returned stream object.
-   * The stream implementation uses data flow control to prevent memory overload. [`stream.write()`](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_writable_write_chunk_encoding_callback)
-   * returns `false` to indicate that data transfer should be paused.
-   *
-   * After that, the stream emits a ['drain' event](https://nodejs.org/dist/latest-v10.x/docs/api/stream.html#stream_event_drain)
-   * when it is ready to resume data transfer.
-   *
-   * @deprecated
-   *   This method is deprecated. Instead of writing rows to the stream returned by this method,
-   *   you can pass any object that implements the `Iterable` or `AsyncIterable` interface (e.g. a `Readable`
-   *   stream or an `AsyncGenerator`) when calling [[Connection.execBulkLoad]]. This method will be removed in the future.
-   */
-  getRowStream() {
-    if (this.firstRowWritten) {
-      throw new Error('BulkLoad cannot be switched to streaming mode after first row has been written using addRow().');
-    }
-    if (this.executionStarted) {
-      throw new Error('BulkLoad cannot be switched to streaming mode after execution has started.');
-    }
-    this.streamingMode = true;
-
-    return this.rowToPacketTransform;
   }
 
   /**

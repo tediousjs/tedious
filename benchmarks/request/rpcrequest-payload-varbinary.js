@@ -3,7 +3,7 @@ const { createBenchmark } = require('../common');
 const { Request, TYPES } = require('../../src/tedious');
 const RpcRequestPayload = require('../../src/rpcrequest-payload');
 
-const { Readable } = require('readable-stream');
+const { Readable } = require('stream');
 
 const bench = createBenchmark(main, {
   n: [10, 100],
@@ -29,12 +29,9 @@ function main({ n, size }) {
       return;
     }
 
-    const payload = new RpcRequestPayload(request, Buffer.alloc(0), {});
-    const stream = Readable.from(payload, { objectMode: false });
-    const chunks = [];
-    stream.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
+    const payload = new RpcRequestPayload(request.sqlTextOrProcedure, request.parameters, Buffer.alloc(0), {}, undefined);
+    const stream = Readable.from(payload);
+    stream.on('data', () => {});
     stream.on('end', cb);
   })();
 }
