@@ -112,14 +112,15 @@ connection.connect();
   "options": {
     "userName": value,
     "password": value,
-    "domain": value (Optional)
+    "tenantId": value (Optional)
   }
 }           
 {% endhighlight %}
           <ul>
             <li>username (string): A user needs to provide the `userName` associated to their account.</li>
             <li>password (string): A user needs to provide the `password` associated to their account.</li>
-            <li>domain (string): Optional parameter for specific Azure tenant ID.</li>
+            <li>tenantId (string): Optional parameter for specific Azure tenant ID. Note: this used to be called 
+              <code>domain</code>. <code>domain</code> will proceed to work but will be removed in the near future.</li>
           </ul>
           <li><code>azure-active-directory-access-token</code></li>
 {% highlight javascript %}
