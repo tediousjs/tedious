@@ -56,6 +56,16 @@ const emitTrustServerCertificateWarning = () => {
   }
 };
 
+let domainRenameToTenantIdWarningEmitted = false;
+const emitDomainRenameToTenantIdWarning = () => {
+  if (!domainRenameToTenantIdWarningEmitted) {
+    domainRenameToTenantIdWarningEmitted = true;
+    process.emitWarning('`When using authentication type `azure-active-directory-password`,' +
+    ' config.authentication.options.domain` will be renamed to config.authentications.options.tenantId`' +
+    ' in the future. Rename `domain` to `tenantId` to silence this message.');
+  }
+};
+
 type BeginTransactionCallback =
   /**
    * The callback is called when the request to start the transaction has completed,
@@ -261,7 +271,7 @@ interface AzureActiveDirectoryPasswordAuthentication {
     /**
      * Optional parameter for specific Azure tenant ID
      */
-    domain: string;
+    tenantId: string;
   };
 }
 
@@ -1097,12 +1107,22 @@ class Connection extends EventEmitter {
           emitAzureADPasswordClientIdDeprecationWarning();
         }
 
+        if (options.domain !== undefined && typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+        } else if (options.domain !== undefined) {
+          emitDomainRenameToTenantIdWarning();
+        }
+
+        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
+          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
+        }
+
         authentication = {
           type: 'azure-active-directory-password',
           options: {
             userName: options.userName,
             password: options.password,
-            domain: options.domain ?? 'common',
+            tenantId: options.tenantId ?? options.domain,
             clientId: options.clientId ?? '7f98cb04-cd1e-40df-9140-3bf7e2cea4db'
           }
         };
@@ -3432,7 +3452,7 @@ Connection.prototype.STATE = {
 
               if (authentication.type === 'azure-active-directory-password') {
                 const credentials = new UsernamePasswordCredential(
-                  authentication.options.domain,
+                  authentication.options.tenantId ?? 'common',
                   authentication.options.clientId,
                   authentication.options.userName,
                   authentication.options.password
