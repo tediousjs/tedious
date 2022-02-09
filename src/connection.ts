@@ -3404,27 +3404,39 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
             }
           } else if (this.ntlmpacket) {
-            const authentication = this.config.authentication as NtlmAuthentication;
+            try {
+              const authentication = this.config.authentication as NtlmAuthentication;
 
-            const payload = new NTLMResponsePayload({
-              domain: authentication.options.domain,
-              userName: authentication.options.userName,
-              password: authentication.options.password,
-              ntlmpacket: this.ntlmpacket
-            });
+              const payload = new NTLMResponsePayload({
+                domain: authentication.options.domain,
+                userName: authentication.options.userName,
+                password: authentication.options.password,
+                ntlmpacket: this.ntlmpacket
+              });
 
-            this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-            this.debug.payload(function() {
-              return payload.toString('  ');
-            });
+              this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+              this.debug.payload(function() {
+                return payload.toString('  ');
+              });
 
-            this.ntlmpacket = undefined;
+              this.ntlmpacket = undefined;
 
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
+              this.messageIo.readMessage().then((message) => {
+                this.dispatchEvent('message', message);
+              }, (err) => {
+                this.socketError(err);
+              });
+            } catch (error: any) {
+              if (error.code === 'ERR_OSSL_EVP_UNSUPPORTED') {
+                const node17Message = new ConnectionError('Node 17 now uses OpenSSL 3, which considers md4 encryption a legacy type.' +
+                ' In order to use NTLM with Node 17, enable the `--openssl-legacy-provider` command line flag.' +
+                ' Check the Tedious FAQ for more information.', 'ELOGIN');
+                this.emit('connect', new AggregateError([error, node17Message]));
+              } else {
+                throw error;
+              }
+              this.transitionTo(this.STATE.FINAL);
+            }
           } else if (this.loginError) {
             if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
