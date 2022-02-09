@@ -5,6 +5,7 @@ const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
+const childProcess = require('child_process');
 
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
@@ -455,17 +456,42 @@ describe('Ntlm Test', function() {
     });
   }
 
-  it('should ntlm', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.AsIs);
-  });
+  const nodeVersion = parseInt(process.versions.node.split('.')[0]);
+  if (nodeVersion <= 16 || (process.execArgv.includes('--openssl-legacy-provider') && nodeVersion >= 17)) {
+    it('should ntlm', function(done) {
+      runNtlmTest.call(this, done, DomainCaseEnum.AsIs);
+    });
 
-  it('should ntlm lower', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.Lower);
-  });
+    it('should ntlm lower', function(done) {
+      runNtlmTest.call(this, done, DomainCaseEnum.Lower);
+    });
 
-  it('should ntlm upper', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.Upper);
-  });
+    it('should ntlm upper', function(done) {
+      runNtlmTest.call(this, done, DomainCaseEnum.Upper);
+    });
+
+  } else {
+
+    it('should throw a connection error with node 17', () => {
+      const child = childProcess.spawnSync(process.execPath,
+                                           ['./test/integration/child-processes/ntlm-connect-node17.js'],
+                                           { encoding: 'utf8' });
+      const thrownError = child.stderr;
+      assert.isTrue(thrownError.includes('ConnectionError'));
+      assert.isTrue(thrownError.includes('--openssl-legacy-provider'));
+      assert.strictEqual(child.status, 1);
+    });
+
+    it('should ntlm with node 17 when `--openssl-legacy-provider` flag enabled', () => {
+      const child = childProcess.spawnSync(process.execPath,
+                                           ['--openssl-legacy-provider',
+                                            './test/integration/child-processes/ntlm-connect-node17.js'],
+                                           { encoding: 'utf8' });
+      assert.strictEqual(child.status, 0);
+    });
+
+  }
+
 });
 
 describe('Encrypt Test', function() {
