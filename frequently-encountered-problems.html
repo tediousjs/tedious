@@ -166,6 +166,41 @@ title: F.E.Q.
     </dd>
     <br />
     <dt>
+        <h2>Using NTLM authentication with Node.js 17</h2>
+    </dt>
+    <dd>
+        <p>
+            Node 17 has upgraded to OpenSSL 3.0, which considers md4 encryption a legacy type due to md4 being insecure. 
+            Since NTLM uses md4 encryption, you must enable the `--openssl-legacy-provider` command line option in order to use
+            NTLM authentication with Node 17. If you attempt to use NTLM without the option enabled, 
+            it will throw an error and not allow you to connect.
+        </p>
+        <p>
+            Enabling the flag in <code>package.json:</code>
+{% highlight javascript %}
+{
+    "scripts": {
+        "start": "node --openssl-legacy-provider example.js"
+    }
+}
+{% endhighlight %}
+        </p>
+        <p>
+            Enabling the flag in the command line:
+{% highlight plaintext %}
+C:\Tedious> node --openssl-legacy-provider example.js
+{% endhighlight %}
+        </p>
+        <p>
+            You can find more information on this here:
+            <ul>
+                <li><a href=https://www.openssl.org/docs/manmaster/man7/OSSL_PROVIDER-legacy.html>OpenSSL 3 Documentation</a></li>
+                <li><a href=https://nodejs.org/en/blog/release/v17.0.0>Node 17 Changelog</a></li>
+            </ul>
+        </p>
+    </dd>
+    <br />
+    <dt>
         <h2>Other</h2>
     </dt>
     <dd>

@@ -207,6 +207,10 @@ connection.connect();
             <li>tenantId (string): Directory (`tenant`) ID from your registered Azure application.</li>
           </ul>                  
         </ul>
+        <li><code>NTLM</code></li>
+        <ul>
+          <dd>If using NTLM with node 17 or newer, the <code>--openssl-legacy-provider</code> command line flag must be enabled, else an error will be thrown. Check the <a href="./frequently-encountered-problems.html">FAQ</a> for more information.</dd>
+        </ul>
       </dd>
 
       <dt>
