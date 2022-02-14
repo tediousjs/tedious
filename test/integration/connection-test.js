@@ -1354,9 +1354,12 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     config.options.enableAnsiNullDefault = false;
 
-    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined} */err) {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined } */err) {
+      assert.instanceOf(err, AggregateError);
+      if (err instanceof AggregateError) {
+        assert.strictEqual(err.errors.length, 1);
+        assert.strictEqual(err.errors[0].number, 515);
+      }
     }); // Cannot insert the value NULL
   });
 });

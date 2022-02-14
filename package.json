@@ -44,6 +44,7 @@
     "@azure/keyvault-keys": "^4.3.0",
     "@js-joda/core": "^4.0.0",
     "bl": "^5.0.0",
+    "es-aggregate-error": "^1.0.7",
     "iconv-lite": "^0.6.3",
     "jsbi": "^3.2.1",
     "native-duplexpair": "^1.0.0",

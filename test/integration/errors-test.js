@@ -5,7 +5,6 @@ const assert = require('chai').assert;
 const debug = false;
 
 import Connection from '../../src/connection';
-import { RequestError } from '../../src/errors';
 import Request from '../../src/request';
 
 const config = JSON.parse(
@@ -69,8 +68,11 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 2627);
+      assert.ok(err instanceof AggregateError);
+      if (err instanceof AggregateError) {
+        assert.strictEqual(err.errors.length, 1);
+        assert.strictEqual(err.errors[0].number, 2627);
+      }
     });
   });
 
@@ -82,8 +84,11 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+      assert.ok(err instanceof AggregateError);
+      if (err instanceof AggregateError) {
+        assert.strictEqual(err.errors.length, 1);
+        assert.strictEqual(err.errors[0].number, 515);
+      }
     });
   });
 
@@ -93,8 +98,11 @@ describe('Errors Test', function() {
   ';
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 3701);
+      assert.ok(err instanceof AggregateError);
+      if (err instanceof AggregateError) {
+        assert.strictEqual(err.errors.length, 1);
+        assert.strictEqual(err.errors[0].number, 3701);
+      }
     });
   });
 
@@ -111,21 +119,23 @@ describe('Errors Test', function() {
         assert.fail('Expected `err` to not be undefined');
       }
 
-      const requestError = /** @type {RequestError} */(err);
+      if (err instanceof AggregateError) {
+        assert.strictEqual(err.errors.length, 1);
 
-      assert.strictEqual(requestError.number, 50000);
-      assert.strictEqual(requestError.state, 42);
-      assert.strictEqual(requestError.class, 14);
+        const requestError = err.errors[0];
+        assert.strictEqual(requestError.number, 50000);
+        assert.strictEqual(requestError.state, 42);
+        assert.strictEqual(requestError.class, 14);
 
-      assert.exists(requestError.serverName);
-      assert.exists(requestError.procName);
+        assert.exists(requestError.serverName);
+        assert.exists(requestError.procName);
 
-      // The procedure name will actually be padded to 128 chars with underscores and
-      // some random hexadecimal digits.
-      assert.match(/** @type {string} */(requestError.procName), /^#testExtendedErrorInfo/);
+        // The procedure name will actually be padded to 128 chars with underscores and
+        // some random hexadecimal digits.
+        assert.match(/** @type {string} */(requestError.procName), /^#testExtendedErrorInfo/);
 
-      assert.strictEqual(requestError.lineNumber, 1);
-
+        assert.strictEqual(requestError.lineNumber, 1);
+      }
       connection.close();
     });
 

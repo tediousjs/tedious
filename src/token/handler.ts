@@ -270,7 +270,7 @@ export class Login7TokenHandler extends TokenHandler {
       error.isTransient = true;
     }
 
-    this.connection.loginError = error;
+    this.connection.loginError = new AggregateError([error]);
   }
 
   onSSPI(token: SSPIToken) {
@@ -305,27 +305,27 @@ export class Login7TokenHandler extends TokenHandler {
 
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
       if (token.fedAuth === undefined) {
-        this.connection.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
+        this.connection.loginError = new AggregateError([new ConnectionError('Did not receive Active Directory authentication acknowledgement')]);
       } else if (token.fedAuth.length !== 0) {
-        this.connection.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+        this.connection.loginError = new AggregateError([new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`)]);
       }
     } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
-      this.connection.loginError = new ConnectionError('Received acknowledgement for unknown feature');
+      this.connection.loginError = new AggregateError([new ConnectionError('Received acknowledgement for unknown feature')]);
     } else if (token.fedAuth) {
-      this.connection.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+      this.connection.loginError = new AggregateError([new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment')]);
     }
   }
 
   onLoginAck(token: LoginAckToken) {
     if (!token.tdsVersion) {
       // unsupported TDS version
-      this.connection.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+      this.connection.loginError = new AggregateError([new ConnectionError('Server responded with unknown TDS version.', 'ETDS')]);
       return;
     }
 
     if (!token.interface) {
       // unsupported interface
-      this.connection.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+      this.connection.loginError = new AggregateError([new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP')]);
       return;
     }
 

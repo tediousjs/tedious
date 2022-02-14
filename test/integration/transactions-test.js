@@ -298,8 +298,10 @@ describe('Transactions Test', function() {
             });
 
             req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
-              assert.match(err.message, /^String or binary data would be truncated/);
-
+              if (err instanceof AggregateError) {
+                assert.strictEqual(err.errors.length, 1);
+                assert.match(err.errors[0].message, /^String or binary data would be truncated/);
+              }
               connection.close();
             });
             connection.execSqlBatch(req);
@@ -463,7 +465,7 @@ describe('Transactions Test', function() {
             request = new Request('create table #temp (id int)', function(err) {
               innerDone(err, outerDone, function(err) {
                 assert.equal(
-                  err.message,
+                  err.errors[0].message,
                   "There is already an object named '#temp' in the database."
                 );
 
