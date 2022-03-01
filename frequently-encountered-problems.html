@@ -201,6 +201,54 @@ C:\Tedious> node --openssl-legacy-provider example.js
     </dd>
     <br />
     <dt>
+        <h2>The relations between <code>options.trustServerCertificate, options.encrypt,</code> and <code>options.cryptoCredentialDetails</code></h2>
+    </dt>
+    <dd>
+        <ul>
+            <li>
+                If your server has encryption set to 'ON' or 'REQ', and:
+                <ul>
+                    <li>
+                        <code>encrypt = true</code> in your config, the driver will start TLS
+                        with the corresponding <code>trustServerCertificate</code> settings.
+                    </li>
+                    <li>
+                        <code>encrypt = false</code>, the driver will throw an error 
+                        stating that <code>Server requires encryption, set 'encrypt' option to true.</code> then close the connection.
+                    </li>
+                </ul>
+            </li>
+            <li>
+                If <code>encrypt = true</code> and <code>trustServerCertificate = false</code>, 
+                then you may be required to provide your certificate details using <code>cryptoCredentialsDetails</code>. 
+                Details on how to provide the <code>cryptoCredentialsDetails</code> object can be found in the
+                 <a href="/api-connection.html">connection</a> page of the documentation.
+            </li>
+            <li>
+                If <code>encrypt = false</code>, then <code>trustServerCertificate</code> is ignored.
+            </li>
+        </ul>
+
+    </dd>
+    <br />
+    <dt>
+        <h2>TLS 1.0 compatibility with Node 12 and newer</code></h2>
+    </dt>
+    <dd>
+        <p>
+            The default TLS settings were tightened in Node 12 and newer, requiring at least TLS 1.2 or above. You can find documentation
+            on how to upgrade your server to TLS 1.2 
+            <a href="https://support.microsoft.com/en-us/topic/kb3135244-tls-1-2-support-for-microsoft-sql-server-e4472ef8-90a9-13c1-e4d8-44aad198cdbe">here</a>.
+        </p>
+        <p>
+            It is NOT RECOMMENDED to continue to use TLS 1.0 due to the associated security risks. However, as a last resort,
+            you can continue to use TLS 1.0 by adding the <code>--tls-min-v1.0</code> command line flag, 
+            or by passing a custom <code>cryptoCredentialsDetails</code> option to the Connection constructor that specifies 
+            <code>minVersion: 'TLSv1'</code>.
+        </p>
+    </dd>
+    <br />
+    <dt>
         <h2>Other</h2>
     </dt>
     <dd>
