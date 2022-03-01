@@ -112,6 +112,7 @@ connection.connect();
   "options": {
     "userName": value,
     "password": value,
+    "clientId": value,
     "tenantId": value (Optional)
   }
 }           
@@ -119,8 +120,14 @@ connection.connect();
           <ul>
             <li>username (string): A user needs to provide the `userName` associated to their account.</li>
             <li>password (string): A user needs to provide the `password` associated to their account.</li>
-            <li>tenantId (string): Optional parameter for specific Azure tenant ID. Note: this used to be called 
-              <code>domain</code>. <code>domain</code> will proceed to work but will be removed in the near future.</li>
+            <li>clientId (string): Application (`client`) ID from your registered Azure application. This currently is optional
+              and uses a default clientId, but a user-provided clientId will be required in the near future.
+            </li>
+            <li>tenantId (string): Optional parameter for specific Azure tenant ID. (default: <code>common</code>).
+              If your server does not support the <code>/common</code> endpoint, please provide a tenantId.
+              Note: this used to be called <code>domain</code>. 
+              <code>domain</code> will proceed to work but will be removed in the near future.
+            </li>
           </ul>
           <li><code>azure-active-directory-access-token</code></li>
 {% highlight javascript %}
