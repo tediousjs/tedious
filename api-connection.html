@@ -347,10 +347,10 @@ connection.connect();
         <code>options.cryptoCredentialsDetails</code>
       </dt>
       <dd>
-        When encryption is used, an object may be supplied that will be used
-        for the first argument when calling
-        <a
-          href="http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized">tls.createSecurePair</a>
+        When options.encrypt is set to true, an object may be supplied that will be used
+        as the <code>secureContext</code> field when calling
+        <a href="https://nodejs.org/docs/latest/api/tls.html#class-tlstlssocket">new tls.TLSSocket</a>.
+        The available options are listed under <a href="https://nodejs.org/docs/latest/api/tls.html#tlscreatesecurecontextoptions">tls.createSecureContext</a>.
         (default: <code>{}</code>).
       </dd>
 
