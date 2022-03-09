@@ -57,6 +57,16 @@ const emitTrustServerCertificateWarning = () => {
   }
 };
 
+let domainRenameToTenantIdWarningEmitted = false;
+const emitDomainRenameToTenantIdWarning = () => {
+  if (!domainRenameToTenantIdWarningEmitted) {
+    domainRenameToTenantIdWarningEmitted = true;
+    process.emitWarning('`When using authentication type `azure-active-directory-password`,' +
+    ' config.authentication.options.domain` will be renamed to config.authentications.options.tenantId`' +
+    ' in the future. Rename `domain` to `tenantId` to silence this message.');
+  }
+};
+
 type BeginTransactionCallback =
   /**
    * The callback is called when the request to start the transaction has completed,
@@ -262,15 +272,21 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `userName` asscoiate to their account.
      */
     userName: string;
+
     /**
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
 
     /**
+     * A client id to use.
+     */
+    clientId: string;
+
+    /**
      * Optional parameter for specific Azure tenant ID
      */
-    domain: string;
+    tenantId: string;
   };
 }
 
@@ -1103,12 +1119,29 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
 
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        } else if (options.clientId === undefined) {
+          emitAzureADPasswordClientIdDeprecationWarning();
+        }
+
+        if (options.domain !== undefined && typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+        } else if (options.domain !== undefined) {
+          emitDomainRenameToTenantIdWarning();
+        }
+
+        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
+          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
+        }
+
         authentication = {
           type: 'azure-active-directory-password',
           options: {
             userName: options.userName,
             password: options.password,
-            domain: options.domain,
+            tenantId: options.tenantId ?? options.domain,
+            clientId: options.clientId ?? '7f98cb04-cd1e-40df-9140-3bf7e2cea4db'
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -3114,6 +3147,22 @@ class Connection extends EventEmitter {
   }
 }
 
+let azureADPasswordClientIdDeprecationWarningEmitted = false;
+function emitAzureADPasswordClientIdDeprecationWarning() {
+  if (azureADPasswordClientIdDeprecationWarningEmitted) {
+    return;
+  }
+
+  azureADPasswordClientIdDeprecationWarningEmitted = true;
+
+  process.emitWarning(
+    'When using the `azure-active-directory-password` authentication method, please provide a value for the `clientId` option. ' +
+    'This option will be required in a future release.',
+    'DeprecationWarning',
+    Connection.prototype.on
+  );
+}
+
 export default Connection;
 module.exports = Connection;
 
@@ -3431,8 +3480,8 @@ Connection.prototype.STATE = {
 
               if (authentication.type === 'azure-active-directory-password') {
                 const credentials = new UsernamePasswordCredential(
-                  authentication.options.domain ?? 'common',  // tenantId
-                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',     // clientId
+                  authentication.options.tenantId ?? 'common',
+                  authentication.options.clientId,
                   authentication.options.userName,
                   authentication.options.password
                 );
