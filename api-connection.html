@@ -100,10 +100,28 @@ connection.connect();
       </dt>
       <dd>
         Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>,
-        <code>azure-active-directory-password</code>, <code>azure-active-directory-access-token</code>, 
-        <code>azure-active-directory-msi-vm</code>, <code>azure-active-directory-msi-app-service</code>, 
-        or <code>azure-active-directory-service-principal-secret</code>
+        <code>azure-active-directory-default</code>, <code>azure-active-directory-password</code>, 
+        <code>azure-active-directory-access-token</code>, <code>azure-active-directory-msi-vm</code>, 
+        <code>azure-active-directory-msi-app-service</code>, or <code>azure-active-directory-service-principal-secret</code>
         <ul>
+          <li><code>azure-active-directory-default</code></li>
+          <p>
+            This uses <code>DefaultAzureCredential</code> to try multiple methods of authentication. You can find 
+            more information on what values to provide and how to provide them from 
+            <a href="https://docs.microsoft.com/en-us/javascript/api/overview/azure/identity-readme?view=azure-node-latest#defaultazurecredential">this Microsoft document.</a>
+          </p>
+{% highlight javascript %}
+"authentication": {
+  "type":'azure-active-directory-default',
+  ...,
+  "options": {
+    "clientId": value (Optional)
+  }
+}           
+{% endhighlight %}
+          <ul>
+            <li>clientId (string): The (`client`) ID of the user you want to log in with.</li>
+          </ul>
           <li><code>azure-active-directory-password</code></li>
 {% highlight javascript %}
 "authentication": {
