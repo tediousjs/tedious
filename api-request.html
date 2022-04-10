@@ -106,9 +106,7 @@ request.on('columnMetadata', function (columns) { });
   <div class="name">columns</div>
   <div class="description">
     <p>
-      An array like object, where the columns can be accessed either by index or name.
-      Columns with a name that is an integer are not accessible by name,
-      as it would be interpreted as an array index.
+      An array or object (depends on <code>config.options.useColumnNames</code>), where the columns can be accessed by index/name.
     </p>
     <p>
       Each column has these properties.
