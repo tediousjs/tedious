@@ -1082,7 +1082,34 @@ connection.connect();
 <p>
   Executes a <a href="bulk-load.html">BulkLoad</a>.
 </p>
+<div class="argument">
+  <div class="name">rows</div>
+  <div class="description">
+    <p>
+      The row data. Accepts objects that implements the <code>Iterable</code> or <code>AsyncIterable</code> interface
+      (e.g. a <code>Readable</code> stream or an <code>AsyncGenerator</code>). Each row can either be an array or object.    
 
+      <ul>
+          <li> Using an Iterable object
+{% highlight javascript %}
+const rows = [{col1name: col1data, col2name: col2data, col3name: col3data, ... }, 
+              [col1data, col2data, col3data, ...], 
+              {col2name: col2data}]
+{% endhighlight %}   
+        </li>
+        <li> Using an AsyncIterable object
+{% highlight javascript %}
+const rows = Readable.from([{col1name: col1data, col2name: col2data, col3name: col3data, ... }, 
+              [col1data, col2data, col3data, ...], 
+              {col2name: col2data}])
+{% endhighlight %}             
+
+        </li>
+      </ul>
+
+    </p>
+  </div>
+</div>
 <h2 id="function_execute">connection.execute(request, parameters)</h2>
 <p>
   Execute previously prepared SQL, using the supplied parameters.
@@ -1325,7 +1352,7 @@ connection.connect();
   </div>
 </div>
 
-<h2 id="function_newBulkLoad">connection.newBulkLoad(tableName, callback)</h2>
+<h2 id="function_newBulkLoad">connection.newBulkLoad(tableName, options, callback)</h2>
 <p>
   Creates a new <a href="bulk-load.html">BulkLoad</a> instance.
 </p>
@@ -1335,6 +1362,42 @@ connection.connect();
     <p>
       The name of the table to bulk-insert into.
     </p>
+  </div>
+</div>
+<div class="argument">
+  <div class="name">options(optional)</div>
+  <div class="description">
+    <dl>
+      <dt>
+        <code>checkConstraints</code>
+      </dt>
+      <dd>
+        <p>
+          Honors constraints during bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms186247(v=sql.105).aspx">CHECK_CONSTRAINTS</a>. (default: <code>false</code>)
+        </p>
+      </dd>
+
+      <dt>
+        <code>fireTriggers</code>
+      </dt>
+      <dd>
+        Honors insert triggers during bulk load, using the T-SQL <a href="https://technet.microsoft.com/en-us/library/ms187640(v=sql.105).aspx">FIRE_TRIGGERS</a>. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>keepNulls</code>
+      </dt>
+      <dd>
+        Honors null value passed, ignores the default values set on table, using T-SQL <a href="https://msdn.microsoft.com/en-us/library/ms187887(v=sql.120).aspx">KEEP_NULLS</a>. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>tableLock</code>
+      </dt>
+      <dd>
+        Places a bulk update(BU) lock on table while performing bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx">TABLOCK</a>. (default: <code>false</code>)
+      </dd>
+      </dl>
   </div>
 </div>
 <div class="argument">
