@@ -249,6 +249,26 @@ C:\Tedious> node --openssl-legacy-provider example.js
     </dd>
     <br />
     <dt>
+        <h2>How Tedious handles Unicode datatype conversions when using parameters</code></h2>
+    </dt>
+    <dd>
+        <p>
+            Since all JavaScript strings are Unicode, when using a non-Unicode datatype (such as VarChar), then Tedious will do the conversion 
+            from a Unicode string to a non-Unicode string using the <a href="https://www.npmjs.com/package/iconv-lite">iconv-lite library</a>  then send the data to the server. 
+            The conversion might not match the way SQL Server would do the conversion in some edge cases 
+            (like characters that can't be translated to the target encoding).
+        </p>
+        <p>
+            There are some alternatives to this. You can use a Unicode datatype as the parameter type. Tedious will send the string as Unicode, 
+            then the SQL server will do the conversion, which may cause a performance hit in certain situations.
+        </p>
+        <p>
+            Another option is to use varbinary, 
+            if the binary data is encoded in the matching database column encoding. This will bypass any conversion at any point.
+        </p>
+    </dd>
+    <br />
+    <dt>
         <h2>Other</h2>
     </dt>
     <dd>
