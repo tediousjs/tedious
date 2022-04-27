@@ -44,6 +44,7 @@ import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 
+import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
@@ -938,7 +939,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  loginError: undefined | ConnectionError;
+  loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
@@ -3163,6 +3164,13 @@ function emitAzureADPasswordClientIdDeprecationWarning() {
   );
 }
 
+function isTransientError(error: AggregateError | ConnectionError): boolean {
+  if (error instanceof AggregateError) {
+    error = error.errors[0];
+  }
+  return (error instanceof ConnectionError) && !!error.isTransient;
+}
+
 export default Connection;
 module.exports = Connection;
 
@@ -3352,7 +3360,7 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
             }
           } else if (this.loginError) {
-            if (this.loginError.isTransient) {
+            if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
@@ -3418,7 +3426,7 @@ Connection.prototype.STATE = {
               this.socketError(err);
             });
           } else if (this.loginError) {
-            if (this.loginError.isTransient) {
+            if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
@@ -3510,7 +3518,8 @@ Connection.prototype.STATE = {
 
             getToken((err, token) => {
               if (err) {
-                this.loginError = new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+                this.loginError = new AggregateError(
+                  [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
                 this.emit('connect', this.loginError);
                 this.transitionTo(this.STATE.FINAL);
                 return;
@@ -3519,7 +3528,7 @@ Connection.prototype.STATE = {
               this.sendFedAuthTokenMessage(token!);
             });
           } else if (this.loginError) {
-            if (this.loginError.isTransient) {
+            if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
               this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
