@@ -33,6 +33,8 @@ import {
 } from './token';
 import BulkLoad from '../bulk-load';
 
+import AggregateError from 'es-aggregate-error';
+
 export class UnexpectedTokenError extends Error {
   constructor(handler: TokenHandler, token: Token) {
     super('Unexpected token `' + token.name + '` in `' + handler.constructor.name + '`');
@@ -368,12 +370,14 @@ export class Login7TokenHandler extends TokenHandler {
 export class RequestTokenHandler extends TokenHandler {
   connection: Connection;
   request: Request | BulkLoad;
+  errors: RequestError[];
 
   constructor(connection: Connection, request: Request | BulkLoad) {
     super();
 
     this.connection = connection;
     this.request = request;
+    this.errors = [];
   }
 
   onInfoMessage(token: InfoMessageToken) {
@@ -392,8 +396,11 @@ export class RequestTokenHandler extends TokenHandler {
       error.serverName = token.serverName;
       error.procName = token.procName;
       error.lineNumber = token.lineNumber;
-
+      this.errors.push(error);
       this.request.error = error;
+      if (this.request instanceof Request && this.errors.length > 1) {
+        this.request.error = new AggregateError(this.errors);
+      }
     }
   }
 
