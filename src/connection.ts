@@ -3440,11 +3440,12 @@ Connection.prototype.STATE = {
               });
             } catch (error: any) {
               if (error.code === 'ERR_OSSL_EVP_UNSUPPORTED') {
-                this.emit('connect', new ConnectionError(`Node 17 now uses OpenSSL 3, which considers md4 encryption a legacy type.
-                In order to use NTLM with Node 17, enable the '--openssl-legacy-provider' command line flag.
-                Check the Tedious FAQ for more information.`, 'ELOGIN'));
+                const node17Message = new ConnectionError('Node 17 now uses OpenSSL 3, which considers md4 encryption a legacy type.' +
+                ' In order to use NTLM with Node 17, enable the `--openssl-legacy-provider` command line flag.' +
+                ' Check the Tedious FAQ for more information.', 'ELOGIN');
+                this.emit('connect', new AggregateError([error, node17Message]));
               } else {
-                this.emit('connect', new ConnectionError('Login failed.' + error.message, 'ELOGIN'));
+                throw error;
               }
               this.transitionTo(this.STATE.FINAL);
             }
