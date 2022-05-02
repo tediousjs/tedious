@@ -249,7 +249,7 @@ C:\Tedious> node --openssl-legacy-provider example.js
     </dd>
     <br />
     <dt>
-        <h2>How Tedious handles Unicode datatype conversions when using parameters</code></h2>
+        <h2>How Tedious handles Unicode datatype conversions when using parameters</h2>
     </dt>
     <dd>
         <p>
@@ -259,7 +259,7 @@ C:\Tedious> node --openssl-legacy-provider example.js
             (like characters that can't be translated to the target encoding).
         </p>
         <p>
-            There are some alternatives to this. You can use a Unicode datatype as the parameter type. Tedious will send the string as Unicode, 
+            There are some alternatives to this. You can use a Unicode datatype as the parameter type. Tedious will send the string in the SQL server's default encoding, 
             then the SQL server will do the conversion, which may cause a performance hit in certain situations.
         </p>
         <p>
