@@ -86,7 +86,7 @@
     "semantic-release": "^17.4.7",
     "sinon": "^11.1.2",
     "typedoc": "^0.21.9",
-    "typescript": "^4.4.2"
+    "typescript": "^4.6.4"
   },
   "scripts": {
     "docs": "typedoc",
