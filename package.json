@@ -47,7 +47,7 @@
     "bl": "^5.0.0",
     "es-aggregate-error": "^1.0.7",
     "iconv-lite": "^0.6.3",
-    "jsbi": "^3.2.1",
+    "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
     "node-abort-controller": "^3.0.1",
     "punycode": "^2.1.0",
