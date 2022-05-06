@@ -45,7 +45,7 @@
     "@js-joda/core": "^4.0.0",
     "@types/es-aggregate-error": "^1.0.2",
     "bl": "^5.0.0",
-    "es-aggregate-error": "^1.0.7",
+    "es-aggregate-error": "^1.0.8",
     "iconv-lite": "^0.6.3",
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
