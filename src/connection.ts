@@ -422,13 +422,6 @@ interface State {
   name: string;
   enter?(this: Connection): void;
   exit?(this: Connection, newState: State): void;
-  events: {
-    socketError?(this: Connection, err: Error): void;
-    connectTimeout?(this: Connection): void;
-    message?(this: Connection, message: Message): void;
-    retry?(this: Connection): void;
-    reconnect?(this: Connection): void;
-  };
 }
 
 type Authentication = DefaultAuthentication |
@@ -2092,7 +2085,10 @@ class Connection extends EventEmitter {
     this.debug.log(message);
     this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
-    this.dispatchEvent('connectTimeout');
+
+    if (this.state !== this.STATE.FINAL) {
+      this.transitionTo(this.STATE.FINAL);
+    }
   }
 
   /**
@@ -2101,7 +2097,14 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
+
+    const sqlRequest = this.request!;
+    this.request = undefined;
+
+    this.transitionTo(this.STATE.FINAL);
+
+    const err = new ConnectionError(message, 'ETIMEOUT');
+    sqlRequest.callback(err);
   }
 
   /**
@@ -2189,33 +2192,11 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  getEventHandler<T extends keyof State['events']>(eventName: T): NonNullable<State['events'][T]> {
-    const handler = this.state.events[eventName];
-
-    if (!handler) {
-      throw new Error(`No event '${eventName}' in state '${this.state.name}'`);
-    }
-
-    return handler!;
-  }
-
-  /**
-   * @private
-   */
-  dispatchEvent<T extends keyof State['events']>(eventName: T, ...args: Parameters<NonNullable<State['events'][T]>>) {
-    const handler = this.state.events[eventName] as ((this: Connection, ...args: any[]) => void) | undefined;
-    if (handler) {
-      handler.apply(this, args);
-    } else {
-      this.emit('error', new Error(`No event '${eventName}' in state '${this.state.name}'`));
-      this.close();
-    }
-  }
-
-  /**
-   * @private
-   */
   socketError(error: Error) {
+    if (this.state === this.STATE.FINAL) {
+      return;
+    }
+
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
@@ -2225,7 +2206,15 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
-    this.dispatchEvent('socketError', error);
+
+    const sqlRequest = this.request;
+    this.request = undefined;
+
+    this.transitionTo(this.STATE.FINAL);
+
+    if (sqlRequest) {
+      sqlRequest.callback(error);
+    }
   }
 
   /**
@@ -2248,13 +2237,13 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
 
-      this.dispatchEvent('reconnect');
+      this.transitionTo(this.STATE.CONNECTING);
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
       this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-      this.dispatchEvent('retry');
+      this.createRetryTimer();
     } else {
       this.transitionTo(this.STATE.FINAL);
     }
@@ -3177,20 +3166,11 @@ module.exports = Connection;
 Connection.prototype.STATE = {
   INITIALIZED: {
     name: 'Initialized',
-    events: {}
   },
   CONNECTING: {
     name: 'Connecting',
     enter: function() {
       this.initialiseConnection();
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
     }
   },
   SENT_PRELOGIN: {
@@ -3198,20 +3178,7 @@ Connection.prototype.STATE = {
     enter: function() {
       this.emptyMessageBuffer();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         message.on('data', (data) => {
           this.addToMessageBuffer(data);
         });
@@ -3245,26 +3212,17 @@ Connection.prototype.STATE = {
             }
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
       this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
-    },
-    events: {
-      message: function() {
-      },
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      reconnect: function() {
-        this.transitionTo(this.STATE.CONNECTING);
-      }
     }
   },
   TRANSIENT_FAILURE_RETRY: {
@@ -3272,38 +3230,12 @@ Connection.prototype.STATE = {
     enter: function() {
       this.curTransientRetryCount++;
       this.cleanupConnection(CLEANUP_TYPE.RETRY);
-    },
-    events: {
-      message: function() {
-      },
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      retry: function() {
-        this.createRetryTimer();
-      }
     }
   },
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         message.on('data', (data) => {
           this.messageIo.tlsHandshakeData(data);
         });
@@ -3321,33 +3253,22 @@ Connection.prototype.STATE = {
               this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
             }
           } else {
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
+            this.messageIo.readMessage().then(onMessage, (err) => {
               this.socketError(err);
             });
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
@@ -3372,26 +3293,17 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
@@ -3420,9 +3332,7 @@ Connection.prototype.STATE = {
 
             this.ntlmpacket = undefined;
 
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
+            this.messageIo.readMessage().then(onMessage, (err) => {
               this.socketError(err);
             });
           } else if (this.loginError) {
@@ -3438,26 +3348,17 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7Withfedauth',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
@@ -3540,7 +3441,11 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.FINAL);
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
@@ -3548,60 +3453,29 @@ Connection.prototype.STATE = {
     enter: function() {
       this.sendInitialSql();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function socketError() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
 
         tokenStreamParser.once('end', () => {
           this.transitionTo(this.STATE.LOGGED_IN);
           this.processedInitialSql();
         });
-      }
-    }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
+    },
   },
   LOGGED_IN: {
     name: 'LoggedIn',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     enter: function() {
       this.emptyMessageBuffer();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    exit: function(nextState) {
-      this.clearRequestTimer();
-    },
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
@@ -3669,7 +3543,14 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', onEndOfMessage);
         this.request?.once('cancel', onCancel);
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
+    },
+    exit: function(nextState) {
+      this.clearRequestTimer();
     }
   },
   SENT_ATTENTION: {
@@ -3677,22 +3558,7 @@ Connection.prototype.STATE = {
     enter: function() {
       this.emptyMessageBuffer();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
-      message: function(message) {
+      const onMessage = (message: Message) => {
         const handler = new AttentionTokenHandler(this, this.request!);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
@@ -3713,24 +3579,17 @@ Connection.prototype.STATE = {
             }
           }
         });
-      }
+      };
+
+      this.messageIo.readMessage().then(onMessage, (err) => {
+        this.socketError(err);
+      });
     }
   },
   FINAL: {
     name: 'Final',
     enter: function() {
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-    },
-    events: {
-      connectTimeout: function() {
-        // Do nothing, as the timer should be cleaned up.
-      },
-      message: function() {
-        // Do nothing
-      },
-      socketError: function() {
-        // Do nothing
-      }
     }
   }
 };
