@@ -70,7 +70,7 @@
     "@types/depd": "^1.1.32",
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^12.20.25",
+    "@types/node": "^12.20.50",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^5.22.0",
     "@typescript-eslint/parser": "^5.22.0",
