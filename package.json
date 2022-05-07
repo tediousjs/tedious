@@ -66,7 +66,7 @@
     "@commitlint/travis-cli": "^16.2.4",
     "@types/async": "^3.2.7",
     "@types/bl": "^5.0.2",
-    "@types/chai": "^4.2.21",
+    "@types/chai": "^4.3.1",
     "@types/depd": "^1.1.32",
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^9.0.0",
