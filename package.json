@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@azure/identity": "^2.0.4",
-    "@azure/keyvault-keys": "^4.3.0",
+    "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.2.0",
     "@types/es-aggregate-error": "^1.0.2",
     "bl": "^5.0.0",
