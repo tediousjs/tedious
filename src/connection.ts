@@ -1935,11 +1935,12 @@ class Connection extends EventEmitter {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
         });
       }, (err) => {
-        process.nextTick(() => {
-          if (err.name === 'AbortError') {
-            return;
-          }
+        if (err.name === 'AbortError') {
+          // Ignore the AbortError for now, this is still handled by the connectTimer firing
+          return;
+        }
 
+        process.nextTick(() => {
           this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
         });
       });

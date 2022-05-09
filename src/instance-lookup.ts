@@ -1,8 +1,9 @@
 import dns from 'dns';
-import { AbortController, AbortSignal } from 'node-abort-controller';
+import { AbortSignal } from 'node-abort-controller';
 
 import AbortError from './errors/abort-error';
 import { Sender } from './sender';
+import { withTimeout } from './utils/with-timeout';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -29,7 +30,7 @@ export async function instanceLookup(options: { server: string, instanceName: st
     throw new TypeError('Invalid arguments: "timeout" must be a number');
   }
 
-  let retries = options.retries === undefined ? RETRIES : options.retries;
+  const retries = options.retries === undefined ? RETRIES : options.retries;
   if (typeof retries !== 'number') {
     throw new TypeError('Invalid arguments: "retries" must be a number');
   }
@@ -50,52 +51,36 @@ export async function instanceLookup(options: { server: string, instanceName: st
     throw new AbortError();
   }
 
-  while (retries >= 0) {
-    retries--;
+  let response;
 
-    const controller = new AbortController();
-
-    const abortCurrentAttempt = () => { controller.abort(); };
-
-    // If the overall instance lookup is aborted,
-    // forward the abort to the controller of the current
-    // lookup attempt.
-    signal.addEventListener('abort', abortCurrentAttempt, { once: true });
-
-    const request = Buffer.from([0x02]);
-    const sender = new Sender(options.server, port, lookup, controller.signal, request);
-    const timer = setTimeout(abortCurrentAttempt, timeout);
-
-    let response;
+  for (let i = 0; i <= retries; i++) {
     try {
-      response = await sender.execute();
-    } catch (err: unknown) {
-      clearTimeout(timer);
-
-      if (err instanceof Error && err.name === 'AbortError') {
-        // If the overall instance lookup was aborted,
-        // do not perform any further attempts.
-        if (signal.aborted) {
-          throw new AbortError();
-        }
-
+      response = await withTimeout(timeout, async (signal) => {
+        const request = Buffer.from([0x02]);
+        return new Sender(options.server, port, lookup, signal, request).execute();
+      }, signal);
+    } catch (err) {
+      // If the current attempt timed out, continue with the next
+      if (!signal.aborted && err instanceof Error && err.name === 'TimeoutError') {
         continue;
       }
 
       throw err;
     }
+  }
 
-    const message = response.toString('ascii', MYSTERY_HEADER_LENGTH);
-    const foundPort = parseBrowserResponse(message, instanceName);
+  if (!response) {
+    throw new Error('Failed to get response from SQL Server Browser on ' + server);
+  }
 
-    if (foundPort) {
-      return foundPort;
-    }
+  const message = response.toString('ascii', MYSTERY_HEADER_LENGTH);
+  const foundPort = parseBrowserResponse(message, instanceName);
 
+  if (!foundPort) {
     throw new Error('Port for ' + instanceName + ' not found in ' + options.server);
   }
 
-  throw new Error('Failed to get response from SQL Server Browser on ' + server);
+  return foundPort;
 }
 
 export function parseBrowserResponse(response: string, instanceName: string) {
