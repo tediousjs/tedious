@@ -269,28 +269,6 @@ C:\Tedious> node --openssl-legacy-provider example.js
     </dd>
     <br />
     <dt>
-        <h2>Why use aggregate error instead of the normal error object</h2>
-    </dt>
-    <dd>
-        <p>
-            Users has been reported issues that request, and connection does not return the full track back of errors.
-        </p>
-        <p>
-            For request, this is the related issue: <a href="https://github.com/tediousjs/tedious/issues/968">Issue 968</a></p>
-            In order to review all the errors, an aggregate error object is ideal for record the errors along the process 
-            and allow users to access them easily at the end. To output the errors, user need to do an additional step for 
-            output each error one by one using a loop. 
-        </p>
-        <p>
-            For connection, tedious used to swallow the errors during the get azure token process, and returns a generic 
-            error message. By this behavior, user will miss the details from the original error from the server side. Using a 
-            an aggregate error object, the team stack both the generic error message along with the original error object 
-            from the server side. To output the errors, user need to do an additional step for 
-            output each error one by one using a loop. 
-        </p>
-    </dd>
-    <br />
-    <dt>
         <h2>Other</h2>
     </dt>
     <dd>

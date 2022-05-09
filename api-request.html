@@ -65,11 +65,7 @@ connection.execSql(request);
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occured, an aggregate error object will be returned, and it needed to be logged as an array of messages.
-          Be careful to check the size of the error message array before logging it as an array
-{% highlight javascript %}
-err.errors.map (error=>console.log('Error: ', err))
-{% endhighlight %}
+          If an error occured, an error object.
         </p>
       </div>
     </div>
