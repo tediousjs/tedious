@@ -13,6 +13,8 @@ import { TYPE } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
+import { AbortSignal } from 'node-abort-controller';
+import { AbortError } from './util/abort-error';
 
 class MessageIO extends EventEmitter {
   socket: Socket;
@@ -133,8 +135,26 @@ class MessageIO extends EventEmitter {
   /**
    * Read the next incoming message from the socket.
    */
-  async readMessage(): Promise<Message> {
-    const result = await this.incomingMessageIterator.next();
+  async readMessage(signal: AbortSignal): Promise<Message> {
+    let onAbort: () => void;
+    let onSocketError: (err: Error) => void;
+
+    const result = await Promise.race([
+      this.incomingMessageIterator.next(),
+
+      new Promise((resolve, reject) => {
+        onAbort = () => { reject(new AbortError()); };
+        signal.addEventListener('abort', onAbort);
+      }),
+
+      new Promise((resolve, reject) => {
+        onSocketError = reject;
+        this.socket.addListener('error', onSocketError);
+      })
+    ]).finally(() => {
+      signal.removeEventListener('abort', onAbort);
+      this.socket.removeListener('error', onSocketError);
+    }) as IteratorResult<Message, any>;
 
     if (result.done) {
       throw new Error('unexpected end of message stream');

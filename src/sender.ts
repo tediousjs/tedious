@@ -3,19 +3,9 @@ import dns from 'dns';
 import net from 'net';
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';
+import { AbortError } from './util/abort-error';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
-
-class AbortError extends Error {
-  code: string;
-
-  constructor() {
-    super('The operation was aborted');
-
-    this.code = 'ABORT_ERR';
-    this.name = 'AbortError';
-  }
-}
 
 export class ParallelSendStrategy {
   addresses: dns.LookupAddress[];

@@ -3,7 +3,8 @@ const Duplex = require('stream').Duplex;
 const MessageIO = require('../../src/message-io');
 const Message = require('../../src/message');
 const Packet = require('../../src/packet').Packet;
-const assert = require('chai').assert;
+const { assert } = require('chai');
+const { AbortController } = require('node-abort-controller');
 
 class Connection extends Duplex {
   _read(size) { }
@@ -85,7 +86,8 @@ describe('Message IO', function() {
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.readMessage().then((message) => {
+    const controller = new AbortController();
+    io.readMessage(controller.signal).then((message) => {
       assert.instanceOf(message, Message);
 
       message.on('data', (data) => {
@@ -108,7 +110,8 @@ describe('Message IO', function() {
     const connection = new Connection();
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.readMessage().then((message) => {
+    const controller = new AbortController();
+    io.readMessage(controller.signal).then((message) => {
       message.on('data', (data) => {
         assert.isOk(data.equals(payload));
       });
@@ -134,7 +137,8 @@ describe('Message IO', function() {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.readMessage().then((message) => {
+    const controller = new AbortController();
+    io.readMessage(controller.signal).then((message) => {
       message.on('data', function(data) {
         receivedPacketCount++;
 
@@ -170,7 +174,8 @@ describe('Message IO', function() {
     let receivedPacketCount = 0;
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.readMessage().then((message) => {
+    const controller = new AbortController();
+    io.readMessage(controller.signal).then((message) => {
       message.on('data', function(data) {
         receivedPacketCount++;
 
@@ -207,7 +212,8 @@ describe('Message IO', function() {
     let receivedData = Buffer.alloc(0);
 
     const io = new MessageIO(connection, packetSize, new Debug());
-    io.readMessage().then((message) => {
+    const controller = new AbortController();
+    io.readMessage(controller.signal).then((message) => {
       message.on('data', function(data) {
         receivedData = Buffer.concat([receivedData, data]);
       });

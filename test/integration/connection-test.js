@@ -283,6 +283,22 @@ describe('Initiate Connect Test', function() {
     connection.connect();
   });
 
+  it('should allow closing a connection while it is connecting', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    connection.connect((err) => {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err?.message, 'The operation was aborted');
+
+      done();
+    });
+
+    process.nextTick(() => {
+      connection.close();
+    });
+  });
+
   it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;

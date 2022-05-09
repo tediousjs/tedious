@@ -3,17 +3,7 @@ import dns from 'dns';
 
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';
-
-class AbortError extends Error {
-  code: string;
-
-  constructor() {
-    super('The operation was aborted');
-
-    this.code = 'ABORT_ERR';
-    this.name = 'AbortError';
-  }
-}
+import { AbortError } from './util/abort-error';
 
 export class ParallelConnectionStrategy {
   addresses: dns.LookupAddress[];
