@@ -273,19 +273,19 @@ C:\Tedious> node --openssl-legacy-provider example.js
     </dt>
     <dd>
         <p>
-            Users has been reported issues that request, and connection does not return the full track back of errors.
+            Users has reported issues that <code>Request</code> and <code>connection</code> do not return the full backtrace of errors.
         </p>
         <p>
-            For request, this is the related issue: <a href="https://github.com/tediousjs/tedious/issues/968">Issue 968</a></p>
-            In order to review all the errors, an aggregate error object is ideal for record the errors along the process 
-            and allow users to access them easily at the end. To output the errors, user need to do an additional step for 
+            For <code>Request</code>, this is the related issue: <a href="https://github.com/tediousjs/tedious/issues/968">Issue 968</a></p>
+            In order to review all the errors, an aggregate error object is ideal to record the errors along the process 
+            and allow users to access them easily at the end. To output the errors, users need to do an additional step to  
             output each error one by one using a loop. 
         </p>
         <p>
-            For connection, tedious used to swallow the errors during the get azure token process, and returns a generic 
-            error message. By this behavior, user will miss the details from the original error from the server side. Using a 
-            an aggregate error object, the team stack both the generic error message along with the original error object 
-            from the server side. To output the errors, user need to do an additional step for 
+            For <code>Connection</code>, Tedious used to overwrite the errors during the Azure token retrieval process, and returns a generic 
+            error message. With this behavior, users will miss the details from the original error from the SQL server. Using a 
+            an aggregate error object, Tedious stacks both the generic error message along with the original error object 
+            from the SQL server. To output the errors, users need to do an additional step to 
             output each error one by one using a loop. 
         </p>
     </dd>
