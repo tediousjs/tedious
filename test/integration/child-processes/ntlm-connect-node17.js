@@ -13,7 +13,11 @@ const connection = new Connection(ntlmConfig);
 
 connection.connect(function(err) {
   if (err) {
-    throw err;
+    if (err instanceof AggregateError) {
+      throw err.errors;
+    } else {
+      throw err;
+    }
   }
   connection.close();
 });

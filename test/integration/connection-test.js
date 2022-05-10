@@ -399,7 +399,7 @@ describe('Initiate Connect Test', function() {
 });
 
 
-describe('Ntlm Test', function() {
+describe.only('Ntlm Test', function() {
   /**
    * @enum {number}
    */
@@ -472,11 +472,12 @@ describe('Ntlm Test', function() {
 
   } else {
 
-    it('should throw a connection error with node 17', () => {
+    it('should throw an aggregate error with node 17', () => {
       const child = childProcess.spawnSync(process.execPath,
                                            ['./test/integration/child-processes/ntlm-connect-node17.js'],
                                            { encoding: 'utf8' });
       const thrownError = child.stderr;
+      assert.isTrue(thrownError.includes('ERR_OSSL_EVP_UNSUPPORTED'));
       assert.isTrue(thrownError.includes('ConnectionError'));
       assert.isTrue(thrownError.includes('--openssl-legacy-provider'));
       assert.strictEqual(child.status, 1);
