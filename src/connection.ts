@@ -3294,10 +3294,34 @@ Connection.prototype.STATE = {
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+      (async () => {
+        while (!this.messageIo.tlsNegotiationComplete) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
+
+          for await (const data of message) {
+            this.messageIo.tlsHandshakeData(data);
+          }
+        }
+
+        this.sendLogin7Packet();
+
+        const { authentication } = this.config;
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        } else if (authentication.type === 'ntlm') {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        } else {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3306,32 +3330,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.messageIo.tlsHandshakeData(data);
-        });
-
-        message.once('end', () => {
-          if (this.messageIo.tlsNegotiationComplete) {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          } else {
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
-          }
-        });
       }
     }
   },
