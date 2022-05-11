@@ -3196,12 +3196,51 @@ Connection.prototype.STATE = {
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async function(this: Connection) {
+        let messageBuffer = Buffer.alloc(0);
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        for await (const data of message) {
+          messageBuffer = Buffer.concat([messageBuffer, data]);
+        }
+
+        const preloginPayload = new PreloginPayload(messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        } else {
+          this.sendLogin7Packet();
+
+          const { authentication } = this.config;
+          if (authentication.type === 'ntlm') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
+        }
+      }).call(this).catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3210,41 +3249,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.addToMessageBuffer(data);
-        });
-
-        message.once('end', () => {
-          const preloginPayload = new PreloginPayload(this.messageBuffer);
-          this.debug.payload(function() {
-            return preloginPayload.toString('  ');
-          });
-
-          if (preloginPayload.fedAuthRequired === 1) {
-            this.fedAuthRequired = true;
-          }
-
-          if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-            if (!this.config.options.encrypt) {
-              this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-              return this.close();
-            }
-
-            this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-          } else {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          }
-        });
       }
     }
   },
