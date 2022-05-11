@@ -3196,7 +3196,7 @@ Connection.prototype.STATE = {
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      (async function(this: Connection) {
+      (async () => {
         let messageBuffer = Buffer.alloc(0);
 
         let message;
@@ -3237,7 +3237,7 @@ Connection.prototype.STATE = {
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
           }
         }
-      }).call(this).catch((err) => {
+      })().catch((err) => {
         process.nextTick(() => {
           throw err;
         });
