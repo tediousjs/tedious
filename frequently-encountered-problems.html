@@ -283,7 +283,7 @@ C:\Tedious> node --openssl-legacy-provider example.js
         </p>
         <p>
             For <code>Connection</code>, Tedious used to overwrite the errors during the Azure token retrieval process, and returns a generic 
-            error message. With this behavior, users will miss the details from the original error from the SQL server. Using a 
+            error message. With this behavior, users will miss the details from the original error from the SQL server. Using 
             an aggregate error object, Tedious stacks both the generic error message along with the original error object 
             from the SQL server. To output the errors, users need to do an additional step to 
             output each error one by one using a loop. 
