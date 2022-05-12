@@ -3550,13 +3550,21 @@ Connection.prototype.STATE = {
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      this.sendInitialSql();
+      (async () => {
+        this.sendInitialSql();
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+        await once(tokenStreamParser, 'end');
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
+        this.transitionTo(this.STATE.LOGGED_IN);
+        this.processedInitialSql();
+
+      })();
     },
     events: {
       socketError: function socketError() {
@@ -3564,14 +3572,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-
-        tokenStreamParser.once('end', () => {
-          this.transitionTo(this.STATE.LOGGED_IN);
-          this.processedInitialSql();
-        });
       }
     }
   },
