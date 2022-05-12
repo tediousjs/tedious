@@ -3368,7 +3368,11 @@ Connection.prototype.STATE = {
           this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
         }
-      })();
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function() {
@@ -3434,7 +3438,11 @@ Connection.prototype.STATE = {
           }
         }
 
-      })();
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function() {
@@ -3564,7 +3572,11 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
 
-      })();
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function socketError() {
