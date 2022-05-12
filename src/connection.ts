@@ -17,7 +17,7 @@ import {
 
 import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
-import { EventEmitter } from 'events';
+import { EventEmitter, once } from 'events';
 import { InstanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
@@ -3196,12 +3196,51 @@ Connection.prototype.STATE = {
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        let messageBuffer = Buffer.alloc(0);
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        for await (const data of message) {
+          messageBuffer = Buffer.concat([messageBuffer, data]);
+        }
+
+        const preloginPayload = new PreloginPayload(messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+          this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        } else {
+          this.sendLogin7Packet();
+
+          const { authentication } = this.config;
+          if (authentication.type === 'ntlm') {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          } else {
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          }
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3210,41 +3249,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.addToMessageBuffer(data);
-        });
-
-        message.once('end', () => {
-          const preloginPayload = new PreloginPayload(this.messageBuffer);
-          this.debug.payload(function() {
-            return preloginPayload.toString('  ');
-          });
-
-          if (preloginPayload.fedAuthRequired === 1) {
-            this.fedAuthRequired = true;
-          }
-
-          if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-            if (!this.config.options.encrypt) {
-              this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-              return this.close();
-            }
-
-            this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-          } else {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          }
-        });
       }
     }
   },
@@ -3290,10 +3294,34 @@ Connection.prototype.STATE = {
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+      (async () => {
+        while (!this.messageIo.tlsNegotiationComplete) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
+
+          for await (const data of message) {
+            this.messageIo.tlsHandshakeData(data);
+          }
+        }
+
+        this.sendLogin7Packet();
+
+        const { authentication } = this.config;
+        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        } else if (authentication.type === 'ntlm') {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        } else {
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3302,42 +3330,48 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.messageIo.tlsHandshakeData(data);
-        });
-
-        message.once('end', () => {
-          if (this.messageIo.tlsNegotiationComplete) {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          } else {
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+
+        if (handler.loginAckReceived) {
+          if (handler.routingData) {
+            this.routingData = handler.routingData;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
+        } else if (this.loginError) {
+          if (isTransientError(this.loginError)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3346,56 +3380,26 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        tokenStreamParser.once('end', () => {
-          if (handler.loginAckReceived) {
-            if (handler.routingData) {
-              this.routingData = handler.routingData;
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
-          } else if (this.loginError) {
-            if (isTransientError(this.loginError)) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
-          } else {
-            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      (async () => {
+        while (true) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
 
-        tokenStreamParser.once('end', () => {
+          const handler = new Login7TokenHandler(this);
+          const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+          await once(tokenStreamParser, 'end');
+
           if (handler.loginAckReceived) {
             if (handler.routingData) {
               this.routingData = handler.routingData;
@@ -3420,11 +3424,6 @@ Connection.prototype.STATE = {
 
             this.ntlmpacket = undefined;
 
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
           } else if (this.loginError) {
             if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
@@ -3437,7 +3436,20 @@ Connection.prototype.STATE = {
             this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
         });
+      });
+    },
+    events: {
+      socketError: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3546,12 +3558,24 @@ Connection.prototype.STATE = {
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      this.sendInitialSql();
+      (async () => {
+        this.sendInitialSql();
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+        await once(tokenStreamParser, 'end');
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        this.transitionTo(this.STATE.LOGGED_IN);
+        this.processedInitialSql();
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3560,14 +3584,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-
-        tokenStreamParser.once('end', () => {
-          this.transitionTo(this.STATE.LOGGED_IN);
-          this.processedInitialSql();
-        });
       }
     }
   },
