@@ -3382,24 +3382,20 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      (async () => {
+        while (true) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
 
-        tokenStreamParser.once('end', () => {
+          const handler = new Login7TokenHandler(this);
+          const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+          await once(tokenStreamParser, 'end');
+
           if (handler.loginAckReceived) {
             if (handler.routingData) {
               this.routingData = handler.routingData;
@@ -3424,11 +3420,6 @@ Connection.prototype.STATE = {
 
             this.ntlmpacket = undefined;
 
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
           } else if (this.loginError) {
             if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
@@ -3441,7 +3432,16 @@ Connection.prototype.STATE = {
             this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
             this.transitionTo(this.STATE.FINAL);
           }
-        });
+        }
+
+      })();
+    },
+    events: {
+      socketError: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
