@@ -13,7 +13,7 @@ type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback
 export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
-  return new Promise<net.Socket>((resolve, reject) => {
+  return await new Promise<net.Socket>((resolve, reject) => {
     if (signal.aborted) {
       return reject(new AbortError());
     }
@@ -158,7 +158,7 @@ export async function lookupAllAddresses(host: string, lookup: LookupFunction, s
     return [{ address: host, family: 4 }];
   } else {
     // dns.lookup does not have support for AbortSignal yet
-    return Promise.race([
+    return await Promise.race([
       new Promise<LookupAddress[]>((resolve, reject) => {
         lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
           err ? reject(err) : resolve(addresses);

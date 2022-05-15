@@ -14,7 +14,7 @@ const MYSTERY_HEADER_LENGTH = 3;
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
-export async function instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction, signal: AbortSignal }): Promise<number> {
+export async function instanceLookup(options: { server: string, instanceName: string, timeout?: number, retries?: number, port?: number, lookup?: LookupFunction, signal: AbortSignal }) {
   const server = options.server;
   if (typeof server !== 'string') {
     throw new TypeError('Invalid arguments: "server" must be a string');
@@ -57,7 +57,7 @@ export async function instanceLookup(options: { server: string, instanceName: st
     try {
       response = await withTimeout(timeout, async (signal) => {
         const request = Buffer.from([0x02]);
-        return new Sender(options.server, port, lookup, signal, request).execute();
+        return await new Sender(options.server, port, lookup, signal, request).execute();
       }, signal);
     } catch (err) {
       // If the current attempt timed out, continue with the next

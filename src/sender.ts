@@ -23,8 +23,8 @@ export class ParallelSendStrategy {
     this.signal = signal;
   }
 
-  send(): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
+  async send() {
+    return await new Promise<Buffer>((resolve, reject) => {
       const signal = this.signal;
 
       if (signal.aborted) {
@@ -97,36 +97,36 @@ export class Sender {
     this.signal = signal;
   }
 
-  execute(): Promise<Buffer> {
+  async execute() {
     if (net.isIP(this.host)) {
-      return this.executeForIP();
+      return await this.executeForIP();
     } else {
-      return this.executeForHostname();
+      return await this.executeForHostname();
     }
   }
 
-  executeForIP(): Promise<Buffer> {
-    return this.executeForAddresses([
+  async executeForIP() {
+    return await this.executeForAddresses([
       { address: this.host, family: net.isIPv6(this.host) ? 6 : 4 }
     ]);
   }
 
   // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
-  invokeLookupAll(host: string): Promise<dns.LookupAddress[]> {
-    return new Promise((resolve, reject) => {
+  async invokeLookupAll(host: string) {
+    return await new Promise<dns.LookupAddress[]>((resolve, reject) => {
       this.lookup.call(null, punycode.toASCII(host), { all: true }, (err, addresses) => {
         err ? reject(err) : resolve(addresses);
       });
     });
   }
 
-  async executeForHostname(): Promise<Buffer> {
+  async executeForHostname() {
     const addresses = await this.invokeLookupAll(this.host);
-    return this.executeForAddresses(addresses);
+    return await this.executeForAddresses(addresses);
   }
 
-  executeForAddresses(addresses: dns.LookupAddress[]): Promise<Buffer> {
+  async executeForAddresses(addresses: dns.LookupAddress[]) {
     const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.signal, this.request);
-    return parallelSendStrategy.send();
+    return await parallelSendStrategy.send();
   }
 }
