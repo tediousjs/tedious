@@ -2,7 +2,7 @@ import dns from 'dns';
 import { AbortSignal } from 'node-abort-controller';
 
 import AbortError from './errors/abort-error';
-import { Sender } from './sender';
+import { sendMessage } from './sender';
 import { withTimeout } from './utils/with-timeout';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
@@ -57,7 +57,7 @@ export async function instanceLookup(options: { server: string, instanceName: st
     try {
       response = await withTimeout(timeout, async (signal) => {
         const request = Buffer.from([0x02]);
-        return await new Sender(options.server, port, lookup, signal, request).execute();
+        return await sendMessage(options.server, port, lookup, signal, request);
       }, signal);
     } catch (err) {
       // If the current attempt timed out, continue with the next
