@@ -3691,12 +3691,40 @@ Connection.prototype.STATE = {
   SENT_ATTENTION: {
     name: 'SentAttention',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        this.emptyMessageBuffer();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        const handler = new AttentionTokenHandler(this, this.request!);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+        // 3.2.5.7 Sent Attention State
+        // Discard any data contained in the response, until we receive the attention response
+        if (handler.attentionReceived) {
+          this.clearCancelTimer();
+
+          const sqlRequest = this.request!;
+          this.request = undefined;
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
+          } else {
+            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
+          }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3707,28 +3735,6 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
 
         sqlRequest.callback(err);
-      },
-      message: function(message) {
-        const handler = new AttentionTokenHandler(this, this.request!);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        tokenStreamParser.once('end', () => {
-          // 3.2.5.7 Sent Attention State
-          // Discard any data contained in the response, until we receive the attention response
-          if (handler.attentionReceived) {
-            this.clearCancelTimer();
-
-            const sqlRequest = this.request!;
-            this.request = undefined;
-            this.transitionTo(this.STATE.LOGGED_IN);
-
-            if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-              sqlRequest.callback(sqlRequest.error);
-            } else {
-              sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
-            }
-          }
-        });
       }
     }
   },
