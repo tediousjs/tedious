@@ -3310,12 +3310,21 @@ Connection.prototype.STATE = {
         this.sendLogin7Packet();
 
         const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-        } else if (authentication.type === 'ntlm') {
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        } else {
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+
+        switch (authentication.type) {
+          case 'azure-active-directory-password':
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+          case 'azure-active-directory-service-principal-secret':
+          case 'azure-active-directory-default':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            break;
+          case 'ntlm':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            break;
+          default:
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            break;
         }
       })().catch((err) => {
         process.nextTick(() => {
