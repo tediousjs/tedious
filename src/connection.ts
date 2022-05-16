@@ -3598,26 +3598,15 @@ Connection.prototype.STATE = {
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        this.emptyMessageBuffer();
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    exit: function(nextState) {
-      this.clearRequestTimer();
-    },
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
-      message: function(message) {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
@@ -3685,6 +3674,19 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', onEndOfMessage);
         this.request?.once('cancel', onCancel);
+      })();
+
+    },
+    exit: function(nextState) {
+      this.clearRequestTimer();
+    },
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request!;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       }
     }
   },
