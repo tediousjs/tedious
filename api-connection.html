@@ -906,7 +906,22 @@ connection.connect();
       <div class="name">err</div>
       <div class="description">
         <p>
-          If an error occurred, a string with details of the error.
+          If an error occurs, either a connection error or an aggregate error object will be returned.
+          <ul>
+            <li>
+              If a connection error is returned, then it can be directly logged.
+{% highlight javascript %}
+console.log('Error: ', err)
+{% endhighlight %}   
+            </li>
+            <li>
+              If an aggregate error object is returned, then it needs to be logged as an array of messages.
+              Be careful to check the size of the error message array before logging it as an array
+{% highlight javascript %}
+err.errors.map(error=>console.log('Error: ', err))
+{% endhighlight %}
+            </li>
+          </ul>
         </p>
       </div>
     </div>
