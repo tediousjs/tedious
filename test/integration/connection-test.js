@@ -399,7 +399,7 @@ describe('Initiate Connect Test', function() {
 });
 
 
-describe.only('Ntlm Test', function() {
+describe('Ntlm Test', function() {
   /**
    * @enum {number}
    */
