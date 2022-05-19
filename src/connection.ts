@@ -3433,11 +3433,6 @@ Connection.prototype.STATE = {
 
               this.ntlmpacket = undefined;
 
-              this.messageIo.readMessage().then((message) => {
-                this.dispatchEvent('message', message);
-              }, (err) => {
-                this.socketError(err);
-              });
             } catch (error: any) {
               if (error.code === 'ERR_OSSL_EVP_UNSUPPORTED') {
                 const node17Message = new ConnectionError('Node 17 now uses OpenSSL 3, which considers md4 encryption a legacy type.' +
