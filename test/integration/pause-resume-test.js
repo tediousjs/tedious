@@ -6,6 +6,7 @@ const assert = require('chai').assert;
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
+import { assertInstanceOf } from '../helpers';
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
@@ -118,8 +119,8 @@ describe('Pause-Resume Test', function() {
           `;
 
       const request = new Request(sql, (error) => {
-        assert.instanceOf(error, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(error).code, 'ECANCEL');
+        assertInstanceOf(error, RequestError);
+        assert.strictEqual(error.code, 'ECANCEL');
 
         next();
       });

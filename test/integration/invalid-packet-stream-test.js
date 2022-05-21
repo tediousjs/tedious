@@ -2,6 +2,7 @@
 
 const { assert } = require('chai');
 const net = require('net');
+const { assertInstanceOf } = require('../helpers');
 const Connection = require('../../src/tedious').Connection;
 const ConnectionError = require('../../src/errors').ConnectionError;
 
@@ -59,8 +60,8 @@ describe('Connecting to a server that sends invalid packet data', function() {
     });
 
     connection.connect((err) => {
-      assert.instanceOf(err, ConnectionError);
-      assert.equal(/** @type {ConnectionError} */(err).message, 'Connection lost - Unable to process incoming packet');
+      assertInstanceOf(err, ConnectionError);
+      assert.equal(err.message, 'Connection lost - Unable to process incoming packet');
 
       done();
     });

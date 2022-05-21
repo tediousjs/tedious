@@ -9,6 +9,7 @@ const TYPES = require('../../src/data-type').typeByName;
 import Connection from '../../src/connection';
 import { RequestError } from '../../src/errors';
 import Request from '../../src/request';
+import { assertInstanceOf } from '../helpers';
 
 const debugMode = false;
 
@@ -128,8 +129,8 @@ describe('BulkLoad', function() {
 
   it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
-      assert.instanceOf(err, RequestError, 'An error should have been thrown to indicate the incorrect table format.');
-      assert.strictEqual(/** @type {RequestError} */(err).message, 'An unknown error has occurred. This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.');
+      assertInstanceOf(err, RequestError, 'An error should have been thrown to indicate the incorrect table format.');
+      assert.strictEqual(err.message, 'An unknown error has occurred. This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.');
 
       assert.isUndefined(rowCount);
 
@@ -375,8 +376,8 @@ describe('BulkLoad', function() {
           'Sort order incorrect for the following two rows: primary key of first row: (6), primary key of second row: (5).'
         ].join(' ');
 
-        assert.instanceOf(err, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(err).message, expectedMessage);
+        assertInstanceOf(err, RequestError);
+        assert.strictEqual(err.message, expectedMessage);
 
         assert.strictEqual(rowCount, 0);
 
@@ -485,8 +486,8 @@ describe('BulkLoad', function() {
 
   it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1153,8 +1154,8 @@ describe('BulkLoad', function() {
      * @param {undefined | number} rowCount
      */
     function completeBulkLoad(err, rowCount) {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
 
       assert.strictEqual(rowCount, 0);
       startVerifyTableContent();
@@ -1198,8 +1199,8 @@ describe('BulkLoad', function() {
       }
 
       const bulkLoad = connection.newBulkLoad('#stream_test', (err, rowCount) => {
-        assert.instanceOf(err, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
+        assertInstanceOf(err, RequestError);
+        assert.strictEqual(err.message, 'Canceled.');
 
         assert.strictEqual(rowCount, 0);
       });
@@ -1237,8 +1238,8 @@ describe('BulkLoad', function() {
 
   it('cancels any bulk load that takes longer than the given timeout', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).message, 'Timeout: Request failed to complete in 10ms');
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 10ms');
 
       done();
     });
@@ -1338,8 +1339,8 @@ describe('BulkLoad', function() {
      * @param {undefined | number} rowCount
      */
     function completeBulkLoad(err, rowCount) {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).message, 'Timeout: Request failed to complete in 200ms');
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Timeout: Request failed to complete in 200ms');
 
       assert.strictEqual(rowCount, 0);
 
@@ -1525,8 +1526,8 @@ describe('BulkLoad', function() {
        * @param {undefined | number} rowCount
        */
       function completeBulkLoad(err, rowCount) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
+        assertInstanceOf(err, TypeError);
+        assert.strictEqual(err.message, 'Invalid date.');
 
         done();
       }
@@ -1545,8 +1546,8 @@ describe('BulkLoad', function() {
        * @param {undefined | number} rowCount
        */
       function completeBulkLoad(err, rowCount) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
+        assertInstanceOf(err, TypeError);
+        assert.strictEqual(err.message, 'Invalid date.');
 
         assert.strictEqual(rowCount, 0);
 

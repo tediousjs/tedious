@@ -8,6 +8,7 @@ import AggregateError from 'es-aggregate-error';
 import { RequestError } from '../../src/errors';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { assertInstanceOf } from '../helpers';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
@@ -193,7 +194,7 @@ describe('Errors Test', function() {
       }
 
       const request = new Request('create type test_type as table ( id int, primary key (code) );', (error) => {
-        assert.instanceOf(error, AggregateError);
+        assertInstanceOf(error, AggregateError);
 
         if (error instanceof AggregateError) {
           assert.strictEqual(error.errors.length, 2);
@@ -233,7 +234,7 @@ describe('Errors Test', function() {
     });
 
     connection.on('end', function() {
-      assert.instanceOf(connectionError, AggregateError);
+      assertInstanceOf(connectionError, AggregateError);
 
       if (connectionError instanceof AggregateError) {
         assert.strictEqual(connectionError.errors.length, 2);

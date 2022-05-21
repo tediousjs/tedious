@@ -7,6 +7,7 @@ const { assert } = require('chai');
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { assertInstanceOf } from '../helpers';
 
 function getConfig() {
   var config = JSON.parse(
@@ -181,7 +182,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
   it('correctly handles validation errors', function(done) {
     const request = new Request('__tediousTvpTest', (err) => {
-      assert.instanceOf(err, TypeError);
+      assertInstanceOf(err, TypeError);
       assert.strictEqual(err?.message, 'Value must be between 0 and 255, inclusive.');
 
       const request = new Request('SELECT 1', done);

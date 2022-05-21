@@ -6,9 +6,11 @@ const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
 
+import { assertInstanceOf } from '../helpers';
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
 import Request from '../../src/request';
+
 
 function getConfig() {
   const config = JSON.parse(
@@ -294,8 +296,8 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
     connection.connect(function(err) {
-      assert.instanceOf(err, ConnectionError);
-      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+      assertInstanceOf(err, ConnectionError);
+      assert.strictEqual(err.code, 'ESOCKET');
     });
 
     connection.on('end', function() {
@@ -389,8 +391,8 @@ describe('Initiate Connect Test', function() {
     conn.connect((err) => {
       conn.close();
 
-      assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+      assertInstanceOf(err, Error);
+      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
 
       done();
     });
@@ -851,8 +853,8 @@ describe('Insertion Tests', function() {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).code, 'ECLOSE');
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.code, 'ECLOSE');
     });
 
     const connection = new Connection(config);
@@ -1186,8 +1188,8 @@ describe('Insertion Tests', function() {
     let cancelledAt;
 
     const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Canceled.');
+      assertInstanceOf(err, Error);
+      assert.strictEqual(err.message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1259,7 +1261,8 @@ describe('Insertion Tests', function() {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {
-        assert.equal(/** @type {Error} */(err).message, 'Timeout: Request failed to complete in 1000ms');
+        assertInstanceOf(err, Error);
+        assert.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
 
         connection.close();
       }
@@ -1354,9 +1357,9 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     config.options.enableAnsiNullDefault = false;
 
-    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined} */err) {
-      assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+    runSqlBatch(done, config, sql, function(err) {
+      assertInstanceOf(err, RequestError);
+      assert.strictEqual(err.number, 515);
     }); // Cannot insert the value NULL
   });
 });
