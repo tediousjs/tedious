@@ -34,6 +34,53 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
+export interface IParser {
+  readInt8(callback: (data: number) => void): void;
+  readUInt8(callback: (data: number) => void): void;
+
+  readInt16LE(callback: (data: number) => void): void;
+  readInt16BE(callback: (data: number) => void): void;
+  readUInt16LE(callback: (data: number) => void): void;
+  readUInt16BE(callback: (data: number) => void): void;
+
+  readInt32LE(callback: (data: number) => void): void;
+  readInt32BE(callback: (data: number) => void): void;
+  readUInt32LE(callback: (data: number) => void): void;
+  readUInt32BE(callback: (data: number) => void): void;
+
+  readBigInt64LE(callback: (data: JSBI) => void): void;
+  readBigUInt64LE(callback: (data: JSBI) => void): void;
+  readInt64LE(callback: (data: number) => void): void;
+  readInt64BE(callback: (data: number) => void): void;
+  readUInt64LE(callback: (data: number) => void): void;
+  readUInt64BE(callback: (data: number) => void): void;
+
+  readFloatLE(callback: (data: number) => void): void;
+  readFloatBE(callback: (data: number) => void): void;
+
+  readDoubleLE(callback: (data: number) => void): void;
+  readDoubleBE(callback: (data: number) => void): void;
+
+  readUInt24LE(callback: (data: number) => void): void;
+
+  readUInt40LE(callback: (data: number) => void): void;
+
+  readUNumeric64LE(callback: (data: number) => void): void;
+
+  readUNumeric96LE(callback: (data: number) => void): void;
+
+  readUNumeric128LE(callback: (data: number) => void): void;
+
+  readBuffer(length: number, callback: (data: Buffer) => void): void;
+
+  readBVarChar(callback: (data: string) => void): void;
+  readUsVarChar(callback: (data: string) => void): void;
+
+  readBVarByte(callback: (data: Buffer) => void): void;
+
+  readUsVarByte(callback: (data: Buffer) => void): void;
+}
+
 class StreamBuffer {
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
   buffer: Buffer;
@@ -61,7 +108,7 @@ class StreamBuffer {
   }
 }
 
-class Parser {
+class Parser implements IParser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: InternalConnectionOptions;
