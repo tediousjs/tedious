@@ -6,6 +6,7 @@ parser: "@typescript-eslint/parser"
 
 parserOptions:
   sourceType: "module"
+  project: "./tsconfig.json"
 
 plugins:
   - "@typescript-eslint"
@@ -93,7 +94,7 @@ rules:
       message: "Use `new` keyword when throwing an `Error`.",
     }
   ]
-  no-return-await: "error"
+  no-return-await: "off"
   no-self-assign: "error"
   no-self-compare: "error"
   no-tabs: "error"
@@ -193,6 +194,7 @@ overrides:
       "@typescript-eslint/prefer-namespace-keyword": "error"
       "@typescript-eslint/triple-slash-reference": "error"
       "@typescript-eslint/type-annotation-spacing": "error"
+      "@typescript-eslint/return-await": ["error", "always"]
       "no-var": "error"
       "prefer-const": "error"
       "prefer-rest-params": "error"
