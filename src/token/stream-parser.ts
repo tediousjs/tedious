@@ -539,6 +539,7 @@ class Parser implements IParser {
   }
 
   // ------------------------ TEMP ASYNC ------------------------------
+  /*
   async suspend_async(next: () => void) {
     await this.streamBuffer.waitForChunk();
     next();
@@ -833,6 +834,270 @@ class Parser implements IParser {
     this.readUInt16LE((length) => {
       this.readBuffer(length, callback);
     });
+  }
+
+  */
+
+  // ------------------ Callback removal ---------------------
+
+  async awaitData_async(length: number): Promise<void> {
+    if (this.position + length > this.buffer.length) {
+      this.suspend(() => {});
+      await this.streamBuffer.waitForChunk();
+    }
+  }
+
+
+  async readInt8_async(): Promise<number> {
+    await this.awaitData_async(1);
+    const data = this.buffer.readInt8(this.position);
+    this.position += 1;
+    return data;
+  }
+
+  async readUInt8_async(): Promise<number> {
+    await this.awaitData_async(1);
+    const data = this.buffer.readUInt8(this.position);
+    this.position += 1;
+    return data;
+  }
+
+  async readInt16LE_async(): Promise<number> {
+    await this.awaitData_async(2);
+    const data = this.buffer.readInt16LE(this.position);
+    this.position += 2;
+    return data;
+  }
+
+  async readInt16BE_async(): Promise<number> {
+    await this.awaitData_async(2);
+    const data = this.buffer.readInt16BE(this.position);
+    this.position += 2;
+    return data;
+  }
+
+  async readUInt16LE_async(): Promise<number> {
+    await this.awaitData_async(2);
+    const data = this.buffer.readUInt16LE(this.position);
+    this.position += 2;
+    return data;
+  }
+
+  async readUInt16BE_async(): Promise<number> {
+    await this.awaitData_async(2);
+    const data = this.buffer.readUInt16BE(this.position);
+    this.position += 2;
+    return data;
+  }
+
+  async readInt32LE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readInt32LE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async readInt32BE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readInt32BE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async readUInt32LE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readUInt32LE(this.position);
+    this.position += 4;
+    return data;
+
+  }
+
+  async readUInt32BE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readUInt32BE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async readBigInt64LE_async(): Promise<JSBI> {
+    await this.awaitData_async(8);
+    const result = JSBI.add(
+      JSBI.leftShift(
+        JSBI.BigInt(
+          this.buffer[this.position + 4] +
+          this.buffer[this.position + 5] * 2 ** 8 +
+          this.buffer[this.position + 6] * 2 ** 16 +
+          (this.buffer[this.position + 7] << 24) // Overflow
+        ),
+        JSBI.BigInt(32)
+      ),
+      JSBI.BigInt(
+        this.buffer[this.position] +
+        this.buffer[this.position + 1] * 2 ** 8 +
+        this.buffer[this.position + 2] * 2 ** 16 +
+        this.buffer[this.position + 3] * 2 ** 24
+      )
+    );
+
+    this.position += 8;
+
+    return result;
+  }
+
+  async readInt64LE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = Math.pow(2, 32) * this.buffer.readInt32LE(this.position + 4) + ((this.buffer[this.position + 4] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32LE(this.position);
+    this.position += 8;
+    return data;
+  }
+
+  async readInt64BE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = Math.pow(2, 32) * this.buffer.readInt32BE(this.position) + ((this.buffer[this.position] & 0x80) === 0x80 ? 1 : -1) * this.buffer.readUInt32BE(this.position + 4);
+    this.position += 8;
+    return data;
+  }
+
+  async readBigUInt64LE_async(): Promise<JSBI> {
+    await this.awaitData_async(8);
+    const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
+    const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
+
+    this.position += 8;
+
+    return JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32)));
+  }
+
+  async readUInt64LE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = Math.pow(2, 32) * this.buffer.readUInt32LE(this.position + 4) + this.buffer.readUInt32LE(this.position);
+    this.position += 8;
+    return data;
+  }
+
+  async readUInt64BE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = Math.pow(2, 32) * this.buffer.readUInt32BE(this.position) + this.buffer.readUInt32BE(this.position + 4);
+    this.position += 8;
+    return data;
+  }
+
+  async readFloatLE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readFloatLE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async readFloatBE_async(): Promise<number> {
+    await this.awaitData_async(4);
+    const data = this.buffer.readFloatBE(this.position);
+    this.position += 4;
+    return data;
+  }
+
+  async readDoubleLE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = this.buffer.readDoubleLE(this.position);
+    this.position += 8;
+    return data;
+  }
+
+  async readDoubleBE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const data = this.buffer.readDoubleBE(this.position);
+    this.position += 8;
+    return data;
+  }
+
+  async readUInt24LE_async(): Promise<number> {
+    await this.awaitData_async(3);
+    const low = this.buffer.readUInt16LE(this.position);
+    const high = this.buffer.readUInt8(this.position + 2);
+
+    this.position += 3;
+
+    return low | (high << 16);
+  }
+
+  async readUInt40LE_async(): Promise<number> {
+    await this.awaitData_async(5);
+    const low = this.buffer.readUInt32LE(this.position);
+    const high = this.buffer.readUInt8(this.position + 4);
+
+    this.position += 5;
+
+    return (0x100000000 * high) + low;
+  }
+
+  async readUNumeric64LE_async(): Promise<number> {
+    await this.awaitData_async(8);
+    const low = this.buffer.readUInt32LE(this.position);
+    const high = this.buffer.readUInt32LE(this.position + 4);
+
+    this.position += 8;
+
+    return (0x100000000 * high) + low;
+  }
+
+  async readUNumeric96LE_async(): Promise<number> {
+    await this.awaitData_async(12);
+    const dword1 = this.buffer.readUInt32LE(this.position);
+    const dword2 = this.buffer.readUInt32LE(this.position + 4);
+    const dword3 = this.buffer.readUInt32LE(this.position + 8);
+
+    this.position += 12;
+
+    return dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3);
+  }
+
+  async readUNumeric128LE_async(): Promise<number> {
+    await this.awaitData_async(16);
+    const dword1 = this.buffer.readUInt32LE(this.position);
+    const dword2 = this.buffer.readUInt32LE(this.position + 4);
+    const dword3 = this.buffer.readUInt32LE(this.position + 8);
+    const dword4 = this.buffer.readUInt32LE(this.position + 12);
+
+    this.position += 16;
+
+    return dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4);
+  }
+
+  // Variable length data
+
+  async readBuffer_async(length: number): Promise<Buffer> {
+    await this.awaitData_async(length);
+    const data = this.buffer.slice(this.position, this.position + length);
+    this.position += length;
+    return data;
+  }
+
+  // Read a Unicode String (BVARCHAR)
+  async readBVarChar_async(): Promise<string> {
+    const length = await this.readUInt8_async();
+    const data = await this.readBuffer_async(length * 2);
+    return data.toString('ucs2');
+  }
+
+  // Read a Unicode String (USVARCHAR)
+  async readUsVarChar_async(): Promise<string> {
+    const length = await this.readUInt16LE_async();
+    const data = await this.readBuffer_async(length * 2);
+    return data.toString('ucs2');
+  }
+
+  // Read binary data (BVARBYTE)
+  async readBVarByte_async(): Promise<Buffer> {
+    const length = await this.readUInt8_async();
+    const data = await this.readBuffer_async(length);
+    return data;
+  }
+
+  // Read binary data (USVARBYTE)
+  async readUsVarByte_async(): Promise<Buffer> {
+    const length = await this.readUInt16LE_async();
+    const data = await this.readBuffer_async(length);
+    return data;
   }
 }
 
