@@ -327,8 +327,159 @@ function metadataParse(parser: Parser, options: InternalConnectionOptions, callb
   });
 }
 
+// ------------- Remove callbacks ----------------
+async function metadataParse_async(parser: Parser, options: InternalConnectionOptions, /* callback: (metadata: Metadata) => void, */ shouldReadFlags = true): Promise<Metadata> {
+  const userType = options.tdsVersion < '7_2' ? await parser.readUInt16LE_async() : await parser.readUInt32LE_async();
+  const flags = await readFlags_async(parser, shouldReadFlags);
+  const typeNumber = await parser.readUInt8_async();
+  const type: DataType = TYPE[typeNumber];
+  let collation: Collation | undefined;
+  let precision: number | undefined;
+  let scale: number | undefined;
+  let dataLength: number | undefined;
+  let schema: XmlSchema | undefined;
+  let udtInfo: UdtInfo | undefined;
+  if (!type) {
+    throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber));
+  }
+
+  switch (type.name) {
+    case 'Null':
+    case 'TinyInt':
+    case 'SmallInt':
+    case 'Int':
+    case 'BigInt':
+    case 'Real':
+    case 'Float':
+    case 'SmallMoney':
+    case 'Money':
+    case 'Bit':
+    case 'SmallDateTime':
+    case 'DateTime':
+    case 'Date':
+      break;
+
+    case 'IntN':
+    case 'FloatN':
+    case 'MoneyN':
+    case 'BitN':
+    case 'UniqueIdentifier':
+    case 'DateTimeN':
+      dataLength = await parser.readUInt8_async();
+      break;
+
+    case 'Variant':
+      dataLength = await parser.readUInt32LE_async();
+      break;
+
+    case 'VarChar':
+    case 'Char':
+    case 'NVarChar':
+    case 'NChar':
+      dataLength = await parser.readUInt16LE_async();
+      collation = await readCollation_async(parser);
+      break;
+
+    case 'Text':
+    case 'NText':
+      dataLength = await parser.readUInt32LE_async();
+      collation = await readCollation_async(parser);
+      break;
+
+    case 'VarBinary':
+    case 'Binary':
+      dataLength = await parser.readUInt16LE_async();
+      break;
+
+    case 'Image':
+      dataLength = await parser.readUInt32LE_async();
+      break;
+
+    case 'Xml':
+      schema = await readSchema_async(parser);
+      break;
+
+    case 'Time':
+    case 'DateTime2':
+    case 'DateTimeOffset':
+      scale = await parser.readUInt8_async();
+      break;
+
+    case 'NumericN':
+    case 'DecimalN':
+      dataLength = await parser.readUInt8_async();
+      precision = await parser.readUInt8_async();
+      scale = await parser.readUInt8_async();
+      break;
+
+    case 'UDT':
+      udtInfo = await readUDTInfo_async(parser);
+      break;
+    default:
+      throw new Error(sprintf('Unrecognised type %s', type.name));
+  }
+  return {
+    userType: userType,
+    flags: flags,
+    type: type,
+    collation: collation,
+    precision: precision,
+    scale: scale,
+    dataLength: dataLength,
+    schema: schema,
+    udtInfo: udtInfo
+  };
+}
+
+async function readFlags_async(parser: Parser, shouldReadFlags: boolean): Promise<number> {
+  if (shouldReadFlags === false) {
+    return 0;
+  } else {
+    const flags = await parser.readUInt16LE_async();
+    return flags;
+  }
+}
+
+async function readCollation_async(parser: IParser): Promise<Collation> {
+  // s2.2.5.1.2
+  const collationData = await parser.readBuffer_async(5);
+  return Collation.fromBuffer(collationData);
+}
+
+async function readSchema_async(parser: Parser): Promise<XmlSchema | undefined> {
+  // s2.2.5.5.3
+  const schemaPresent = await parser.readUInt8_async();
+  if (schemaPresent === 0x01) {
+    const dbname = await parser.readBVarChar_async();
+    const owningSchema = await parser.readBVarChar_async();
+    const xmlSchemaCollection = await parser.readUsVarChar_async();
+    return {
+      dbname: dbname,
+      owningSchema: owningSchema,
+      xmlSchemaCollection: xmlSchemaCollection
+    };
+  }
+}
+
+async function readUDTInfo_async(parser: Parser): Promise<UdtInfo | undefined> {
+  const maxByteSize = await parser.readUInt16LE_async();
+  const dbname = await parser.readBVarChar_async();
+  const owningSchema = await parser.readBVarChar_async();
+  const typeName = await parser.readBVarChar_async();
+  const assemblyName = await parser.readUsVarChar_async();
+  return {
+    maxByteSize: maxByteSize,
+    dbname: dbname,
+    owningSchema: owningSchema,
+    typeName: typeName,
+    assemblyName: assemblyName
+  };
+}
+
+
 export default metadataParse;
-export { readCollation };
+export { readCollation, metadataParse_async };
 
 module.exports = metadataParse;
 module.exports.readCollation = readCollation;
+module.exports.metadataParse_async = metadataParse_async;

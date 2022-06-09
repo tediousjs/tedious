@@ -80,6 +80,9 @@ export interface IParser {
   readBVarByte(callback: (data: Buffer) => void): void;
 
   readUsVarByte(callback: (data: Buffer) => void): void;
+
+  readBuffer_async(length: number): Promise<Buffer>;
+
 }
 
 class StreamBuffer {

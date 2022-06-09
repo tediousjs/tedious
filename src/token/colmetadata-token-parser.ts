@@ -1,4 +1,4 @@
-import metadataParse, { Metadata } from '../metadata-parser';
+import metadataParse, { Metadata, metadataParse_async } from '../metadata-parser';
 import { CEKEntry } from '../always-encrypted/cek-entry';
 import { CryptoMetadata } from '../always-encrypted/types';
 import Parser from './stream-parser';
@@ -223,6 +223,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   parser.position += 2;
   // let cekList: CEKEntry[] | undefined;
 
+  // readCEKTable(parser, parser.options, (c?: CEKEntry[]) => { cekList = c; });
   const cekList = await readCEKTable_async(parser, parser.options);
 
   while (parser.suspended) {
@@ -233,12 +234,8 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   }
 
   const columns: ColumnMetadata[] = [];
-
   for (let i = 0; i < columnCount; i++) {
-    let column: ColumnMetadata;
-    readColumn(parser, parser.options, i, cekList, (c) => {
-      column = c;
-    });
+    const column = await readColumn_async(parser, parser.options, i, cekList);
     while (parser.suspended) {
       await parser.streamBuffer.waitForChunk();
       parser.suspended = false;
@@ -265,27 +262,6 @@ async function readCEKTable_async(parser: Parser, options: InternalConnectionOpt
     }
   }
   return cekList;
-}
-
-async function readTableName_async(parser: Parser, options: InternalConnectionOptions, metadata: Metadata): Promise<string | string[] | undefined> {
-  if (metadata.type.hasTableName) {
-    if (options.tdsVersion >= '7_2') {
-      const numberOfTableNameParts = await parser.readUInt8_async();
-      const tableName: string[] = [];
-      let i = 0;
-      while (i < numberOfTableNameParts) {
-        const part = await parser.readUsVarChar_async();
-        tableName.push(part);
-        i++;
-      }
-      return tableName;
-    } else {
-      const tableName = await parser.readUsVarChar_async();
-      return tableName;
-    }
-  } else {
-    return undefined;
-  }
 }
 
 
@@ -325,6 +301,106 @@ async function readCEKValue_async(parser: Parser, cekEntry: CEKEntry, cekTableEn
   const algorithmNameBuffer = await parser.readBuffer_async(2 * algorithmNameLength);
   const algorithmName = algorithmNameBuffer.toString('ucs2');
   cekEntry.add(encryptedCEK, cekTableEntryMetadata.databaseId, cekTableEntryMetadata.cekId, cekTableEntryMetadata.cekVersion, cekTableEntryMetadata.cekMdVersion, keyPath, keyStoreName, algorithmName);
+}
+
+async function readColumn_async(parser: Parser, options: InternalConnectionOptions, index: number, cekList: CEKEntry[] | undefined): Promise<ColumnMetadata> {
+  const metadata = await metadataParse_async(parser, options, true);
+  const tableName = await readTableName_async(parser, options, metadata);
+  const cryptoMetadata = await readCryptoMetadata_async(parser, metadata, cekList, options);
+  if (cryptoMetadata && cryptoMetadata.baseTypeInfo) {
+    cryptoMetadata.baseTypeInfo.flags = metadata.flags;
+    metadata.collation = cryptoMetadata.baseTypeInfo.collation;
+  }
+  const colName = await readColumnName_async(parser, options, index, metadata);
+
+  return {
+    userType: metadata.userType,
+    flags: metadata.flags,
+    type: metadata.type,
+    collation: metadata.collation,
+    precision: metadata.precision,
+    scale: metadata.scale,
+    udtInfo: metadata.udtInfo,
+    dataLength: metadata.dataLength,
+    schema: metadata.schema,
+    colName: colName,
+    tableName: tableName,
+    cryptoMetadata: options.serverSupportsColumnEncryption === true ? cryptoMetadata : undefined,
+  };
+}
+
+async function readTableName_async(parser: Parser, options: InternalConnectionOptions, metadata: Metadata): Promise<string | string[] | undefined> {
+  if (metadata.type.hasTableName) {
+    if (options.tdsVersion >= '7_2') {
+      const numberOfTableNameParts = await parser.readUInt8_async();
+      const tableName: string[] = [];
+      let i = 0;
+      while (i < numberOfTableNameParts) {
+        const part = await parser.readUsVarChar_async();
+        tableName.push(part);
+        i++;
+      }
+      return tableName;
+    } else {
+      const tableName = await parser.readUsVarChar_async();
+      return tableName;
+    }
+  } else {
+    return undefined;
+  }
+}
+
+async function readCryptoMetadata_async(parser: Parser, metadata: Metadata, cekList: CEKEntry[] | undefined, options: InternalConnectionOptions/* , callback: (cryptoMetdata?: CryptoMetadata) => void */): Promise<CryptoMetadata | undefined> {
+  if (options.serverSupportsColumnEncryption === true && 0x0800 === (metadata.flags & 0x0800)) {
+    const ordinal = await readCryptoMetadataOrdinal_async(parser, cekList);
+    const metadata = await metadataParse_async(parser, options, false);
+    const algorithmId = await parser.readUInt8_async();
+    const algorithmName = await readCustomEncryptionMetadata_async(parser, algorithmId);
+    const encryptionType = await parser.readUInt8_async();
+    const normalizationRuleVersion = await parser.readBuffer_async(1);
+    return {
+      cekEntry: cekList ? cekList[ordinal] : undefined,
+      ordinal,
+      cipherAlgorithmId: algorithmId,
+      cipherAlgorithmName: algorithmName,
+      encryptionType: encryptionType,
+      normalizationRuleVersion,
+      baseTypeInfo: metadata,
+    };
+  }
+}
+
+async function readCryptoMetadataOrdinal_async(parser: Parser, cekList: CEKEntry[] | undefined): Promise<number> {
+  if (cekList) {
+    const ordinal = await parser.readUInt16LE_async();
+    return ordinal;
+  } else {
+    return 0;
+  }
+}
+
+async function readCustomEncryptionMetadata_async(parser: Parser, algorithmId: number): Promise<string> {
+  if (algorithmId === 0) {
+    const nameSize = await parser.readUInt8_async();
+    const algorithmNameBuffer = await parser.readBuffer_async(nameSize);
+    const algorithmName = algorithmNameBuffer.toString('ucs2');
+    return algorithmName;
+  } else {
+    return '';
+  }
+}
+
+async function readColumnName_async(parser: Parser, options: InternalConnectionOptions, index: number, metadata: Metadata): Promise<string> {
+  const colName = await parser.readBVarChar_async();
+  if (options.columnNameReplacer) {
+    return options.columnNameReplacer(colName, index, metadata);
+  } else if (options.camelCaseColumns) {
+    return colName.replace(/^[A-Z]/, function(s) {
+      return s.toLowerCase();
+    });
+  } else {
+    return colName;
+  }
 }
 
 export default colMetadataParser;
