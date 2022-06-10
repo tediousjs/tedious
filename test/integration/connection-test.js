@@ -471,8 +471,9 @@ describe('Ntlm Test', function() {
     });
 
   } else {
+    const ntlmConfig = getNtlmConfig();
 
-    it('should throw an aggregate error with node 17', () => {
+    (ntlmConfig ? it : it.skip)('should throw an aggregate error with node 17', () => {
       const child = childProcess.spawnSync(process.execPath,
                                            ['./test/integration/child-processes/ntlm-connect-node17.js'],
                                            { encoding: 'utf8' });
@@ -483,7 +484,7 @@ describe('Ntlm Test', function() {
       assert.strictEqual(child.status, 1);
     });
 
-    it('should ntlm with node 17 when `--openssl-legacy-provider` flag enabled', () => {
+    (ntlmConfig ? it : it.skip)('should ntlm with node 17 when `--openssl-legacy-provider` flag enabled', () => {
       const child = childProcess.spawnSync(process.execPath,
                                            ['--openssl-legacy-provider',
                                             './test/integration/child-processes/ntlm-connect-node17.js'],
