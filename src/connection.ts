@@ -3411,9 +3411,9 @@ Connection.prototype.STATE = {
           if (handler.loginAckReceived) {
             if (handler.routingData) {
               this.routingData = handler.routingData;
-              this.transitionTo(this.STATE.REROUTING);
+              return this.transitionTo(this.STATE.REROUTING);
             } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+              return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
             }
           } else if (this.ntlmpacket) {
             try {
@@ -3442,19 +3442,19 @@ Connection.prototype.STATE = {
               } else {
                 throw error;
               }
-              this.transitionTo(this.STATE.FINAL);
+              return this.transitionTo(this.STATE.FINAL);
             }
           } else if (this.loginError) {
             if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
               this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              return this.transitionTo(this.STATE.FINAL);
             }
           } else {
             this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            return this.transitionTo(this.STATE.FINAL);
           }
         }
 

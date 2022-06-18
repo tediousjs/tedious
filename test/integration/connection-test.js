@@ -435,12 +435,32 @@ describe('Ntlm Test', function() {
         assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
     }
 
+    let row = 0;
+
+    const request = new Request('select 1; select 2;', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
+
+      connection.close();
+    });
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function(columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns[0].value, ++row);
+    });
+
     const connection = new Connection(ntlmConfig);
 
     connection.connect(function(err) {
       assert.ifError(err);
-
-      connection.close();
+      connection.execSql(request);
     });
 
     connection.on('end', function() {
@@ -471,8 +491,9 @@ describe('Ntlm Test', function() {
     });
 
   } else {
+    const ntlmConfig = getNtlmConfig();
 
-    it('should throw an aggregate error with node 17', () => {
+    (ntlmConfig ? it : it.skip)('should throw an aggregate error with node 17', () => {
       const child = childProcess.spawnSync(process.execPath,
                                            ['./test/integration/child-processes/ntlm-connect-node17.js'],
                                            { encoding: 'utf8' });
@@ -483,7 +504,7 @@ describe('Ntlm Test', function() {
       assert.strictEqual(child.status, 1);
     });
 
-    it('should ntlm with node 17 when `--openssl-legacy-provider` flag enabled', () => {
+    (ntlmConfig ? it : it.skip)('should ntlm with node 17 when `--openssl-legacy-provider` flag enabled', () => {
       const child = childProcess.spawnSync(process.execPath,
                                            ['--openssl-legacy-provider',
                                             './test/integration/child-processes/ntlm-connect-node17.js'],
