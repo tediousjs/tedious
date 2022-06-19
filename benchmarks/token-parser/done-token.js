@@ -15,7 +15,7 @@ async function * repeat(data, n) {
 
 function main({ n, tokenCount }) {
   const data = Buffer.from('FE0000E0000000000000000000'.repeat(tokenCount), 'hex');
-  const parser = new Parser(repeat(data, n), { token: function() { } }, {}, {});
+  const parser = new Parser(repeat(data, n), { token: function() { } }, { onDoneProc: () => {} }, {});
 
   bench.start();
 
