@@ -435,12 +435,32 @@ describe('Ntlm Test', function() {
         assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
     }
 
+    let row = 0;
+
+    const request = new Request('select 1; select 2;', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
+
+      connection.close();
+    });
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function(columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns[0].value, ++row);
+    });
+
     const connection = new Connection(ntlmConfig);
 
     connection.connect(function(err) {
       assert.ifError(err);
-
-      connection.close();
+      connection.execSql(request);
     });
 
     connection.on('end', function() {
