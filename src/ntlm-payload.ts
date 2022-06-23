@@ -1,6 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
 import JSBI from 'jsbi';
+import { createMD4 } from 'hash-wasm';
 
 interface Options {
   domain: string;
@@ -13,7 +14,7 @@ interface Options {
 }
 
 class NTLMResponsePayload {
-  data: Buffer;
+  data: Promise<Buffer>;
 
   constructor(loginData: Options) {
     this.data = this.createResponse(loginData);
@@ -23,7 +24,7 @@ class NTLMResponsePayload {
     return indent + 'NTLM Auth';
   }
 
-  createResponse(challenge: Options) {
+  async createResponse(challenge: Options) {
     const client_nonce = this.createClientNonce();
     const lmv2len = 24;
     const ntlmv2len = 16;
@@ -65,10 +66,10 @@ class NTLMResponsePayload {
     data.writeUInt16LE(0x08);
     data.writeString(domain, 'ucs2');
     data.writeString(username, 'ucs2');
-    const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
+    const lmv2Data = await this.lmv2Response(domain, username, password, server_nonce, client_nonce);
     data.copyFrom(lmv2Data);
     const genTime = new Date().getTime();
-    const ntlmDataBuffer = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
+    const ntlmDataBuffer = await this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
     data.copyFrom(ntlmDataBuffer);
     data.writeUInt32LE(0x0101);
     data.writeUInt32LE(0x0000);
@@ -91,9 +92,9 @@ class NTLMResponsePayload {
     return client_nonce;
   }
 
-  ntlmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, targetInfo: Buffer, clientNonce: Buffer, mytime: number) {
+  async ntlmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, targetInfo: Buffer, clientNonce: Buffer, mytime: number) {
     const timestamp = this.createTimestamp(mytime);
-    const hash = this.ntv2Hash(domain, user, password);
+    const hash = await this.ntv2Hash(domain, user, password);
     const dataLength = 40 + targetInfo.length;
     const data = Buffer.alloc(dataLength, 0);
     serverNonce.copy(data, 0, 0, 8);
@@ -119,8 +120,8 @@ class NTLMResponsePayload {
     return result;
   }
 
-  lmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, clientNonce: Buffer) {
-    const hash = this.ntv2Hash(domain, user, password);
+  async lmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, clientNonce: Buffer) {
+    const hash = await this.ntv2Hash(domain, user, password);
     const data = Buffer.alloc(serverNonce.length + clientNonce.length, 0);
 
     serverNonce.copy(data);
@@ -135,15 +136,17 @@ class NTLMResponsePayload {
     return response;
   }
 
-  ntv2Hash(domain: string, user: string, password: string) {
-    const hash = this.ntHash(password);
+  async ntv2Hash(domain: string, user: string, password: string) {
+    const hash = await this.ntHash(password);
     const identity = Buffer.from(user.toUpperCase() + domain.toUpperCase(), 'ucs2');
     return this.hmacMD5(identity, hash);
   }
 
-  ntHash(text: string) {
+  async ntHash(text: string) {
     const unicodeString = Buffer.from(text, 'ucs2');
-    return crypto.createHash('md4').update(unicodeString).digest();
+    const md4 = await createMD4();
+    const encryptedString = md4.update(unicodeString).digest();
+    return Buffer.from(encryptedString, 'hex');
   }
 
   hmacMD5(data: Buffer, key: Buffer) {
