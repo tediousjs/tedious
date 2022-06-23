@@ -5,7 +5,6 @@ const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
-const childProcess = require('child_process');
 
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
