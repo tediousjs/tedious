@@ -1,8 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
 import JSBI from 'jsbi';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const md4 = require('js-md4');
+import md4 from 'js-md4';
 
 interface Options {
   domain: string;
