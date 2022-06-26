@@ -349,6 +349,7 @@ describe('MessageIO', function() {
           key: readFileSync('./test/fixtures/localhost.key'),
           cert: readFileSync('./test/fixtures/localhost.crt'),
           isServer: true,
+          ciphers: 'ECDHE-RSA-AES128-GCM-SHA256',
           // TDS 7.x only supports TLS versions up to TLS v1.2
           maxVersion: 'TLSv1.2'
         }),
@@ -367,15 +368,13 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          io.startTls(createSecureContext({}), 'localhost', true);
+          await new Promise<void>((resolve, reject) => {
+            io.startTls(createSecureContext({}), 'localhost', true, (err) => {
+              err ? reject(err) : resolve();
+            });
+          });
 
-          while (!io.tlsNegotiationComplete) {
-            const message = await io.readMessage();
-
-            for await (const chunk of message) {
-              io.tlsHandshakeData(chunk);
-            }
-          }
+          assert(io.tlsNegotiationComplete);
         })(),
 
         // Server side
@@ -388,7 +387,6 @@ describe('MessageIO', function() {
 
           {
             const message = await io.readMessage();
-
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -406,7 +404,6 @@ describe('MessageIO', function() {
 
           {
             const message = await io.readMessage();
-
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -422,6 +419,7 @@ describe('MessageIO', function() {
             io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
 
+          // Verify that server side was successful at this point
           await onSecure;
         })()
       ]);
@@ -435,17 +433,11 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          io.startTls(createSecureContext({}), 'localhost', true);
-
-          while (!io.tlsNegotiationComplete) {
-            const message = await io.readMessage();
-
-            for await (const chunk of message) {
-              io.tlsHandshakeData(chunk);
-            }
-          }
-
-          assert(io.tlsNegotiationComplete);
+          await new Promise<void>((resolve, reject) => {
+            io.startTls(createSecureContext({}), 'localhost', true, (err) => {
+              err ? reject(err) : resolve();
+            });
+          });
 
           // Send a request (via TLS)
           io.sendMessage(TYPE.LOGIN7, payload);
@@ -471,7 +463,6 @@ describe('MessageIO', function() {
 
           {
             const message = await io.readMessage();
-
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -486,6 +477,118 @@ describe('MessageIO', function() {
 
             io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
+
+          {
+            const message = await io.readMessage();
+            for await (const chunk of message) {
+              securePair.encrypted.write(chunk);
+            }
+
+            await once(securePair.encrypted, 'readable');
+
+            const chunks = [];
+            let chunk;
+            while (chunk = securePair.encrypted.read()) {
+              chunks.push(chunk);
+            }
+
+            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+          }
+
+          // Verify that server side was successful at this point
+          await onSecure;
+
+          // Set up TLS encryption
+          serverConnection.pipe(securePair.encrypted);
+          securePair.encrypted.pipe(serverConnection);
+
+          // Wait for client request
+          await once(securePair.cleartext, 'readable');
+
+          {
+            const chunks: Buffer[] = [];
+            let chunk;
+            while (chunk = securePair.cleartext.read()) {
+              chunks.push(chunk);
+            }
+
+            const data = Buffer.concat(chunks);
+            assert.lengthOf(data, 11);
+
+            // Send a response
+            const packet = new Packet(TYPE.LOGIN7);
+            packet.addData(payload);
+            packet.last(true);
+            securePair.cleartext.write(packet.buffer);
+          }
+        })()
+      ]);
+    });
+
+    it('handles errors happening before TLS negotiation has sent any data', async function() {
+      await Promise.all([
+        // Client side
+        (async () => {
+          const io = new MessageIO(clientConnection, packetSize, debug);
+
+          let hadError = false;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              io.startTls(createSecureContext({
+                // Use a cipher that causes an error immediately
+                ciphers: 'NULL'
+              }), 'localhost', true, (err) => {
+                err ? reject(err) : resolve();
+              });
+            });
+          } catch (err: any) {
+            hadError = true;
+
+            assert.instanceOf(err, Error);
+            assert.strictEqual(err.code, 'ERR_SSL_NO_CIPHERS_AVAILABLE');
+            assert.strictEqual(err.reason, 'no ciphers available');
+          }
+
+          assert(hadError);
+        })(),
+
+        // Server side
+        (async () => {
+          // Does nothing...
+        })()
+      ]);
+    });
+
+    it('handles errors that happen during TLS negotiation', async function() {
+      await Promise.all([
+        // Client side
+        (async () => {
+          const io = new MessageIO(clientConnection, packetSize, debug);
+
+          let hadError = false;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              io.startTls(createSecureContext({
+                // Use some cipher that's not supported on the server side
+                ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256'
+              }), 'localhost', true, (err) => {
+                err ? reject(err) : resolve();
+              });
+            });
+          } catch (err: any) {
+            hadError = true;
+
+            assert.instanceOf(err, Error);
+            assert.strictEqual(err.code, 'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE');
+            assert.strictEqual(err.reason, 'sslv3 alert handshake failure');
+          }
+
+          assert(hadError);
+        })(),
+
+        // Server side
+        (async () => {
+          const io = new MessageIO(serverConnection, packetSize, debug);
 
           {
             const message = await io.readMessage();
@@ -504,30 +607,6 @@ describe('MessageIO', function() {
 
             io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
-
-          await onSecure;
-
-          // Set up TLS encryption
-          serverConnection.pipe(securePair.encrypted);
-          securePair.encrypted.pipe(serverConnection);
-
-          // Wait for client request
-          await once(securePair.cleartext, 'readable');
-
-          const chunks = [];
-          let chunk;
-          while (chunk = securePair.cleartext.read()) {
-            chunks.push(chunk);
-          }
-
-          const data = Buffer.concat(chunks);
-          assert.lengthOf(data, 11);
-
-          // Send a response
-          const packet = new Packet(TYPE.LOGIN7);
-          packet.addData(payload);
-          packet.last(true);
-          securePair.cleartext.write(packet.buffer);
         })()
       ]);
     });
