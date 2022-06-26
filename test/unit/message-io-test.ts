@@ -368,11 +368,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          await new Promise<void>((resolve, reject) => {
-            io.startTls(createSecureContext({}), 'localhost', true, (err) => {
-              err ? reject(err) : resolve();
-            });
-          });
+          await io.startTls(createSecureContext({}), 'localhost', true);
 
           assert(io.tlsNegotiationComplete);
         })(),
@@ -433,11 +429,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          await new Promise<void>((resolve, reject) => {
-            io.startTls(createSecureContext({}), 'localhost', true, (err) => {
-              err ? reject(err) : resolve();
-            });
-          });
+          await io.startTls(createSecureContext({}), 'localhost', true);
 
           // Send a request (via TLS)
           io.sendMessage(TYPE.LOGIN7, payload);
@@ -533,14 +525,10 @@ describe('MessageIO', function() {
 
           let hadError = false;
           try {
-            await new Promise<void>((resolve, reject) => {
-              io.startTls(createSecureContext({
-                // Use a cipher that causes an error immediately
-                ciphers: 'NULL'
-              }), 'localhost', true, (err) => {
-                err ? reject(err) : resolve();
-              });
-            });
+            await io.startTls(createSecureContext({
+              // Use a cipher that causes an error immediately
+              ciphers: 'NULL'
+            }), 'localhost', true);
           } catch (err: any) {
             hadError = true;
 
@@ -567,14 +555,10 @@ describe('MessageIO', function() {
 
           let hadError = false;
           try {
-            await new Promise<void>((resolve, reject) => {
-              io.startTls(createSecureContext({
-                // Use some cipher that's not supported on the server side
-                ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256'
-              }), 'localhost', true, (err) => {
-                err ? reject(err) : resolve();
-              });
-            });
+            await io.startTls(createSecureContext({
+              // Use some cipher that's not supported on the server side
+              ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256'
+            }), 'localhost', true);
           } catch (err: any) {
             hadError = true;
 

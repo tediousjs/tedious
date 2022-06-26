@@ -61,96 +61,98 @@ class MessageIO extends EventEmitter {
   }
 
   // Negotiate TLS encryption.
-  startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean, callback: (err?: Error) => void) {
-    const duplexpair = new DuplexPair();
-    const securePair = this.securePair = {
-      cleartext: tls.connect({
-        socket: duplexpair.socket1 as Socket,
-        servername: hostname,
-        secureContext: secureContext,
-        rejectUnauthorized: !trustServerCertificate
-      }),
-      encrypted: duplexpair.socket2
-    };
+  startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
+    return new Promise<void>((resolve, reject) => {
+      const duplexpair = new DuplexPair();
+      const securePair = this.securePair = {
+        cleartext: tls.connect({
+          socket: duplexpair.socket1 as Socket,
+          servername: hostname,
+          secureContext: secureContext,
+          rejectUnauthorized: !trustServerCertificate
+        }),
+        encrypted: duplexpair.socket2
+      };
 
-    const onSecureConnect = () => {
-      securePair.encrypted.removeListener('readable', onReadable);
-      securePair.cleartext.removeListener('error', onError);
-      securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+      const onSecureConnect = () => {
+        securePair.encrypted.removeListener('readable', onReadable);
+        securePair.cleartext.removeListener('error', onError);
+        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
 
-      // If we encounter any errors from this point on,
-      // we just forward them to the actual network socket.
-      securePair.cleartext.once('error', (err) => {
-        this.socket.destroy(err);
-      });
+        // If we encounter any errors from this point on,
+        // we just forward them to the actual network socket.
+        securePair.cleartext.once('error', (err) => {
+          this.socket.destroy(err);
+        });
 
-      const cipher = securePair.cleartext.getCipher();
-      if (cipher) {
-        this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
-      }
-
-      this.emit('secure', securePair.cleartext);
-
-      securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
-
-      this.outgoingMessageStream.unpipe(this.socket);
-      this.socket.unpipe(this.incomingMessageStream);
-
-      this.socket.pipe(securePair.encrypted);
-      securePair.encrypted.pipe(this.socket);
-
-      securePair.cleartext.pipe(this.incomingMessageStream);
-      this.outgoingMessageStream.pipe(securePair.cleartext);
-
-      this.tlsNegotiationComplete = true;
-
-      callback();
-    };
-
-    const onError = (err?: Error) => {
-      securePair.encrypted.removeListener('readable', onReadable);
-      securePair.cleartext.removeListener('error', onError);
-      securePair.cleartext.removeListener('secureConnect', onSecureConnect);
-
-      securePair.cleartext.destroy();
-      securePair.encrypted.destroy();
-
-      callback(err);
-    };
-
-    const onReadable = () => {
-      // When there is handshake data on the encryped stream of the secure pair,
-      // we wrap it into a `PRELOGIN` message and send it to the server.
-      //
-      // For each `PRELOGIN` message we sent we get back exactly one response message
-      // that contains the server's handshake response data.
-      const message = new Message({ type: TYPE.PRELOGIN, resetConnection: false });
-
-      let chunk;
-      while (chunk = securePair.encrypted.read()) {
-        message.write(chunk);
-      }
-      this.outgoingMessageStream.write(message);
-      message.end();
-
-      this.readMessage().then(async (response) => {
-        // Setup readable handler for the next round of handshaking.
-        // If we encounter a `secureConnect` on the cleartext side
-        // of the secure pair, the `readable` handler is cleared
-        // and no further handshake handling will happen.
-        securePair.encrypted.once('readable', onReadable);
-
-        for await (const data of response) {
-          // We feed the server's handshake response back into the
-          // encrypted end of the secure pair.
-          securePair.encrypted.write(data);
+        const cipher = securePair.cleartext.getCipher();
+        if (cipher) {
+          this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
         }
-      }).catch(onError);
-    };
 
-    securePair.cleartext.once('error', onError);
-    securePair.cleartext.once('secureConnect', onSecureConnect);
-    securePair.encrypted.once('readable', onReadable);
+        this.emit('secure', securePair.cleartext);
+
+        securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+
+        this.outgoingMessageStream.unpipe(this.socket);
+        this.socket.unpipe(this.incomingMessageStream);
+
+        this.socket.pipe(securePair.encrypted);
+        securePair.encrypted.pipe(this.socket);
+
+        securePair.cleartext.pipe(this.incomingMessageStream);
+        this.outgoingMessageStream.pipe(securePair.cleartext);
+
+        this.tlsNegotiationComplete = true;
+
+        resolve();
+      };
+
+      const onError = (err?: Error) => {
+        securePair.encrypted.removeListener('readable', onReadable);
+        securePair.cleartext.removeListener('error', onError);
+        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+
+        securePair.cleartext.destroy();
+        securePair.encrypted.destroy();
+
+        reject(err);
+      };
+
+      const onReadable = () => {
+        // When there is handshake data on the encryped stream of the secure pair,
+        // we wrap it into a `PRELOGIN` message and send it to the server.
+        //
+        // For each `PRELOGIN` message we sent we get back exactly one response message
+        // that contains the server's handshake response data.
+        const message = new Message({ type: TYPE.PRELOGIN, resetConnection: false });
+
+        let chunk;
+        while (chunk = securePair.encrypted.read()) {
+          message.write(chunk);
+        }
+        this.outgoingMessageStream.write(message);
+        message.end();
+
+        this.readMessage().then(async (response) => {
+          // Setup readable handler for the next round of handshaking.
+          // If we encounter a `secureConnect` on the cleartext side
+          // of the secure pair, the `readable` handler is cleared
+          // and no further handshake handling will happen.
+          securePair.encrypted.once('readable', onReadable);
+
+          for await (const data of response) {
+            // We feed the server's handshake response back into the
+            // encrypted end of the secure pair.
+            securePair.encrypted.write(data);
+          }
+        }).catch(onError);
+      };
+
+      securePair.cleartext.once('error', onError);
+      securePair.cleartext.once('secureConnect', onSecureConnect);
+      securePair.encrypted.once('readable', onReadable);
+    });
   }
 
   // TODO listen for 'drain' event when socket.write returns false.

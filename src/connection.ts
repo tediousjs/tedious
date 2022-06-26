@@ -3212,11 +3212,7 @@ Connection.prototype.STATE = {
 
           try {
             this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            await new Promise<void>((resolve, reject) => {
-              this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate, (err) => {
-                err ? reject(err) : resolve();
-              });
-            });
+            await this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           } catch (err: any) {
             return this.socketError(err);
           }
