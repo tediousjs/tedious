@@ -144,7 +144,7 @@ class NTLMResponsePayload {
 
   ntHash(text: string) {
     const unicodeString = Buffer.from(text, 'ucs2');
-    return Buffer.from(md4.hex(unicodeString), 'hex');
+    return Buffer.from(md4.arrayBuffer(unicodeString));
   }
 
   hmacMD5(data: Buffer, key: Buffer) {
