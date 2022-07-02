@@ -2279,20 +2279,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  emptyMessageBuffer() {
-    this.messageBuffer = Buffer.alloc(0);
-  }
-
-  /**
-   * @private
-   */
-  addToMessageBuffer(data: Buffer) {
-    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
-  }
-
-  /**
-   * @private
-   */
   sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
@@ -3607,8 +3593,6 @@ Connection.prototype.STATE = {
     name: 'SentClientRequest',
     enter: function() {
       (async () => {
-        this.emptyMessageBuffer();
-
         let message;
         try {
           message = await this.messageIo.readMessage();
@@ -3702,8 +3686,6 @@ Connection.prototype.STATE = {
     name: 'SentAttention',
     enter: function() {
       (async () => {
-        this.emptyMessageBuffer();
-
         let message;
         try {
           message = await this.messageIo.readMessage();
