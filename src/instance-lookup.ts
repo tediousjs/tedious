@@ -1,5 +1,6 @@
 import dns from 'dns';
 import { AbortController, AbortSignal } from 'node-abort-controller';
+import { AbortError } from './errors';
 
 import { Sender } from './sender';
 
@@ -10,17 +11,6 @@ const RETRIES = 3;
 const MYSTERY_HEADER_LENGTH = 3;
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
-
-class AbortError extends Error {
-  code: string;
-
-  constructor() {
-    super('The operation was aborted');
-
-    this.code = 'ABORT_ERR';
-    this.name = 'AbortError';
-  }
-}
 
 // Most of the functionality has been determined from from jTDS's MSSqlServerInfo class.
 export class InstanceLookup {
