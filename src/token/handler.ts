@@ -42,6 +42,10 @@ export class UnexpectedTokenError extends Error {
 }
 
 export class TokenHandler {
+  handle(token: Token): void {
+    this[token.handlerName as keyof TokenHandler](token as any);
+  }
+
   onInfoMessage(token: InfoMessageToken) {
     throw new UnexpectedTokenError(this, token);
   }

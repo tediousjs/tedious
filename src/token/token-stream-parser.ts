@@ -21,7 +21,7 @@ export class Parser extends EventEmitter {
     const controller = new AbortController();
     this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options, controller.signal));
     this.parser.on('data', (token: Token) => {
-      handler[token.handlerName as keyof TokenHandler](token as any);
+      handler.handle(token);
     });
 
     this.parser.on('drain', () => {
