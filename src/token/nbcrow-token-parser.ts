@@ -6,6 +6,7 @@ import { ColumnMetadata } from './colmetadata-token-parser';
 import { NBCRowToken } from './token';
 
 import valueParse from '../value-parser';
+import { AbortSignal } from 'node-abort-controller';
 
 function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: ParserOptions, callback: (value: unknown) => void) {
   callback(null);
@@ -16,14 +17,14 @@ interface Column {
   metadata: ColumnMetadata;
 }
 
-async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
+async function nbcRowParser(parser: Parser, signal: AbortSignal): Promise<NBCRowToken> {
   const colMetadata = parser.colMetadata;
   const bitmapByteLength = Math.ceil(colMetadata.length / 8);
   const columns: Column[] = [];
   const bitmap: boolean[] = [];
 
   while (parser.buffer.length - parser.position < bitmapByteLength) {
-    await parser.streamBuffer.waitForChunk();
+    await parser.streamBuffer.waitForChunk(signal);
   }
 
   const bytes = parser.buffer.slice(parser.position, parser.position + bitmapByteLength);
@@ -50,7 +51,7 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
     });
 
     while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
+      await parser.streamBuffer.waitForChunk(signal);
 
       parser.suspended = false;
       const next = parser.next!;

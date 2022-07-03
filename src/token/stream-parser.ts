@@ -17,6 +17,8 @@ import returnValueParser from './returnvalue-token-parser';
 import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
+import { AbortSignal } from 'node-abort-controller';
+import { AbortError } from '../errors';
 
 const tokenParsers = {
   [TYPE.DONE]: doneParser,
@@ -48,8 +50,23 @@ class StreamBuffer {
     this.position = 0;
   }
 
-  async waitForChunk() {
-    const result = await this.iterator.next();
+  async waitForChunk(signal: AbortSignal) {
+    if (signal.aborted) {
+      throw new AbortError();
+    }
+
+    let onAbort: () => void;
+
+    const result = await Promise.race([
+      this.iterator.next(),
+      new Promise<never>((resolve, reject) => {
+        onAbort = () => { reject(new AbortError()); };
+        signal.addEventListener('abort', onAbort, { once: true });
+      })
+    ]);
+
+    signal.removeEventListener('abort', onAbort!);
+
     if (result.done) {
       throw new Error('unexpected end of data');
     }
@@ -72,18 +89,17 @@ class Parser {
   next: (() => void) | undefined;
   streamBuffer: StreamBuffer;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, signal: AbortSignal) {
     let token: Token | undefined;
     const onDoneParsing = (t: Token | undefined) => { token = t; };
 
     const streamBuffer = new StreamBuffer(iterable);
 
     const parser = new Parser(streamBuffer, debug, options);
-    parser.colMetadata = colMetadata;
 
     while (true) {
       try {
-        await streamBuffer.waitForChunk();
+        await streamBuffer.waitForChunk(signal);
       } catch (err: unknown) {
         if (streamBuffer.position === streamBuffer.buffer.length) {
           return;
@@ -110,18 +126,22 @@ class Parser {
       }
 
       while (!parser.suspended && parser.position + 1 <= parser.buffer.length) {
+        if (signal.aborted) {
+          throw new AbortError();
+        }
+
         const type = parser.buffer.readUInt8(parser.position);
 
         parser.position += 1;
 
         if (type === TYPE.COLMETADATA) {
-          const token = await colMetadataParser(parser);
+          const token = await colMetadataParser(parser, signal);
           parser.colMetadata = token.columns;
           yield token;
         } else if (type === TYPE.ROW) {
-          yield rowParser(parser);
+          yield rowParser(parser, signal);
         } else if (type === TYPE.NBCROW) {
-          yield nbcRowParser(parser);
+          yield nbcRowParser(parser, signal);
         } else if (tokenParsers[type]) {
           tokenParsers[type](parser, parser.options, onDoneParsing);
 

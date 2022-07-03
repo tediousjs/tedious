@@ -1,3 +1,4 @@
+import { AbortSignal } from 'node-abort-controller';
 import metadataParse, { Metadata } from '../metadata-parser';
 
 import Parser, { ParserOptions } from './stream-parser';
@@ -81,9 +82,9 @@ function readColumn(parser: Parser, options: ParserOptions, index: number, callb
   });
 }
 
-async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
+async function colMetadataParser(parser: Parser, signal: AbortSignal): Promise<ColMetadataToken> {
   while (parser.buffer.length - parser.position < 2) {
-    await parser.streamBuffer.waitForChunk();
+    await parser.streamBuffer.waitForChunk(signal);
   }
 
   const columnCount = parser.buffer.readUInt16LE(parser.position);
@@ -98,7 +99,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
     });
 
     while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
+      await parser.streamBuffer.waitForChunk(signal);
 
       parser.suspended = false;
       const next = parser.next!;

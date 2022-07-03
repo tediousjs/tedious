@@ -5,6 +5,7 @@ import { Token } from './token';
 import { Readable } from 'stream';
 import Message from '../message';
 import { TokenHandler } from './handler';
+import { AbortController } from 'node-abort-controller';
 
 export class Parser extends EventEmitter {
   debug: Debug;
@@ -17,7 +18,8 @@ export class Parser extends EventEmitter {
     this.debug = debug;
     this.options = options;
 
-    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
+    const controller = new AbortController();
+    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options, controller.signal));
     this.parser.on('data', (token: Token) => {
       handler[token.handlerName as keyof TokenHandler](token as any);
     });

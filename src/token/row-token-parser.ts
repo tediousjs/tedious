@@ -6,13 +6,14 @@ import { ColumnMetadata } from './colmetadata-token-parser';
 import { RowToken } from './token';
 
 import valueParse from '../value-parser';
+import { AbortSignal } from 'node-abort-controller';
 
 interface Column {
   value: unknown;
   metadata: ColumnMetadata;
 }
 
-async function rowParser(parser: Parser): Promise<RowToken> {
+async function rowParser(parser: Parser, signal: AbortSignal): Promise<RowToken> {
   const colMetadata = parser.colMetadata;
   const length = colMetadata.length;
   const columns: Column[] = [];
@@ -25,7 +26,7 @@ async function rowParser(parser: Parser): Promise<RowToken> {
     });
 
     while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
+      await parser.streamBuffer.waitForChunk(signal);
 
       parser.suspended = false;
       const next = parser.next!;
