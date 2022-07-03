@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
-import StreamParser from './stream-parser';
+import StreamParser, { ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import { InternalConnectionOptions } from '../connection';
 import { Token } from './token';
 import { Readable } from 'stream';
 import Message from '../message';
@@ -9,10 +8,10 @@ import { TokenHandler } from './handler';
 
 export class Parser extends EventEmitter {
   debug: Debug;
-  options: InternalConnectionOptions;
+  options: ParserOptions;
   parser: Readable;
 
-  constructor(message: Message, debug: Debug, handler: TokenHandler, options: InternalConnectionOptions) {
+  constructor(message: Message, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;

@@ -1,6 +1,5 @@
 import { Collation } from './collation';
-import Parser from './token/stream-parser';
-import { InternalConnectionOptions } from './connection';
+import Parser, { ParserOptions } from './token/stream-parser';
 import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
 
@@ -103,7 +102,7 @@ function readUDTInfo(parser: Parser, callback: (udtInfo: UdtInfo | undefined) =>
   });
 }
 
-function metadataParse(parser: Parser, options: InternalConnectionOptions, callback: (metadata: Metadata) => void) {
+function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void) {
   (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
     parser.readUInt16LE((flags) => {
       parser.readUInt8((typeNumber) => {

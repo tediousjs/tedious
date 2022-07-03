@@ -34,6 +34,8 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+
 class StreamBuffer {
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
   buffer: Buffer;
@@ -64,13 +66,13 @@ class StreamBuffer {
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
-  options: InternalConnectionOptions;
+  options: ParserOptions;
 
   suspended: boolean;
   next: (() => void) | undefined;
   streamBuffer: StreamBuffer;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     let token: Token | undefined;
     const onDoneParsing = (t: Token | undefined) => { token = t; };
 
@@ -137,7 +139,7 @@ class Parser {
     }
   }
 
-  constructor(streamBuffer: StreamBuffer, debug: Debug, options: InternalConnectionOptions) {
+  constructor(streamBuffer: StreamBuffer, debug: Debug, options: ParserOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;

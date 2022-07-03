@@ -1,5 +1,4 @@
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';
 
@@ -13,7 +12,7 @@ interface TokenData {
   lineNumber: number;
 }
 
-function parseToken(parser: Parser, options: InternalConnectionOptions, callback: (data: TokenData) => void) {
+function parseToken(parser: Parser, options: ParserOptions, callback: (data: TokenData) => void) {
   // length
   parser.readUInt16LE(() => {
     parser.readUInt32LE((number) => {
@@ -42,13 +41,13 @@ function parseToken(parser: Parser, options: InternalConnectionOptions, callback
   });
 }
 
-export function infoParser(parser: Parser, options: InternalConnectionOptions, callback: (token: InfoMessageToken) => void) {
+export function infoParser(parser: Parser, options: ParserOptions, callback: (token: InfoMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new InfoMessageToken(data));
   });
 }
 
-export function errorParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ErrorMessageToken) => void) {
+export function errorParser(parser: Parser, options: ParserOptions, callback: (token: ErrorMessageToken) => void) {
   parseToken(parser, options, (data) => {
     callback(new ErrorMessageToken(data));
   });
