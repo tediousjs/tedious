@@ -3644,7 +3644,11 @@ Connection.prototype.STATE = {
           this.inTransaction = false;
         }
         sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
-      })();
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     exit: function(nextState) {
       this.clearRequestTimer();
