@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const DuplexPair = require('native-duplexpair');
+import DuplexPair from 'native-duplexpair';
 
 import { Duplex } from 'stream';
 import * as tls from 'tls';
