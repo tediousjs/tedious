@@ -141,16 +141,6 @@ class MessageIO extends EventEmitter {
 
     return result.value;
   }
-
-  // Temporarily suspends the flow of incoming packets.
-  pause() {
-    this.incomingMessageStream.pause();
-  }
-
-  // Resumes the flow of incoming packets.
-  resume() {
-    this.incomingMessageStream.resume();
-  }
 }
 
 export default MessageIO;
