@@ -2,11 +2,15 @@ import { AddressInfo, createConnection, createServer, Server, Socket } from 'net
 import { once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
+import DuplexPair from 'native-duplexpair';
+import { createSecureContext, TLSSocket } from 'tls';
+import { readFileSync } from 'fs';
+import { Duplex } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
 import Message from '../../src/message';
-import { Packet } from '../../src/packet';
+import { Packet, TYPE } from '../../src/packet';
 
 const packetType = 2;
 const packetSize = 8 + 4;
@@ -329,6 +333,146 @@ describe('MessageIO', function() {
           // inside the `IncomingMessageStream`. We don't actually care about this, so it's
           // okay if this changes.
           assert.deepEqual(receivedData, [ payload ]);
+        })()
+      ]);
+    });
+  });
+
+  describe('#startTls', function() {
+    let securePair: { encrypted: Duplex, cleartext: TLSSocket };
+
+    beforeEach(function() {
+      const duplexpair = new DuplexPair();
+
+      securePair = {
+        cleartext: new TLSSocket(duplexpair.socket1 as Socket, {
+          key: readFileSync('./test/fixtures/localhost.key'),
+          cert: readFileSync('./test/fixtures/localhost.crt'),
+          isServer: true,
+        }),
+        encrypted: duplexpair.socket2
+      };
+    });
+
+    afterEach(function() {
+      securePair.cleartext.destroy();
+      securePair.encrypted.destroy();
+    });
+
+    it('performs TLS negotiation', async function() {
+      await Promise.all([
+        // Client side
+        (async () => {
+          const io = new MessageIO(clientConnection, packetSize, debug);
+
+          io.startTls(createSecureContext({}), 'localhost', true);
+
+          while (!io.tlsNegotiationComplete) {
+            const message = await io.readMessage();
+
+            for await (const chunk of message) {
+              io.tlsHandshakeData(chunk);
+            }
+          }
+        })(),
+
+        // Server side
+        (async () => {
+          const io = new MessageIO(serverConnection, packetSize, debug);
+
+          const message = await io.readMessage();
+
+          for await (const chunk of message) {
+            securePair.encrypted.write(chunk);
+          }
+
+          await once(securePair.encrypted, 'readable');
+
+          const chunks = [];
+          let chunk;
+          while (chunk = securePair.encrypted.read()) {
+            chunks.push(chunk);
+          }
+
+          io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+        })()
+      ]);
+    });
+
+    it('sends and receives data via TLS after successful TLS negotiation', async function() {
+      const payload = Buffer.from([1, 2, 3]);
+
+      await Promise.all([
+        // Client side
+        (async () => {
+          const io = new MessageIO(clientConnection, packetSize, debug);
+
+          io.startTls(createSecureContext({}), 'localhost', true);
+
+          while (!io.tlsNegotiationComplete) {
+            const message = await io.readMessage();
+
+            for await (const chunk of message) {
+              io.tlsHandshakeData(chunk);
+            }
+          }
+
+          assert(io.tlsNegotiationComplete);
+
+          // Send a request (via TLS)
+          io.sendMessage(TYPE.LOGIN7, payload);
+
+          // Receive response (via TLS)
+          const message = await io.readMessage();
+
+          const chunks: Buffer[] = [];
+          for await (const chunk of message) {
+            chunks.push(chunk);
+          }
+
+          assert.deepEqual(Buffer.concat(chunks), payload);
+        })(),
+
+        // Server side
+        (async () => {
+          const io = new MessageIO(serverConnection, packetSize, debug);
+
+          const message = await io.readMessage();
+
+          for await (const chunk of message) {
+            securePair.encrypted.write(chunk);
+          }
+
+          await once(securePair.encrypted, 'readable');
+
+          const chunks = [];
+          let chunk;
+          while (chunk = securePair.encrypted.read()) {
+            chunks.push(chunk);
+          }
+
+          io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+
+          // Set up TLS encryption
+          serverConnection.pipe(securePair.encrypted);
+          securePair.encrypted.pipe(serverConnection);
+
+          // Wait for client request
+          await once(securePair.cleartext, 'readable');
+
+          chunks.length = 0;
+          while (chunk = securePair.cleartext.read()) {
+            chunks.push(chunk);
+          }
+
+          const data = Buffer.concat(chunks);
+          assert.lengthOf(data, 11);
+
+          // Send a response
+          const packet = new Packet(TYPE.LOGIN7);
+          packet.addData(payload);
+          packet.last(true);
+          securePair.cleartext.write(packet.buffer);
         })()
       ]);
     });
