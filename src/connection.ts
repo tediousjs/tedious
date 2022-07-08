@@ -2022,13 +2022,11 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.SENT_PRELOGIN);
       });
     }, (err) => {
-      process.nextTick(() => {
-        if (err.name === 'AbortError') {
-          return;
-        }
+      if (err.name === 'AbortError') {
+        return;
+      }
 
-        return this.socketError(err);
-      });
+      process.nextTick(() => { this.socketError(err); });
     });
   }
 
