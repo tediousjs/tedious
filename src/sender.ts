@@ -9,11 +9,11 @@ import AbortError from './errors/abort-error';
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export async function sendInParallel(addresses: dns.LookupAddress[], port: number, request: Buffer, signal: AbortSignal) {
-  return await new Promise<Buffer>((resolve, reject) => {
-    if (signal.aborted) {
-      return reject(new AbortError());
-    }
+  if (signal.aborted) {
+    throw new AbortError();
+  }
 
+  return await new Promise<Buffer>((resolve, reject) => {
     const sockets: dgram.Socket[] = [];
 
     let errorCount = 0;
@@ -65,6 +65,10 @@ export async function sendInParallel(addresses: dns.LookupAddress[], port: numbe
 }
 
 export async function sendMessage(host: string, port: number, lookup: LookupFunction, signal: AbortSignal, request: Buffer) {
+  if (signal.aborted) {
+    throw new AbortError();
+  }
+
   let addresses: dns.LookupAddress[];
 
   if (net.isIP(host)) {
@@ -73,7 +77,15 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
     ];
   } else {
     addresses = await new Promise<dns.LookupAddress[]>((resolve, reject) => {
+      const onAbort = () => {
+        reject(new AbortError());
+      };
+
+      signal.addEventListener('abort', onAbort);
+
       lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+        signal.removeEventListener('abort', onAbort);
+
         err ? reject(err) : resolve(addresses);
       });
     });

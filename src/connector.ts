@@ -4,20 +4,19 @@ import dns, { LookupAddress } from 'dns';
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
-import { once } from 'events';
 
 import AggregateError from 'es-aggregate-error';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+  if (signal.aborted) {
+    throw new AbortError();
+  }
+
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
   return await new Promise<net.Socket>((resolve, reject) => {
-    if (signal.aborted) {
-      return reject(new AbortError());
-    }
-
     const sockets = new Array(addresses.length);
 
     const errors: Error[] = [];
@@ -84,6 +83,10 @@ export async function connectInParallel(options: { host: string, port: number, l
 }
 
 export async function connectInSequence(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
+  if (signal.aborted) {
+    throw new AbortError();
+  }
+
   const errors: any[] = [];
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
@@ -157,17 +160,18 @@ export async function lookupAllAddresses(host: string, lookup: LookupFunction, s
   } else if (net.isIPv4(host)) {
     return [{ address: host, family: 4 }];
   } else {
-    // dns.lookup does not have support for AbortSignal yet
-    return await Promise.race([
-      new Promise<LookupAddress[]>((resolve, reject) => {
-        lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
-          err ? reject(err) : resolve(addresses);
-        });
-      }),
+    return await new Promise<LookupAddress[]>((resolve, reject) => {
+      const onAbort = () => {
+        reject(new AbortError());
+      };
 
-      once(signal, 'abort').then(() => {
-        throw new AbortError();
-      })
-    ]);
+      signal.addEventListener('abort', onAbort);
+
+      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+        signal.removeEventListener('abort', onAbort);
+
+        err ? reject(err) : resolve(addresses);
+      });
+    });
   }
 }
