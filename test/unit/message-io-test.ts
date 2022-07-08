@@ -349,6 +349,8 @@ describe('MessageIO', function() {
           key: readFileSync('./test/fixtures/localhost.key'),
           cert: readFileSync('./test/fixtures/localhost.crt'),
           isServer: true,
+          // TDS 7.x only supports TLS versions up to TLS v1.2
+          maxVersion: 'TLSv1.2'
         }),
         encrypted: duplexpair.socket2
       };
@@ -380,21 +382,47 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(serverConnection, packetSize, debug);
 
-          const message = await io.readMessage();
+          // The server side TLS socket emits a `secure` event
+          // once TLS handshaking was completed.
+          const onSecure = once(securePair.cleartext, 'secure');
 
-          for await (const chunk of message) {
-            securePair.encrypted.write(chunk);
+          {
+            const message = await io.readMessage();
+
+            for await (const chunk of message) {
+              securePair.encrypted.write(chunk);
+            }
+
+            await once(securePair.encrypted, 'readable');
+
+            const chunks = [];
+            let chunk;
+            while (chunk = securePair.encrypted.read()) {
+              chunks.push(chunk);
+            }
+
+            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
 
-          await once(securePair.encrypted, 'readable');
+          {
+            const message = await io.readMessage();
 
-          const chunks = [];
-          let chunk;
-          while (chunk = securePair.encrypted.read()) {
-            chunks.push(chunk);
+            for await (const chunk of message) {
+              securePair.encrypted.write(chunk);
+            }
+
+            await once(securePair.encrypted, 'readable');
+
+            const chunks = [];
+            let chunk;
+            while (chunk = securePair.encrypted.read()) {
+              chunks.push(chunk);
+            }
+
+            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
 
-          io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+          await onSecure;
         })()
       ]);
     });
@@ -437,21 +465,47 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(serverConnection, packetSize, debug);
 
-          const message = await io.readMessage();
+          // The server side TLS socket emits a `secure` event
+          // once TLS handshaking was completed.
+          const onSecure = once(securePair.cleartext, 'secure');
 
-          for await (const chunk of message) {
-            securePair.encrypted.write(chunk);
+          {
+            const message = await io.readMessage();
+
+            for await (const chunk of message) {
+              securePair.encrypted.write(chunk);
+            }
+
+            await once(securePair.encrypted, 'readable');
+
+            const chunks = [];
+            let chunk;
+            while (chunk = securePair.encrypted.read()) {
+              chunks.push(chunk);
+            }
+
+            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
 
-          await once(securePair.encrypted, 'readable');
+          {
+            const message = await io.readMessage();
 
-          const chunks = [];
-          let chunk;
-          while (chunk = securePair.encrypted.read()) {
-            chunks.push(chunk);
+            for await (const chunk of message) {
+              securePair.encrypted.write(chunk);
+            }
+
+            await once(securePair.encrypted, 'readable');
+
+            const chunks = [];
+            let chunk;
+            while (chunk = securePair.encrypted.read()) {
+              chunks.push(chunk);
+            }
+
+            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
           }
 
-          io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+          await onSecure;
 
           // Set up TLS encryption
           serverConnection.pipe(securePair.encrypted);
@@ -460,7 +514,8 @@ describe('MessageIO', function() {
           // Wait for client request
           await once(securePair.cleartext, 'readable');
 
-          chunks.length = 0;
+          const chunks = [];
+          let chunk;
           while (chunk = securePair.cleartext.read()) {
             chunks.push(chunk);
           }
