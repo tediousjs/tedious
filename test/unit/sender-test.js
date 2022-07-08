@@ -3,9 +3,9 @@ const { assert } = require('chai');
 const dns = require('dns');
 const { AbortController } = require('node-abort-controller');
 
-const { Sender } = require('../../src/sender');
+const { sendMessage } = require('../../src/sender');
 
-describe('Sender', function() {
+describe('sendMessage', function() {
   describe('with a single IPv4 address', function() {
     /**
      * @type {dgram.Socket}
@@ -62,8 +62,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      await sender.execute();
+      await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
     });
 
     it('forwards any errors happening during lookup', async function() {
@@ -78,11 +77,10 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
 
       let error;
       try {
-        await sender.execute();
+        await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
         error = err;
       }
@@ -100,8 +98,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
-      await sender.execute();
+      await sendMessage(address, port, dns.lookup, controller.signal, expectedRequest);
     });
 
     it('calls the given callback with the received response', async function() {
@@ -112,9 +109,8 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
 
-      const message = await sender.execute();
+      const message = await sendMessage(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
       assert.deepEqual(message, expectedResponse);
     });
 
@@ -132,11 +128,10 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
 
       let error;
       try {
-        await sender.execute();
+        await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
         error = err;
       }
@@ -161,11 +156,10 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
 
       let error;
       try {
-        await sender.execute();
+        await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
         error = err;
       }
@@ -182,11 +176,10 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
 
       let error;
       try {
-        await sender.execute();
+        await sendMessage(address, port, dns.lookup, controller.signal, expectedRequest);
       } catch (err) {
         error = err;
       }
@@ -252,8 +245,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
-      await sender.execute();
+      await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
     });
 
     it('forwards any errors happening during lookup', async function() {
@@ -268,11 +260,10 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
 
       let error;
       try {
-        await sender.execute();
+        await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
         error = err;
       }
@@ -290,8 +281,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender(address, port, dns.lookup, controller.signal, expectedRequest);
-      await sender.execute();
+      await sendMessage(address, port, dns.lookup, controller.signal, expectedRequest);
     });
 
     it('calls the given callback with the received response', async function() {
@@ -302,8 +292,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
-      const message = await sender.execute();
+      const message = await sendMessage(address, port, dns.lookup, controller.signal, Buffer.from([0x02]));
 
       assert.deepEqual(message, expectedResponse);
     });
@@ -375,8 +364,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
-      await sender.execute();
+      await sendMessage('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
 
       assert.deepEqual([
         [ '127.0.0.1', expectedRequest ],
@@ -407,8 +395,7 @@ describe('Sender', function() {
       });
 
       const controller = new AbortController();
-      const sender = new Sender('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
-      const response = await sender.execute();
+      const response = await sendMessage('foo.bar.baz', port, lookup, controller.signal, expectedRequest);
 
       assert.strictEqual(messages.length, 3);
       assert.deepEqual(response, Buffer.from('response #3'));
