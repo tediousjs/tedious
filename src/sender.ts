@@ -4,40 +4,16 @@ import net from 'net';
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';
 
+import AbortError from './errors/abort-error';
+
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
-class AbortError extends Error {
-  code: string;
-
-  constructor() {
-    super('The operation was aborted');
-
-    this.code = 'ABORT_ERR';
-    this.name = 'AbortError';
-  }
-}
-
-export class ParallelSendStrategy {
-  addresses: dns.LookupAddress[];
-  port: number;
-  request: Buffer;
-
-  signal: AbortSignal;
-
-  constructor(addresses: dns.LookupAddress[], port: number, signal: AbortSignal, request: Buffer) {
-    this.addresses = addresses;
-    this.port = port;
-    this.request = request;
-    this.signal = signal;
+export async function sendInParallel(addresses: dns.LookupAddress[], port: number, request: Buffer, signal: AbortSignal) {
+  if (signal.aborted) {
+    throw new AbortError();
   }
 
-  send(cb: (error: Error | null, message?: Buffer) => void) {
-    const signal = this.signal;
-
-    if (signal.aborted) {
-      return cb(new AbortError());
-    }
-
+  return await new Promise<Buffer>((resolve, reject) => {
     const sockets: dgram.Socket[] = [];
 
     let errorCount = 0;
@@ -45,11 +21,11 @@ export class ParallelSendStrategy {
     const onError = (err: Error) => {
       errorCount++;
 
-      if (errorCount === this.addresses.length) {
+      if (errorCount === addresses.length) {
         signal.removeEventListener('abort', onAbort);
         clearSockets();
 
-        cb(err);
+        reject(err);
       }
     };
 
@@ -57,13 +33,13 @@ export class ParallelSendStrategy {
       signal.removeEventListener('abort', onAbort);
       clearSockets();
 
-      cb(null, message);
+      resolve(message);
     };
 
     const onAbort = () => {
       clearSockets();
 
-      cb(new AbortError());
+      reject(new AbortError());
     };
 
     const clearSockets = () => {
@@ -76,62 +52,44 @@ export class ParallelSendStrategy {
 
     signal.addEventListener('abort', onAbort, { once: true });
 
-    for (let j = 0; j < this.addresses.length; j++) {
-      const udpType = this.addresses[j].family === 6 ? 'udp6' : 'udp4';
+    for (let j = 0; j < addresses.length; j++) {
+      const udpType = addresses[j].family === 6 ? 'udp6' : 'udp4';
 
       const socket = dgram.createSocket(udpType);
       sockets.push(socket);
       socket.on('error', onError);
       socket.on('message', onMessage);
-      socket.send(this.request, 0, this.request.length, this.port, this.addresses[j].address);
+      socket.send(request, 0, request.length, port, addresses[j].address);
     }
-  }
+  });
 }
 
-export class Sender {
-  host: string;
-  port: number;
-  request: Buffer;
-  lookup: LookupFunction;
-  signal: AbortSignal;
-
-  constructor(host: string, port: number, lookup: LookupFunction, signal: AbortSignal, request: Buffer) {
-    this.host = host;
-    this.port = port;
-    this.request = request;
-    this.lookup = lookup;
-    this.signal = signal;
+export async function sendMessage(host: string, port: number, lookup: LookupFunction, signal: AbortSignal, request: Buffer) {
+  if (signal.aborted) {
+    throw new AbortError();
   }
 
-  execute(cb: (error: Error | null, message?: Buffer) => void) {
-    if (net.isIP(this.host)) {
-      this.executeForIP(cb);
-    } else {
-      this.executeForHostname(cb);
-    }
-  }
+  let addresses: dns.LookupAddress[];
 
-  executeForIP(cb: (error: Error | null, message?: Buffer) => void) {
-    this.executeForAddresses([{ address: this.host, family: net.isIPv6(this.host) ? 6 : 4 }], cb);
-  }
+  if (net.isIP(host)) {
+    addresses = [
+      { address: host, family: net.isIPv6(host) ? 6 : 4 }
+    ];
+  } else {
+    addresses = await new Promise<dns.LookupAddress[]>((resolve, reject) => {
+      const onAbort = () => {
+        reject(new AbortError());
+      };
 
-  // Wrapper for stubbing. Sinon does not have support for stubbing module functions.
-  invokeLookupAll(host: string, cb: (error: Error | null, addresses?: dns.LookupAddress[]) => void) {
-    this.lookup.call(null, punycode.toASCII(host), { all: true }, cb);
-  }
+      signal.addEventListener('abort', onAbort);
 
-  executeForHostname(cb: (error: Error | null, message?: Buffer) => void) {
-    this.invokeLookupAll(this.host, (err, addresses) => {
-      if (err) {
-        return cb(err);
-      }
+      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+        signal.removeEventListener('abort', onAbort);
 
-      this.executeForAddresses(addresses!, cb);
+        err ? reject(err) : resolve(addresses);
+      });
     });
   }
 
-  executeForAddresses(addresses: dns.LookupAddress[], cb: (error: Error | null, message?: Buffer) => void) {
-    const parallelSendStrategy = new ParallelSendStrategy(addresses, this.port, this.signal, this.request);
-    parallelSendStrategy.send(cb);
-  }
+  return await sendInParallel(addresses, port, request, signal);
 }

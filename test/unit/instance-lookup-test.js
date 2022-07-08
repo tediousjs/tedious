@@ -1,59 +1,67 @@
-const InstanceLookup = require('../../src/instance-lookup').InstanceLookup;
 const sinon = require('sinon');
 const punycode = require('punycode');
 const assert = require('chai').assert;
 const dgram = require('dgram');
 const { AbortController } = require('node-abort-controller');
 
+const { instanceLookup, parseBrowserResponse } = require('../../src/instance-lookup');
+
 describe('instanceLookup invalid args', function() {
-  let instanceLookup;
+  it('invalid server', async function() {
+    let error;
+    try {
+      await instanceLookup({ server: 4 });
+    } catch (err) {
+      error = err;
+    }
 
-  beforeEach(function() {
-    instanceLookup = new InstanceLookup();
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Invalid arguments: "server" must be a string');
   });
 
-  it('invalid server', () => {
-    assert.throws(() => {
-      instanceLookup.instanceLookup({ server: 4 });
-    }, 'Invalid arguments: "server" must be a string');
+  it('invalid instanceName', async function() {
+    let error;
+    try {
+      await instanceLookup({ server: 'serverName', instanceName: 4 });
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Invalid arguments: "instanceName" must be a string');
   });
 
-  it('invalid instanceName', () => {
-    assert.throws(() => {
-      instanceLookup.instanceLookup({ server: 'serverName', instanceName: 4 });
-    }, 'Invalid arguments: "instanceName" must be a string');
-  });
-
-  it('invalid timeout', () => {
-    assert.throws(() => {
-      instanceLookup.instanceLookup({
+  it('invalid timeout', async function() {
+    let error;
+    try {
+      await instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: 'some string'
       });
-    }, 'Invalid arguments: "timeout" must be a number');
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Invalid arguments: "timeout" must be a number');
   });
 
-  it('invalid retries', () => {
-    assert.throws(() => {
-      instanceLookup.instanceLookup({
+  it('invalid retries', async function() {
+    let error;
+    try {
+      await instanceLookup({
         server: 'server',
         instanceName: 'instance',
         timeout: 1000,
         retries: 'some string'
       });
-    }, 'Invalid arguments: "retries" must be a number');
-  });
+    } catch (err) {
+      error = err;
+    }
 
-  it('invalid callback', () => {
-    assert.throws(() => {
-      instanceLookup.instanceLookup({
-        server: 'server',
-        instanceName: 'instance',
-        timeout: 1000,
-        retries: 3
-      }, 4);
-    }, 'Invalid arguments: "callback" must be a function');
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Invalid arguments: "retries" must be a number');
   });
 });
 
@@ -72,27 +80,28 @@ describe('InstanceLookup', function() {
     server.close(done);
   });
 
-  it('sends a request to the given server browser endpoint', function(done) {
+  it('sends a request to the given server browser endpoint', async function() {
     server.on('message', (msg) => {
       assert.deepEqual(msg, Buffer.from([0x02]));
-
-      done();
     });
 
     const controller = new AbortController();
-    new InstanceLookup().instanceLookup({
-      server: server.address().address,
-      port: server.address().port,
-      instanceName: 'second',
-      timeout: 500,
-      retries: 1,
-      signal: controller.signal
-    }, () => {
+
+    try {
+      await instanceLookup({
+        server: server.address().address,
+        port: server.address().port,
+        instanceName: 'second',
+        timeout: 500,
+        retries: 1,
+        signal: controller.signal
+      });
+    } catch {
       // Ignore
-    });
+    }
   });
 
-  it('can be aborted immediately', function(done) {
+  it('can be aborted immediately', async function() {
     server.on('message', (msg, rinfo) => {
       assert.fail('expected no message to be received');
     });
@@ -100,22 +109,25 @@ describe('InstanceLookup', function() {
     const controller = new AbortController();
     controller.abort();
 
-    new InstanceLookup().instanceLookup({
-      server: server.address().address,
-      port: server.address().port,
-      instanceName: 'first',
-      timeout: 500,
-      retries: 1,
-      signal: controller.signal
-    }, (err) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await instanceLookup({
+        server: server.address().address,
+        port: server.address().port,
+        instanceName: 'first',
+        timeout: 500,
+        retries: 1,
+        signal: controller.signal
+      });
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
   });
 
-  it('can be aborted after sending the first request', function(done) {
+  it('can be aborted after sending the first request', async function() {
     server.on('message', (msg, rinfo) => {
       if (controller.signal.aborted) {
         assert.fail('expected no message to be received');
@@ -126,22 +138,25 @@ describe('InstanceLookup', function() {
 
     const controller = new AbortController();
 
-    new InstanceLookup().instanceLookup({
-      server: server.address().address,
-      port: server.address().port,
-      instanceName: 'first',
-      timeout: 500,
-      retries: 1,
-      signal: controller.signal
-    }, (err) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
+    let error;
+    try {
+      await instanceLookup({
+        server: server.address().address,
+        port: server.address().port,
+        instanceName: 'first',
+        timeout: 500,
+        retries: 1,
+        signal: controller.signal
+      });
+    } catch (err) {
+      error = err;
+    }
 
-      done();
-    });
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
   });
 
-  it('can be aborted after retrying to send a request', function(done) {
+  it('can be aborted after retrying to send a request', async function() {
     server.once('message', () => {
       server.on('message', (msg, rinfo) => {
         if (controller.signal.aborted) {
@@ -154,56 +169,55 @@ describe('InstanceLookup', function() {
 
     const controller = new AbortController();
 
-    new InstanceLookup().instanceLookup({
-      server: server.address().address,
-      port: server.address().port,
-      instanceName: 'first',
-      timeout: 500,
-      retries: 1,
-      signal: controller.signal
-    }, (err) => {
-      assert.instanceOf(err, Error);
-      assert.strictEqual(err.name, 'AbortError');
-
-      done();
-    });
-  });
-
-  describe('when not receiving a response', function(done) {
-    it('times out after the given timeout period', function(done) {
-      let timedOut = false;
-      let errored = false;
-
-      setTimeout(() => {
-        timedOut = true;
-      }, 500);
-
-      setTimeout(() => {
-        assert.isTrue(errored);
-        done();
-      }, 600);
-
-      const controller = new AbortController();
-
-      new InstanceLookup().instanceLookup({
+    let error;
+    try {
+      await instanceLookup({
         server: server.address().address,
         port: server.address().port,
-        instanceName: 'instance',
+        instanceName: 'first',
         timeout: 500,
-        retries: 0,
+        retries: 1,
         signal: controller.signal
-      }, (err) => {
-        assert.instanceOf(err, Error);
-        assert.match(err.message, /^Failed to get response from SQL Server Browser/);
-        assert.isTrue(timedOut);
-
-        errored = true;
       });
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
+  });
+
+  describe('when not receiving a response', function() {
+    it('times out after the given timeout period', async function() {
+      const controller = new AbortController();
+
+      const timeBefore = process.hrtime();
+
+      let error;
+      try {
+        await instanceLookup({
+          server: server.address().address,
+          port: server.address().port,
+          instanceName: 'instance',
+          timeout: 500,
+          retries: 0,
+          signal: controller.signal
+        });
+      } catch (err) {
+        error = err;
+      }
+
+      const timeDiff = process.hrtime(timeBefore);
+
+      assert.instanceOf(error, Error);
+      assert.match(error.message, /^Failed to get response from SQL Server Browser/);
+
+      assert.approximately(500000000, timeDiff[1], 100000000);
     });
   });
 
   describe('when receiving a response before timing out', function() {
-    it('returns the port for the instance with a matching name', function(done) {
+    it('returns the port for the instance with a matching name', async function() {
       server.on('message', (msg, rinfo) => {
         const response = [
           'ServerName;WINDOWS2;InstanceName;first;IsClustered;No;Version;10.50.2500.0;tcp;1444;;',
@@ -216,25 +230,21 @@ describe('InstanceLookup', function() {
 
       const controller = new AbortController();
 
-      new InstanceLookup().instanceLookup({
+      const result = await instanceLookup({
         server: server.address().address,
         port: server.address().port,
         instanceName: 'second',
         timeout: 500,
         retries: 1,
         signal: controller.signal
-      }, (err, result) => {
-        assert.ifError(err);
-
-        assert.strictEqual(result, 1433);
-
-        done();
       });
+
+      assert.strictEqual(result, 1433);
     });
   });
 
   describe('when receiving a response that does not contain the requested instance name', function() {
-    it('returns an error', function(done) {
+    it('throws an error', async function() {
       server.on('message', (msg, rinfo) => {
         const response = [
           'ServerName;WINDOWS2;InstanceName;first;IsClustered;No;Version;10.50.2500.0;tcp;1444;;',
@@ -247,59 +257,59 @@ describe('InstanceLookup', function() {
 
       const controller = new AbortController();
 
-      new InstanceLookup().instanceLookup({
-        server: server.address().address,
-        port: server.address().port,
-        instanceName: 'other',
-        timeout: 500,
-        retries: 1,
-        signal: controller.signal
-      }, (err) => {
-        assert.instanceOf(err, Error);
-        assert.match(err.message, /^Port for other not found/);
+      let error;
+      try {
+        await instanceLookup({
+          server: server.address().address,
+          port: server.address().port,
+          instanceName: 'other',
+          timeout: 500,
+          retries: 1,
+          signal: controller.signal
+        });
+      } catch (err) {
+        error = err;
+      }
 
-        done();
-      });
+      assert.instanceOf(error, Error);
+      assert.match(error.message, /^Port for other not found/);
     });
   });
 
   describe('when receiving an invalid response', function() {
-    it('returns an error', function(done) {
+    it('throws an error', async function() {
       server.on('message', (msg, rinfo) => {
         server.send('foo bar baz', rinfo.port, rinfo.address);
       });
 
       const controller = new AbortController();
 
-      new InstanceLookup().instanceLookup({
-        server: server.address().address,
-        port: server.address().port,
-        instanceName: 'other',
-        timeout: 500,
-        retries: 1,
-        signal: controller.signal
-      }, (err) => {
-        assert.instanceOf(err, Error);
-        assert.match(err.message, /^Port for other not found/);
+      let error;
+      try {
+        await instanceLookup({
+          server: server.address().address,
+          port: server.address().port,
+          instanceName: 'other',
+          timeout: 500,
+          retries: 1,
+          signal: controller.signal
+        });
+      } catch (err) {
+        error = err;
+      }
 
-        done();
-      });
+      assert.instanceOf(error, Error);
+      assert.match(error.message, /^Port for other not found/);
     });
   });
 });
 
 describe('parseBrowserResponse', function() {
-  let instanceLookup;
-
-  beforeEach(function() {
-    instanceLookup = new InstanceLookup();
-  });
-
   it('oneInstanceFound', () => {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesFoundInFirst', () => {
@@ -307,7 +317,7 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesFoundInSecond', () => {
@@ -315,7 +325,7 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), 1433);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
   it('twoInstancesNotFound', () => {
@@ -323,14 +333,14 @@ describe('parseBrowserResponse', function() {
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
 
-    assert.strictEqual(instanceLookup.parseBrowserResponse(response, 'sqlexpress'), undefined);
+    assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), undefined);
   });
 });
 
 describe('parseBrowserResponse', function() {
-  it('test IDN Server name', (done) => {
+  it('test IDN Server name', async function() {
     const lookup = sinon.spy(function lookup(hostname, options, callback) {
-      callback([{ address: '127.0.0.1', family: 4 }]);
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
 
     const controller = new AbortController();
@@ -339,22 +349,24 @@ describe('parseBrowserResponse', function() {
       server: '本地主机.ad',
       instanceName: 'instance',
       timeout: 500,
-      retries: 1,
+      retries: 0,
       lookup: lookup,
       signal: controller.signal
     };
 
-    new InstanceLookup().instanceLookup(options, () => {
-      sinon.assert.calledOnce(lookup);
-      sinon.assert.calledWithMatch(lookup, punycode.toASCII(options.server));
+    try {
+      await instanceLookup(options);
+    } catch {
+      // ignore
+    }
 
-      done();
-    });
+    sinon.assert.calledOnce(lookup);
+    sinon.assert.calledWithMatch(lookup, punycode.toASCII(options.server));
   });
 
-  it('test ASCII Server name', (done) => {
+  it('test ASCII Server name', async function() {
     const lookup = sinon.spy(function lookup(hostname, options, callback) {
-      callback([{ address: '127.0.0.1', family: 4 }]);
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
 
     const controller = new AbortController();
@@ -363,16 +375,18 @@ describe('parseBrowserResponse', function() {
       server: 'localhost',
       instanceName: 'instance',
       timeout: 500,
-      retries: 1,
+      retries: 0,
       lookup: lookup,
       signal: controller.signal
     };
 
-    new InstanceLookup().instanceLookup(options, (err) => {
-      sinon.assert.calledOnce(lookup);
-      sinon.assert.calledWithMatch(lookup, options.server);
+    try {
+      await instanceLookup(options);
+    } catch {
+      // ignore
+    }
 
-      done();
-    });
+    sinon.assert.calledOnce(lookup);
+    sinon.assert.calledWithMatch(lookup, options.server);
   });
 });

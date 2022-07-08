@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import os from 'os';
 import { Socket } from 'net';
+import dns from 'dns';
 
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
@@ -17,7 +18,7 @@ import {
 import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
-import { InstanceLookup } from './instance-lookup';
+import { instanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
@@ -30,7 +31,7 @@ import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
-import { Connector } from './connector';
+import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
@@ -1924,21 +1925,24 @@ class Connection extends EventEmitter {
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
     } else {
-      return new InstanceLookup().instanceLookup({
+      return instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
-      }, (err, port) => {
-        if (err) {
-          if (err.name === 'AbortError') {
-            return;
-          }
-
-          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
+      }).then((port) => {
+        process.nextTick(() => {
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
+        });
+      }, (err) => {
+        if (err.name === 'AbortError') {
+          // Ignore the AbortError for now, this is still handled by the connectTimer firing
+          return;
         }
+
+        process.nextTick(() => {
+          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
+        });
       });
     }
   }
@@ -1997,31 +2001,32 @@ class Connection extends EventEmitter {
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, signal, multiSubnetFailover).execute((err, socket) => {
-      if (err) {
-        if (err.name === 'AbortError') {
-          return;
-        }
+    const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
 
-        return this.socketError(err);
+    connect(connectOpts, dns.lookup, signal).then((socket) => {
+      process.nextTick(() => {
+        socket.on('error', (error) => { this.socketError(error); });
+        socket.on('close', () => { this.socketClose(); });
+        socket.on('end', () => { this.socketEnd(); });
+        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+        this.socket = socket;
+
+        this.closed = false;
+        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+        this.sendPreLogin();
+        this.transitionTo(this.STATE.SENT_PRELOGIN);
+      });
+    }, (err) => {
+      if (err.name === 'AbortError') {
+        return;
       }
 
-      socket = socket!;
-      socket.on('error', (error) => { this.socketError(error); });
-      socket.on('close', () => { this.socketClose(); });
-      socket.on('end', () => { this.socketEnd(); });
-      socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-      this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
-      this.socket = socket;
-
-      this.closed = false;
-      this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-      this.sendPreLogin();
-      this.transitionTo(this.STATE.SENT_PRELOGIN);
+      process.nextTick(() => { this.socketError(err); });
     });
   }
 
