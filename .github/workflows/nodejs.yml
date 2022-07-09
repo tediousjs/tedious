@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Use Node.js 12
+    - name: Use Node.js 14
       uses: actions/setup-node@v1
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -63,7 +63,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x, 18.x]
+        node-version: [14.x, 16.x, 18.x]
       fail-fast: false
 
     services:
@@ -175,7 +175,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure:
-    name: Azure SQL Server / Node.js 12.x
+    name: Azure SQL Server / Node.js 14.x
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
@@ -183,10 +183,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Use Node.js 12
+    - name: Use Node.js 14
       uses: actions/setup-node@v1
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -292,10 +292,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Use Node.js 12
+    - name: Use Node.js 14
       uses: actions/setup-node@v1
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
