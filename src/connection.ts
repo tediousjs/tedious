@@ -49,15 +49,6 @@ import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
-let trustServerWarningEmitted = false;
-
-const emitTrustServerCertificateWarning = () => {
-  if (!trustServerWarningEmitted) {
-    trustServerWarningEmitted = true;
-    process.emitWarning('`config.options.trustServerCertificate` will default to false in the future. To silence this message, specify a value explicitly in the config options');
-  }
-};
-
 let domainRenameToTenantIdWarningEmitted = false;
 const emitDomainRenameToTenantIdWarning = () => {
   if (!domainRenameToTenantIdWarningEmitted) {
@@ -1290,7 +1281,7 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustedServerNameAE: undefined,
-        trustServerCertificate: true,
+        trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
         workstationId: undefined,
@@ -1675,8 +1666,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
-      } else {
-        emitTrustServerCertificateWarning();
       }
 
       if (config.options.useColumnNames !== undefined) {
