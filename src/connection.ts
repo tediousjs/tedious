@@ -49,16 +49,6 @@ import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
-let domainRenameToTenantIdWarningEmitted = false;
-const emitDomainRenameToTenantIdWarning = () => {
-  if (!domainRenameToTenantIdWarningEmitted) {
-    domainRenameToTenantIdWarningEmitted = true;
-    process.emitWarning('`When using authentication type `azure-active-directory-password`,' +
-    ' config.authentication.options.domain` will be renamed to config.authentications.options.tenantId`' +
-    ' in the future. Rename `domain` to `tenantId` to silence this message.');
-  }
-};
-
 type BeginTransactionCallback =
   /**
    * The callback is called when the request to start the transaction has completed,
@@ -1115,12 +1105,6 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
 
-        if (options.domain !== undefined && typeof options.domain !== 'string') {
-          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
-        } else if (options.domain !== undefined) {
-          emitDomainRenameToTenantIdWarning();
-        }
-
         if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
           throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
         }
@@ -1130,7 +1114,7 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
-            tenantId: options.tenantId ?? options.domain,
+            tenantId: options.tenantId,
             clientId: options.clientId
           }
         };
