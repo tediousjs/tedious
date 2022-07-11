@@ -1,6 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
 import JSBI from 'jsbi';
+import md4 from 'js-md4';
 
 interface Options {
   domain: string;
@@ -143,7 +144,7 @@ class NTLMResponsePayload {
 
   ntHash(text: string) {
     const unicodeString = Buffer.from(text, 'ucs2');
-    return crypto.createHash('md4').update(unicodeString).digest();
+    return Buffer.from(md4.arrayBuffer(unicodeString));
   }
 
   hmacMD5(data: Buffer, key: Buffer) {

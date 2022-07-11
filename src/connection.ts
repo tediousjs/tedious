@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import os from 'os';
 import { Socket } from 'net';
+import dns from 'dns';
 
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
@@ -8,16 +9,16 @@ import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
+  DefaultAzureCredential,
   ClientSecretCredential,
   ManagedIdentityCredential,
-  TokenCredential,
   UsernamePasswordCredential,
 } from '@azure/identity';
 
 import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
-import { EventEmitter } from 'events';
-import { InstanceLookup } from './instance-lookup';
+import { EventEmitter, once } from 'events';
+import { instanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
@@ -30,7 +31,7 @@ import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
-import { Connector } from './connector';
+import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
@@ -43,9 +44,29 @@ import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 
+import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+
+let trustServerWarningEmitted = false;
+
+const emitTrustServerCertificateWarning = () => {
+  if (!trustServerWarningEmitted) {
+    trustServerWarningEmitted = true;
+    process.emitWarning('`config.options.trustServerCertificate` will default to false in the future. To silence this message, specify a value explicitly in the config options');
+  }
+};
+
+let domainRenameToTenantIdWarningEmitted = false;
+const emitDomainRenameToTenantIdWarning = () => {
+  if (!domainRenameToTenantIdWarningEmitted) {
+    domainRenameToTenantIdWarningEmitted = true;
+    process.emitWarning('`When using authentication type `azure-active-directory-password`,' +
+    ' config.authentication.options.domain` will be renamed to config.authentications.options.tenantId`' +
+    ' in the future. Rename `domain` to `tenantId` to silence this message.');
+  }
+};
 
 type BeginTransactionCallback =
   /**
@@ -211,14 +232,28 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieve a token
      */
     clientId?: string;
   };
 }
+
+interface AzureActiveDirectoryDefaultAuthentication {
+  type: 'azure-active-directory-default';
+  options: {
+    /**
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
+     *
+     * This is optional for retrieving a token
+     */
+    clientId?: string;
+  };
+}
+
 
 interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
@@ -238,15 +273,21 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `userName` asscoiate to their account.
      */
     userName: string;
+
     /**
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
 
     /**
+     * A client id to use.
+     */
+    clientId: string;
+
+    /**
      * Optional parameter for specific Azure tenant ID
      */
-    domain: string;
+    tenantId: string;
   };
 }
 
@@ -308,7 +349,7 @@ interface ErrorWithCode extends Error {
 
 interface InternalConnectionConfig {
   server: string;
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
   options: InternalConnectionOptions;
 }
 
@@ -396,7 +437,8 @@ type Authentication = DefaultAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
   AzureActiveDirectoryAccessTokenAuthentication |
-  AzureActiveDirectoryServicePrincipalSecret;
+  AzureActiveDirectoryServicePrincipalSecret |
+  AzureActiveDirectoryDefaultAuthentication;
 
 type AuthenticationType = Authentication['type'];
 
@@ -447,6 +489,7 @@ interface AuthenticationOptions {
    * Type of the authentication method, valid types are `default`, `ntlm`,
    * `azure-active-directory-password`, `azure-active-directory-access-token`,
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
+   * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
    */
   type?: AuthenticationType;
@@ -460,6 +503,7 @@ interface AuthenticationOptions {
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   * * `azure-active-directory-default` : [[AzureActiveDirectoryDefaultAuthentication.options]]
    */
   options?: any;
 }
@@ -895,7 +939,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  loginError: undefined | ConnectionError;
+  loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
@@ -1038,8 +1082,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1076,12 +1120,29 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
 
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        } else if (options.clientId === undefined) {
+          emitAzureADPasswordClientIdDeprecationWarning();
+        }
+
+        if (options.domain !== undefined && typeof options.domain !== 'string') {
+          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
+        } else if (options.domain !== undefined) {
+          emitDomainRenameToTenantIdWarning();
+        }
+
+        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
+          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
+        }
+
         authentication = {
           type: 'azure-active-directory-password',
           options: {
             userName: options.userName,
             password: options.password,
-            domain: options.domain,
+            tenantId: options.tenantId ?? options.domain,
+            clientId: options.clientId ?? '7f98cb04-cd1e-40df-9140-3bf7e2cea4db'
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -1102,6 +1163,16 @@ class Connection extends EventEmitter {
 
         authentication = {
           type: 'azure-active-directory-msi-vm',
+          options: {
+            clientId: options.clientId
+          }
+        };
+      } else if (type === 'azure-active-directory-default') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+        authentication = {
+          type: 'azure-active-directory-default',
           options: {
             clientId: options.clientId
           }
@@ -1604,6 +1675,8 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
+      } else {
+        emitTrustServerCertificateWarning();
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -1769,18 +1842,7 @@ class Connection extends EventEmitter {
    */
   on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
 
-  /**
-   * A SSPI token was send by the server.
-   *
-   * @deprecated
-   */
-  on(event: 'sspichallenge', listener: (token: import('./token/token').SSPIToken) => void): this
-
   on(event: string | symbol, listener: (...args: any[]) => void) {
-    if (event === 'sspichallenge') {
-      emitSSPIChallengeEventDeprecationWarning();
-    }
-
     return super.on(event, listener);
   }
 
@@ -1840,10 +1902,6 @@ class Connection extends EventEmitter {
    * @private
    */
   emit(event: 'rollbackTransaction'): boolean
-  /**
-   * @private
-   */
-  emit(event: 'sspichallenge', token: import('./token/token').SSPIToken): boolean
 
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
@@ -1867,21 +1925,24 @@ class Connection extends EventEmitter {
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
     } else {
-      return new InstanceLookup().instanceLookup({
+      return instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
-      }, (err, port) => {
-        if (err) {
-          if (err.name === 'AbortError') {
-            return;
-          }
-
-          this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
+      }).then((port) => {
+        process.nextTick(() => {
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
+        });
+      }, (err) => {
+        if (err.name === 'AbortError') {
+          // Ignore the AbortError for now, this is still handled by the connectTimer firing
+          return;
         }
+
+        process.nextTick(() => {
+          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
+        });
       });
     }
   }
@@ -1905,7 +1966,7 @@ class Connection extends EventEmitter {
 
       const request = this.request;
       if (request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
         request.callback(err);
         this.request = undefined;
       }
@@ -1940,31 +2001,32 @@ class Connection extends EventEmitter {
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, signal, multiSubnetFailover).execute((err, socket) => {
-      if (err) {
-        if (err.name === 'AbortError') {
-          return;
-        }
+    const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
 
-        return this.socketError(err);
+    connect(connectOpts, dns.lookup, signal).then((socket) => {
+      process.nextTick(() => {
+        socket.on('error', (error) => { this.socketError(error); });
+        socket.on('close', () => { this.socketClose(); });
+        socket.on('end', () => { this.socketEnd(); });
+        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+        this.socket = socket;
+
+        this.closed = false;
+        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+        this.sendPreLogin();
+        this.transitionTo(this.STATE.SENT_PRELOGIN);
+      });
+    }, (err) => {
+      if (err.name === 'AbortError') {
+        return;
       }
 
-      socket = socket!;
-      socket.on('error', (error) => { this.socketError(error); });
-      socket.on('close', () => { this.socketClose(); });
-      socket.on('end', () => { this.socketEnd(); });
-      socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-      this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
-      this.socket = socket;
-
-      this.closed = false;
-      this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-      this.sendPreLogin();
-      this.transitionTo(this.STATE.SENT_PRELOGIN);
+      process.nextTick(() => { this.socketError(err); });
     });
   }
 
@@ -2032,7 +2094,7 @@ class Connection extends EventEmitter {
   connectTimeout() {
     const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
+    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -2043,7 +2105,7 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
   }
 
   /**
@@ -2055,7 +2117,7 @@ class Connection extends EventEmitter {
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = RequestError(message, 'ETIMEOUT');
+    request.error = new RequestError(message, 'ETIMEOUT');
   }
 
   /**
@@ -2161,11 +2223,11 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
     this.dispatchEvent('socketError', error);
   }
@@ -2222,20 +2284,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  emptyMessageBuffer() {
-    this.messageBuffer = Buffer.alloc(0);
-  }
-
-  /**
-   * @private
-   */
-  addToMessageBuffer(data: Buffer) {
-    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
-  }
-
-  /**
-   * @private
-   */
   sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
@@ -2266,6 +2314,7 @@ class Connection extends EventEmitter {
         break;
 
       case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
         payload.fedAuth = {
@@ -2545,44 +2594,6 @@ class Connection extends EventEmitter {
    * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
    * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
    *
-   * // Now, we can specify each row to be written.
-   * //
-   * // Note that these rows are held in memory until the
-   * // bulk load was performed, so if you need to write a large
-   * // number of rows (e.g. by reading from a CSV file),
-   * // using a streaming bulk load is advisable to keep memory usage low.
-   * bulkLoad.addRow({ 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') });
-   * bulkLoad.addRow({ 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') });
-   *
-   * connection.execBulkLoad(bulkLoad);
-   * ```
-   *
-   * @param bulkLoad A previously created [[BulkLoad]].
-   *
-   * @deprecated Adding rows to a [[BulkLoad]] via [[BulkLoad.addRow]] or [[BulkLoad.getRowStream]]
-   *   is deprecated and will be removed in the future. You should migrate to calling [[Connection.execBulkLoad]]
-   *   with a `Iterable` or `AsyncIterable` as the second argument instead.
-   */
-  execBulkLoad(bulkLoad: BulkLoad): void
-
-  /**
-   * Execute a [[BulkLoad]].
-   *
-   * ```js
-   * // We want to perform a bulk load into a table with the following format:
-   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
-   *
-   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
-   *   // ...
-   * });
-   *
-   * // First, we need to specify the columns that we want to write to,
-   * // and their definitions. These definitions must match the actual table,
-   * // otherwise the bulk load will fail.
-   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
-   *
    * // Execute a bulk load with a predefined list of rows.
    * //
    * // Note that these rows are held in memory until the
@@ -2710,7 +2721,7 @@ class Connection extends EventEmitter {
       if (name === 'handle') {
         request.handle = value;
       } else {
-        request.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+        request.error = new RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
       }
     });
 
@@ -3004,10 +3015,10 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
       process.nextTick(() => {
-        request.callback(RequestError('Canceled.', 'ECANCEL'));
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
@@ -3024,6 +3035,7 @@ class Connection extends EventEmitter {
 
       const onCancel = () => {
         payloadStream.unpipe(message);
+        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
 
         // set the ignore bit and end the message.
         message.ignore = true;
@@ -3059,8 +3071,6 @@ class Connection extends EventEmitter {
 
         // Only set a request error if no error was set yet.
         request.error ??= error;
-
-        payloadStream.unpipe(message);
 
         message.ignore = true;
         message.end();
@@ -3128,19 +3138,27 @@ class Connection extends EventEmitter {
   }
 }
 
-let sspichallengeEventDeprecationWarningEmitted = false;
-function emitSSPIChallengeEventDeprecationWarning() {
-  if (sspichallengeEventDeprecationWarningEmitted) {
+let azureADPasswordClientIdDeprecationWarningEmitted = false;
+function emitAzureADPasswordClientIdDeprecationWarning() {
+  if (azureADPasswordClientIdDeprecationWarningEmitted) {
     return;
   }
 
-  sspichallengeEventDeprecationWarningEmitted = true;
+  azureADPasswordClientIdDeprecationWarningEmitted = true;
 
   process.emitWarning(
-    'The `sspichallenge` event is deprecated and will be removed.',
+    'When using the `azure-active-directory-password` authentication method, please provide a value for the `clientId` option. ' +
+    'This option will be required in a future release.',
     'DeprecationWarning',
     Connection.prototype.on
   );
+}
+
+function isTransientError(error: AggregateError | ConnectionError): boolean {
+  if (error instanceof AggregateError) {
+    error = error.errors[0];
+  }
+  return (error instanceof ConnectionError) && !!error.isTransient;
 }
 
 export default Connection;
@@ -3168,12 +3186,66 @@ Connection.prototype.STATE = {
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        let messageBuffer = Buffer.alloc(0);
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        for await (const data of message) {
+          messageBuffer = Buffer.concat([messageBuffer, data]);
+        }
+
+        const preloginPayload = new PreloginPayload(messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+
+        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          try {
+            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+            await this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+          } catch (err: any) {
+            return this.socketError(err);
+          }
+        }
+
+        this.sendLogin7Packet();
+
+        const { authentication } = this.config;
+
+        switch (authentication.type) {
+          case 'azure-active-directory-password':
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+          case 'azure-active-directory-service-principal-secret':
+          case 'azure-active-directory-default':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            break;
+          case 'ntlm':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            break;
+          default:
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            break;
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3182,41 +3254,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.addToMessageBuffer(data);
-        });
-
-        message.once('end', () => {
-          const preloginPayload = new PreloginPayload(this.messageBuffer);
-          this.debug.payload(function() {
-            return preloginPayload.toString('  ');
-          });
-
-          if (preloginPayload.fedAuthRequired === 1) {
-            this.fedAuthRequired = true;
-          }
-
-          if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-            if (!this.config.options.encrypt) {
-              this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-              return this.close();
-            }
-
-            this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-          } else {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          }
-        });
       }
     }
   },
@@ -3261,56 +3298,54 @@ Connection.prototype.STATE = {
   },
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
-    enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.messageIo.tlsHandshakeData(data);
-        });
-
-        message.once('end', () => {
-          if (this.messageIo.tlsNegotiationComplete) {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          } else {
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+
+        if (handler.loginAckReceived) {
+          if (handler.routingData) {
+            this.routingData = handler.routingData;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
+        } else if (this.loginError) {
+          if (isTransientError(this.loginError)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3319,62 +3354,32 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        tokenStreamParser.once('end', () => {
-          if (handler.loginAckReceived) {
-            if (handler.routingData) {
-              this.routingData = handler.routingData;
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
-          } else if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
-          } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      (async () => {
+        while (true) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
 
-        tokenStreamParser.once('end', () => {
+          const handler = new Login7TokenHandler(this);
+          const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+          await once(tokenStreamParser, 'end');
+
           if (handler.loginAckReceived) {
             if (handler.routingData) {
               this.routingData = handler.routingData;
-              this.transitionTo(this.STATE.REROUTING);
+              return this.transitionTo(this.STATE.REROUTING);
             } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+              return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
             }
           } else if (this.ntlmpacket) {
             const authentication = this.config.authentication as NtlmAuthentication;
@@ -3392,35 +3397,24 @@ Connection.prototype.STATE = {
             });
 
             this.ntlmpacket = undefined;
-
-            this.messageIo.readMessage().then((message) => {
-              this.dispatchEvent('message', message);
-            }, (err) => {
-              this.socketError(err);
-            });
           } else if (this.loginError) {
-            if (this.loginError.isTransient) {
+            if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
               this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              return this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+            return this.transitionTo(this.STATE.FINAL);
           }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
         });
-      }
-    }
-  },
-  SENT_LOGIN7_WITH_FEDAUTH: {
-    name: 'SentLogin7Withfedauth',
-    enter: function() {
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
       });
     },
     events: {
@@ -3429,96 +3423,133 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
+    enter: function() {
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        await once(tokenStreamParser, 'end');
+        if (handler.loginAckReceived) {
+          if (handler.routingData) {
+            this.routingData = handler.routingData;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
 
-        tokenStreamParser.once('end', () => {
-          if (handler.loginAckReceived) {
-            if (handler.routingData) {
-              this.routingData = handler.routingData;
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
+          return;
+        }
 
+        const fedAuthInfoToken = handler.fedAuthInfoToken;
+
+        if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+
+          let credentials;
+
+          switch (authentication.type) {
+            case 'azure-active-directory-password':
+              credentials = new UsernamePasswordCredential(
+                authentication.options.tenantId ?? 'common',
+                authentication.options.clientId,
+                authentication.options.userName,
+                authentication.options.password
+              );
+              break;
+            case 'azure-active-directory-msi-vm':
+            case 'azure-active-directory-msi-app-service':
+              const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+              credentials = new ManagedIdentityCredential(...msiArgs);
+              break;
+            case 'azure-active-directory-default':
+              const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+              credentials = new DefaultAzureCredential(args);
+              break;
+            case 'azure-active-directory-service-principal-secret':
+              credentials = new ClientSecretCredential(
+                authentication.options.tenantId,
+                authentication.options.clientId,
+                authentication.options.clientSecret
+              );
+              break;
+          }
+
+          let tokenResponse;
+          try {
+            tokenResponse = await credentials.getToken(tokenScope);
+          } catch (err) {
+            this.loginError = new AggregateError(
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
             return;
           }
 
-          const fedAuthInfoToken = handler.fedAuthInfoToken;
 
-          if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-            const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
-            const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+          const token = tokenResponse.token;
+          this.sendFedAuthTokenMessage(token);
 
-            const getToken = (callback: (error: Error | null, token?: string) => void) => {
-              const getTokenFromCredentials = (credentials: TokenCredential) => {
-                credentials.getToken(tokenScope).then((tokenResponse) => {
-                  callback(null, tokenResponse?.token);
-                }, callback);
-              };
-
-              if (authentication.type === 'azure-active-directory-password') {
-                const credentials = new UsernamePasswordCredential(
-                  authentication.options.domain ?? 'common',  // tenantId
-                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',     // clientId
-                  authentication.options.userName,
-                  authentication.options.password
-                );
-
-                getTokenFromCredentials(credentials);
-              } else if (authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service') {
-                const msiArgs = authentication.options.clientId ? [ authentication.options.clientId, {} ] : [ {} ];
-                const credentials = new ManagedIdentityCredential(...msiArgs);
-
-                getTokenFromCredentials(credentials);
-              } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-                const credentials = new ClientSecretCredential(
-                  authentication.options.tenantId,
-                  authentication.options.clientId,
-                  authentication.options.clientSecret
-                );
-
-                getTokenFromCredentials(credentials);
-              }
-            };
-
-            getToken((err, token) => {
-              if (err) {
-                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
-                return;
-              }
-
-              this.sendFedAuthTokenMessage(token!);
-            });
-          } else if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (isTransientError(this.loginError)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
         });
+      });
+    },
+    events: {
+      socketError: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      this.sendInitialSql();
+      (async () => {
+        this.sendInitialSql();
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+        await once(tokenStreamParser, 'end');
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        this.transitionTo(this.STATE.LOGGED_IN);
+        this.processedInitialSql();
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3527,14 +3558,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-
-        tokenStreamParser.once('end', () => {
-          this.transitionTo(this.STATE.LOGGED_IN);
-          this.processedInitialSql();
-        });
       }
     }
   },
@@ -3549,26 +3572,13 @@ Connection.prototype.STATE = {
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     enter: function() {
-      this.emptyMessageBuffer();
-
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
-      });
-    },
-    exit: function(nextState) {
-      this.clearRequestTimer();
-    },
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
-      message: function(message) {
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
@@ -3636,18 +3646,57 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', onEndOfMessage);
         this.request?.once('cancel', onCancel);
+      })();
+
+    },
+    exit: function(nextState) {
+      this.clearRequestTimer();
+    },
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request!;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       }
     }
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
 
-      this.messageIo.readMessage().then((message) => {
-        this.dispatchEvent('message', message);
-      }, (err) => {
-        this.socketError(err);
+        const handler = new AttentionTokenHandler(this, this.request!);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+        // 3.2.5.7 Sent Attention State
+        // Discard any data contained in the response, until we receive the attention response
+        if (handler.attentionReceived) {
+          this.clearCancelTimer();
+
+          const sqlRequest = this.request!;
+          this.request = undefined;
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
+          } else {
+            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
+          }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     },
     events: {
@@ -3658,28 +3707,6 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
 
         sqlRequest.callback(err);
-      },
-      message: function(message) {
-        const handler = new AttentionTokenHandler(this, this.request!);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        tokenStreamParser.once('end', () => {
-          // 3.2.5.7 Sent Attention State
-          // Discard any data contained in the response, until we receive the attention response
-          if (handler.attentionReceived) {
-            this.clearCancelTimer();
-
-            const sqlRequest = this.request!;
-            this.request = undefined;
-            this.transitionTo(this.STATE.LOGGED_IN);
-
-            if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-              sqlRequest.callback(sqlRequest.error);
-            } else {
-              sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
-            }
-          }
-        });
       }
     }
   },

@@ -113,11 +113,7 @@ const VarChar: { maximumLength: number } & DataType = {
     }
 
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
 
     if (!collation) {

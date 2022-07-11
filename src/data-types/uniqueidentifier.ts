@@ -43,11 +43,7 @@ const UniqueIdentifier: DataType = {
     }
 
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
 
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {

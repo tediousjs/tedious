@@ -1,5 +1,4 @@
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 import { Collation } from '../collation';
 
 import {
@@ -179,7 +178,7 @@ function readNewAndOldValue(parser: Parser, length: number, type: { name: string
   }
 }
 
-function envChangeParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: EnvChangeToken | undefined) => void) {
+function envChangeParser(parser: Parser, _options: ParserOptions, callback: (token: EnvChangeToken | undefined) => void) {
   parser.readUInt16LE((length) => {
     parser.readUInt8((typeNumber) => {
       const type = types[typeNumber];
