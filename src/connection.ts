@@ -49,25 +49,6 @@ import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
-let trustServerWarningEmitted = false;
-
-const emitTrustServerCertificateWarning = () => {
-  if (!trustServerWarningEmitted) {
-    trustServerWarningEmitted = true;
-    process.emitWarning('`config.options.trustServerCertificate` will default to false in the future. To silence this message, specify a value explicitly in the config options');
-  }
-};
-
-let domainRenameToTenantIdWarningEmitted = false;
-const emitDomainRenameToTenantIdWarning = () => {
-  if (!domainRenameToTenantIdWarningEmitted) {
-    domainRenameToTenantIdWarningEmitted = true;
-    process.emitWarning('`When using authentication type `azure-active-directory-password`,' +
-    ' config.authentication.options.domain` will be renamed to config.authentications.options.tenantId`' +
-    ' in the future. Rename `domain` to `tenantId` to silence this message.');
-  }
-};
-
 type BeginTransactionCallback =
   /**
    * The callback is called when the request to start the transaction has completed,
@@ -1112,24 +1093,16 @@ class Connection extends EventEmitter {
           }
         };
       } else if (type === 'azure-active-directory-password') {
+        if (typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
         if (options.userName !== undefined && typeof options.userName !== 'string') {
           throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
 
         if (options.password !== undefined && typeof options.password !== 'string') {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        } else if (options.clientId === undefined) {
-          emitAzureADPasswordClientIdDeprecationWarning();
-        }
-
-        if (options.domain !== undefined && typeof options.domain !== 'string') {
-          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
-        } else if (options.domain !== undefined) {
-          emitDomainRenameToTenantIdWarning();
         }
 
         if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
@@ -1141,8 +1114,8 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
-            tenantId: options.tenantId ?? options.domain,
-            clientId: options.clientId ?? '7f98cb04-cd1e-40df-9140-3bf7e2cea4db'
+            tenantId: options.tenantId,
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -1290,7 +1263,7 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustedServerNameAE: undefined,
-        trustServerCertificate: true,
+        trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
         workstationId: undefined,
@@ -1675,8 +1648,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
-      } else {
-        emitTrustServerCertificateWarning();
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -3136,22 +3107,6 @@ class Connection extends EventEmitter {
         return 'read committed';
     }
   }
-}
-
-let azureADPasswordClientIdDeprecationWarningEmitted = false;
-function emitAzureADPasswordClientIdDeprecationWarning() {
-  if (azureADPasswordClientIdDeprecationWarningEmitted) {
-    return;
-  }
-
-  azureADPasswordClientIdDeprecationWarningEmitted = true;
-
-  process.emitWarning(
-    'When using the `azure-active-directory-password` authentication method, please provide a value for the `clientId` option. ' +
-    'This option will be required in a future release.',
-    'DeprecationWarning',
-    Connection.prototype.on
-  );
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {
