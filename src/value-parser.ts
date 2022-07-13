@@ -458,17 +458,15 @@ function readVariant(parser: Parser, options: ParserOptions, dataLength: number,
         case 'VarChar':
         case 'Char':
           return parser.readUInt16LE((_maxLength) => {
-            readCollation(parser, (collation) => {
-              readChars(parser, dataLength, collation.codepage!, callback);
-            });
+            const collation = readCollation(parser);
+            readChars(parser, dataLength, collation.codepage!, callback);
           });
 
         case 'NVarChar':
         case 'NChar':
           return parser.readUInt16LE((_maxLength) => {
-            readCollation(parser, (_collation) => {
-              readNChars(parser, dataLength, callback);
-            });
+            readCollation(parser);
+            readNChars(parser, dataLength, callback);
           });
 
         default:
