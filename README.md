@@ -5,7 +5,7 @@
 Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality. 
 
-If you're looking for a SQL Server client library, you can take a look [mssql](https://github.com/tediousjs/node-mssql).
+If you're looking for a more high level SQL Server client library, you can take a look [mssql](https://github.com/tediousjs/node-mssql).
 
 **NOTE: New columns are nullable by default as of version 1.11.0**
 
