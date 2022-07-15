@@ -93,14 +93,12 @@ function readUInt32LE(parser: Parser): number {
 function readBVarChar(parser: Parser): string {
   const length = readUInt8(parser) * 2;
   const data = readFromBuffer(parser, length).toString('ucs2');
-  parser.position += length;
   return data;
 }
 
 function readUsVarChar(parser: Parser): string {
   const length = readUInt16LE(parser) * 2;
   const data = readFromBuffer(parser, length).toString('ucs2');
-  parser.position += length;
   return data;
 }
 
