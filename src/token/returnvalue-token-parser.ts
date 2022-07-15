@@ -25,6 +25,7 @@ function returnParser(parser: Parser, options: ParserOptions, callback: (token: 
 
 function readValue(parser: Parser, options: ParserOptions, paramOrdinal: number, paramName: string, originalPosition: number, callback: (token: ReturnValueToken) => void) {
   let metadata!: Metadata;
+  parser.position = originalPosition;
   try {
     metadata = metadataParse(parser, options);
   } catch (err) {
