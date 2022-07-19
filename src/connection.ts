@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import os from 'os';
+import * as tls from 'tls';
 import { Socket } from 'net';
+const fs = require('fs');
 
 import constants from 'constants';
 import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
@@ -47,6 +49,7 @@ import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import Procedures from './special-stored-procedure';
 
 let trustServerWarningEmitted = false;
 
@@ -213,6 +216,10 @@ const DEFAULT_LANGUAGE = 'us_english';
  * @private
  */
 const DEFAULT_DATEFORMAT = 'mdy';
+/**
+ * @private
+ */
+ const DEFAULT_ENCRYPT = 'mandatory';
 
 interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
@@ -383,7 +390,7 @@ export interface InternalConnectionOptions {
   enableImplicitTransactions: null | boolean;
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
-  encrypt: boolean;
+  encrypt: string | boolean;
   encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
@@ -404,6 +411,7 @@ export interface InternalConnectionOptions {
   textsize: number;
   trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
+  hostNameInCertificate:string | undefined;
   useColumnNames: boolean;
   useUTC: boolean;
   workstationId: undefined | string;
@@ -828,7 +836,15 @@ export interface ConnectionOptions {
    * (default: `true`)
    */
   trustServerCertificate?: boolean;
+  /**
+   *
+   */
+   hostNameInCertificate ?: string;
 
+  /**
+   *
+   */
+   serverName ?: string;
   /**
    * A boolean determining whether to return rows as arrays or key-value collections.
    *
@@ -1269,7 +1285,7 @@ class Connection extends EventEmitter {
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
-        encrypt: true,
+        encrypt: DEFAULT_ENCRYPT,
         fallbackToDefaultDb: false,
         encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
@@ -1291,6 +1307,7 @@ class Connection extends EventEmitter {
         trustedServerNameAE: undefined,
         trustServerCertificate: true,
         useColumnNames: false,
+        hostNameInCertificate :undefined,
         useUTC: true,
         workstationId: undefined,
         lowerCaseGuids: false
@@ -1515,11 +1532,37 @@ class Connection extends EventEmitter {
       }
 
       if (config.options.encrypt !== undefined) {
-        if (typeof config.options.encrypt !== 'boolean') {
-          throw new TypeError('The "config.options.encrypt" property must be of type boolean.');
+        if (typeof config.options.encrypt == 'string')
+        {
+          (config.options.encrypt)
+          {
+            switch (config.options.encrypt) {
+              case 'strict':
+                this.config.options.encrypt = config.options.encrypt;
+                break;
+              case 'mandatory':
+              case 'true':
+              case 'yes':
+                this.config.options.encrypt = 'mandatory';
+                break;
+              case 'optional':
+              case 'false':
+              case 'no':
+                this.config.options.encrypt = 'optional';
+                break;
+              default:
+                throw new TypeError('The "encrypt" property must one of "strict","mandatory","true", "yes" or "optional", "false", "no".');
+            }
+          }
         }
-
-        this.config.options.encrypt = config.options.encrypt;
+        else if(typeof config.options.encrypt == 'boolean' && !config.options.encrypt)
+        {
+          this.config.options.encrypt = 'optional';
+        }
+        else
+        {
+          throw new TypeError('The "config.options.encrypt" property must be of type string or boolean.');
+        }
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
@@ -1676,6 +1719,20 @@ class Connection extends EventEmitter {
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
       } else {
         emitTrustServerCertificateWarning();
+      }
+
+      if (config.options.serverName   !== undefined) {
+        if (typeof config.options.serverName !== 'string') {
+          throw new TypeError('The "config.options.serverName" property must be of type string.');
+        }
+        this.config.options.serverName  = config.options.serverName ;
+        if (config.options.hostNameInCertificate  !== undefined) {
+          if (typeof config.options.hostNameInCertificate !== 'string') {
+            throw new TypeError('The "config.options.hostNameInCertificate" property must be of type string.');
+          }
+
+          this.config.options.serverName = config.options.hostNameInCertificate;
+        }
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -2006,22 +2063,54 @@ class Connection extends EventEmitter {
         return this.socketError(err);
       }
 
+      // Make socket not type of undefined
       socket = socket!;
-      socket.on('error', (error) => { this.socketError(error); });
-      socket.on('close', () => { this.socketClose(); });
-      socket.on('end', () => { this.socketEnd(); });
-      socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+      if(this.config.options.encrypt === 'strict')
+      {
+        const encryptOptions = {
+          host: this.config.server,
+          socket: socket,
+          ALPNProtocols: ['tds/8.0'],
+          servername: this.config.options.serverName ? this.config.options.serverName : this.config.server,
+        };
+        const encryptsocket = tls.connect(encryptOptions, () => {
+          socket = encryptsocket;
 
-      this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+          socket.on('error', (error) => { this.socketError(error); });
+          socket.on('close', () => { this.socketClose(); });
+          socket.on('end', () => { this.socketEnd(); });
+          socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
-      this.socket = socket;
+          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
-      this.closed = false;
-      this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+          this.socket = socket;
 
-      this.sendPreLogin();
-      this.transitionTo(this.STATE.SENT_PRELOGIN);
+          this.closed = false;
+          this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+          this.sendPreLogin();
+          this.transitionTo(this.STATE.SENT_PRELOGIN);
+        })
+
+        console.log('using TDS 8.0 strict TLS encryption')
+      } else {
+        socket.on('error', (error) => { this.socketError(error); });
+        socket.on('close', () => { this.socketClose(); });
+        socket.on('end', () => { this.socketEnd(); });
+        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+        this.socket = socket;
+
+        this.closed = false;
+        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+        this.sendPreLogin();
+        this.transitionTo(this.STATE.SENT_PRELOGIN);
+      }
     });
   }
 
@@ -2264,9 +2353,16 @@ class Connection extends EventEmitter {
    */
   sendPreLogin() {
     const [ , major, minor, build ] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [ '0.0.0', '0', '0', '0' ];
-
+    let encryptSetting = false;
+    if("strict" !== this.config.options.encrypt)
+    {
+      if("mandatory" === this.config.options.encrypt)
+      {
+        encryptSetting= true;
+      }
+    }
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt,
+      encrypt: encryptSetting,
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
@@ -3217,14 +3313,13 @@ Connection.prototype.STATE = {
         if (preloginPayload.fedAuthRequired === 1) {
           this.fedAuthRequired = true;
         }
-
-        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+        if ("strict" != this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
           if (!this.config.options.encrypt) {
             this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
             return this.close();
           }
 
-          this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+          this.messageIo.startTls(this.secureContext, this.config.options.serverName? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
         } else {
           this.sendLogin7Packet();

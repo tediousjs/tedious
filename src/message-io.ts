@@ -65,6 +65,7 @@ class MessageIO extends EventEmitter {
     const duplexpair = new DuplexPair();
     const securePair = this.securePair = {
       cleartext: tls.connect({
+        host:hostname,
         socket: duplexpair.socket1 as Socket,
         servername: hostname,
         secureContext: secureContext,
