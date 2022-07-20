@@ -527,6 +527,7 @@ describe('MessageIO', function() {
           try {
             await io.startTls(createSecureContext({
               // Use a cipher that causes an error immediately
+              maxVersion: 'TLSv1.2',
               ciphers: 'NULL'
             }), 'localhost', true);
           } catch (err: any) {
