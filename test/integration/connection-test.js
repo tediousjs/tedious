@@ -221,15 +221,10 @@ describe('Initiate Connect Test', function() {
     config.options.cryptoCredentialsDetails = {
       ciphers: '!ALL'
     };
-
-    try {
+    assert.throws(() => {
       const { createSecureContext } = require('tls');
       createSecureContext(config.options.cryptoCredentialsDetails);
-    } catch {
-      assert.throws(() => {
-        new Connection(config);
-      });
-    }
+    }, Error, new RegExp(/.*SSL routines.*no cipher match/));
 
     done();
   });
