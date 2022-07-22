@@ -289,7 +289,6 @@ describe('Initiate Connect Test', function() {
 
     // Specify a cipher that should never be supported by SQL Server
     config.options.cryptoCredentialsDetails = {
-      maxVersion: 'TLSv1.2',
       ciphers: 'NULL'
     };
 
