@@ -30,9 +30,7 @@ const BigInt: DataType = {
     if (parameter.value == null) {
       return;
     }
-    // const buffer = Buffer.alloc(8);
-    // buffer.writeBigInt64LE(parameter.value);
-    // buffer.
+
     const buffer = new WritableTrackingBuffer(8);
     buffer.writeInt64LE(Number(parameter.value));
     yield buffer.data;

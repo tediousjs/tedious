@@ -257,23 +257,9 @@ class Parser {
 
   readBigInt64LE(callback: (data: BigInt) => void) {
     this.awaitData(8, () => {
-      const result =
-        (BigInt(
-          this.buffer[this.position + 4] +
-          this.buffer[this.position + 5] * 2 ** 8 +
-          this.buffer[this.position + 6] * 2 ** 16 +
-          (this.buffer[this.position + 7] << 24) // Overflow
-        ) << BigInt(32)
-        ) +
-        BigInt(
-          this.buffer[this.position] +
-          this.buffer[this.position + 1] * 2 ** 8 +
-          this.buffer[this.position + 2] * 2 ** 16 +
-          this.buffer[this.position + 3] * 2 ** 24
-        );
+      const data = this.buffer.readBigInt64LE(this.position);
       this.position += 8;
-
-      callback(result);
+      callback(data);
     });
   }
 
@@ -295,12 +281,9 @@ class Parser {
 
   readBigUInt64LE(callback: (data: BigInt) => void) {
     this.awaitData(8, () => {
-      const low = BigInt(this.buffer.readUInt32LE(this.position));
-      const high = BigInt(this.buffer.readUInt32LE(this.position + 4));
-
+      const data = this.buffer.readBigUInt64LE(this.position);
       this.position += 8;
-
-      callback(low + (high << BigInt(32)));
+      callback(data);
     });
   }
 

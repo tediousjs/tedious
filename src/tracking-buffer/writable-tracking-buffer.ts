@@ -104,44 +104,26 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeBigInt64LE(value: number) {
-    this.writeBigU_Int64LE(value);
+  writeBigInt64LE(value: BigInt) {
+    const length = 8;
+    this.makeRoomFor(length);
+    this.buffer.writeBigInt64LE(value.valueOf(), this.position);
+    this.position += length;
   }
 
   writeInt64LE(value: number) {
-    this.writeBigInt64LE(value);
+    this.writeBigInt64LE(BigInt(value));
   }
 
   writeUInt64LE(value: number) {
-    this.writeBigUInt64LE(value);
+    this.writeBigUInt64LE(BigInt(value));
   }
 
-  writeBigUInt64LE(value: number) {
-    this.writeBigU_Int64LE(value);
-  }
-
-  private writeBigU_Int64LE(value: number) {
-    this.makeRoomFor(8);
-
-    let lo = Number(BigInt(value) & BigInt(0xffffffff));
-
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-
-    let hi = Number((BigInt(value) >> BigInt(32)) & BigInt(0xffffffff));
-
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
+  writeBigUInt64LE(value: BigInt) {
+    const length = 8;
+    this.makeRoomFor(length);
+    this.buffer.writeBigUInt64LE(value.valueOf(), this.position);
+    this.position += length;
   }
 
   writeUInt32BE(value: number) {
