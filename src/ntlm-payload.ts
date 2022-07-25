@@ -1,6 +1,5 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
-import JSBI from 'jsbi';
 import md4 from 'js-md4';
 
 interface Options {
@@ -109,10 +108,10 @@ class NTLMResponsePayload {
   }
 
   createTimestamp(time: number) {
-    const tenthsOfAMicrosecond = JSBI.multiply(JSBI.add(JSBI.BigInt(time), JSBI.BigInt(11644473600)), JSBI.BigInt(10000000));
+    const tenthsOfAMicrosecond = (BigInt(time) + BigInt(11644473600)) * BigInt(10000000);
 
-    const lo = JSBI.toNumber(JSBI.bitwiseAnd(tenthsOfAMicrosecond, JSBI.BigInt(0xffffffff)));
-    const hi = JSBI.toNumber(JSBI.bitwiseAnd(JSBI.signedRightShift(tenthsOfAMicrosecond, JSBI.BigInt(32)), JSBI.BigInt(0xffffffff)));
+    const lo = Number(tenthsOfAMicrosecond & BigInt(0xffffffff));
+    const hi = Number((tenthsOfAMicrosecond >> BigInt(32)) & BigInt(0xffffffff));
 
     const result = Buffer.alloc(8);
     result.writeUInt32LE(lo, 0);

@@ -1,5 +1,3 @@
-import JSBI from 'jsbi';
-
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -106,36 +104,44 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeBigInt64LE(value: JSBI) {
+  writeBigInt64LE(value: number) {
     this.writeBigU_Int64LE(value);
   }
 
-  private writeBigU_Int64LE(value: JSBI) {
-    this.makeRoomFor(8);
-
-    let lo = JSBI.toNumber(JSBI.bitwiseAnd(value, JSBI.BigInt(0xffffffff)));
-
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-    lo = lo >> 8;
-    this.buffer[this.position++] = lo;
-
-    let hi = JSBI.toNumber(JSBI.bitwiseAnd(JSBI.signedRightShift(value, JSBI.BigInt(32)), JSBI.BigInt(0xffffffff)));
-
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
-    hi = hi >> 8;
-    this.buffer[this.position++] = hi;
+  writeInt64LE(value: number) {
+    this.writeBigInt64LE(value);
   }
 
-  writeInt64LE(value: number) {
-    this.writeBigInt64LE(JSBI.BigInt(value));
+  writeUInt64LE(value: number) {
+    this.writeBigUInt64LE(value);
+  }
+
+  writeBigUInt64LE(value: number) {
+    this.writeBigU_Int64LE(value);
+  }
+
+  private writeBigU_Int64LE(value: number) {
+    this.makeRoomFor(8);
+
+    let lo = Number(BigInt(value) & BigInt(0xffffffff));
+
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+    lo = lo >> 8;
+    this.buffer[this.position++] = lo;
+
+    let hi = Number((BigInt(value) >> BigInt(32)) & BigInt(0xffffffff));
+
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
+    hi = hi >> 8;
+    this.buffer[this.position++] = hi;
   }
 
   writeUInt32BE(value: number) {
@@ -149,14 +155,6 @@ class WritableTrackingBuffer {
     // inspired by https://github.com/dpw/node-buffer-more-ints
     this.writeInt32LE(value & -1);
     this.writeUInt8(Math.floor(value * SHIFT_RIGHT_32));
-  }
-
-  writeUInt64LE(value: number) {
-    this.writeBigUInt64LE(JSBI.BigInt(value));
-  }
-
-  writeBigUInt64LE(value: JSBI) {
-    this.writeBigU_Int64LE(value);
   }
 
   writeInt8(value: number) {
