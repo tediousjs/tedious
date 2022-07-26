@@ -4,7 +4,7 @@ import { Socket } from 'net';
 import dns from 'dns';
 
 import constants from 'constants';
-import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
+import { SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
 
@@ -888,7 +888,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  secureContext: SecureContext;
+  secureContextOptions: SecureContextOptions;
   /**
    * @private
    */
@@ -1683,21 +1683,19 @@ class Connection extends EventEmitter {
       }
     }
 
-    let credentialsDetails = this.config.options.cryptoCredentialsDetails;
-    if (credentialsDetails.secureOptions === undefined) {
+    this.secureContextOptions = this.config.options.cryptoCredentialsDetails;
+    if (this.secureContextOptions.secureOptions === undefined) {
       // If the caller has not specified their own `secureOptions`,
       // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
       // Older SQL Server instances running on older Windows versions have
       // trouble with the BEAST workaround in OpenSSL.
       // As BEAST is a browser specific exploit, we can just disable this option here.
-      credentialsDetails = Object.create(credentialsDetails, {
+      this.secureContextOptions = Object.create(this.secureContextOptions, {
         secureOptions: {
           value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
         }
       });
     }
-
-    this.secureContext = createSecureContext(credentialsDetails);
 
     this.debug = this.createDebug();
     this.inTransaction = false;
@@ -3172,7 +3170,7 @@ Connection.prototype.STATE = {
 
           try {
             this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            await this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+            await this.messageIo.startTls(this.secureContextOptions, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           } catch (err: any) {
             return this.socketError(err);
           }
