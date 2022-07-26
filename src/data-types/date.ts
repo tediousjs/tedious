@@ -1,12 +1,11 @@
 import { DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { Temporal } from '@js-temporal/polyfill';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
-const globalDate = global.Date;
-const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
+const EPOCH_DATE = new Temporal.PlainDate(1, 1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 const DATA_LENGTH = Buffer.from([0x03]);
-
+console.log(EPOCH_DATE.toString());
 const Date: DataType = {
   id: 0x28,
   type: 'DATEN',
@@ -37,26 +36,30 @@ const Date: DataType = {
 
     let date;
     if (options.useUTC) {
-      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      date = new Temporal.PlainDate(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
     } else {
-      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      date = new Temporal.PlainDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
     }
-
-    const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+    const days = EPOCH_DATE.until(date).days;
     const buffer = Buffer.alloc(3);
     buffer.writeUIntLE(days, 0, 3);
     yield buffer;
   },
 
   // TODO: value is techincally of type 'unknown'.
-  validate: function(value): null | Date {
+  validate: function(value): null | Temporal.PlainDate {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof globalDate)) {
-      value = new globalDate(globalDate.parse(value));
+    try {
+      if (!(value instanceof Temporal.PlainDate)) {
+        value = Temporal.PlainDate.from(value);
+      }
+    } catch {
+      throw new TypeError('Invalid date.');
     }
+
 
     if (isNaN(value)) {
       throw new TypeError('Invalid date.');
