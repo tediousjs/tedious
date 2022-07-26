@@ -61,7 +61,13 @@ class MessageIO extends EventEmitter {
   }
 
   // Negotiate TLS encryption.
-  startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
+  startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean) {
+    if (!credentialsDetails.maxVersion || !['TLSv1.2', 'TLSv1.1', 'TLSv1'].includes(credentialsDetails.maxVersion)) {
+      credentialsDetails.maxVersion = 'TLSv1.2';
+    }
+
+    const secureContext = tls.createSecureContext(credentialsDetails);
+
     return new Promise<void>((resolve, reject) => {
       const duplexpair = new DuplexPair();
       const securePair = this.securePair = {
