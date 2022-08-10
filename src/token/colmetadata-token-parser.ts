@@ -63,13 +63,11 @@ function readColumnName(parser: Parser, options: ParserOptions, index: number, m
 
 function readColumn(parser: Parser, options: ParserOptions, index: number, callback: (column: ColumnMetadata) => void) {
   let metadata!: Metadata;
-  const offset = parser.position;
   try {
     metadata = metadataParse(parser, options);
   } catch (err) {
     if (err instanceof NotEnoughDataError) {
       return parser.suspend(() => {
-        parser.position = offset;
         readColumn(parser, options, index, callback);
       });
     }

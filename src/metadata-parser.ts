@@ -4,6 +4,7 @@ import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
+import BufferReader from './token/buffer-reader';
 
 interface XmlSchema {
   dbname: string;
@@ -54,66 +55,19 @@ export type Metadata = {
 } & BaseMetadata;
 
 class UnknownTypeError extends Error { }
-class NotEnoughDataError extends Error { }
 
-function checkDataLength(buffer: Buffer, offset: number, numBytes: number): void {
-  if (buffer.length < offset + numBytes) {
-    throw new NotEnoughDataError();
-  }
-}
-
-function readFromBuffer(parser: Parser, length: number): Buffer {
-  checkDataLength(parser.buffer, parser.position, length);
-  const result = parser.buffer.slice(parser.position, parser.position + length);
-  parser.position += length;
-  return result;
-}
-
-function readUInt8(parser: Parser): number {
-  checkDataLength(parser.buffer, parser.position, 1);
-  const data = parser.buffer.readUInt8(parser.position);
-  parser.position += 1;
-  return data;
-}
-
-function readUInt16LE(parser: Parser): number {
-  checkDataLength(parser.buffer, parser.position, 2);
-  const data = parser.buffer.readUInt16LE(parser.position);
-  parser.position += 2;
-  return data;
-}
-
-function readUInt32LE(parser: Parser): number {
-  checkDataLength(parser.buffer, parser.position, 4);
-  const data = parser.buffer.readUInt32LE(parser.position);
-  parser.position += 4;
-  return data;
-}
-
-function readBVarChar(parser: Parser): string {
-  const length = readUInt8(parser) * 2;
-  const data = readFromBuffer(parser, length).toString('ucs2');
-  return data;
-}
-
-function readUsVarChar(parser: Parser): string {
-  const length = readUInt16LE(parser) * 2;
-  const data = readFromBuffer(parser, length).toString('ucs2');
-  return data;
-}
-
-function readCollation(parser: Parser): Collation {
+function readCollation(br: BufferReader): Collation {
   // s2.2.5.1.2
-  const collationData = readFromBuffer(parser, 5);
+  const collationData = br.readFromBuffer(5);
   return Collation.fromBuffer(collationData);
 }
 
-function readSchema(parser: Parser): XmlSchema | undefined {
-  const schemaPresent = readUInt8(parser);
+function readSchema(br: BufferReader): XmlSchema | undefined {
+  const schemaPresent = br.readUInt8();
   if (schemaPresent === 0x01) {
-    const dbname = readBVarChar(parser);
-    const owningSchema = readBVarChar(parser);
-    const xmlSchemaCollection = readUsVarChar(parser);
+    const dbname = br.readBVarChar();
+    const owningSchema = br.readBVarChar();
+    const xmlSchemaCollection = br.readUsVarChar();
     return {
       dbname: dbname,
       owningSchema: owningSchema,
@@ -124,12 +78,12 @@ function readSchema(parser: Parser): XmlSchema | undefined {
   }
 }
 
-function readUDTInfo(parser: Parser) {
-  const maxByteSize = readUInt16LE(parser);
-  const dbname = readBVarChar(parser);
-  const owningSchema = readBVarChar(parser);
-  const typeName = readBVarChar(parser);
-  const assemblyName = readUsVarChar(parser);
+function readUDTInfo(br: BufferReader): UdtInfo {
+  const maxByteSize = br.readUInt16LE();
+  const dbname = br.readBVarChar();
+  const owningSchema = br.readBVarChar();
+  const typeName = br.readBVarChar();
+  const assemblyName = br.readUsVarChar();
   return {
     maxByteSize: maxByteSize,
     dbname: dbname,
@@ -141,16 +95,17 @@ function readUDTInfo(parser: Parser) {
 
 function metadataParse(parser: Parser, options: ParserOptions): Metadata {
   let userType: number;
+  const br = new BufferReader(parser);
 
   if (options.tdsVersion < '7_2') {
-    userType = readUInt16LE(parser);
+    userType = br.readUInt16LE();
   } else {
-    userType = readUInt32LE(parser);
+    userType = br.readUInt32LE();
   }
 
-  const flags = readUInt16LE(parser);
+  const flags = br.readUInt16LE();
 
-  const typeNumber = readUInt8(parser);
+  const typeNumber = br.readUInt8();
   const type: DataType = TYPE[typeNumber];
 
   let collation: Collation | undefined;
@@ -186,55 +141,55 @@ function metadataParse(parser: Parser, options: ParserOptions): Metadata {
     case 'BitN':
     case 'UniqueIdentifier':
     case 'DateTimeN':
-      dataLength = readUInt8(parser);
+      dataLength = br.readUInt8();
       break;
 
     case 'Variant':
-      dataLength = readUInt32LE(parser);
+      dataLength = br.readUInt32LE();
       break;
 
     case 'VarChar':
     case 'Char':
     case 'NVarChar':
     case 'NChar':
-      dataLength = readUInt16LE(parser);
-      collation = readCollation(parser);
+      dataLength = br.readUInt16LE();
+      collation = readCollation(br);
       break;
 
     case 'Text':
     case 'NText':
-      dataLength = readUInt32LE(parser);
-      collation = readCollation(parser);
+      dataLength = br.readUInt32LE();
+      collation = readCollation(br);
       break;
 
     case 'VarBinary':
     case 'Binary':
-      dataLength = readUInt16LE(parser);
+      dataLength = br.readUInt16LE();
       break;
 
     case 'Image':
-      dataLength = readUInt32LE(parser);
+      dataLength = br.readUInt32LE();
       break;
 
     case 'Xml':
-      schema = readSchema(parser);
+      schema = readSchema(br);
       break;
 
     case 'Time':
     case 'DateTime2':
     case 'DateTimeOffset':
-      scale = readUInt8(parser);
+      scale = br.readUInt8();
       break;
 
     case 'NumericN':
     case 'DecimalN':
-      dataLength = readUInt8(parser);
-      precision = readUInt8(parser);
-      scale = readUInt8(parser);
+      dataLength = br.readUInt8();
+      precision = br.readUInt8();
+      scale = br.readUInt8();
       break;
 
     case 'UDT':
-      udtInfo = readUDTInfo(parser);
+      udtInfo = readUDTInfo(br);
       break;
 
     default:

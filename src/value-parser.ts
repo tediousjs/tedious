@@ -5,6 +5,7 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
+import BufferReader from './token/buffer-reader';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -458,14 +459,16 @@ function readVariant(parser: Parser, options: ParserOptions, dataLength: number,
         case 'VarChar':
         case 'Char':
           return parser.readUInt16LE((_maxLength) => {
-            const collation = readCollation(parser);
+            const br = new BufferReader(parser);
+            const collation = readCollation(br);
             readChars(parser, dataLength, collation.codepage!, callback);
           });
 
         case 'NVarChar':
         case 'NChar':
           return parser.readUInt16LE((_maxLength) => {
-            readCollation(parser);
+            const br = new BufferReader(parser);
+            readCollation(br);
             readNChars(parser, dataLength, callback);
           });
 

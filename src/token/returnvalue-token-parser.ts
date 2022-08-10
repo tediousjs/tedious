@@ -15,23 +15,22 @@ function returnParser(parser: Parser, options: ParserOptions, callback: (token: 
       if (paramName.charAt(0) === '@') {
         paramName = paramName.slice(1);
       }
-      parser.position += 1;
-      // status
-      readValue(parser, options, paramOrdinal, paramName, parser.position, callback);
-
+      parser.readUInt8(() => {
+        // status
+        readValue(parser, options, paramOrdinal, paramName, callback);
+      });
     });
   });
 }
 
-function readValue(parser: Parser, options: ParserOptions, paramOrdinal: number, paramName: string, originalPosition: number, callback: (token: ReturnValueToken) => void) {
+function readValue(parser: Parser, options: ParserOptions, paramOrdinal: number, paramName: string, callback: (token: ReturnValueToken) => void) {
   let metadata!: Metadata;
-  parser.position = originalPosition;
   try {
     metadata = metadataParse(parser, options);
   } catch (err) {
     if (err instanceof NotEnoughDataError) {
       return parser.suspend(() => {
-        readValue(parser, options, paramOrdinal, paramName, originalPosition, callback);
+        readValue(parser, options, paramOrdinal, paramName, callback);
       });
     }
   }
