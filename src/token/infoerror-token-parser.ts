@@ -1,59 +1,8 @@
 import Parser, { ParserOptions } from './stream-parser';
-
+import BufferReader from './buffer-reader';
 import { InfoMessageToken, ErrorMessageToken } from './token';
 
 class NotEnoughDataError extends Error { }
-let offset: number;
-
-function checkDataLength(buffer: Buffer, numBytes: number): void {
-  if (buffer.length < offset + numBytes) {
-    throw new NotEnoughDataError();
-  }
-}
-
-function readUInt16LE(parser: Parser): number {
-  const numBytes = 2;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt16LE(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readUInt8(parser: Parser): number {
-  const numBytes = 1;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt8(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readUInt32LE(parser: Parser): number {
-  const numBytes = 4;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt32LE(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readBVarChar(parser: Parser): string {
-  const numBytes = readUInt8(parser) * 2;
-  const data = readFromBuffer(parser, numBytes).toString('ucs2');
-  return data;
-}
-
-
-function readUsVarChar(parser: Parser): string {
-  const numBytes = readUInt16LE(parser) * 2;
-  const data = readFromBuffer(parser, numBytes).toString('ucs2');
-  return data;
-}
-
-function readFromBuffer(parser: Parser, numBytes: number): Buffer {
-  checkDataLength(parser.buffer, numBytes);
-  const result = parser.buffer.slice(offset, offset + numBytes);
-  offset += numBytes;
-  return result;
-}
 
 interface TokenData {
   number: number;
@@ -67,16 +16,15 @@ interface TokenData {
 
 function parseToken(parser: Parser, options: ParserOptions): TokenData {
   // length
-  offset = parser.position;
-  readUInt16LE(parser);
-  const number = readUInt32LE(parser);
-  const state = readUInt8(parser);
-  const clazz = readUInt8(parser);
-  const message = readUsVarChar(parser);
-  const serverName = readBVarChar(parser);
-  const procName = readBVarChar(parser);
-  const lineNumber = options.tdsVersion < '7_2' ? readUInt16LE(parser) : readUInt32LE(parser);
-  parser.position = offset;
+  const br = new BufferReader(parser);
+  br.readUInt16LE();
+  const number = br.readUInt32LE();
+  const state = br.readUInt8();
+  const clazz = br.readUInt8();
+  const message = br.readUsVarChar();
+  const serverName = br.readBVarChar();
+  const procName = br.readBVarChar();
+  const lineNumber = options.tdsVersion < '7_2' ? br.readUInt16LE() : br.readUInt32LE();
   return {
     'number': number,
     'state': state,

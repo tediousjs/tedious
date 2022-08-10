@@ -3,6 +3,7 @@ import Parser, { ParserOptions } from './stream-parser';
 import { LoginAckToken } from './token';
 
 import { versionsByValue as versions } from '../tds-versions';
+import BufferReader from './buffer-reader';
 
 class NotEnoughDataError extends Error { }
 
@@ -11,65 +12,18 @@ const interfaceTypes: { [key: number]: string } = {
   1: 'SQL_TSQL'
 };
 
-let offset: number;
-
-function checkDataLength(buffer: Buffer, numBytes: number): void {
-  if (buffer.length < offset + numBytes) {
-    throw new NotEnoughDataError();
-  }
-}
-
-function readUInt16LE(parser: Parser): number {
-  const numBytes = 2;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt16LE(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readUInt8(parser: Parser): number {
-  const numBytes = 1;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt8(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readUInt32BE(parser: Parser): number {
-  const numBytes = 4;
-  checkDataLength(parser.buffer, numBytes);
-  const data = parser.buffer.readUInt32BE(offset);
-  offset += numBytes;
-  return data;
-}
-
-function readBVarChar(parser: Parser): string {
-  const numBytes = readUInt8(parser) * 2;
-  const data = readFromBuffer(parser, numBytes).toString('ucs2');
-  return data;
-}
-
-function readFromBuffer(parser: Parser, numBytes: number): Buffer {
-  checkDataLength(parser.buffer, numBytes);
-  const result = parser.buffer.slice(offset, offset + numBytes);
-  offset += numBytes;
-  return result;
-}
-
 function parseToken(parser: Parser): LoginAckToken {
-  offset = parser.position;
-  readUInt16LE(parser);
-  const interfaceNumber = readUInt8(parser);
+  const br = new BufferReader(parser);
+  br.readUInt16LE();
+  const interfaceNumber = br.readUInt8();
   const interfaceType = interfaceTypes[interfaceNumber];
-  const tdsVersionNumber = readUInt32BE(parser);
+  const tdsVersionNumber = br.readUInt32BE();
   const tdsVersion = versions[tdsVersionNumber];
-  const progName = readBVarChar(parser);
-  const major = readUInt8(parser);
-  const minor = readUInt8(parser);
-  const buildNumHi = readUInt8(parser);
-  const buildNumLow = readUInt8(parser);
-
-  parser.position = offset;
+  const progName = br.readBVarChar();
+  const major = br.readUInt8();
+  const minor = br.readUInt8();
+  const buildNumHi = br.readUInt8();
+  const buildNumLow = br.readUInt8();
 
   return new LoginAckToken({
     interface: interfaceType,
