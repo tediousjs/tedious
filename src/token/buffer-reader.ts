@@ -4,7 +4,7 @@ class NotEnoughDataError extends Error { }
 
 
 export default class BufferReader {
-  offset: number;
+  private offset: number;
   parser: Parser;
 
   constructor(parser: Parser) {
@@ -12,7 +12,7 @@ export default class BufferReader {
     this.parser = parser;
   }
 
-  checkDataLength(buffer: Buffer, numBytes: number): void {
+  private checkDataLength(buffer: Buffer, numBytes: number): void {
     if (buffer.length < this.parser.position + numBytes) {
       this.parser.position = this.offset;
       throw new NotEnoughDataError();
