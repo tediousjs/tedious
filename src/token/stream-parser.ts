@@ -255,7 +255,7 @@ class Parser {
     });
   }
 
-  readBigInt64LE(callback: (data: BigInt) => void) {
+  readBigInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
       const data = this.buffer.readBigInt64LE(this.position);
       this.position += 8;
@@ -279,7 +279,7 @@ class Parser {
     });
   }
 
-  readBigUInt64LE(callback: (data: BigInt) => void) {
+  readBigUInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
       const data = this.buffer.readBigUInt64LE(this.position);
       this.position += 8;

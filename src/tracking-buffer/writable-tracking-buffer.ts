@@ -104,10 +104,10 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
-  writeBigInt64LE(value: BigInt) {
+  writeBigInt64LE(value: bigint) {
     const length = 8;
     this.makeRoomFor(length);
-    this.buffer.writeBigInt64LE(value.valueOf(), this.position);
+    this.buffer.writeBigInt64LE(value, this.position);
     this.position += length;
   }
 
@@ -119,10 +119,10 @@ class WritableTrackingBuffer {
     this.writeBigUInt64LE(BigInt(value));
   }
 
-  writeBigUInt64LE(value: BigInt) {
+  writeBigUInt64LE(value: bigint) {
     const length = 8;
     this.makeRoomFor(length);
-    this.buffer.writeBigUInt64LE(value.valueOf(), this.position);
+    this.buffer.writeBigUInt64LE(value, this.position);
     this.position += length;
   }
 
