@@ -1,6 +1,5 @@
 import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
-import JSBI from 'jsbi';
 
 import { TYPE, Token, ColMetadataToken } from './token';
 
@@ -256,29 +255,11 @@ class Parser {
     });
   }
 
-  readBigInt64LE(callback: (data: JSBI) => void) {
+  readBigInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
-      const result = JSBI.add(
-        JSBI.leftShift(
-          JSBI.BigInt(
-            this.buffer[this.position + 4] +
-            this.buffer[this.position + 5] * 2 ** 8 +
-            this.buffer[this.position + 6] * 2 ** 16 +
-            (this.buffer[this.position + 7] << 24) // Overflow
-          ),
-          JSBI.BigInt(32)
-        ),
-        JSBI.BigInt(
-          this.buffer[this.position] +
-          this.buffer[this.position + 1] * 2 ** 8 +
-          this.buffer[this.position + 2] * 2 ** 16 +
-          this.buffer[this.position + 3] * 2 ** 24
-        )
-      );
-
+      const data = this.buffer.readBigInt64LE(this.position);
       this.position += 8;
-
-      callback(result);
+      callback(data);
     });
   }
 
@@ -298,14 +279,11 @@ class Parser {
     });
   }
 
-  readBigUInt64LE(callback: (data: JSBI) => void) {
+  readBigUInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
-      const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
-      const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
-
+      const data = this.buffer.readBigUInt64LE(this.position);
       this.position += 8;
-
-      callback(JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32))));
+      callback(data);
     });
   }
 
