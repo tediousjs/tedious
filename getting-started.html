@@ -37,6 +37,7 @@ title: Getting started
     }
     // If no error, then good to go...
     executeStatement();
+    
   });
 
   // Initialize the connection.
@@ -90,6 +91,8 @@ title: Getting started
     });
 
     connection.execSql(request);
+    // Finally, we close the connection
+    connection.close()
   }
 {% endhighlight %}
 
