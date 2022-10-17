@@ -3,7 +3,7 @@ import { once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
-import { createSecureContext, TLSSocket } from 'tls';
+import { TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
 import { Duplex } from 'stream';
 
@@ -368,7 +368,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          await io.startTls(createSecureContext({}), 'localhost', true);
+          await io.startTls({}, 'localhost', true);
 
           assert(io.tlsNegotiationComplete);
         })(),
@@ -429,7 +429,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          await io.startTls(createSecureContext({}), 'localhost', true);
+          await io.startTls({}, 'localhost', true);
 
           // Send a request (via TLS)
           io.sendMessage(TYPE.LOGIN7, payload);
@@ -525,10 +525,10 @@ describe('MessageIO', function() {
 
           let hadError = false;
           try {
-            await io.startTls(createSecureContext({
+            await io.startTls({
               // Use a cipher that causes an error immediately
               ciphers: 'NULL'
-            }), 'localhost', true);
+            }, 'localhost', true);
           } catch (err: any) {
             hadError = true;
 
@@ -555,10 +555,10 @@ describe('MessageIO', function() {
 
           let hadError = false;
           try {
-            await io.startTls(createSecureContext({
+            await io.startTls({
               // Use some cipher that's not supported on the server side
               ciphers: 'ECDHE-ECDSA-AES128-GCM-SHA256'
-            }), 'localhost', true);
+            }, 'localhost', true);
           } catch (err: any) {
             hadError = true;
 

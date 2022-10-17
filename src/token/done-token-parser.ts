@@ -1,5 +1,3 @@
-import JSBI from 'jsbi';
-
 import Parser, { ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
@@ -48,7 +46,7 @@ function parseToken(parser: Parser, options: ParserOptions, callback: (data: Tok
         parser.readUInt32LE(next);
       } else {
         parser.readBigUInt64LE((rowCount) => {
-          next(JSBI.toNumber(rowCount));
+          next(Number(rowCount));
         });
       }
     });
