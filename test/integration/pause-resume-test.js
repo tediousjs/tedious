@@ -119,7 +119,7 @@ describe('Pause-Resume Test', function() {
 
       const request = new Request(sql, (error) => {
         assert.instanceOf(error, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(error).code, 'ECANCEL');
+        assert.strictEqual(error.code, 'ECANCEL');
 
         next();
       });

@@ -60,7 +60,7 @@ describe('Connecting to a server that sends invalid packet data', function() {
 
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);
-      assert.equal(/** @type {ConnectionError} */(err).message, 'Connection lost - Unable to process incoming packet');
+      assert.equal(err.message, 'Connection lost - Unable to process incoming packet');
 
       done();
     });
