@@ -674,7 +674,7 @@ declare namespace Chai {
          * @param value   Actual value.
          * @param message    Message to display on error.
          */
-        exists<T>(value: T, message?: string): void;
+        exists<T>(value: T, message?: string): asserts value is (T extends undefined | null ? never : T);
 
         /**
          * Asserts that the target is either null or undefined.
@@ -701,7 +701,7 @@ declare namespace Chai {
          * @param value   Actual value.
          * @param message   Message to display on error.
          */
-        isDefined<T>(value: T, message?: string): void;
+        isDefined<T>(value: T, message?: string): asserts value is (T extends undefined ? never : T);
 
         /**
          * Asserts that value is a function.
@@ -852,7 +852,8 @@ declare namespace Chai {
          * @param constructor   Potential expected contructor of value.
          * @param message   Message to display on error.
          */
-        instanceOf<T>(value: T, constructor: Function, message?: string): void;
+        instanceOf<T extends object | number | string | boolean | undefined | null, F extends new(...args: any) => any>(value: T, constructor: F, message?: string): asserts value is (InstanceType<F> extends T ? InstanceType<F> : never);
+        instanceOf<F extends new(...args: any) => any>(value: unknown, constructor: F, message?: string): asserts value is InstanceType<F>;
 
         /**
          * Asserts that value is not an instance of constructor.
