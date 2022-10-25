@@ -1127,7 +1127,7 @@ declare namespace Chai {
          * @param property   Potential contained property of object.
          * @param message   Message to display on error.
          */
-        property<T>(object: T, property: string /* keyof T */, message?: string): void;
+        property<T, P extends string | number | symbol>(object: T, property: P, message?: string): asserts object is T & { [_ in P]: any };
 
         /**
          * Asserts that object has a property named by property.
@@ -1171,7 +1171,7 @@ declare namespace Chai {
          * @param value   Potential expected property value.
          * @param message   Message to display on error.
          */
-        propertyVal<T, V>(object: T, property: string /* keyof T */, value: V, message?: string): void;
+        propertyVal<T, P extends string | number | symbol, V>(object: T, property: P, value: V, message?: string): asserts object is T & { [_ in P]: V };
 
         /**
          * Asserts that object has a property named by property with value given by value.
