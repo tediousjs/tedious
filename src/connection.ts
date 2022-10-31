@@ -750,7 +750,9 @@ export interface ConnectionOptions {
   readOnlyIntent?: boolean;
 
   /**
-   * The number of milliseconds before a request is considered failed, or `0` for no timeout
+   * The number of milliseconds before a request is considered failed, or `0` for no timeout.
+   *
+   * As soon as a response is received, the timeout is cleared. This means that queries that immediately return a response have ability to run longer than this timeout.
    *
    * (default: `15000`).
    */
