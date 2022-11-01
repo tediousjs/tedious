@@ -1316,14 +1316,6 @@ class Connection extends EventEmitter {
         this.config.options.columnNameReplacer = config.options.columnNameReplacer;
       }
 
-      if (config.options.connectTimeout !== undefined) {
-        if (typeof config.options.connectTimeout !== 'number') {
-          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
-        }
-
-        this.config.options.connectTimeout = config.options.connectTimeout;
-      }
-
       if (config.options.connectionIsolationLevel !== undefined) {
         assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
 
