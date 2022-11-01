@@ -2978,68 +2978,70 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(new RequestError(message, 'EINVALIDSTATE'));
-    } else if (request.canceled) {
-      process.nextTick(() => {
+      return request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    }
+
+    if (request.canceled) {
+      return process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
-    } else {
-      if (packetType === TYPE.SQL_BATCH) {
-        this.isSqlBatch = true;
-      } else {
-        this.isSqlBatch = false;
-      }
-
-      this.request = request;
-      request.connection! = this;
-      request.rowCount! = 0;
-      request.rows! = [];
-      request.rst! = [];
-
-      const onCancel = () => {
-        payloadStream.unpipe(message);
-        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
-
-        // set the ignore bit and end the message.
-        message.ignore = true;
-        message.end();
-
-        if (request instanceof Request && request.paused) {
-          // resume the request if it was paused so we can read the remaining tokens
-          request.resume();
-        }
-      };
-
-      request.once('cancel', onCancel);
-
-      this.createRequestTimer();
-
-      const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-      this.messageIo.outgoingMessageStream.write(message);
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-      message.once('finish', () => {
-        request.removeListener('cancel', onCancel);
-        request.once('cancel', this._cancelAfterRequestSent);
-
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload!.toString('  ');
-        });
-      });
-
-      const payloadStream = Readable.from(payload);
-      payloadStream.once('error', (error) => {
-        payloadStream.unpipe(message);
-
-        // Only set a request error if no error was set yet.
-        request.error ??= error;
-
-        message.ignore = true;
-        message.end();
-      });
-      payloadStream.pipe(message);
     }
+
+    if (packetType === TYPE.SQL_BATCH) {
+      this.isSqlBatch = true;
+    } else {
+      this.isSqlBatch = false;
+    }
+
+    this.request = request;
+    request.connection! = this;
+    request.rowCount! = 0;
+    request.rows! = [];
+    request.rst! = [];
+
+    const onCancel = () => {
+      payloadStream.unpipe(message);
+      payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+
+      // set the ignore bit and end the message.
+      message.ignore = true;
+      message.end();
+
+      if (request instanceof Request && request.paused) {
+        // resume the request if it was paused so we can read the remaining tokens
+        request.resume();
+      }
+    };
+
+    request.once('cancel', onCancel);
+
+    this.createRequestTimer();
+
+    const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+    this.messageIo.outgoingMessageStream.write(message);
+    this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+
+    message.once('finish', () => {
+      request.removeListener('cancel', onCancel);
+      request.once('cancel', this._cancelAfterRequestSent);
+
+      this.resetConnectionOnNextRequest = false;
+      this.debug.payload(function() {
+        return payload!.toString('  ');
+      });
+    });
+
+    const payloadStream = Readable.from(payload);
+    payloadStream.once('error', (error) => {
+      payloadStream.unpipe(message);
+
+      // Only set a request error if no error was set yet.
+      request.error ??= error;
+
+      message.ignore = true;
+      message.end();
+    });
+    payloadStream.pipe(message);
   }
 
   /**
