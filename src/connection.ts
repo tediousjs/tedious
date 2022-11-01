@@ -713,6 +713,13 @@ export interface ConnectionOptions {
   localAddress?: string | undefined;
 
   /**
+   * A boolean determining whether to parse unique identifier type with lowercase case characters.
+   *
+   * (default: `false`).
+   */
+  lowerCaseGuids?: boolean;
+
+  /**
    * The maximum number of connection retries for transient errors.、
    *
    * (default: `3`).
@@ -833,13 +840,6 @@ export interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
-
-  /**
-   * A boolean determining whether to parse unique identifier type with lowercase case characters.
-   *
-   * (default: `false`).
-   */
-  lowerCaseGuids?: boolean;
 }
 
 /**
