@@ -5,7 +5,6 @@ const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
-const dns = require('dns');
 
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
@@ -280,68 +279,49 @@ describe('Initiate Connect Test', function() {
   });
 
   it('should clear timeouts when failing to connect', function(done) {
-    const lookup = dns.lookup;
-    // force the dns lookup to fail, thus triggering an error in the connection
-    // @ts-ignore
-    dns.lookup = () => {
-      throw new Error('synthetic error');
-    };
-    try {
-      const connection = new Connection({
-        server: 'localhost',
-        options: { connectTimeout: 30000 },
-      });
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: { connectTimeout: 30000 },
+    });
 
-      connection.on('connect', (err) => {
-        try {
-          assert.instanceOf(err, ConnectionError);
-          assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
-          assert.strictEqual(connection.connectTimer, undefined);
-          done();
-        } catch (e) {
-          done(e);
-        }
-      });
-      connection.on('error', done);
-      connection.connect();
-      assert.isOk(connection.connectTimer);
-    } finally {
-      dns.lookup = lookup;
-    }
+    connection.on('connect', (err) => {
+      try {
+        assert.instanceOf(err, ConnectionError);
+        assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+        assert.strictEqual(connection.connectTimer, undefined);
+        done();
+      } catch (e) {
+        done(e);
+      }
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
   });
 
   it('should clear timeouts when failing to connect to named instance', function(done) {
-    const lookup = dns.lookup;
-    // force the dns lookup to fail, thus triggering an error in the connection
-    // @ts-ignore
-    dns.lookup = () => {
-      throw new Error('synthetic error');
-    };
-    try {
-      const connection = new Connection({
-        server: 'localhost',
-        options: {
-          instanceName: 'inst',
-          connectTimeout: 30000,
-        },
-      });
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: {
+        instanceName: 'inst',
+        connectTimeout: 30000,
+      },
+    });
 
-      connection.on('connect', (err) => {
-        try {
-          assert.instanceOf(err, ConnectionError);
-          assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
-          assert.strictEqual(connection.connectTimer, undefined);
-          done();
-        } catch (e) {
-          done(e);
-        }
-      });
-      connection.on('error', done);
-      connection.connect();
-      assert.isOk(connection.connectTimer);
-    } finally {
-      dns.lookup = lookup;
-    }
+    connection.on('connect', (err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
+      assert.strictEqual(connection.connectTimer, undefined);
+
+      done();
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
   });
 
   it('should fail if no cipher can be negotiated', function(done) {
