@@ -278,6 +278,52 @@ describe('Initiate Connect Test', function() {
     connection.connect();
   });
 
+  it('should clear timeouts when failing to connect', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: { connectTimeout: 30000 },
+    });
+
+    connection.on('connect', (err) => {
+      try {
+        assert.instanceOf(err, ConnectionError);
+        assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+        assert.strictEqual(connection.connectTimer, undefined);
+        done();
+      } catch (e) {
+        done(e);
+      }
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
+  });
+
+  it('should clear timeouts when failing to connect to named instance', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: {
+        instanceName: 'inst',
+        connectTimeout: 30000,
+      },
+    });
+
+    connection.on('connect', (err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
+      assert.strictEqual(connection.connectTimer, undefined);
+
+      done();
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
+  });
+
   it('should fail if no cipher can be negotiated', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
