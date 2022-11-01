@@ -713,6 +713,13 @@ export interface ConnectionOptions {
   localAddress?: string | undefined;
 
   /**
+   * A boolean determining whether to parse unique identifier type with lowercase case characters.
+   *
+   * (default: `false`).
+   */
+  lowerCaseGuids?: boolean;
+
+  /**
    * The maximum number of connection retries for transient errors.、
    *
    * (default: `3`).
@@ -833,13 +840,6 @@ export interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
-
-  /**
-   * A boolean determining whether to parse unique identifier type with lowercase case characters.
-   *
-   * (default: `false`).
-   */
-  lowerCaseGuids?: boolean;
 }
 
 /**
@@ -1314,14 +1314,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.columnNameReplacer = config.options.columnNameReplacer;
-      }
-
-      if (config.options.connectTimeout !== undefined) {
-        if (typeof config.options.connectTimeout !== 'number') {
-          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
-        }
-
-        this.config.options.connectTimeout = config.options.connectTimeout;
       }
 
       if (config.options.connectionIsolationLevel !== undefined) {
