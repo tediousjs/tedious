@@ -2454,7 +2454,13 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSqlBatch(request: Request) {
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2512,7 +2518,13 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2628,7 +2640,13 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, (err) => {
+        if (err) {
+          bulkLoad.callback(err);
+        } else {
+          bulkLoad.callback(undefined, bulkLoad.rowCount);
+        }
+      });
     });
 
     bulkLoad.once('cancel', onCancel);
@@ -2688,7 +2706,13 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2712,7 +2736,13 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2758,7 +2788,13 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2780,7 +2816,13 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2819,7 +2861,13 @@ class Connection extends EventEmitter {
     const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2845,7 +2893,13 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2871,7 +2925,13 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2894,7 +2954,13 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()), (err) => {
+      if (err) {
+        request.callback(err);
+      } else {
+        request.callback(undefined, request.rowCount, request.rows);
+      }
+    });
   }
 
   /**
@@ -2974,16 +3040,16 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, callback: (err: Error | undefined | null) => void) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      return request.callback(new RequestError(message, 'EINVALIDSTATE'));
+      return callback(new RequestError(message, 'EINVALIDSTATE'));
     }
 
     if (request.canceled) {
       return process.nextTick(() => {
-        request.callback(new RequestError('Canceled.', 'ECANCEL'));
+        callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     }
 
@@ -3112,7 +3178,8 @@ class Connection extends EventEmitter {
         if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
           this.inTransaction = false;
         }
-        sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+
+        callback(sqlRequest.error);
       };
 
       tokenStreamParser.once('end', onEndOfMessage);
