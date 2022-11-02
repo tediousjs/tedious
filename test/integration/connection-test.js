@@ -336,7 +336,7 @@ describe('Initiate Connect Test', function() {
     const connection = new Connection(config);
     connection.connect(function(err) {
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+      assert.strictEqual(err.code, 'ESOCKET');
     });
 
     connection.on('end', function() {
@@ -431,7 +431,7 @@ describe('Initiate Connect Test', function() {
       conn.close();
 
       assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
 
       done();
     });
@@ -913,7 +913,7 @@ describe('Insertion Tests', function() {
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).code, 'ECLOSE');
+      assert.strictEqual(err.code, 'ECLOSE');
     });
 
     const connection = new Connection(config);
@@ -1248,7 +1248,7 @@ describe('Insertion Tests', function() {
 
     const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
       assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Canceled.');
+      assert.strictEqual(err.message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1320,7 +1320,8 @@ describe('Insertion Tests', function() {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {
-        assert.equal(/** @type {Error} */(err).message, 'Timeout: Request failed to complete in 1000ms');
+        assert.instanceOf(err, RequestError);
+        assert.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
 
         connection.close();
       }
@@ -1415,9 +1416,9 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     config.options.enableAnsiNullDefault = false;
 
-    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined} */err) {
+    runSqlBatch(done, config, sql, function(err) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+      assert.strictEqual(err.number, 515);
     }); // Cannot insert the value NULL
   });
 });
