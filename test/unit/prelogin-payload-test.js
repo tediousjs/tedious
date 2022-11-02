@@ -8,7 +8,7 @@ function assertPayload(payload, encryptionString, { major, minor, build, subbuil
   assert.strictEqual(payload.version.subbuild, subbuild);
 
   assert.strictEqual(payload.encryptionString, encryptionString);
-  assert.strictEqual(payload.instance, 0);
+  assert.strictEqual(payload.instanceName, '');
   assert.strictEqual(payload.threadId, 0);
   assert.strictEqual(payload.marsString, 'OFF');
   assert.strictEqual(payload.fedAuthRequired, 1);
@@ -23,6 +23,11 @@ describe('prelogin-payload-assert', function() {
   it('should encrypt', function() {
     const payload = new PreloginPayload({ encrypt: true, version: { major: 11, minor: 3, build: 2, subbuild: 0 } });
     assertPayload(payload, 'ON', { major: 11, minor: 3, build: 2, subbuild: 0 });
+  });
+
+  it('should accept an instance name', function() {
+    const payload = new PreloginPayload({ encrypt: true, version: { major: 11, minor: 3, build: 2, subbuild: 0 }, instanceName: 'MSSQLServer' });
+    assert.strictEqual(payload.instanceName, 'MSSQLServer');
   });
 
   it('should create from buffer', function() {

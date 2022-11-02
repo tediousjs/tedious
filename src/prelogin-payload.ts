@@ -48,6 +48,7 @@ interface Options {
     build: number;
     subbuild: number;
   };
+  instanceName: string | undefined;
 }
 
 /*
@@ -67,7 +68,7 @@ class PreloginPayload {
   encryption!: number;
   encryptionString!: string;
 
-  instance!: number;
+  instanceName!: string;
 
   threadId!: number;
 
@@ -75,10 +76,10 @@ class PreloginPayload {
   marsString!: string;
   fedAuthRequired!: number;
 
-  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
+  constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 }, instanceName: undefined }) {
     if (bufferOrOptions instanceof Buffer) {
       this.data = bufferOrOptions;
-      this.options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } };
+      this.options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 }, instanceName: undefined };
     } else {
       this.options = bufferOrOptions;
       this.createOptions();
@@ -90,7 +91,7 @@ class PreloginPayload {
     const options = [
       this.createVersionOption(),
       this.createEncryptionOption(),
-      this.createInstanceOption(),
+      this.createInstanceNameOption(),
       this.createThreadIdOption(),
       this.createMarsOption(),
       this.createFedAuthOption()
@@ -144,8 +145,11 @@ class PreloginPayload {
     };
   }
 
-  createInstanceOption() {
+  createInstanceNameOption() {
     const buffer = new WritableTrackingBuffer(optionBufferSize);
+    if (this.options.instanceName !== undefined) {
+      buffer.writeString(this.options.instanceName, 'utf8');
+    }
     buffer.writeUInt8(0x00);
     return {
       token: TOKEN.INSTOPT,
@@ -193,7 +197,7 @@ class PreloginPayload {
           this.extractEncryption(dataOffset);
           break;
         case TOKEN.INSTOPT:
-          this.extractInstance(dataOffset);
+          this.extractInstanceName(dataOffset, dataLength);
           break;
         case TOKEN.THREADID:
           if (dataLength > 0) {
@@ -226,8 +230,12 @@ class PreloginPayload {
     this.encryptionString = encryptByValue[this.encryption];
   }
 
-  extractInstance(offset: number) {
-    this.instance = this.data.readUInt8(offset);
+  extractInstanceName(offset: number, dataLength: number) {
+    if (dataLength === 0) {
+      return;
+    }
+
+    this.instanceName = this.data.toString('utf8', offset, offset + dataLength);
   }
 
   extractThreadId(offset: number) {
@@ -245,11 +253,11 @@ class PreloginPayload {
 
   toString(indent = '') {
     return indent + 'PreLogin - ' + sprintf(
-      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
+      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instanceName:%s, threadId:0x%08X, mars:0x%02X(%s)',
       this.version.major, this.version.minor, this.version.build, this.version.subbuild,
       this.encryption ? this.encryption : 0,
       this.encryptionString ? this.encryptionString : '',
-      this.instance ? this.instance : 0,
+      this.instanceName ? this.instanceName : '',
       this.threadId ? this.threadId : 0,
       this.mars ? this.mars : 0,
       this.marsString ? this.marsString : ''

@@ -147,6 +147,31 @@ describe('Initiate Connect Test', function() {
     });
   });
 
+  it('should fail when connecting by port with wrong instance name', function(done) {
+    const config = getConfig();
+
+    config.options.instanceName = 'NonExistInstanceName';
+
+    if ((config.options != null ? config.options.port : undefined) == null) {
+      // Config says don't do this test (probably because ports are dynamic).
+      return this.skip();
+    }
+
+    const connection = new Connection(config);
+
+    connection.connect((err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(err?.message, 'Server instanceName does not match');
+
+      done();
+    });
+
+    connection.on('infoMessage', function(info) {
+      // console.log("#{info.number} : #{info.message}")
+    });
+  });
+
+
   it('should connect by instance name', function(done) {
     if (!getInstanceName()) {
       // Config says don't do this test (probably because SQL Server Browser is not available).

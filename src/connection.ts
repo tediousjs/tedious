@@ -854,6 +854,7 @@ const CLEANUP_TYPE = {
 interface RoutingData {
   server: string;
   port: number;
+  instanceName: string | undefined;
 }
 
 /**
@@ -1272,10 +1273,6 @@ class Connection extends EventEmitter {
     };
 
     if (config.options) {
-      if (config.options.port && config.options.instanceName) {
-        throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
-      }
-
       if (config.options.abortTransactionOnError !== undefined) {
         if (typeof config.options.abortTransactionOnError !== 'boolean' && config.options.abortTransactionOnError !== null) {
           throw new TypeError('The "config.options.abortTransactionOnError" property must be of type string or null.');
@@ -1510,7 +1507,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.instanceName = config.options.instanceName;
-        this.config.options.port = undefined;
       }
 
       if (config.options.isolationLevel !== undefined) {
@@ -1561,7 +1557,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
-        this.config.options.instanceName = undefined;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -2241,7 +2236,8 @@ class Connection extends EventEmitter {
 
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt,
-      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 },
+      instanceName: this.routingData?.instanceName ?? this.config.options.instanceName
     });
 
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
@@ -3154,6 +3150,11 @@ Connection.prototype.STATE = {
         }
 
         const preloginPayload = new PreloginPayload(messageBuffer);
+        if (preloginPayload.instanceName !== undefined && preloginPayload.instanceName !== '\x00') {
+          this.emit('connect', new ConnectionError('Server instanceName does not match'));
+          return this.close();
+        }
+
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
         });
