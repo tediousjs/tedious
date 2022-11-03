@@ -1009,11 +1009,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  _cancelAfterRequestSent: () => void;
-
-  /**
-   * @private
-   */
   databaseCollation: Collation | undefined;
 
   /**
@@ -1707,11 +1702,6 @@ class Connection extends EventEmitter {
     this.transientErrorLookup = new TransientErrorLookup();
 
     this.state = this.STATE.INITIALIZED;
-
-    this._cancelAfterRequestSent = () => {
-      this.messageIo.sendMessage(TYPE.ATTENTION);
-      this.createCancelTimer();
-    };
   }
 
   connect(connectListener?: (err?: Error) => void) {
@@ -3080,9 +3070,14 @@ class Connection extends EventEmitter {
     this.messageIo.outgoingMessageStream.write(message);
     this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
+    const onCancelAfterRequestSent = () => {
+      this.messageIo.sendMessage(TYPE.ATTENTION);
+      this.createCancelTimer();
+    };
+
     message.once('finish', () => {
       request.removeListener('cancel', onCancel);
-      request.once('cancel', this._cancelAfterRequestSent);
+      request.once('cancel', onCancelAfterRequestSent);
 
       this.resetConnectionOnNextRequest = false;
       this.debug.payload(function() {
@@ -3136,7 +3131,7 @@ class Connection extends EventEmitter {
         }
       }
 
-      request.removeListener('cancel', this._cancelAfterRequestSent);
+      request.removeListener('cancel', onCancelAfterRequestSent);
       request.removeListener('cancel', onCancel);
 
       // If the request was canceled and we have a `cancelTimer`
