@@ -3048,52 +3048,53 @@ class Connection extends EventEmitter {
     request.rows! = [];
     request.rst! = [];
 
-    const onCancel = () => {
-      payloadStream.unpipe(message);
-      payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
-
-      // set the ignore bit and end the message.
-      message.ignore = true;
-      message.end();
-
-      if (request instanceof Request && request.paused) {
-        // resume the request if it was paused so we can read the remaining tokens
-        request.resume();
-      }
-    };
-
-    request.once('cancel', onCancel);
-
     this.createRequestTimer();
 
     const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
     this.messageIo.outgoingMessageStream.write(message);
     this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-    message.once('finish', () => {
-      request.removeListener('cancel', onCancel);
-
-      this.resetConnectionOnNextRequest = false;
-      this.debug.payload(function() {
-        return payload!.toString('  ');
-      });
-    });
-
-    const payloadStream = Readable.from(payload);
-    payloadStream.once('error', (error) => {
-      payloadStream.unpipe(message);
-
-      // Only set a request error if no error was set yet.
-      request.error ??= error;
-
-      message.ignore = true;
-      message.end();
-    });
-    payloadStream.pipe(message);
-
     (async () => {
+      {
+        const payloadStream = Readable.from(payload);
+
+        const onCancel = () => {
+          payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        };
+
+        request.once('cancel', onCancel);
+
+        try {
+          for await (const chunk of payloadStream) {
+            if (message.write(chunk) === false) {
+              // TODO: Handle request cancellation while waiting for 'drain' event
+              await once(message, 'drain');
+            }
+          }
+        } catch (error) {
+          request.error ??= error as Error;
+          message.ignore = true;
+
+          if (request instanceof Request && request.paused) {
+            // resume the request if it was paused so we can read the remaining tokens
+            request.resume();
+          }
+        } finally {
+          request.removeListener('cancel', onCancel);
+        }
+
+        message.end();
+
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload!.toString('  ');
+        });
+      }
+
+      let waitForAttentionResponse = false;
       const onCancelAfterRequestSent = () => {
         this.messageIo.sendMessage(TYPE.ATTENTION);
+        waitForAttentionResponse = true;
         this.createCancelTimer();
         this.transitionTo(this.STATE.SENT_ATTENTION);
       };
@@ -3137,7 +3138,7 @@ class Connection extends EventEmitter {
           request.removeListener('cancel', onCancel);
         }
 
-        if (request.canceled) {
+        if (waitForAttentionResponse) {
           // 3.2.5.7 Sent Attention State
           while (true) {
             try {
