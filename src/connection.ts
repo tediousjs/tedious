@@ -2437,12 +2437,20 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSqlBatch(request: Request) {
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2501,12 +2509,20 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2623,12 +2639,20 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, (err) => {
-        if (err) {
-          bulkLoad.callback(err);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload).then(() => {
+        if (bulkLoad.error) {
+          process.nextTick(() => {
+            bulkLoad.callback(bulkLoad.error);
+          });
         } else {
-          bulkLoad.callback(undefined, bulkLoad.rowCount);
+          process.nextTick(() => {
+            bulkLoad.callback(undefined, bulkLoad.rowCount);
+          });
         }
+      }, (err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
     });
 
@@ -2689,12 +2713,20 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2719,12 +2751,20 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2771,12 +2811,20 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2799,12 +2847,20 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2844,12 +2900,20 @@ class Connection extends EventEmitter {
     const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor())).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2876,12 +2940,20 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor())).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2908,12 +2980,20 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()), (err) => {
-      if (err) {
-        request.callback(err);
+    this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor())).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -2937,12 +3017,21 @@ class Connection extends EventEmitter {
       }));
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()), (err) => {
-      if (err) {
-        request.callback(err);
+
+    this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor())).then(() => {
+      if (request.error) {
+        process.nextTick(() => {
+          request.callback(request.error);
+        });
       } else {
-        request.callback(undefined, request.rowCount, request.rows);
+        process.nextTick(() => {
+          request.callback(undefined, request.rowCount, request.rows);
+        });
       }
+    }, (err) => {
+      process.nextTick(() => {
+        throw err;
+      });
     });
   }
 
@@ -3023,17 +3112,17 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, callback: (err: Error | undefined | null) => void) {
+  async makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      return callback(new RequestError(message, 'EINVALIDSTATE'));
+      request.error = new RequestError(message, 'EINVALIDSTATE');
+      return;
     }
 
     if (request.canceled) {
-      return process.nextTick(() => {
-        callback(new RequestError('Canceled.', 'ECANCEL'));
-      });
+      request.error = new RequestError('Canceled.', 'ECANCEL');
+      return;
     }
 
     if (packetType === TYPE.SQL_BATCH) {
@@ -3054,137 +3143,124 @@ class Connection extends EventEmitter {
     this.messageIo.outgoingMessageStream.write(message);
     this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-    (async () => {
-      {
-        const payloadStream = Readable.from(payload);
+    {
+      const payloadStream = Readable.from(payload);
 
-        const onCancel = () => {
-          payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
-        };
-
-        request.once('cancel', onCancel);
-
-        try {
-          for await (const chunk of payloadStream) {
-            if (message.write(chunk) === false) {
-              // TODO: Handle request cancellation while waiting for 'drain' event
-              await once(message, 'drain');
-            }
-          }
-        } catch (error) {
-          request.error ??= error as Error;
-          message.ignore = true;
-
-          if (request instanceof Request && request.paused) {
-            // resume the request if it was paused so we can read the remaining tokens
-            request.resume();
-          }
-        } finally {
-          request.removeListener('cancel', onCancel);
-        }
-
-        message.end();
-
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload!.toString('  ');
-        });
-      }
-
-      let waitForAttentionResponse = false;
-      const onCancelAfterRequestSent = () => {
-        this.messageIo.sendMessage(TYPE.ATTENTION);
-        waitForAttentionResponse = true;
-        this.createCancelTimer();
-        this.transitionTo(this.STATE.SENT_ATTENTION);
+      const onCancel = () => {
+        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
       };
 
-      request.once('cancel', onCancelAfterRequestSent);
+      request.once('cancel', onCancel);
+
       try {
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
+        for await (const chunk of payloadStream) {
+          if (message.write(chunk) === false) {
+            // TODO: Handle request cancellation while waiting for 'drain' event
+            await once(message, 'drain');
+          }
         }
-        // request timer is stopped on first data package
-        this.clearRequestTimer();
+      } catch (error) {
+        request.error ??= error as Error;
+        message.ignore = true;
 
-        const onCancel = () => {
-          if (request instanceof Request && request.paused) {
-            // resume the request if it was paused so we can read the remaining tokens
-            request.resume();
-          }
-        };
+        if (request instanceof Request && request.paused) {
+          // resume the request if it was paused so we can read the remaining tokens
+          request.resume();
+        }
+      } finally {
+        request.removeListener('cancel', onCancel);
+      }
 
-        request.once('cancel', onCancel);
-        try {
-          if (request instanceof Request && request.paused) {
-            await once(request, 'resume');
-          }
+      message.end();
 
-          const handler = new RequestTokenHandler(this, request);
-          for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
-            // If the request was canceled, we discard any data contained in the response.
-            if (!request.canceled) {
-              if (request instanceof Request && request.paused) {
-                await once(request, 'resume');
-              }
+      this.resetConnectionOnNextRequest = false;
+      this.debug.payload(function() {
+        return payload!.toString('  ');
+      });
+    }
 
-              handler[token.handlerName](token as any);
-            }
-          }
-        } finally {
-          request.removeListener('cancel', onCancel);
+    let waitForAttentionResponse = false;
+    const onCancelAfterRequestSent = () => {
+      this.messageIo.sendMessage(TYPE.ATTENTION);
+      waitForAttentionResponse = true;
+      this.createCancelTimer();
+      this.transitionTo(this.STATE.SENT_ATTENTION);
+    };
+
+    request.once('cancel', onCancelAfterRequestSent);
+    try {
+      let message;
+      try {
+        message = await this.messageIo.readMessage();
+      } catch (err: any) {
+        return this.socketError(err);
+      }
+      // request timer is stopped on first data package
+      this.clearRequestTimer();
+
+      const onCancel = () => {
+        if (request instanceof Request && request.paused) {
+          // resume the request if it was paused so we can read the remaining tokens
+          request.resume();
+        }
+      };
+
+      request.once('cancel', onCancel);
+      try {
+        if (request instanceof Request && request.paused) {
+          await once(request, 'resume');
         }
 
-        if (waitForAttentionResponse) {
-          // 3.2.5.7 Sent Attention State
-          while (true) {
-            try {
-              message = await this.messageIo.readMessage();
-            } catch (err: any) {
-              return this.socketError(err);
+        const handler = new RequestTokenHandler(this, request);
+        for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+          // If the request was canceled, we discard any data contained in the response.
+          if (!request.canceled) {
+            if (request instanceof Request && request.paused) {
+              await once(request, 'resume');
             }
 
-            const handler = new AttentionTokenHandler(this, request);
-            for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
-              try {
-                handler[token.handlerName](token as any);
-              } catch (err) {
-                console.log(err);
-                throw err;
-              }
-            }
-
-            if (handler.attentionReceived) {
-              this.clearCancelTimer();
-
-              if (!request.error || !(request.error instanceof RequestError) || request.error.code !== 'ETIMEOUT') {
-                request.error = new RequestError('Canceled.', 'ECANCEL');
-              }
-
-              break;
-            }
+            handler[token.handlerName](token as any);
           }
         }
       } finally {
-        request.removeListener('cancel', onCancelAfterRequestSent);
+        request.removeListener('cancel', onCancel);
       }
 
-      this.transitionTo(this.STATE.LOGGED_IN);
-      this.request = undefined;
+      if (waitForAttentionResponse) {
+        // 3.2.5.7 Sent Attention State
+        while (true) {
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
 
-      if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
-        this.inTransaction = false;
+          const handler = new AttentionTokenHandler(this, request);
+          for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+            handler[token.handlerName](token as any);
+          }
+
+          if (handler.attentionReceived) {
+            this.clearCancelTimer();
+
+            if (!request.error || !(request.error instanceof RequestError) || request.error.code !== 'ETIMEOUT') {
+              request.error = new RequestError('Canceled.', 'ECANCEL');
+            }
+
+            break;
+          }
+        }
       }
+    } finally {
+      request.removeListener('cancel', onCancelAfterRequestSent);
+    }
 
-      callback(request.error);
-    })().catch((err) => {
-      process.nextTick(() => {
-        throw err;
-      });
-    });
+    this.transitionTo(this.STATE.LOGGED_IN);
+    this.request = undefined;
+
+    if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+      this.inTransaction = false;
+    }
   }
 
   /**
