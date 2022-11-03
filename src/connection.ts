@@ -28,7 +28,7 @@ import Request from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
-import { Parser as TokenStreamParser } from './token/token-stream-parser';
+import StreamParser from './token/stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -47,7 +47,7 @@ import { Collation } from './collation';
 import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
-import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
   /**
@@ -1949,13 +1949,6 @@ class Connection extends EventEmitter {
     return debug;
   }
 
-  /**
-   * @private
-   */
-  createTokenStreamParser(message: Message, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
-  }
-
   connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
@@ -3119,7 +3112,32 @@ class Connection extends EventEmitter {
       // request timer is stopped on first data package
       this.clearRequestTimer();
 
-      const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, request));
+      const onCancel = () => {
+        if (request instanceof Request && request.paused) {
+          // resume the request if it was paused so we can read the remaining tokens
+          request.resume();
+        }
+      };
+
+      request.once('cancel', onCancel);
+
+      if (request instanceof Request && request.paused) {
+        await once(request, 'resume');
+      }
+
+      const handler = new RequestTokenHandler(this, request);
+      for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+        if (request instanceof Request && request.paused) {
+          await once(request, 'resume');
+        }
+
+        if (!request.canceled) {
+          handler[token.handlerName](token as any);
+        }
+      }
+
+      request.removeListener('cancel', this._cancelAfterRequestSent);
+      request.removeListener('cancel', onCancel);
 
       // If the request was canceled and we have a `cancelTimer`
       // defined, we send a attention message after the
@@ -3133,57 +3151,14 @@ class Connection extends EventEmitter {
         return this.transitionTo(this.STATE.SENT_ATTENTION);
       }
 
-      const onResume = () => {
-        tokenStreamParser.resume();
-      };
-      const onPause = () => {
-        tokenStreamParser.pause();
-
-        request.once('resume', onResume);
-      };
-
-      request.on('pause', onPause);
-
-      if (request instanceof Request && request.paused) {
-        onPause();
+      this.transitionTo(this.STATE.LOGGED_IN);
+      const sqlRequest = request as Request;
+      this.request = undefined;
+      if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+        this.inTransaction = false;
       }
 
-      const onCancel = () => {
-        tokenStreamParser.removeListener('end', onEndOfMessage);
-
-        if (request instanceof Request && request.paused) {
-          // resume the request if it was paused so we can read the remaining tokens
-          request.resume();
-        }
-
-        request.removeListener('pause', onPause);
-        request.removeListener('resume', onResume);
-
-        // The `_cancelAfterRequestSent` callback will have sent a
-        // attention message, so now we need to also switch to
-        // the `SENT_ATTENTION` state to make sure the attention ack
-        // message is processed correctly.
-        this.transitionTo(this.STATE.SENT_ATTENTION);
-      };
-
-      const onEndOfMessage = () => {
-        request.removeListener('cancel', this._cancelAfterRequestSent);
-        request.removeListener('cancel', onCancel);
-        request.removeListener('pause', onPause);
-        request.removeListener('resume', onResume);
-
-        this.transitionTo(this.STATE.LOGGED_IN);
-        const sqlRequest = request as Request;
-        this.request = undefined;
-        if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
-          this.inTransaction = false;
-        }
-
-        callback(sqlRequest.error);
-      };
-
-      tokenStreamParser.once('end', onEndOfMessage);
-      request.once('cancel', onCancel);
+      callback(sqlRequest.error);
     })();
   }
 
@@ -3411,9 +3386,9 @@ Connection.prototype.STATE = {
         }
 
         const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        await once(tokenStreamParser, 'end');
+        for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+          handler[token.handlerName](token as any);
+        }
 
         if (handler.loginAckReceived) {
           if (handler.routingData) {
@@ -3462,9 +3437,9 @@ Connection.prototype.STATE = {
           }
 
           const handler = new Login7TokenHandler(this);
-          const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-          await once(tokenStreamParser, 'end');
+          for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+            handler[token.handlerName](token as any);
+          }
 
           if (handler.loginAckReceived) {
             if (handler.routingData) {
@@ -3530,8 +3505,10 @@ Connection.prototype.STATE = {
         }
 
         const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-        await once(tokenStreamParser, 'end');
+        for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+          handler[token.handlerName](token as any);
+        }
+
         if (handler.loginAckReceived) {
           if (handler.routingData) {
             this.routingData = handler.routingData;
@@ -3632,8 +3609,11 @@ Connection.prototype.STATE = {
         } catch (err: any) {
           return this.socketError(err);
         }
-        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-        await once(tokenStreamParser, 'end');
+
+        const handler = new InitialSqlTokenHandler(this);
+        for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+          handler[token.handlerName](token as any);
+        }
 
         this.transitionTo(this.STATE.LOGGED_IN);
         this.processedInitialSql();
@@ -3689,9 +3669,10 @@ Connection.prototype.STATE = {
         }
 
         const handler = new AttentionTokenHandler(this, this.request!);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
+          handler[token.handlerName](token as any);
+        }
 
-        await once(tokenStreamParser, 'end');
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {
