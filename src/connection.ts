@@ -390,6 +390,7 @@ export interface InternalConnectionOptions {
   useUTC: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
+  numericAsString: boolean;
 }
 
 interface KeyStoreProviderMap {
@@ -840,6 +841,17 @@ export interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
+
+  /**
+   * Should numeric datayypes be returned as strings or numbers?
+   *
+   * The options are:
+   * * true - always return them as strings
+   * * false - always return them as numbers with possible precision loss
+   *
+   * (default: false)
+   */
+  numericAsString?: boolean;
 }
 
 /**
@@ -1267,7 +1279,8 @@ class Connection extends EventEmitter {
         useColumnNames: false,
         useUTC: true,
         workstationId: undefined,
-        lowerCaseGuids: false
+        lowerCaseGuids: false,
+        numericAsString: false
       }
     };
 
@@ -1656,6 +1669,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.useUTC = config.options.useUTC;
+      }
+
+      if (config.options.numericAsString !== undefined) {
+        if (typeof config.options.numericAsString !== 'boolean') {
+          throw new TypeError('The "config.options.numericAsString" property must be of type boolean.');
+        }
+
+        this.config.options.numericAsString = config.options.numericAsString;
       }
 
       if (config.options.workstationId !== undefined) {
