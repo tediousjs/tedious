@@ -6,6 +6,8 @@ import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 
+import Big from 'big.js';
+
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const THREE_AND_A_THIRD = 3 + (1 / 3);
@@ -315,7 +317,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: ParserOptions, 
         if (dataLength === 0) {
           return callback(null);
         } else {
-          return readNumeric(parser, dataLength!, metadata.precision!, metadata.scale!, callback);
+          return readNumeric(parser, dataLength!, metadata.precision!, metadata.scale!, options.numericAsString, callback);
         }
       });
 
@@ -356,7 +358,7 @@ function readUniqueIdentifier(parser: Parser, options: ParserOptions, callback: 
   });
 }
 
-function readNumeric(parser: Parser, dataLength: number, _precision: number, scale: number, callback: (value: unknown) => void) {
+function readNumeric(parser: Parser, dataLength: number, _precision: number, scale: number, numericAsString: boolean, callback: (value: number | string) => void) {
   parser.readUInt8((sign) => {
     sign = sign === 1 ? 1 : -1;
 
@@ -374,7 +376,28 @@ function readNumeric(parser: Parser, dataLength: number, _precision: number, sca
     }
 
     readValue.call(parser, (value) => {
-      callback((value * sign) / Math.pow(10, scale));
+
+      if (!numericAsString) {
+        // Convert it back to a number if it's a Big
+        if (typeof value !== 'number') {
+          value = value.toNumber();
+        }
+        return callback((value * sign) / Math.pow(10, scale));
+      }
+
+      if (typeof value === 'number') {
+        value = Big(value);
+      }
+
+      if (scale === 0) {
+        callback(value.times(sign).toString());
+      } else {
+        // Fix decimal precision to match scale so we don't loose it in the conversion
+        Big.DP = scale;
+
+        callback(value.times(sign).div(Math.pow(10, scale)).toFixed(scale));
+      }
+
     });
   });
 }
@@ -451,7 +474,7 @@ function readVariant(parser: Parser, options: ParserOptions, dataLength: number,
         case 'DecimalN':
           return parser.readUInt8((precision) => {
             parser.readUInt8((scale) => {
-              readNumeric(parser, dataLength, precision, scale, callback);
+              readNumeric(parser, dataLength, precision, scale, options.numericAsString, callback);
             });
           });
 

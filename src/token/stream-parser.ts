@@ -17,6 +17,8 @@ import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 
+import Big from 'big.js';
+
 const tokenParsers = {
   [TYPE.DONE]: doneParser,
   [TYPE.DONEINPROC]: doneInProcParser,
@@ -33,7 +35,7 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
-export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns' | 'numericAsString'>;
 
 class StreamBuffer {
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
@@ -357,18 +359,18 @@ class Parser {
     });
   }
 
-  readUNumeric64LE(callback: (data: number) => void) {
+  readUNumeric64LE(callback: (data: number | Big) => void) {
     this.awaitData(8, () => {
       const low = this.buffer.readUInt32LE(this.position);
       const high = this.buffer.readUInt32LE(this.position + 4);
 
       this.position += 8;
 
-      callback((0x100000000 * high) + low);
+      callback(Big(0x100000000).times(high).plus(low));
     });
   }
 
-  readUNumeric96LE(callback: (data: number) => void) {
+  readUNumeric96LE(callback: (data: number | Big) => void) {
     this.awaitData(12, () => {
       const dword1 = this.buffer.readUInt32LE(this.position);
       const dword2 = this.buffer.readUInt32LE(this.position + 4);
@@ -376,11 +378,11 @@ class Parser {
 
       this.position += 12;
 
-      callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3));
+      callback(Big(dword1).plus(Big(0x100000000).times(dword2)).plus(Big(0x100000000).times(0x100000000).times(dword3)));
     });
   }
 
-  readUNumeric128LE(callback: (data: number) => void) {
+  readUNumeric128LE(callback: (data: number | Big) => void) {
     this.awaitData(16, () => {
       const dword1 = this.buffer.readUInt32LE(this.position);
       const dword2 = this.buffer.readUInt32LE(this.position + 4);
@@ -389,7 +391,7 @@ class Parser {
 
       this.position += 16;
 
-      callback(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4));
+      callback(Big(dword1).plus(Big(0x100000000).times(dword2)).plus(Big(0x100000000).times(0x100000000).times(dword3)).plus(Big(0x100000000).times(0x100000000).times(0x100000000).times(dword4)));
     });
   }
 
