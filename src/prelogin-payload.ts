@@ -234,7 +234,6 @@ class PreloginPayload {
     if (dataLength === 0) {
       return;
     }
-
     this.instanceName = this.data.toString('utf8', offset, offset + dataLength);
   }
 
