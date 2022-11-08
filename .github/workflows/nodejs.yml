@@ -15,9 +15,11 @@ jobs:
     name: Linting
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Use Node.js 14
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: 14
 
@@ -26,7 +28,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -76,10 +78,10 @@ jobs:
           SA_PASSWORD: "yourStrong(!)Password"
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
 
@@ -113,7 +115,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -182,9 +184,9 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Use Node.js 14
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: 14
 
@@ -193,7 +195,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -292,9 +294,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Use Node.js 14
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: 14
 
@@ -303,7 +305,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
