@@ -1254,7 +1254,7 @@ class Connection extends EventEmitter {
         maxRetriesOnTransientErrors: 3,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
-        port: DEFAULT_PORT,
+        port: undefined,
         readOnlyIntent: false,
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
@@ -1549,6 +1549,8 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
+      } else if (!this.config.options.instanceName) {
+        this.config.options.port = DEFAULT_PORT;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -1878,15 +1880,23 @@ class Connection extends EventEmitter {
   initialiseConnection() {
     const signal = this.createConnectTimer();
 
+    // If user provided both port and an instance name,
+    // the code should always use the port and skip the instance lookup
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
     } else {
+      // The instance lookup communicates with the server and gets all the
+      // available instance name and their corresponding ports.
+      // Then based on the provided instance name and the result ports,
+      // logic will try to find a match and connection to the instance by its port.
       return instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
       }).then((port) => {
+        // If we get a port from the instance lookup process, the logic will try to connect
+        // using this port.
         process.nextTick(() => {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
         });
