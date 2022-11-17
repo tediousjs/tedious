@@ -1,7 +1,7 @@
-import Parser, { ParserOptions } from './stream-parser';
+import LegacyParser, { ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
-import { BigUInt64LE, Sequence, UInt16LE, UInt32LE, Map, Parser as P } from '../parser';
+import { BigUInt64LE, Sequence, UInt16LE, UInt32LE, Map } from '../parser';
 
 const STATUS = {
   MORE: 0x0001,
@@ -81,31 +81,14 @@ export class DoneTokenParser extends Map<[number, number, bigint | number], Done
   }
 }
 
-function execParser<T extends DoneTokenParser | DoneProcTokenParser | DoneInProcTokenParser>(parser: Parser, options: ParserOptions, parserConstructor: { new(options: ParserOptions): T }, callback: (token: T extends P<infer O> ? O : never) => void) {
-  const p = new parserConstructor(options);
-
-  const next = () => {
-    const result = p.parse(parser.buffer, parser.position);
-    parser.position = result.offset;
-
-    if (result.done) {
-      return callback(result.value as T extends P<infer O> ? O : never);
-    }
-
-    parser.suspend(next);
-  };
-
-  next();
+export function doneParser(parser: LegacyParser, options: ParserOptions, callback: (token: DoneToken) => void) {
+  parser.execParser(DoneTokenParser, callback);
 }
 
-export function doneParser(parser: Parser, options: ParserOptions, callback: (token: DoneToken) => void) {
-  execParser(parser, options, DoneTokenParser, callback);
+export function doneInProcParser(parser: LegacyParser, options: ParserOptions, callback: (token: DoneInProcToken) => void) {
+  parser.execParser(DoneInProcTokenParser, callback);
 }
 
-export function doneInProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneInProcToken) => void) {
-  execParser(parser, options, DoneInProcTokenParser, callback);
-}
-
-export function doneProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneProcToken) => void) {
-  execParser(parser, options, DoneProcTokenParser, callback);
+export function doneProcParser(parser: LegacyParser, options: ParserOptions, callback: (token: DoneProcToken) => void) {
+  parser.execParser(DoneProcTokenParser, callback);
 }

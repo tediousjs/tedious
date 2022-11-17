@@ -17,6 +17,8 @@ import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 
+import { Parser } from '../parser';
+
 const tokenParsers = {
   [TYPE.DONE]: doneParser,
   [TYPE.DONEINPROC]: doneInProcParser,
@@ -62,7 +64,7 @@ class StreamBuffer {
   }
 }
 
-class Parser {
+class LegacyParser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: ParserOptions;
@@ -77,7 +79,7 @@ class Parser {
 
     const streamBuffer = new StreamBuffer(iterable);
 
-    const parser = new Parser(streamBuffer, debug, options);
+    const parser = new LegacyParser(streamBuffer, debug, options);
     parser.colMetadata = colMetadata;
 
     while (true) {
@@ -146,6 +148,23 @@ class Parser {
     this.streamBuffer = streamBuffer;
     this.suspended = false;
     this.next = undefined;
+  }
+
+  execParser<T>(parserConstructor: { new (options: ParserOptions): Parser<T> }, callback: (token: T) => void) {
+    const p = new parserConstructor(this.options);
+
+    const next = () => {
+      const result = p.parse(this.buffer, this.position);
+      this.position = result.offset;
+
+      if (result.done) {
+        return callback(result.value);
+      }
+
+      this.suspend(next);
+    };
+
+    next();
   }
 
   get buffer() {
@@ -436,5 +455,5 @@ class Parser {
   }
 }
 
-export default Parser;
-module.exports = Parser;
+export default LegacyParser;
+module.exports = LegacyParser;

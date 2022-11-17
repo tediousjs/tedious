@@ -1,32 +1,25 @@
 // s2.2.7.14
-import Parser, { ParserOptions } from './stream-parser';
+import { UsVarbyte, Map } from '../parser';
+import LegacyParser, { ParserOptions } from './stream-parser';
 
 import { OrderToken } from './token';
 
-function orderParser(parser: Parser, _options: ParserOptions, callback: (token: OrderToken) => void) {
-  parser.readUInt16LE((length) => {
-    const columnCount = length / 2;
-    const orderColumns: number[] = [];
+class OrderTokenParser extends Map<Buffer, OrderToken> {
+  constructor() {
+    super(new UsVarbyte(), (buf) => {
+      const orderColumns = [];
 
-    let i = 0;
-    function next(done: () => void) {
-      if (i === columnCount) {
-        return done();
+      for (let i = 0; i < buf.length; i += 2) {
+        orderColumns.push(buf.readUInt16LE(i));
       }
 
-      parser.readUInt16LE((column) => {
-        orderColumns.push(column);
-
-        i++;
-
-        next(done);
-      });
-    }
-
-    next(() => {
-      callback(new OrderToken(orderColumns));
+      return new OrderToken(orderColumns);
     });
-  });
+  }
+}
+
+function orderParser(parser: LegacyParser, _options: ParserOptions, callback: (token: OrderToken) => void) {
+  parser.execParser(OrderTokenParser, callback);
 }
 
 export default orderParser;

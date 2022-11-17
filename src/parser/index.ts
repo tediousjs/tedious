@@ -48,6 +48,40 @@ export class Sequence<I extends [...any[]]> extends Parser<I> {
   }
 }
 
+export class Record<I extends { [key: string]: any }> extends Parser<I> {
+  index: number;
+  record: { [K in keyof I]: Parser<I[K]> };
+  result: I;
+
+  constructor(record: { [K in keyof I]: Parser<I[K]> }) {
+    super();
+
+    this.index = 0;
+    this.record = record;
+
+    this.result = {} as I;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<I> {
+    const keys = Object.keys(this.record);
+
+    while (this.index < keys.length) {
+      const key = keys[this.index] as keyof I;
+      const r = this.record[key].parse(buffer, offset);
+
+      if (!r.done) {
+        return r;
+      }
+
+      offset = r.offset;
+      this.result[key] = r.value;
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
+
 /**
  * Transform the result of a parser to a different value.
  */
