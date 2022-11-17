@@ -1,4 +1,4 @@
-import { BVarbyte, Choice, Mapper, Tuple, UInt8, UsVarbyte, Parser, BVarchar } from '..';
+import { BVarbyte, FlatMap, Map, Sequence, UInt8, UsVarbyte, Parser, BVarchar } from '..';
 import { Collation } from '../../collation';
 import { DatabaseEnvChangeToken, LanguageEnvChangeToken, CharsetEnvChangeToken, PacketSizeEnvChangeToken, BeginTransactionEnvChangeToken, CommitTransactionEnvChangeToken, RollbackTransactionEnvChangeToken, DatabaseMirroringPartnerEnvChangeToken, ResetConnectionEnvChangeToken, RoutingEnvChangeToken, CollationChangeToken } from '../../token/token';
 
@@ -15,13 +15,13 @@ type EnvChangeToken =
   RoutingEnvChangeToken |
   CollationChangeToken;
 
-export class EnvChangeTokenParser extends Mapper<Buffer, EnvChangeToken> {
+export class EnvChangeTokenParser extends Map<Buffer, EnvChangeToken> {
   constructor() {
     super(new UsVarbyte(), parseEnvChangeBody);
   }
 }
 
-class EnvChangeBodyParser extends Choice<number, EnvChangeToken> {
+class EnvChangeBodyParser extends FlatMap<number, EnvChangeToken> {
   constructor() {
     super(new UInt8(), chooseEnvChangeType);
   }
@@ -51,11 +51,11 @@ function buildPacketSizeChangeToken([newValue, oldValue]: [string, string]) {
 function chooseEnvChangeType(type: number): Parser<EnvChangeToken> {
   switch (type) {
     case 7: {
-      return new Mapper(new Tuple<[Buffer, Buffer]>([new BVarbyte(), new BVarbyte()]), buildCollationChangeToken);
+      return new Map(new Sequence<[Buffer, Buffer]>([new BVarbyte(), new BVarbyte()]), buildCollationChangeToken);
     }
 
     case 4: {
-      return new Mapper(new Tuple<[string, string]>([new BVarchar(), new BVarchar()]), buildPacketSizeChangeToken);
+      return new Map(new Sequence<[string, string]>([new BVarchar(), new BVarchar()]), buildPacketSizeChangeToken);
     }
 
     default: {

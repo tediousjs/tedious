@@ -19,7 +19,6 @@ function buildColMetadataToken([metadata, tableName, colName]: [metadata: Metada
     tableName: tableName
   };
 }
-
 export class ColMetadataTokenParser extends Map<[Metadata, string[] | string | undefined, string], ColMetadataToken> {
   constructor() {
     super(new Sequence<[Metadata, string, string]>([new MetadataParser(), new UsVarchar(), new BVarchar()]), buildColMetadataToken);

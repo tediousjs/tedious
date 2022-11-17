@@ -1,12 +1,23 @@
-
 export type Result<T> =
   { done: true, value: T, offset: number } |
   { done: false, value: undefined, offset: number };
 
+/**
+ * Base parser class.
+ */
 export abstract class Parser<T> {
+  /**
+   * Parse data in buffer, starting from `offset`.
+   *
+   * Returns a result denoting whether the parser is done, what value was parsed,
+   * and from which offset to continue in the given buffer.
+   */
   abstract parse(buffer: Buffer, offset: number): Result<T>
 }
 
+/**
+ * Execute a sequence of parsers and collect their results.
+ */
 export class Sequence<I extends [...any[]]> extends Parser<I> {
   index: number;
   list: Parser<any>[];
@@ -17,18 +28,18 @@ export class Sequence<I extends [...any[]]> extends Parser<I> {
     this.index = 0;
     this.list = list;
 
-    this.result = [] as unknown as I;
+    this.result = new Array(this.list.length) as I;
   }
 
   parse(buffer: Buffer, offset: number): Result<I> {
     while (this.index < this.list.length) {
       const r = this.list[this.index].parse(buffer, offset);
-      offset = r.offset;
 
       if (!r.done) {
-        return { done: false, value: undefined, offset: offset };
+        return r;
       }
 
+      offset = r.offset;
       this.result[this.index] = r.value;
       this.index += 1;
     }
@@ -37,6 +48,9 @@ export class Sequence<I extends [...any[]]> extends Parser<I> {
   }
 }
 
+/**
+ * Transform the result of a parser to a different value.
+ */
 export class Map<I, O> extends Parser<O> {
   map: (input: I) => O;
   input: Parser<I>;
@@ -60,6 +74,9 @@ export class Map<I, O> extends Parser<O> {
   }
 }
 
+/**
+ * Call one parser, and use its result to determine how to continue parsing.
+ */
 export class FlatMap<I, O> extends Parser<O> {
   value: Parser<I>;
   next: Parser<O> | undefined;
@@ -86,14 +103,7 @@ export class FlatMap<I, O> extends Parser<O> {
       this.next = this.options(r.value);
     }
 
-    const r = this.next!.parse(buffer, offset);
-    offset = r.offset;
-
-    if (r.done) {
-      return { done: r.done, value: r.value, offset: offset };
-    } else {
-      return { done: false, value: undefined, offset: offset };
-    }
+    return this.next!.parse(buffer, offset);
   }
 }
 
@@ -123,6 +133,11 @@ export class UInt16LE extends Parser<number> {
       case 0: {
         if (offset === buffer.length) {
           return { done: false, value: undefined, offset: offset };
+        }
+
+        // Fast path, buffer has all data available
+        if (offset + 2 <= buffer.length) {
+          return { done: true, value: buffer.readUInt16LE(offset), offset: offset + 2 };
         }
 
         this.result += buffer[offset++];
@@ -168,6 +183,11 @@ export class UInt32LE extends Parser<number> {
       case 0: {
         if (offset === buffer.length) {
           return { done: false, value: undefined, offset: offset };
+        }
+
+        // Fast path, buffer has all data available
+        if (offset + 4 <= buffer.length) {
+          return { done: true, value: buffer.readUInt32LE(offset), offset: offset + 4 };
         }
 
         this.result += buffer[offset++];
@@ -219,6 +239,124 @@ export class UInt32LE extends Parser<number> {
   }
 }
 
+export class BigUInt64LE extends Parser<bigint> {
+  index: number;
+  lo: number;
+  hi: number;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.lo = 0;
+    this.hi = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<bigint> {
+    switch (this.index) {
+      case 0: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        // Fast path, buffer has all data available
+        if (offset + 8 <= buffer.length) {
+          return { done: true, value: buffer.readBigUInt64LE(offset), offset: offset + 8 };
+        }
+
+        this.lo += buffer[offset++];
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 1: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.lo += buffer[offset++] * 2 ** 8;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 2: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.lo += buffer[offset++] * 2 ** 16;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 3: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.lo += buffer[offset++] * 2 ** 32;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 4: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.hi += buffer[offset++];
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 5: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.hi += buffer[offset++] * 2 ** 8;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 6: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.hi += buffer[offset++] * 2 ** 16;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 7: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.hi += buffer[offset++] * 2 ** 32;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 8: {
+        return { done: true, value: BigInt(this.lo) + (BigInt(this.hi) << 32n), offset: offset };
+      }
+
+      default:
+        throw new Error('unreachable');
+    }
+  }
+}
+
 class NVarbyte extends Parser<Buffer> {
   length: UInt8 | UInt16LE | UInt32LE;
 
@@ -236,12 +374,12 @@ class NVarbyte extends Parser<Buffer> {
   parse(buffer: Buffer, offset: number): Result<Buffer> {
     if (this.remainingLength === undefined) {
       const r = this.length.parse(buffer, offset);
-      offset = r.offset;
 
       if (!r.done) {
-        return { done: false, value: undefined, offset: offset };
+        return r;
       }
 
+      offset = r.offset;
       this.remainingLength = r.value;
     }
 
@@ -306,12 +444,12 @@ class NVarchar extends Parser<string> {
   parse(buffer: Buffer, offset: number): Result<string> {
     if (this.remainingLength === undefined) {
       const r = this.length.parse(buffer, offset);
-      offset = r.offset;
 
       if (!r.done) {
-        return { done: false, value: undefined, offset: offset };
+        return r;
       }
 
+      offset = r.offset;
       this.remainingLength = r.value * 2;
     }
 
