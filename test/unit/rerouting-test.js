@@ -8,8 +8,6 @@ const Debug = require('../../src/debug');
 const PreloginPayload = require('../../src/prelogin-payload');
 const Message = require('../../src/message');
 const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
-const StreamParser = require('../../src/token/stream-parser');
-const Login7TokenHandler = require('../../src/token/handler').Login7TokenHandler;
 
 function buildRoutingEnvChangeToken(hostname, port) {
   const valueBuffer = new WritableTrackingBuffer(0);
@@ -253,11 +251,12 @@ describe('Connecting to a server that sends a re-routing information', function(
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x12);
 
-          let messageBuffer = Buffer.alloc(0);
+          const chunks = [];
           for await (const data of message) {
-            messageBuffer = Buffer.concat([messageBuffer, data]);
+            chunks.push(data);
           }
-          const preloginPayload = new PreloginPayload(messageBuffer);
+
+          const preloginPayload = new PreloginPayload(Buffer.concat(chunks));
           assert.strictEqual(preloginPayload.instanceName, 'instanceNameA\u0000');
 
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
@@ -385,16 +384,5 @@ describe('Connecting to a server that sends a re-routing information', function(
     } finally {
       connection.close();
     }
-  });
-
-  it('Test if routing data capture the correct instance name value', async function() {
-    const responseMessage = new Message({ type: 0x04 });
-    responseMessage.end(buildRoutingEnvChangeToken(targetServer.address().address + '\\instanceNameA', targetServer.address().port));
-    const parser = StreamParser.parseTokens(responseMessage, {}, {});
-    const result = await parser.next();
-    const handler = new Login7TokenHandler(new Connection({ server: 'servername' }));
-    handler[result.value.handlerName](result.value);
-    assert.strictEqual(handler.routingData.instanceName, 'instanceNameA');
-    assert.isTrue((await parser.next()).done);
   });
 });
