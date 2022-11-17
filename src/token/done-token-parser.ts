@@ -1,7 +1,7 @@
 import Parser, { ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
-// s2.2.7.5/6/7
+import { BigUInt64LE, Sequence, UInt16LE, UInt32LE, Map, Parser as P } from '../parser';
 
 const STATUS = {
   MORE: 0x0001,
@@ -22,51 +22,90 @@ interface TokenData {
   curCmd: number;
 }
 
-function parseToken(parser: Parser, options: ParserOptions, callback: (data: TokenData) => void) {
-  parser.readUInt16LE((status) => {
-    const more = !!(status & STATUS.MORE);
-    const sqlError = !!(status & STATUS.ERROR);
-    const rowCountValid = !!(status & STATUS.COUNT);
-    const attention = !!(status & STATUS.ATTN);
-    const serverError = !!(status & STATUS.SRVERROR);
+function buildTokenData(status: number, curCmd: number, rowCount: bigint | number): TokenData {
+  const more = !!(status & STATUS.MORE);
+  const sqlError = !!(status & STATUS.ERROR);
+  const rowCountValid = !!(status & STATUS.COUNT);
+  const attention = !!(status & STATUS.ATTN);
+  const serverError = !!(status & STATUS.SRVERROR);
 
-    parser.readUInt16LE((curCmd) => {
-      const next = (rowCount: number) => {
-        callback({
-          more: more,
-          sqlError: sqlError,
-          attention: attention,
-          serverError: serverError,
-          rowCount: rowCountValid ? rowCount : undefined,
-          curCmd: curCmd
-        });
-      };
+  return {
+    more: more,
+    sqlError: sqlError,
+    attention: attention,
+    serverError: serverError,
+    rowCount: rowCountValid ? Number(rowCount) : undefined,
+    curCmd: curCmd
+  };
+}
 
-      if (options.tdsVersion < '7_2') {
-        parser.readUInt32LE(next);
-      } else {
-        parser.readBigUInt64LE((rowCount) => {
-          next(Number(rowCount));
-        });
-      }
-    });
-  });
+function buildDoneProcToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneProcToken {
+  return new DoneProcToken(buildTokenData(status, curCmd, rowCount));
+}
+
+function buildDoneInProcToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneInProcToken {
+  return new DoneInProcToken(buildTokenData(status, curCmd, rowCount));
+}
+
+function buildDoneToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneToken {
+  return new DoneToken(buildTokenData(status, curCmd, rowCount));
+}
+
+export class DoneProcTokenParser extends Map<[number, number, bigint | number], DoneProcToken> {
+  constructor(options: { tdsVersion: string }) {
+    if (options.tdsVersion < '7_2') {
+      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneProcToken);
+    } else {
+      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneProcToken);
+    }
+  }
+}
+
+export class DoneInProcTokenParser extends Map<[number, number, bigint | number], DoneInProcToken> {
+  constructor(options: { tdsVersion: string }) {
+    if (options.tdsVersion < '7_2') {
+      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneInProcToken);
+    } else {
+      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneInProcToken);
+    }
+  }
+}
+
+export class DoneTokenParser extends Map<[number, number, bigint | number], DoneToken> {
+  constructor(options: { tdsVersion: string }) {
+    if (options.tdsVersion < '7_2') {
+      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneToken);
+    } else {
+      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneToken);
+    }
+  }
+}
+
+function execParser<T extends DoneTokenParser | DoneProcTokenParser | DoneInProcTokenParser>(parser: Parser, options: ParserOptions, parserConstructor: { new(options: ParserOptions): T }, callback: (token: T extends P<infer O> ? O : never) => void) {
+  const p = new parserConstructor(options);
+
+  const next = () => {
+    const result = p.parse(parser.buffer, parser.position);
+    parser.position = result.offset;
+
+    if (result.done) {
+      return callback(result.value as T extends P<infer O> ? O : never);
+    }
+
+    parser.suspend(next);
+  };
+
+  next();
 }
 
 export function doneParser(parser: Parser, options: ParserOptions, callback: (token: DoneToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneToken(data));
-  });
+  execParser(parser, options, DoneTokenParser, callback);
 }
 
 export function doneInProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneInProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneInProcToken(data));
-  });
+  execParser(parser, options, DoneInProcTokenParser, callback);
 }
 
 export function doneProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneProcToken(data));
-  });
+  execParser(parser, options, DoneProcTokenParser, callback);
 }

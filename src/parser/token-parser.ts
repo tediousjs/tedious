@@ -1,6 +1,6 @@
 import { FlatMap, UInt8 } from '.';
 import { Token } from '../token/token';
-import { DoneProcTokenParser } from './tokens/done-token';
+import { DoneProcTokenParser } from '../token/done-token-parser';
 import { EnvChangeTokenParser } from './tokens/env-change-token';
 
 function selectTokenParser(options: { tdsVersion: string }, type: number) {
@@ -16,6 +16,9 @@ function selectTokenParser(options: { tdsVersion: string }, type: number) {
   }
 }
 
+/**
+ * Parse a single token.
+ */
 export class TokenParser extends FlatMap<number, Token> {
   constructor(options: { tdsVersion: string }) {
     super(new UInt8(), (type) => { return selectTokenParser(options, type); });
