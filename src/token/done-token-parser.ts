@@ -1,7 +1,7 @@
 import LegacyParser, { ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
-import { BigUInt64LE, Sequence, UInt16LE, UInt32LE, Map } from '../parser';
+import { BigUInt64LE, UInt16LE, UInt32LE, Map, Record } from '../parser';
 
 const STATUS = {
   MORE: 0x0001,
@@ -22,61 +22,85 @@ interface TokenData {
   curCmd: number;
 }
 
-function buildTokenData(status: number, curCmd: number, rowCount: bigint | number): TokenData {
+function buildTokenData({ status, curCmd, rowCount }: { status: number, curCmd: number, rowCount: bigint | number }): TokenData {
   const more = !!(status & STATUS.MORE);
   const sqlError = !!(status & STATUS.ERROR);
   const rowCountValid = !!(status & STATUS.COUNT);
   const attention = !!(status & STATUS.ATTN);
   const serverError = !!(status & STATUS.SRVERROR);
 
-  return {
+  return new DoneProcToken({
     more: more,
     sqlError: sqlError,
     attention: attention,
     serverError: serverError,
     rowCount: rowCountValid ? Number(rowCount) : undefined,
     curCmd: curCmd
-  };
+  });
 }
 
-function buildDoneProcToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneProcToken {
-  return new DoneProcToken(buildTokenData(status, curCmd, rowCount));
+function buildDoneProcToken(data: { status: number, curCmd: number, rowCount: bigint | number }): DoneProcToken {
+  return new DoneProcToken(buildTokenData(data));
 }
 
-function buildDoneInProcToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneInProcToken {
-  return new DoneInProcToken(buildTokenData(status, curCmd, rowCount));
+function buildDoneInProcToken(data: { status: number, curCmd: number, rowCount: bigint | number }): DoneInProcToken {
+  return new DoneInProcToken(buildTokenData(data));
 }
 
-function buildDoneToken([status, curCmd, rowCount]: [number, number, bigint | number]): DoneToken {
-  return new DoneToken(buildTokenData(status, curCmd, rowCount));
+function buildDoneToken(data: { status: number, curCmd: number, rowCount: bigint | number }): DoneToken {
+  return new DoneToken(buildTokenData(data));
 }
 
-export class DoneProcTokenParser extends Map<[number, number, bigint | number], DoneProcToken> {
+export class DoneProcTokenParser extends Map<{ status: number, curCmd: number, rowCount: bigint | number }, DoneProcToken> {
   constructor(options: { tdsVersion: string }) {
     if (options.tdsVersion < '7_2') {
-      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneProcToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new UInt32LE()
+      }), buildDoneProcToken);
     } else {
-      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneProcToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new BigUInt64LE()
+      }), buildDoneProcToken);
     }
   }
 }
 
-export class DoneInProcTokenParser extends Map<[number, number, bigint | number], DoneInProcToken> {
+export class DoneInProcTokenParser extends Map<{ status: number, curCmd: number, rowCount: bigint | number }, DoneInProcToken> {
   constructor(options: { tdsVersion: string }) {
     if (options.tdsVersion < '7_2') {
-      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneInProcToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new UInt32LE()
+      }), buildDoneInProcToken);
     } else {
-      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneInProcToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new BigUInt64LE()
+      }), buildDoneInProcToken);
     }
   }
 }
 
-export class DoneTokenParser extends Map<[number, number, bigint | number], DoneToken> {
+export class DoneTokenParser extends Map<{ status: number, curCmd: number, rowCount: bigint | number }, DoneToken> {
   constructor(options: { tdsVersion: string }) {
     if (options.tdsVersion < '7_2') {
-      super(new Sequence<[number, number, number]>([new UInt16LE(), new UInt16LE(), new UInt32LE()]), buildDoneToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new UInt32LE()
+      }), buildDoneToken);
     } else {
-      super(new Sequence<[number, number, bigint]>([new UInt16LE(), new UInt16LE(), new BigUInt64LE()]), buildDoneToken);
+      super(new Record({
+        status: new UInt16LE(),
+        curCmd: new UInt16LE(),
+        rowCount: new BigUInt64LE()
+      }), buildDoneToken);
     }
   }
 }
