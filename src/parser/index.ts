@@ -238,63 +238,37 @@ export class Int32LE extends Parser<number> {
   }
 
   parse(buffer: Buffer, offset: number): Result<number> {
-    switch (this.index) {
-      case 0: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        // Fast path, buffer has all data available
-        if (offset + 4 <= buffer.length) {
-          return { done: true, value: buffer.readInt32LE(offset), offset: offset + 4 };
-        }
-
-        this.result += buffer[offset++];
-        this.index += 1;
-
-        // fall through
+    const dataLength = 4;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
       }
 
-      case 1: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += buffer[offset++] * 2 ** 8;
-        this.index += 1;
-
-        // fall through
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readInt32LE(offset), offset: offset + dataLength };
       }
 
-      case 2: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += buffer[offset++] * 2 ** 16;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 3: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += (buffer[offset++] << 24);
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 4: {
-        return { done: true, value: this.result, offset: offset };
-      }
-
-      default:
-        throw new Error('unreachable');
+      this.result += buffer[offset++];
+      this.index += 1;
     }
+
+    while (this.index < 4) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      if (this.index < dataLength - 1) {
+        this.result += buffer[offset++] * 2 ** (8 * this.index);
+      } else {
+        // Last byte
+        this.result += buffer[offset++] << (8 * this.index);
+      }
+
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
   }
 }
 
@@ -311,63 +285,31 @@ export class UInt32LE extends Parser<number> {
   }
 
   parse(buffer: Buffer, offset: number): Result<number> {
-    switch (this.index) {
-      case 0: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        // Fast path, buffer has all data available
-        if (offset + 4 <= buffer.length) {
-          return { done: true, value: buffer.readUInt32LE(offset), offset: offset + 4 };
-        }
-
-        this.result += buffer[offset++];
-        this.index += 1;
-
-        // fall through
+    const dataLength = 4;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
       }
 
-      case 1: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += buffer[offset++] * 2 ** 8;
-        this.index += 1;
-
-        // fall through
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readUInt32LE(offset), offset: offset + dataLength };
       }
 
-      case 2: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += buffer[offset++] * 2 ** 16;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 3: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.result += buffer[offset++] * 2 ** 24;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 4: {
-        return { done: true, value: this.result, offset: offset };
-      }
-
-      default:
-        throw new Error('unreachable');
+      this.result += buffer[offset++];
+      this.index += 1;
     }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.result += buffer[offset++] * 2 ** (8 * this.index);
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
   }
 }
 
