@@ -1,4 +1,4 @@
-import { BVarchar, Map, Record, Sequence, UInt16LE, UInt32LE, UInt8, UsVarbyte, UsVarchar } from '../parser';
+import { BVarchar, Map, Record, UInt16LE, UInt32LE, UInt8, UsVarbyte, UsVarchar } from '../parser';
 import Parser, { ParserOptions } from './stream-parser';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';
