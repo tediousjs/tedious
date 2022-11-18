@@ -6,6 +6,7 @@ import {
   UInt16LE,
   Int32LE,
   UInt32LE,
+  BigUInt64LE,
   UsVarbyte
 } from '../../../src/parser';
 
@@ -198,6 +199,76 @@ describe('UInt32LE', function() {
       const result = parser.parse(Buffer.from('FF', 'hex'), 0);
       assert.isTrue(result.done);
       assert.strictEqual(result.value, 4294902015);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('BigUInt64LE', function() {
+  it('parses an unsigned bigint', function() {
+    const parser = new BigUInt64LE();
+    const result = parser.parse(Buffer.from('FF00FFFF00FFFFFF', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 18446742978492825855n);
+    assert.strictEqual(result.offset, 8);
+  });
+
+  it('parses an unsigned bigint over multiple buffers', function() {
+    const parser = new BigUInt64LE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 18446742978492825855n);
       assert.strictEqual(result.offset, 1);
     }
   });
