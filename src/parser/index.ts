@@ -107,6 +107,15 @@ export class FlatMap<I, O> extends Parser<O> {
   }
 }
 
+export class Int8 extends Parser<number> {
+  parse(buffer: Buffer, offset: number): Result<number> {
+    if (offset === buffer.length) {
+      return { done: false, value: undefined, offset: offset };
+    }
+    return { done: true, value: buffer.readInt8(offset), offset: offset + 1 };
+  }
+}
+
 export class UInt8 extends Parser<number> {
   parse(buffer: Buffer, offset: number): Result<number> {
     if (offset === buffer.length) {
@@ -114,6 +123,56 @@ export class UInt8 extends Parser<number> {
     }
 
     return { done: true, value: buffer[offset], offset: offset + 1 };
+  }
+}
+
+export class Int16LE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    switch (this.index) {
+      case 0: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        // Fast path, buffer has all data available
+        if (offset + 2 <= buffer.length) {
+          return { done: true, value: buffer.readInt16LE(offset), offset: offset + 2 };
+        }
+
+        this.result += buffer[offset++];
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 1: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.result += buffer[offset++] * 2 ** 8;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 2: {
+        return { done: true, value: this.result | (this.result & 2 ** 15) * 0x1fffe, offset: offset };
+      }
+
+      default:
+        throw new Error('unreachable');
+    }
   }
 }
 
@@ -166,6 +225,79 @@ export class UInt16LE extends Parser<number> {
     }
   }
 }
+
+export class Int32LE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    switch (this.index) {
+      case 0: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        // Fast path, buffer has all data available
+        if (offset + 4 <= buffer.length) {
+          return { done: true, value: buffer.readInt32LE(offset), offset: offset + 4 };
+        }
+
+        this.result += buffer[offset++];
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 1: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.result += buffer[offset++] * 2 ** 8;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 2: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.result += buffer[offset++] * 2 ** 16;
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 3: {
+        if (offset === buffer.length) {
+          return { done: false, value: undefined, offset: offset };
+        }
+
+        this.result += (buffer[offset++] << 24);
+        this.index += 1;
+
+        // fall through
+      }
+
+      case 4: {
+        return { done: true, value: this.result, offset: offset };
+      }
+
+      default:
+        throw new Error('unreachable');
+    }
+  }
+}
+
 
 export class UInt32LE extends Parser<number> {
   index: number;
@@ -223,7 +355,7 @@ export class UInt32LE extends Parser<number> {
           return { done: false, value: undefined, offset: offset };
         }
 
-        this.result += buffer[offset++] * 2 ** 32;
+        this.result += buffer[offset++] * 2 ** 24;
         this.index += 1;
 
         // fall through
