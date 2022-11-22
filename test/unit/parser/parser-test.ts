@@ -7,6 +7,7 @@ import {
   Int32LE,
   Int32BE,
   UInt32LE,
+  UInt32BE,
   BigUInt64LE,
   BVarchar,
   UsVarbyte
@@ -257,6 +258,49 @@ describe('UInt32LE', function() {
   });
 });
 
+describe('UInt32BE', function() {
+  it('parses an unsigned integer', function() {
+    const parser = new UInt32BE();
+    const result = parser.parse(Buffer.from('FFFF00FF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 4294902015);
+    assert.strictEqual(result.offset, 4);
+  });
+
+  it('parses an unsigned integer over multiple buffers', function() {
+    const parser = new UInt32BE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 4294902015);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
 describe('BigUInt64LE', function() {
   it('parses an unsigned bigint', function() {
     const parser = new BigUInt64LE();
@@ -327,7 +371,7 @@ describe('BigUInt64LE', function() {
   });
 });
 
-describe.only('BVarchar', function() {
+describe('BVarchar', function() {
   it('parses a unicode string with a length specified using an unsigned char', function() {
     const parser = new BVarchar();
 
