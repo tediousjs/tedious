@@ -287,7 +287,7 @@ export class Int32LE extends Parser<number> {
       this.index += 1;
     }
 
-    while (this.index < 4) {
+    while (this.index < dataLength) {
       if (offset === buffer.length) {
         return { done: false, value: undefined, offset: offset };
       }
@@ -306,6 +306,44 @@ export class Int32LE extends Parser<number> {
   }
 }
 
+export class Int32BE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readInt32BE(offset), offset: offset + dataLength };
+      }
+
+      this.result += (buffer[offset++] << 24);
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      this.result += buffer[offset++] * 2 ** (8 * (3 - this.index));
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
 
 export class UInt32LE extends Parser<number> {
   index: number;
@@ -368,7 +406,7 @@ export class BigUInt64LE extends Parser<bigint> {
       }
 
       // Fast path, buffer has all data available
-      if (offset + 8 <= buffer.length) {
+      if (offset + dataLength <= buffer.length) {
         return { done: true, value: buffer.readBigUInt64LE(offset), offset: offset + 8 };
       }
 

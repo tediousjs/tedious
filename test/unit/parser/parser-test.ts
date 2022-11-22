@@ -5,6 +5,7 @@ import {
   Int16LE,
   UInt16LE,
   Int32LE,
+  Int32BE,
   UInt32LE,
   BigUInt64LE,
   UsVarbyte
@@ -160,6 +161,57 @@ describe('Int32LE', function() {
   });
 });
 
+describe('Int32BE', function() {
+  it('parses an signed negative integer', function() {
+    const parser = new Int32BE();
+    const result = parser.parse(Buffer.from('FFFF00FF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, -65281);
+    assert.strictEqual(result.offset, 4);
+  });
+
+  it('parses an signed positive integer', function() {
+    const parser = new Int32BE();
+    const result = parser.parse(Buffer.from('00FFFFFF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 16777215);
+    assert.strictEqual(result.offset, 4);
+  });
+
+  it('parses a signed integer over multiple buffers', function() {
+    const parser = new Int32BE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, -65281);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
 
 describe('UInt32LE', function() {
   it('parses an unsigned integer', function() {
