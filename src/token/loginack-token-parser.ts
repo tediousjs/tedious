@@ -11,25 +11,33 @@ const interfaceTypes: { [key: number]: string } = {
 };
 
 interface TokenData {
-  interfaceNumber: number;
-  tdsVersionNumber: number;
+  interface: string;
+  tdsVersion: string;
   progName: string;
-  major: number;
-  minor: number;
-  buildNumHi: number;
-  buildNumLow: number;
+  progVersion: {
+    major: number;
+    minor: number;
+    buildNumHi: number;
+    buildNumLow: number;
+  };
 }
 
 class TokenDataParser extends Record<TokenData> {
   constructor() {
     super({
-      interfaceNumber: new UInt8(),
-      tdsVersionNumber: new UInt32BE(),
+      interface: new Map(new UInt8(), (interfaceNumber) => {
+        return interfaceTypes[interfaceNumber];
+      }),
+      tdsVersion: new Map(new UInt32BE(), (tdsVersionNumber) => {
+        return versions[tdsVersionNumber];
+      }),
       progName: new BVarchar(),
-      major: new UInt8(),
-      minor: new UInt8(),
-      buildNumHi: new UInt8(),
-      buildNumLow: new UInt8(),
+      progVersion: new Record({
+        major: new UInt8(),
+        minor: new UInt8(),
+        buildNumHi: new UInt8(),
+        buildNumLow: new UInt8(),
+      }),
     });
   }
 }
@@ -42,18 +50,7 @@ function parseTokenData(buffer: Buffer) {
     throw new Error('Parsing error');
   }
 
-  const data = result.value;
-  return new LoginAckToken({
-    interface: interfaceTypes[data.interfaceNumber],
-    tdsVersion: versions[data.tdsVersionNumber],
-    progName: data.progName,
-    progVersion: {
-      major: data.major,
-      minor: data.minor,
-      buildNumHi: data.buildNumHi,
-      buildNumLow: data.buildNumLow,
-    }
-  });
+  return new LoginAckToken(result.value);
 }
 
 export class LoginAckTokenParser extends Map<Buffer, LoginAckToken> {
