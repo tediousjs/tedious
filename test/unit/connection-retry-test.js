@@ -7,44 +7,40 @@ const OutgoingMessageStream = require('../../src/outgoing-message-stream');
 const Debug = require('../../src/debug');
 const PreloginPayload = require('../../src/prelogin-payload');
 const Message = require('../../src/message');
+const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
 
 function buildLoginAckToken() {
   const progname = 'Tedious SQL Server';
 
-  const buffer = Buffer.from([
-    0xAD, // Type
-    0x00, 0x00, // Length
-    0x00, // interface number - SQL
-    0x74, 0x00, 0x00, 0x04, // TDS version number
-    Buffer.byteLength(progname, 'ucs2') / 2, ...Buffer.from(progname, 'ucs2'), // Progname
-    0x00, // major
-    0x00, // minor
-    0x00, 0x00, // buildNum
-  ]);
+  const dataBuf = new WritableTrackingBuffer(0);
+  dataBuf.writeUInt8(0); // interface number - SQL
+  dataBuf.writeBuffer(Buffer.from([0x74, 0x00, 0x00, 0x04])); // TDS version number
+  dataBuf.writeBVarchar(progname, 'ucs2');
+  dataBuf.writeUInt8(0x00); // major
+  dataBuf.writeUInt8(0x00); // minor
+  dataBuf.writeUInt16LE(0x00); // buildNum
 
-  buffer.writeUInt16LE(buffer.length, 1);
-
-  return buffer;
+  const tokenBuf = new WritableTrackingBuffer(0);
+  tokenBuf.writeUInt8(0xAD); // Token Type
+  tokenBuf.writeUsVarbyte(dataBuf.data);
+  return tokenBuf.data;
 }
 
 function buildErrorMessageToken(number, message) {
-  const buffer = Buffer.from([
-    0xAA, // Type
-    0x00, 0x00, // Length
-    0x00, 0x00, 0x00, 0x00, // Number
-    0x00, // State
-    0x00, // Class
-    0x00, 0x00, ...Buffer.from(message, 'ucs2'), // Message
-    0x00, // Server Name
-    0x00, // Proc Name
-    0x00, 0x00, 0x00, 0x00, // Line Number
-  ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
-  buffer.writeUInt32LE(number, 3);
-  buffer.writeUInt16LE(Buffer.byteLength(message, 'ucs2') / 2, 9);
+  const dataBuf = new WritableTrackingBuffer(0);
+  dataBuf.writeUInt32LE(number); // number
+  dataBuf.writeUInt8(0); // state
+  dataBuf.writeUInt8(0); // class
+  dataBuf.writeUsVarchar(message, 'ucs2'); // message
+  dataBuf.writeBVarchar(''); // server name
+  dataBuf.writeBVarchar(''); // proc name
+  dataBuf.writeUInt32LE(0); // line number
 
-  return buffer;
+  const tokenBuf = new WritableTrackingBuffer(0);
+  tokenBuf.writeUInt8(0xAA); // token type
+  tokenBuf.writeUsVarbyte(dataBuf.data);
+  return tokenBuf.data;
 }
 
 describe('Automatic Connection Retry', function() {
