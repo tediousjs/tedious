@@ -43,7 +43,6 @@ function parseTokenData(buffer: Buffer) {
   }
 
   const data = result.value;
-
   return new LoginAckToken({
     interface: interfaceTypes[data.interfaceNumber],
     tdsVersion: versions[data.tdsVersionNumber],
