@@ -287,7 +287,7 @@ export class Int32LE extends Parser<number> {
       this.index += 1;
     }
 
-    while (this.index < 4) {
+    while (this.index < dataLength) {
       if (offset === buffer.length) {
         return { done: false, value: undefined, offset: offset };
       }
@@ -306,6 +306,44 @@ export class Int32LE extends Parser<number> {
   }
 }
 
+export class Int32BE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readInt32BE(offset), offset: offset + dataLength };
+      }
+
+      this.result += (buffer[offset++] << 24);
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      this.result += buffer[offset++] * 2 ** (8 * (3 - this.index));
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
 
 export class UInt32LE extends Parser<number> {
   index: number;
@@ -347,6 +385,45 @@ export class UInt32LE extends Parser<number> {
   }
 }
 
+export class UInt32BE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readUInt32BE(offset), offset: offset + dataLength };
+      }
+
+      this.result += buffer[offset++] * 2 ** 24;
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      this.result += buffer[offset++] * 2 ** (8 * (3 - this.index));
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
+
 export class BigUInt64LE extends Parser<bigint> {
   index: number;
   lo: number;
@@ -361,107 +438,40 @@ export class BigUInt64LE extends Parser<bigint> {
   }
 
   parse(buffer: Buffer, offset: number): Result<bigint> {
-    switch (this.index) {
-      case 0: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        // Fast path, buffer has all data available
-        if (offset + 8 <= buffer.length) {
-          return { done: true, value: buffer.readBigUInt64LE(offset), offset: offset + 8 };
-        }
-
-        this.lo += buffer[offset++];
-        this.index += 1;
-
-        // fall through
+    const dataLength = 8;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
       }
 
-      case 1: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.lo += buffer[offset++] * 2 ** 8;
-        this.index += 1;
-
-        // fall through
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readBigUInt64LE(offset), offset: offset + 8 };
       }
 
-      case 2: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.lo += buffer[offset++] * 2 ** 16;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 3: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.lo += buffer[offset++] * 2 ** 32;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 4: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.hi += buffer[offset++];
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 5: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.hi += buffer[offset++] * 2 ** 8;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 6: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.hi += buffer[offset++] * 2 ** 16;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 7: {
-        if (offset === buffer.length) {
-          return { done: false, value: undefined, offset: offset };
-        }
-
-        this.hi += buffer[offset++] * 2 ** 32;
-        this.index += 1;
-
-        // fall through
-      }
-
-      case 8: {
-        return { done: true, value: BigInt(this.lo) + (BigInt(this.hi) << 32n), offset: offset };
-      }
-
-      default:
-        throw new Error('unreachable');
+      this.lo += buffer[offset++];
+      this.index += 1;
     }
+
+    while (this.index < dataLength / 2) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.lo += buffer[offset++] * 2 ** (8 * this.index);
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.hi += buffer[offset++] * 2 ** (8 * (this.index - 4));
+      this.index += 1;
+    }
+
+    return { done: true, value: BigInt(this.lo) + (BigInt(this.hi) << 32n), offset: offset };
   }
 }
 

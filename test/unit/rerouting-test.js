@@ -30,20 +30,18 @@ function buildRoutingEnvChangeToken(hostname, port) {
 function buildLoginAckToken() {
   const progname = 'Tedious SQL Server';
 
-  const buffer = Buffer.from([
-    0xAD, // Type
-    0x00, 0x00, // Length
-    0x00, // interface number - SQL
-    0x74, 0x00, 0x00, 0x04, // TDS version number
-    Buffer.byteLength(progname, 'ucs2') / 2, ...Buffer.from(progname, 'ucs2'), // Progname
-    0x00, // major
-    0x00, // minor
-    0x00, 0x00, // buildNum
-  ]);
+  const dataBuf = new WritableTrackingBuffer(0);
+  dataBuf.writeUInt8(0); // interface number - SQL
+  dataBuf.writeBuffer(Buffer.from([0x74, 0x00, 0x00, 0x04])); // TDS version number
+  dataBuf.writeBVarchar(progname, 'ucs2');
+  dataBuf.writeUInt8(0x00); // major
+  dataBuf.writeUInt8(0x00); // minor
+  dataBuf.writeUInt16LE(0x00); // buildNum
 
-  buffer.writeUInt16LE(buffer.length, 1);
-
-  return buffer;
+  const tokenBuf = new WritableTrackingBuffer(0);
+  tokenBuf.writeUInt8(0xAD); // Token Type
+  tokenBuf.writeUsVarbyte(dataBuf.data);
+  return tokenBuf.data;
 }
 
 describe('Connecting to a server that sends a re-routing information', function() {
