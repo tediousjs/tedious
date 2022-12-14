@@ -2,12 +2,15 @@ import { assert } from 'chai';
 import {
   Int8,
   UInt8,
+  Int16BE,
   Int16LE,
+  UInt16BE,
   UInt16LE,
   Int32LE,
   Int32BE,
   UInt32LE,
   UInt32BE,
+  BigInt64LE,
   BigUInt64LE,
   BVarchar,
   UsVarbyte
@@ -44,6 +47,44 @@ describe('UInt8', function() {
   });
 });
 
+describe('Int16BE', function() {
+  it('parses a signed negative short', function() {
+    const parser = new Int16BE();
+    const result = parser.parse(Buffer.from('FF00', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, -256);
+    assert.strictEqual(result.offset, 2);
+  });
+
+  it('parses a signed positive short', function() {
+    const parser = new Int16BE();
+    const result = parser.parse(Buffer.from('0FFF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 4095);
+    assert.strictEqual(result.offset, 2);
+  });
+
+  it('parses a signed short over multiple buffers', function() {
+    const parser = new Int16BE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, -256);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
 describe('Int16LE', function() {
   it('parses a signed negative short', function() {
     const parser = new Int16LE();
@@ -77,6 +118,35 @@ describe('Int16LE', function() {
       const result = parser.parse(Buffer.from('FF', 'hex'), 0);
       assert.isTrue(result.done);
       assert.strictEqual(result.value, -256);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('UInt16BE', function() {
+  it('parses an unsigned short', function() {
+    const parser = new UInt16BE();
+    const result = parser.parse(Buffer.from('00FF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 255);
+    assert.strictEqual(result.offset, 2);
+  });
+
+  it('parses an unsigned short over multiple buffers', function() {
+    const parser = new UInt16BE();
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 255);
       assert.strictEqual(result.offset, 1);
     }
   });
@@ -300,6 +370,86 @@ describe('UInt32BE', function() {
     }
   });
 });
+
+
+describe('BigInt64LE', function() {
+  it('parses an signed negative bigint', function() {
+    const parser = new BigInt64LE();
+    const result = parser.parse(Buffer.from('FF00FFFF00FFFFFF', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, -1095216725761n);
+    assert.strictEqual(result.offset, 8);
+  });
+
+  it('parses an signed positive bigint', function() {
+    const parser = new BigInt64LE();
+    const result = parser.parse(Buffer.from('FF00FFFF00FFFF00', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 72056498821202175n);
+    assert.strictEqual(result.offset, 8);
+  });
+
+  it('parses a signed negative bigint over multiple buffers', function() {
+    const parser = new BigInt64LE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, -1095216725761n);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
 
 describe('BigUInt64LE', function() {
   it('parses an unsigned bigint', function() {
