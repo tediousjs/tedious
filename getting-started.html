@@ -80,6 +80,8 @@ title: Getting started
         console.log(err);
       } else {
         console.log(rowCount + ' rows');
+        // and we close the connection
+        connection.close()
       }
     });
 
