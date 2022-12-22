@@ -81,6 +81,8 @@ title: Getting started
         console.log(err);
       } else {
         console.log(rowCount + ' rows');
+        // and we close the connection
+        connection.close()
       }
     });
 
@@ -91,8 +93,6 @@ title: Getting started
     });
 
     connection.execSql(request);
-    // Finally, we close the connection
-    connection.close()
   }
 {% endhighlight %}
 
