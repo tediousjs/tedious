@@ -3761,14 +3761,17 @@ Connection.prototype.STATE = {
         };
 
         const onEndOfMessage = () => {
-          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
-          this.request?.removeListener('cancel', onCancel);
-          this.request?.removeListener('pause', onPause);
-          this.request?.removeListener('resume', onResume);
-
+          const sqlRequest = this.request;
           this.transitionTo(this.STATE.LOGGED_IN);
-          const sqlRequest = this.request as Request;
+          if (!sqlRequest) {
+            return;
+          }
           this.request = undefined;
+          sqlRequest.removeListener('cancel', this._cancelAfterRequestSent);
+          sqlRequest.removeListener('cancel', onCancel);
+          sqlRequest.removeListener('pause', onPause);
+          sqlRequest.removeListener('resume', onResume);
+
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
