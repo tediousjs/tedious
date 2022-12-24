@@ -1,3 +1,4 @@
+import iconv from 'iconv-lite';
 import { once } from 'events';
 
 import {
@@ -31,6 +32,7 @@ import Message from './message';
 import NTLMResponsePayload from './ntlm-payload';
 import { Login7TokenHandler } from './token/handler';
 import { createNTLMRequest } from './ntlm';
+import { setCodec } from './conv';
 
 export type InternalConnectionOptions = LiteInternalConnectionOptions;
 export type ConnectionConfiguration = LiteConnectionConfiguration;
@@ -506,3 +508,5 @@ class Connection extends LiteConnection {
 
 export default Connection;
 module.exports = Connection;
+
+setCodec(iconv);
