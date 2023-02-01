@@ -11,7 +11,8 @@
     "options": {
       "port": 1433,
       "database": "master",
-      "trustServerCertificate": true
+      "trustServerCertificate": true,
+      "encrypt": "strict"
     }
   }
 }
