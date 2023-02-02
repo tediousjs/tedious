@@ -1,14 +1,13 @@
 // s2.2.7.16
 
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 
 import { ReturnValueToken } from './token';
 
 import metadataParse from '../metadata-parser';
 import valueParse from '../value-parser';
 
-function returnParser(parser: Parser, options: InternalConnectionOptions, callback: (token: ReturnValueToken) => void) {
+function returnParser(parser: Parser, options: ParserOptions, callback: (token: ReturnValueToken) => void) {
   parser.readUInt16LE((paramOrdinal) => {
     parser.readBVarChar((paramName) => {
       if (paramName.charAt(0) === '@') {

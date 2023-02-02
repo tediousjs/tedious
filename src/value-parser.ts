@@ -1,6 +1,5 @@
-import Parser from './token/stream-parser';
+import Parser, { ParserOptions } from './token/stream-parser';
 import { Metadata, readCollation } from './metadata-parser';
-import { InternalConnectionOptions } from './connection';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
@@ -61,7 +60,7 @@ function readBit(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function valueParse(parser: Parser, metadata: Metadata, options: InternalConnectionOptions, callback: (value: unknown) => void): void {
+function valueParse(parser: Parser, metadata: Metadata, options: ParserOptions, callback: (value: unknown) => void): void {
   const type = metadata.type;
 
   switch (type.name) {
@@ -351,7 +350,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: InternalConnect
   }
 }
 
-function readUniqueIdentifier(parser: Parser, options: InternalConnectionOptions, callback: (value: unknown) => void) {
+function readUniqueIdentifier(parser: Parser, options: ParserOptions, callback: (value: unknown) => void) {
   parser.readBuffer(0x10, (data) => {
     callback(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data));
   });
@@ -380,7 +379,7 @@ function readNumeric(parser: Parser, dataLength: number, _precision: number, sca
   });
 }
 
-function readVariant(parser: Parser, options: InternalConnectionOptions, dataLength: number, callback: (value: unknown) => void) {
+function readVariant(parser: Parser, options: ParserOptions, dataLength: number, callback: (value: unknown) => void) {
   return parser.readUInt8((baseType) => {
     const type = TYPE[baseType];
 

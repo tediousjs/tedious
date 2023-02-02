@@ -1,7 +1,6 @@
 import metadataParse, { Metadata } from '../metadata-parser';
 
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
 
 export interface ColumnMetadata extends Metadata {
@@ -13,7 +12,7 @@ export interface ColumnMetadata extends Metadata {
   tableName?: string | string[] | undefined;
 }
 
-function readTableName(parser: Parser, options: InternalConnectionOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
+function readTableName(parser: Parser, options: ParserOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
     if (options.tdsVersion >= '7_2') {
       parser.readUInt8((numberOfTableNameParts) => {
@@ -46,7 +45,7 @@ function readTableName(parser: Parser, options: InternalConnectionOptions, metad
   }
 }
 
-function readColumnName(parser: Parser, options: InternalConnectionOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
+function readColumnName(parser: Parser, options: ParserOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
   parser.readBVarChar((colName) => {
     if (options.columnNameReplacer) {
       callback(options.columnNameReplacer(colName, index, metadata));
@@ -60,7 +59,7 @@ function readColumnName(parser: Parser, options: InternalConnectionOptions, inde
   });
 }
 
-function readColumn(parser: Parser, options: InternalConnectionOptions, index: number, callback: (column: ColumnMetadata) => void) {
+function readColumn(parser: Parser, options: ParserOptions, index: number, callback: (column: ColumnMetadata) => void) {
   metadataParse(parser, options, (metadata) => {
     readTableName(parser, options, metadata, (tableName) => {
       readColumnName(parser, options, index, metadata, (colName) => {

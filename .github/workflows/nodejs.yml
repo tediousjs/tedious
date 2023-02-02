@@ -15,18 +15,20 @@ jobs:
     name: Linting
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
       with:
-        node-version: 12
+        fetch-depth: 0
+    - name: Use Node.js 14
+      uses: actions/setup-node@v3
+      with:
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -63,7 +65,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x]
+        node-version: [14.x, 16.x, 18.x]
       fail-fast: false
 
     services:
@@ -76,10 +78,10 @@ jobs:
           SA_PASSWORD: "yourStrong(!)Password"
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
 
@@ -113,7 +115,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -175,25 +177,25 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure:
-    name: Azure SQL Server / Node.js 12.x
+    name: Azure SQL Server / Node.js 14.x
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
+    - name: Use Node.js 14
+      uses: actions/setup-node@v3
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -238,7 +240,8 @@ jobs:
             "authentication": {
               "type": "azure-active-directory-password",
               "options": {
-                "domain": "${{ secrets.AZURE_AD_TENANT_ID }}",
+                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
+                "tenantId": "${{ secrets.AZURE_AD_TENANT_ID }}",
                 "userName": "${{ secrets.AZURE_AD_USERNAME }}",
                 "password": "${{ secrets.AZURE_AD_PASSWORD }}"
               }
@@ -291,18 +294,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
+    - name: Use Node.js 14
+      uses: actions/setup-node@v3
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
