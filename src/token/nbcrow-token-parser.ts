@@ -1,14 +1,13 @@
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
-import Parser from './stream-parser';
+import Parser, { ParserOptions } from './stream-parser';
 import { ColumnMetadata } from './colmetadata-token-parser';
-import { InternalConnectionOptions } from '../connection';
 
 import { NBCRowToken } from './token';
 
 import valueParse from '../value-parser';
 
-function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: InternalConnectionOptions, callback: (value: unknown) => void) {
+function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: ParserOptions, callback: (value: unknown) => void) {
   callback(null);
 }
 

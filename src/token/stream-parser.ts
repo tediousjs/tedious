@@ -1,6 +1,5 @@
 import Debug from '../debug';
 import { InternalConnectionOptions } from '../connection';
-import JSBI from 'jsbi';
 
 import { TYPE, Token, ColMetadataToken } from './token';
 
@@ -34,6 +33,8 @@ const tokenParsers = {
   [TYPE.SSPI]: sspiParser
 };
 
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+
 class StreamBuffer {
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
   buffer: Buffer;
@@ -64,13 +65,13 @@ class StreamBuffer {
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
-  options: InternalConnectionOptions;
+  options: ParserOptions;
 
   suspended: boolean;
   next: (() => void) | undefined;
   streamBuffer: StreamBuffer;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: InternalConnectionOptions, colMetadata: ColumnMetadata[] = []) {
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     let token: Token | undefined;
     const onDoneParsing = (t: Token | undefined) => { token = t; };
 
@@ -137,7 +138,7 @@ class Parser {
     }
   }
 
-  constructor(streamBuffer: StreamBuffer, debug: Debug, options: InternalConnectionOptions) {
+  constructor(streamBuffer: StreamBuffer, debug: Debug, options: ParserOptions) {
     this.debug = debug;
     this.colMetadata = [];
     this.options = options;
@@ -254,29 +255,11 @@ class Parser {
     });
   }
 
-  readBigInt64LE(callback: (data: JSBI) => void) {
+  readBigInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
-      const result = JSBI.add(
-        JSBI.leftShift(
-          JSBI.BigInt(
-            this.buffer[this.position + 4] +
-            this.buffer[this.position + 5] * 2 ** 8 +
-            this.buffer[this.position + 6] * 2 ** 16 +
-            (this.buffer[this.position + 7] << 24) // Overflow
-          ),
-          JSBI.BigInt(32)
-        ),
-        JSBI.BigInt(
-          this.buffer[this.position] +
-          this.buffer[this.position + 1] * 2 ** 8 +
-          this.buffer[this.position + 2] * 2 ** 16 +
-          this.buffer[this.position + 3] * 2 ** 24
-        )
-      );
-
+      const data = this.buffer.readBigInt64LE(this.position);
       this.position += 8;
-
-      callback(result);
+      callback(data);
     });
   }
 
@@ -296,14 +279,11 @@ class Parser {
     });
   }
 
-  readBigUInt64LE(callback: (data: JSBI) => void) {
+  readBigUInt64LE(callback: (data: bigint) => void) {
     this.awaitData(8, () => {
-      const low = JSBI.BigInt(this.buffer.readUInt32LE(this.position));
-      const high = JSBI.BigInt(this.buffer.readUInt32LE(this.position + 4));
-
+      const data = this.buffer.readBigUInt64LE(this.position);
       this.position += 8;
-
-      callback(JSBI.add(low, JSBI.leftShift(high, JSBI.BigInt(32))));
+      callback(data);
     });
   }
 

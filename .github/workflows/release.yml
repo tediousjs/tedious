@@ -9,16 +9,16 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
+    - name: Use Node.js 14
+      uses: actions/setup-node@v3
       with:
-        node-version: 12
+        node-version: 14
 
     - name: Tag latest release
       run: |
         echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-        
+
         read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
         if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
           date_format="%Y-%m-%dT%H:%M:%SZ"

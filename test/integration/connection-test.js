@@ -221,15 +221,10 @@ describe('Initiate Connect Test', function() {
     config.options.cryptoCredentialsDetails = {
       ciphers: '!ALL'
     };
-
-    try {
+    assert.throws(() => {
       const { createSecureContext } = require('tls');
       createSecureContext(config.options.cryptoCredentialsDetails);
-    } catch {
-      assert.throws(() => {
-        new Connection(config);
-      });
-    }
+    }, Error, new RegExp(/.*SSL routines.*no cipher match/));
 
     done();
   });
@@ -281,6 +276,52 @@ describe('Initiate Connect Test', function() {
       connection.close();
     });
     connection.connect();
+  });
+
+  it('should clear timeouts when failing to connect', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: { connectTimeout: 30000 },
+    });
+
+    connection.on('connect', (err) => {
+      try {
+        assert.instanceOf(err, ConnectionError);
+        assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+        assert.strictEqual(connection.connectTimer, undefined);
+        done();
+      } catch (e) {
+        done(e);
+      }
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
+  });
+
+  it('should clear timeouts when failing to connect to named instance', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: {
+        instanceName: 'inst',
+        connectTimeout: 30000,
+      },
+    });
+
+    connection.on('connect', (err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
+      assert.strictEqual(connection.connectTimer, undefined);
+
+      done();
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
   });
 
   it('should fail if no cipher can be negotiated', function(done) {
@@ -434,12 +475,32 @@ describe('Ntlm Test', function() {
         assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
     }
 
+    let row = 0;
+
+    const request = new Request('select 1; select 2;', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
+
+      connection.close();
+    });
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function(columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns[0].value, ++row);
+    });
+
     const connection = new Connection(ntlmConfig);
 
     connection.connect(function(err) {
       assert.ifError(err);
-
-      connection.close();
+      connection.execSql(request);
     });
 
     connection.on('end', function() {

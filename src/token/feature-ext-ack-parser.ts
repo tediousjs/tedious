@@ -1,5 +1,4 @@
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 
 import { FeatureExtAckToken } from './token';
 
@@ -13,7 +12,7 @@ const FEATURE_ID = {
   TERMINATOR: 0xFF
 };
 
-function featureExtAckParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: FeatureExtAckToken) => void) {
+function featureExtAckParser(parser: Parser, _options: ParserOptions, callback: (token: FeatureExtAckToken) => void) {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
 
