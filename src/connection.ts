@@ -49,7 +49,6 @@ import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
-import Procedures from './special-stored-procedure';
 
 type BeginTransactionCallback =
   /**
@@ -671,7 +670,7 @@ export interface ConnectionOptions {
    *
    * (default: `false`)
    */
-  encrypt?: boolean;
+  encrypt?: string | boolean;
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -2018,11 +2017,13 @@ class Connection extends EventEmitter {
 
     connect(connectOpts, dns.lookup, signal).then((socket) => {
       process.nextTick(() => {
+        const secureContext = tls.createSecureContext(this.secureContextOptions);
         if (this.config.options.encrypt === 'strict') {
           const encryptOptions = {
             host: this.config.server,
             socket: socket,
             ALPNProtocols: ['tds/8.0'],
+            secureContext: secureContext,
             servername: this.config.options.serverName ? this.config.options.serverName : this.config.server,
           };
           const encryptsocket = tls.connect(encryptOptions, () => {
