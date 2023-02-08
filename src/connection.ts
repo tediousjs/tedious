@@ -1518,8 +1518,8 @@ class Connection extends EventEmitter {
                 throw new TypeError('The "encrypt" property must one of "strict","mandatory","true", "yes" or "optional", "false", "no".');
             }
           }
-        } else if (typeof config.options.encrypt == 'boolean' && !config.options.encrypt) {
-          this.config.options.encrypt = 'optional';
+        } else if (typeof config.options.encrypt == 'boolean') {
+          config.options.encrypt ? this.config.options.encrypt = 'mandatory' : this.config.options.encrypt = 'optional';
         } else {
           throw new TypeError('The "config.options.encrypt" property must be of type string or boolean.');
         }
