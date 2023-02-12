@@ -68,15 +68,6 @@ jobs:
         node-version: [14.x, 16.x, 18.x]
       fail-fast: false
 
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server
-        ports:
-          - 1433:1433
-        env:
-          ACCEPT_EULA: "Y"
-          SA_PASSWORD: "yourStrong(!)Password"
-
     steps:
     - uses: actions/checkout@v3
 
@@ -84,6 +75,11 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
+
+    - name: Start containers
+      run: |
+        docker-compose -f ".devcontainer/docker-compose.yml" create --build mssql
+        docker-compose -f ".devcontainer/docker-compose.yml" start mssql
 
     - name: Set up CI configuration
       run: |
