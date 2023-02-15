@@ -78,8 +78,7 @@ jobs:
 
     - name: Start containers
       run: |
-        docker-compose -f ".devcontainer/docker-compose.yml" create --build mssql
-        docker-compose -f ".devcontainer/docker-compose.yml" start mssql
+        docker-compose -f "test/docker-compose.linux.yml" up --wait
 
     - name: Set up CI configuration
       run: |
