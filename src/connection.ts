@@ -196,10 +196,6 @@ const DEFAULT_LANGUAGE = 'us_english';
  * @private
  */
 const DEFAULT_DATEFORMAT = 'mdy';
-/**
- * @private
- */
-const DEFAULT_ENCRYPT = 'mandatory';
 
 interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
@@ -391,7 +387,6 @@ export interface InternalConnectionOptions {
   textsize: number;
   trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
-  hostNameInCertificate: string | undefined;
   useColumnNames: boolean;
   useUTC: boolean;
   workstationId: undefined | string;
@@ -666,9 +661,10 @@ export interface ConnectionOptions {
   enableQuotedIdentifier?: boolean;
 
   /**
-   * A boolean determining whether or not the connection will be encrypted. Set to `true` if you're on Windows Azure.
+   * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
+   * a boolean determining whether or not the connection will be encrypted.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
   encrypt?: string | boolean;
 
@@ -823,10 +819,6 @@ export interface ConnectionOptions {
    * (default: `true`)
    */
   trustServerCertificate?: boolean;
-  /**
-   *
-   */
-  hostNameInCertificate?: string;
 
   /**
    *
@@ -1257,7 +1249,7 @@ class Connection extends EventEmitter {
         enableImplicitTransactions: false,
         enableNumericRoundabort: false,
         enableQuotedIdentifier: true,
-        encrypt: DEFAULT_ENCRYPT,
+        encrypt: true,
         fallbackToDefaultDb: false,
         encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
@@ -1279,7 +1271,6 @@ class Connection extends EventEmitter {
         trustedServerNameAE: undefined,
         trustServerCertificate: false,
         useColumnNames: false,
-        hostNameInCertificate: undefined,
         useUTC: true,
         workstationId: undefined,
         lowerCaseGuids: false
@@ -1494,34 +1485,15 @@ class Connection extends EventEmitter {
 
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
-
       if (config.options.encrypt !== undefined) {
-        if (typeof config.options.encrypt == 'string') {
-          (config.options.encrypt);
-          {
-            switch (config.options.encrypt) {
-              case 'strict':
-                this.config.options.encrypt = config.options.encrypt;
-                break;
-              case 'mandatory':
-              case 'true':
-              case 'yes':
-                this.config.options.encrypt = 'mandatory';
-                break;
-              case 'optional':
-              case 'false':
-              case 'no':
-                this.config.options.encrypt = 'optional';
-                break;
-              default:
-                throw new TypeError('The "encrypt" property must one of "strict","mandatory","true", "yes" or "optional", "false", "no".');
-            }
-          }
-        } else if (typeof config.options.encrypt == 'boolean') {
-          config.options.encrypt ? this.config.options.encrypt = 'mandatory' : this.config.options.encrypt = 'optional';
-        } else {
+        if (typeof config.options.encrypt !== 'boolean' && typeof config.options.encrypt !== 'string') {
           throw new TypeError('The "config.options.encrypt" property must be of type string or boolean.');
         }
+        if (typeof config.options.encrypt == 'string' && config.options.encrypt !== 'strict') {
+          throw new TypeError('The "encrypt" property must one of "strict",true or false.');
+        }
+
+        this.config.options.encrypt = config.options.encrypt;
       }
 
       if (config.options.fallbackToDefaultDb !== undefined) {
@@ -1683,13 +1655,6 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.serverName" property must be of type string.');
         }
         this.config.options.serverName = config.options.serverName;
-        if (config.options.hostNameInCertificate !== undefined) {
-          if (typeof config.options.hostNameInCertificate !== 'string') {
-            throw new TypeError('The "config.options.hostNameInCertificate" property must be of type string.');
-          }
-
-          this.config.options.serverName = config.options.hostNameInCertificate;
-        }
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -2314,14 +2279,8 @@ class Connection extends EventEmitter {
    */
   sendPreLogin() {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
-    let encryptSetting = false;
-    if ('strict' !== this.config.options.encrypt) {
-      if ('mandatory' === this.config.options.encrypt) {
-        encryptSetting = true;
-      }
-    }
     const payload = new PreloginPayload({
-      encrypt: encryptSetting,
+      encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
@@ -3250,7 +3209,7 @@ Connection.prototype.STATE = {
 
           try {
             this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+            await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           } catch (err: any) {
             return this.socketError(err);
           }
