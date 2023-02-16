@@ -6,7 +6,7 @@ services:
 
     volumes:
       - "..:/workspace:cached"
-      - "./test-connection.json:/root/.tedious/test-connection.json"
+      - "./test-connection.json:/home/node/.tedious/test-connection.json"
 
     # Overrides default command so things don't shut down after the process ends.
     command: "sleep infinity"
@@ -15,7 +15,7 @@ services:
       - mssql
 
   mssql:
-    image: "mcr.microsoft.com/mssql/server:2019-latest"
+    image: "mcr.microsoft.com/mssql/server:2022-latest"
 
     restart: unless-stopped
 
