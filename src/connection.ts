@@ -1486,11 +1486,10 @@ class Connection extends EventEmitter {
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
       if (config.options.encrypt !== undefined) {
-        if (typeof config.options.encrypt !== 'boolean' && typeof config.options.encrypt !== 'string') {
-          throw new TypeError('The "config.options.encrypt" property must be of type string or boolean.');
-        }
-        if (typeof config.options.encrypt == 'string' && config.options.encrypt !== 'strict') {
-          throw new TypeError('The "encrypt" property must one of "strict",true or false.');
+        if (typeof config.options.encrypt !== 'boolean') {
+          if (config.options.encrypt !== 'strict') {
+            throw new TypeError('The "encrypt" property must be set to "strict", or of type boolean.');
+          }
         }
 
         this.config.options.encrypt = config.options.encrypt;
@@ -2280,6 +2279,9 @@ class Connection extends EventEmitter {
   sendPreLogin() {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
+      // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
+      // this function. Therefore, the encrypt will be set to false here.
+      // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
       encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
