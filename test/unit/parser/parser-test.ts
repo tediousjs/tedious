@@ -12,6 +12,10 @@ import {
   UInt32BE,
   BigInt64LE,
   BigUInt64LE,
+  FloatLE,
+  FloatBE,
+  DoubleLE,
+  DoubleBE,
   BVarchar,
   UsVarbyte
 } from '../../../src/parser';
@@ -516,6 +520,235 @@ describe('BigUInt64LE', function() {
       const result = parser.parse(Buffer.from('FF', 'hex'), 0);
       assert.isTrue(result.done);
       assert.strictEqual(result.value, 18446742978492825855n);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('FloatLE', function() {
+  it('parses a float', function() {
+    const parser = new FloatLE();
+
+    const result = parser.parse(Buffer.from('00010000', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 3.587324068671532e-43);
+    assert.strictEqual(result.offset, 4);
+  });
+
+  it('parses a float over multiple buffers', function() {
+    const parser = new FloatLE();
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('01', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 3.587324068671532e-43);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('FloatBE', function() {
+  it('parses a float', function() {
+    const parser = new FloatBE();
+
+    const result = parser.parse(Buffer.from('00000100', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 3.587324068671532e-43);
+    assert.strictEqual(result.offset, 4);
+  });
+
+  it('parses a float over multiple buffers', function() {
+    const parser = new FloatBE();
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('01', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 3.587324068671532e-43);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('DoubleLE', function() {
+  it('parses a double', function() {
+    const parser = new DoubleLE();
+
+    const result = parser.parse(Buffer.from('0000000000000010', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 1.2882297539194267e-231);
+    assert.strictEqual(result.offset, 8);
+  });
+
+  it('parses a double over multiple buffers', function() {
+    const parser = new DoubleLE();
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('10', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 1.2882297539194267e-231);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+
+describe('DoubleBE', function() {
+  it('parses a double', function() {
+    const parser = new DoubleBE();
+
+    const result = parser.parse(Buffer.from('1000000000000000', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 1.2882297539194267e-231);
+    assert.strictEqual(result.offset, 8);
+  });
+
+  it('parses a double over multiple buffers', function() {
+    const parser = new DoubleBE();
+
+    {
+      const result = parser.parse(Buffer.from('10', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 1.2882297539194267e-231);
       assert.strictEqual(result.offset, 1);
     }
   });

@@ -635,6 +635,190 @@ export class BigUInt64LE extends Parser<bigint> {
   }
 }
 
+
+// Temporary buffers to convert numbers.
+const float32Array = new Float32Array(1);
+const uInt8Float32Array = new Uint8Array(float32Array.buffer);
+const float64Array = new Float64Array(1);
+const uInt8Float64Array = new Uint8Array(float64Array.buffer);
+
+// Check endianness.
+float32Array[0] = -1; // 0xBF800000
+// Either it is [0, 0, 128, 191] or [191, 128, 0, 0]. It is not possible to
+// check this with `os.endianness()` because that is determined at compile time.
+const bigEndian = uInt8Float32Array[3] === 0;
+
+class Float extends Parser<number> {
+  index: number;
+  result: 0;
+  floatLe: boolean;
+  constructor(le: boolean, dataLength: number) {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+    this.floatLe = le;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+
+    if (this.floatLe) {
+      return bigEndian ? this.readFloatBackwards(buffer, offset) : this.readFloatForwards(buffer, offset);
+    } else {
+      return bigEndian ? this.readFloatForwards(buffer, offset) : this.readFloatBackwards(buffer, offset);
+    }
+  }
+
+  readFloatBackwards(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      uInt8Float32Array[dataLength - 1 - this.index++] = buffer[offset++];
+
+    }
+    return { done: true, value: float32Array[0], offset: offset };
+  }
+
+  readFloatForwards(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      uInt8Float32Array[this.index++] = buffer[offset++];
+
+    }
+    return { done: true, value: float32Array[0], offset: offset };
+  }
+
+}
+
+export class FloatLE extends Float {
+
+  constructor() {
+    super(true, 4);
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+
+    // Fast path, buffer has all data available
+    if (offset + dataLength <= buffer.length) {
+      return { done: true, value: buffer.readFloatLE(offset), offset: offset + dataLength };
+    }
+
+    return super.parse(buffer, offset);
+  }
+}
+
+export class FloatBE extends Float {
+
+  constructor() {
+    super(false, 4);
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 4;
+
+    // Fast path, buffer has all data available
+    if (offset + dataLength <= buffer.length) {
+      return { done: true, value: buffer.readFloatBE(offset), offset: offset + dataLength };
+    }
+
+    return super.parse(buffer, offset);
+  }
+}
+
+
+class Double extends Parser<number> {
+  index: number;
+  result: 0;
+  doubleLe: boolean;
+  constructor(le: boolean, dataLength: number) {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+    this.doubleLe = le;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+
+    if (this.doubleLe) {
+      return bigEndian ? this.readDoubleBackwards(buffer, offset) : this.readDoubleForwards(buffer, offset);
+    } else {
+      return bigEndian ? this.readDoubleForwards(buffer, offset) : this.readDoubleBackwards(buffer, offset);
+    }
+  }
+
+  readDoubleBackwards(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      uInt8Float64Array[dataLength - 1 - this.index++] = buffer[offset++];
+
+    }
+    return { done: true, value: float64Array[0], offset: offset };
+  }
+
+  readDoubleForwards(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      uInt8Float64Array[this.index++] = buffer[offset++];
+
+    }
+    return { done: true, value: float64Array[0], offset: offset };
+  }
+
+}
+
+export class DoubleLE extends Double {
+
+  constructor() {
+    super(true, 8);
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+
+    // Fast path, buffer has all data available
+    if (offset + dataLength <= buffer.length) {
+      return { done: true, value: buffer.readDoubleLE(offset), offset: offset + dataLength };
+    }
+
+    return super.parse(buffer, offset);
+  }
+}
+
+export class DoubleBE extends Double {
+
+  constructor() {
+    super(false, 8);
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+
+    // Fast path, buffer has all data available
+    if (offset + dataLength <= buffer.length) {
+      return { done: true, value: buffer.readDoubleBE(offset), offset: offset + dataLength };
+    }
+
+    return super.parse(buffer, offset);
+  }
+}
+
 class NVarbyte extends Parser<Buffer> {
   length: UInt8 | UInt16LE | UInt32LE;
 
