@@ -9,6 +9,7 @@ const os = require('os');
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
 import Request from '../../src/request';
+import { versions } from '../../src/tds-versions';
 
 function getConfig() {
   const config = JSON.parse(
@@ -530,16 +531,37 @@ describe('Ntlm Test', function() {
 });
 
 describe('Encrypt Test', function() {
-  it('should encrypt', function(done) {
-    const config = getConfig();
-    config.options.encrypt = true;
-
+  /**
+   * @this {Mocha.Context}
+   * @param {Mocha.Done} done
+   * @param {import("../../src/connection").ConnectionConfiguration} config
+   * @param {string} tdsKey
+   * @returns {void}
+   */
+  function runEncryptTest(done, config, tdsKey) {
     const connection = new Connection(config);
 
     connection.connect(function(err) {
       assert.ifError(err);
+      connection.execSql(request);
+    });
 
-      connection.close();
+    const request = new Request(
+      `SELECT c.protocol_version
+       FROM sys.dm_exec_connections AS c
+       JOIN sys.dm_exec_sessions AS s
+       ON c.session_id = s.session_id
+       WHERE c.session_id = @@SPID`, (err, rowCount) => {
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
+
+        connection.close();
+      });
+
+    request.on('row', function(columns) {
+      //  console.log(versions[tdsKey],columns[0].value)
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(versions[tdsKey], columns[0].value);
     });
 
     connection.on('end', function() {
@@ -547,7 +569,7 @@ describe('Encrypt Test', function() {
     });
 
     connection.on('databaseChange', function(database) {
-      assert.strictEqual(database, config.options.database);
+      assert.strictEqual(database, config.options?.database);
     });
 
     connection.on('secure', function(cleartext) {
@@ -560,9 +582,19 @@ describe('Encrypt Test', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
+    connection.on('debug', function(text) {
       // console.log(text)
     });
+  }
+  it('should encrypt', function(done) {
+    const config = getConfig();
+    config.options.encrypt = true;
+    runEncryptTest.call(this, done, config, '7_4');
+  });
+  it.only('encrypt with TDS8.0', function(done) {
+    const config = getConfig();
+    config.options.encrypt = 'strict';
+    runEncryptTest.call(this, done, config, '8_0');
   });
 });
 

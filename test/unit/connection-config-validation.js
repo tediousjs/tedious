@@ -94,4 +94,12 @@ describe('Connection configuration validation', function() {
       new Connection(config);
     });
   });
+
+  it('bad encrypt value', () => {
+    const numberEncrypt = 0;
+    config.options.encrypt = numberEncrypt;
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
 });

@@ -1999,7 +1999,6 @@ class Connection extends EventEmitter {
             socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
             this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-            this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
             this.socket = socket;
 
