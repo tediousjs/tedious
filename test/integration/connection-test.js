@@ -591,7 +591,7 @@ describe('Encrypt Test', function() {
     config.options.encrypt = true;
     runEncryptTest.call(this, done, config, '7_4');
   });
-  it.only('encrypt with TDS8.0', function(done) {
+  it('encrypt with TDS8.0', function(done) {
     const config = getConfig();
     config.options.encrypt = 'strict';
     runEncryptTest.call(this, done, config, '8_0');
