@@ -2055,7 +2055,14 @@ class Connection extends EventEmitter {
    * @private
    */
   connectTimeout() {
-    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
+    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+    // If we have routing data stored, this connection has been redirected
+    const server = this.routingData ? this.routingData.server : this.config.server;
+    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+    // Grab the target host from the connection configration, and from a redirect message
+    // otherwise, leave the message empty.
+    const routingMessage = this.routingData ? '' : `(redirected from ${this.config.server}${hostPostfix})`;
+    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
     this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
@@ -2184,7 +2191,14 @@ class Connection extends EventEmitter {
    */
   socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
-      const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? '' : `(redirected from ${this.config.server}${hostPostfix})`;
+      const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
