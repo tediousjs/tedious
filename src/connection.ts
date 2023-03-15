@@ -2061,7 +2061,7 @@ class Connection extends EventEmitter {
     const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
     // Grab the target host from the connection configration, and from a redirect message
     // otherwise, leave the message empty.
-    const routingMessage = this.routingData ? '' : `(redirected from ${this.config.server}${hostPostfix})`;
+    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
     const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
     this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
@@ -2197,7 +2197,7 @@ class Connection extends EventEmitter {
       const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
       // Grab the target host from the connection configration, and from a redirect message
       // otherwise, leave the message empty.
-      const routingMessage = this.routingData ? '' : `(redirected from ${this.config.server}${hostPostfix})`;
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', new ConnectionError(message, 'ESOCKET'));
