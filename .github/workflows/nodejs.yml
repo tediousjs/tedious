@@ -76,6 +76,10 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
+    - name: Generate TLS Certificate
+      run: |
+        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
+
     - name: Start containers
       run: |
         docker-compose -f "test/docker-compose.linux.yml" up --detach
@@ -83,6 +87,7 @@ jobs:
     - name: Set up CI configuration
       run: |
         mkdir ~/.tedious
+
         echo '{
           "config": {
             "server": "localhost",
@@ -96,10 +101,10 @@ jobs:
             "options": {
               "port": 1433,
               "database": "master",
-              "trustServerCertificate": true
+              "encrypt": true
             }
           }
-        }' > ~/.tedious/test-connection.json
+        }' | jq --arg certificate "$(cat ./test/fixtures/localhost.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
