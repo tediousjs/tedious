@@ -2,7 +2,7 @@ version: '3'
 
 services:
   mssql:
-    build: "../.devcontainer/mssql"
+    build: "."
 
     restart: unless-stopped
 
