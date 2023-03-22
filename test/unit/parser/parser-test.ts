@@ -18,6 +18,7 @@ import {
   DoubleBE,
   BVarchar,
   UsVarchar,
+  BVarbyte,
   UsVarbyte
 } from '../../../src/parser';
 
@@ -1026,6 +1027,62 @@ describe('UsVarchar', function() {
       const result = parser.parse(Buffer.from('00', 'hex'), 0);
       assert.isTrue(result.done);
       assert.deepEqual(result.value, 'ABCDEFGH');
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('BVarbyte', function() {
+  it('parses an binary with a length specified using an unsigned short', function() {
+    const parser = new BVarbyte();
+
+    const result = parser.parse(Buffer.from('050102030405', 'hex'), 0);
+    assert.isTrue(result.done);
+    assert.strictEqual(result.offset, 6);
+  });
+
+  it('parses in chunks', function() {
+    const parser = new BVarbyte();
+
+    {
+      const result = parser.parse(Buffer.from('05', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('01', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('02', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('03', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('04', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('05', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.deepEqual(result.value, Buffer.from('0102030405', 'hex'));
       assert.strictEqual(result.offset, 1);
     }
   });
