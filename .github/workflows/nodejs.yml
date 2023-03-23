@@ -235,7 +235,7 @@ jobs:
             "options": {
               "port": 1433,
               "database": "master",
-              "encrypt": true
+              "trustServerCertificate": true
             }
           }
         }' > ~/.tedious/test-connection.json
