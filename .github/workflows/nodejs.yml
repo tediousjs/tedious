@@ -78,7 +78,7 @@ jobs:
 
     - name: Generate TLS Certificate
       run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
+        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
 
     - name: Start containers
       run: |
