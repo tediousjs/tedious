@@ -208,22 +208,11 @@ jobs:
         Pop-Location
 
     - uses: actions/checkout@v3
-    - name: Use Node.js 14
+
+    - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
-        node-version: 14
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        node-version: ${{ matrix.node-version }}
 
     - name: Set up CI configuration
       run: |
@@ -311,62 +300,6 @@ jobs:
     - name: run integration tests (TDS 7.1)
       env:
         TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-  azure-sql-auth:
-    name: Azure SQL Server / Node.js 14.x
-    runs-on: ubuntu-latest
-
-    # Only run these tests if we have access to the secrets
-    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js 14
-      uses: actions/setup-node@v3
-      with:
-        node-version: 14
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - run: npm ci
-
-    - run: mkdir ~/.tedious
-
-    - name: Set up CI configuration (SQL Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "${{ secrets.AZURE_USERNAME }}",
-                "password": "${{ secrets.AZURE_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
-
-    - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v1
