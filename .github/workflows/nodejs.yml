@@ -176,6 +176,39 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  test-windows:
+    name: SQL Server Windows / Node.js ${{ matrix.node-version }}
+
+    runs-on: windows-2022
+
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js 14
+      uses: actions/setup-node@v3
+      with:
+        node-version: 14
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - run: mkdir ~/.tedious
+
   azure-sql-auth:
     name: Azure SQL Server / Node.js 14.x
     runs-on: ubuntu-latest
