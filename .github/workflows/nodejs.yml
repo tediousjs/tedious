@@ -246,7 +246,7 @@ jobs:
         '-----END CERTIFICATE-----'
         )
         # Output PEM file to the path
-        $output | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii
+        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
 
     - name: Set up CI configuration
       shell: bash
