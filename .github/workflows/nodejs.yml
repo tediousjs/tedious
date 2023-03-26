@@ -214,6 +214,10 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
+    - name: Generate TLS Certificate
+      run: |
+        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
+
     - name: Install dbatools
       shell: powershell
       run: Install-Module dbatools -Force
@@ -246,7 +250,7 @@ jobs:
         '-----END CERTIFICATE-----'
         )
         # Output PEM file to the path
-        $output | Out-File -FilePath test\fixtures\localhost.crt -Encoding ascii
+        $output | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii
 
     - name: Set up CI configuration
       run: |
@@ -268,7 +272,7 @@ jobs:
               "trustServerCertificate": true
             }
           }
-        }' | jq --arg certificate "$(cat ./test/fixtures/localhost.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
