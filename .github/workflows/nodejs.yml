@@ -218,6 +218,7 @@ jobs:
       run: Install-Module dbatools -Force
 
     - name: Set up TLS Key and Certificate
+      shell: powershell
       run: |
         Import-Module dbatools
 
