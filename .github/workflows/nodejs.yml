@@ -214,9 +214,37 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
-    - name: Generate TLS Certificate
+    - name: Install dbatools
+      run: Install-Module dbatools -Scope CurrentUser
+
+    - name: Set up TLS Key and Certificate
       run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
+        Import-Module dbatools
+
+        $certificate = New-SelfSignedCertificate `
+          -Type SSLServerAuthentication `
+          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+          -DnsName "$env:COMPUTERNAME",'localhost.' `
+          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+          -NotAfter (Get-Date).AddMonths(36) `
+          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+          -CertStoreLocation Cert:\LocalMachine\My `
+
+        $sqlinstance = Find-DbaInstance -ComputerName localhost
+        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+        Restart-Service MSSQLSERVER
+
+        # Convert UA certificate raw data to Base64
+        $output = @(
+        '-----BEGIN CERTIFICATE-----'
+        [System.Convert]::ToBase64String($certificate.RawData, 1)
+        '-----END CERTIFICATE-----'
+        )
+        # Output PEM file to the path
+        $output | Out-File -FilePath test\fixtures\localhost.crt -Encoding ascii
 
     - name: Set up CI configuration
       run: |
@@ -238,7 +266,7 @@ jobs:
               "trustServerCertificate": true
             }
           }
-        }' > ~/.tedious/test-connection.json
+        }' | jq --arg certificate "$(cat ./test/fixtures/localhost.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
