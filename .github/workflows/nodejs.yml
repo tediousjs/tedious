@@ -78,7 +78,7 @@ jobs:
 
     - name: Generate TLS Certificate
       run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
+        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
 
     - name: Start containers
       run: |
@@ -104,7 +104,7 @@ jobs:
               "encrypt": true
             }
           }
-        }' | jq --arg certificate "$(cat ./test/fixtures/localhost.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -213,10 +213,6 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-
-    - name: Generate TLS Certificate
-      run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/localhost.key -out ./test/fixtures/localhost.crt
 
     - name: Install dbatools
       shell: powershell
