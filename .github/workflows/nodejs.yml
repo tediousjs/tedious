@@ -215,7 +215,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
 
     - name: Install dbatools
-      run: Install-Module dbatools -Scope CurrentUser
+      run: Install-Module dbatools
 
     - name: Set up TLS Key and Certificate
       run: |
