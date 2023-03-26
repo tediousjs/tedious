@@ -249,6 +249,7 @@ jobs:
         $output | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii
 
     - name: Set up CI configuration
+      shell: bash
       run: |
         mkdir ~/.tedious
 
@@ -269,6 +270,8 @@ jobs:
             }
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+        cat ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
