@@ -193,8 +193,7 @@ jobs:
         Push-Location C:\temp
 
         Invoke-WebRequest -Uri https://download.microsoft.com/download/c/c/9/cc9c6797-383c-4b24-8920-dc057c1de9d3/SQL2022-SSEI-Dev.exe -OutFile SQL2022-SSEI-Dev.exe
-        ./SQL2022-SSEI-Dev.exe /ACTION=Download /MEDIAPATH=C:\temp /MEDIATYPE=CAB /QUIET
-
+        Start-Process -Wait -FilePath ./SQL2022-SSEI-Dev.exe -ArgumentList /ACTION=Download, /MEDIAPATH=C:\temp, /MEDIATYPE=CAB, /QUIET
         Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
 
         .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=0 /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS
