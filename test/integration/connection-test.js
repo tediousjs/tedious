@@ -535,10 +535,9 @@ describe('Encrypt Test', function() {
    * @this {Mocha.Context}
    * @param {Mocha.Done} done
    * @param {import("../../src/connection").ConnectionConfiguration} config
-   * @param {string} tdsKey
    * @returns {void}
    */
-  function runEncryptTest(done, config, tdsKey) {
+  function runEncryptTest(done, config) {
     const connection = new Connection(config);
 
     connection.connect(function(err) {
@@ -559,9 +558,13 @@ describe('Encrypt Test', function() {
       });
 
     request.on('row', function(columns) {
-      //  console.log(versions[tdsKey],columns[0].value)
+      // console.log(versions[tdsKey],columns[0].value)
       assert.strictEqual(columns.length, 1);
-      assert.strictEqual(versions[tdsKey], columns[0].value);
+      if ('strict' === connection.config.options.encrypt) {
+        assert.strictEqual(versions['8_0'], columns[0].value);
+      } else {
+        assert.strictEqual(versions[connection.config.options.tdsVersion], columns[0].value);
+      }
     });
 
     connection.on('end', function() {
@@ -589,12 +592,12 @@ describe('Encrypt Test', function() {
   it('should encrypt', function(done) {
     const config = getConfig();
     config.options.encrypt = true;
-    runEncryptTest.call(this, done, config, '7_4');
+    runEncryptTest.call(this, done, config);
   });
   it('encrypt with TDS8.0', function(done) {
     const config = getConfig();
     config.options.encrypt = 'strict';
-    runEncryptTest.call(this, done, config, '8_0');
+    runEncryptTest.call(this, done, config);
   });
 });
 
