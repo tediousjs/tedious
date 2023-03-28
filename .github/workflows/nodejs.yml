@@ -192,12 +192,11 @@ jobs:
       run: |
         Push-Location C:\temp
 
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile sqlsetup.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile sqlsetup.box
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile SQLServer2022-DEV-x64-ENU.exe
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile SQLServer2022-DEV-x64-ENU.box
         Invoke-WebRequest -Uri https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe -Outfile SQLServer2022-KB5023127-x64.exe
 
-        Start-Process -Wait -FilePath ./SQL2022-SSEI-Dev.exe -ArgumentList /ACTION=Download, /MEDIAPATH=C:\temp, /MEDIATYPE=CAB, /QUIET
-        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-DEU.exe -ArgumentList /qs, /x:setup
+        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
 
         .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
