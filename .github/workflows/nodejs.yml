@@ -192,17 +192,14 @@ jobs:
       run: |
         Push-Location C:\temp
 
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/c/c/9/cc9c6797-383c-4b24-8920-dc057c1de9d3/SQL2022-SSEI-Dev.exe -OutFile SQL2022-SSEI-Dev.exe
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile sqlsetup.exe
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile sqlsetup.box
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe -Outfile C:\temp\updates\SQLServer2022-KB5023127-x64.exe
+
         Start-Process -Wait -FilePath ./SQL2022-SSEI-Dev.exe -ArgumentList /ACTION=Download, /MEDIAPATH=C:\temp, /MEDIATYPE=CAB, /QUIET
-        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-DEU.exe -ArgumentList /qs, /x:setup
 
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS
-
-        Set-ItemProperty -path "HKLM:\Software\Microsoft\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQLSERVER\" -Name LoginMode -Value 2
-        Restart-Service MSSQLSERVER
-
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] WITH PASSWORD=N'yourStrong(!)Password'"
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] ENABLE"
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp\updates /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
         Pop-Location
 
