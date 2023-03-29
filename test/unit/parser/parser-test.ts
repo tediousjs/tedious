@@ -10,6 +10,7 @@ import {
   Int32BE,
   UInt32LE,
   UInt32BE,
+  UInt40LE,
   BigInt64LE,
   BigUInt64LE,
   BVarchar,
@@ -323,6 +324,56 @@ describe('UInt32LE', function() {
       const result = parser.parse(Buffer.from('FF', 'hex'), 0);
       assert.isTrue(result.done);
       assert.strictEqual(result.value, 4294902015);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe.only('UInt40LE', function() {
+  it('parses an unsigned integer', function() {
+    const parser = new UInt40LE();
+    const result = parser.parse(Buffer.from('FF00FFFFFF', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 1099511562495);
+    assert.strictEqual(result.offset, 5);
+  });
+
+  it('parses an unsigned integer over multiple buffers', function() {
+    const parser = new UInt40LE();
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('FF', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 1099511562495);
       assert.strictEqual(result.offset, 1);
     }
   });
