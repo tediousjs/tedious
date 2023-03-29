@@ -501,7 +501,7 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-test-windows-2017:
+  test-windows-2017:
     name: SQL Server 2017 Windows / Node.js ${{ matrix.node-version }}
 
     runs-on: windows-2022
