@@ -78,7 +78,7 @@ jobs:
 
     - name: Generate TLS Certificate
       run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
+        openssl req -x509 -newkey rsa:4096 -nodes -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
 
     - name: Start containers
       run: |
@@ -192,18 +192,13 @@ jobs:
       run: |
         Push-Location C:\temp
 
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile sqlsetup.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile sqlsetup.box
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile SQLServer2022-DEV-x64-ENU.exe
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile SQLServer2022-DEV-x64-ENU.box
+        Invoke-WebRequest -Uri https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe -Outfile SQLServer2022-KB5023127-x64.exe
 
-        Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
+        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
 
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=0 /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS
-
-        Set-ItemProperty -path "HKLM:\Software\Microsoft\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQLSERVER\" -Name LoginMode -Value 2
-        Restart-Service MSSQLSERVER
-
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] WITH PASSWORD=N'yourStrong(!)Password'"
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] ENABLE"
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
         Pop-Location
 
@@ -246,9 +241,10 @@ jobs:
         '-----END CERTIFICATE-----'
         )
         # Output PEM file to the path
-        $output | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii
+        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
 
     - name: Set up CI configuration
+      shell: bash
       run: |
         mkdir ~/.tedious
 
@@ -269,6 +265,8 @@ jobs:
             }
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+        cat ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
