@@ -226,7 +226,7 @@ jobs:
         Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
         Invoke-WebRequest -Uri $update_link -Outfile sqlupdate.exe
 
-        Start-Process -Wait -FilePath ./mssql.exe -ArgumentList /qs, /x:setup
+        Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
 
         .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
