@@ -176,6 +176,183 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  test-windows:
+    name: SQL Server ${{ matrix.node-version }} Windows / Node.js ${{ matrix.node-version }}
+
+    runs-on: windows-2022
+
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
+        mssql-version: [2022]
+      fail-fast: false
+
+    steps:
+    - name: Install SQL Server ${{ matrix.node-version }}
+      shell: pwsh
+      run: |
+        Push-Location C:\temp
+
+        $exe_link, $box_link, $update_link = '', '', ''
+
+        switch (${{ matrix.mssql-version }}) {
+          '2022' {
+            $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe'
+          }
+          default {
+            Write-Error "Invalid SQL Server version specified: $env:version"
+            Exit 1
+          }
+        }
+
+        Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
+        Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
+        Invoke-WebRequest -Uri $update_link -Outfile sqlupdate.exe
+
+        Start-Process -Wait -FilePath ./mssql.exe -ArgumentList /qs, /x:setup
+
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+        Pop-Location
+
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install dbatools
+      shell: powershell
+      run: Install-Module dbatools -Force
+
+    - name: Set up TLS Key and Certificate
+      shell: powershell
+      run: |
+        Import-Module dbatools
+
+        $certificate = New-SelfSignedCertificate `
+          -Type SSLServerAuthentication `
+          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+          -DnsName "$env:COMPUTERNAME",'localhost.' `
+          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+          -NotAfter (Get-Date).AddMonths(36) `
+          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+          -CertStoreLocation Cert:\LocalMachine\My `
+
+        $sqlinstance = Find-DbaInstance -ComputerName localhost
+        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+        Restart-Service MSSQLSERVER
+
+        # Convert UA certificate raw data to Base64
+        $output = @(
+        '-----BEGIN CERTIFICATE-----'
+        [System.Convert]::ToBase64String($certificate.RawData, 1)
+        '-----END CERTIFICATE-----'
+        )
+        # Output PEM file to the path
+        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+    - name: Set up CI configuration
+      shell: bash
+      run: |
+        mkdir ~/.tedious
+
+        echo '{
+          "config": {
+            "server": "localhost",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "sa",
+                "password": "yourStrong(!)Password"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "master",
+              "trustServerCertificate": true
+            }
+          }
+        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+        cat ~/.tedious/test-connection.json
+
+    - name: Upgrade npm
+      run: npm install -g npm
+      if: ${{ matrix.node-version == '6.x' }}
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - name: run unit tests
+      run: npx nyc --reporter=lcov npm run test
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.4)
+      env:
+        TEDIOUS_TDS_VERSION: 7_4
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.3B)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_B
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.3A)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_A
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.2)
+      env:
+        TEDIOUS_TDS_VERSION: 7_2
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.1)
+      env:
+        TEDIOUS_TDS_VERSION: 7_1
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
 
   test-windows-2022:
     name: SQL Server 2022 Windows / Node.js ${{ matrix.node-version }}
