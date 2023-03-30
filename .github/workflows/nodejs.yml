@@ -184,7 +184,7 @@ jobs:
     strategy:
       matrix:
         node-version: [14.x, 16.x, 18.x]
-        mssql-version: [2022]
+        mssql-version: [2016, 2017, 2019, 2022]
       fail-fast: false
 
     steps:
@@ -200,6 +200,21 @@ jobs:
             $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
             $update_link = 'https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe'
+          }
+          '2019' {
+            $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2019-KB5023049-x64.exe'
+          }
+          '2017' {
+            $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe'
+          }
+          '2016' {
+            $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
           }
           default {
             Write-Error "Invalid SQL Server version specified: $env:version"
@@ -353,654 +368,653 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  # test-windows-2022:
+  #   name: SQL Server 2022 Windows / Node.js ${{ matrix.node-version }}
+
+  #   runs-on: windows-2022
+
+  #   strategy:
+  #     matrix:
+  #       node-version: [14.x, 16.x, 18.x]
+  #     fail-fast: false
+
+  #   steps:
+  #   - name: Install a SQL Server 2022
+  #     shell: pwsh
+  #     run: |
+  #       Push-Location C:\temp
+
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile SQLServer2022-DEV-x64-ENU.exe
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile SQLServer2022-DEV-x64-ENU.box
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe -Outfile SQLServer2022-KB5023127-x64.exe
+
+  #       Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+
+  #       .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+  #       Pop-Location
+
+  #   - uses: actions/checkout@v3
+
+  #   - name: Use Node.js ${{ matrix.node-version }}
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: ${{ matrix.node-version }}
+
+  #   - name: Install dbatools
+  #     shell: powershell
+  #     run: Install-Module dbatools -Force
+
+  #   - name: Set up TLS Key and Certificate
+  #     shell: powershell
+  #     run: |
+  #       Import-Module dbatools
+
+  #       $certificate = New-SelfSignedCertificate `
+  #         -Type SSLServerAuthentication `
+  #         -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+  #         -DnsName "$env:COMPUTERNAME",'localhost.' `
+  #         -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+  #         -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+  #         -NotAfter (Get-Date).AddMonths(36) `
+  #         -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+  #         -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+  #         -CertStoreLocation Cert:\LocalMachine\My `
+
+  #       $sqlinstance = Find-DbaInstance -ComputerName localhost
+  #       $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+  #       Restart-Service MSSQLSERVER
+
+  #       # Convert UA certificate raw data to Base64
+  #       $output = @(
+  #       '-----BEGIN CERTIFICATE-----'
+  #       [System.Convert]::ToBase64String($certificate.RawData, 1)
+  #       '-----END CERTIFICATE-----'
+  #       )
+  #       # Output PEM file to the path
+  #       $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+  #   - name: Set up CI configuration
+  #     shell: bash
+  #     run: |
+  #       mkdir ~/.tedious
+
+  #       echo '{
+  #         "config": {
+  #           "server": "localhost",
+  #           "authentication": {
+  #             "type": "default",
+  #             "options": {
+  #               "userName": "sa",
+  #               "password": "yourStrong(!)Password"
+  #             }
+  #           },
+  #           "options": {
+  #             "port": 1433,
+  #             "database": "master",
+  #             "trustServerCertificate": true
+  #           }
+  #         }
+  #       }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+  #       cat ~/.tedious/test-connection.json
+
+  #   - name: Upgrade npm
+  #     run: npm install -g npm
+  #     if: ${{ matrix.node-version == '6.x' }}
+
+  #   - name: Determine npm cache directory
+  #     id: npm-cache
+  #     run: |
+  #       echo "::set-output name=dir::$(npm config get cache)"
+
+  #   - uses: actions/cache@v3
+  #     with:
+  #       path: ${{ steps.npm-cache.outputs.dir }}
+  #       key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #       restore-keys: |
+  #         ${{ runner.os }}-node-
 
-  test-windows-2022:
-    name: SQL Server 2022 Windows / Node.js ${{ matrix.node-version }}
-
-    runs-on: windows-2022
-
-    strategy:
-      matrix:
-        node-version: [14.x, 16.x, 18.x]
-      fail-fast: false
-
-    steps:
-    - name: Install a SQL Server 2022
-      shell: pwsh
-      run: |
-        Push-Location C:\temp
-
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile SQLServer2022-DEV-x64-ENU.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile SQLServer2022-DEV-x64-ENU.box
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe -Outfile SQLServer2022-KB5023127-x64.exe
-
-        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
-
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
-
-        Pop-Location
-
-    - uses: actions/checkout@v3
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
-    - name: Set up TLS Key and Certificate
-      shell: powershell
-      run: |
-        Import-Module dbatools
-
-        $certificate = New-SelfSignedCertificate `
-          -Type SSLServerAuthentication `
-          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
-          -DnsName "$env:COMPUTERNAME",'localhost.' `
-          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
-          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
-          -NotAfter (Get-Date).AddMonths(36) `
-          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
-          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
-          -CertStoreLocation Cert:\LocalMachine\My `
-
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
-
-        Restart-Service MSSQLSERVER
-
-        # Convert UA certificate raw data to Base64
-        $output = @(
-        '-----BEGIN CERTIFICATE-----'
-        [System.Convert]::ToBase64String($certificate.RawData, 1)
-        '-----END CERTIFICATE-----'
-        )
-        # Output PEM file to the path
-        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
-
-    - name: Set up CI configuration
-      shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-        cat ~/.tedious/test-connection.json
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - run: npm ci
-
-    - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.4)
-      env:
-        TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3B)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3A)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.2)
-      env:
-        TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-  test-windows-2019:
-    name: SQL Server 2019 Windows / Node.js ${{ matrix.node-version }}
-
-    runs-on: windows-2022
-
-    strategy:
-      matrix:
-        node-version: [14.x, 16.x, 18.x]
-      fail-fast: false
-
-    steps:
-    - name: Install a SQL Server 2019
-      shell: pwsh
-      run: |
-        Push-Location C:\temp
-
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe -OutFile SQLServer2019-DEV-x64-ENU.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box -OutFile SQLServer2019-DEV-x64-ENU.box
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2019-KB5023049-x64.exe -Outfile SQLServer2019-KB5023049-x64.exe
-
-        Start-Process -Wait -FilePath ./SQLServer2019-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
-
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
-
-        Pop-Location
-
-    - uses: actions/checkout@v3
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
-    - name: Set up TLS Key and Certificate
-      shell: powershell
-      run: |
-        Import-Module dbatools
-
-        $certificate = New-SelfSignedCertificate `
-          -Type SSLServerAuthentication `
-          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
-          -DnsName "$env:COMPUTERNAME",'localhost.' `
-          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
-          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
-          -NotAfter (Get-Date).AddMonths(36) `
-          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
-          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
-          -CertStoreLocation Cert:\LocalMachine\My `
-
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
-
-        Restart-Service MSSQLSERVER
-
-        # Convert UA certificate raw data to Base64
-        $output = @(
-        '-----BEGIN CERTIFICATE-----'
-        [System.Convert]::ToBase64String($certificate.RawData, 1)
-        '-----END CERTIFICATE-----'
-        )
-        # Output PEM file to the path
-        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
-
-    - name: Set up CI configuration
-      shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-        cat ~/.tedious/test-connection.json
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - run: npm ci
-
-    - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.4)
-      env:
-        TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3B)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3A)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.2)
-      env:
-        TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-  test-windows-2017:
-    name: SQL Server 2017 Windows / Node.js ${{ matrix.node-version }}
-
-    runs-on: windows-2022
-
-    strategy:
-      matrix:
-        node-version: [14.x, 16.x, 18.x]
-      fail-fast: false
-
-    steps:
-    - name: Install a SQL Server 2017
-      shell: pwsh
-      run: |
-        Push-Location C:\temp
-
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe -OutFile SQLServer2017-DEV-x64-ENU.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box -OutFile SQLServer2017-DEV-x64-ENU.box
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe -Outfile SQLServer2017-KB5016884-x64.exe
-
-        Start-Process -Wait -FilePath ./SQLServer2017-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
-
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
-
-        Pop-Location
-
-    - uses: actions/checkout@v3
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
-    - name: Set up TLS Key and Certificate
-      shell: powershell
-      run: |
-        Import-Module dbatools
-
-        $certificate = New-SelfSignedCertificate `
-          -Type SSLServerAuthentication `
-          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
-          -DnsName "$env:COMPUTERNAME",'localhost.' `
-          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
-          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
-          -NotAfter (Get-Date).AddMonths(36) `
-          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
-          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
-          -CertStoreLocation Cert:\LocalMachine\My `
-
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
-
-        Restart-Service MSSQLSERVER
-
-        # Convert UA certificate raw data to Base64
-        $output = @(
-        '-----BEGIN CERTIFICATE-----'
-        [System.Convert]::ToBase64String($certificate.RawData, 1)
-        '-----END CERTIFICATE-----'
-        )
-        # Output PEM file to the path
-        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
-
-    - name: Set up CI configuration
-      shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-        cat ~/.tedious/test-connection.json
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - run: npm ci
-
-    - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.4)
-      env:
-        TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3B)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3A)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.2)
-      env:
-        TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-  test-windows-2016:
-    name: SQL Server 2016 Windows / Node.js ${{ matrix.node-version }}
-
-    runs-on: windows-2022
-
-    strategy:
-      matrix:
-        node-version: [14.x, 16.x, 18.x]
-      fail-fast: false
-
-    steps:
-    - name: Install a SQL Server 2016
-      shell: pwsh
-      run: |
-        Push-Location C:\temp
-
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe -OutFile SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box -OutFile SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe -Outfile SQLServer2016SP3-KB5003279-x64-ENU.exe
-
-        Start-Process -Wait -FilePath ./SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
-
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
-
-        Pop-Location
-
-    - uses: actions/checkout@v3
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
-    - name: Set up TLS Key and Certificate
-      shell: powershell
-      run: |
-        Import-Module dbatools
-
-        $certificate = New-SelfSignedCertificate `
-          -Type SSLServerAuthentication `
-          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
-          -DnsName "$env:COMPUTERNAME",'localhost.' `
-          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
-          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
-          -NotAfter (Get-Date).AddMonths(36) `
-          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
-          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
-          -CertStoreLocation Cert:\LocalMachine\My `
-
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
-
-        Restart-Service MSSQLSERVER
-
-        # Convert UA certificate raw data to Base64
-        $output = @(
-        '-----BEGIN CERTIFICATE-----'
-        [System.Convert]::ToBase64String($certificate.RawData, 1)
-        '-----END CERTIFICATE-----'
-        )
-        # Output PEM file to the path
-        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
-
-    - name: Set up CI configuration
-      shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-        cat ~/.tedious/test-connection.json
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
-    - run: npm ci
-
-    - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.4)
-      env:
-        TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3B)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.3A)
-      env:
-        TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.2)
-      env:
-        TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
+  #   - run: npm ci
+
+  #   - name: run unit tests
+  #     run: npx nyc --reporter=lcov npm run test
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.4)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_4
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3B)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_B
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3A)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_A
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.2)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_2
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.1)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_1
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  # test-windows-2019:
+  #   name: SQL Server 2019 Windows / Node.js ${{ matrix.node-version }}
+
+  #   runs-on: windows-2022
+
+  #   strategy:
+  #     matrix:
+  #       node-version: [14.x, 16.x, 18.x]
+  #     fail-fast: false
+
+  #   steps:
+  #   - name: Install a SQL Server 2019
+  #     shell: pwsh
+  #     run: |
+  #       Push-Location C:\temp
+
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe -OutFile SQLServer2019-DEV-x64-ENU.exe
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box -OutFile SQLServer2019-DEV-x64-ENU.box
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2019-KB5023049-x64.exe -Outfile SQLServer2019-KB5023049-x64.exe
+
+  #       Start-Process -Wait -FilePath ./SQLServer2019-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+
+  #       .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+  #       Pop-Location
+
+  #   - uses: actions/checkout@v3
+
+  #   - name: Use Node.js ${{ matrix.node-version }}
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: ${{ matrix.node-version }}
+
+  #   - name: Install dbatools
+  #     shell: powershell
+  #     run: Install-Module dbatools -Force
+
+  #   - name: Set up TLS Key and Certificate
+  #     shell: powershell
+  #     run: |
+  #       Import-Module dbatools
+
+  #       $certificate = New-SelfSignedCertificate `
+  #         -Type SSLServerAuthentication `
+  #         -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+  #         -DnsName "$env:COMPUTERNAME",'localhost.' `
+  #         -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+  #         -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+  #         -NotAfter (Get-Date).AddMonths(36) `
+  #         -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+  #         -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+  #         -CertStoreLocation Cert:\LocalMachine\My `
+
+  #       $sqlinstance = Find-DbaInstance -ComputerName localhost
+  #       $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+  #       Restart-Service MSSQLSERVER
+
+  #       # Convert UA certificate raw data to Base64
+  #       $output = @(
+  #       '-----BEGIN CERTIFICATE-----'
+  #       [System.Convert]::ToBase64String($certificate.RawData, 1)
+  #       '-----END CERTIFICATE-----'
+  #       )
+  #       # Output PEM file to the path
+  #       $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+  #   - name: Set up CI configuration
+  #     shell: bash
+  #     run: |
+  #       mkdir ~/.tedious
+
+  #       echo '{
+  #         "config": {
+  #           "server": "localhost",
+  #           "authentication": {
+  #             "type": "default",
+  #             "options": {
+  #               "userName": "sa",
+  #               "password": "yourStrong(!)Password"
+  #             }
+  #           },
+  #           "options": {
+  #             "port": 1433,
+  #             "database": "master",
+  #             "trustServerCertificate": true
+  #           }
+  #         }
+  #       }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+  #       cat ~/.tedious/test-connection.json
+
+  #   - name: Upgrade npm
+  #     run: npm install -g npm
+  #     if: ${{ matrix.node-version == '6.x' }}
+
+  #   - name: Determine npm cache directory
+  #     id: npm-cache
+  #     run: |
+  #       echo "::set-output name=dir::$(npm config get cache)"
+
+  #   - uses: actions/cache@v3
+  #     with:
+  #       path: ${{ steps.npm-cache.outputs.dir }}
+  #       key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #       restore-keys: |
+  #         ${{ runner.os }}-node-
+
+  #   - run: npm ci
+
+  #   - name: run unit tests
+  #     run: npx nyc --reporter=lcov npm run test
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.4)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_4
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3B)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_B
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3A)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_A
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.2)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_2
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.1)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_1
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  # test-windows-2017:
+  #   name: SQL Server 2017 Windows / Node.js ${{ matrix.node-version }}
+
+  #   runs-on: windows-2022
+
+  #   strategy:
+  #     matrix:
+  #       node-version: [14.x, 16.x, 18.x]
+  #     fail-fast: false
+
+  #   steps:
+  #   - name: Install a SQL Server 2017
+  #     shell: pwsh
+  #     run: |
+  #       Push-Location C:\temp
+
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe -OutFile SQLServer2017-DEV-x64-ENU.exe
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box -OutFile SQLServer2017-DEV-x64-ENU.box
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe -Outfile SQLServer2017-KB5016884-x64.exe
+
+  #       Start-Process -Wait -FilePath ./SQLServer2017-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+
+  #       .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+  #       Pop-Location
+
+  #   - uses: actions/checkout@v3
+
+  #   - name: Use Node.js ${{ matrix.node-version }}
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: ${{ matrix.node-version }}
+
+  #   - name: Install dbatools
+  #     shell: powershell
+  #     run: Install-Module dbatools -Force
+
+  #   - name: Set up TLS Key and Certificate
+  #     shell: powershell
+  #     run: |
+  #       Import-Module dbatools
+
+  #       $certificate = New-SelfSignedCertificate `
+  #         -Type SSLServerAuthentication `
+  #         -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+  #         -DnsName "$env:COMPUTERNAME",'localhost.' `
+  #         -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+  #         -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+  #         -NotAfter (Get-Date).AddMonths(36) `
+  #         -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+  #         -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+  #         -CertStoreLocation Cert:\LocalMachine\My `
+
+  #       $sqlinstance = Find-DbaInstance -ComputerName localhost
+  #       $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+  #       Restart-Service MSSQLSERVER
+
+  #       # Convert UA certificate raw data to Base64
+  #       $output = @(
+  #       '-----BEGIN CERTIFICATE-----'
+  #       [System.Convert]::ToBase64String($certificate.RawData, 1)
+  #       '-----END CERTIFICATE-----'
+  #       )
+  #       # Output PEM file to the path
+  #       $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+  #   - name: Set up CI configuration
+  #     shell: bash
+  #     run: |
+  #       mkdir ~/.tedious
+
+  #       echo '{
+  #         "config": {
+  #           "server": "localhost",
+  #           "authentication": {
+  #             "type": "default",
+  #             "options": {
+  #               "userName": "sa",
+  #               "password": "yourStrong(!)Password"
+  #             }
+  #           },
+  #           "options": {
+  #             "port": 1433,
+  #             "database": "master",
+  #             "trustServerCertificate": true
+  #           }
+  #         }
+  #       }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+  #       cat ~/.tedious/test-connection.json
+
+  #   - name: Upgrade npm
+  #     run: npm install -g npm
+  #     if: ${{ matrix.node-version == '6.x' }}
+
+  #   - name: Determine npm cache directory
+  #     id: npm-cache
+  #     run: |
+  #       echo "::set-output name=dir::$(npm config get cache)"
+
+  #   - uses: actions/cache@v3
+  #     with:
+  #       path: ${{ steps.npm-cache.outputs.dir }}
+  #       key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #       restore-keys: |
+  #         ${{ runner.os }}-node-
+
+  #   - run: npm ci
+
+  #   - name: run unit tests
+  #     run: npx nyc --reporter=lcov npm run test
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.4)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_4
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3B)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_B
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3A)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_A
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.2)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_2
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.1)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_1
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  # test-windows-2016:
+  #   name: SQL Server 2016 Windows / Node.js ${{ matrix.node-version }}
+
+  #   runs-on: windows-2022
+
+  #   strategy:
+  #     matrix:
+  #       node-version: [14.x, 16.x, 18.x]
+  #     fail-fast: false
+
+  #   steps:
+  #   - name: Install a SQL Server 2016
+  #     shell: pwsh
+  #     run: |
+  #       Push-Location C:\temp
+
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe -OutFile SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box -OutFile SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box
+  #       Invoke-WebRequest -Uri https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe -Outfile SQLServer2016SP3-KB5003279-x64-ENU.exe
+
+  #       Start-Process -Wait -FilePath ./SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+
+  #       .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+  #       Pop-Location
+
+  #   - uses: actions/checkout@v3
+
+  #   - name: Use Node.js ${{ matrix.node-version }}
+  #     uses: actions/setup-node@v3
+  #     with:
+  #       node-version: ${{ matrix.node-version }}
+
+  #   - name: Install dbatools
+  #     shell: powershell
+  #     run: Install-Module dbatools -Force
+
+  #   - name: Set up TLS Key and Certificate
+  #     shell: powershell
+  #     run: |
+  #       Import-Module dbatools
+
+  #       $certificate = New-SelfSignedCertificate `
+  #         -Type SSLServerAuthentication `
+  #         -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+  #         -DnsName "$env:COMPUTERNAME",'localhost.' `
+  #         -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+  #         -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+  #         -NotAfter (Get-Date).AddMonths(36) `
+  #         -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+  #         -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+  #         -CertStoreLocation Cert:\LocalMachine\My `
+
+  #       $sqlinstance = Find-DbaInstance -ComputerName localhost
+  #       $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+  #       Restart-Service MSSQLSERVER
+
+  #       # Convert UA certificate raw data to Base64
+  #       $output = @(
+  #       '-----BEGIN CERTIFICATE-----'
+  #       [System.Convert]::ToBase64String($certificate.RawData, 1)
+  #       '-----END CERTIFICATE-----'
+  #       )
+  #       # Output PEM file to the path
+  #       $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+  #   - name: Set up CI configuration
+  #     shell: bash
+  #     run: |
+  #       mkdir ~/.tedious
+
+  #       echo '{
+  #         "config": {
+  #           "server": "localhost",
+  #           "authentication": {
+  #             "type": "default",
+  #             "options": {
+  #               "userName": "sa",
+  #               "password": "yourStrong(!)Password"
+  #             }
+  #           },
+  #           "options": {
+  #             "port": 1433,
+  #             "database": "master",
+  #             "trustServerCertificate": true
+  #           }
+  #         }
+  #       }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+  #       cat ~/.tedious/test-connection.json
+
+  #   - name: Upgrade npm
+  #     run: npm install -g npm
+  #     if: ${{ matrix.node-version == '6.x' }}
+
+  #   - name: Determine npm cache directory
+  #     id: npm-cache
+  #     run: |
+  #       echo "::set-output name=dir::$(npm config get cache)"
+
+  #   - uses: actions/cache@v3
+  #     with:
+  #       path: ${{ steps.npm-cache.outputs.dir }}
+  #       key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  #       restore-keys: |
+  #         ${{ runner.os }}-node-
+
+  #   - run: npm ci
+
+  #   - name: run unit tests
+  #     run: npx nyc --reporter=lcov npm run test
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.4)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_4
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3B)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_B
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.3A)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_3_A
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.2)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_2
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
+
+  #   - name: run integration tests (TDS 7.1)
+  #     env:
+  #       TEDIOUS_TDS_VERSION: 7_1
+  #     run: npx nyc --reporter=lcov npm run test-integration
+
+  #   - uses: codecov/codecov-action@v1
+  #     with:
+  #       token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-sql-auth:
     name: Azure SQL Server / Node.js 14.x
