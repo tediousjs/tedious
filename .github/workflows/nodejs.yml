@@ -177,7 +177,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   test-windows:
-    name: SQL Server ${{ matrix.node-version }} Windows / Node.js ${{ matrix.node-version }}
+    name: SQL Server ${{ matrix.mssql-version }} Windows / Node.js ${{ matrix.node-version }}
 
     runs-on: windows-2022
 
@@ -188,7 +188,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Install SQL Server ${{ matrix.node-version }}
+    - name: Install SQL Server ${{ matrix.mssql-version }}
       shell: pwsh
       run: |
         Push-Location C:\temp
