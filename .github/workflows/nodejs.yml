@@ -217,7 +217,7 @@ jobs:
             $update_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
           }
           default {
-            Write-Error "Invalid SQL Server version specified: $env:version"
+            Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
             Exit 1
           }
         }
