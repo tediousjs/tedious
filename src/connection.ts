@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import os from 'os';
 import * as tls from 'tls';
-import { Socket } from 'net';
+import * as net from 'net';
 import dns from 'dns';
 
 import constants from 'constants';
@@ -989,7 +989,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  socket: undefined | Socket;
+  socket: undefined | net.Socket;
   /**
    * @private
    */
@@ -1970,6 +1970,48 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
+  socketHandlingForSendPreLogin(socket: net.Socket) {
+    socket.on('error', (error) => { this.socketError(error); });
+    socket.on('close', () => { this.socketClose(); });
+    socket.on('end', () => { this.socketEnd(); });
+    socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+    this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+    this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+    this.socket = socket;
+
+    this.closed = false;
+    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+    this.sendPreLogin();
+    this.transitionTo(this.STATE.SENT_PRELOGIN);
+  }
+
+  wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
+    return new Promise((resolve, reject) => {
+      const secureContext = tls.createSecureContext(this.secureContextOptions);
+      // If connect to an ip address directly,
+      // need to set the servername to an empty string
+      // if the user has not given a servername explicitly
+      const serverName = !net.isIP(this.config.server) ? this.config.server : '';
+      const encryptOptions = {
+        host: this.config.server,
+        socket: socket,
+        ALPNProtocols: ['tds/8.0'],
+        secureContext: secureContext,
+        servername: this.config.options.serverName ? this.config.options.serverName : serverName,
+      };
+
+      const encryptsocket = tls.connect(encryptOptions, () => {
+        encryptsocket.removeListener('error', reject);
+        resolve(encryptsocket);
+      });
+
+      encryptsocket.once('error', reject);
+    });
+  }
+
   connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
@@ -1979,57 +2021,24 @@ class Connection extends EventEmitter {
 
     const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
 
-    connect(connectOpts, dns.lookup, signal).then((socket) => {
-      process.nextTick(() => {
-        const secureContext = tls.createSecureContext(this.secureContextOptions);
-        if (this.config.options.encrypt === 'strict') {
-          const encryptOptions = {
-            host: this.config.server,
-            socket: socket,
-            ALPNProtocols: ['tds/8.0'],
-            secureContext: secureContext,
-            servername: this.config.options.serverName ? this.config.options.serverName : this.config.server,
-          };
-          const encryptsocket = tls.connect(encryptOptions, () => {
-            socket = encryptsocket;
+    (async () => {
+      let socket = await connect(connectOpts, dns.lookup, signal);
 
-            socket.on('error', (error) => { this.socketError(error); });
-            socket.on('close', () => { this.socketClose(); });
-            socket.on('end', () => { this.socketEnd(); });
-            socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+      if (this.config.options.encrypt === 'strict') {
+        try {
+          // Wrap the socket with TLS for TDS 8.0
+          socket = await this.wrapWithTls(socket);
+        } catch (err) {
+          socket.end();
 
-            this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-
-            this.socket = socket;
-
-            this.closed = false;
-            this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-            this.sendPreLogin();
-            this.transitionTo(this.STATE.SENT_PRELOGIN);
-          });
-
-          console.log('using TDS 8.0 strict TLS encryption');
-        } else {
-          socket.on('error', (error) => { this.socketError(error); });
-          socket.on('close', () => { this.socketClose(); });
-          socket.on('end', () => { this.socketEnd(); });
-          socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
-          this.socket = socket;
-
-          this.closed = false;
-          this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-          this.sendPreLogin();
-          this.transitionTo(this.STATE.SENT_PRELOGIN);
+          throw err;
         }
-      });
-    }, (err) => {
+      }
+
+      this.socketHandlingForSendPreLogin(socket);
+    })().catch((err) => {
       this.clearConnectTimer();
+
       if (err.name === 'AbortError') {
         return;
       }
