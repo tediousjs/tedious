@@ -18,10 +18,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -65,7 +65,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x]
+        node-version: [16.x, 18.x, 19.x]
       fail-fast: false
 
     steps:
@@ -183,7 +183,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x]
+        node-version: [16.x, 18.x, 19.x]
       fail-fast: false
 
     steps:
@@ -341,7 +341,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-sql-auth:
-    name: Azure SQL Server / Node.js 14.x
+    name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
@@ -349,10 +349,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -394,7 +394,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-auth:
-    name: Azure SQL Server / Node.js 14.x
+    name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
@@ -402,10 +402,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -452,7 +452,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-service-principal-auth:
-    name: Azure SQL Server / Node.js 14.x
+    name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
 
     # Only run these tests if we have access to the secrets
@@ -460,10 +460,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -516,10 +516,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 14
+    - name: Use Node.js 16
       uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
