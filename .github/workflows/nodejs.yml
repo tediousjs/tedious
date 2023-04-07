@@ -297,8 +297,6 @@ jobs:
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
-        cat ~/.tedious/test-connection.json
-
     - name: Upgrade npm
       run: npm install -g npm
       if: ${{ matrix.node-version == '6.x' }}
