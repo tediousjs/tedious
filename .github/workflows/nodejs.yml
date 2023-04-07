@@ -510,7 +510,7 @@ jobs:
 
   pre-release:
     name: Pre-Release
-    needs: [test, azure-sql-auth, azure-ad-auth, azure-ad-service-principal-auth]
+    needs: [test, test-windows]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
 
