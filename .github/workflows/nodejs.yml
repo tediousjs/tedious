@@ -14,6 +14,7 @@ jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v3
       with:
@@ -60,8 +61,8 @@ jobs:
 
   test:
     name: SQL Server Linux / Node.js ${{ matrix.node-version }}
-
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       matrix:
@@ -178,8 +179,8 @@ jobs:
 
   test-windows:
     name: SQL Server Windows / Node.js ${{ matrix.node-version }}
-
     runs-on: windows-2022
+    timeout-minutes: 20
 
     strategy:
       matrix:
@@ -343,6 +344,7 @@ jobs:
   azure-sql-auth:
     name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Only run these tests if we have access to the secrets
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
@@ -396,6 +398,7 @@ jobs:
   azure-ad-auth:
     name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Only run these tests if we have access to the secrets
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
@@ -454,6 +457,7 @@ jobs:
   azure-ad-service-principal-auth:
     name: Azure SQL Server / Node.js 16.x
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Only run these tests if we have access to the secrets
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
