@@ -9,11 +9,11 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 14
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
       with:
-        node-version: 14
+        node-version: 16
 
     - name: Tag latest release
       run: |
