@@ -79,7 +79,7 @@ jobs:
 
     - name: Generate TLS Certificate
       run: |
-        openssl req -x509 -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
+        openssl req -x509 -newkey rsa:4096 -nodes -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
 
     - name: Start containers
       run: |
@@ -178,33 +178,58 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   test-windows:
-    name: SQL Server Windows / Node.js ${{ matrix.node-version }}
+    name: SQL Server ${{ matrix.mssql-version }} Windows / Node.js ${{ matrix.node-version }}
     runs-on: windows-2022
     timeout-minutes: 20
 
     strategy:
       matrix:
+        mssql-version: [2016, 2017, 2019, 2022]
         node-version: [16.x, 18.x, 19.x]
       fail-fast: false
 
     steps:
-    - name: Install a SQL Server 2022
+    - name: Install SQL Server ${{ matrix.mssql-version }}
       shell: pwsh
       run: |
         Push-Location C:\temp
 
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe -OutFile sqlsetup.exe
-        Invoke-WebRequest -Uri https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box -OutFile sqlsetup.box
+        $exe_link, $box_link, $update_link = '', '', ''
+
+        switch (${{ matrix.mssql-version }}) {
+          '2022' {
+            $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe'
+          }
+          '2019' {
+            $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2019-KB5023049-x64.exe'
+          }
+          '2017' {
+            $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe'
+          }
+          '2016' {
+            $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box'
+            $update_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
+          }
+          default {
+            Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
+            Exit 1
+          }
+        }
+
+        Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
+        Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
+        Invoke-WebRequest -Uri $update_link -Outfile sqlupdate.exe
 
         Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
 
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=0 /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /USESQLRECOMMENDEDMEMORYLIMITS
-
-        Set-ItemProperty -path "HKLM:\Software\Microsoft\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQLSERVER\" -Name LoginMode -Value 2
-        Restart-Service MSSQLSERVER
-
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] WITH PASSWORD=N'yourStrong(!)Password'"
-        sqlcmd -S localhost -q "ALTER LOGIN [sa] ENABLE"
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
         Pop-Location
 
@@ -247,9 +272,10 @@ jobs:
         '-----END CERTIFICATE-----'
         )
         # Output PEM file to the path
-        $output | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii
+        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
 
     - name: Set up CI configuration
+      shell: bash
       run: |
         mkdir ~/.tedious
 
