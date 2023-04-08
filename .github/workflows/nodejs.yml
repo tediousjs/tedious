@@ -227,7 +227,7 @@ jobs:
         Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
         Invoke-WebRequest -Uri $update_link -Outfile sqlupdate.exe
 
-        Start-Process -Wait -FilePath ./SQLServer2022-DEV-x64-ENU.exe -ArgumentList /qs, /x:setup
+        Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
 
         .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
 
@@ -296,8 +296,6 @@ jobs:
             }
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-        cat ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
