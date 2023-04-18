@@ -447,6 +447,117 @@ export class Int32BE extends Parser<number> {
   }
 }
 
+export class Int64BE extends Parser<number> {
+  index: number;
+  lo: number;
+  hi: number;
+  first: number;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.lo = 0;
+    this.hi = 0;
+    this.first = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        const low = buffer.readInt32BE(offset);
+        const high = buffer.readUInt32BE(offset + 4);
+        const bufferValue = Math.pow(2, 32) * low + ((buffer[offset] & 0x80) === 0x80 ? 1 : -1) * high;
+        return { done: true, value: bufferValue, offset: offset + dataLength };
+      }
+      this.first = buffer[offset];
+      this.lo += buffer[offset++] << 24;
+      this.index += 1;
+    }
+
+    while (this.index < dataLength / 2) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      this.lo += buffer[offset++] * 2 ** (8 * (3 - this.index));
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      this.hi += buffer[offset++] * 2 ** (8 * (7 - this.index));
+      this.index += 1;
+    }
+
+    return { done: true, value: Math.pow(2, 32) * this.lo + ((this.first & 0x80) === 0x80 ? 1 : -1) * this.hi, offset: offset };
+  }
+}
+
+export class Int64LE extends Parser<number> {
+  index: number;
+  lo: number;
+  hi: number;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.lo = 0;
+    this.hi = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        const low = buffer.readUInt32LE(offset);
+        const high = buffer.readInt32LE(offset + 4);
+        const bufferValue = Math.pow(2, 32) * high + ((buffer[offset + dataLength - 1] & 0x80) === 0x80 ? 1 : -1) * low;
+        return { done: true, value: bufferValue, offset: offset + dataLength };
+      }
+
+      this.lo += buffer[offset++];
+      this.index += 1;
+    }
+
+    while (this.index < dataLength / 2) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.lo += buffer[offset++] * 2 ** (8 * this.index);
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+      if (this.index < dataLength - 1) {
+        this.hi += buffer[offset++] * 2 ** (8 * (this.index - 4));
+      } else {
+        // Last byte
+        this.hi += buffer[offset++] << 24;
+      }
+      this.index += 1;
+    }
+    return { done: true, value: Math.pow(2, 32) * this.hi + ((buffer[offset - 1] & 0x80) === 0x80 ? 1 : -1) * this.lo, offset: offset };
+  }
+}
+
 export class UInt32LE extends Parser<number> {
   index: number;
   result: 0;
@@ -539,18 +650,17 @@ export class UInt40LE extends Parser<number> {
   parse(buffer: Buffer, offset: number): Result<number> {
     const dataLength = 5;
     if (this.index === 0) {
-      //reach the end of the incoming buffer
+      // reach the end of the incoming buffer
       if (offset === buffer.length) {
         return { done: false, value: undefined, offset: offset };
       }
 
       // Fast path, incoming buffer has all data available
       if (offset + dataLength <= buffer.length) {
-        console.log('here')
-        //read low bytes and high bytes consectivly
+        // read low bytes and high bytes consectivly
         const low = buffer.readUInt32LE(offset);
         const high = buffer.readUInt8(offset + 4);
-        return { done: true, value: (2**32 * high) + low, offset: offset + dataLength};
+        return { done: true, value: Math.pow(2, 32) * high + low, offset: offset + dataLength };
       }
 
       this.result += buffer[offset++];
