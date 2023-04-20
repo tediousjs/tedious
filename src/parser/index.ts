@@ -657,10 +657,7 @@ export class UInt40LE extends Parser<number> {
 
       // Fast path, incoming buffer has all data available
       if (offset + dataLength <= buffer.length) {
-        // read low bytes and high bytes consectivly
-        const low = buffer.readUInt32LE(offset);
-        const high = buffer.readUInt8(offset + 4);
-        return { done: true, value: Math.pow(2, 32) * high + low, offset: offset + dataLength };
+        return { done: true, value: buffer.readUIntLE(offset, 5), offset: offset + dataLength };
       }
 
       this.result += buffer[offset++];
