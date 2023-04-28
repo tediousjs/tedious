@@ -677,6 +677,49 @@ export class UInt40LE extends Parser<number> {
   }
 }
 
+export class UInt64LE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 8;
+    if (this.index === 0) {
+      // reach the end of the incoming buffer
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        const low = buffer.readUInt32LE(offset);
+        const high = buffer.readUInt32LE(offset + 4);
+        const bufferValue = Math.pow(2, 32) * high + low;
+        return { done: true, value: bufferValue, offset: offset + dataLength };
+      }
+
+      this.result += buffer[offset++];
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.result += buffer[offset++] * 2 ** (8 * this.index);
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
+
 export class BigInt64LE extends Parser<bigint> {
   index: number;
   lo: number;
