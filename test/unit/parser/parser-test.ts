@@ -16,6 +16,7 @@ import {
   FloatBE,
   DoubleLE,
   DoubleBE,
+  UInt24LE,
   BVarchar,
   UsVarchar,
   BVarbyte,
@@ -751,6 +752,42 @@ describe('DoubleBE', function() {
       const result = parser.parse(Buffer.from('00', 'hex'), 0);
       assert.isTrue(result.done);
       assert.strictEqual(result.value, 1.2882297539194267e-231);
+      assert.strictEqual(result.offset, 1);
+    }
+  });
+});
+
+describe('UInt24LE', function() {
+  it('parses an unsigned short', function() {
+    const parser = new UInt24LE();
+    const result = parser.parse(Buffer.from('000010', 'hex'), 0);
+
+    assert.isTrue(result.done);
+    assert.strictEqual(result.value, 1048576);
+    assert.strictEqual(result.offset, 3);
+  });
+
+  it('parses an unsigned short over multiple buffers', function() {
+    const parser = new UInt24LE();
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('00', 'hex'), 0);
+      assert.isFalse(result.done);
+      assert.isUndefined(result.value);
+      assert.strictEqual(result.offset, 1);
+    }
+
+    {
+      const result = parser.parse(Buffer.from('10', 'hex'), 0);
+      assert.isTrue(result.done);
+      assert.strictEqual(result.value, 1048576);
       assert.strictEqual(result.offset, 1);
     }
   });

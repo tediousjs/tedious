@@ -362,6 +362,47 @@ export class UInt16LE extends Parser<number> {
   }
 }
 
+export class UInt24LE extends Parser<number> {
+  index: number;
+  result: 0;
+
+  constructor() {
+    super();
+
+    this.index = 0;
+    this.result = 0;
+  }
+
+  parse(buffer: Buffer, offset: number): Result<number> {
+    const dataLength = 3;
+    if (this.index === 0) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      // Fast path, buffer has all data available
+      if (offset + dataLength <= buffer.length) {
+        return { done: true, value: buffer.readUIntLE(offset, dataLength), offset: offset + dataLength };
+      }
+
+      this.result += buffer[offset++];
+      this.index += 1;
+    }
+
+    while (this.index < dataLength) {
+      if (offset === buffer.length) {
+        return { done: false, value: undefined, offset: offset };
+      }
+
+      this.result += buffer[offset++] * 2 ** (8 * this.index);
+      this.index += 1;
+    }
+
+    return { done: true, value: this.result, offset: offset };
+  }
+}
+
+
 export class Int32LE extends Parser<number> {
   index: number;
   result: 0;
@@ -569,7 +610,6 @@ export class BigInt64LE extends Parser<bigint> {
       if (offset === buffer.length) {
         return { done: false, value: undefined, offset: offset };
       }
-      console.log(this.index);
       if (this.index < dataLength - 1) {
         this.hi += buffer[offset++] * 2 ** (8 * (this.index - 4));
       } else {
