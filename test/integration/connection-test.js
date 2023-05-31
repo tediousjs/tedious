@@ -532,72 +532,133 @@ describe('Ntlm Test', function() {
 
 describe('Encrypt Test', function() {
   /**
-   * @this {Mocha.Context}
-   * @param {Mocha.Done} done
-   * @param {import("../../src/connection").ConnectionConfiguration} config
-   * @returns {void}
+   * @param {any} config
+   * @param {(err: Error | null, supportsTds8?: boolean) => void} callback
    */
-  function runEncryptTest(done, config) {
+  function supportsTds8(config, callback) {
     const connection = new Connection(config);
 
-    connection.connect(function(err) {
-      assert.ifError(err);
+    connection.connect((err) => {
+      if (err) {
+        return callback(err);
+      }
+
+      let supportsTds8 = false;
+
+      const request = new Request("SELECT host_platform, SERVERPROPERTY('ProductMajorVersion') FROM sys.dm_os_host_info", (err) => {
+        connection.close();
+
+        if (err) {
+          return callback(err);
+        }
+
+        callback(null, supportsTds8);
+      });
+
+      request.on('row', (row) => {
+        supportsTds8 = row[0].value !== 'Linux' && row[1].value >= '2022';
+      });
+
       connection.execSql(request);
     });
+  }
 
-    const request = new Request(
-      `SELECT c.protocol_version
-       FROM sys.dm_exec_connections AS c
-       JOIN sys.dm_exec_sessions AS s
-       ON c.session_id = s.session_id
-       WHERE c.session_id = @@SPID`, (err, rowCount) => {
+  describe('with strict encryption enabled (TDS 8.0)', function() {
+    /**
+     * @type {Connection}
+     */
+    let connection;
+
+    beforeEach(function(done) {
+      const config = getConfig();
+
+      supportsTds8(config, (err, supportsTds8) => {
+        if (err) {
+          return done(err);
+        }
+
+        if (!supportsTds8) {
+          return this.skip();
+        }
+
+        config.options.encrypt = 'strict';
+
+        connection = new Connection(config);
+        connection.connect(done);
+      });
+    });
+
+    afterEach(function() {
+      connection && connection.close();
+    });
+
+    it('opens an encrypted connection', function(done) {
+      const request = new Request(`
+        SELECT c.protocol_version, c.encrypt_option
+        FROM sys.dm_exec_connections AS c
+        WHERE c.session_id = @@SPID
+      `, (err, rowCount) => {
+        if (err) {
+          return done(err);
+        }
+
         assert.ifError(err);
         assert.strictEqual(rowCount, 1);
 
-        connection.close();
+        done();
       });
 
-    request.on('row', function(columns) {
-      // console.log(versions[tdsKey],columns[0].value)
-      assert.strictEqual(columns.length, 1);
-      if ('strict' === connection.config.options.encrypt) {
+      request.on('row', function(columns) {
+        assert.strictEqual(columns.length, 2);
         assert.strictEqual(versions['8_0'], columns[0].value);
-      } else {
-        assert.strictEqual(versions[connection.config.options.tdsVersion], columns[0].value);
-      }
-    });
+        assert.strictEqual('TRUE', columns[1].value);
+      });
 
-    connection.on('end', function() {
-      done();
+      connection.execSql(request);
     });
-
-    connection.on('databaseChange', function(database) {
-      assert.strictEqual(database, config.options?.database);
-    });
-
-    connection.on('secure', function(cleartext) {
-      assert.ok(cleartext);
-      assert.ok(cleartext.getCipher());
-      assert.ok(cleartext.getPeerCertificate());
-    });
-
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
-
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
-  }
-  it('should encrypt', function(done) {
-    const config = getConfig();
-    config.options.encrypt = true;
-    runEncryptTest.call(this, done, config);
   });
-  it('encrypt with TDS8.0', function(done) {
-    const config = getConfig();
-    config.options.encrypt = 'strict';
-    runEncryptTest.call(this, done, config);
+
+  describe('with encryption enabled', function() {
+    /**
+     * @type {Connection}
+     */
+    let connection;
+
+    beforeEach(function(done) {
+      const config = getConfig();
+      config.options.encrypt = true;
+      connection = new Connection(config);
+      connection.connect(done);
+    });
+
+    afterEach(function() {
+      connection.close();
+    });
+
+    it('opens an encrypted connection', function(done) {
+      const request = new Request(`
+        SELECT c.protocol_version, c.encrypt_option
+        FROM sys.dm_exec_connections AS c
+        WHERE c.session_id = @@SPID
+      `, (err, rowCount) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      request.on('row', function(columns) {
+        assert.strictEqual(columns.length, 2);
+        assert.strictEqual(versions[connection.config.options.tdsVersion], columns[0].value);
+        assert.strictEqual('TRUE', columns[1].value);
+      });
+
+      connection.execSql(request);
+    });
   });
 });
 
