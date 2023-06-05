@@ -218,13 +218,13 @@ jobs:
             $update_download_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
           }
           default {
-            Write-Error "Invalid SQL Server version specified: asdasd"
+            Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
             Exit 1
           }
         }
 
         if (${{ matrix.mssql-version }} -ne '2016') {
-          $response = Invoke-WebRequest -Uri $update_ilnk
+          $response = Invoke-WebRequest -Uri $update_link
           $dl_link = ($response.Links.href | Where-Object {$_ -like 'https://download.microsoft.com/*'})
           echo $dl_link
           $update_download_link = [System.Uri]::new($dl_link)
