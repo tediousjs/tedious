@@ -224,11 +224,13 @@ jobs:
         }
 
         if (${{ matrix.mssql-version }} -ne '2016') {
-          $response = Invoke-WebRequest -Uri $update_link
-          echo $response
-          $dl_link = ($response.Links.href | Where-Object {$_ -like 'https://download.microsoft.com/*'})
-          echo $dl_link
-          $update_download_link = [System.Uri]::new($dl_link)
+          $dl_links = ((Invoke-WebRequest -Uri $update_link).Links | Where-Object {$_.href -like 'https://download.microsoft.com/*'})
+          if ($dl_links.count -gt 0) {
+            $update_download_link = [System.Uri]::new($dl_links[0].href)
+          } else {
+            Write-Error "Download link not found"
+            Exit 1
+          }
           echo $update_download_link
         }
 
