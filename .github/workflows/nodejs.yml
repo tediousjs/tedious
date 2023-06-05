@@ -225,6 +225,7 @@ jobs:
 
         if (${{ matrix.mssql-version }} -ne '2016') {
           $update_download_link = [System.Uri]::new(((Invoke-WebRequest -Uri $update_link).Links.href | Where-Object {$_ -like 'https://download.microsoft.com/*'}))
+          echo $update_download_link
         }
 
         Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
