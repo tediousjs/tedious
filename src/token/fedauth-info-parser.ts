@@ -1,5 +1,4 @@
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import Parser, { ParserOptions } from './stream-parser';
 import { FedAuthInfoToken } from './token';
 
 const FEDAUTHINFOID = {
@@ -7,7 +6,7 @@ const FEDAUTHINFOID = {
   SPN: 0x02
 };
 
-function fedAuthInfoParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: FedAuthInfoToken) => void) {
+function fedAuthInfoParser(parser: Parser, _options: ParserOptions, callback: (token: FedAuthInfoToken) => void) {
   parser.readUInt32LE((tokenLength) => {
     parser.readBuffer(tokenLength, (data) => {
       let spn: string | undefined, stsurl: string | undefined;

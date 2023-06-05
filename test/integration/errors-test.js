@@ -4,8 +4,9 @@ const fs = require('fs');
 const assert = require('chai').assert;
 const debug = false;
 
-import Connection from '../../src/connection';
+import AggregateError from 'es-aggregate-error';
 import { RequestError } from '../../src/errors';
+import Connection from '../../src/connection';
 import Request from '../../src/request';
 
 const config = JSON.parse(
@@ -179,6 +180,65 @@ describe('Errors Test', function() {
     });
 
     connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('should throw aggregate error with two error messages', function(done) {
+    const connection = new Connection(config);
+
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const request = new Request('create type test_type as table ( id int, primary key (code) );', (error) => {
+        assert.instanceOf(error, AggregateError);
+
+        if (error instanceof AggregateError) {
+          assert.strictEqual(error.errors.length, 2);
+          assert.strictEqual(error.errors[0].message, 'Column name \'code\' does not exist in the target table or view.');
+          assert.strictEqual(error.errors[1].message, 'Could not create constraint or index. See previous errors.');
+        }
+
+        connection.close();
+      });
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
+  it.skip('should throw aggregate error with AAD token retrieve', function(done) {
+    config.server = 'help.kusto.windows.net';
+    config.authentication = {
+      type: 'azure-active-directory-password',
+      options: {
+        userName: 'username',
+        password: 'password',
+        // Lack of tenantId will generate a AAD token retrieve error
+        clientId: 'clientID',
+      }
+    };
+    config.options.tdsVersion = '7_4';
+    const connection = new Connection(config);
+
+    /** @type {Error | undefined} */
+    let connectionError;
+    connection.connect((err) => {
+      connectionError = err;
+
+      assert.instanceOf(connectionError, AggregateError);
+
+      if (connectionError instanceof AggregateError) {
+        assert.strictEqual(connectionError.errors.length, 2);
+        assert.strictEqual(connectionError.errors[0].message, 'Security token could not be authenticated or authorized.');
+        assert.include(connectionError.errors[1].message, 'The grant type is not supported over the /common or /consumers endpoints.');
+      }
+
       done();
     });
   });

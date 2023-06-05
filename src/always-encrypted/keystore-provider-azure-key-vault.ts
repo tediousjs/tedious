@@ -201,7 +201,7 @@ export class ColumnEncryptionAzureKeyVaultProvider {
 
     this.createKeyClient(keyParts.vaultUrl);
 
-    return (this.keyClient as KeyClient).getKey(keyParts.name, keyParts.version ? { version: keyParts.version } : {});
+    return await (this.keyClient as KeyClient).getKey(keyParts.name, keyParts.version ? { version: keyParts.version } : {});
   }
 
   private createKeyClient(keyVaultUrl: string): void {

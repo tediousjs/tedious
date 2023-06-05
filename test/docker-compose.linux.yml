@@ -1,0 +1,14 @@
+version: '3'
+
+services:
+  mssql:
+    build: "."
+
+    restart: unless-stopped
+
+    environment:
+      - "ACCEPT_EULA=Y"
+      - "SA_PASSWORD=yourStrong(!)Password"
+
+    ports:
+      - "1433:1433"
