@@ -29,10 +29,6 @@ function getConfig() {
   return config;
 }
 
-process.on('uncaughtException', function(err) {
-  console.error(err.stack);
-});
-
 function getInstanceName() {
   return JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
