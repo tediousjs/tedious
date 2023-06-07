@@ -34,7 +34,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=16"
   },
   "publishConfig": {
     "tag": "next"
@@ -43,14 +43,13 @@
     "@azure/identity": "^2.0.4",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.2.0",
-    "@types/es-aggregate-error": "^1.0.2",
     "bl": "^5.0.0",
     "es-aggregate-error": "^1.0.8",
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
-    "node-abort-controller": "^3.0.1",
+    "node-abort-controller": "^3.1.1",
     "punycode": "^2.1.0",
     "sprintf-js": "^1.1.2"
   },
@@ -69,6 +68,7 @@
     "@types/bl": "^5.0.2",
     "@types/chai": "^4.3.1",
     "@types/depd": "^1.1.32",
+    "@types/es-aggregate-error": "^1.0.2",
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "^12.20.50",
@@ -109,7 +109,7 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 14
+            "node": 16
           }
         }
       ],

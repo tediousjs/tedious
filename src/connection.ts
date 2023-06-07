@@ -343,6 +343,7 @@ export interface InternalConnectionOptions {
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
+  connector: undefined | (() => Promise<Socket>);
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   cryptoCredentialsDetails: SecureContextOptions;
@@ -536,6 +537,13 @@ export interface ConnectionOptions {
   connectionRetryInterval?: number;
 
   /**
+   * Custom connector factory method.
+   *
+   * (default: `undefined`)
+   */
+  connector?: () => Promise<Socket>;
+
+  /**
    * The number of milliseconds before the attempt to connect is considered failed
    *
    * (default: `15000`).
@@ -713,6 +721,13 @@ export interface ConnectionOptions {
   localAddress?: string | undefined;
 
   /**
+   * A boolean determining whether to parse unique identifier type with lowercase case characters.
+   *
+   * (default: `false`).
+   */
+  lowerCaseGuids?: boolean;
+
+  /**
    * The maximum number of connection retries for transient errors.、
    *
    * (default: `3`).
@@ -835,13 +850,6 @@ export interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
-
-  /**
-   * A boolean determining whether to parse unique identifier type with lowercase case characters.
-   *
-   * (default: `false`).
-   */
-  lowerCaseGuids?: boolean;
 }
 
 /**
@@ -1224,6 +1232,7 @@ class Connection extends EventEmitter {
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
+        connector: undefined,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
@@ -1318,14 +1327,6 @@ class Connection extends EventEmitter {
         this.config.options.columnNameReplacer = config.options.columnNameReplacer;
       }
 
-      if (config.options.connectTimeout !== undefined) {
-        if (typeof config.options.connectTimeout !== 'number') {
-          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
-        }
-
-        this.config.options.connectTimeout = config.options.connectTimeout;
-      }
-
       if (config.options.connectionIsolationLevel !== undefined) {
         assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
 
@@ -1338,6 +1339,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.connector !== undefined) {
+        if (typeof config.options.connector !== 'function') {
+          throw new TypeError('The "config.options.connector" property must be a function.');
+        }
+
+        this.config.options.connector = config.options.connector;
       }
 
       if (config.options.cryptoCredentialsDetails !== undefined) {
@@ -1894,7 +1903,7 @@ class Connection extends EventEmitter {
     const signal = this.createConnectTimer();
 
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
     } else {
       return instanceLookup({
         server: this.config.server,
@@ -1903,9 +1912,10 @@ class Connection extends EventEmitter {
         signal: signal
       }).then((port) => {
         process.nextTick(() => {
-          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
         });
       }, (err) => {
+        this.clearConnectTimer();
         if (err.name === 'AbortError') {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
@@ -1965,14 +1975,14 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
       localAddress: this.config.options.localAddress
     };
 
-    const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
+    const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
     connect(connectOpts, dns.lookup, signal).then((socket) => {
       process.nextTick(() => {
@@ -1993,6 +2003,7 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.SENT_PRELOGIN);
       });
     }, (err) => {
+      this.clearConnectTimer();
       if (err.name === 'AbortError') {
         return;
       }
