@@ -27,33 +27,26 @@ function createDbChangeBuffer() {
 
 describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
-    var buffer = createDbChangeBuffer();
+    const buffer = createDbChangeBuffer();
 
-    var parser = new Parser(debug);
-    parser.on('databaseChange', function(event) {
-      assert.isOk(event);
+    const parser = new Parser([buffer], debug, {
+      onDatabaseChange: function(token) {
+        assert.isOk(token);
+      }
     });
 
-    parser.addBuffer(buffer);
-
-    assert.isOk(parser.isEnd());
-
-    done();
+    parser.on('end', done);
   });
 
   it('should split token across buffers', (done) => {
-    var buffer = createDbChangeBuffer();
+    const buffer = createDbChangeBuffer();
 
-    var parser = new Parser(debug);
-    parser.on('databaseChange', function(event) {
-      assert.isOk(event);
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)], debug, {
+      onDatabaseChange: function(token) {
+        assert.isOk(token);
+      }
     });
 
-    parser.addBuffer(buffer.slice(0, 6));
-    parser.addBuffer(buffer.slice(6));
-
-    assert.isOk(parser.isEnd());
-
-    done();
+    parser.on('end', done);
   });
 });

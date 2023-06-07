@@ -1,42 +1,25 @@
-var tedious = require("../../lib/tedious");
-var Request = tedious.Request;
-var TYPES = tedious.TYPES;
+const { createBenchmark } = require('../common');
 
-var Parser = require("../../lib/token/token-stream-parser").Parser;
+const { Parser } = require('../../src/token/token-stream-parser');
 
-var common = require("../common");
-
-var parser = new Parser({ token: function() { } }, {}, {});
-
-var tokenCount = 50;
-var data = Buffer.from(new Array(tokenCount).join("810300000000001000380269006400000000000900e7c8000904d00034046e0061006d006500000000000900e7ffff0904d000340b6400650073006300720069007000740069006f006e00"), "hex");
-
-common.createBenchmark({
-  name: "parsing `COLMETADATA` tokens",
-
-  profileIterations: 3000,
-
-  setup: function(cb) {
-    cb();
-  },
-
-  exec: function(cb) {
-    var count = 0;
-
-    parser.on("columnMetadata", function() {
-      count += 1;
-
-      if (count === tokenCount - 1) {
-        parser.removeAllListeners("columnMetadata");
-
-        cb();
-      }
-    });
-
-    parser.addBuffer(data);
-  },
-
-  teardown: function(cb) {
-    cb();
-  }
+const bench = createBenchmark(main, {
+  n: [10, 100, 1000],
+  tokenCount: [10, 100, 1000, 10000]
 });
+
+async function * repeat(data, n) {
+  for (let i = 0; i < n; i++) {
+    yield data;
+  }
+}
+
+function main({ n, tokenCount }) {
+  const data = Buffer.from('810300000000001000380269006400000000000900e7c8000904d00034046e0061006d006500000000000900e7ffff0904d000340b6400650073006300720069007000740069006f006e00'.repeat(tokenCount), 'hex');
+  const parser = new Parser(repeat(data, n), { token: function() { } }, {}, {});
+
+  bench.start();
+
+  parser.on('end', () => {
+    bench.end(n);
+  });
+}

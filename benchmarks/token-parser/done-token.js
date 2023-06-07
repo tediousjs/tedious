@@ -1,42 +1,25 @@
-var tedious = require("../../lib/tedious");
-var Request = tedious.Request;
-var TYPES = tedious.TYPES;
+const { createBenchmark } = require('../common');
 
-var Parser = require("../../lib/token/token-stream-parser").Parser;
+const { Parser } = require('../../src/token/token-stream-parser');
 
-var common = require("../common");
-
-var parser = new Parser({ token: function() { } }, {}, {});
-
-var tokenCount = 500;
-var data = Buffer.from(new Array(tokenCount).join("FE0000E0000000000000000000"), "hex");
-
-common.createBenchmark({
-  name: "parsing `DONEPROC` tokens",
-
-  profileIterations: 3000,
-
-  setup: function(cb) {
-    cb();
-  },
-
-  exec: function(cb) {
-    var count = 0;
-
-    parser.on("doneProc", function() {
-      count += 1;
-
-      if (count === tokenCount - 1) {
-        parser.removeAllListeners("doneProc");
-
-        cb();
-      }
-    });
-
-    parser.addBuffer(data);
-  },
-
-  teardown: function(cb) {
-    cb();
-  }
+const bench = createBenchmark(main, {
+  n: [10, 100, 1000],
+  tokenCount: [10, 100, 1000, 10000]
 });
+
+async function * repeat(data, n) {
+  for (let i = 0; i < n; i++) {
+    yield data;
+  }
+}
+
+function main({ n, tokenCount }) {
+  const data = Buffer.from('FE0000E0000000000000000000'.repeat(tokenCount), 'hex');
+  const parser = new Parser(repeat(data, n), { token: function() { } }, {}, {});
+
+  bench.start();
+
+  parser.on('end', () => {
+    bench.end(n);
+  });
+}

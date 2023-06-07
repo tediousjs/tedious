@@ -1,19 +1,16 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
+import md4 from 'js-md4';
 
-const BigInteger = require('big-number');
-
-const hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
-
-type Options = {
-  domain: string,
-  userName: string,
-  password: string,
+interface Options {
+  domain: string;
+  userName: string;
+  password: string;
   ntlmpacket: {
-    target: Buffer,
-    nonce: Buffer
-  }
-};
+    target: Buffer;
+    nonce: Buffer;
+  };
+}
 
 class NTLMResponsePayload {
   data: Buffer;
@@ -22,7 +19,7 @@ class NTLMResponsePayload {
     this.data = this.createResponse(loginData);
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + 'NTLM Auth';
   }
 
@@ -111,24 +108,15 @@ class NTLMResponsePayload {
   }
 
   createTimestamp(time: number) {
-    const tenthsOfAMicrosecond = BigInteger(time).plus(11644473600).multiply(10000000);
-    const hexArray = [];
+    const tenthsOfAMicrosecond = (BigInt(time) + BigInt(11644473600)) * BigInt(10000000);
 
-    let pair = [];
-    while (tenthsOfAMicrosecond.val() !== '0') {
-      const idx = tenthsOfAMicrosecond.mod(16);
-      pair.unshift(hex[idx]);
-      if (pair.length === 2) {
-        hexArray.push(pair.join(''));
-        pair = [];
-      }
-    }
+    const lo = Number(tenthsOfAMicrosecond & BigInt(0xffffffff));
+    const hi = Number((tenthsOfAMicrosecond >> BigInt(32)) & BigInt(0xffffffff));
 
-    if (pair.length > 0) {
-      hexArray.push(pair[0] + '0');
-    }
-
-    return Buffer.from(hexArray.join(''), 'hex');
+    const result = Buffer.alloc(8);
+    result.writeUInt32LE(lo, 0);
+    result.writeUInt32LE(hi, 4);
+    return result;
   }
 
   lmv2Response(domain: string, user: string, password: string, serverNonce: Buffer, clientNonce: Buffer) {
@@ -154,28 +142,12 @@ class NTLMResponsePayload {
   }
 
   ntHash(text: string) {
-    const hash = Buffer.alloc(21, 0);
-
     const unicodeString = Buffer.from(text, 'ucs2');
-    const md4 = crypto.createHash('md4').update(unicodeString).digest();
-    if (md4.copy) {
-      md4.copy(hash);
-    } else {
-      Buffer.from(md4).copy(hash);
-    }
-    return hash;
+    return Buffer.from(md4.arrayBuffer(unicodeString));
   }
 
   hmacMD5(data: Buffer, key: Buffer) {
-    const hmac = crypto.createHmac('MD5', key);
-    hmac.update(data);
-
-    const result = hmac.digest();
-    if (result.copy) {
-      return result;
-    } else {
-      return Buffer.from(result).slice(0, 16);
-    }
+    return crypto.createHmac('MD5', key).update(data).digest();
   }
 }
 

@@ -1,11 +1,11 @@
-const { PassThrough } = require('readable-stream');
+import { PassThrough } from 'stream';
 
 class Message extends PassThrough {
   type: number;
   resetConnection: boolean;
   ignore: boolean;
 
-  constructor({ type, resetConnection = false } : { type: number, resetConnection?: boolean }) {
+  constructor({ type, resetConnection = false }: { type: number, resetConnection?: boolean | undefined }) {
     super();
 
     this.type = type;

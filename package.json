@@ -34,49 +34,63 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">= 6"
+    "node": ">=16"
   },
   "publishConfig": {
     "tag": "next"
   },
   "dependencies": {
-    "@azure/ms-rest-nodeauth": "^2.0.2",
-    "@types/node": "^12.6.9",
-    "big-number": "1.0.0",
-    "bl": "^3.0.0",
-    "depd": "^2.0.0",
-    "iconv-lite": "^0.4.23",
+    "@azure/identity": "^2.0.4",
+    "@azure/keyvault-keys": "^4.4.0",
+    "@js-joda/core": "^5.2.0",
+    "bl": "^5.0.0",
+    "es-aggregate-error": "^1.0.8",
+    "iconv-lite": "^0.6.3",
+    "js-md4": "^0.3.2",
+    "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
+    "node-abort-controller": "^3.1.1",
     "punycode": "^2.1.0",
-    "readable-stream": "^3.4.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.5.5",
-    "@babel/core": "^7.5.5",
-    "@babel/node": "^7.5.5",
-    "@babel/preset-env": "^7.5.5",
-    "@babel/preset-typescript": "^7.3.3",
-    "@babel/register": "^7.5.5",
-    "@commitlint/cli": "^8.0.0",
-    "@commitlint/config-conventional": "^8.0.0",
-    "@commitlint/travis-cli": "^8.0.0",
-    "async": "^2.6.1",
-    "babel-eslint": "^11.0.0-beta.0",
-    "babel-plugin-istanbul": "^5.2.0",
-    "benchmark": "^2.1.0",
-    "chai": "^4.1.2",
-    "codecov": "^3.5.0",
-    "eslint": "^5.16.0",
-    "mitm": "^1.7.0",
-    "mocha": "^6.1.4",
-    "nyc": "^14.1.1",
-    "rimraf": "^2.6.3",
-    "semantic-release": "^15.13.12",
-    "sinon": "^7.3.2",
-    "typescript": "^3.6.2"
+    "@babel/cli": "^7.17.10",
+    "@babel/core": "^7.17.10",
+    "@babel/node": "^7.17.10",
+    "@babel/plugin-proposal-class-properties": "^7.16.7",
+    "@babel/preset-env": "^7.17.10",
+    "@babel/preset-typescript": "^7.16.7",
+    "@babel/register": "^7.17.7",
+    "@commitlint/cli": "^16.2.4",
+    "@commitlint/config-conventional": "^16.2.4",
+    "@commitlint/travis-cli": "^16.2.4",
+    "@types/async": "^3.2.13",
+    "@types/bl": "^5.0.2",
+    "@types/chai": "^4.3.1",
+    "@types/depd": "^1.1.32",
+    "@types/es-aggregate-error": "^1.0.2",
+    "@types/lru-cache": "^5.1.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "^12.20.50",
+    "@types/sprintf-js": "^1.1.2",
+    "@typescript-eslint/eslint-plugin": "^5.22.0",
+    "@typescript-eslint/parser": "^5.22.0",
+    "async": "^3.2.3",
+    "babel-plugin-istanbul": "^6.1.1",
+    "chai": "^4.3.6",
+    "codecov": "^3.8.3",
+    "eslint": "^7.32.0",
+    "mitm": "^1.7.2",
+    "mocha": "^9.2.2",
+    "nyc": "^15.1.0",
+    "rimraf": "^3.0.2",
+    "semantic-release": "^19.0.3",
+    "sinon": "^11.1.2",
+    "typedoc": "^0.22.15",
+    "typescript": "^4.6.4"
   },
   "scripts": {
+    "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha test/integration/",
@@ -86,6 +100,7 @@
     "semantic-release": "semantic-release"
   },
   "babel": {
+    "sourceMaps": "both",
     "ignore": [
       "./src/**/*.d.ts"
     ],
@@ -94,16 +109,72 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 6
+            "node": 16
           }
         }
       ],
-      "@babel/preset-typescript"
+      [
+        "@babel/preset-typescript",
+        {
+          "allowDeclareFields": true
+        }
+      ]
+    ],
+    "plugins": [
+      [
+        "@babel/transform-typescript",
+        {
+          "allowDeclareFields": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-class-properties",
+        {
+          "loose": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-private-methods",
+        {
+          "loose": true
+        }
+      ],
+      [
+        "@babel/plugin-proposal-private-property-in-object",
+        {
+          "loose": true
+        }
+      ]
     ]
   },
   "commitlint": {
     "extends": [
       "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "body-max-line-length": [
+        1,
+        "always",
+        100
+      ],
+      "footer-max-line-length": [
+        1,
+        "always",
+        100
+      ],
+      "header-max-length": [
+        1,
+        "always",
+        100
+      ]
+    }
+  },
+  "mocha": {
+    "require": "test/setup.js",
+    "timeout": 5000,
+    "extension": [
+      "js",
+      "ts"
     ]
   },
   "nyc": {

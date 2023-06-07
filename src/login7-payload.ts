@@ -1,4 +1,5 @@
-const { sprintf } = require('sprintf-js');
+import { sprintf } from 'sprintf-js';
+import { versions } from './tds-versions';
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -63,15 +64,15 @@ const FEDAUTH_OPTIONS = {
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
-type Options = {
-  tdsVersion: number,
-  packetSize: number,
-  clientProgVer: number,
-  clientPid: number,
-  connectionId: number,
-  clientTimeZone: number,
-  clientLcid: number
-};
+interface Options {
+  tdsVersion: number;
+  packetSize: number;
+  clientProgVer: number;
+  clientPid: number;
+  connectionId: number;
+  clientTimeZone: number;
+  clientLcid: number;
+}
 
 /*
   s2.2.6.3
@@ -411,6 +412,17 @@ class Login7Payload {
       }
     }
 
+    if (this.tdsVersion >= versions['7_4']) {
+      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+      const buf = Buffer.alloc(6);
+      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+      buf.writeUInt32LE(1, 1);
+      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+      buffers.push(buf);
+    }
+
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 
     return Buffer.concat(buffers);
@@ -452,7 +464,7 @@ class Login7Payload {
     return password;
   }
 
-  toString(indent: string = '') {
+  toString(indent = '') {
     return indent + 'Login7 - ' +
       sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
               this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId

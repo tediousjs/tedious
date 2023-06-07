@@ -1,9 +1,9 @@
-const Parser = require('../../../src/token/stream-parser');
+const StreamParser = require('../../../src/token/stream-parser');
 const WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
 
 describe('Loginack Token Parser', () => {
-  it('should have correct info', () => {
+  it('should have correct info', async () => {
     const interfaceType = 1;
     const version = 0x72090002;
     const progName = 'prog';
@@ -30,13 +30,16 @@ describe('Loginack Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
     // console.log(buffer)
 
-    const parser = new Parser({ token() { } }, {}, { tdsVersion: '7_2' });
-    parser.write(data);
-    const token = parser.read();
+    const parser = StreamParser.parseTokens([data], { tdsVersion: '7_2' });
 
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
     assert.strictEqual(token.interface, 'SQL_TSQL');
     assert.strictEqual(token.tdsVersion, '7_2');
     assert.strictEqual(token.progName, progName);
     assert.deepEqual(token.progVersion, progVersion);
+
+    assert.isTrue((await parser.next()).done);
   });
 });

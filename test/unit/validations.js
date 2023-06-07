@@ -1,3 +1,4 @@
+const { Collation } = require('../../src/collation');
 const TYPE = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
 
@@ -32,8 +33,9 @@ describe('Validations', function() {
     value = TYPE.TinyInt.validate('15');
     assert.strictEqual(value, 15);
 
-    value = TYPE.TinyInt.validate(256);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.TinyInt.validate(256);
+    }, TypeError, 'Value must be between 0 and 255, inclusive.');
   });
 
   it('SmallInt', () => {
@@ -43,8 +45,9 @@ describe('Validations', function() {
     value = TYPE.SmallInt.validate(-32768);
     assert.strictEqual(value, -32768);
 
-    value = TYPE.SmallInt.validate(-32769);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.SmallInt.validate(-32769);
+    }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
   });
 
   it('Int', () => {
@@ -54,8 +57,9 @@ describe('Validations', function() {
     value = TYPE.Int.validate(2147483647);
     assert.strictEqual(value, 2147483647);
 
-    value = TYPE.Int.validate(2147483648);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Int.validate(2147483648);
+    }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
   });
 
   it('BigInt', () => {
@@ -71,11 +75,13 @@ describe('Validations', function() {
     value = TYPE.BigInt.validate(9007199254740991);
     assert.strictEqual(value, 9007199254740991);
 
-    value = TYPE.BigInt.validate(-9007199254740992);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.BigInt.validate(-9007199254740992);
+    }, TypeError, 'Value must be between -9007199254740991 and 9007199254740991, inclusive.  For smaller or bigger numbers, use VarChar type.');
 
-    value = TYPE.BigInt.validate(9007199254740992);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.BigInt.validate(9007199254740992);
+    }, TypeError, 'Value must be between -9007199254740991 and 9007199254740991, inclusive.  For smaller or bigger numbers, use VarChar type.');
   });
 
   it('SmallDateTime', () => {
@@ -89,8 +95,9 @@ describe('Validations', function() {
     value = TYPE.SmallDateTime.validate('2015-02-12T16:43:13.632Z');
     assert.strictEqual(+value, 1423759393632);
 
-    value = TYPE.SmallDateTime.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.SmallDateTime.validate('xxx');
+    }, TypeError, 'Invalid date.');
   });
 
   it('DateTime', () => {
@@ -104,8 +111,9 @@ describe('Validations', function() {
     value = TYPE.DateTime.validate('2015-02-12T16:43:13.632Z');
     assert.strictEqual(+value, 1423759393632);
 
-    value = TYPE.DateTime.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.DateTime.validate('xxx');
+    }, TypeError, 'Invalid date.');
   });
 
   it('DateTime2', () => {
@@ -119,8 +127,9 @@ describe('Validations', function() {
     value = TYPE.DateTime2.validate('2015-02-12T16:43:13.632Z');
     assert.strictEqual(+value, 1423759393632);
 
-    value = TYPE.DateTime2.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.DateTime2.validate('xxx');
+    }, TypeError, 'Invalid date.');
   });
 
   it('Time', () => {
@@ -134,8 +143,9 @@ describe('Validations', function() {
     value = TYPE.Time.validate('2015-02-12T16:43:13.632Z');
     assert.strictEqual(+value, 1423759393632);
 
-    value = TYPE.Time.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Time.validate('xxx');
+    }, TypeError, 'Invalid time.');
   });
 
   it('DateTimeOffset', () => {
@@ -149,8 +159,9 @@ describe('Validations', function() {
     value = TYPE.DateTimeOffset.validate('2015-02-12T16:43:13.632Z');
     assert.strictEqual(+value, 1423759393632);
 
-    value = TYPE.DateTimeOffset.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.DateTimeOffset.validate('xxx');
+    }, TypeError, 'Invalid date.');
   });
 
   it('Real', () => {
@@ -163,8 +174,9 @@ describe('Validations', function() {
     value = TYPE.Real.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-    value = TYPE.Real.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Real.validate('xxx');
+    }, TypeError, 'Invalid number.');
   });
 
   it('Float', () => {
@@ -177,8 +189,9 @@ describe('Validations', function() {
     value = TYPE.Float.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-    value = TYPE.Float.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Float.validate('xxx');
+    }, TypeError, 'Invalid number.');
   });
 
   it('Decimal', () => {
@@ -191,8 +204,9 @@ describe('Validations', function() {
     value = TYPE.Decimal.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-    value = TYPE.Decimal.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Decimal.validate('xxx');
+    }, TypeError, 'Invalid number.');
   });
 
   it('Numeric', () => {
@@ -205,8 +219,9 @@ describe('Validations', function() {
     value = TYPE.Numeric.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-    value = TYPE.Numeric.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Numeric.validate('xxx');
+    }, TypeError, 'Invalid number.');
   });
 
   it('Money', () => {
@@ -219,8 +234,9 @@ describe('Validations', function() {
     value = TYPE.Money.validate('1516.61556');
     assert.strictEqual(value, 1516.61556);
 
-    value = TYPE.Money.validate('xxx');
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Money.validate('xxx');
+    }, TypeError, 'Invalid number.');
   });
 
   it('SmallMoney', () => {
@@ -230,8 +246,9 @@ describe('Validations', function() {
     value = TYPE.SmallMoney.validate(214748.3647);
     assert.strictEqual(value, 214748.3647);
 
-    value = TYPE.SmallMoney.validate(214748.3648);
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.SmallMoney.validate(214748.3648);
+    }, TypeError, 'Value must be between -214748.3648 and 214748.3647');
   });
 
   it('Image', () => {
@@ -242,8 +259,9 @@ describe('Validations', function() {
     value = TYPE.Image.validate(buffer);
     assert.strictEqual(value, buffer);
 
-    value = TYPE.Image.validate({});
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Image.validate({});
+    }, TypeError, 'Invalid buffer.');
   });
 
   it('Binary', () => {
@@ -254,8 +272,9 @@ describe('Validations', function() {
     value = TYPE.Binary.validate(buffer);
     assert.strictEqual(value, buffer);
 
-    value = TYPE.Binary.validate({});
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Binary.validate({});
+    }, TypeError, 'Invalid buffer.');
   });
 
   it('VarBinary', () => {
@@ -266,36 +285,47 @@ describe('Validations', function() {
     value = TYPE.VarBinary.validate(buffer);
     assert.strictEqual(value, buffer);
 
-    value = TYPE.VarBinary.validate({});
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.VarBinary.validate({});
+    }, TypeError, 'Invalid buffer.');
   });
 
   it('Text', () => {
-    let value = TYPE.Text.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.Text.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.Text.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.Text.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.Text.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.Text.validate({ toString: null });
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Text.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.Text.validate({ toString: null }, collation);
+    }, TypeError, 'Invalid string.');
   });
 
   it('VarChar', () => {
-    let value = TYPE.VarChar.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.VarChar.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.VarChar.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.VarChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.VarChar.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.VarChar.validate({ toString: null });
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.VarChar.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.VarChar.validate({ toString: null }, collation);
+    }, TypeError, 'Invalid string.');
   });
 
   it('NVarChar', () => {
@@ -305,25 +335,32 @@ describe('Validations', function() {
     value = TYPE.NVarChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
-    value = TYPE.NVarChar.validate({ toString: null });
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.NVarChar.validate({ toString: null });
+    }, TypeError, 'Invalid string.');
   });
 
   it('Char', () => {
-    let value = TYPE.Char.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.Char.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.Char.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.Char.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.Char.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
-    value = TYPE.Char.validate({ toString: null });
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.Char.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.Char.validate({ toString: null }, collation);
+    }, TypeError, 'Invalid string.');
   });
 
   it('NChar', () => {
@@ -333,11 +370,13 @@ describe('Validations', function() {
     value = TYPE.NChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
-    value = TYPE.NChar.validate({ toString: null });
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.NChar.validate({ toString: null });
+    }, TypeError, 'Invalid string.');
   });
 
   it('TVP', () => {
@@ -348,7 +387,8 @@ describe('Validations', function() {
     value = TYPE.TVP.validate(table);
     assert.strictEqual(value, table);
 
-    value = TYPE.TVP.validate({});
-    assert.ok(value instanceof TypeError);
+    assert.throws(() => {
+      TYPE.TVP.validate({});
+    }, TypeError, 'Invalid table.');
   });
 });

@@ -1,5 +1,3 @@
-import { numberToInt64LE } from './bigint';
-
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -106,9 +104,26 @@ class WritableTrackingBuffer {
     this.position += length;
   }
 
+  writeBigInt64LE(value: bigint) {
+    const length = 8;
+    this.makeRoomFor(length);
+    this.buffer.writeBigInt64LE(value, this.position);
+    this.position += length;
+  }
+
   writeInt64LE(value: number) {
-    const buf = numberToInt64LE(value);
-    this.copyFrom(buf);
+    this.writeBigInt64LE(BigInt(value));
+  }
+
+  writeUInt64LE(value: number) {
+    this.writeBigUInt64LE(BigInt(value));
+  }
+
+  writeBigUInt64LE(value: bigint) {
+    const length = 8;
+    this.makeRoomFor(length);
+    this.buffer.writeBigUInt64LE(value, this.position);
+    this.position += length;
   }
 
   writeUInt32BE(value: number) {
@@ -122,11 +137,6 @@ class WritableTrackingBuffer {
     // inspired by https://github.com/dpw/node-buffer-more-ints
     this.writeInt32LE(value & -1);
     this.writeUInt8(Math.floor(value * SHIFT_RIGHT_32));
-  }
-
-  writeUInt64LE(value: number) {
-    this.writeInt32LE(value & -1);
-    this.writeUInt32LE(Math.floor(value * SHIFT_RIGHT_32));
   }
 
   writeInt8(value: number) {

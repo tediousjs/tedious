@@ -1,493 +1,518 @@
 const Mitm = require('mitm');
 const sinon = require('sinon');
-const dns = require('dns');
 const punycode = require('punycode');
 const assert = require('chai').assert;
+const { AbortController } = require('node-abort-controller');
+const AggregateError = require('es-aggregate-error');
 
-const ParallelConnectionStrategy = require('../../src/connector')
-  .ParallelConnectionStrategy;
-const SequentialConnectionStrategy = require('../../src/connector')
-  .SequentialConnectionStrategy;
-const Connector = require('../../src/connector').Connector;
+const {
+  lookupAllAddresses,
+  connectInParallel,
+  connectInSequence
+} = require('../../src/connector');
 
-function connectToIpTestImpl(hostIp, localIp, mitm, done) {
-  const connectionOptions = {
-    host: hostIp,
-    port: 12345,
-    localAddress: localIp
-  };
-  const connector = new Connector(connectionOptions, true);
+describe('lookupAllAddresses', function() {
+  it('test IDN Server name', async function() {
+    const lookup = sinon.spy(function lookup(hostname, options, callback) {
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
+    });
 
-  let expectedSocket;
+    const server = '本地主机.ad';
+    const controller = new AbortController();
 
-  mitm.once('connect', function(socket, options) {
-    expectedSocket = socket;
-
-    assert.strictEqual(options, connectionOptions);
-  });
-
-  connector.execute(function(err, socket) {
-    if (err) {
-      return done(err);
+    try {
+      await lookupAllAddresses(server, lookup, controller.signal);
+    } catch {
+      // Ignore
     }
 
-    assert.strictEqual(socket, expectedSocket);
-
-    done();
-  });
-}
-
-describe('connector tests', function() {
-  describe('Connector with MultiSubnetFailover', function() {
-    let mitm;
-
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
-    });
-
-    afterEach(function() {
-      mitm.disable();
-    });
-
-    it('should connects directly if given an IP v4 address', function(done) {
-      connectToIpTestImpl('127.0.0.1', '192.168.0.1', mitm, done);
-    });
-
-    it('should connects directly if given an IP v6 address', function(done) {
-      connectToIpTestImpl('::1', '2002:20:0:0:0:0:1:2', mitm, done);
-    });
-
-    it('should uses a parallel connection strategy', function(done) {
-      const connector = new Connector({ host: 'localhost', port: 12345 }, true);
-
-      const spy = sinon.spy(ParallelConnectionStrategy.prototype, 'connect');
-
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(spy.callCount, 1);
-
-        done();
-      });
-    });
+    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
   });
 
-  describe('Connector without MultiSubnetFailover', function() {
-    let mitm;
-
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
+  it('test ASCII Server name', async function() {
+    const lookup = sinon.spy(function lookup(hostname, options, callback) {
+      callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
 
-    afterEach(function() {
-      mitm.disable();
-    });
+    const server = 'localhost';
+    const controller = new AbortController();
 
-    afterEach(function() {
-      sinon.restore();
-    });
+    try {
+      await lookupAllAddresses(server, lookup, controller.signal);
+    } catch {
+      // Ignore
+    }
 
-    it('should connect directly if given an IP address', function(done) {
-      const connectionOptions = {
-        host: '127.0.0.1',
-        port: 12345,
-        localAddress: '192.168.0.1'
+    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
+  });
+});
+
+describe('connectInSequence', function() {
+  let mitm;
+
+  beforeEach(function() {
+    mitm = new Mitm();
+    mitm.enable();
+  });
+
+  afterEach(function() {
+    mitm.disable();
+  });
+
+  it('tries to connect to all addresses in sequence', async function() {
+    const controller = new AbortController();
+
+    const attemptedConnections = [];
+    mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
+
+      const expectedConnectionCount = attemptedConnections.length;
+      const handler = () => {
+        socket.removeListener('connect', handler);
+        socket.removeListener('error', handler);
+
+        assert.strictEqual(attemptedConnections.length, expectedConnectionCount);
       };
-      const connector = new Connector(connectionOptions, false);
 
-      let expectedSocket;
-      mitm.once('connect', function(socket, options) {
+      socket.on('connect', handler);
+      socket.on('error', handler);
+
+      if (options.host !== '127.0.0.4') {
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
+      }
+    });
+
+    await connectInSequence(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
+
+    assert.strictEqual(attemptedConnections.length, 3);
+
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+
+    assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
+    assert.strictEqual(attemptedConnections[1].port, 12345);
+    assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
+
+    assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+    assert.strictEqual(attemptedConnections[2].port, 12345);
+    assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
+  });
+
+  it('passes the first succesfully connected socket to the callback', async function() {
+    const controller = new AbortController();
+
+    let expectedSocket;
+    mitm.on('connect', function(socket, opts) {
+      if (opts.host !== '127.0.0.4') {
+        socket.destroy(new Error());
+      } else {
         expectedSocket = socket;
-
-        assert.strictEqual(options, connectionOptions);
-      });
-
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(socket, expectedSocket);
-
-        done();
-      });
+      }
     });
 
-    it('should uses a sequential connection strategy', function(done) {
-      const connector = new Connector({ host: 'localhost', port: 12345 }, false);
+    const socket = await connectInSequence(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
 
-      const spy = sinon.spy(
-        SequentialConnectionStrategy.prototype,
-        'connect'
-      );
-
-      connector.execute(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(spy.callCount, 1);
-
-        done();
-      });
-    });
+    assert.strictEqual(expectedSocket, socket);
   });
 
-  describe('SequentialConnectionStrategy', function() {
-    let mitm;
+  it('only attempts new connections until the first successful connection', async function() {
+    const controller = new AbortController();
 
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
+    const attemptedConnections = [];
+
+    mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
     });
 
-    afterEach(function() {
-      mitm.disable();
-    });
+    await connectInSequence(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
 
-    it('should tries to connect to all addresses in sequence', function(done) {
-      const strategy = new SequentialConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
+    assert.strictEqual(attemptedConnections.length, 1);
 
-      const attemptedConnections = [];
-      mitm.on('connect', function(socket, options) {
-        attemptedConnections.push(options);
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
+  });
 
-        const expectedConnectionCount = attemptedConnections.length;
-        const handler = () => {
-          socket.removeListener('connect', handler);
-          socket.removeListener('error', handler);
+  it('fails if all sequential connections fail', async function() {
+    const controller = new AbortController();
 
-          assert.strictEqual(attemptedConnections.length, expectedConnectionCount);
-        };
-
-        socket.on('connect', handler);
-        socket.on('error', handler);
-
-        if (options.host !== '127.0.0.4') {
-          process.nextTick(() => {
-            socket.emit('error', new Error());
-          });
-        }
+    let i = 0;
+    mitm.on('connect', function(socket) {
+      process.nextTick(() => {
+        socket.emit('error', new Error(`failed connection #${i += 1}`));
       });
+    });
 
-      strategy.connect(function(err) {
-        if (err) {
-          return done(err);
-        }
+    let error;
+    try {
+      await connectInSequence(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      error = err;
+    }
 
+    assert.instanceOf(error, AggregateError);
+    assert.equal(error.message, 'Could not connect (sequence)');
+    assert.lengthOf(error.errors, 3);
+
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
+
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
+
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
+  });
+
+  it('destroys all sockets except for the first succesfully connected socket', async function() {
+    const controller = new AbortController();
+    const attemptedSockets = [];
+
+    mitm.on('connect', function(socket, options) {
+      attemptedSockets.push(socket);
+
+      if (options.host !== '127.0.0.4') {
+        process.nextTick(() => {
+          socket.emit('error', new Error());
+        });
+      }
+    });
+
+    await connectInSequence(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
+
+    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(!attemptedSockets[2].destroyed);
+  });
+
+  it('will immediately abort when called with an aborted signal', async function() {
+    const controller = new AbortController();
+    controller.abort();
+
+    mitm.on('connect', () => {
+      assert.fail('no connections expected');
+    });
+
+    let error;
+    try {
+      await connectInSequence(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
+  });
+
+  it('can be aborted while trying to connect', async function() {
+    const controller = new AbortController();
+
+    const attemptedSockets = [];
+    mitm.on('connect', function(socket) {
+      attemptedSockets.push(socket);
+
+      process.nextTick(() => {
+        controller.abort();
+      });
+    });
+
+    let error;
+    try {
+      await connectInSequence(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
+
+    assert.lengthOf(attemptedSockets, 1);
+    assert.isOk(attemptedSockets[0].destroyed);
+  });
+});
+
+describe('connectInParallel', function() {
+  let mitm;
+
+  beforeEach(function() {
+    mitm = new Mitm();
+    mitm.enable();
+  });
+
+  afterEach(function() {
+    mitm.disable();
+  });
+
+  it('tries to connect to all addresses in parallel', async function() {
+    const controller = new AbortController();
+    const attemptedConnections = [];
+
+    mitm.on('connect', function(socket, options) {
+      attemptedConnections.push(options);
+
+      socket.once('connect', function() {
         assert.strictEqual(attemptedConnections.length, 3);
-
-        assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-        assert.strictEqual(attemptedConnections[0].port, 12345);
-        assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
-
-        assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
-        assert.strictEqual(attemptedConnections[1].port, 12345);
-        assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
-
-        assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
-        assert.strictEqual(attemptedConnections[2].port, 12345);
-        assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
-
-        done();
       });
     });
 
-    it('should passes the first succesfully connected socket to the callback', function(done) {
-      const strategy = new SequentialConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
+    await connectInParallel(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
 
-      let expectedSocket;
-      mitm.on('connect', function(socket, opts) {
-        if (opts.host !== '127.0.0.4') {
-          socket.destroy(new Error());
-        } else {
-          expectedSocket = socket;
-        }
-      });
+    assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
+    assert.strictEqual(attemptedConnections[0].port, 12345);
+    assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
 
-      strategy.connect(function(err, socket) {
-        assert.strictEqual(expectedSocket, socket);
+    assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
+    assert.strictEqual(attemptedConnections[1].port, 12345);
+    assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
 
-        done();
-      });
-    });
+    assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
+    assert.strictEqual(attemptedConnections[2].port, 12345);
+    assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
+  });
 
-    it('should only attempts new connections until the first successful connection', function(done) {
-      const strategy = new SequentialConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
+  it('fails if all parallel connections fail', async function() {
+    const controller = new AbortController();
 
-      const attemptedConnections = [];
-
-      mitm.on('connect', function(socket, options) {
-        attemptedConnections.push(options);
-      });
-
-      strategy.connect(function(err) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(attemptedConnections.length, 1);
-
-        assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-        assert.strictEqual(attemptedConnections[0].port, 12345);
-        assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
-
-        done();
+    let i = 0;
+    mitm.on('connect', function(socket) {
+      process.nextTick(() => {
+        socket.emit('error', new Error(`failed connection #${i += 1}`));
       });
     });
 
-    it('should fails if all sequential connections fail', function(done) {
-      const strategy = new SequentialConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
+    let error;
+    try {
+      await connectInParallel(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
       );
+    } catch (err) {
+      error = err;
+    }
 
-      mitm.on('connect', function(socket) {
+    assert.instanceOf(error, AggregateError);
+    assert.equal(error.message, 'Could not connect (parallel)');
+    assert.lengthOf(error.errors, 3);
+
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
+
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
+
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
+  });
+
+  it('passes the first succesfully connected socket to the callback', async function() {
+    const controller = new AbortController();
+
+    let expectedSocket;
+    mitm.on('connect', function(socket, opts) {
+      if (opts.host !== '127.0.0.4') {
         process.nextTick(() => {
           socket.emit('error', new Error());
         });
-      });
-
-      strategy.connect(function(err, socket) {
-        assert.equal('Could not connect (sequence)', err.message);
-
-        done();
-      });
+      } else {
+        expectedSocket = socket;
+      }
     });
 
-    it('should destroys all sockets except for the first succesfully connected socket', function(done) {
-      const strategy = new SequentialConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
-
-      const attemptedSockets = [];
-
-      mitm.on('connect', function(socket, options) {
-        attemptedSockets.push(socket);
-
-        if (options.host !== '127.0.0.4') {
-          process.nextTick(() => {
-            socket.emit('error', new Error());
-          });
-        }
-      });
-
-      strategy.connect(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.isOk(attemptedSockets[0].destroyed);
-        assert.isOk(attemptedSockets[1].destroyed);
-        assert.isOk(!attemptedSockets[2].destroyed);
-
-        done();
-      });
-    });
+    const socket = await connectInParallel(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
+    assert.strictEqual(expectedSocket, socket);
   });
 
-  describe('ParallelConnectionStrategy', function() {
-    let mitm;
+  it('destroys all sockets except for the first succesfully connected socket', async function() {
+    const controller = new AbortController();
+    const attemptedSockets = [];
 
-    beforeEach(function() {
-      mitm = new Mitm();
-      mitm.enable();
+    mitm.on('connect', function(socket) {
+      attemptedSockets.push(socket);
     });
 
-    afterEach(function() {
-      mitm.disable();
-    });
+    await connectInParallel(
+      { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+      function lookup(hostname, options, callback) {
+        callback(null, [
+          { address: '127.0.0.2', family: 4 },
+          { address: '2002:20:0:0:0:0:1:3', family: 6 },
+          { address: '127.0.0.4', family: 4 }
+        ]);
+      },
+      controller.signal,
+    );
 
-    it('should tries to connect to all addresses in parallel', function(done) {
-      const strategy = new ParallelConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
-
-      const attemptedConnections = [];
-
-      mitm.on('connect', function(socket, options) {
-        attemptedConnections.push(options);
-
-        socket.once('connect', function() {
-          assert.strictEqual(attemptedConnections.length, 3);
-        });
-      });
-
-      strategy.connect(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(attemptedConnections[0].host, '127.0.0.2');
-        assert.strictEqual(attemptedConnections[0].port, 12345);
-        assert.strictEqual(attemptedConnections[0].localAddress, '192.168.0.1');
-
-        assert.strictEqual(attemptedConnections[1].host, '2002:20:0:0:0:0:1:3');
-        assert.strictEqual(attemptedConnections[1].port, 12345);
-        assert.strictEqual(attemptedConnections[1].localAddress, '192.168.0.1');
-
-        assert.strictEqual(attemptedConnections[2].host, '127.0.0.4');
-        assert.strictEqual(attemptedConnections[2].port, 12345);
-        assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
-
-        done();
-      });
-    });
-
-    it('should fails if all parallel connections fail', function(done) {
-      const strategy = new ParallelConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
-
-      mitm.on('connect', function(socket) {
-        process.nextTick(() => {
-          socket.emit('error', new Error());
-        });
-      });
-
-      strategy.connect(function(err, socket) {
-        assert.equal('Could not connect (parallel)', err.message);
-
-        done();
-      });
-    });
-
-    it('should passes the first succesfully connected socket to the callback', function(done) {
-      const strategy = new ParallelConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
-
-      let expectedSocket;
-      mitm.on('connect', function(socket, opts) {
-        if (opts.host !== '127.0.0.4') {
-          process.nextTick(() => {
-            socket.emit('error', new Error());
-          });
-        } else {
-          expectedSocket = socket;
-        }
-      });
-
-      strategy.connect(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.strictEqual(expectedSocket, socket);
-
-        done();
-      });
-    });
-
-    it('should destroys all sockets except for the first succesfully connected socket', function(done) {
-      const strategy = new ParallelConnectionStrategy(
-        [
-          { address: '127.0.0.2' },
-          { address: '2002:20:0:0:0:0:1:3' },
-          { address: '127.0.0.4' }
-        ],
-        { port: 12345, localAddress: '192.168.0.1' }
-      );
-
-      const attemptedSockets = [];
-
-      mitm.on('connect', function(socket) {
-        attemptedSockets.push(socket);
-      });
-
-      strategy.connect(function(err, socket) {
-        if (err) {
-          return done(err);
-        }
-
-        assert.isOk(!attemptedSockets[0].destroyed);
-        assert.isOk(attemptedSockets[1].destroyed);
-        assert.isOk(attemptedSockets[2].destroyed);
-
-        done();
-      });
-    });
+    assert.isOk(!attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(attemptedSockets[2].destroyed);
   });
 
-  describe('Test unicode SQL Server name', function() {
-    let spy;
+  it('will immediately abort when called with an aborted signal', async function() {
+    const controller = new AbortController();
+    controller.abort();
 
-    beforeEach(function() {
-      // Spy the dns.lookup so we can verify if it receives punycode value for IDN Server names
-      spy = sinon.spy(dns, 'lookup');
+    mitm.on('connect', () => {
+      assert.fail('no connections expected');
     });
 
-    afterEach(function() {
-      sinon.restore();
+    let error;
+    try {
+      await connectInParallel(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
+  });
+
+  it('can be aborted while trying to connect', async function() {
+    const controller = new AbortController();
+
+    const attemptedSockets = [];
+    mitm.on('connect', function(socket) {
+      attemptedSockets.push(socket);
+
+      process.nextTick(() => {
+        controller.abort();
+      });
     });
 
-    it('should test IDN Server name', function() {
-      const server = '本地主机.ad';
-      const connector = new Connector({ host: server, port: 12345 }, true);
+    let error;
+    try {
+      await connectInParallel(
+        { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
+        function lookup(hostname, options, callback) {
+          callback(null, [
+            { address: '127.0.0.2', family: 4 },
+            { address: '2002:20:0:0:0:0:1:3', family: 6 },
+            { address: '127.0.0.4', family: 4 }
+          ]);
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      error = err;
+    }
 
-      connector.execute(() => { });
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.name, 'AbortError');
 
-      assert.isOk(spy.called, 'Failed to call dns.lookup on hostname');
-      assert.isOk(spy.calledWithMatch(punycode.toASCII(server)), 'Unexpcted hostname passed to dns.lookup');
-    });
-
-    it('should test ASCII Server name', function() {
-      const server = 'localhost';
-      const connector = new Connector({ host: server, port: 12345 }, true);
-
-      connector.execute(() => { });
-
-      assert.isOk(spy.called, 'Failed to call dns.lookup on hostname');
-      assert.isOk(spy.calledWithMatch(server), 'Unexpcted hostname passed to dns.lookup');
-    });
+    assert.lengthOf(attemptedSockets, 3);
+    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isOk(attemptedSockets[2].destroyed);
   });
 });

@@ -1,8 +1,11 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const TYPES = require('../../src/data-type').typeByName;
 const fs = require('fs');
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
 
 function getConfig() {
   const config = JSON.parse(
@@ -22,50 +25,91 @@ function getConfig() {
   return config;
 }
 
-function execSqlBatch(connection, sql, doneCallback) {
-  const request = new Request(sql, function(err) {
-    if (err) {
-      console.log(err);
-      assert.ok(false);
-    }
+/**
+ * @typedef {typeof import('../../src/data-type').typeByName} TYPES
+ */
 
-    doneCallback();
+describe('RPC test', function() {
+  /** @type {Connection} */
+  let connection;
+
+  beforeEach(function(done) {
+    const config = getConfig();
+    connection = new Connection(config);
+    connection.connect(done);
+
+    connection.on('infoMessage', (info) => {
+      // console.log("#{info.number} : #{info.message}")
+    });
+
+    connection.on('errorMessage', (error) => {
+      console.log(`${error.number} : ${error.message}`);
+    });
+
+    connection.on('debug', (text) => {
+      // console.log(text)
+    });
   });
 
-  connection.execSqlBatch(request);
-}
-
-function testProc(done, type, typeAsString, value) {
-  const config = getConfig();
-
-  const request = new Request('#test_proc', function(err) {
-    assert.ifError(err);
-
-    connection.close();
-  });
-
-  request.addParameter('param', type, value);
-
-  request.on('doneProc', function(rowCount, more, returnStatus) {
-    assert.ok(!more);
-    assert.strictEqual(returnStatus, 0);
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
-  });
-
-  request.on('row', function(columns) {
-    if (value instanceof Date) {
-      assert.strictEqual(columns[0].value.getTime(), value.getTime());
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
     } else {
-      assert.strictEqual(columns[0].value, value);
+      done();
     }
   });
 
-  let connection = new Connection(config);
+  /**
+   * @param {Connection} connection
+   * @param {string} sql
+   * @param {() => void} done
+   */
+  function execSqlBatch(connection, sql, done) {
+    const request = new Request(sql, function(err) {
+      if (err) {
+        console.log(err);
+        assert.ok(false);
+      }
 
-  connection.on('connect', function(err) {
+      done();
+    });
+
+    connection.execSqlBatch(request);
+  }
+
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
+  function testProc(done, type, typeAsString, value) {
+    const request = new Request('#test_proc', function(err) {
+      assert.ifError(err);
+
+      done();
+    });
+
+    request.addParameter('param', type, value);
+
+    request.on('doneProc', function(rowCount, more, returnStatus) {
+      assert.ok(!more);
+      assert.strictEqual(returnStatus, 0);
+    });
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.ok(more);
+    });
+
+    request.on('row', function(columns) {
+      if (value instanceof Date) {
+        assert.strictEqual(columns[0].value.getTime(), value.getTime());
+      } else {
+        assert.strictEqual(columns[0].value, value);
+      }
+    });
+
     execSqlBatch(
       connection,
       `\
@@ -78,63 +122,43 @@ select @param\
         connection.callProcedure(request);
       }
     );
-  });
+  }
 
-  connection.on('end', function(info) {
-    done();
-  });
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
+  function testProcOutput(done, type, typeAsString, value) {
+    const request = new Request('#test_proc', function(err) {
+      assert.ifError(err);
 
-  connection.on(
-    'infoMessage',
-    function(info) { }
-    // console.log("#{info.number} : #{info.message}")
-  );
+      done();
+    });
 
-  connection.on('errorMessage', function(error) {
-    console.log(`${error.number} : ${error.message}`);
-  });
+    request.addParameter('paramIn', type, value);
+    request.addOutputParameter('paramOut', type);
 
-  connection.on(
-    'debug',
-    function(text) { }
-    // console.log(text)
-  );
-}
+    request.on('doneProc', function(rowCount, more, returnStatus) {
+      assert.ok(!more);
+      assert.strictEqual(returnStatus, 0);
+    });
 
-function testProcOutput(done, type, typeAsString, value) {
-  const config = getConfig();
+    request.on('doneInProc', function(rowCount, more) {
+      assert.ok(more);
+    });
 
-  const request = new Request('#test_proc', function(err) {
-    assert.ifError(err);
+    request.on('returnValue', function(name, returnValue, metadata) {
+      assert.strictEqual(name, 'paramOut');
+      if (value instanceof Date && returnValue instanceof Date) {
+        assert.strictEqual(returnValue.getTime(), value.getTime());
+      } else {
+        assert.strictEqual(returnValue, value);
+      }
+      assert.ok(metadata);
+    });
 
-    connection.close();
-  });
-
-  request.addParameter('paramIn', type, value);
-  request.addOutputParameter('paramOut', type);
-
-  request.on('doneProc', function(rowCount, more, returnStatus) {
-    assert.ok(!more);
-    assert.strictEqual(returnStatus, 0);
-  });
-
-  request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
-  });
-
-  request.on('returnValue', function(name, returnValue, metadata) {
-    assert.strictEqual(name, 'paramOut');
-    if (value instanceof Date) {
-      assert.strictEqual(returnValue.getTime(), value.getTime());
-    } else {
-      assert.strictEqual(returnValue, value);
-    }
-    assert.ok(metadata);
-  });
-
-  let connection = new Connection(config);
-
-  connection.on('connect', function(err) {
     execSqlBatch(
       connection,
       `\
@@ -148,27 +172,8 @@ set @paramOut = @paramIn\
         connection.callProcedure(request);
       }
     );
-  });
+  }
 
-  connection.on('end', function(info) {
-    done();
-  });
-
-  connection.on('infoMessage', function(info) {
-    // console.log("#{info.number} : #{info.message}")
-  });
-
-  connection.on('errorMessage', function(error) {
-    console.log(`${error.number} : ${error.message}`);
-  });
-
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
-}
-
-
-describe('RPC test', function() {
   it('should exec proc varchar', function(done) {
     testProc(done, TYPES.VarChar, 'varchar(10)', 'test');
   });
@@ -199,6 +204,18 @@ describe('RPC test', function() {
 
   it('should exec proc small int null', function(done) {
     testProc(done, TYPES.SmallInt, 'smallint', null);
+  });
+
+  it('should exec proc bigint', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', '3');
+  });
+
+  it('should exec proc negative bigint', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', '-3');
+  });
+
+  it('should exec proc bigint null', function(done) {
+    testProc(done, TYPES.BigInt, 'bigint', null);
   });
 
   it('should exec proc int', function(done) {
@@ -324,11 +341,11 @@ describe('RPC test', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.callProcedure(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -368,7 +385,7 @@ describe('RPC test', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       execSqlBatch(
         connection,
         '\
@@ -382,7 +399,7 @@ describe('RPC test', function() {
       );
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 

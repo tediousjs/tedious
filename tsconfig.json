@@ -2,16 +2,28 @@
   "compilerOptions": {
     "target": "esnext",
     "moduleResolution": "node",
-    "allowJs": false,
+    "allowJs": true,
     "noEmit": true,
     "strict": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [ "esnext" ]
+    "lib": [ "esnext" ],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "exactOptionalPropertyTypes": true
   },
 
   "include": [
-      "src/**/*.ts"
-  ]
+    "types/*.d.ts",
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "test/**/*.js",
+  ],
+
+  "typedocOptions": {
+    "name": "Tedious",
+    "out": "./docs",
+    "entryPoints": ["./src/tedious.ts"]
+  }
 }

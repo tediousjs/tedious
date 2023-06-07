@@ -1,17 +1,18 @@
 const NTLMPayload = require('../../src/ntlm-payload');
 const assert = require('chai').assert;
 
+const challenge = {
+  domain: 'domain',
+  userName: 'username',
+  password: 'password',
+  ntlmpacket: {
+    target: Buffer.from([170, 170, 170, 170]), // aa aa aa aa
+    nonce: Buffer.from([187, 187, 187, 187, 187, 187, 187, 187])
+  }
+};
+
 describe('ntlm payload test', function() {
   it('should respond to challenge', function() {
-    const challenge = {
-      domain: 'domain',
-      userName: 'username',
-      password: 'password',
-      ntlmpacket: {
-        target: Buffer.from([170, 170, 170, 170]), // aa aa aa aa
-        nonce: Buffer.from([187, 187, 187, 187, 187, 187, 187, 187])
-      }
-    };
 
     const response = new NTLMPayload(challenge);
 

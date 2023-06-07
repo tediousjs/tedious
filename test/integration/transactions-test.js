@@ -180,7 +180,7 @@ GO`,
   }
 
   run(actions) {
-    this.connection.on('connect', (err) => {
+    this.connection.connect((err) => {
       async.series(actions);
     });
   }
@@ -280,7 +280,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       let req = new Request('create table #temp (value varchar(50))', function(
         err
       ) {
@@ -297,17 +297,11 @@ describe('Transactions Test', function() {
               assert.ok(true);
             });
 
-            req = new Request(
-              "insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')",
-              function(err) {
-                assert.strictEqual(
-                  err.message,
-                  'String or binary data would be truncated.'
-                );
+            req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
+              assert.match(err.message, /^String or binary data would be truncated/);
 
-                connection.close();
-              }
-            );
+              connection.close();
+            });
             connection.execSqlBatch(req);
           });
         });
@@ -323,7 +317,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.transaction(function(err, outerDone) {
         assert.ifError(err);
 
@@ -345,7 +339,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       let request = new Request('create table #temp (id int)', function(err) {
         assert.ifError(err);
 
@@ -403,7 +397,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       let request = new Request('create table #temp (id int)', function(err) {
         assert.ifError(err);
 
@@ -456,7 +450,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.transaction(function(err, outerDone) {
         assert.ifError(err);
 
@@ -496,7 +490,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.transaction(function(err, outerDone) {
         assert.ifError(err);
 
@@ -524,7 +518,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.transaction(function(err, outerDone) {
         assert.ifError(err);
 
@@ -593,7 +587,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.transaction(function(err) {
         assert.ifError(err);
 
@@ -613,7 +607,7 @@ describe('Transactions Test', function() {
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.beginTransaction(function(err) {
         assert.ifError(err);
 
