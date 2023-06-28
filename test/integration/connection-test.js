@@ -539,20 +539,46 @@ describe('Encrypt Test', function() {
         return callback(err);
       }
 
-      let supportsTds8 = false;
-
-      const request = new Request("SELECT host_platform, SERVERPROPERTY('ProductMajorVersion') FROM sys.dm_os_host_info", (err) => {
-        connection.close();
-
+      /**
+       * @type {string | undefined}
+       */
+      let productMajorVersion;
+      const request = new Request("SELECT SERVERPROPERTY('ProductMajorVersion')", (err) => {
         if (err) {
+          connection.close();
           return callback(err);
         }
 
-        callback(null, supportsTds8);
+        if (!productMajorVersion || productMajorVersion < '2022') {
+          connection.close();
+          return callback(null, false);
+        }
+
+        if (productMajorVersion > '2022') {
+          connection.close();
+          return callback(null, true);
+        }
+
+        let supportsTds8 = false;
+        const request = new Request("SELECT host_platform FROM sys.dm_os_host_info", (err) => {
+          connection.close();
+
+          if (err) {
+            return callback(err);
+          }
+
+          callback(null, supportsTds8);
+        });
+
+        request.on('row', (row) => {
+          supportsTds8 = row[0].value !== 'Linux';
+        });
+
+        connection.execSql(request);
       });
 
       request.on('row', (row) => {
-        supportsTds8 = row[0].value !== 'Linux' && row[1].value >= '2022';
+        productMajorVersion = row[0].value;
       });
 
       connection.execSql(request);
