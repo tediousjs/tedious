@@ -15,7 +15,7 @@ services:
       - mssql
 
   mssql:
-    build: "./mssql"
+    image: mcr.microsoft.com/mssql/server:2022-latest
 
     restart: unless-stopped
 
