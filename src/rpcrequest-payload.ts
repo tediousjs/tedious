@@ -68,7 +68,12 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
   * generateParameterData(parameter: Parameter) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
-    buffer.writeBVarchar('@' + parameter.name);
+
+    if (parameter.name) {
+      buffer.writeBVarchar('@' + parameter.name);
+    } else {
+      buffer.writeBVarchar('');
+    }
 
     let statusFlags = 0;
     if (parameter.output) {
