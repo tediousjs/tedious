@@ -345,7 +345,7 @@ export interface InternalConnectionOptions {
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
-  connector: undefined | (() => Promise<Socket>);
+  connector: undefined | (() => Promise<net.Socket>);
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   cryptoCredentialsDetails: SecureContextOptions;
@@ -543,7 +543,7 @@ export interface ConnectionOptions {
    *
    * (default: `undefined`)
    */
-  connector?: () => Promise<Socket>;
+  connector?: () => Promise<net.Socket>;
 
   /**
    * The number of milliseconds before the attempt to connect is considered failed
@@ -2032,7 +2032,7 @@ class Connection extends EventEmitter {
     });
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<Socket>) {
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
