@@ -560,7 +560,7 @@ describe('Encrypt Test', function() {
         }
 
         let supportsTds8 = false;
-        const request = new Request("SELECT host_platform FROM sys.dm_os_host_info", (err) => {
+        const request = new Request('SELECT host_platform FROM sys.dm_os_host_info', (err) => {
           connection.close();
 
           if (err) {
