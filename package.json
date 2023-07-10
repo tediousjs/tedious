@@ -40,7 +40,7 @@
     "tag": "next"
   },
   "dependencies": {
-    "@azure/identity": "^3.2.3",
+    "@azure/identity": "^2.0.4",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.2.0",
     "bl": "^5.0.0",
