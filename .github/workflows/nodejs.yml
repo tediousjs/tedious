@@ -39,26 +39,6 @@ jobs:
     - run: npm ci
     - run: npm run lint
 
-    - name: Prepare Commitlint (pull_request)
-      if: ${{ github.event_name == 'pull_request' }}
-      run: |
-        echo "TRAVIS_PULL_REQUEST_SLUG=${{ github.event.pull_request.head.repo.full_name }}" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=HEAD~..HEAD" >> $GITHUB_ENV
-
-    - name: Prepare Commitlint (push)
-      if: ${{ github.event_name == 'push' }}
-      run:  |
-        echo "TRAVIS_PULL_REQUEST_SLUG=" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=${{ github.event.before }}..${{ github.event.after }}" >> $GITHUB_ENV
-
-    - run: npx commitlint-travis
-      env:
-        TRAVIS: "true"
-        CI: "true"
-        TRAVIS_EVENT_TYPE: "${{ github.event_name }}"
-        TRAVIS_REPO_SLUG: "${{ github.repository }}"
-        TRAVIS_COMMIT: "${{ github.sha }}"
-
   test:
     name: SQL Server Linux / Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
