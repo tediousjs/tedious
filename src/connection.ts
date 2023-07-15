@@ -865,6 +865,7 @@ const CLEANUP_TYPE = {
 interface RoutingData {
   server: string;
   port: number;
+  instanceName: string | undefined;
 }
 
 /**
@@ -1265,7 +1266,7 @@ class Connection extends EventEmitter {
         maxRetriesOnTransientErrors: 3,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
-        port: DEFAULT_PORT,
+        port: undefined,
         readOnlyIntent: false,
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
@@ -1284,10 +1285,6 @@ class Connection extends EventEmitter {
     };
 
     if (config.options) {
-      if (config.options.port && config.options.instanceName) {
-        throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
-      }
-
       if (config.options.abortTransactionOnError !== undefined) {
         if (typeof config.options.abortTransactionOnError !== 'boolean' && config.options.abortTransactionOnError !== null) {
           throw new TypeError('The "config.options.abortTransactionOnError" property must be of type string or null.');
@@ -1522,7 +1519,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.instanceName = config.options.instanceName;
-        this.config.options.port = undefined;
       }
 
       if (config.options.isolationLevel !== undefined) {
@@ -1573,7 +1569,8 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
-        this.config.options.instanceName = undefined;
+      } else if (!this.config.options.instanceName) {
+        this.config.options.port = DEFAULT_PORT;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -1903,15 +1900,23 @@ class Connection extends EventEmitter {
   initialiseConnection() {
     const signal = this.createConnectTimer();
 
+    // If user provided both port and an instance name,
+    // the code should always use the port and skip the instance lookup
     if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
     } else {
+      // The instance lookup communicates with the server and gets all the
+      // available instance name and their corresponding ports.
+      // Then based on the provided instance name and the result ports,
+      // logic will try to find a match and connection to the instance by its port.
       return instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
       }).then((port) => {
+        // If we get a port from the instance lookup process, the logic will try to connect
+        // using this port.
         process.nextTick(() => {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
         });
@@ -2255,7 +2260,8 @@ class Connection extends EventEmitter {
 
     const payload = new PreloginPayload({
       encrypt: this.config.options.encrypt,
-      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 },
+      instanceName: this.routingData?.instanceName ?? this.config.options.instanceName
     });
 
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
@@ -3169,6 +3175,11 @@ Connection.prototype.STATE = {
         }
 
         const preloginPayload = new PreloginPayload(messageBuffer);
+        if (preloginPayload.instanceName !== undefined && preloginPayload.instanceName !== '\x00') {
+          this.emit('connect', new ConnectionError('Server instanceName does not match'));
+          return this.close();
+        }
+
         this.debug.payload(function() {
           return preloginPayload.toString('  ');
         });

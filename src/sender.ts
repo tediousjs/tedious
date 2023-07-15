@@ -90,6 +90,7 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
       });
     });
   }
-
+  // This sends one or multiple IP addresses in parallel (for clustered SQL server setups)
+  // and it returns the first response it gets back from the SQL server browser agent
   return await sendInParallel(addresses, port, request, signal);
 }

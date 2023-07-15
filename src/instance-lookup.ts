@@ -57,6 +57,8 @@ export async function instanceLookup(options: { server: string, instanceName: st
     try {
       response = await withTimeout(timeout, async (signal) => {
         const request = Buffer.from([0x02]);
+        // This will send message to request a response that containing
+        // all instances available on the host
         return await sendMessage(options.server, port, lookup, signal, request);
       }, signal);
     } catch (err) {
@@ -74,6 +76,9 @@ export async function instanceLookup(options: { server: string, instanceName: st
   }
 
   const message = response.toString('ascii', MYSTERY_HEADER_LENGTH);
+  // This function will try to parse out all the port information from the response
+  // Then compare the instance name while parsing the response, and if there is an
+  // instance name match, then return that port.
   const foundPort = parseBrowserResponse(message, instanceName);
 
   if (!foundPort) {

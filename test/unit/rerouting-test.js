@@ -256,6 +256,9 @@ describe('Connecting to a server that sends a re-routing information', function(
             chunks.push(data);
           }
 
+          const preloginPayload = new PreloginPayload(Buffer.concat(chunks));
+          assert.strictEqual(preloginPayload.instanceName, 'instanceNameA\u0000');
+
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
@@ -367,7 +370,8 @@ describe('Connecting to a server that sends a re-routing information', function(
       server: routingServer.address().address,
       options: {
         port: routingServer.address().port,
-        encrypt: false
+        encrypt: false,
+        instanceName: 'instanceNameA'
       }
     });
 
