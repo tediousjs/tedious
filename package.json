@@ -54,13 +54,12 @@
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.17.10",
-    "@babel/core": "^7.17.10",
-    "@babel/node": "^7.17.10",
-    "@babel/plugin-proposal-class-properties": "^7.16.7",
-    "@babel/preset-env": "^7.17.10",
-    "@babel/preset-typescript": "^7.16.7",
-    "@babel/register": "^7.17.7",
+    "@babel/cli": "^7.22.5",
+    "@babel/core": "^7.22.5",
+    "@babel/node": "^7.22.5",
+    "@babel/preset-env": "^7.22.5",
+    "@babel/preset-typescript": "^7.22.5",
+    "@babel/register": "^7.22.5",
     "@types/async": "^3.2.13",
     "@types/bl": "^5.0.2",
     "@types/chai": "^4.3.1",
@@ -68,7 +67,7 @@
     "@types/es-aggregate-error": "^1.0.2",
     "@types/lru-cache": "^5.1.0",
     "@types/mocha": "^9.1.1",
-    "@types/node": "^12.20.50",
+    "@types/node": "^16.18.38",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^5.22.0",
     "@typescript-eslint/parser": "^5.22.0",
@@ -83,8 +82,8 @@
     "rimraf": "^3.0.2",
     "semantic-release": "^19.0.3",
     "sinon": "^11.1.2",
-    "typedoc": "^0.22.15",
-    "typescript": "^4.6.4"
+    "typedoc": "^0.24.8",
+    "typescript": "^4.9.5"
   },
   "scripts": {
     "docs": "typedoc",
@@ -122,24 +121,6 @@
         "@babel/transform-typescript",
         {
           "allowDeclareFields": true
-        }
-      ],
-      [
-        "@babel/plugin-proposal-class-properties",
-        {
-          "loose": true
-        }
-      ],
-      [
-        "@babel/plugin-proposal-private-methods",
-        {
-          "loose": true
-        }
-      ],
-      [
-        "@babel/plugin-proposal-private-property-in-object",
-        {
-          "loose": true
         }
       ]
     ]
