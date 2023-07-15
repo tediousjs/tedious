@@ -43,6 +43,7 @@ import { AbortController, AbortSignal } from 'node-abort-controller';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
+import Procedures from './special-stored-procedure';
 
 import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
@@ -343,6 +344,7 @@ export interface InternalConnectionOptions {
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
+  connector: undefined | (() => Promise<Socket>);
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   cryptoCredentialsDetails: SecureContextOptions;
@@ -534,6 +536,13 @@ export interface ConnectionOptions {
    * (default:`500`)
    */
   connectionRetryInterval?: number;
+
+  /**
+   * Custom connector factory method.
+   *
+   * (default: `undefined`)
+   */
+  connector?: () => Promise<Socket>;
 
   /**
    * The number of milliseconds before the attempt to connect is considered failed
@@ -757,7 +766,9 @@ export interface ConnectionOptions {
   readOnlyIntent?: boolean;
 
   /**
-   * The number of milliseconds before a request is considered failed, or `0` for no timeout
+   * The number of milliseconds before a request is considered failed, or `0` for no timeout.
+   *
+   * As soon as a response is received, the timeout is cleared. This means that queries that immediately return a response have ability to run longer than this timeout.
    *
    * (default: `15000`).
    */
@@ -1217,6 +1228,7 @@ class Connection extends EventEmitter {
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
+        connector: undefined,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
@@ -1323,6 +1335,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.connector !== undefined) {
+        if (typeof config.options.connector !== 'function') {
+          throw new TypeError('The "config.options.connector" property must be a function.');
+        }
+
+        this.config.options.connector = config.options.connector;
       }
 
       if (config.options.cryptoCredentialsDetails !== undefined) {
@@ -1874,7 +1894,7 @@ class Connection extends EventEmitter {
     const signal = this.createConnectTimer();
 
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
     } else {
       return instanceLookup({
         server: this.config.server,
@@ -1883,7 +1903,7 @@ class Connection extends EventEmitter {
         signal: signal
       }).then((port) => {
         process.nextTick(() => {
-          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal);
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
         });
       }, (err) => {
         this.clearConnectTimer();
@@ -1939,14 +1959,14 @@ class Connection extends EventEmitter {
     return debug;
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
       localAddress: this.config.options.localAddress
     };
 
-    const connect = multiSubnetFailover ? connectInParallel : connectInSequence;
+    const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
     connect(connectOpts, dns.lookup, signal).then((socket) => {
       process.nextTick(() => {
@@ -2509,7 +2529,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_executesql', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
       if (request.error) {
         process.nextTick(() => {
           request.callback(request.error);
@@ -2704,6 +2724,7 @@ class Connection extends EventEmitter {
     });
 
     request.preparing = true;
+
     // TODO: We need to clean up this event handler, otherwise this leaks memory
     request.on('returnValue', (name: string, value: any) => {
       if (name === 'handle') {
@@ -2713,7 +2734,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_prepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
       if (request.error) {
         process.nextTick(() => {
           request.callback(request.error);
@@ -2751,7 +2772,7 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_unprepare', parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
       if (request.error) {
         process.nextTick(() => {
           request.callback(request.error);
@@ -2782,7 +2803,7 @@ class Connection extends EventEmitter {
 
     executeParameters.push({
       type: TYPES.Int,
-      name: 'handle',
+      name: '',
       // TODO: Abort if `request.handle` is not set
       value: request.handle,
       output: false,
@@ -2811,7 +2832,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_execute', executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation)).then(() => {
       if (request.error) {
         process.nextTick(() => {
           request.callback(request.error);

@@ -39,26 +39,6 @@ jobs:
     - run: npm ci
     - run: npm run lint
 
-    - name: Prepare Commitlint (pull_request)
-      if: ${{ github.event_name == 'pull_request' }}
-      run: |
-        echo "TRAVIS_PULL_REQUEST_SLUG=${{ github.event.pull_request.head.repo.full_name }}" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=HEAD~..HEAD" >> $GITHUB_ENV
-
-    - name: Prepare Commitlint (push)
-      if: ${{ github.event_name == 'push' }}
-      run:  |
-        echo "TRAVIS_PULL_REQUEST_SLUG=" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=${{ github.event.before }}..${{ github.event.after }}" >> $GITHUB_ENV
-
-    - run: npx commitlint-travis
-      env:
-        TRAVIS: "true"
-        CI: "true"
-        TRAVIS_EVENT_TYPE: "${{ github.event_name }}"
-        TRAVIS_REPO_SLUG: "${{ github.repository }}"
-        TRAVIS_COMMIT: "${{ github.sha }}"
-
   test:
     name: SQL Server Linux / Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
@@ -194,28 +174,28 @@ jobs:
       run: |
         Push-Location C:\temp
 
-        $exe_link, $box_link, $update_link = '', '', ''
+        $exe_link, $box_link, $update_link, $update_download_link = '', '', '', ''
 
         switch (${{ matrix.mssql-version }}) {
           '2022' {
             $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
-            $update_link = 'https://download.microsoft.com/download/9/6/8/96819b0c-c8fb-4b44-91b5-c97015bbda9f/SQLServer2022-KB5023127-x64.exe'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=105013'
           }
           '2019' {
             $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
-            $update_link = 'https://download.microsoft.com/download/6/e/7/6e72dddf-dfa4-4889-bc3d-e5d3a0fd11ce/SQLServer2019-KB5023049-x64.exe'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=100809'
           }
           '2017' {
             $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
-            $update_link = 'https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=56128'
           }
           '2016' {
             $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box'
-            $update_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
+            $update_download_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
           }
           default {
             Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
@@ -223,9 +203,20 @@ jobs:
           }
         }
 
+        if (${{ matrix.mssql-version }} -ne '2016') {
+          $dl_links = ((Invoke-WebRequest -Uri $update_link).Links | Where-Object {$_.href -like 'https://download.microsoft.com/*'})
+          if ($dl_links.count -gt 0) {
+            $update_download_link = [System.Uri]::new($dl_links[0].href)
+          } else {
+            Write-Error "Download link not found"
+            Exit 1
+          }
+          echo $update_download_link
+        }
+
+        Invoke-WebRequest -Uri $update_download_link -Outfile sqlupdate.exe
         Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
         Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
-        Invoke-WebRequest -Uri $update_link -Outfile sqlupdate.exe
 
         Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
 
