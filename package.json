@@ -54,10 +54,10 @@
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.22.5",
-    "@babel/core": "^7.22.5",
-    "@babel/node": "^7.22.5",
-    "@babel/preset-env": "^7.22.5",
+    "@babel/cli": "^7.22.9",
+    "@babel/core": "^7.22.9",
+    "@babel/node": "^7.22.6",
+    "@babel/preset-env": "^7.22.9",
     "@babel/preset-typescript": "^7.22.5",
     "@babel/register": "^7.22.5",
     "@types/async": "^3.2.13",
