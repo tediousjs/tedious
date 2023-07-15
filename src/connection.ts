@@ -3176,8 +3176,29 @@ class Connection extends EventEmitter {
       try {
         for await (const chunk of payloadStream) {
           if (message.write(chunk) === false) {
-            // TODO: Handle request cancellation while waiting for 'drain' event
-            await once(message, 'drain');
+            // Wait for the message to drain, or the request to be cancelled.
+            await new Promise<void>((resolve) => {
+              const onDrain = () => {
+                request.removeListener('cancel', onCancel);
+                message.removeListener('drain', onDrain);
+
+                resolve();
+              };
+
+              const onCancel = () => {
+                request.removeListener('cancel', onCancel);
+                message.removeListener('drain', onDrain);
+
+                resolve();
+              };
+
+              message.once('drain', onDrain);
+              request.once('cancel', onCancel);
+            });
+
+            if (request.canceled) {
+              break;
+            }
           }
         }
       } catch (error) {
@@ -3235,13 +3256,33 @@ class Connection extends EventEmitter {
         const handler = new RequestTokenHandler(this, request);
         for await (const token of StreamParser.parseTokens(message, this.debug, this.config.options)) {
           // If the request was canceled, we discard any data contained in the response.
-          if (!request.canceled) {
-            if (request instanceof Request && request.paused) {
-              await once(request, 'resume');
-            }
-
-            handler[token.handlerName](token as any);
+          if (request.canceled) {
+            continue;
           }
+
+          if (request instanceof Request && request.paused) {
+            // Wait for the request to be unpaused or canceled
+            await new Promise<void>((resolve) => {
+              const onResume = () => {
+                request.removeListener('resume', onResume);
+                request.removeListener('cancel', onCancel);
+
+                resolve();
+              };
+
+              const onCancel = () => {
+                request.removeListener('resume', onResume);
+                request.removeListener('cancel', onCancel);
+
+                resolve();
+              };
+
+              request.on('resume', onResume);
+              request.on('cancel', onCancel);
+            });
+          }
+
+          handler[token.handlerName](token as any);
         }
       } finally {
         request.removeListener('cancel', onCancel);
