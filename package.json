@@ -60,9 +60,6 @@
     "@babel/preset-env": "^7.22.5",
     "@babel/preset-typescript": "^7.22.5",
     "@babel/register": "^7.22.5",
-    "@commitlint/cli": "^16.2.4",
-    "@commitlint/config-conventional": "^16.2.4",
-    "@commitlint/travis-cli": "^16.2.4",
     "@types/async": "^3.2.13",
     "@types/bl": "^5.0.2",
     "@types/chai": "^4.3.1",
@@ -127,28 +124,6 @@
         }
       ]
     ]
-  },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ],
-    "rules": {
-      "body-max-line-length": [
-        1,
-        "always",
-        100
-      ],
-      "footer-max-line-length": [
-        1,
-        "always",
-        100
-      ],
-      "header-max-length": [
-        1,
-        "always",
-        100
-      ]
-    }
   },
   "mocha": {
     "require": "test/setup.js",
