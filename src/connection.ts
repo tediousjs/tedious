@@ -963,7 +963,7 @@ class Connection extends EventEmitter {
     SENT_CLIENT_REQUEST: State;
     SENT_ATTENTION: State;
     FINAL: State;
-  }
+  };
 
   /**
    * @private
