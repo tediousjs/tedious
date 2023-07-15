@@ -81,7 +81,7 @@
     "nyc": "^15.1.0",
     "rimraf": "^5.0.1",
     "semantic-release": "^19.0.3",
-    "sinon": "^11.1.2",
+    "sinon": "^15.2.0",
     "typedoc": "^0.24.8",
     "typescript": "^5.1.6"
   },
