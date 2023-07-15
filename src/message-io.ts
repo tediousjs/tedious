@@ -25,7 +25,7 @@ class MessageIO extends EventEmitter {
   securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
-  }
+  };
 
   incomingMessageIterator: AsyncIterableIterator<Message>;
 
