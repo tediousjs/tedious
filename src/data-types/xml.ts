@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 
 const XML: DataType = {
   id: 0xF1,

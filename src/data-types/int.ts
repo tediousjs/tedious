@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import IntN from './intn';
 
 const NULL_LENGTH = Buffer.from([0x00]);

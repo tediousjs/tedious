@@ -37,9 +37,9 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { CryptoMetadata } from './always-encrypted/types';
+import { type CryptoMetadata } from './always-encrypted/types';
 
-import { InternalConnectionOptions } from './connection';
+import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 
 export interface Parameter {

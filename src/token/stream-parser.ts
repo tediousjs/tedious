@@ -1,9 +1,9 @@
 import Debug from '../debug';
-import { InternalConnectionOptions } from '../connection';
+import { type InternalConnectionOptions } from '../connection';
 
 import { TYPE, Token, ColMetadataToken } from './token';
 
-import colMetadataParser, { ColumnMetadata } from './colmetadata-token-parser';
+import colMetadataParser, { type ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
 import envChangeParser from './env-change-token-parser';
 import { errorParser, infoParser } from './infoerror-token-parser';
