@@ -1003,7 +1003,6 @@ describe('Parameterised Statements Test', function() {
       async.series([
         (next) => {
           connection.execSqlBatch(new Request(`
-            USE tempdb;
             BEGIN TRY
               DROP TYPE TediousTestType
             END TRY
@@ -1013,7 +1012,6 @@ describe('Parameterised Statements Test', function() {
         },
         (next) => {
           connection.execSqlBatch(new Request(`
-            USE tempdb;
             CREATE TYPE TediousTestType AS TABLE (
               a bit,
               b tinyint,
