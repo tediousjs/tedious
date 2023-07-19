@@ -2,7 +2,7 @@ version: '3'
 
 services:
   app:
-    image: "mcr.microsoft.com/vscode/devcontainers/javascript-node:14"
+    image: "mcr.microsoft.com/devcontainers/javascript-node:16"
 
     volumes:
       - "..:/workspace:cached"
@@ -15,10 +15,13 @@ services:
       - mssql
 
   mssql:
-    image: "mcr.microsoft.com/mssql/server:2022-latest"
+    image: mcr.microsoft.com/mssql/server:2022-latest
 
     restart: unless-stopped
 
     environment:
       - "ACCEPT_EULA=Y"
       - "SA_PASSWORD=yourStrong(!)Password"
+
+    ports:
+      - "1433:1433"

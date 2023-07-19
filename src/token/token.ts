@@ -43,7 +43,7 @@ export class ColMetadataToken extends Token {
   declare name: 'COLMETADATA';
   declare handlerName: 'onColMetadata';
 
-  columns: ColumnMetadata[]
+  columns: ColumnMetadata[];
 
   constructor(columns: ColumnMetadata[]) {
     super('COLMETADATA', 'onColMetadata');

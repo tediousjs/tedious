@@ -34,7 +34,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=16"
   },
   "publishConfig": {
     "tag": "next"
@@ -42,52 +42,48 @@
   "dependencies": {
     "@azure/identity": "^2.0.4",
     "@azure/keyvault-keys": "^4.4.0",
-    "@js-joda/core": "^5.2.0",
-    "bl": "^5.0.0",
-    "es-aggregate-error": "^1.0.8",
+    "@js-joda/core": "^5.5.3",
+    "bl": "^6.0.3",
+    "es-aggregate-error": "^1.0.9",
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
-    "node-abort-controller": "^3.0.1",
-    "punycode": "^2.1.0",
+    "node-abort-controller": "^3.1.1",
+    "punycode": "^2.3.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
-    "@babel/cli": "^7.17.10",
-    "@babel/core": "^7.17.10",
-    "@babel/node": "^7.17.10",
-    "@babel/plugin-proposal-class-properties": "^7.16.7",
-    "@babel/preset-env": "^7.17.10",
-    "@babel/preset-typescript": "^7.16.7",
-    "@babel/register": "^7.17.7",
-    "@commitlint/cli": "^16.2.4",
-    "@commitlint/config-conventional": "^16.2.4",
-    "@commitlint/travis-cli": "^16.2.4",
-    "@types/es-aggregate-error": "^1.0.2",
-    "@types/async": "^3.2.13",
-    "@types/bl": "^5.0.2",
-    "@types/chai": "^4.3.1",
+    "@babel/cli": "^7.22.9",
+    "@babel/core": "^7.22.9",
+    "@babel/node": "^7.22.6",
+    "@babel/preset-env": "^7.22.9",
+    "@babel/preset-typescript": "^7.22.5",
+    "@babel/register": "^7.22.5",
+    "@types/async": "^3.2.20",
+    "@types/bl": "^5.1.0",
+    "@types/chai": "^4.3.5",
     "@types/depd": "^1.1.32",
-    "@types/lru-cache": "^5.1.0",
-    "@types/mocha": "^9.1.1",
-    "@types/node": "^12.20.50",
+    "@types/es-aggregate-error": "^1.0.2",
+    "@types/lru-cache": "^5.1.1",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^16.18.38",
     "@types/sprintf-js": "^1.1.2",
-    "@typescript-eslint/eslint-plugin": "^5.22.0",
-    "@typescript-eslint/parser": "^5.22.0",
-    "async": "^3.2.3",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "async": "^3.2.4",
     "babel-plugin-istanbul": "^6.1.1",
-    "chai": "^4.3.6",
+    "chai": "^4.3.7",
     "codecov": "^3.8.3",
-    "eslint": "^7.32.0",
+    "eslint": "^8.45.0",
     "mitm": "^1.7.2",
-    "mocha": "^9.2.2",
+    "mocha": "^10.2.0",
     "nyc": "^15.1.0",
-    "rimraf": "^3.0.2",
+    "rimraf": "^5.0.1",
     "semantic-release": "^19.0.3",
-    "sinon": "^11.1.2",
-    "typedoc": "^0.22.15",
-    "typescript": "^4.6.4"
+    "sinon": "^15.2.0",
+    "typedoc": "^0.24.8",
+    "typescript": "^5.1.6"
   },
   "scripts": {
     "docs": "typedoc",
@@ -109,7 +105,7 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 14
+            "node": 16
           }
         }
       ],
@@ -126,48 +122,8 @@
         {
           "allowDeclareFields": true
         }
-      ],
-      [
-        "@babel/plugin-proposal-class-properties",
-        {
-          "loose": true
-        }
-      ],
-      [
-        "@babel/plugin-proposal-private-methods",
-        {
-          "loose": true
-        }
-      ],
-      [
-        "@babel/plugin-proposal-private-property-in-object",
-        {
-          "loose": true
-        }
       ]
     ]
-  },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ],
-    "rules": {
-      "body-max-line-length": [
-        1,
-        "always",
-        100
-      ],
-      "footer-max-line-length": [
-        1,
-        "always",
-        100
-      ],
-      "header-max-length": [
-        1,
-        "always",
-        100
-      ]
-    }
   },
   "mocha": {
     "require": "test/setup.js",
