@@ -989,7 +989,6 @@ describe('Parameterised Statements Test', function() {
 
   it('supports TVP values', function(done) {
     const config = getConfig();
-    config.options.database = 'tempdb';
     const connection = new Connection(config);
 
     if (config.options.tdsVersion < '7_3_A') {
