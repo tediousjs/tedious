@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import os from 'os';
-import { Socket } from 'net';
+import * as tls from 'tls';
+import * as net from 'net';
 import dns from 'dns';
 
 import constants from 'constants';
@@ -344,7 +345,7 @@ export interface InternalConnectionOptions {
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
-  connector: undefined | (() => Promise<Socket>);
+  connector: undefined | (() => Promise<net.Socket>);
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   cryptoCredentialsDetails: SecureContextOptions;
@@ -367,7 +368,7 @@ export interface InternalConnectionOptions {
   enableImplicitTransactions: null | boolean;
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
-  encrypt: boolean;
+  encrypt: string | boolean;
   encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
@@ -542,7 +543,7 @@ export interface ConnectionOptions {
    *
    * (default: `undefined`)
    */
-  connector?: () => Promise<Socket>;
+  connector?: () => Promise<net.Socket>;
 
   /**
    * The number of milliseconds before the attempt to connect is considered failed
@@ -669,11 +670,12 @@ export interface ConnectionOptions {
   enableQuotedIdentifier?: boolean;
 
   /**
-   * A boolean determining whether or not the connection will be encrypted. Set to `true` if you're on Windows Azure.
+   * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
+   * a boolean determining whether or not the connection will be encrypted.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
-  encrypt?: boolean;
+  encrypt?: string | boolean;
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -829,6 +831,10 @@ export interface ConnectionOptions {
    */
   trustServerCertificate?: boolean;
 
+  /**
+   *
+   */
+  serverName?: string;
   /**
    * A boolean determining whether to return rows as arrays or key-value collections.
    *
@@ -994,7 +1000,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  socket: undefined | Socket;
+  socket: undefined | net.Socket;
   /**
    * @private
    */
@@ -1499,10 +1505,11 @@ class Connection extends EventEmitter {
 
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
-
       if (config.options.encrypt !== undefined) {
         if (typeof config.options.encrypt !== 'boolean') {
-          throw new TypeError('The "config.options.encrypt" property must be of type boolean.');
+          if (config.options.encrypt !== 'strict') {
+            throw new TypeError('The "encrypt" property must be set to "strict", or of type boolean.');
+          }
         }
 
         this.config.options.encrypt = config.options.encrypt;
@@ -1660,6 +1667,13 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
+      }
+
+      if (config.options.serverName !== undefined) {
+        if (typeof config.options.serverName !== 'string') {
+          throw new TypeError('The "config.options.serverName" property must be of type string.');
+        }
+        this.config.options.serverName = config.options.serverName;
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -1976,7 +1990,49 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<Socket>) {
+  socketHandlingForSendPreLogin(socket: net.Socket) {
+    socket.on('error', (error) => { this.socketError(error); });
+    socket.on('close', () => { this.socketClose(); });
+    socket.on('end', () => { this.socketEnd(); });
+    socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+    this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+    this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+    this.socket = socket;
+
+    this.closed = false;
+    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+    this.sendPreLogin();
+    this.transitionTo(this.STATE.SENT_PRELOGIN);
+  }
+
+  wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
+    return new Promise((resolve, reject) => {
+      const secureContext = tls.createSecureContext(this.secureContextOptions);
+      // If connect to an ip address directly,
+      // need to set the servername to an empty string
+      // if the user has not given a servername explicitly
+      const serverName = !net.isIP(this.config.server) ? this.config.server : '';
+      const encryptOptions = {
+        host: this.config.server,
+        socket: socket,
+        ALPNProtocols: ['tds/8.0'],
+        secureContext: secureContext,
+        servername: this.config.options.serverName ? this.config.options.serverName : serverName,
+      };
+
+      const encryptsocket = tls.connect(encryptOptions, () => {
+        encryptsocket.removeListener('error', reject);
+        resolve(encryptsocket);
+      });
+
+      encryptsocket.once('error', reject);
+    });
+  }
+
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
@@ -1985,26 +2041,24 @@ class Connection extends EventEmitter {
 
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
-    connect(connectOpts, dns.lookup, signal).then((socket) => {
-      process.nextTick(() => {
-        socket.on('error', (error) => { this.socketError(error); });
-        socket.on('close', () => { this.socketClose(); });
-        socket.on('end', () => { this.socketEnd(); });
-        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+    (async () => {
+      let socket = await connect(connectOpts, dns.lookup, signal);
 
-        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      if (this.config.options.encrypt === 'strict') {
+        try {
+          // Wrap the socket with TLS for TDS 8.0
+          socket = await this.wrapWithTls(socket);
+        } catch (err) {
+          socket.end();
 
-        this.socket = socket;
+          throw err;
+        }
+      }
 
-        this.closed = false;
-        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-        this.sendPreLogin();
-        this.transitionTo(this.STATE.SENT_PRELOGIN);
-      });
-    }, (err) => {
+      this.socketHandlingForSendPreLogin(socket);
+    })().catch((err) => {
       this.clearConnectTimer();
+
       if (err.name === 'AbortError') {
         return;
       }
@@ -2075,7 +2129,14 @@ class Connection extends EventEmitter {
    * @private
    */
   connectTimeout() {
-    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
+    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+    // If we have routing data stored, this connection has been redirected
+    const server = this.routingData ? this.routingData.server : this.config.server;
+    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+    // Grab the target host from the connection configration, and from a redirect message
+    // otherwise, leave the message empty.
+    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
     this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
@@ -2204,7 +2265,14 @@ class Connection extends EventEmitter {
    */
   socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
-      const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+      const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
       this.debug.log(message);
       this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
@@ -2251,10 +2319,12 @@ class Connection extends EventEmitter {
    * @private
    */
   sendPreLogin() {
-    const [ , major, minor, build ] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [ '0.0.0', '0', '0', '0' ];
-
+    const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt,
+      // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
+      // this function. Therefore, the encrypt will be set to false here.
+      // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
+      encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
@@ -3176,8 +3246,7 @@ Connection.prototype.STATE = {
         if (preloginPayload.fedAuthRequired === 1) {
           this.fedAuthRequired = true;
         }
-
-        if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
+        if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
           if (!this.config.options.encrypt) {
             this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
             return this.close();
@@ -3185,7 +3254,7 @@ Connection.prototype.STATE = {
 
           try {
             this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            await this.messageIo.startTls(this.secureContextOptions, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+            await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
           } catch (err: any) {
             return this.socketError(err);
           }
