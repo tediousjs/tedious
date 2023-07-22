@@ -156,7 +156,7 @@ describe('BulkLoad', function() {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, (err, rowCount) => {
       assert.ok(err, 'An error should have been thrown to indicate the conflict with the CHECK constraint.');
 
-      assert.strictEqual(rowCount, 0);
+      assert.isUndefined(rowCount);
 
       done();
     });
@@ -378,7 +378,7 @@ describe('BulkLoad', function() {
         assert.instanceOf(err, RequestError);
         assert.strictEqual(/** @type {RequestError} */(err).message, expectedMessage);
 
-        assert.strictEqual(rowCount, 0);
+        assert.isUndefined(rowCount);
 
         done();
       });
@@ -863,7 +863,7 @@ describe('BulkLoad', function() {
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       assert.strictEqual(err, expectedError);
-      assert.strictEqual(rowCount, 0);
+      assert.isUndefined(rowCount);
 
       /** @type {unknown[]} */
       const results = [];
@@ -1156,7 +1156,7 @@ describe('BulkLoad', function() {
       assert.instanceOf(err, RequestError);
       assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
 
-      assert.strictEqual(rowCount, 0);
+      assert.isUndefined(rowCount);
       startVerifyTableContent();
     }
 
@@ -1201,7 +1201,7 @@ describe('BulkLoad', function() {
         assert.instanceOf(err, RequestError);
         assert.strictEqual(/** @type {RequestError} */(err).message, 'Canceled.');
 
-        assert.strictEqual(rowCount, 0);
+        assert.isUndefined(rowCount);
       });
 
       bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
@@ -1341,7 +1341,7 @@ describe('BulkLoad', function() {
       assert.instanceOf(err, RequestError);
       assert.strictEqual(/** @type {RequestError} */(err).message, 'Timeout: Request failed to complete in 200ms');
 
-      assert.strictEqual(rowCount, 0);
+      assert.isUndefined(rowCount);
 
       done();
     }
@@ -1548,7 +1548,7 @@ describe('BulkLoad', function() {
         assert.instanceOf(err, TypeError);
         assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
 
-        assert.strictEqual(rowCount, 0);
+        assert.isUndefined(rowCount);
 
         /**
          * @type {unknown[]}
