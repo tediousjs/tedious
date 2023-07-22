@@ -3,7 +3,8 @@ export const versions: { [key: string]: number } = {
   '7_2': 0x72090002,
   '7_3_A': 0x730A0003,
   '7_3_B': 0x730B0003,
-  '7_4': 0x74000004
+  '7_4': 0x74000004,
+  '8_0': 0x08000000
 };
 
 export const versionsByValue: { [key: number]: string } = {};
