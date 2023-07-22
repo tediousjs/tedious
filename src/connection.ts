@@ -1973,13 +1973,6 @@ class Connection extends EventEmitter {
     return debug;
   }
 
-  /**
-   * @private
-   */
-  createTokenStreamParser(message: Message, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
-  }
-
   socketHandlingForSendPreLogin(socket: net.Socket) {
     socket.on('error', (error) => { this.socketError(error); });
     socket.on('close', () => { this.socketClose(); });
