@@ -138,8 +138,10 @@ connection.connect();
           <ul>
             <li>username (string): A user needs to provide the `userName` associated to their account.</li>
             <li>password (string): A user needs to provide the `password` associated to their account.</li>
-            <li>clientId (string): Application (`client`) ID from your registered Azure application. This currently is optional
-              and uses a default clientId, but a user-provided clientId will be required in the near future.
+            <li>clientId (string): Application (`client`) ID from your registered Azure application. 
+              The application has to have public client flows enabled and has to have `user_impersonation` 
+              permissions for Azure SQL Database. The user account that is being used also has to be assigned
+              to the application, and has to grant consent (either explicitly or via admin consent).
             </li>
             <li>tenantId (string): Optional parameter for specific Azure tenant ID. (default: <code>common</code>).
               If your server does not support the <code>/common</code> endpoint, please provide a tenantId.
