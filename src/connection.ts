@@ -3274,9 +3274,7 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.REROUTING);
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
-        this.loggedInSendingInitialSql(signal).catch((err) => {
-          process.nextTick(() => { throw err; });
-        });
+        return await this.loggedInSendingInitialSql(signal);
       }
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
@@ -3319,10 +3317,7 @@ class Connection extends EventEmitter {
           this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
           return;
         } else {
-          this.loggedInSendingInitialSql(signal).catch((err) => {
-            process.nextTick(() => { throw err; });
-          });
-          return;
+          return await this.loggedInSendingInitialSql(signal);
         }
       } else if (this.ntlmpacket) {
         const authentication = this.config.authentication as NtlmAuthentication;
@@ -3381,9 +3376,7 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.REROUTING);
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
-        this.loggedInSendingInitialSql(signal).catch((err) => {
-          process.nextTick(() => { throw err; });
-        });
+        return await this.loggedInSendingInitialSql(signal);
       }
 
       return;
