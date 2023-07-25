@@ -2425,6 +2425,9 @@ class Connection extends EventEmitter {
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    this.sentLogin7WithStandardLogin().catch((err) => {
+      process.nextTick(() => { throw err; });
+    });
   }
 
   /**
@@ -3251,6 +3254,9 @@ class Connection extends EventEmitter {
         break;
       default:
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        this.sentLogin7WithStandardLogin().catch((err) => {
+          process.nextTick(() => { throw err; });
+        });
         break;
     }
   }
@@ -3560,13 +3566,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
-    enter: function() {
-      this.sentLogin7WithStandardLogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
