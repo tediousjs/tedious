@@ -1769,6 +1769,7 @@ class Connection extends EventEmitter {
     }
 
     this.transitionTo(this.STATE.CONNECTING);
+    this.initialiseConnection();
   }
 
   /**
@@ -2175,6 +2176,7 @@ class Connection extends EventEmitter {
     this.retryTimer = undefined;
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
+    this.initialiseConnection();
   }
 
   /**
@@ -3467,9 +3469,6 @@ Connection.prototype.STATE = {
   },
   CONNECTING: {
     name: 'Connecting',
-    enter: function() {
-      this.initialiseConnection();
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3512,6 +3511,7 @@ Connection.prototype.STATE = {
       },
       reconnect: function() {
         this.transitionTo(this.STATE.CONNECTING);
+        this.initialiseConnection();
       }
     }
   },
