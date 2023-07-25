@@ -2316,7 +2316,7 @@ class Connection extends EventEmitter {
       const port = this.routingData ? this.routingData.port : this.config.options.port;
       this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-      this.dispatchEvent('retry');
+      this.createRetryTimer();
     } else {
       this.transitionTo(this.STATE.FINAL);
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
@@ -3553,9 +3553,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      retry: function() {
-        this.createRetryTimer();
       }
     }
   },
