@@ -3251,6 +3251,9 @@ class Connection extends EventEmitter {
         break;
       case 'ntlm':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        this.sentLogin7WithNtlm().catch((err) => {
+          process.nextTick(() => { throw err; });
+        });
         break;
       default:
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
@@ -3579,13 +3582,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
-    enter: function() {
-      this.sentLogin7WithNtlm().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
