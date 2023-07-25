@@ -2058,7 +2058,7 @@ class Connection extends EventEmitter {
 
       this.sendPreLogin();
       this.transitionTo(this.STATE.SENT_PRELOGIN);
-      this.handlePreloginResponse().catch((err) => {
+      this.handlePreloginResponse(signal).catch((err) => {
         process.nextTick(() => { throw err; });
       });
     })().catch((err) => {
@@ -3197,7 +3197,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  async handlePreloginResponse() {
+  async handlePreloginResponse(signal: AbortSignal) {
     let messageBuffer = Buffer.alloc(0);
 
     let message;
@@ -3244,26 +3244,26 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-service-principal-secret':
       case 'azure-active-directory-default':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-        this.sentLogin7WithFedauth().catch((err) => {
+        this.sentLogin7WithFedauth(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
         break;
       case 'ntlm':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        this.sentLogin7WithNtlm().catch((err) => {
+        this.sentLogin7WithNtlm(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
         break;
       default:
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        this.sentLogin7WithStandardLogin().catch((err) => {
+        this.sentLogin7WithStandardLogin(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
         break;
     }
   }
 
-  async sentLogin7WithStandardLogin() {
+  async sentLogin7WithStandardLogin(signal: AbortSignal) {
     let message;
     try {
       message = await this.messageIo.readMessage();
@@ -3305,7 +3305,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  async sentLogin7WithNtlm() {
+  async sentLogin7WithNtlm(signal: AbortSignal) {
     while (true) {
       let message;
       try {
@@ -3370,7 +3370,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  async sentLogin7WithFedauth() {
+  async sentLogin7WithFedauth(signal: AbortSignal) {
     let message;
     try {
       message = await this.messageIo.readMessage();
@@ -3448,7 +3448,7 @@ class Connection extends EventEmitter {
       this.sendFedAuthTokenMessage(token);
       // sent the fedAuth token message, the rest is similar to standard login 7
       this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-      this.sentLogin7WithStandardLogin().catch((err) => {
+      this.sentLogin7WithStandardLogin(signal).catch((err) => {
         process.nextTick(() => { throw err; });
       });
     } else if (this.loginError) {
