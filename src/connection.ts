@@ -3291,6 +3291,8 @@ class Connection extends EventEmitter {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        this.curTransientRetryCount++;
+        this.cleanupConnection(CLEANUP_TYPE.RETRY);
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3349,7 +3351,10 @@ class Connection extends EventEmitter {
       } else if (this.loginError) {
         if (isTransientError(this.loginError)) {
           this.debug.log('Initiating retry on transient error');
-          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.curTransientRetryCount++;
+          this.cleanupConnection(CLEANUP_TYPE.RETRY);
+          return;
         } else {
           this.emit('connect', this.loginError);
           this.transitionTo(this.STATE.FINAL);
@@ -3450,6 +3455,8 @@ class Connection extends EventEmitter {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        this.curTransientRetryCount++;
+        this.cleanupConnection(CLEANUP_TYPE.RETRY);
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3536,10 +3543,6 @@ Connection.prototype.STATE = {
   },
   TRANSIENT_FAILURE_RETRY: {
     name: 'TRANSIENT_FAILURE_RETRY',
-    enter: function() {
-      this.curTransientRetryCount++;
-      this.cleanupConnection(CLEANUP_TYPE.RETRY);
-    },
     events: {
       message: function() {
       },
