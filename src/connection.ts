@@ -2309,7 +2309,8 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.REROUTING) {
       this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
 
-      this.dispatchEvent('reconnect');
+      this.transitionTo(this.STATE.CONNECTING);
+      this.initialiseConnection();
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
@@ -3530,10 +3531,6 @@ Connection.prototype.STATE = {
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      reconnect: function() {
-        this.transitionTo(this.STATE.CONNECTING);
-        this.initialiseConnection();
       }
     }
   },
