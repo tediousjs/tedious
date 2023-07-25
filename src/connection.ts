@@ -3422,6 +3422,7 @@ class Connection extends EventEmitter {
 
     this.clearConnectTimer();
     this.closeConnection();
+    await once(this.socket!, 'close');
 
     this.emit('rerouting');
 
@@ -3442,6 +3443,7 @@ class Connection extends EventEmitter {
 
     this.clearConnectTimer();
     this.closeConnection();
+    await once(this.socket!, 'close');
 
     this.socket = undefined;
     this.closed = true;
