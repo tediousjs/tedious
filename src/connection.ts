@@ -3272,6 +3272,7 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       }
@@ -3308,7 +3309,9 @@ class Connection extends EventEmitter {
       if (handler.loginAckReceived) {
         if (handler.routingData) {
           this.routingData = handler.routingData;
-          return this.transitionTo(this.STATE.REROUTING);
+          this.transitionTo(this.STATE.REROUTING);
+          this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
+          return;
         } else {
           return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         }
@@ -3362,6 +3365,7 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       }
@@ -3495,9 +3499,6 @@ Connection.prototype.STATE = {
   },
   REROUTING: {
     name: 'ReRouting',
-    enter: function() {
-      this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
-    },
     events: {
       message: function() {
       },
