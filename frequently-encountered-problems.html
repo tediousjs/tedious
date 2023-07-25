@@ -13,11 +13,17 @@ title: F.E.Q.
     <dd>
         <p>First step to debug any problems is to ensure that
             <a href="https://github.com/tediousjs/tedious/releases">tedious is up to date.</a></p>
-        <p>If you're using tediousjs/mssql, make sure it's up to date, as well as its tedious dependency in
-            package.json.
-            <br>
-            Note: tediousjs/mssql is <strong>no longer being actively maintained</strong>
-        </p>
+    </dd>
+    <br />
+    <dt>
+        <h2>tediousjs > node-mssql and tedious-connection-pool</h2>
+    </dt>
+    <dd>
+        <p>Neither of these repositories are maintained by Tedious. These are third-party libraries that use Tedious.</p>
+        <p><b>node-mssql</b> is currently being maintained by a third party.</p>
+        <p><b>tedious-connection-pool</b> is not being actively maintained, however, still valid to some extent.</p>
+        <p>If using either of these, ensure that you're using the latest versions and that their package.json has the <a
+                href="https://github.com/tediousjs/tedious/releases">latest tedious version</a> as its dependency.</p>
     </dd>
     <br />
     <dt>
@@ -106,15 +112,6 @@ title: F.E.Q.
                 protocol state diagram </a>
             [bottom-half of the diagram] for a high level understanding of the TDS lifecycle).
         </p>
-    </dd>
-    <br />
-    <dt>
-        <h2>tediousjs > tedious-connection-pool and node-mssql</h2>
-    </dt>
-    <dd>
-        <p>Both of these repositories are not being actively maintained, however, still valid to some extent.</p>
-        <p>If using either of these, ensure that you're using the latest versions and that their package.json has the <a
-                href="https://github.com/tediousjs/tedious/releases">latest tedious version</a> as its dependency</p>
     </dd>
     <br />
     <dt>
