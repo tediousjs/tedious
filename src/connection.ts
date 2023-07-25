@@ -3229,13 +3229,13 @@ class Connection extends EventEmitter {
     if (handler.loginAckReceived) {
       if (handler.routingData) {
         this.routingData = handler.routingData;
-        return await this.handleRerouting();
+        return await this.handleRerouting(signal);
       } else {
         return await this.loggedInSendingInitialSql(signal);
       }
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
-        return await this.handleRetry();
+        return await this.handleRetry(signal);
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3267,7 +3267,7 @@ class Connection extends EventEmitter {
       if (handler.loginAckReceived) {
         if (handler.routingData) {
           this.routingData = handler.routingData;
-          return await this.handleRerouting();
+          return await this.handleRerouting(signal);
         } else {
           return await this.loggedInSendingInitialSql(signal);
         }
@@ -3289,7 +3289,7 @@ class Connection extends EventEmitter {
         this.ntlmpacket = undefined;
       } else if (this.loginError) {
         if (isTransientError(this.loginError)) {
-          return await this.handleRetry();
+          return await this.handleRetry(signal);
         } else {
           this.emit('connect', this.loginError);
           this.transitionTo(this.STATE.FINAL);
@@ -3321,7 +3321,7 @@ class Connection extends EventEmitter {
     if (handler.loginAckReceived) {
       if (handler.routingData) {
         this.routingData = handler.routingData;
-        return await this.handleRerouting();
+        return await this.handleRerouting(signal);
       } else {
         return await this.loggedInSendingInitialSql(signal);
       }
@@ -3381,7 +3381,7 @@ class Connection extends EventEmitter {
       return await this.handleLogin7WithStandardLoginResponse(signal);
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
-        return await this.handleRetry();
+        return await this.handleRetry(signal);
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3414,7 +3414,7 @@ class Connection extends EventEmitter {
     await once(tokenStreamParser, 'end');
   }
 
-  async handleRerouting() {
+  async handleRerouting(signal: AbortSignal) {
     this.transitionTo(this.STATE.REROUTING);
 
     this.clearConnectTimer();
@@ -3432,7 +3432,7 @@ class Connection extends EventEmitter {
     this.initialiseConnection();
   }
 
-  async handleRetry() {
+  async handleRetry(signal: AbortSignal) {
     this.debug.log('Initiating retry on transient error');
     this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
     this.curTransientRetryCount++;
