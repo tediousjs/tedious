@@ -2241,7 +2241,21 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  socketError(error: Error) {
+  socketError(err: Error) {
+    if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
+      const wrappedErr = this.wrapSocketError(err);
+      this.debug.log(wrappedErr.message);
+      this.emit('connect', wrappedErr);
+    } else {
+      const wrappedErr = this.wrapSocketError(err);
+      this.debug.log(wrappedErr.message);
+      this.emit('error', wrappedErr);
+    }
+
+    this.dispatchEvent('socketError', err);
+  }
+
+  wrapSocketError(err: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
       // If we have routing data stored, this connection has been redirected
@@ -2250,15 +2264,12 @@ class Connection extends EventEmitter {
       // Grab the target host from the connection configration, and from a redirect message
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-      const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
-      this.debug.log(message);
-      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
+      const message = `Failed to connect to ${server}${port}${routingMessage} - ${err.message}`;
+      return new ConnectionError(message, 'ESOCKET');
     } else {
-      const message = `Connection lost - ${error.message}`;
-      this.debug.log(message);
-      this.emit('error', new ConnectionError(message, 'ESOCKET'));
+      const message = `Connection lost - ${err.message}`;
+      return new ConnectionError(message, 'ESOCKET');
     }
-    this.dispatchEvent('socketError', error);
   }
 
   /**
