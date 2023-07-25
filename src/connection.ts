@@ -2058,7 +2058,7 @@ class Connection extends EventEmitter {
 
       this.sendPreLogin();
       this.transitionTo(this.STATE.SENT_PRELOGIN);
-      this.sentPrelogin().catch((err) => {
+      this.handlePreloginResponse().catch((err) => {
         process.nextTick(() => { throw err; });
       });
     })().catch((err) => {
@@ -3197,7 +3197,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  async sentPrelogin() {
+  async handlePreloginResponse() {
     let messageBuffer = Buffer.alloc(0);
 
     let message;
