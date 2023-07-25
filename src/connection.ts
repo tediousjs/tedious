@@ -1909,6 +1909,7 @@ class Connection extends EventEmitter {
    */
   close() {
     this.transitionTo(this.STATE.FINAL);
+    this.cleanupConnection(CLEANUP_TYPE.NORMAL);
   }
 
   /**
@@ -2312,6 +2313,7 @@ class Connection extends EventEmitter {
       this.dispatchEvent('retry');
     } else {
       this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
     }
   }
 
@@ -3215,9 +3217,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3288,9 +3292,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3304,9 +3310,11 @@ Connection.prototype.STATE = {
       },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       reconnect: function() {
         this.transitionTo(this.STATE.CONNECTING);
@@ -3324,9 +3332,11 @@ Connection.prototype.STATE = {
       },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       retry: function() {
         this.createRetryTimer();
@@ -3338,9 +3348,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3374,10 +3386,12 @@ Connection.prototype.STATE = {
           } else {
             this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
+            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
           }
         } else {
           this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
+          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
         }
       })().catch((err) => {
         process.nextTick(() => {
@@ -3388,9 +3402,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3440,14 +3456,17 @@ Connection.prototype.STATE = {
               return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
               this.emit('connect', this.loginError);
-              return this.transitionTo(this.STATE.FINAL);
+              this.transitionTo(this.STATE.FINAL);
+              this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+              return;
             }
           } else {
             this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-            return this.transitionTo(this.STATE.FINAL);
+            this.transitionTo(this.STATE.FINAL);
+            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+            return;
           }
         }
-
       })().catch((err) => {
         process.nextTick(() => {
           throw err;
@@ -3457,9 +3476,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3531,6 +3552,7 @@ Connection.prototype.STATE = {
               [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
             this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
+            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
             return;
           }
 
@@ -3545,10 +3567,12 @@ Connection.prototype.STATE = {
           } else {
             this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
+            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
           }
         } else {
           this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
           this.transitionTo(this.STATE.FINAL);
+          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
         }
 
       })().catch((err) => {
@@ -3560,9 +3584,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3592,9 +3618,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function socketError() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3603,6 +3631,7 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3694,6 +3723,7 @@ Connection.prototype.STATE = {
         const sqlRequest = this.request!;
         this.request = undefined;
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
 
         sqlRequest.callback(err);
       }
@@ -3742,6 +3772,7 @@ Connection.prototype.STATE = {
         this.request = undefined;
 
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
 
         sqlRequest.callback(err);
       }
@@ -3749,9 +3780,6 @@ Connection.prototype.STATE = {
   },
   FINAL: {
     name: 'Final',
-    enter: function() {
-      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-    },
     events: {
       connectTimeout: function() {
         // Do nothing, as the timer should be cleaned up.
