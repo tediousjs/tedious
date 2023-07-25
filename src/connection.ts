@@ -1992,7 +1992,7 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  socketHandlingForSendPreLogin(socket: net.Socket) {
+  performSocketSetup(socket: net.Socket) {
     socket.on('error', (error) => { this.socketError(error); });
     socket.on('close', () => { this.socketClose(); });
     socket.on('end', () => { this.socketEnd(); });
@@ -2005,12 +2005,6 @@ class Connection extends EventEmitter {
 
     this.closed = false;
     this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-    this.sendPreLogin();
-    this.transitionTo(this.STATE.SENT_PRELOGIN);
-    this.sentPrelogin().catch((err) => {
-      process.nextTick(() => { throw err; });
-    });
   }
 
   wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
@@ -2060,7 +2054,13 @@ class Connection extends EventEmitter {
         }
       }
 
-      this.socketHandlingForSendPreLogin(socket);
+      this.performSocketSetup(socket);
+
+      this.sendPreLogin();
+      this.transitionTo(this.STATE.SENT_PRELOGIN);
+      this.sentPrelogin().catch((err) => {
+        process.nextTick(() => { throw err; });
+      });
     })().catch((err) => {
       this.clearConnectTimer();
 
