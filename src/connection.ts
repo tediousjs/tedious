@@ -2430,6 +2430,7 @@ class Connection extends EventEmitter {
    * @private
    */
   sendInitialSql() {
+    this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
     const message = new Message({ type: TYPE.SQL_BATCH });
@@ -2530,14 +2531,6 @@ class Connection extends EventEmitter {
     }
 
     return options.join('\n');
-  }
-
-  /**
-   * @private
-   */
-  processedInitialSql() {
-    this.clearConnectTimer();
-    this.emit('connect');
   }
 
   /**
@@ -3243,19 +3236,16 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
       case 'azure-active-directory-default':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
         this.handleLogin7WithFedauthResponse(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
         break;
       case 'ntlm':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
         this.handleLogin7WithNtlmResponse(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
         break;
       default:
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
         this.handleLogin7WithStandardLoginResponse(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
@@ -3264,6 +3254,8 @@ class Connection extends EventEmitter {
   }
 
   async handleLogin7WithStandardLoginResponse(signal: AbortSignal) {
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+
     let message;
     try {
       message = await this.messageIo.readMessage();
@@ -3282,7 +3274,6 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.REROUTING);
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         this.loggedInSendingInitialSql(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
@@ -3306,6 +3297,8 @@ class Connection extends EventEmitter {
   }
 
   async handleLogin7WithNtlmResponse(signal: AbortSignal) {
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+
     while (true) {
       let message;
       try {
@@ -3326,7 +3319,6 @@ class Connection extends EventEmitter {
           this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
           return;
         } else {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
           this.loggedInSendingInitialSql(signal).catch((err) => {
             process.nextTick(() => { throw err; });
           });
@@ -3371,6 +3363,8 @@ class Connection extends EventEmitter {
   }
 
   async handleLogin7WithFedauthResponse(signal: AbortSignal) {
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+
     let message;
     try {
       message = await this.messageIo.readMessage();
@@ -3387,7 +3381,6 @@ class Connection extends EventEmitter {
         this.transitionTo(this.STATE.REROUTING);
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         this.loggedInSendingInitialSql(signal).catch((err) => {
           process.nextTick(() => { throw err; });
         });
@@ -3447,7 +3440,6 @@ class Connection extends EventEmitter {
       const token = tokenResponse.token;
       this.sendFedAuthTokenMessage(token);
       // sent the fedAuth token message, the rest is similar to standard login 7
-      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
       this.handleLogin7WithStandardLoginResponse(signal).catch((err) => {
         process.nextTick(() => { throw err; });
       });
@@ -3471,7 +3463,14 @@ class Connection extends EventEmitter {
 
   async loggedInSendingInitialSql(signal: AbortSignal) {
     this.sendInitialSql();
+    this.handleInitialSqlResponse(signal);
 
+    this.transitionTo(this.STATE.LOGGED_IN);
+    this.clearConnectTimer();
+    this.emit('connect');
+  }
+
+  async handleInitialSqlResponse(signal: AbortSignal) {
     let message;
     try {
       message = await this.messageIo.readMessage();
@@ -3480,9 +3479,6 @@ class Connection extends EventEmitter {
     }
     const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
     await once(tokenStreamParser, 'end');
-
-    this.transitionTo(this.STATE.LOGGED_IN);
-    this.processedInitialSql();
   }
 }
 
