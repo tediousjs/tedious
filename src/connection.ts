@@ -2314,10 +2314,7 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
 
-      this.transitionTo(this.STATE.CONNECTING);
-      this.initialiseConnection();
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
@@ -3271,8 +3268,7 @@ class Connection extends EventEmitter {
     if (handler.loginAckReceived) {
       if (handler.routingData) {
         this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
-        this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
+        return await this.handleRerouting();
       } else {
         return await this.loggedInSendingInitialSql(signal);
       }
@@ -3313,9 +3309,7 @@ class Connection extends EventEmitter {
       if (handler.loginAckReceived) {
         if (handler.routingData) {
           this.routingData = handler.routingData;
-          this.transitionTo(this.STATE.REROUTING);
-          this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
-          return;
+          return await this.handleRerouting();
         } else {
           return await this.loggedInSendingInitialSql(signal);
         }
@@ -3373,13 +3367,10 @@ class Connection extends EventEmitter {
     if (handler.loginAckReceived) {
       if (handler.routingData) {
         this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
-        this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
+        return await this.handleRerouting();
       } else {
         return await this.loggedInSendingInitialSql(signal);
       }
-
-      return;
     }
 
     const fedAuthInfoToken = handler.fedAuthInfoToken;
@@ -3470,6 +3461,25 @@ class Connection extends EventEmitter {
     }
     const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
     await once(tokenStreamParser, 'end');
+  }
+
+  async handleRerouting() {
+    this.transitionTo(this.STATE.REROUTING);
+
+    this.clearConnectTimer();
+    this.closeConnection();
+
+    this.emit('rerouting');
+
+    this.socket!.destroy();
+    this.socket = undefined;
+    this.closed = true;
+    this.loginError = undefined;
+
+    this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+
+    this.transitionTo(this.STATE.CONNECTING);
+    this.initialiseConnection();
   }
 }
 
