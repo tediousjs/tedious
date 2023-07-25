@@ -3275,6 +3275,9 @@ class Connection extends EventEmitter {
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.loggedInSendingInitialSql().catch((err) => {
+          process.nextTick(() => { throw err; });
+        });
       }
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
@@ -3313,7 +3316,11 @@ class Connection extends EventEmitter {
           this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
           return;
         } else {
-          return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          this.loggedInSendingInitialSql().catch((err) => {
+            process.nextTick(() => { throw err; });
+          });
+          return;
         }
       } else if (this.ntlmpacket) {
         const authentication = this.config.authentication as NtlmAuthentication;
@@ -3613,13 +3620,6 @@ Connection.prototype.STATE = {
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
-    enter: function() {
-      this.loggedInSendingInitialSql().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function socketError() {
         this.transitionTo(this.STATE.FINAL);
