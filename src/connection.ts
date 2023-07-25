@@ -2007,6 +2007,9 @@ class Connection extends EventEmitter {
 
     this.sendPreLogin();
     this.transitionTo(this.STATE.SENT_PRELOGIN);
+    this.sentPrelogin().catch((err) => {
+      process.nextTick(() => { throw err; });
+    });
   }
 
   wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
@@ -3192,6 +3195,99 @@ class Connection extends EventEmitter {
         return 'read committed';
     }
   }
+
+  async sentPrelogin() {
+    let messageBuffer = Buffer.alloc(0);
+
+    let message;
+    try {
+      message = await this.messageIo.readMessage();
+    } catch (err: any) {
+      return this.socketError(err);
+    }
+
+    for await (const data of message) {
+      messageBuffer = Buffer.concat([messageBuffer, data]);
+    }
+
+    const preloginPayload = new PreloginPayload(messageBuffer);
+    this.debug.payload(function() {
+      return preloginPayload.toString('  ');
+    });
+
+    if (preloginPayload.fedAuthRequired === 1) {
+      this.fedAuthRequired = true;
+    }
+    if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+      if (!this.config.options.encrypt) {
+        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+        return this.close();
+      }
+
+      try {
+        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+      } catch (err: any) {
+        return this.socketError(err);
+      }
+    }
+
+    this.sendLogin7Packet();
+
+    const { authentication } = this.config;
+
+    switch (authentication.type) {
+      case 'azure-active-directory-password':
+      case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-msi-app-service':
+      case 'azure-active-directory-service-principal-secret':
+      case 'azure-active-directory-default':
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        break;
+      case 'ntlm':
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        break;
+      default:
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        break;
+    }
+  }
+
+  async sentLogin7WithStandardLogin() {
+    let message;
+    try {
+      message = await this.messageIo.readMessage();
+    } catch (err: any) {
+      return this.socketError(err);
+    }
+
+    const handler = new Login7TokenHandler(this);
+    const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+    await once(tokenStreamParser, 'end');
+
+    if (handler.loginAckReceived) {
+      if (handler.routingData) {
+        this.routingData = handler.routingData;
+        this.transitionTo(this.STATE.REROUTING);
+      } else {
+        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      }
+    } else if (this.loginError) {
+      if (isTransientError(this.loginError)) {
+        this.debug.log('Initiating retry on transient error');
+        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+      } else {
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+      }
+    } else {
+      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+      this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+    }
+  }
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {
@@ -3227,68 +3323,6 @@ Connection.prototype.STATE = {
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
-    enter: function() {
-      (async () => {
-        let messageBuffer = Buffer.alloc(0);
-
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
-        }
-
-        for await (const data of message) {
-          messageBuffer = Buffer.concat([messageBuffer, data]);
-        }
-
-        const preloginPayload = new PreloginPayload(messageBuffer);
-        this.debug.payload(function() {
-          return preloginPayload.toString('  ');
-        });
-
-        if (preloginPayload.fedAuthRequired === 1) {
-          this.fedAuthRequired = true;
-        }
-        if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
-          if (!this.config.options.encrypt) {
-            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-            return this.close();
-          }
-
-          try {
-            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-          } catch (err: any) {
-            return this.socketError(err);
-          }
-        }
-
-        this.sendLogin7Packet();
-
-        const { authentication } = this.config;
-
-        switch (authentication.type) {
-          case 'azure-active-directory-password':
-          case 'azure-active-directory-msi-vm':
-          case 'azure-active-directory-msi-app-service':
-          case 'azure-active-directory-service-principal-secret':
-          case 'azure-active-directory-default':
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            break;
-          case 'ntlm':
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            break;
-          default:
-            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            break;
-        }
-      })().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3359,41 +3393,7 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
     enter: function() {
-      (async () => {
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
-        }
-
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-        await once(tokenStreamParser, 'end');
-
-        if (handler.loginAckReceived) {
-          if (handler.routingData) {
-            this.routingData = handler.routingData;
-            this.transitionTo(this.STATE.REROUTING);
-          } else {
-            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-          }
-        } else if (this.loginError) {
-          if (isTransientError(this.loginError)) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-          } else {
-            this.emit('connect', this.loginError);
-            this.transitionTo(this.STATE.FINAL);
-            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-          }
-        } else {
-          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-          this.transitionTo(this.STATE.FINAL);
-          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-        }
-      })().catch((err) => {
+      this.sentLogin7WithStandardLogin().catch((err) => {
         process.nextTick(() => {
           throw err;
         });
