@@ -76,6 +76,17 @@ title: F.E.Q.
     </dd>
     <br />
     <dt>
+        <h2>Providing a client ID when using <code>azure-active-directory-password</code></h2>
+    </dt>
+    <dd>
+        <p>The clientId field is now mandatory when using the <code>azure-active-directory-password</code> authentication type.</p>
+        <p>Microsoft-owned drivers have a default hard-coded client ID. Because Tedious is NOT a Microsoft-owned driver, 
+            the previously provided default client ID has been removed from Tedious. It will expire in the near future and stop working.</p>
+        <p>Please refer to the <a href="https://tediousjs.github.io/tedious/api-connection.html#function_newConnection">connection</a> 
+            API documentation for more information and alternate Azure connection methods.</p>
+    </dd>
+    <br />
+    <dt>
         <h2>Remote Azure Connection</h2>
     </dt>
     <dd>
