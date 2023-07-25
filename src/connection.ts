@@ -3288,6 +3288,166 @@ class Connection extends EventEmitter {
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
     }
   }
+
+  async sentLogin7WithNtlm() {
+    while (true) {
+      let message;
+      try {
+        message = await this.messageIo.readMessage();
+      } catch (err: any) {
+        return this.socketError(err);
+      }
+
+      const handler = new Login7TokenHandler(this);
+      const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+      await once(tokenStreamParser, 'end');
+
+      if (handler.loginAckReceived) {
+        if (handler.routingData) {
+          this.routingData = handler.routingData;
+          return this.transitionTo(this.STATE.REROUTING);
+        } else {
+          return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        }
+      } else if (this.ntlmpacket) {
+        const authentication = this.config.authentication as NtlmAuthentication;
+
+        const payload = new NTLMResponsePayload({
+          domain: authentication.options.domain,
+          userName: authentication.options.userName,
+          password: authentication.options.password,
+          ntlmpacket: this.ntlmpacket
+        });
+
+        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+        this.debug.payload(function() {
+          return payload.toString('  ');
+        });
+
+        this.ntlmpacket = undefined;
+      } else if (this.loginError) {
+        if (isTransientError(this.loginError)) {
+          this.debug.log('Initiating retry on transient error');
+          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        } else {
+          this.emit('connect', this.loginError);
+          this.transitionTo(this.STATE.FINAL);
+          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+          return;
+        }
+      } else {
+        this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+        this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+        return;
+      }
+    }
+  }
+
+  async sentLogin7WithFedauth() {
+    let message;
+    try {
+      message = await this.messageIo.readMessage();
+    } catch (err: any) {
+      return this.socketError(err);
+    }
+
+    const handler = new Login7TokenHandler(this);
+    const tokenStreamParser = this.createTokenStreamParser(message, handler);
+    await once(tokenStreamParser, 'end');
+    if (handler.loginAckReceived) {
+      if (handler.routingData) {
+        this.routingData = handler.routingData;
+        this.transitionTo(this.STATE.REROUTING);
+      } else {
+        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      }
+
+      return;
+    }
+
+    const fedAuthInfoToken = handler.fedAuthInfoToken;
+
+    if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+      const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+      const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+
+      let credentials;
+
+      switch (authentication.type) {
+        case 'azure-active-directory-password':
+          credentials = new UsernamePasswordCredential(
+            authentication.options.tenantId ?? 'common',
+            authentication.options.clientId,
+            authentication.options.userName,
+            authentication.options.password
+          );
+          break;
+        case 'azure-active-directory-msi-vm':
+        case 'azure-active-directory-msi-app-service':
+          const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+          credentials = new ManagedIdentityCredential(...msiArgs);
+          break;
+        case 'azure-active-directory-default':
+          const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+          credentials = new DefaultAzureCredential(args);
+          break;
+        case 'azure-active-directory-service-principal-secret':
+          credentials = new ClientSecretCredential(
+            authentication.options.tenantId,
+            authentication.options.clientId,
+            authentication.options.clientSecret
+          );
+          break;
+      }
+
+      let tokenResponse;
+      try {
+        tokenResponse = await credentials.getToken(tokenScope);
+      } catch (err) {
+        this.loginError = new AggregateError(
+          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+        return;
+      }
+
+
+      const token = tokenResponse.token;
+      this.sendFedAuthTokenMessage(token);
+
+    } else if (this.loginError) {
+      if (isTransientError(this.loginError)) {
+        this.debug.log('Initiating retry on transient error');
+        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+      } else {
+        this.emit('connect', this.loginError);
+        this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+      }
+    } else {
+      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+      this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+    }
+  }
+
+  async loggedInSendingInitialSql() {
+    this.sendInitialSql();
+    let message;
+    try {
+      message = await this.messageIo.readMessage();
+    } catch (err: any) {
+      return this.socketError(err);
+    }
+    const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+    await once(tokenStreamParser, 'end');
+
+    this.transitionTo(this.STATE.LOGGED_IN);
+    this.processedInitialSql();
+  }
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {
@@ -3413,61 +3573,7 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
     enter: function() {
-      (async () => {
-        while (true) {
-          let message;
-          try {
-            message = await this.messageIo.readMessage();
-          } catch (err: any) {
-            return this.socketError(err);
-          }
-
-          const handler = new Login7TokenHandler(this);
-          const tokenStreamParser = this.createTokenStreamParser(message, handler);
-
-          await once(tokenStreamParser, 'end');
-
-          if (handler.loginAckReceived) {
-            if (handler.routingData) {
-              this.routingData = handler.routingData;
-              return this.transitionTo(this.STATE.REROUTING);
-            } else {
-              return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
-          } else if (this.ntlmpacket) {
-            const authentication = this.config.authentication as NtlmAuthentication;
-
-            const payload = new NTLMResponsePayload({
-              domain: authentication.options.domain,
-              userName: authentication.options.userName,
-              password: authentication.options.password,
-              ntlmpacket: this.ntlmpacket
-            });
-
-            this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-            this.debug.payload(function() {
-              return payload.toString('  ');
-            });
-
-            this.ntlmpacket = undefined;
-          } else if (this.loginError) {
-            if (isTransientError(this.loginError)) {
-              this.debug.log('Initiating retry on transient error');
-              return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-              this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-              return;
-            }
-          } else {
-            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
-            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-            return;
-          }
-        }
-      })().catch((err) => {
+      this.sentLogin7WithNtlm().catch((err) => {
         process.nextTick(() => {
           throw err;
         });
@@ -3487,95 +3593,7 @@ Connection.prototype.STATE = {
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7Withfedauth',
     enter: function() {
-      (async () => {
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
-        }
-
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-        await once(tokenStreamParser, 'end');
-        if (handler.loginAckReceived) {
-          if (handler.routingData) {
-            this.routingData = handler.routingData;
-            this.transitionTo(this.STATE.REROUTING);
-          } else {
-            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-          }
-
-          return;
-        }
-
-        const fedAuthInfoToken = handler.fedAuthInfoToken;
-
-        if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
-          const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
-
-          let credentials;
-
-          switch (authentication.type) {
-            case 'azure-active-directory-password':
-              credentials = new UsernamePasswordCredential(
-                authentication.options.tenantId ?? 'common',
-                authentication.options.clientId,
-                authentication.options.userName,
-                authentication.options.password
-              );
-              break;
-            case 'azure-active-directory-msi-vm':
-            case 'azure-active-directory-msi-app-service':
-              const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-              credentials = new ManagedIdentityCredential(...msiArgs);
-              break;
-            case 'azure-active-directory-default':
-              const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-              credentials = new DefaultAzureCredential(args);
-              break;
-            case 'azure-active-directory-service-principal-secret':
-              credentials = new ClientSecretCredential(
-                authentication.options.tenantId,
-                authentication.options.clientId,
-                authentication.options.clientSecret
-              );
-              break;
-          }
-
-          let tokenResponse;
-          try {
-            tokenResponse = await credentials.getToken(tokenScope);
-          } catch (err) {
-            this.loginError = new AggregateError(
-              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-            this.emit('connect', this.loginError);
-            this.transitionTo(this.STATE.FINAL);
-            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-            return;
-          }
-
-
-          const token = tokenResponse.token;
-          this.sendFedAuthTokenMessage(token);
-
-        } else if (this.loginError) {
-          if (isTransientError(this.loginError)) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-          } else {
-            this.emit('connect', this.loginError);
-            this.transitionTo(this.STATE.FINAL);
-            this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-          }
-        } else {
-          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-          this.transitionTo(this.STATE.FINAL);
-          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-        }
-
-      })().catch((err) => {
+      this.sentLogin7WithFedauth().catch((err) => {
         process.nextTick(() => {
           throw err;
         });
@@ -3595,21 +3613,7 @@ Connection.prototype.STATE = {
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      (async () => {
-        this.sendInitialSql();
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
-        }
-        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-        await once(tokenStreamParser, 'end');
-
-        this.transitionTo(this.STATE.LOGGED_IN);
-        this.processedInitialSql();
-
-      })().catch((err) => {
+      this.loggedInSendingInitialSql().catch((err) => {
         process.nextTick(() => {
           throw err;
         });
