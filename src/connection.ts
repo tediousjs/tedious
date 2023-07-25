@@ -2423,11 +2423,6 @@ class Connection extends EventEmitter {
     offset = data.writeUInt32LE(accessTokenLen, offset);
     data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
-    // sent the fedAuth token message, the rest is similar to standard login 7
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-    this.sentLogin7WithStandardLogin().catch((err) => {
-      process.nextTick(() => { throw err; });
-    });
   }
 
   /**
@@ -3442,7 +3437,11 @@ class Connection extends EventEmitter {
 
       const token = tokenResponse.token;
       this.sendFedAuthTokenMessage(token);
-
+      // sent the fedAuth token message, the rest is similar to standard login 7
+      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+      this.sentLogin7WithStandardLogin().catch((err) => {
+        process.nextTick(() => { throw err; });
+      });
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
