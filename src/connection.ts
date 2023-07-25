@@ -2043,16 +2043,22 @@ class Connection extends EventEmitter {
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
     try {
-      let socket = await connect(connectOpts, dns.lookup, signal);
+      let socket;
+
+      try {
+        socket = await connect(connectOpts, dns.lookup, signal);
+      } catch (err: any) {
+        throw this.wrapSocketError(err);
+      }
 
       if (this.config.options.encrypt === 'strict') {
         try {
           // Wrap the socket with TLS for TDS 8.0
           socket = await this.wrapWithTls(socket);
-        } catch (err) {
+        } catch (err: any) {
           socket.end();
 
-          throw err;
+          throw this.wrapSocketError(err);
         }
       }
 
@@ -2068,7 +2074,12 @@ class Connection extends EventEmitter {
         return;
       }
 
-      process.nextTick(() => { this.socketError(err); });
+      this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+
+      process.nextTick(() => {
+        this.emit('connect', err);
+      });
     }
   }
 
@@ -3173,7 +3184,7 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     for await (const data of message) {
@@ -3190,15 +3201,14 @@ class Connection extends EventEmitter {
     }
     if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
       if (!this.config.options.encrypt) {
-        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
+        throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
       }
 
       try {
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
         await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
       } catch (err: any) {
-        return this.socketError(err);
+        throw this.wrapSocketError(err);
       }
     }
 
@@ -3229,7 +3239,7 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     const handler = new Login7TokenHandler(this);
@@ -3248,14 +3258,10 @@ class Connection extends EventEmitter {
       if (isTransientError(this.loginError)) {
         return await this.handleRetry(signal);
       } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+        throw this.loginError;
       }
     } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
-      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+      throw new ConnectionError('Login failed.', 'ELOGIN');
     }
   }
 
@@ -3267,7 +3273,7 @@ class Connection extends EventEmitter {
       try {
         message = await this.messageIo.readMessage();
       } catch (err: any) {
-        return this.socketError(err);
+        throw this.wrapSocketError(err);
       }
 
       const handler = new Login7TokenHandler(this);
@@ -3302,16 +3308,10 @@ class Connection extends EventEmitter {
         if (isTransientError(this.loginError)) {
           return await this.handleRetry(signal);
         } else {
-          this.emit('connect', this.loginError);
-          this.transitionTo(this.STATE.FINAL);
-          this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-          return;
+          throw this.loginError;
         }
       } else {
-        this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-        return;
+        throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     }
   }
@@ -3323,7 +3323,7 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     const handler = new Login7TokenHandler(this);
@@ -3377,31 +3377,22 @@ class Connection extends EventEmitter {
       try {
         tokenResponse = await credentials.getToken(tokenScope);
       } catch (err) {
-        this.loginError = new AggregateError(
-          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-        return;
+        throw new AggregateError([new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
       }
-
 
       const token = tokenResponse.token;
       this.sendFedAuthTokenMessage(token);
+
       // sent the fedAuth token message, the rest is similar to standard login 7
       return await this.handleLogin7WithStandardLoginResponse(signal);
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
         return await this.handleRetry(signal);
       } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+        throw this.loginError;
       }
     } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
-      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+      throw new ConnectionError('Login failed.', 'ELOGIN');
     }
   }
 
@@ -3419,8 +3410,9 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
+
     const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
     await once(tokenStreamParser, 'end');
   }
