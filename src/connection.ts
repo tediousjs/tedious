@@ -3382,6 +3382,9 @@ class Connection extends EventEmitter {
         this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.loggedInSendingInitialSql().catch((err) => {
+          process.nextTick(() => { throw err; });
+        });
       }
 
       return;
