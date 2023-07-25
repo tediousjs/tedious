@@ -3274,10 +3274,7 @@ class Connection extends EventEmitter {
       }
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        this.curTransientRetryCount++;
-        this.cleanupConnection(CLEANUP_TYPE.RETRY);
+        return await this.handleRetry();
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3331,11 +3328,7 @@ class Connection extends EventEmitter {
         this.ntlmpacket = undefined;
       } else if (this.loginError) {
         if (isTransientError(this.loginError)) {
-          this.debug.log('Initiating retry on transient error');
-          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-          this.curTransientRetryCount++;
-          this.cleanupConnection(CLEANUP_TYPE.RETRY);
-          return;
+          return await this.handleRetry();
         } else {
           this.emit('connect', this.loginError);
           this.transitionTo(this.STATE.FINAL);
@@ -3427,10 +3420,7 @@ class Connection extends EventEmitter {
       return await this.handleLogin7WithStandardLoginResponse(signal);
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        this.curTransientRetryCount++;
-        this.cleanupConnection(CLEANUP_TYPE.RETRY);
+        return await this.handleRetry();
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3480,6 +3470,13 @@ class Connection extends EventEmitter {
 
     this.transitionTo(this.STATE.CONNECTING);
     this.initialiseConnection();
+  }
+
+  async handleRetry() {
+    this.debug.log('Initiating retry on transient error');
+    this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+    this.curTransientRetryCount++;
+    this.cleanupConnection(CLEANUP_TYPE.RETRY);
   }
 }
 
