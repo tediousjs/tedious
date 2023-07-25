@@ -2150,7 +2150,9 @@ class Connection extends EventEmitter {
     this.debug.log(message);
     this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
-    this.dispatchEvent('connectTimeout');
+
+    this.transitionTo(this.STATE.FINAL);
+    this.cleanupConnection(CLEANUP_TYPE.NORMAL);
   }
 
   /**
@@ -3492,10 +3494,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3503,10 +3501,6 @@ Connection.prototype.STATE = {
     name: 'SentPrelogin',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
@@ -3520,10 +3514,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3535,10 +3525,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3546,10 +3532,6 @@ Connection.prototype.STATE = {
     name: 'SentTLSSSLNegotiation',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
@@ -3561,10 +3543,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3572,10 +3550,6 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithNTLMLogin',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
@@ -3587,10 +3561,6 @@ Connection.prototype.STATE = {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
     }
   },
@@ -3598,10 +3568,6 @@ Connection.prototype.STATE = {
     name: 'LoggedInSendingInitialSql',
     events: {
       socketError: function socketError() {
-        this.transitionTo(this.STATE.FINAL);
-        this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
@@ -3762,9 +3728,6 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     events: {
-      connectTimeout: function() {
-        // Do nothing, as the timer should be cleaned up.
-      },
       message: function() {
         // Do nothing
       },
