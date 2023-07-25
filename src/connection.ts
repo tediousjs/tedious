@@ -1018,10 +1018,6 @@ class Connection extends EventEmitter {
    * @private
    */
   requestTimer: undefined | NodeJS.Timeout;
-  /**
-   * @private
-   */
-  retryTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
@@ -1959,7 +1955,6 @@ class Connection extends EventEmitter {
     if (!this.closed) {
       this.clearConnectTimer();
       this.clearRequestTimer();
-      this.clearRetryTimer();
       this.closeConnection();
       if (cleanupType === CLEANUP_TYPE.REDIRECT) {
         this.emit('rerouting');
@@ -2128,16 +2123,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createRetryTimer() {
-    this.clearRetryTimer();
-    this.retryTimer = setTimeout(() => {
-      this.retryTimeout();
-    }, this.config.options.connectionRetryInterval);
-  }
-
-  /**
-   * @private
-   */
   connectTimeout() {
     const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
     // If we have routing data stored, this connection has been redirected
@@ -2179,16 +2164,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  retryTimeout() {
-    this.retryTimer = undefined;
-    this.emit('retry');
-    this.transitionTo(this.STATE.CONNECTING);
-    this.initialiseConnection();
-  }
-
-  /**
-   * @private
-   */
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
@@ -2213,16 +2188,6 @@ class Connection extends EventEmitter {
     if (this.requestTimer) {
       clearTimeout(this.requestTimer);
       this.requestTimer = undefined;
-    }
-  }
-
-  /**
-   * @private
-   */
-  clearRetryTimer() {
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = undefined;
     }
   }
 
@@ -3473,7 +3438,6 @@ class Connection extends EventEmitter {
     this.curTransientRetryCount++;
 
     this.clearConnectTimer();
-    this.clearRetryTimer();
     this.closeConnection();
 
     this.socket = undefined;
@@ -3484,7 +3448,14 @@ class Connection extends EventEmitter {
     const port = this.routingData ? this.routingData.port : this.config.options.port;
     this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-    this.createRetryTimer();
+    await new Promise<void>((resolve, _reject) => {
+      setTimeout(resolve, this.config.options.connectionRetryInterval);
+    });
+
+    this.emit('retry');
+
+    this.transitionTo(this.STATE.CONNECTING);
+    this.initialiseConnection();
   }
 }
 
