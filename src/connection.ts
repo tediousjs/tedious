@@ -3463,7 +3463,7 @@ class Connection extends EventEmitter {
 
   async loggedInSendingInitialSql(signal: AbortSignal) {
     this.sendInitialSql();
-    this.handleInitialSqlResponse(signal);
+    await this.handleInitialSqlResponse(signal);
 
     this.transitionTo(this.STATE.LOGGED_IN);
     this.clearConnectTimer();
