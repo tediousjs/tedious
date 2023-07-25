@@ -1919,30 +1919,37 @@ class Connection extends EventEmitter {
   initialiseConnection() {
     const signal = this.createConnectTimer();
 
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
-    } else {
-      return instanceLookup({
-        server: this.config.server,
-        instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout,
-        signal: signal
-      }).then((port) => {
-        process.nextTick(() => {
-          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+    this.establishConnection(signal).catch((err) => {
+      process.nextTick(() => { throw err; });
+    });
+  }
+
+  async establishConnection(signal: AbortSignal) {
+    let port = this.config.options.port;
+
+    if (!port) {
+      try {
+        port = await instanceLookup({
+          server: this.config.server,
+          instanceName: this.config.options.instanceName!,
+          timeout: this.config.options.connectTimeout,
+          signal: signal
         });
-      }, (err) => {
+      } catch (err: any) {
         this.clearConnectTimer();
+
         if (err.name === 'AbortError') {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
         }
 
-        process.nextTick(() => {
+        return process.nextTick(() => {
           this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
         });
-      });
+      }
     }
+
+    await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
   }
 
   /**
@@ -2031,7 +2038,7 @@ class Connection extends EventEmitter {
     });
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+  async connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
@@ -2040,7 +2047,7 @@ class Connection extends EventEmitter {
 
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
-    (async () => {
+    try {
       let socket = await connect(connectOpts, dns.lookup, signal);
 
       if (this.config.options.encrypt === 'strict') {
@@ -2058,10 +2065,8 @@ class Connection extends EventEmitter {
 
       this.sendPreLogin();
       this.transitionTo(this.STATE.SENT_PRELOGIN);
-      this.handlePreloginResponse(signal).catch((err) => {
-        process.nextTick(() => { throw err; });
-      });
-    })().catch((err) => {
+      return await this.handlePreloginResponse(signal);
+    } catch (err: any) {
       this.clearConnectTimer();
 
       if (err.name === 'AbortError') {
@@ -2069,7 +2074,7 @@ class Connection extends EventEmitter {
       }
 
       process.nextTick(() => { this.socketError(err); });
-    });
+    }
   }
 
   /**
@@ -3236,20 +3241,13 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
       case 'azure-active-directory-default':
-        this.handleLogin7WithFedauthResponse(signal).catch((err) => {
-          process.nextTick(() => { throw err; });
-        });
-        break;
+        return await this.handleLogin7WithFedauthResponse(signal);
+
       case 'ntlm':
-        this.handleLogin7WithNtlmResponse(signal).catch((err) => {
-          process.nextTick(() => { throw err; });
-        });
-        break;
+        return await this.handleLogin7WithNtlmResponse(signal);
+
       default:
-        this.handleLogin7WithStandardLoginResponse(signal).catch((err) => {
-          process.nextTick(() => { throw err; });
-        });
-        break;
+        return await this.handleLogin7WithStandardLoginResponse(signal);
     }
   }
 
@@ -3433,9 +3431,7 @@ class Connection extends EventEmitter {
       const token = tokenResponse.token;
       this.sendFedAuthTokenMessage(token);
       // sent the fedAuth token message, the rest is similar to standard login 7
-      this.handleLogin7WithStandardLoginResponse(signal).catch((err) => {
-        process.nextTick(() => { throw err; });
-      });
+      return await this.handleLogin7WithStandardLoginResponse(signal);
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
