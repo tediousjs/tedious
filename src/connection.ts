@@ -2316,11 +2316,7 @@ class Connection extends EventEmitter {
     if (this.state === this.STATE.REROUTING) {
 
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
-      const server = this.routingData ? this.routingData.server : this.config.server;
-      const port = this.routingData ? this.routingData.port : this.config.options.port;
-      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-      this.createRetryTimer();
     } else {
       this.transitionTo(this.STATE.FINAL);
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
@@ -3461,7 +3457,6 @@ class Connection extends EventEmitter {
 
     this.emit('rerouting');
 
-    this.socket!.destroy();
     this.socket = undefined;
     this.closed = true;
     this.loginError = undefined;
@@ -3476,7 +3471,20 @@ class Connection extends EventEmitter {
     this.debug.log('Initiating retry on transient error');
     this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
     this.curTransientRetryCount++;
-    this.cleanupConnection(CLEANUP_TYPE.RETRY);
+
+    this.clearConnectTimer();
+    this.clearRetryTimer();
+    this.closeConnection();
+
+    this.socket = undefined;
+    this.closed = true;
+    this.loginError = undefined;
+
+    const server = this.routingData ? this.routingData.server : this.config.server;
+    const port = this.routingData ? this.routingData.port : this.config.options.port;
+    this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+    this.createRetryTimer();
   }
 }
 
