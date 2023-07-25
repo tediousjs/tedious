@@ -3248,6 +3248,9 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-service-principal-secret':
       case 'azure-active-directory-default':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        this.sentLogin7WithFedauth().catch((err) => {
+          process.nextTick(() => { throw err; });
+        });
         break;
       case 'ntlm':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
@@ -3595,13 +3598,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7Withfedauth',
-    enter: function() {
-      this.sentLogin7WithFedauth().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
