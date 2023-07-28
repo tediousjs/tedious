@@ -41,6 +41,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
+import AbortError from './errors/abort-error';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
@@ -2008,7 +2009,11 @@ class Connection extends EventEmitter {
     this.transitionTo(this.STATE.SENT_PRELOGIN);
   }
 
-  wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
+  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+    if (signal.aborted) {
+      throw new AbortError();
+    }
+
     return new Promise((resolve, reject) => {
       const secureContext = tls.createSecureContext(this.secureContextOptions);
       // If connect to an ip address directly,
@@ -2023,12 +2028,41 @@ class Connection extends EventEmitter {
         servername: this.config.options.serverName ? this.config.options.serverName : serverName,
       };
 
-      const encryptsocket = tls.connect(encryptOptions, () => {
-        encryptsocket.removeListener('error', reject);
-        resolve(encryptsocket);
-      });
+      const encryptsocket = tls.connect(encryptOptions);
 
-      encryptsocket.once('error', reject);
+      const onAbort = () => {
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(new AbortError());
+      };
+
+      const onError = (err: Error) => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(err);
+      };
+
+      const onConnect = () => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        resolve(encryptsocket);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      encryptsocket.on('error', onError);
+      encryptsocket.on('secureConnect', onConnect);
     });
   }
 
@@ -2047,7 +2081,7 @@ class Connection extends EventEmitter {
       if (this.config.options.encrypt === 'strict') {
         try {
           // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket);
+          socket = await this.wrapWithTls(socket, signal);
         } catch (err) {
           socket.end();
 

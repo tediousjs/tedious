@@ -549,12 +549,12 @@ describe('Encrypt Test', function() {
           return callback(err);
         }
 
-        if (!productMajorVersion || productMajorVersion < '2022') {
+        if (!productMajorVersion || productMajorVersion < '16') {
           connection.close();
           return callback(null, false);
         }
 
-        if (productMajorVersion > '2022') {
+        if (productMajorVersion > '16') {
           connection.close();
           return callback(null, true);
         }
