@@ -1,7 +1,7 @@
 const { assert } = require('chai');
 const net = require('net');
 
-const { Connection } = require('../../src/tedious');
+const { Connection, ConnectionError } = require('../../src/tedious');
 const IncomingMessageStream = require('../../src/incoming-message-stream');
 const OutgoingMessageStream = require('../../src/outgoing-message-stream');
 const Debug = require('../../src/debug');
@@ -377,6 +377,87 @@ describe('Connecting to a server that sends a re-routing information', function(
           err ? reject(err) : resolve(err);
         });
       });
+    } finally {
+      connection.close();
+    }
+  });
+
+  it('it should throw an error with redirect information when targetserver connection failed', async function() {
+    routingServer.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          const chunks = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          const chunks = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.write(buildLoginAckToken());
+          responseMessage.end(buildRoutingEnvChangeToken('test.invalid', targetServer.address().port));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // No further messages, connection closed on remote
+        {
+          const { done } = await messageIterator.next();
+          assert.isTrue(done);
+        }
+      } catch (err) {
+        process.nextTick(() => {
+          throw err;
+        });
+      } finally {
+        connection.end();
+      }
+    });
+
+    const connection = new Connection({
+      server: routingServer.address().address,
+      options: {
+        port: routingServer.address().port,
+        encrypt: false
+      }
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        connection.connect((err) => {
+          err ? reject(err) : resolve(err);
+        });
+      });
+    } catch (err) {
+      assert.instanceOf(err, ConnectionError);
+      const message = `Failed to connect to test.invalid:${targetServer.address().port} (redirected from ${routingServer.address().address}:${routingServer.address().port})`;
+      assert.include(err.message, message);
     } finally {
       connection.close();
     }

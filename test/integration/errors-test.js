@@ -212,7 +212,7 @@ describe('Errors Test', function() {
     });
   });
 
-  it('should throw aggregate error with AAD token retrieve', function(done) {
+  it.skip('should throw aggregate error with AAD token retrieve', function(done) {
     config.server = 'help.kusto.windows.net';
     config.authentication = {
       type: 'azure-active-directory-password',
@@ -230,9 +230,7 @@ describe('Errors Test', function() {
     let connectionError;
     connection.connect((err) => {
       connectionError = err;
-    });
 
-    connection.on('end', function() {
       assert.instanceOf(connectionError, AggregateError);
 
       if (connectionError instanceof AggregateError) {

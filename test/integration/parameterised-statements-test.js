@@ -4,6 +4,7 @@ const fs = require('fs');
 const assert = require('chai').assert;
 const TYPES = require('../../src/data-type').typeByName;
 
+import async from 'async';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 
@@ -984,6 +985,150 @@ describe('Parameterised Statements Test', function() {
       new Date('January 1, 1998 22:59:59.999'),
       new Date('January 1, 1998 23:00:00.000')
     );
+  });
+
+  it('supports TVP values', function(done) {
+    const config = getConfig();
+    const connection = new Connection(config);
+
+    if (config.options.tdsVersion < '7_3_A') {
+      this.skip();
+    }
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      async.series([
+        (next) => {
+          connection.execSqlBatch(new Request(`
+            BEGIN TRY
+              DROP TYPE TediousTestType
+            END TRY
+            BEGIN CATCH
+            END CATCH
+          `, next));
+        },
+        (next) => {
+          connection.execSqlBatch(new Request(`
+            CREATE TYPE TediousTestType AS TABLE (
+              a bit,
+              b tinyint,
+              c smallint,
+              d int,
+              e bigint,
+              f real,
+              g float,
+              h varchar(100),
+              i nvarchar(100),
+              j datetime
+            )
+          `, next));
+        }
+      ], (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request('select * from @param', function(err) {
+          if (err) {
+            return done(err);
+          }
+
+          connection.close();
+        });
+
+        request.addParameter('param', TYPES.TVP, {
+          name: 'TediousTestType',
+
+          columns: [
+            {
+              name: 'a',
+              type: TYPES.Bit
+            },
+            {
+              name: 'b',
+              type: TYPES.TinyInt
+            },
+            {
+              name: 'c',
+              type: TYPES.SmallInt
+            },
+            {
+              name: 'd',
+              type: TYPES.Int
+            },
+            {
+              name: 'e',
+              type: TYPES.BigInt
+            },
+            {
+              name: 'f',
+              type: TYPES.Real
+            },
+            {
+              name: 'g',
+              type: TYPES.Float
+            },
+            {
+              name: 'h',
+              type: TYPES.VarChar,
+              length: 100
+            },
+            {
+              name: 'i',
+              type: TYPES.NVarChar,
+              length: 100
+            },
+            {
+              name: 'j',
+              type: TYPES.DateTime,
+              length: 100
+            }
+          ],
+          rows: [
+            [
+              false,
+              1,
+              2,
+              3,
+              4,
+              5.5,
+              6.6,
+              'asdf',
+              'asdf',
+              new Date(Date.UTC(2014, 0, 1))
+            ]
+          ]
+        });
+
+        request.on('doneInProc', function(rowCount, more) {
+          assert.ok(more);
+          assert.strictEqual(rowCount, 1);
+        });
+
+        request.on('row', function(columns) {
+          assert.strictEqual(columns.length, 10);
+          assert.strictEqual(columns[0].value, false);
+          assert.strictEqual(columns[1].value, 1);
+          assert.strictEqual(columns[2].value, 2);
+          assert.strictEqual(columns[3].value, 3);
+          assert.strictEqual(columns[4].value, '4');
+          assert.strictEqual(columns[5].value, 5.5);
+          assert.strictEqual(columns[6].value, 6.6);
+          assert.strictEqual(columns[7].value, 'asdf');
+          assert.strictEqual(columns[8].value, 'asdf');
+          assert.deepEqual(columns[9].value, new Date(Date.UTC(2014, 0, 1)));
+        });
+
+        connection.on('end', function() {
+          done();
+        });
+
+        connection.execSql(request);
+      });
+    });
   });
 
   // This test fails on the version of SQL Server in AppVeyor.

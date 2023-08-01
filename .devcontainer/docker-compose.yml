@@ -2,11 +2,11 @@ version: '3'
 
 services:
   app:
-    image: "mcr.microsoft.com/vscode/devcontainers/javascript-node:14"
+    image: "mcr.microsoft.com/devcontainers/javascript-node:16"
 
     volumes:
       - "..:/workspace:cached"
-      - "./test-connection.json:/root/.tedious/test-connection.json"
+      - "./test-connection.json:/home/node/.tedious/test-connection.json"
 
     # Overrides default command so things don't shut down after the process ends.
     command: "sleep infinity"
@@ -15,10 +15,13 @@ services:
       - mssql
 
   mssql:
-    image: "mcr.microsoft.com/mssql/server:2019-latest"
+    image: mcr.microsoft.com/mssql/server:2022-latest
 
     restart: unless-stopped
 
     environment:
       - "ACCEPT_EULA=Y"
       - "SA_PASSWORD=yourStrong(!)Password"
+
+    ports:
+      - "1433:1433"
