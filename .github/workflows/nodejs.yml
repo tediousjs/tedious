@@ -349,6 +349,11 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+    - name: run integration tests (TDS 7.1)
+      env:
+        TEDIOUS_TDS_VERSION: 7_1
+      run: npx nyc --reporter=lcov npm run test-integration
+
     - uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
