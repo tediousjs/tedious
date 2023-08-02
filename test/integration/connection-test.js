@@ -532,6 +532,10 @@ describe('Encrypt Test', function() {
    * @param {(err: Error | null, supportsTds8?: boolean) => void} callback
    */
   function supportsTds8(config, callback) {
+    if (config.options.tdsVersion < '7_2') {
+      return callback(null, false);
+    }
+
     const connection = new Connection(config);
 
     connection.connect((err) => {
@@ -549,12 +553,12 @@ describe('Encrypt Test', function() {
           return callback(err);
         }
 
-        if (!productMajorVersion || productMajorVersion < '2022') {
+        if (!productMajorVersion || productMajorVersion < '16') {
           connection.close();
           return callback(null, false);
         }
 
-        if (productMajorVersion > '2022') {
+        if (productMajorVersion > '16') {
           connection.close();
           return callback(null, true);
         }
