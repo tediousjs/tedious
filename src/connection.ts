@@ -41,7 +41,6 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
-import AbortError from './errors/abort-error';
 import { Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
@@ -2010,9 +2009,7 @@ class Connection extends EventEmitter {
   }
 
   wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
-    if (signal.aborted) {
-      throw new AbortError();
-    }
+    signal.throwIfAborted();
 
     return new Promise((resolve, reject) => {
       const secureContext = tls.createSecureContext(this.secureContextOptions);
@@ -2036,7 +2033,7 @@ class Connection extends EventEmitter {
 
         encryptsocket.destroy();
 
-        reject(new AbortError());
+        reject(signal.reason);
       };
 
       const onError = (err: Error) => {
@@ -2092,8 +2089,7 @@ class Connection extends EventEmitter {
       this.socketHandlingForSendPreLogin(socket);
     })().catch((err) => {
       this.clearConnectTimer();
-
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.message === 'AbortError') {
         return;
       }
 

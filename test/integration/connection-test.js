@@ -4,6 +4,7 @@ const async = require('async');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
+const net = require('net');
 const os = require('os');
 
 import Connection from '../../src/connection';
@@ -584,7 +585,48 @@ describe('Encrypt Test', function() {
       connection.execSql(request);
     });
   }
+  it.only('Timeout handled correctly with strict encryption enabled (TDS 8.0)', function(done) {
+    const config = getConfig();
+    supportsTds8(config, async (err, supportsTds8) => {
+      if (err) {
+        return done(err);
+      }
 
+      if (!supportsTds8) {
+        return this.skip();
+      }
+
+      /**
+       * @type {net.Server}
+       */
+
+      const targetServer = net.createServer();
+      targetServer.on('connection', () => {});
+      targetServer.listen(0, '127.0.0.1', () => {
+        assert(targetServer.address());
+        const addressInfo = /** @type {net.AddressInfo} */(targetServer.address());
+        const connection = new Connection({
+          server: addressInfo?.address,
+          options: {
+            port: addressInfo?.port,
+            encrypt: 'strict',
+            connectTimeout: 3000
+          }
+        });
+
+        connection.connect((err) => {
+          assert.instanceOf(err, ConnectionError);
+          const message = `Failed to connect to ${addressInfo?.address}:${addressInfo?.port} in 3000ms`;
+          assert.equal(/** @type {Error} */(err).message, message);
+          connection.close();
+        });
+        connection.on('end', function() {
+          done();
+        });
+      });
+      setTimeout(() => targetServer.close(done), 4000);
+    });
+  });
   describe('with strict encryption enabled (TDS 8.0)', function() {
     /**
      * @type {Connection}
