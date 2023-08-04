@@ -4,6 +4,7 @@ import { TYPE, DataType } from './data-type';
 import { CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
+import BufferReader from './token/buffer-reader';
 
 interface XmlSchema {
   dbname: string;
@@ -53,268 +54,159 @@ export type Metadata = {
   cryptoMetadata?: CryptoMetadata;
 } & BaseMetadata;
 
+class UnknownTypeError extends Error { }
 
-function readCollation(parser: Parser, callback: (collation: Collation) => void) {
+function readCollation(br: BufferReader): Collation {
   // s2.2.5.1.2
-  parser.readBuffer(5, (collationData) => {
-    callback(Collation.fromBuffer(collationData));
-  });
+  const collationData = br.readFromBuffer(5);
+  return Collation.fromBuffer(collationData);
 }
 
-function readSchema(parser: Parser, callback: (schema: XmlSchema | undefined) => void) {
-  // s2.2.5.5.3
-  parser.readUInt8((schemaPresent) => {
-    if (schemaPresent === 0x01) {
-      parser.readBVarChar((dbname) => {
-        parser.readBVarChar((owningSchema) => {
-          parser.readUsVarChar((xmlSchemaCollection) => {
-            callback({
-              dbname: dbname,
-              owningSchema: owningSchema,
-              xmlSchemaCollection: xmlSchemaCollection
-            });
-          });
-        });
-      });
-    } else {
-      callback(undefined);
-    }
-  });
+function readSchema(br: BufferReader): XmlSchema | undefined {
+  const schemaPresent = br.readUInt8();
+  if (schemaPresent === 0x01) {
+    const dbname = br.readBVarChar();
+    const owningSchema = br.readBVarChar();
+    const xmlSchemaCollection = br.readUsVarChar();
+    return {
+      dbname: dbname,
+      owningSchema: owningSchema,
+      xmlSchemaCollection: xmlSchemaCollection
+    };
+  } else {
+    return undefined;
+  }
 }
 
-function readUDTInfo(parser: Parser, callback: (udtInfo: UdtInfo | undefined) => void) {
-  parser.readUInt16LE((maxByteSize) => {
-    parser.readBVarChar((dbname) => {
-      parser.readBVarChar((owningSchema) => {
-        parser.readBVarChar((typeName) => {
-          parser.readUsVarChar((assemblyName) => {
-            callback({
-              maxByteSize: maxByteSize,
-              dbname: dbname,
-              owningSchema: owningSchema,
-              typeName: typeName,
-              assemblyName: assemblyName
-            });
-          });
-        });
-      });
-    });
-  });
+function readUDTInfo(br: BufferReader): UdtInfo {
+  const maxByteSize = br.readUInt16LE();
+  const dbname = br.readBVarChar();
+  const owningSchema = br.readBVarChar();
+  const typeName = br.readBVarChar();
+  const assemblyName = br.readUsVarChar();
+  return {
+    maxByteSize: maxByteSize,
+    dbname: dbname,
+    owningSchema: owningSchema,
+    typeName: typeName,
+    assemblyName: assemblyName
+  };
 }
 
-function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void) {
-  (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (userType) => {
-    parser.readUInt16LE((flags) => {
-      parser.readUInt8((typeNumber) => {
-        const type: DataType = TYPE[typeNumber];
+function metadataParse(parser: Parser, options: ParserOptions): Metadata {
+  let userType: number;
+  const br = new BufferReader(parser);
 
-        if (!type) {
-          throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber));
-        }
+  if (options.tdsVersion < '7_2') {
+    userType = br.readUInt16LE();
+  } else {
+    userType = br.readUInt32LE();
+  }
 
-        switch (type.name) {
-          case 'Null':
-          case 'TinyInt':
-          case 'SmallInt':
-          case 'Int':
-          case 'BigInt':
-          case 'Real':
-          case 'Float':
-          case 'SmallMoney':
-          case 'Money':
-          case 'Bit':
-          case 'SmallDateTime':
-          case 'DateTime':
-          case 'Date':
-            return callback({
-              userType: userType,
-              flags: flags,
-              type: type,
-              collation: undefined,
-              precision: undefined,
-              scale: undefined,
-              dataLength: undefined,
-              schema: undefined,
-              udtInfo: undefined
-            });
+  const flags = br.readUInt16LE();
 
-          case 'IntN':
-          case 'FloatN':
-          case 'MoneyN':
-          case 'BitN':
-          case 'UniqueIdentifier':
-          case 'DateTimeN':
-            return parser.readUInt8((dataLength) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: dataLength,
-                schema: undefined,
-                udtInfo: undefined
-              });
-            });
+  const typeNumber = br.readUInt8();
+  const type: DataType = TYPE[typeNumber];
 
-          case 'Variant':
-            return parser.readUInt32LE((dataLength) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: dataLength,
-                schema: undefined,
-                udtInfo: undefined
-              });
-            });
+  let collation: Collation | undefined;
+  let precision: number | undefined;
+  let scale: number | undefined;
+  let dataLength: number | undefined;
+  let schema: XmlSchema | undefined;
+  let udtInfo: UdtInfo | undefined;
 
-          case 'VarChar':
-          case 'Char':
-          case 'NVarChar':
-          case 'NChar':
-            return parser.readUInt16LE((dataLength) => {
-              readCollation(parser, (collation) => {
-                callback({
-                  userType: userType,
-                  flags: flags,
-                  type: type,
-                  collation: collation,
-                  precision: undefined,
-                  scale: undefined,
-                  dataLength: dataLength,
-                  schema: undefined,
-                  udtInfo: undefined
-                });
-              });
-            });
+  if (!type) {
+    throw new UnknownTypeError(sprintf('Unrecognised data type 0x%02X', typeNumber));
+  }
 
-          case 'Text':
-          case 'NText':
-            return parser.readUInt32LE((dataLength) => {
-              readCollation(parser, (collation) => {
-                callback({
-                  userType: userType,
-                  flags: flags,
-                  type: type,
-                  collation: collation,
-                  precision: undefined,
-                  scale: undefined,
-                  dataLength: dataLength,
-                  schema: undefined,
-                  udtInfo: undefined
-                });
-              });
-            });
+  switch (type.name) {
+    case 'Null':
+    case 'TinyInt':
+    case 'SmallInt':
+    case 'Int':
+    case 'BigInt':
+    case 'Real':
+    case 'Float':
+    case 'SmallMoney':
+    case 'Money':
+    case 'Bit':
+    case 'SmallDateTime':
+    case 'DateTime':
+    case 'Date':
+      break;
 
-          case 'VarBinary':
-          case 'Binary':
-            return parser.readUInt16LE((dataLength) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: dataLength,
-                schema: undefined,
-                udtInfo: undefined
-              });
-            });
+    case 'IntN':
+    case 'FloatN':
+    case 'MoneyN':
+    case 'BitN':
+    case 'UniqueIdentifier':
+    case 'DateTimeN':
+      dataLength = br.readUInt8();
+      break;
 
-          case 'Image':
-            return parser.readUInt32LE((dataLength) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: dataLength,
-                schema: undefined,
-                udtInfo: undefined
-              });
-            });
+    case 'Variant':
+      dataLength = br.readUInt32LE();
+      break;
 
-          case 'Xml':
-            return readSchema(parser, (schema) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: undefined,
-                schema: schema,
-                udtInfo: undefined
-              });
-            });
+    case 'VarChar':
+    case 'Char':
+    case 'NVarChar':
+    case 'NChar':
+      dataLength = br.readUInt16LE();
+      collation = readCollation(br);
+      break;
 
-          case 'Time':
-          case 'DateTime2':
-          case 'DateTimeOffset':
-            return parser.readUInt8((scale) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: scale,
-                dataLength: undefined,
-                schema: undefined,
-                udtInfo: undefined
-              });
-            });
+    case 'Text':
+    case 'NText':
+      dataLength = br.readUInt32LE();
+      collation = readCollation(br);
+      break;
 
-          case 'NumericN':
-          case 'DecimalN':
-            return parser.readUInt8((dataLength) => {
-              parser.readUInt8((precision) => {
-                parser.readUInt8((scale) => {
-                  callback({
-                    userType: userType,
-                    flags: flags,
-                    type: type,
-                    collation: undefined,
-                    precision: precision,
-                    scale: scale,
-                    dataLength: dataLength,
-                    schema: undefined,
-                    udtInfo: undefined
-                  });
-                });
-              });
-            });
+    case 'VarBinary':
+    case 'Binary':
+      dataLength = br.readUInt16LE();
+      break;
 
-          case 'UDT':
-            return readUDTInfo(parser, (udtInfo) => {
-              callback({
-                userType: userType,
-                flags: flags,
-                type: type,
-                collation: undefined,
-                precision: undefined,
-                scale: undefined,
-                dataLength: undefined,
-                schema: undefined,
-                udtInfo: udtInfo
-              });
-            });
+    case 'Image':
+      dataLength = br.readUInt32LE();
+      break;
 
-          default:
-            throw new Error(sprintf('Unrecognised type %s', type.name));
-        }
-      });
-    });
-  });
+    case 'Xml':
+      schema = readSchema(br);
+      break;
+
+    case 'Time':
+    case 'DateTime2':
+    case 'DateTimeOffset':
+      scale = br.readUInt8();
+      break;
+
+    case 'NumericN':
+    case 'DecimalN':
+      dataLength = br.readUInt8();
+      precision = br.readUInt8();
+      scale = br.readUInt8();
+      break;
+
+    case 'UDT':
+      udtInfo = readUDTInfo(br);
+      break;
+
+    default:
+      throw new UnknownTypeError(sprintf('Unrecognised type %s', type.name));
+  }
+
+  return {
+    userType: userType,
+    flags: flags,
+    type: type,
+    collation: collation,
+    precision: precision,
+    scale: scale,
+    dataLength: dataLength,
+    schema: schema,
+    udtInfo: udtInfo
+  };
 }
 
 export default metadataParse;

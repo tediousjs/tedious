@@ -12,6 +12,8 @@ export interface ColumnMetadata extends Metadata {
   tableName?: string | string[] | undefined;
 }
 
+class NotEnoughDataError extends Error { }
+
 function readTableName(parser: Parser, options: ParserOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
   if (metadata.type.hasTableName) {
     if (options.tdsVersion >= '7_2') {
@@ -60,22 +62,30 @@ function readColumnName(parser: Parser, options: ParserOptions, index: number, m
 }
 
 function readColumn(parser: Parser, options: ParserOptions, index: number, callback: (column: ColumnMetadata) => void) {
-  metadataParse(parser, options, (metadata) => {
-    readTableName(parser, options, metadata, (tableName) => {
-      readColumnName(parser, options, index, metadata, (colName) => {
-        callback({
-          userType: metadata.userType,
-          flags: metadata.flags,
-          type: metadata.type,
-          collation: metadata.collation,
-          precision: metadata.precision,
-          scale: metadata.scale,
-          udtInfo: metadata.udtInfo,
-          dataLength: metadata.dataLength,
-          schema: metadata.schema,
-          colName: colName,
-          tableName: tableName
-        });
+  let metadata!: Metadata;
+  try {
+    metadata = metadataParse(parser, options);
+  } catch (err) {
+    if (err instanceof NotEnoughDataError) {
+      return parser.suspend(() => {
+        readColumn(parser, options, index, callback);
+      });
+    }
+  }
+  readTableName(parser, options, metadata, (tableName) => {
+    readColumnName(parser, options, index, metadata, (colName) => {
+      callback({
+        userType: metadata.userType,
+        flags: metadata.flags,
+        type: metadata.type,
+        collation: metadata.collation,
+        precision: metadata.precision,
+        scale: metadata.scale,
+        udtInfo: metadata.udtInfo,
+        dataLength: metadata.dataLength,
+        schema: metadata.schema,
+        colName: colName,
+        tableName: tableName
       });
     });
   });

@@ -1,32 +1,38 @@
 // s2.2.7.14
+import BufferReader from './buffer-reader';
 import Parser, { ParserOptions } from './stream-parser';
 
 import { OrderToken } from './token';
 
+class NotEnoughDataError extends Error { }
+
+function parseToken(parser: Parser): OrderToken {
+  const br = new BufferReader(parser);
+
+  const length = br.readUInt16LE();
+  const columnCount = length / 2;
+  const orderColumns: number[] = [];
+
+  for (let i = 0; i < columnCount; i++) {
+    const column = br.readUInt16LE();
+    orderColumns.push(column);
+  }
+
+  return new OrderToken(orderColumns);
+}
+
 function orderParser(parser: Parser, _options: ParserOptions, callback: (token: OrderToken) => void) {
-  parser.readUInt16LE((length) => {
-    const columnCount = length / 2;
-    const orderColumns: number[] = [];
-
-    let i = 0;
-    function next(done: () => void) {
-      if (i === columnCount) {
-        return done();
-      }
-
-      parser.readUInt16LE((column) => {
-        orderColumns.push(column);
-
-        i++;
-
-        next(done);
+  let data!: OrderToken;
+  try {
+    data = parseToken(parser);
+  } catch (err) {
+    if (err instanceof NotEnoughDataError) {
+      return parser.suspend(() => {
+        orderParser(parser, _options, callback);
       });
     }
-
-    next(() => {
-      callback(new OrderToken(orderColumns));
-    });
-  });
+  }
+  callback(data);
 }
 
 export default orderParser;

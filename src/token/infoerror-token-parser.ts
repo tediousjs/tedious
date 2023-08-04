@@ -1,6 +1,8 @@
 import Parser, { ParserOptions } from './stream-parser';
-
+import BufferReader from './buffer-reader';
 import { InfoMessageToken, ErrorMessageToken } from './token';
+
+class NotEnoughDataError extends Error { }
 
 interface TokenData {
   number: number;
@@ -12,43 +14,54 @@ interface TokenData {
   lineNumber: number;
 }
 
-function parseToken(parser: Parser, options: ParserOptions, callback: (data: TokenData) => void) {
+function parseToken(parser: Parser, options: ParserOptions): TokenData {
   // length
-  parser.readUInt16LE(() => {
-    parser.readUInt32LE((number) => {
-      parser.readUInt8((state) => {
-        parser.readUInt8((clazz) => {
-          parser.readUsVarChar((message) => {
-            parser.readBVarChar((serverName) => {
-              parser.readBVarChar((procName) => {
-                (options.tdsVersion < '7_2' ? parser.readUInt16LE : parser.readUInt32LE).call(parser, (lineNumber: number) => {
-                  callback({
-                    'number': number,
-                    'state': state,
-                    'class': clazz,
-                    'message': message,
-                    'serverName': serverName,
-                    'procName': procName,
-                    'lineNumber': lineNumber
-                  });
-                });
-              });
-            });
-          });
-        });
-      });
-    });
-  });
+  const br = new BufferReader(parser);
+  br.readUInt16LE();
+  const number = br.readUInt32LE();
+  const state = br.readUInt8();
+  const clazz = br.readUInt8();
+  const message = br.readUsVarChar();
+  const serverName = br.readBVarChar();
+  const procName = br.readBVarChar();
+  const lineNumber = options.tdsVersion < '7_2' ? br.readUInt16LE() : br.readUInt32LE();
+  return {
+    'number': number,
+    'state': state,
+    'class': clazz,
+    'message': message,
+    'serverName': serverName,
+    'procName': procName,
+    'lineNumber': lineNumber
+  } as TokenData;
 }
 
 export function infoParser(parser: Parser, options: ParserOptions, callback: (token: InfoMessageToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new InfoMessageToken(data));
-  });
+  let data!: TokenData;
+  try {
+    data = parseToken(parser, options);
+  } catch (err) {
+    if (err instanceof NotEnoughDataError) {
+      return parser.suspend(() => {
+        infoParser(parser, options, callback);
+      });
+    }
+  }
+
+  callback(new InfoMessageToken(data));
 }
 
 export function errorParser(parser: Parser, options: ParserOptions, callback: (token: ErrorMessageToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new ErrorMessageToken(data));
-  });
+  let data!: TokenData;
+  try {
+    data = parseToken(parser, options);
+  } catch (err) {
+    if (err instanceof NotEnoughDataError) {
+      return parser.suspend(() => {
+        errorParser(parser, options, callback);
+      });
+    }
+  }
+
+  callback(new ErrorMessageToken(data));
 }
