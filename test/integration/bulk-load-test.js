@@ -7,7 +7,7 @@ const assert = require('chai').assert;
 const TYPES = require('../../src/data-type').typeByName;
 
 import Connection from '../../src/connection';
-import { RequestError } from '../../src/errors';
+import { RequestError, ParameterValidationError } from '../../src/errors';
 import Request from '../../src/request';
 
 const debugMode = false;
@@ -1525,8 +1525,10 @@ describe('BulkLoad', function() {
        * @param {undefined | number} rowCount
        */
       function completeBulkLoad(err, rowCount) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
+        assert.instanceOf(err, ParameterValidationError);
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).paramName, 'value');
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).paramValue, 'invalid date');
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).message, 'Validation failed for parameter:"value" with value:"invalid date" and message:"Invalid date."');
 
         done();
       }
@@ -1545,8 +1547,10 @@ describe('BulkLoad', function() {
        * @param {undefined | number} rowCount
        */
       function completeBulkLoad(err, rowCount) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(/** @type {TypeError} */(err).message, 'Invalid date.');
+        assert.instanceOf(err, ParameterValidationError);
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).paramName, 'value');
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).paramValue, 'invalid date');
+        assert.strictEqual(/** @type {ParameterValidationError} */(err).message, 'Validation failed for parameter:"value" with value:"invalid date" and message:"Invalid date."');
 
         assert.strictEqual(rowCount, 0);
 
