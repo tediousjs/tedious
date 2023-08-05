@@ -6,19 +6,14 @@ const assert = require('chai').assert;
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
@@ -46,9 +41,9 @@ describe('RPC test', function() {
       console.log(`${error.number} : ${error.message}`);
     });
 
-    connection.on('debug', (text) => {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   afterEach(function(done) {
@@ -360,11 +355,9 @@ set @paramOut = @paramIn\
       assert.ok(error);
     });
 
-    connection.on(
-      'debug',
-      function(text) { }
-      // console.log(text)
-    );
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should proc return value', function(done) {
@@ -414,11 +407,9 @@ set @paramOut = @paramIn\
       assert.ok(error);
     });
 
-    connection.on(
-      'debug',
-      function(text) { }
-      // console.log(text)
-    );
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
 });

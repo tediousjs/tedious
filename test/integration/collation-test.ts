@@ -6,6 +6,7 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { Flags } from '../../src/collation';
 import { TYPES } from '../../src/data-type';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const { config } = JSON.parse(
@@ -13,6 +14,7 @@ function getConfig() {
   );
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  config.options.debug = debugOptionsFromEnv();
 
   return config;
 }
@@ -33,6 +35,11 @@ describe('Database Collation Support', function() {
     connection.once('databaseChange', (databaseName) => {
       originalDatabaseName = databaseName;
     });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
     connection.connect(done);
   });
 

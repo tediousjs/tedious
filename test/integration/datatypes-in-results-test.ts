@@ -6,26 +6,14 @@ import Request from '../../src/request';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import { homedir } from 'os';
-
-const debug = false;
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 const config = JSON.parse(
   fs.readFileSync(homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
+
 config.options.textsize = 8 * 1024;
-
-if (debug) {
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
-} else {
-  config.options.debug = {};
-}
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('Datatypes in results test', function() {
@@ -38,11 +26,9 @@ describe('Datatypes in results test', function() {
       console.log(`${error.number} : ${error.message}`);
     });
 
-    connection.on('debug', function(message) {
-      if (debug) {
-        console.log(message);
-      }
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect(done);
   });
