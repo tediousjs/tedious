@@ -2,30 +2,19 @@
 
 const fs = require('fs');
 const assert = require('chai').assert;
-const debug = false;
 
 import AggregateError from 'es-aggregate-error';
 import { RequestError } from '../../src/errors';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
+
 config.options.textsize = 8 * 1024;
-
-if (debug) {
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true
-  };
-} else {
-  config.options.debug = {};
-}
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 /**
@@ -53,10 +42,8 @@ function execSql(done, sql, requestCallback) {
     done();
   });
 
-  if (debug) {
-    connection.on('debug', function(message) {
-      console.log(message);
-    });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
   }
 }
 
@@ -153,15 +140,17 @@ describe('Errors Test', function() {
       done();
     });
 
-    if (debug) {
-      connection.on('debug', function(message) {
-        console.log(message);
-      });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
     }
   });
 
   it('should support cancelling after starting query execution', function(done) {
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request("select 42, 'hello world'", function(err, rowCount) {
       if (err) {
@@ -186,6 +175,10 @@ describe('Errors Test', function() {
 
   it('should throw aggregate error with two error messages', function(done) {
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect((err) => {
       if (err) {
@@ -225,6 +218,10 @@ describe('Errors Test', function() {
     };
     config.options.tdsVersion = '7_4';
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     /** @type {Error | undefined} */
     let connectionError;

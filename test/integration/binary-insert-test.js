@@ -7,19 +7,13 @@ const TYPES = require('../../src/data-type').typeByName;
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 
-config.options.debug = {
-  packet: true,
-  data: true,
-  payload: true,
-  token: true,
-  log: true
-};
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('inserting binary data', function() {
@@ -28,6 +22,10 @@ describe('inserting binary data', function() {
   beforeEach(function(done) {
     this.connection = new Connection(config);
     this.connection.connect(done);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      this.connection.on('debug', console.log);
+    }
   });
 
   afterEach(function(done) {
