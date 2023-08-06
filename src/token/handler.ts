@@ -1,7 +1,7 @@
 import Connection from '../connection';
 import Request from '../request';
 import { ConnectionError, RequestError } from '../errors';
-import { ColumnMetadata } from './colmetadata-token-parser';
+import { type ColumnMetadata } from './colmetadata-token-parser';
 import {
   BeginTransactionEnvChangeToken,
   CharsetEnvChangeToken,

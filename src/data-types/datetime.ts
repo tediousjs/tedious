@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 

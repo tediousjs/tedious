@@ -1,4 +1,4 @@
-import Parser, { ParserOptions } from './stream-parser';
+import Parser, { type ParserOptions } from './stream-parser';
 import { Collation } from '../collation';
 
 import {

@@ -1,7 +1,7 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { EncryptionAlgorithm, SQLServerEncryptionType } from './types';
+import { type EncryptionAlgorithm, SQLServerEncryptionType } from './types';
 import { createHmac, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { AeadAes256CbcHmac256EncryptionKey, keySize } from './aead-aes-256-cbc-hmac-encryption-key';
 

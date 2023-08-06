@@ -1,7 +1,7 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { EncryptionKeyInfo } from './types';
+import { type EncryptionKeyInfo } from './types';
 
 export class CEKEntry {
   columnEncryptionKeyValues: EncryptionKeyInfo[];

@@ -1,8 +1,8 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { CryptoMetadata, EncryptionKeyInfo } from './types';
-import { InternalConnectionOptions as ConnectionOptions } from '../connection';
+import { type CryptoMetadata, type EncryptionKeyInfo } from './types';
+import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
 import SymmetricKey from './symmetric-key';
 import { getKey } from './symmetric-key-cache';
 import { AeadAes256CbcHmac256Algorithm, algorithmName } from './aead-aes-256-cbc-hmac-algorithm';

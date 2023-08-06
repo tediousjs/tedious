@@ -1,7 +1,7 @@
 // s2.2.7.17
 
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
+import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
 
