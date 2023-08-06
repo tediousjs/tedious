@@ -1,4 +1,4 @@
-import Parser, { ParserOptions } from './stream-parser';
+import Parser, { type ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 
 // s2.2.7.5/6/7

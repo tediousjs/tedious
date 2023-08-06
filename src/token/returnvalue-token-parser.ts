@@ -1,6 +1,6 @@
 // s2.2.7.16
 
-import Parser, { ParserOptions } from './stream-parser';
+import Parser, { type ParserOptions } from './stream-parser';
 
 import { ReturnValueToken } from './token';
 

@@ -1,6 +1,6 @@
 import { Collation } from '../collation';
-import { Metadata } from '../metadata-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
+import { type Metadata } from '../metadata-parser';
+import { type ColumnMetadata } from './colmetadata-token-parser';
 import { TokenHandler } from './handler';
 
 export const TYPE = {

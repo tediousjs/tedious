@@ -1,4 +1,4 @@
-import { AddressInfo, createConnection, createServer, Server, Socket } from 'net';
+import { type AddressInfo, createConnection, createServer, Server, Socket } from 'net';
 import { once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';

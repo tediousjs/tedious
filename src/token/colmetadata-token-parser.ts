@@ -1,6 +1,6 @@
-import metadataParse, { Metadata } from '../metadata-parser';
+import metadataParse, { type Metadata } from '../metadata-parser';
 
-import Parser, { ParserOptions } from './stream-parser';
+import Parser, { type ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
 
 export interface ColumnMetadata extends Metadata {
