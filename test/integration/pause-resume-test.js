@@ -6,10 +6,12 @@ const assert = require('chai').assert;
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  config.options.debug = debugOptionsFromEnv();
   // 250 ms timeout until the first response package is received
   config.options.requestTimeout = 250;
   return config;
@@ -22,6 +24,9 @@ describe('Pause-Resume Test', function() {
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect(done);
   });
 
