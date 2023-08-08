@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import MoneyN from './moneyn';
 
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);

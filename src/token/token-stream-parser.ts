@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import StreamParser, { ParserOptions } from './stream-parser';
+import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
 import { Token } from './token';
 import { Readable } from 'stream';

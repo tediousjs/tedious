@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events';
-import { Parameter, DataType } from './data-type';
 import { ParameterValidationError } from './errors';
+import { type Parameter, type DataType } from './data-type';
 
 import Connection from './connection';
-import { Metadata } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { Collation } from './collation';
 
 /**

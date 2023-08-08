@@ -1,6 +1,6 @@
 import iconv from 'iconv-lite';
 
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
 

@@ -9,8 +9,7 @@ const TYPES = require('../../src/data-type').typeByName;
 import Connection from '../../src/connection';
 import { RequestError, ParameterValidationError } from '../../src/errors';
 import Request from '../../src/request';
-
-const debugMode = false;
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const { config } = JSON.parse(
@@ -21,14 +20,7 @@ function getConfig() {
 
   config.options.cancelTimeout = 1000;
 
-  if (debugMode) {
-    config.options.debug = {
-      packet: true,
-      data: true,
-      payload: true,
-      token: true
-    };
-  }
+  config.options.debug = debugOptionsFromEnv();
 
   return config;
 }
@@ -43,14 +35,14 @@ describe('BulkLoad', function() {
     connection = new Connection(getConfig());
     connection.connect(done);
 
-    if (debugMode) {
+    if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', (message) => console.log(message));
-      connection.on('infoMessage', (info) =>
-        console.log('Info: ' + info.number + ' - ' + info.message)
-      );
-      connection.on('errorMessage', (error) =>
-        console.log('Error: ' + error.number + ' - ' + error.message)
-      );
+      connection.on('infoMessage', (info) => {
+        console.log('Info: ' + info.number + ' - ' + info.message);
+      });
+      connection.on('errorMessage', (error) => {
+        console.log('Error: ' + error.number + ' - ' + error.message);
+      });
     }
   });
 

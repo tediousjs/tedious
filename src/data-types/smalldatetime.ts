@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
 
 const EPOCH_DATE = new Date(1900, 0, 1);

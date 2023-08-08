@@ -1,5 +1,5 @@
 import net from 'net';
-import dns, { LookupAddress } from 'dns';
+import dns, { type LookupAddress } from 'dns';
 
 import * as punycode from 'punycode';
 import { AbortSignal } from 'node-abort-controller';

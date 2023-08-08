@@ -5,7 +5,7 @@ import * as net from 'net';
 import dns from 'dns';
 
 import constants from 'constants';
-import { SecureContextOptions } from 'tls';
+import { type SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
 
@@ -16,7 +16,7 @@ import {
   UsernamePasswordCredential,
 } from '@azure/identity';
 
-import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
+import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
 import { instanceLookup } from './instance-lookup';
@@ -36,12 +36,12 @@ import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
-import { Metadata } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
-import { Parameter, TYPES } from './data-type';
+import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
