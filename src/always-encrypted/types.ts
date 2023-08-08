@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Microsoft Corporation
 
 import { CEKEntry } from './cek-entry';
-import { BaseMetadata } from '../metadata-parser';
+import { type BaseMetadata } from '../metadata-parser';
 
 export interface EncryptionKeyInfo {
   encryptedKey: Buffer;

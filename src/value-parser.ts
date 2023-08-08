@@ -1,5 +1,5 @@
-import Parser, { ParserOptions } from './token/stream-parser';
-import { Metadata, readCollation } from './metadata-parser';
+import Parser, { type ParserOptions } from './token/stream-parser';
+import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';

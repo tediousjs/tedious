@@ -7,20 +7,14 @@ const TYPES = require('../../src/data-type').typeByName;
 import async from 'async';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
-
+  config.options.debug = debugOptionsFromEnv();
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
@@ -101,9 +95,9 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     console.log(`${error.number} : ${error.message}`);
   });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
+  }
 }
 
 /**
@@ -163,9 +157,9 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
     done();
   });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
+  }
 }
 
 describe('Parameterised Statements Test', function() {
@@ -989,10 +983,15 @@ describe('Parameterised Statements Test', function() {
 
   it('supports TVP values', function(done) {
     const config = getConfig();
-    const connection = new Connection(config);
 
     if (config.options.tdsVersion < '7_3_A') {
       this.skip();
+    }
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
     }
 
     connection.connect(function(err) {
@@ -1168,9 +1167,9 @@ describe('Parameterised Statements Test', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should call procedure with parameters', function(done) {
@@ -1251,9 +1250,9 @@ end')\
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
 });

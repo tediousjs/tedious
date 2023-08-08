@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import IntN from './intn';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 

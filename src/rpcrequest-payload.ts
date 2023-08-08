@@ -1,7 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { Parameter, ParameterData } from './data-type';
-import { InternalConnectionOptions } from './connection';
+import { type Parameter, type ParameterData } from './data-type';
+import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 
 // const OPTION = {
