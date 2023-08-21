@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Microsoft Corporation
 
 import { ClientSecretCredential } from '@azure/identity';
-import { CryptographyClient, KeyWrapAlgorithm, KeyClient, KeyVaultKey } from '@azure/keyvault-keys';
+import { CryptographyClient, type KeyWrapAlgorithm, KeyClient, type KeyVaultKey } from '@azure/keyvault-keys';
 import { createHash } from 'crypto';
 import { parse } from 'url';
 

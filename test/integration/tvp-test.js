@@ -7,6 +7,7 @@ const { assert } = require('chai');
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   var config = JSON.parse(
@@ -15,13 +16,7 @@ function getConfig() {
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   return config;
 }
@@ -37,6 +32,9 @@ describe('calling a procedure that takes and returns a TVP', function() {
     config = getConfig();
 
     connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect(done);
   });
 
