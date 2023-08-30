@@ -522,9 +522,10 @@ connection.connect();
         <code>options.encrypt</code>
       </dt>
       <dd>
-        A string value that can be only set to 'strict', indicates the usage of TDS 8.0 protocol. 
-        Otherwise, encrypt can be set to a boolean value which determines whether or not the connection will be encrypted.
-        (default: <code> true </code>).
+        A string value set to <code>strict</code> enables the TDS 8.0 protocol. 
+        Otherwise, encrypt can be set to a boolean value which determines 
+        whether or not the connection will be encrypted under the TDS 7.x protocol. 
+        (default: <code>true</code>)
       </dd>
 
       <dt>
