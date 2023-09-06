@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { ParameterValidationError } from './errors';
+import { RequestError, ParameterValidationError } from './errors';
 import { type Parameter, type DataType } from './data-type';
 
 import Connection from './connection';
@@ -463,7 +463,11 @@ class Request extends EventEmitter {
       try {
         parameter.value = parameter.type.validate(parameter.value, collation);
       } catch (error: any) {
-        throw new ParameterValidationError(error.message, parameter.name, parameter.value);
+        const paramvalidationErr = new ParameterValidationError(error.message, parameter.name, parameter.value);
+        const requestErr = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
+        requestErr.cause = paramvalidationErr;
+
+        throw requestErr;
       }
     }
   }
