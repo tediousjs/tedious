@@ -2089,7 +2089,7 @@ class Connection extends EventEmitter {
       this.socketHandlingForSendPreLogin(socket);
     })().catch((err) => {
       this.clearConnectTimer();
-      if (err.name === 'AbortError' || err.message === 'AbortError') {
+      if (err === signal.reason) {
         return;
       }
 

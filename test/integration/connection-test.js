@@ -625,7 +625,7 @@ describe('Encrypt Test', function() {
       connection.execSql(request);
     });
   }
-  it.only('Timeout handled correctly with strict encryption enabled (TDS 8.0)', function(done) {
+  it ('Timeout handled correctly with strict encryption enabled (TDS 8.0)', function(done) {
     const config = getConfig();
     supportsTds8(config, async (err, supportsTds8) => {
       if (err) {
