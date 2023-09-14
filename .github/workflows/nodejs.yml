@@ -18,8 +18,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4.1.7
 
-      with:
-        fetch-depth: 0
     - name: Use Node.js 18
       uses: actions/setup-node@v4.0.3
       with:
