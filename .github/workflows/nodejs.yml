@@ -24,18 +24,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
     - run: npm run lint
@@ -58,6 +47,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: ${{ matrix.node-version }}
+        cache: 'npm'
 
     - name: Generate TLS Certificate
       run: |
@@ -74,18 +64,6 @@ jobs:
     - name: Upgrade npm
       run: npm install -g npm
       if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
 
     - run: npm ci
 
@@ -215,6 +193,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: ${{ matrix.node-version }}
+        cache: 'npm'
 
     - name: Install dbatools
       shell: powershell
@@ -257,19 +236,6 @@ jobs:
     - name: Upgrade npm
       run: npm install -g npm
       if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      shell: bash
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
 
     - run: npm ci
 
@@ -340,17 +306,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -384,18 +340,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -431,18 +376,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -479,18 +413,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -523,18 +446,7 @@ jobs:
       uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-    - uses: actions/cache@v4.0.2
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
