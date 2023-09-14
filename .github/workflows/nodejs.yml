@@ -61,10 +61,6 @@ jobs:
       shell: bash
       run: cp -f test/config.ci.ts test/config.ts
 
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
     - run: npm ci
 
     - name: run unit tests
@@ -232,10 +228,6 @@ jobs:
     - name: Set up CI configuration
       shell: bash
       run: cp -f test/config.ci.ts test/config.ts
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
 
     - run: npm ci
 
