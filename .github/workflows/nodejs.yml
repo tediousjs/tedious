@@ -77,10 +77,6 @@ jobs:
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
-
     - run: npm ci
 
     - name: run unit tests
@@ -266,10 +262,6 @@ jobs:
             }
           }
         }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
-
-    - name: Upgrade npm
-      run: npm install -g npm
-      if: ${{ matrix.node-version == '6.x' }}
 
     - run: npm ci
 
