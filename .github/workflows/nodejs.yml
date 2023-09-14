@@ -23,18 +23,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
     - run: npm run lint
@@ -56,6 +45,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
+        cache: 'npm'
 
     - name: Generate TLS Certificate
       run: |
@@ -90,18 +80,6 @@ jobs:
     - name: Upgrade npm
       run: npm install -g npm
       if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
 
     - run: npm ci
 
@@ -230,6 +208,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
+        cache: 'npm'
 
     - name: Install dbatools
       shell: powershell
@@ -291,18 +270,6 @@ jobs:
     - name: Upgrade npm
       run: npm install -g npm
       if: ${{ matrix.node-version == '6.x' }}
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
 
     - run: npm ci
 
@@ -372,17 +339,8 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
+        cache: 'npm'
 
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
     - run: npm ci
 
     - run: mkdir ~/.tedious
@@ -426,18 +384,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -485,18 +432,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
@@ -541,18 +477,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
-
-    - name: Determine npm cache directory
-      id: npm-cache
-      run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-
-    - uses: actions/cache@v3
-      with:
-        path: ${{ steps.npm-cache.outputs.dir }}
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+        cache: 'npm'
 
     - run: npm ci
 
