@@ -4,6 +4,7 @@ import { Duplex } from 'stream';
 import Debug from './debug';
 import Message from './message';
 import { Packet, HEADER_LENGTH } from './packet';
+import { MessageBuilder } from './message-builder';
 
 class OutgoingMessageStream extends Duplex {
   packetSize: number;
@@ -27,52 +28,40 @@ class OutgoingMessageStream extends Duplex {
   }
 
   _write(message: Message, _encoding: string, callback: (err?: Error | null) => void) {
-    const length = this.packetSize - HEADER_LENGTH;
-    let packetNumber = 0;
-
     this.currentMessage = message;
+
+    const builder = new MessageBuilder(message.type, this.packetSize);
+
     this.currentMessage.on('data', (data: Buffer) => {
       if (message.ignore) {
         return;
       }
 
-      this.bl.append(data);
+      builder.writeBuffer(data);
 
-      while (this.bl.length > length) {
-        const data = this.bl.slice(0, length);
-        this.bl.consume(length);
+      let needsPause = false;
 
-        // TODO: Get rid of creating `Packet` instances here.
-        const packet = new Packet(message.type);
-        packet.packetId(packetNumber += 1);
-        packet.resetConnection(message.resetConnection);
-        packet.addData(data);
+      let packet;
+      while (packet = builder.flushableBuffers.shift()) {
+        needsPause = this.push(packet) === false;
+      }
 
-        this.debug.packet('Sent', packet);
-        this.debug.data(packet);
-
-        if (this.push(packet.buffer) === false) {
-          message.pause();
-        }
+      if (needsPause) {
+        message.pause();
       }
     });
 
     this.currentMessage.on('end', () => {
-      const data = this.bl.slice();
-      this.bl.consume(data.length);
+      if (message.ignore) {
+        builder.abort();
+      } else {
+        builder.finalize();
+      }
 
-      // TODO: Get rid of creating `Packet` instances here.
-      const packet = new Packet(message.type);
-      packet.packetId(packetNumber += 1);
-      packet.resetConnection(message.resetConnection);
-      packet.last(true);
-      packet.ignore(message.ignore);
-      packet.addData(data);
-
-      this.debug.packet('Sent', packet);
-      this.debug.data(packet);
-
-      this.push(packet.buffer);
+      let packet;
+      while (packet = builder.flushableBuffers.shift()) {
+        this.push(packet);
+      }
 
       this.currentMessage = undefined;
 

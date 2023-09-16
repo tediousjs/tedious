@@ -21,7 +21,7 @@ for (const name in TYPE) {
   typeByValue[TYPE[name]] = name;
 }
 
-const STATUS: { [key: string]: number } = {
+export const STATUS: { [key: string]: number } = {
   NORMAL: 0x00,
   EOM: 0x01,
   IGNORE: 0x02,
