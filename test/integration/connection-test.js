@@ -4,7 +4,6 @@ const async = require('async');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
-const net = require('net');
 const os = require('os');
 
 import Connection from '../../src/connection';
