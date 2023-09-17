@@ -1931,7 +1931,8 @@ class Connection extends EventEmitter {
         });
       }, (err) => {
         this.clearConnectTimer();
-        if (err.name === 'AbortError') {
+
+        if (signal.aborted) {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
         }
@@ -2089,7 +2090,8 @@ class Connection extends EventEmitter {
       this.socketHandlingForSendPreLogin(socket);
     })().catch((err) => {
       this.clearConnectTimer();
-      if (err === signal.reason) {
+
+      if (signal.aborted) {
         return;
       }
 
