@@ -1,5 +1,5 @@
 import * as net from 'net';
-import { Connection } from '../../src/tedious';
+import { Connection, ConnectionError } from '../../src/tedious';
 import { assert } from 'chai';
 
 describe('Using `strict` encryption', function() {
@@ -39,6 +39,38 @@ describe('Using `strict` encryption', function() {
       assert.instanceOf(err, Error);
       assert.include(err!.message, 'Client network socket disconnected before secure TLS connection was established');
 
+      done();
+    });
+  });
+
+  it('handles connection timeout when performing tls handshake', function(done) {
+    server.on('connection', (connection) => {
+      setTimeout(() => {
+        connection.destroy();
+      }, 4000);
+    });
+
+    const addressInfo = server.address() as net.AddressInfo;
+
+    const connection = new Connection({
+      server: addressInfo?.address,
+      options: {
+        port: addressInfo?.port,
+        encrypt: 'strict',
+        connectTimeout: 3000
+      }
+    });
+
+    connection.connect((err) => {
+      assert.instanceOf(err, ConnectionError);
+
+      const message = `Failed to connect to ${addressInfo?.address}:${addressInfo?.port} in 3000ms`;
+      assert.equal(err!.message, message);
+
+      connection.close();
+    });
+
+    connection.on('end', () => {
       done();
     });
   });

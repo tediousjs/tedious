@@ -1931,7 +1931,8 @@ class Connection extends EventEmitter {
         });
       }, (err) => {
         this.clearConnectTimer();
-        if (err.name === 'AbortError') {
+
+        if (signal.aborted) {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
         }
@@ -2008,7 +2009,9 @@ class Connection extends EventEmitter {
     this.transitionTo(this.STATE.SENT_PRELOGIN);
   }
 
-  wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
+  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+    signal.throwIfAborted();
+
     return new Promise((resolve, reject) => {
       const secureContext = tls.createSecureContext(this.secureContextOptions);
       // If connect to an ip address directly,
@@ -2023,12 +2026,41 @@ class Connection extends EventEmitter {
         servername: this.config.options.serverName ? this.config.options.serverName : serverName,
       };
 
-      const encryptsocket = tls.connect(encryptOptions, () => {
-        encryptsocket.removeListener('error', reject);
-        resolve(encryptsocket);
-      });
+      const encryptsocket = tls.connect(encryptOptions);
 
-      encryptsocket.once('error', reject);
+      const onAbort = () => {
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(signal.reason);
+      };
+
+      const onError = (err: Error) => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(err);
+      };
+
+      const onConnect = () => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        resolve(encryptsocket);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      encryptsocket.on('error', onError);
+      encryptsocket.on('secureConnect', onConnect);
     });
   }
 
@@ -2047,7 +2079,7 @@ class Connection extends EventEmitter {
       if (this.config.options.encrypt === 'strict') {
         try {
           // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket);
+          socket = await this.wrapWithTls(socket, signal);
         } catch (err) {
           socket.end();
 
@@ -2059,7 +2091,7 @@ class Connection extends EventEmitter {
     })().catch((err) => {
       this.clearConnectTimer();
 
-      if (err.name === 'AbortError') {
+      if (signal.aborted) {
         return;
       }
 
