@@ -408,10 +408,6 @@ interface State {
   exit?(this: Connection, newState: State): void;
   events: {
     socketError?(this: Connection, err: Error): void;
-    connectTimeout?(this: Connection): void;
-    message?(this: Connection, message: Message): void;
-    retry?(this: Connection): void;
-    reconnect?(this: Connection): void;
   };
 }
 
@@ -3531,8 +3527,6 @@ Connection.prototype.STATE = {
   REROUTING: {
     name: 'ReRouting',
     events: {
-      message: function() {
-      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
@@ -3542,8 +3536,6 @@ Connection.prototype.STATE = {
   TRANSIENT_FAILURE_RETRY: {
     name: 'TRANSIENT_FAILURE_RETRY',
     events: {
-      message: function() {
-      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
@@ -3589,7 +3581,7 @@ Connection.prototype.STATE = {
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     events: {
-      socketError: function socketError() {
+      socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
       }
@@ -3750,9 +3742,6 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     events: {
-      message: function() {
-        // Do nothing
-      },
       socketError: function() {
         // Do nothing
       }
