@@ -1,5 +1,5 @@
 var Debug = require('../../../src/debug');
-var Parser = require('../../../src/token/token-stream-parser').Parser;
+var Parser = require('../../../src/token/stream-parser');
 var TYPE = require('../../../src/token/token').TYPE;
 var WritableTrackingBuffer = require('../../../src/tracking-buffer/writable-tracking-buffer');
 const assert = require('chai').assert;
@@ -25,28 +25,32 @@ function createDbChangeBuffer() {
   return buffer.data;
 }
 
-describe('Token Stream Parser', () => {
-  it('should envChange', (done) => {
+describe('Token Stream Parser', function() {
+  it('should envChange', async function() {
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer], debug, {
-      onDatabaseChange: function(token) {
-        assert.isOk(token);
-      }
-    });
+    const parser = Parser.parseTokens([buffer], debug, {}, []);
 
-    parser.on('end', done);
+    const tokens = [];
+    for await (const token of parser) {
+      tokens.push(token);
+    }
+
+    assert.lengthOf(tokens, 1);
+    assert.strictEqual(tokens[0].name, 'ENVCHANGE');
   });
 
-  it('should split token across buffers', (done) => {
+  it('should split token across buffers', async function() {
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)], debug, {
-      onDatabaseChange: function(token) {
-        assert.isOk(token);
-      }
-    });
+    const parser = Parser.parseTokens([buffer.slice(0, 6), buffer.slice(6)], debug, {}, []);
 
-    parser.on('end', done);
+    const tokens = [];
+    for await (const token of parser) {
+      tokens.push(token);
+    }
+
+    assert.lengthOf(tokens, 1);
+    assert.strictEqual(tokens[0].name, 'ENVCHANGE');
   });
 });
