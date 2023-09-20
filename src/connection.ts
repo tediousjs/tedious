@@ -3100,49 +3100,73 @@ class Connection extends EventEmitter {
       request.rows! = [];
       request.rst! = [];
 
-      const onCancel = () => {
-        payloadStream.unpipe(message);
-        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
-
-        // set the ignore bit and end the message.
-        message.ignore = true;
-        message.end();
-
-        if (request instanceof Request && request.paused) {
-          // resume the request if it was paused so we can read the remaining tokens
-          request.resume();
-        }
-      };
-
-      request.once('cancel', onCancel);
-
       this.createRequestTimer();
 
       const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
       this.messageIo.outgoingMessageStream.write(message);
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-      message.once('finish', () => {
-        request.removeListener('cancel', onCancel);
+      const payloadStream = Readable.from(payload);
+
+      (async () => {
+        const onCancel = () => {
+          payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        };
+        request.once('cancel', onCancel);
+
+        // Cleanup for onCancel
+        try {
+          // Handle errors coming from payloadStream
+          try {
+            for await (const chunk of payloadStream) {
+              if (message.write(chunk) === false) {
+                // Wait for the message to drain, or the request to be cancelled.
+                await new Promise<void>((resolve) => {
+                  const onDrain = () => {
+                    request.removeListener('cancel', onCancel);
+                    message.removeListener('drain', onDrain);
+
+                    resolve();
+                  };
+
+                  const onCancel = () => {
+                    request.removeListener('cancel', onCancel);
+                    message.removeListener('drain', onDrain);
+
+                    resolve();
+                  };
+
+                  message.once('drain', onDrain);
+                  request.once('cancel', onCancel);
+                });
+              }
+            }
+          } catch (err: any) {
+            request.error ??= err;
+            message.ignore = true;
+
+            if (request instanceof Request && request.paused) {
+              // resume the request if it was paused so we can read the remaining tokens
+              request.resume();
+            }
+          }
+
+          message.end();
+        } finally {
+          request.removeListener('cancel', onCancel);
+        }
+
         request.once('cancel', this._cancelAfterRequestSent);
 
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
           return payload!.toString('  ');
         });
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
       });
-
-      const payloadStream = Readable.from(payload);
-      payloadStream.once('error', (error) => {
-        payloadStream.unpipe(message);
-
-        // Only set a request error if no error was set yet.
-        request.error ??= error;
-
-        message.ignore = true;
-        message.end();
-      });
-      payloadStream.pipe(message);
     }
   }
 
