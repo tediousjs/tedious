@@ -3173,7 +3173,7 @@ class Connection extends EventEmitter {
           // request timer is stopped on first data package
           this.clearRequestTimer();
 
-          const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+          const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, request));
 
           // If the request was canceled and we have a `cancelTimer`
           // defined, we send a attention message after the
@@ -3183,7 +3183,7 @@ class Connection extends EventEmitter {
           // (but all the token handlers should be no-ops), and
           // need to ensure the next message is handled by the
           // `SENT_ATTENTION` state.
-          if (this.request?.canceled && this.cancelTimer) {
+          if (request.canceled && this.cancelTimer) {
             return this.transitionTo(this.STATE.SENT_ATTENTION);
           }
 
@@ -3193,25 +3193,25 @@ class Connection extends EventEmitter {
           const onPause = () => {
             tokenStreamParser.pause();
 
-            this.request?.once('resume', onResume);
+            request.once('resume', onResume);
           };
 
-          this.request?.on('pause', onPause);
+          request.on('pause', onPause);
 
-          if (this.request instanceof Request && this.request.paused) {
+          if (request instanceof Request && request.paused) {
             onPause();
           }
 
           const onCancel = () => {
             tokenStreamParser.removeListener('end', onEndOfMessage);
 
-            if (this.request instanceof Request && this.request.paused) {
+            if (request instanceof Request && request.paused) {
               // resume the request if it was paused so we can read the remaining tokens
-              this.request.resume();
+              request.resume();
             }
 
-            this.request?.removeListener('pause', onPause);
-            this.request?.removeListener('resume', onResume);
+            request.removeListener('pause', onPause);
+            request.removeListener('resume', onResume);
 
             // The `_cancelAfterRequestSent` callback will have sent a
             // attention message, so now we need to also switch to
@@ -3221,22 +3221,21 @@ class Connection extends EventEmitter {
           };
 
           const onEndOfMessage = () => {
-            this.request?.removeListener('cancel', this._cancelAfterRequestSent);
-            this.request?.removeListener('cancel', onCancel);
-            this.request?.removeListener('pause', onPause);
-            this.request?.removeListener('resume', onResume);
+            request.removeListener('cancel', this._cancelAfterRequestSent);
+            request.removeListener('cancel', onCancel);
+            request.removeListener('pause', onPause);
+            request.removeListener('resume', onResume);
 
             this.transitionTo(this.STATE.LOGGED_IN);
-            const sqlRequest = this.request as Request;
             this.request = undefined;
-            if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+            if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
               this.inTransaction = false;
             }
-            sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+            request.callback(request.error, request.rowCount, request.rows);
           };
 
           tokenStreamParser.once('end', onEndOfMessage);
-          this.request?.once('cancel', onCancel);
+          request.once('cancel', onCancel);
         }
       })().catch((err) => {
         process.nextTick(() => {
