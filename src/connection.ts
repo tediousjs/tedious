@@ -3235,7 +3235,7 @@ class Connection extends EventEmitter {
               return this.socketError(err);
             }
 
-            const handler = new AttentionTokenHandler(this, this.request!);
+            const handler = new AttentionTokenHandler(this, request);
             for await (const token of this.createTokenStreamParser(message)) {
               handler[token.handlerName](token as any);
             }
