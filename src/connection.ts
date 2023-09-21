@@ -404,7 +404,6 @@ interface KeyStoreProviderMap {
  */
 interface State {
   name: string;
-  enter?(this: Connection): void;
   events: {
     socketError?(this: Connection, err: Error): void;
   };
@@ -2229,10 +2228,6 @@ class Connection extends EventEmitter {
 
     this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
-
-    if (this.state.enter) {
-      this.state.enter.apply(this);
-    }
   }
 
   /**
