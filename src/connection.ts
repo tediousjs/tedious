@@ -3182,8 +3182,8 @@ class Connection extends EventEmitter {
               this.clearRequestTimer();
             }
 
-            if (!request.canceled && request instanceof Request && request.paused) {
-              await new Promise<void>((resolve, _) => {
+            const onCancelOrResume = async () => {
+              return await new Promise<void>((resolve, _) => {
                 const onResume = () => {
                   request.removeListener('cancel', onCancel);
                   request.removeListener('resume', onResume);
@@ -3201,29 +3201,16 @@ class Connection extends EventEmitter {
                 request.on('cancel', onCancel);
                 request.on('resume', onResume);
               });
+            };
+
+            if (!request.canceled && request instanceof Request && request.paused) {
+              await onCancelOrResume();
             }
 
             const handler = new RequestTokenHandler(this, request);
             for await (const token of this.createTokenStreamParser(message)) {
               if (!request.canceled && request instanceof Request && request.paused) {
-                await new Promise<void>((resolve, _) => {
-                  const onResume = () => {
-                    request.removeListener('cancel', onCancel);
-                    request.removeListener('resume', onResume);
-
-                    resolve();
-                  };
-
-                  const onCancel = () => {
-                    request.removeListener('cancel', onCancel);
-                    request.removeListener('resume', onResume);
-
-                    resolve();
-                  };
-
-                  request.on('cancel', onCancel);
-                  request.on('resume', onResume);
-                });
+                await onCancelOrResume();
               }
 
               handler[token.handlerName](token as any);
