@@ -405,7 +405,6 @@ interface KeyStoreProviderMap {
 interface State {
   name: string;
   enter?(this: Connection): void;
-  exit?(this: Connection, newState: State): void;
   events: {
     socketError?(this: Connection, err: Error): void;
   };
@@ -2228,10 +2227,6 @@ class Connection extends EventEmitter {
       return;
     }
 
-    if (this.state && this.state.exit) {
-      this.state.exit.call(this, newState);
-    }
-
     this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
@@ -3146,59 +3141,52 @@ class Connection extends EventEmitter {
           request.removeListener('cancel', onCancel);
         }
 
-        const onCancelAfterRequestSent = () => {
-          this.messageIo.sendMessage(TYPE.ATTENTION);
-          this.createCancelTimer();
-        };
-        request.once('cancel', onCancelAfterRequestSent);
-
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
           return payload!.toString('  ');
         });
 
-        {
+        if (request.canceled) {
           let message;
           try {
             message = await this.messageIo.readMessage();
           } catch (err: any) {
             return this.socketError(err);
-          }
-          // request timer is stopped on first data package
-          this.clearRequestTimer();
-
-          const onCancel = () => {
-            // The `_cancelAfterRequestSent` callback will have sent a
-            // attention message, so now we need to also switch to
-            // the `SENT_ATTENTION` state to make sure the attention ack
-            // message is processed correctly.
-            this.transitionTo(this.STATE.SENT_ATTENTION);
-          };
-          request.once('cancel', onCancel);
-
-          if (!request.canceled && request instanceof Request && request.paused) {
-            await new Promise<void>((resolve, _) => {
-              const onResume = () => {
-                request.removeListener('cancel', onCancel);
-                request.removeListener('resume', onResume);
-
-                resolve();
-              };
-
-              const onCancel = () => {
-                request.removeListener('cancel', onCancel);
-                request.removeListener('resume', onResume);
-
-                resolve();
-              };
-
-              request.on('cancel', onCancel);
-              request.on('resume', onResume);
-            });
+          } finally {
+            // request timer is stopped on first data package (or error)
+            this.clearRequestTimer();
           }
 
           const handler = new RequestTokenHandler(this, request);
           for await (const token of this.createTokenStreamParser(message)) {
+            handler[token.handlerName](token as any);
+          }
+
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+          this.request = undefined;
+          if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+            this.inTransaction = false;
+          }
+          request.callback(request.error, request.rowCount, request.rows);
+        } else {
+          const onCancelAfterRequestSent = () => {
+            this.messageIo.sendMessage(TYPE.ATTENTION);
+            this.createCancelTimer();
+          };
+          request.once('cancel', onCancelAfterRequestSent);
+
+          {
+            let message;
+            try {
+              message = await this.messageIo.readMessage();
+            } catch (err: any) {
+              return this.socketError(err);
+            } finally {
+              // request timer is stopped on first data package (or error)
+              this.clearRequestTimer();
+            }
+
             if (!request.canceled && request instanceof Request && request.paused) {
               await new Promise<void>((resolve, _) => {
                 const onResume = () => {
@@ -3220,29 +3208,78 @@ class Connection extends EventEmitter {
               });
             }
 
-            handler[token.handlerName](token as any);
-          }
+            const handler = new RequestTokenHandler(this, request);
+            for await (const token of this.createTokenStreamParser(message)) {
+              if (!request.canceled && request instanceof Request && request.paused) {
+                await new Promise<void>((resolve, _) => {
+                  const onResume = () => {
+                    request.removeListener('cancel', onCancel);
+                    request.removeListener('resume', onResume);
 
-          request.removeListener('cancel', onCancelAfterRequestSent);
-          request.removeListener('cancel', onCancel);
+                    resolve();
+                  };
 
-          // If the request was canceled and we have a `cancelTimer`
-          // defined, we send a attention message after the
-          // request message was fully sent off.
-          //
-          // We already started consuming the current message
-          // (but all the token handlers should be no-ops), and
-          // need to ensure the next message is handled by the
-          // `SENT_ATTENTION` state.
-          if (request.canceled && this.cancelTimer) {
-            return this.transitionTo(this.STATE.SENT_ATTENTION);
-          } else {
-            this.transitionTo(this.STATE.LOGGED_IN);
-            this.request = undefined;
-            if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
-              this.inTransaction = false;
+                  const onCancel = () => {
+                    request.removeListener('cancel', onCancel);
+                    request.removeListener('resume', onResume);
+
+                    resolve();
+                  };
+
+                  request.on('cancel', onCancel);
+                  request.on('resume', onResume);
+                });
+              }
+
+              handler[token.handlerName](token as any);
             }
-            request.callback(request.error, request.rowCount, request.rows);
+
+            request.removeListener('cancel', onCancelAfterRequestSent);
+
+            // If the request was canceled and we have a `cancelTimer`
+            // defined, we send a attention message after the
+            // request message was fully sent off.
+            //
+            // We already started consuming the current message
+            // (but all the token handlers should be no-ops), and
+            // need to ensure the next message is handled by the
+            // `SENT_ATTENTION` state.
+            if (request.canceled) {
+              let message;
+              try {
+                message = await this.messageIo.readMessage();
+              } catch (err: any) {
+                return this.socketError(err);
+              }
+
+              const handler = new AttentionTokenHandler(this, this.request!);
+              for await (const token of this.createTokenStreamParser(message)) {
+                handler[token.handlerName](token as any);
+              }
+
+              // 3.2.5.7 Sent Attention State
+              // Discard any data contained in the response, until we receive the attention response
+              if (handler.attentionReceived) {
+                this.clearCancelTimer();
+
+                this.request = undefined;
+                this.transitionTo(this.STATE.LOGGED_IN);
+
+                if (request.error && request.error instanceof RequestError && request.error.code === 'ETIMEOUT') {
+                  request.callback(request.error);
+                } else {
+                  request.callback(new RequestError('Canceled.', 'ECANCEL'));
+                }
+              }
+            } else {
+              this.transitionTo(this.STATE.LOGGED_IN);
+
+              this.request = undefined;
+              if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+                this.inTransaction = false;
+              }
+              request.callback(request.error, request.rowCount, request.rows);
+            }
           }
         }
       })().catch((err) => {
@@ -3709,9 +3746,6 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function(nextState) {
-      this.clearRequestTimer();
-    },
     events: {
       socketError: function(err) {
         const sqlRequest = this.request!;
@@ -3725,42 +3759,6 @@ Connection.prototype.STATE = {
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
-    enter: function() {
-      (async () => {
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          return this.socketError(err);
-        }
-
-        const handler = new AttentionTokenHandler(this, this.request!);
-        for await (const token of this.createTokenStreamParser(message)) {
-          handler[token.handlerName](token as any);
-        }
-
-        // 3.2.5.7 Sent Attention State
-        // Discard any data contained in the response, until we receive the attention response
-        if (handler.attentionReceived) {
-          this.clearCancelTimer();
-
-          const sqlRequest = this.request!;
-          this.request = undefined;
-          this.transitionTo(this.STATE.LOGGED_IN);
-
-          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-            sqlRequest.callback(sqlRequest.error);
-          } else {
-            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
-          }
-        }
-
-      })().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function(err) {
         const sqlRequest = this.request!;
