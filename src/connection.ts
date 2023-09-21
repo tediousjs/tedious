@@ -3171,7 +3171,7 @@ class Connection extends EventEmitter {
           };
           request.once('cancel', onCancelAfterRequestSent);
 
-          {
+          try {
             let message;
             try {
               message = await this.messageIo.readMessage();
@@ -3228,53 +3228,53 @@ class Connection extends EventEmitter {
 
               handler[token.handlerName](token as any);
             }
-
+          } finally {
             request.removeListener('cancel', onCancelAfterRequestSent);
+          }
 
-            // If the request was canceled and we have a `cancelTimer`
-            // defined, we send a attention message after the
-            // request message was fully sent off.
-            //
-            // We already started consuming the current message
-            // (but all the token handlers should be no-ops), and
-            // need to ensure the next message is handled by the
-            // `SENT_ATTENTION` state.
-            if (request.canceled) {
-              let message;
-              try {
-                message = await this.messageIo.readMessage();
-              } catch (err: any) {
-                return this.socketError(err);
-              }
+          // If the request was canceled and we have a `cancelTimer`
+          // defined, we send a attention message after the
+          // request message was fully sent off.
+          //
+          // We already started consuming the current message
+          // (but all the token handlers should be no-ops), and
+          // need to ensure the next message is handled by the
+          // `SENT_ATTENTION` state.
+          if (request.canceled) {
+            let message;
+            try {
+              message = await this.messageIo.readMessage();
+            } catch (err: any) {
+              return this.socketError(err);
+            }
 
-              const handler = new AttentionTokenHandler(this, this.request!);
-              for await (const token of this.createTokenStreamParser(message)) {
-                handler[token.handlerName](token as any);
-              }
+            const handler = new AttentionTokenHandler(this, this.request!);
+            for await (const token of this.createTokenStreamParser(message)) {
+              handler[token.handlerName](token as any);
+            }
 
-              // 3.2.5.7 Sent Attention State
-              // Discard any data contained in the response, until we receive the attention response
-              if (handler.attentionReceived) {
-                this.clearCancelTimer();
-
-                this.request = undefined;
-                this.transitionTo(this.STATE.LOGGED_IN);
-
-                if (request.error && request.error instanceof RequestError && request.error.code === 'ETIMEOUT') {
-                  request.callback(request.error);
-                } else {
-                  request.callback(new RequestError('Canceled.', 'ECANCEL'));
-                }
-              }
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN);
+            // 3.2.5.7 Sent Attention State
+            // Discard any data contained in the response, until we receive the attention response
+            if (handler.attentionReceived) {
+              this.clearCancelTimer();
 
               this.request = undefined;
-              if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
-                this.inTransaction = false;
+              this.transitionTo(this.STATE.LOGGED_IN);
+
+              if (request.error && request.error instanceof RequestError && request.error.code === 'ETIMEOUT') {
+                request.callback(request.error);
+              } else {
+                request.callback(new RequestError('Canceled.', 'ECANCEL'));
               }
-              request.callback(request.error, request.rowCount, request.rows);
             }
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN);
+
+            this.request = undefined;
+            if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+              this.inTransaction = false;
+            }
+            request.callback(request.error, request.rowCount, request.rows);
           }
         }
       })().catch((err) => {
