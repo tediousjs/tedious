@@ -65,7 +65,7 @@ function Benchmark(fn, configs, options) {
 
     for (let i = 0; i < length; i++) {
       const entry = entries[i];
-      const stats = this._gcStats[entry.kind];
+      const stats = this._gcStats[entry.detail.kind];
 
       if (stats) {
         stats.count += 1;
