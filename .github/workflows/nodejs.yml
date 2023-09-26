@@ -165,7 +165,7 @@ jobs:
     strategy:
       matrix:
         mssql-version: [2016, 2017, 2019, 2022]
-        node-version: [16.x, 18.x, 19.x]
+        node-version: [16.x, 18.x, 19.x, 20.x]
       fail-fast: false
 
     steps:
