@@ -5,17 +5,396 @@ import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
 import { TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
-import { Duplex } from 'stream';
+import { Duplex, PassThrough, Readable } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
-import Message from '../../src/message';
 import { Packet, TYPE } from '../../src/packet';
+import { BufferListStream } from 'bl';
 
 const packetType = 2;
 const packetSize = 8 + 4;
 
 const delay = promisify(setTimeout);
+
+describe('MessageIO.readMessage', function() {
+  it('can read single packet message from the given readable', async function() {
+    const expectedData = Buffer.from('foobar');
+
+    const stream = Readable.from(function*() {
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.last(true);
+        packet.addData(expectedData);
+        yield packet.buffer;
+      }
+    }());
+
+    const debug = new Debug();
+
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      assert.deepEqual(chunk, expectedData);
+    }
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('can read multi packet message from the given readable', async function() {
+    const expectedData = [ Buffer.from('foo'), Buffer.from('bar') ];
+
+    const stream = Readable.from(function*() {
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[0]);
+        yield packet.buffer;
+      }
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[1]);
+        packet.last(true);
+        yield packet.buffer;
+      }
+    }());
+
+    const debug = new Debug();
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, expectedData);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('can read multi packet message in a single chunk from the given readable', async function() {
+    const expectedData = [Buffer.from('foo'), Buffer.from('bar')];
+
+    const stream = Readable.from(function*() {
+      const chunks = [];
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[0]);
+        chunks.push(packet.buffer);
+      }
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[1]);
+        packet.last(true);
+        chunks.push(packet.buffer);
+      }
+
+      yield Buffer.concat(chunks);
+    }());
+
+    const debug = new Debug();
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, expectedData);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('can read single packet messages in a single chunk from the given readable', async function() {
+    const expectedData = [Buffer.from('foo'), Buffer.from('bar')];
+
+    const stream = Readable.from(function*() {
+      const chunks = [];
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[0]);
+        packet.last(true);
+        chunks.push(packet.buffer);
+      }
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(expectedData[1]);
+        packet.last(true);
+        chunks.push(packet.buffer);
+      }
+
+      yield Buffer.concat(chunks);
+    }());
+
+    const debug = new Debug();
+
+    {
+      const chunks = [];
+      for await (const chunk of MessageIO.readMessage(stream, debug)) {
+        chunks.push(chunk);
+      }
+      assert.deepEqual(chunks, [expectedData[0]]);
+    }
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+
+    {
+      const chunks = [];
+      for await (const chunk of MessageIO.readMessage(stream, debug)) {
+        chunks.push(chunk);
+      }
+      assert.deepEqual(chunks, [expectedData[1]]);
+    }
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('handles streams that close unexpectedly', async function() {
+    const stream = new Readable({
+      read: () => {}
+    });
+
+    const debug = new Debug();
+
+    let hadError = false;
+    try {
+      await Promise.all([
+        (async () => {
+          for await (const { } of MessageIO.readMessage(stream, debug)) { }
+        })(),
+        (async () => {
+          await delay(1);
+          // End the stream
+          stream.push(null);
+        })(),
+      ]);
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert.strictEqual(hadError, true);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('throws an error when given a stream that can not be read from', async function() {
+    const stream = new Readable({ read: () => { } });
+    stream.destroy();
+
+    const debug = new Debug();
+
+    let hadError = false;
+    try {
+      for await (const { } of MessageIO.readMessage(stream, debug)) { }
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert.strictEqual(hadError, true);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('handles errors on the stream during reading', async function() {
+    const stream = Readable.from(function *() {
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(Buffer.alloc(100));
+        yield packet.buffer;
+      }
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(Buffer.alloc(100));
+        yield packet.buffer;
+      }
+    }());
+
+    const debug = new Debug();
+    const expectedErr = new Error('some error');
+
+    let hadError = false;
+    try {
+      for await (const {} of MessageIO.readMessage(stream, debug)) {
+        stream.destroy(expectedErr);
+      }
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err, expectedErr);
+    }
+
+    assert.strictEqual(hadError, true);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('handles errors on the stream during reading (on the next tick)', async function() {
+    const stream = Readable.from(function*() {
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(Buffer.alloc(100));
+        yield packet.buffer;
+      }
+
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(Buffer.alloc(100));
+        yield packet.buffer;
+      }
+    }());
+
+    const debug = new Debug();
+    const expectedErr = new Error('some error');
+
+    let hadError = false;
+    try {
+      for await (const { } of MessageIO.readMessage(stream, debug)) {
+        process.nextTick(() => {
+          stream.destroy(expectedErr);
+        });
+
+        await delay(5);
+      }
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err, expectedErr);
+    }
+
+    assert.strictEqual(hadError, true);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+
+  it('throws an error if the streams ends before receiving the last packet', async function() {
+    const stream = Readable.from(function*() {
+      {
+        const packet = new Packet(TYPE.PRELOGIN);
+        packet.addData(Buffer.alloc(100));
+        yield packet.buffer;
+      }
+    }());
+
+    const debug = new Debug();
+
+    let hadError = false;
+    try {
+      for await (const { } of MessageIO.readMessage(stream, debug)) { }
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert.strictEqual(hadError, true);
+
+    assert.strictEqual(stream.listenerCount('error'), 0);
+    assert.strictEqual(stream.listenerCount('readable'), 0);
+  });
+});
+
+describe('MessageIO.writeMessage', function() {
+  it('can write a payload as a set of packages to the given stream', async function() {
+    const bl = new BufferListStream() as any as Duplex;
+
+    const debug = new Debug();
+    const data = Buffer.from('foobar');
+
+    await MessageIO.writeMessage(bl, debug, 4096, TYPE.PRELOGIN, [data]);
+
+    const packet = new Packet(bl.read());
+    assert.strictEqual(packet.type(), TYPE.PRELOGIN);
+    assert.strictEqual(packet.isLast(), true);
+    assert.deepEqual(packet.data(), data);
+  });
+
+  it('can handle the payload erroring unexpectedly', async function() {
+    const bl = new BufferListStream() as any as Duplex;
+
+    const debug = new Debug();
+    const data = Buffer.from('foobar');
+
+    const expectedError = new Error('unexpected error');
+    const payload = (function*() {
+      yield data;
+
+      throw expectedError;
+    })();
+
+    try {
+      await MessageIO.writeMessage(bl, debug, 4096, TYPE.PRELOGIN, payload);
+    } catch (err: any) {
+      assert.strictEqual(err, expectedError);
+    }
+
+    const packet = new Packet(bl.read());
+    assert.strictEqual(packet.type(), TYPE.PRELOGIN);
+    assert.strictEqual(packet.statusAsString(), 'EOM IGNORE');
+    assert.strictEqual(packet.isLast(), true);
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
+  });
+
+  it('can handle the target stream erroring while waiting for payload data', async function() {
+    const passthrough = new PassThrough({ objectMode: true });
+
+    const debug = new Debug();
+    const data = Buffer.alloc(passthrough.writableHighWaterMark + 1);
+
+    const expectedError = new Error('unexpected error');
+    const payload = (async function*() {
+      yield data;
+
+      await delay(1);
+      passthrough.destroy(expectedError);
+      await delay(1);
+
+      yield data;
+    })();
+
+    try {
+      await MessageIO.writeMessage(passthrough, debug, 4096, TYPE.PRELOGIN, payload);
+    } catch (err: any) {
+      assert.strictEqual(err, expectedError);
+    }
+
+    assert.isNull(passthrough.read());
+  });
+
+  it('can handle the target stream erroring while waiting for a drain event', async function() {
+    const passthrough = new PassThrough({ writableHighWaterMark: 16, readableHighWaterMark: 16 });
+
+    const debug = new Debug();
+
+    const data = Buffer.alloc(passthrough.writableHighWaterMark * 2);
+
+    const expectedError = new Error('unexpected error');
+    const payload = (async function*() {
+      delay(10).then(() => {
+        passthrough.destroy(expectedError);
+      });
+
+      yield data;
+    })();
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(passthrough, debug, 16, TYPE.PRELOGIN, payload);
+    } catch (err: any) {
+      hadError = true;
+      assert.strictEqual(err, expectedError);
+    }
+    assert.isTrue(hadError);
+  });
+});
 
 describe('MessageIO', function() {
   let server: Server;
@@ -56,7 +435,7 @@ describe('MessageIO', function() {
     server.close(done);
   });
 
-  describe('#sendMessage', function() {
+  describe('#writeMessage', function() {
     it('sends data that is smaller than the current packet length', async function() {
       const payload = Buffer.from([1, 2, 3]);
 
@@ -79,7 +458,7 @@ describe('MessageIO', function() {
         // Client side
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
-          io.sendMessage(packetType, payload);
+          await io.writeMessage(packetType, Readable.from([payload]));
         })()
       ]);
     });
@@ -106,7 +485,7 @@ describe('MessageIO', function() {
         // Client side
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
-          io.sendMessage(packetType, payload);
+          await io.writeMessage(packetType, Readable.from([payload]));
         })()
       ]);
     });
@@ -134,7 +513,7 @@ describe('MessageIO', function() {
         // Client side
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
-          io.sendMessage(packetType, payload);
+          await io.writeMessage(packetType, Readable.from([payload]));
         })()
       ]);
     });
@@ -158,11 +537,8 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
-
           const chunks = [];
-          for await (const chunk of message) {
+          for await (const chunk of io.readMessage()) {
             chunks.push(chunk);
           }
 
@@ -189,11 +565,8 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
-
           const chunks = [];
-          for await (const chunk of message) {
+          for await (const chunk of io.readMessage()) {
             chunks.push(chunk);
           }
 
@@ -228,11 +601,8 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
-
           const receivedData: Buffer[] = [];
-          for await (const chunk of message) {
+          for await (const chunk of io.readMessage()) {
             receivedData.push(chunk);
           }
 
@@ -274,11 +644,8 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
-
           const receivedData: Buffer[] = [];
-          for await (const chunk of message) {
+          for await (const chunk of io.readMessage()) {
             receivedData.push(chunk);
           }
 
@@ -321,18 +688,15 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
-
           const receivedData: Buffer[] = [];
-          for await (const chunk of message) {
+          for await (const chunk of io.readMessage()) {
             receivedData.push(chunk);
           }
 
           // The data of the individual packages gets merged together by the buffering happening
           // inside the `IncomingMessageStream`. We don't actually care about this, so it's
           // okay if this changes.
-          assert.deepEqual(receivedData, [ payload ]);
+          assert.deepEqual(Buffer.concat(receivedData), payload);
         })()
       ]);
     });
@@ -395,7 +759,7 @@ describe('MessageIO', function() {
               chunks.push(chunk);
             }
 
-            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+            await io.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
           }
 
           {
@@ -412,7 +776,7 @@ describe('MessageIO', function() {
               chunks.push(chunk);
             }
 
-            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+            await io.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
           }
 
           // Verify that server side was successful at this point
@@ -432,7 +796,7 @@ describe('MessageIO', function() {
           await io.startTls({}, 'localhost', true);
 
           // Send a request (via TLS)
-          io.sendMessage(TYPE.LOGIN7, payload);
+          await io.writeMessage(TYPE.LOGIN7, Readable.from([payload]));
 
           // Receive response (via TLS)
           const message = await io.readMessage();
@@ -467,7 +831,7 @@ describe('MessageIO', function() {
               chunks.push(chunk);
             }
 
-            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+            await io.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
           }
 
           {
@@ -484,7 +848,7 @@ describe('MessageIO', function() {
               chunks.push(chunk);
             }
 
-            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+            await io.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
           }
 
           // Verify that server side was successful at this point
@@ -589,7 +953,7 @@ describe('MessageIO', function() {
               chunks.push(chunk);
             }
 
-            io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+            await io.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
           }
         })()
       ]);

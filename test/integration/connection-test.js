@@ -293,7 +293,6 @@ describe('Initiate Connect Test', function() {
       try {
         assert.instanceOf(err, ConnectionError);
         assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
-        assert.strictEqual(connection.connectTimer, undefined);
         done();
       } catch (e) {
         done(e);
@@ -302,8 +301,6 @@ describe('Initiate Connect Test', function() {
 
     connection.on('error', done);
     connection.connect();
-
-    assert.isOk(connection.connectTimer);
   });
 
   it('should clear timeouts when failing to connect to named instance', function(done) {
@@ -322,15 +319,12 @@ describe('Initiate Connect Test', function() {
     connection.on('connect', (err) => {
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
-      assert.strictEqual(connection.connectTimer, undefined);
 
       done();
     });
 
     connection.on('error', done);
     connection.connect();
-
-    assert.isOk(connection.connectTimer);
   });
 
   it('should fail if no cipher can be negotiated', function(done) {
@@ -466,7 +460,6 @@ describe('Initiate Connect Test', function() {
     });
   });
 });
-
 
 describe('Ntlm Test', function() {
   /**

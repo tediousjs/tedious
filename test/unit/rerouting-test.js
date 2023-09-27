@@ -8,6 +8,7 @@ const Debug = require('../../src/debug');
 const PreloginPayload = require('../../src/prelogin-payload');
 const Message = require('../../src/message');
 const WritableTrackingBuffer = require('../../src/tracking-buffer/writable-tracking-buffer');
+const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 
 function buildRoutingEnvChangeToken(hostname, port) {
   const valueBuffer = new WritableTrackingBuffer(0);
@@ -444,9 +445,14 @@ describe('Connecting to a server that sends a re-routing information', function(
       server: routingServer.address().address,
       options: {
         port: routingServer.address().port,
-        encrypt: false
+        encrypt: false,
+        debug: debugOptionsFromEnv()
       }
     });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     try {
       await new Promise((resolve, reject) => {

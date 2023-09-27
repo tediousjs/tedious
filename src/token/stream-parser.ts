@@ -47,10 +47,14 @@ class StreamBuffer {
     this.position = 0;
   }
 
-  async waitForChunk() {
+  async waitForChunk(errorOnDone = true) {
     const result = await this.iterator.next();
     if (result.done) {
-      throw new Error('unexpected end of data');
+      if (errorOnDone) {
+        throw new Error('unexpected end of data');
+      }
+
+      return;
     }
 
     if (this.position === this.buffer.length) {
@@ -81,14 +85,10 @@ class Parser {
     parser.colMetadata = colMetadata;
 
     while (true) {
-      try {
-        await streamBuffer.waitForChunk();
-      } catch (err: unknown) {
-        if (streamBuffer.position === streamBuffer.buffer.length) {
-          return;
-        }
+      await streamBuffer.waitForChunk(false);
 
-        throw err;
+      if (streamBuffer.position === streamBuffer.buffer.length) {
+        return;
       }
 
       if (parser.suspended) {

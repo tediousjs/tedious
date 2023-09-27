@@ -35,7 +35,6 @@ import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
-import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
@@ -49,7 +48,7 @@ import Procedures from './special-stored-procedure';
 import AggregateError from 'es-aggregate-error';
 import { version } from '../package.json';
 import { URL } from 'url';
-import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
   /**
@@ -324,10 +323,6 @@ interface DefaultAuthentication {
      */
     password?: string | undefined;
   };
-}
-
-interface ErrorWithCode extends Error {
-  code?: string;
 }
 
 interface InternalConnectionConfig {
@@ -1008,10 +1003,6 @@ class Connection extends EventEmitter {
    * @private
    */
   cancelTimer: undefined | NodeJS.Timeout;
-  /**
-   * @private
-   */
-  requestTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
@@ -1749,7 +1740,9 @@ class Connection extends EventEmitter {
     }
 
     this.transitionTo(this.STATE.CONNECTING);
-    this.initialiseConnection();
+    this.initialiseConnection().catch((err) => {
+      process.nextTick(() => { throw err; });
+    });
   }
 
   /**
@@ -1889,6 +1882,7 @@ class Connection extends EventEmitter {
    * The [[Event_end]] will be emitted once the connection has been closed.
    */
   close() {
+    this.socket?.end();
     this.transitionTo(this.STATE.FINAL);
     this.cleanupConnection(CLEANUP_TYPE.NORMAL);
   }
@@ -1896,12 +1890,38 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  initialiseConnection() {
-    const signal = this.createConnectTimer();
+  async initialiseConnection() {
+    const controller = new AbortController();
+    const connectTimer = setTimeout(() => {
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+      const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
 
-    this.establishConnection(signal).catch((err) => {
-      process.nextTick(() => { throw err; });
-    });
+      this.debug.log(message);
+
+      const error = new ConnectionError(message, 'ETIMEOUT');
+
+      controller.abort(error);
+
+      // TODO: Get rid of this call.
+      this.socket?.destroy(error);
+    }, this.config.options.connectTimeout);
+
+    try {
+      await this.establishConnection(controller.signal);
+    } catch (err: any) {
+      this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+
+      process.nextTick(() => { this.emit('connect', err); });
+    } finally {
+      clearTimeout(connectTimer);
+    }
   }
 
   async establishConnection(signal: AbortSignal) {
@@ -1916,20 +1936,11 @@ class Connection extends EventEmitter {
           signal: signal
         });
       } catch (err: any) {
-        this.clearConnectTimer();
-
-        if (signal.aborted) {
-          // Ignore the AbortError for now, this is still handled by the connectTimer firing
-          return;
-        }
-
-        return process.nextTick(() => {
-          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
-        });
+        throw new ConnectionError(err.message, 'EINSTLOOKUP');
       }
     }
 
-    await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+    await this.performConnection(this.config.server, port, signal);
   }
 
   /**
@@ -1937,8 +1948,6 @@ class Connection extends EventEmitter {
    */
   cleanupConnection(cleanupType: typeof CLEANUP_TYPE[keyof typeof CLEANUP_TYPE]) {
     if (!this.closed) {
-      this.clearConnectTimer();
-      this.clearRequestTimer();
       this.closeConnection();
       if (cleanupType === CLEANUP_TYPE.REDIRECT) {
         this.emit('rerouting');
@@ -1946,13 +1955,6 @@ class Connection extends EventEmitter {
         process.nextTick(() => {
           this.emit('end');
         });
-      }
-
-      const request = this.request;
-      if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
-        request.callback(err);
-        this.request = undefined;
       }
 
       this.closed = true;
@@ -1974,14 +1976,11 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message) {
+  createTokenStreamParser(message: AsyncIterable<Buffer>) {
     return TokenStreamParser.parseTokens(message, this.debug, this.config.options);
   }
 
   performSocketSetup(socket: net.Socket) {
-    socket.on('error', (error) => { this.socketError(error); });
-    socket.on('close', () => { this.socketClose(); });
-    socket.on('end', () => { this.socketEnd(); });
     socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
     this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
@@ -1993,10 +1992,10 @@ class Connection extends EventEmitter {
     this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
   }
 
-  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+  async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
     signal.throwIfAborted();
 
-    return new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const secureContext = tls.createSecureContext(this.secureContextOptions);
       // If connect to an ip address directly,
       // need to set the servername to an empty string
@@ -2013,6 +2012,8 @@ class Connection extends EventEmitter {
       const encryptsocket = tls.connect(encryptOptions);
 
       const onAbort = () => {
+        console.log('onAbort', signal.reason);
+
         encryptsocket.removeListener('error', onError);
         encryptsocket.removeListener('connect', onConnect);
 
@@ -2022,6 +2023,8 @@ class Connection extends EventEmitter {
       };
 
       const onError = (err: Error) => {
+        console.log('onError');
+
         signal.removeEventListener('abort', onAbort);
 
         encryptsocket.removeListener('error', onError);
@@ -2048,54 +2051,142 @@ class Connection extends EventEmitter {
     });
   }
 
-  async connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+  async performConnection(server: string, port: number, signal: AbortSignal) {
+    await this.performConnectionWithRetry(server, port, signal);
+
+    // Now that the connection has been established, send the initial SQL setup statement.
+    await this.sendInitialSql(signal);
+    await this.handleInitialSqlResponse(signal);
+
+    // Now that we're connected, add an error handler
+    this.socket!.on('error', (error) => { this.socketError(error); });
+
+    this.transitionTo(this.STATE.LOGGED_IN);
+    process.nextTick(() => { this.emit('connect'); });
+  }
+
+  async performConnectionWithRetry(server: string, port: number, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+
+    let retryCount = 0;
+    while (true) {
+      try {
+        return await this.performConnectionWithReroutingData(server, port, signal);
+      } catch (err: any) {
+        if (!err.isTransient || retryCount === this.config.options.maxRetriesOnTransientErrors) {
+          throw err;
+        }
+      }
+
+      this.closed = true;
+      this.loginError = undefined;
+
+      this.curTransientRetryCount++;
+
+      this.debug.log('Initiating retry on transient error');
+      this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+      // TODO: handle connect signal firing here
+      await new Promise<void>((resolve, _reject) => {
+        setTimeout(resolve, this.config.options.connectionRetryInterval);
+      });
+
+      // TODO: Remove this event
+      process.nextTick(() => { this.emit('retry'); });
+
+      // Wait for `retry` event to have been handled
+      await Promise.resolve();
+
+      this.transitionTo(this.STATE.CONNECTING);
+
+      retryCount += 1;
+    }
+  }
+
+  async performConnectionWithReroutingData(server: string, port: number, signal: AbortSignal): Promise<void> {
+    this.socket = await this.connectOnPort(server, port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+
+    let routingData;
+    try {
+      await this.sendPreLogin();
+      await this.handlePreloginResponse(signal);
+
+      await this.sendLogin7Packet();
+      routingData = await this.handleLogin7Response(signal);
+    } catch (err: any) {
+      // cleanup the socket
+      this.socket.destroy();
+      this.socket = undefined;
+      throw err;
+    }
+
+    if (!routingData) {
+      return;
+    }
+
+    this.socket.destroy();
+    this.socket = undefined;
+
+    this.routingData = routingData;
+
+    this.transitionTo(this.STATE.REROUTING);
+    this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+
+    // TODO: Remove this event
+    process.nextTick(() => { this.emit('rerouting'); });
+
+    // Wait for `rerouting` event to have been handled
+    await Promise.resolve();
+
+    this.closed = true;
+    this.loginError = undefined;
+
+    this.transitionTo(this.STATE.CONNECTING);
+
+    return await this.performConnectionWithReroutingData(routingData.server, routingData.port, signal);
+  }
+
+  async connectOnPort(server: string, port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+    signal.throwIfAborted();
+
     const connectOpts = {
-      host: this.routingData ? this.routingData.server : this.config.server,
-      port: this.routingData ? this.routingData.port : port,
+      host: server,
+      port: port,
       localAddress: this.config.options.localAddress
     };
 
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
+    let socket;
     try {
-      let socket;
+      socket = await connect(connectOpts, dns.lookup, signal);
+    } catch (err: any) {
+      if (err instanceof ConnectionError) {
+        throw err;
+      }
 
+      throw this.wrapSocketError(err);
+    }
+
+    if (this.config.options.encrypt === 'strict') {
       try {
-        socket = await connect(connectOpts, dns.lookup, signal);
+        // Wrap the socket with TLS for TDS 8.0
+        socket = await this.wrapWithTls(socket, signal);
       } catch (err: any) {
+        socket.end();
+
+        if (err instanceof ConnectionError) {
+          throw err;
+        }
+
         throw this.wrapSocketError(err);
       }
-
-      if (this.config.options.encrypt === 'strict') {
-        try {
-          // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket, signal);
-        } catch (err: any) {
-          socket.end();
-
-          throw this.wrapSocketError(err);
-        }
-      }
-
-      this.performSocketSetup(socket);
-
-      this.sendPreLogin();
-      this.transitionTo(this.STATE.SENT_PRELOGIN);
-      return await this.handlePreloginResponse(signal);
-    } catch (err: any) {
-      this.clearConnectTimer();
-
-      if (signal.aborted) {
-        return;
-      }
-
-      this.transitionTo(this.STATE.FINAL);
-      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-
-      process.nextTick(() => {
-        this.emit('connect', err);
-      });
     }
+
+    this.performSocketSetup(socket);
+
+    return socket;
   }
 
   /**
@@ -2105,18 +2196,6 @@ class Connection extends EventEmitter {
     if (this.socket) {
       this.socket.destroy();
     }
-  }
-
-  /**
-   * @private
-   */
-  createConnectTimer() {
-    const controller = new AbortController();
-    this.connectTimer = setTimeout(() => {
-      controller.abort();
-      this.connectTimeout();
-    }, this.config.options.connectTimeout);
-    return controller.signal;
   }
 
   /**
@@ -2135,66 +2214,10 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createRequestTimer() {
-    this.clearRequestTimer(); // release old timer, just to be safe
-    const request = this.request as Request;
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    if (timeout) {
-      this.requestTimer = setTimeout(() => {
-        this.requestTimeout();
-      }, timeout);
-    }
-  }
-
-  /**
-   * @private
-   */
-  connectTimeout() {
-    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
-    // If we have routing data stored, this connection has been redirected
-    const server = this.routingData ? this.routingData.server : this.config.server;
-    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-    // Grab the target host from the connection configration, and from a redirect message
-    // otherwise, leave the message empty.
-    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
-    this.debug.log(message);
-    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = undefined;
-
-    this.transitionTo(this.STATE.FINAL);
-    this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-  }
-
-  /**
-   * @private
-   */
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
     this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
-  }
-
-  /**
-   * @private
-   */
-  requestTimeout() {
-    this.requestTimer = undefined;
-    const request = this.request!;
-    request.cancel();
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = new RequestError(message, 'ETIMEOUT');
-  }
-
-  /**
-   * @private
-   */
-  clearConnectTimer() {
-    if (this.connectTimer) {
-      clearTimeout(this.connectTimer);
-      this.connectTimer = undefined;
-    }
   }
 
   /**
@@ -2210,16 +2233,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  clearRequestTimer() {
-    if (this.requestTimer) {
-      clearTimeout(this.requestTimer);
-      this.requestTimer = undefined;
-    }
-  }
-
-  /**
-   * @private
-   */
   transitionTo(newState: State) {
     if (this.state === newState) {
       this.debug.log('State is already ' + newState.name);
@@ -2228,19 +2241,6 @@ class Connection extends EventEmitter {
 
     this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
-  }
-
-  /**
-   * @private
-   */
-  getEventHandler<T extends keyof State['events']>(eventName: T): NonNullable<State['events'][T]> {
-    const handler = this.state.events[eventName];
-
-    if (!handler) {
-      throw new Error(`No event '${eventName}' in state '${this.state.name}'`);
-    }
-
-    return handler!;
   }
 
   /**
@@ -2282,11 +2282,16 @@ class Connection extends EventEmitter {
       // Grab the target host from the connection configration, and from a redirect message
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-      const message = `Failed to connect to ${server}${port}${routingMessage} - ${err.message}`;
-      return new ConnectionError(message, 'ESOCKET');
+      const message = `Failed to connect to ${server}${port}${routingMessage}`;
+
+      const error = new ConnectionError(message, 'ESOCKET');
+      error.cause = err;
+      return error;
     } else {
-      const message = `Connection lost - ${err.message}`;
-      return new ConnectionError(message, 'ESOCKET');
+      const message = 'Connection lost';
+      const error = new ConnectionError(message, 'ESOCKET');
+      error.cause = err;
+      return error;
     }
   }
 
@@ -2294,12 +2299,12 @@ class Connection extends EventEmitter {
    * @private
    */
   socketEnd() {
-    this.debug.log('socket ended');
-    if (this.state !== this.STATE.FINAL) {
-      const error: ErrorWithCode = new Error('socket hang up');
-      error.code = 'ECONNRESET';
-      this.socketError(error);
-    }
+    // this.debug.log('socket ended');
+    // if (this.state !== this.STATE.FINAL) {
+    //   const error: ErrorWithCode = new Error('socket hang up');
+    //   error.code = 'ECONNRESET';
+    //   this.socketError(error);
+    // }
   }
 
   /**
@@ -2320,7 +2325,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendPreLogin() {
+  async sendPreLogin() {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
       // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
@@ -2330,16 +2335,17 @@ class Connection extends EventEmitter {
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
-    this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
+    await this.messageIo.writeMessage(TYPE.PRELOGIN, [payload.data]);
     this.debug.payload(function() {
       return payload.toString('  ');
     });
+    this.transitionTo(this.STATE.SENT_PRELOGIN);
   }
 
   /**
    * @private
    */
-  sendLogin7Packet() {
+  async sendLogin7Packet() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2400,7 +2406,7 @@ class Connection extends EventEmitter {
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
 
     this.routingData = undefined;
-    this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
+    await this.messageIo.writeMessage(TYPE.LOGIN7, [payload.toBuffer()]);
 
     this.debug.payload(function() {
       return payload.toString('  ');
@@ -2410,26 +2416,32 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendFedAuthTokenMessage(token: string) {
+  async sendFedAuthTokenMessage(token: string, signal: AbortSignal) {
+    signal.throwIfAborted();
+
     const accessTokenLen = Buffer.byteLength(token, 'ucs2');
+
     const data = Buffer.alloc(8 + accessTokenLen);
     let offset = 0;
     offset = data.writeUInt32LE(accessTokenLen + 4, offset);
     offset = data.writeUInt32LE(accessTokenLen, offset);
     data.write(token, offset, 'ucs2');
-    this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
+
+    // TODO: handle `signal`
+    await this.messageIo.writeMessage(TYPE.FEDAUTH_TOKEN, [data]);
   }
 
   /**
    * @private
    */
-  sendInitialSql() {
+  async sendInitialSql(signal: AbortSignal) {
+    signal.throwIfAborted();
+
     this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
     const payload = new SqlBatchPayload(this.getInitialSql(), this.currentTransactionDescriptor(), this.config.options);
 
-    const message = new Message({ type: TYPE.SQL_BATCH });
-    this.messageIo.outgoingMessageStream.write(message);
-    Readable.from(payload).pipe(message);
+    // TODO: handle `signal`
+    await this.messageIo.writeMessage(TYPE.SQL_BATCH, payload);
   }
 
   /**
@@ -3062,7 +3074,9 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+      process.nextTick(() => {
+        request.callback(new RequestError(message, 'EINVALIDSTATE'));
+      });
     } else if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
@@ -3080,189 +3094,205 @@ class Connection extends EventEmitter {
       request.rows! = [];
       request.rst! = [];
 
-      this.createRequestTimer();
-
-      const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-      this.messageIo.outgoingMessageStream.write(message);
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
       const payloadStream = Readable.from(payload);
 
       (async () => {
-        const onCancel = () => {
-          payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
-        };
-        request.once('cancel', onCancel);
+        const request = this.request as Request;
+        const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
 
-        // Cleanup for onCancel
-        try {
-          // Handle errors coming from payloadStream
-          try {
-            for await (const chunk of payloadStream) {
-              if (message.write(chunk) === false) {
-                // Wait for the message to drain, or the request to be cancelled.
-                await new Promise<void>((resolve) => {
-                  const onDrain = () => {
-                    request.removeListener('cancel', onCancel);
-                    message.removeListener('drain', onDrain);
-
-                    resolve();
-                  };
-
-                  const onCancel = () => {
-                    request.removeListener('cancel', onCancel);
-                    message.removeListener('drain', onDrain);
-
-                    resolve();
-                  };
-
-                  message.once('drain', onDrain);
-                  request.once('cancel', onCancel);
-                });
-              }
-            }
-          } catch (err: any) {
-            request.error ??= err;
-            message.ignore = true;
-
-            if (request instanceof Request && request.paused) {
-              // resume the request if it was paused so we can read the remaining tokens
-              request.resume();
-            }
-          }
-
-          message.end();
-        } finally {
-          request.removeListener('cancel', onCancel);
+        let requestTimer;
+        if (timeout) {
+          requestTimer = setTimeout(() => {
+            request.cancel();
+            const message = `Timeout: Request failed to complete in ${timeout}ms`;
+            request.error = new RequestError(message, 'ETIMEOUT');
+          }, timeout);
         }
 
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload!.toString('  ');
-        });
-
-        if (request.canceled) {
-          let message;
-          try {
-            message = await this.messageIo.readMessage();
-          } catch (err: any) {
-            return this.socketError(err);
-          } finally {
-            // request timer is stopped on first data package (or error)
-            this.clearRequestTimer();
-          }
-
-          const handler = new RequestTokenHandler(this, request);
-          for await (const token of this.createTokenStreamParser(message)) {
-            handler[token.handlerName](token as any);
-          }
-
-          this.transitionTo(this.STATE.LOGGED_IN);
-
-          this.request = undefined;
-          if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
-            this.inTransaction = false;
-          }
-          request.callback(request.error, request.rowCount, request.rows);
-        } else {
-          const onCancelAfterRequestSent = () => {
-            this.messageIo.sendMessage(TYPE.ATTENTION);
-            this.createCancelTimer();
+        try {
+          const onCancel = () => {
+            payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
           };
-          request.once('cancel', onCancelAfterRequestSent);
+          request.once('cancel', onCancel);
 
+          // Cleanup for onCancel
           try {
-            let message;
+            // Handle errors coming from payloadStream
             try {
-              message = await this.messageIo.readMessage();
+              await this.messageIo.writeMessage(packetType, payloadStream, this.resetConnectionOnNextRequest);
             } catch (err: any) {
-              return this.socketError(err);
-            } finally {
-              // request timer is stopped on first data package (or error)
-              this.clearRequestTimer();
-            }
+              request.error ??= err;
 
-            const onCancelOrResume = async () => {
-              return await new Promise<void>((resolve, _) => {
-                const onResume = () => {
-                  request.removeListener('cancel', onCancel);
-                  request.removeListener('resume', onResume);
-
-                  resolve();
-                };
-
-                const onCancel = () => {
-                  request.removeListener('cancel', onCancel);
-                  request.removeListener('resume', onResume);
-
-                  resolve();
-                };
-
-                request.on('cancel', onCancel);
-                request.on('resume', onResume);
-              });
-            };
-
-            if (!request.canceled && request instanceof Request && request.paused) {
-              await onCancelOrResume();
-            }
-
-            const handler = new RequestTokenHandler(this, request);
-            for await (const token of this.createTokenStreamParser(message)) {
-              if (!request.canceled && request instanceof Request && request.paused) {
-                await onCancelOrResume();
+              if (request instanceof Request && request.paused) {
+                // resume the request if it was paused so we can read the remaining tokens
+                request.resume();
               }
 
-              handler[token.handlerName](token as any);
+              // TODO: Handle this better? Maybe through an AbortSignal to `.writeMessage`?
+              if (!this.socket?.readable) {
+                this.request = undefined;
+                this.transitionTo(this.STATE.FINAL);
+
+                process.nextTick(() => { request.callback(request.error); });
+                return;
+              }
             }
           } finally {
-            request.removeListener('cancel', onCancelAfterRequestSent);
+            request.removeListener('cancel', onCancel);
           }
 
-          // If the request was canceled and we have a `cancelTimer`
-          // defined, we send a attention message after the
-          // request message was fully sent off.
-          //
-          // We already started consuming the current message
-          // (but all the token handlers should be no-ops), and
-          // need to ensure the next message is handled by the
-          // `SENT_ATTENTION` state.
-          if (request.canceled) {
-            let message;
-            try {
-              message = await this.messageIo.readMessage();
-            } catch (err: any) {
-              return this.socketError(err);
-            }
+          this.resetConnectionOnNextRequest = false;
+          this.debug.payload(function() {
+            return payload!.toString('  ');
+          });
 
-            const handler = new AttentionTokenHandler(this, request);
-            for await (const token of this.createTokenStreamParser(message)) {
+          if (request.canceled) {
+            const handler = new RequestTokenHandler(this, request);
+            for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
+              // request timer is stopped on first data package
+              clearTimeout(requestTimer);
+
               handler[token.handlerName](token as any);
             }
 
-            // 3.2.5.7 Sent Attention State
-            // Discard any data contained in the response, until we receive the attention response
-            if (handler.attentionReceived) {
-              this.clearCancelTimer();
-
-              this.request = undefined;
-              this.transitionTo(this.STATE.LOGGED_IN);
-
-              if (request.error && request.error instanceof RequestError && request.error.code === 'ETIMEOUT') {
-                request.callback(request.error);
-              } else {
-                request.callback(new RequestError('Canceled.', 'ECANCEL'));
-              }
-            }
-          } else {
             this.transitionTo(this.STATE.LOGGED_IN);
 
             this.request = undefined;
             if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
               this.inTransaction = false;
             }
-            request.callback(request.error, request.rowCount, request.rows);
+
+            process.nextTick(() => {
+              request.callback(request.error, request.rowCount, request.rows);
+            });
+          } else {
+            const onCancelAfterRequestSent = async () => {
+              this.createCancelTimer();
+              await this.messageIo.writeMessage(TYPE.ATTENTION, []);
+            };
+            request.once('cancel', onCancelAfterRequestSent);
+
+            try {
+              const onCancelOrResume = async () => {
+                return await new Promise<void>((resolve, _) => {
+                  const onResume = () => {
+                    request.removeListener('cancel', onCancel);
+                    request.removeListener('resume', onResume);
+
+                    resolve();
+                  };
+
+                  const onCancel = () => {
+                    request.removeListener('cancel', onCancel);
+                    request.removeListener('resume', onResume);
+
+                    resolve();
+                  };
+
+                  request.on('cancel', onCancel);
+                  request.on('resume', onResume);
+                });
+              };
+
+              if (!request.canceled && request instanceof Request && request.paused) {
+                await onCancelOrResume();
+              }
+
+              const handler = new RequestTokenHandler(this, request);
+
+              try {
+                for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
+                  // request timer is stopped on first data package
+                  clearTimeout(requestTimer);
+
+                  if (!request.canceled && request instanceof Request && request.paused) {
+                    await onCancelOrResume();
+                  }
+
+                  handler[token.handlerName](token as any);
+                }
+              } catch (err: any) {
+                const error = new RequestError('Connection closed before request completed.', 'ECLOSE');
+                error.cause = err;
+
+                this.request = undefined;
+                request.error = error;
+
+                this.transitionTo(this.STATE.FINAL);
+                this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+
+                process.nextTick(() => { request.callback(request.error); });
+                return;
+              }
+            } finally {
+              request.removeListener('cancel', onCancelAfterRequestSent);
+            }
+
+            // If the request was canceled and we have a `cancelTimer`
+            // defined, we send a attention message after the
+            // request message was fully sent off.
+            //
+            // We already started consuming the current message
+            // (but all the token handlers should be no-ops), and
+            // need to ensure the next message is handled by the
+            // `SENT_ATTENTION` state.
+            if (request.canceled) {
+              const handler = new AttentionTokenHandler(this, request);
+
+              try {
+                for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
+                  handler[token.handlerName](token as any);
+                }
+              } catch (err: any) {
+                this.clearCancelTimer();
+
+                const error = new RequestError('Connection closed before request completed.', 'ECLOSE');
+                error.cause = err;
+
+                this.request = undefined;
+                request.error = error;
+
+                this.transitionTo(this.STATE.FINAL);
+                this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+
+                process.nextTick(() => { request.callback(request.error); });
+                return;
+              }
+
+              // 3.2.5.7 Sent Attention State
+              // Discard any data contained in the response, until we receive the attention response
+              if (handler.attentionReceived) {
+                this.clearCancelTimer();
+
+                this.request = undefined;
+                this.transitionTo(this.STATE.LOGGED_IN);
+
+                if (request.error && request.error instanceof RequestError && request.error.code === 'ETIMEOUT') {
+                  process.nextTick(() => {
+                    request.callback(request.error);
+                  });
+                } else {
+                  process.nextTick(() => {
+                    request.callback(new RequestError('Canceled.', 'ECANCEL'));
+                  });
+                }
+              }
+            } else {
+              this.transitionTo(this.STATE.LOGGED_IN);
+
+              this.request = undefined;
+              if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+                this.inTransaction = false;
+              }
+              process.nextTick(() => {
+                request.callback(request.error, request.rowCount, request.rows);
+              });
+            }
           }
+        } finally {
+          clearTimeout(requestTimer);
         }
       })().catch((err) => {
         process.nextTick(() => {
@@ -3331,16 +3361,10 @@ class Connection extends EventEmitter {
   }
 
   async handlePreloginResponse(signal: AbortSignal) {
+    signal.throwIfAborted();
+
     let messageBuffer = Buffer.alloc(0);
-
-    let message;
-    try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
-
-    for await (const data of message) {
+    for await (const data of this.messageIo.readMessage()) {
       messageBuffer = Buffer.concat([messageBuffer, data]);
     }
 
@@ -3352,6 +3376,7 @@ class Connection extends EventEmitter {
     if (preloginPayload.fedAuthRequired === 1) {
       this.fedAuthRequired = true;
     }
+
     if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
       if (!this.config.options.encrypt) {
         throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
@@ -3364,8 +3389,63 @@ class Connection extends EventEmitter {
         throw this.wrapSocketError(err);
       }
     }
+  }
 
-    this.sendLogin7Packet();
+  async handleLogin7WithStandardLoginResponse(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+
+    const handler = new Login7TokenHandler(this);
+    // TODO: handle `signal`
+    for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
+      handler[token.handlerName](token as any);
+    }
+
+    if (handler.loginAckReceived) {
+      return handler.routingData;
+    }
+
+    throw this.loginError ?? new ConnectionError('Login failed.', 'ELOGIN');
+  }
+
+  async handleLogin7WithNtlmResponse(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+
+    while (true) {
+      const handler = new Login7TokenHandler(this);
+      // TODO: handle `signal`
+      for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
+        handler[token.handlerName](token as any);
+      }
+
+      if (handler.loginAckReceived) {
+        return handler.routingData;
+      } else if (this.ntlmpacket) {
+        const authentication = this.config.authentication as NtlmAuthentication;
+
+        const payload = new NTLMResponsePayload({
+          domain: authentication.options.domain,
+          userName: authentication.options.userName,
+          password: authentication.options.password,
+          ntlmpacket: this.ntlmpacket
+        });
+
+        // TODO: handle `signal`
+        await this.messageIo.writeMessage(TYPE.NTLMAUTH_PKT, [payload.data]);
+        this.debug.payload(function() {
+          return payload.toString('  ');
+        });
+
+        this.ntlmpacket = undefined;
+      }
+
+      throw this.loginError ?? new ConnectionError('Login failed.', 'ELOGIN');
+    }
+  }
+
+  async handleLogin7Response(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
 
     const { authentication } = this.config;
 
@@ -3385,112 +3465,19 @@ class Connection extends EventEmitter {
     }
   }
 
-  async handleLogin7WithStandardLoginResponse(signal: AbortSignal) {
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+  async handleLogin7WithFedauthResponse(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
 
-    let message;
-    try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
-
-    const handler = new Login7TokenHandler(this);
-    for await (const token of this.createTokenStreamParser(message)) {
-      handler[token.handlerName](token as any);
-    }
-
-    if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        return await this.handleRerouting(signal);
-      } else {
-        return await this.loggedInSendingInitialSql(signal);
-      }
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        return await this.handleRetry(signal);
-      } else {
-        throw this.loginError;
-      }
-    } else {
-      throw new ConnectionError('Login failed.', 'ELOGIN');
-    }
-  }
-
-  async handleLogin7WithNtlmResponse(signal: AbortSignal) {
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-
-    while (true) {
-      let message;
-      try {
-        message = await this.messageIo.readMessage();
-      } catch (err: any) {
-        throw this.wrapSocketError(err);
-      }
-
-      const handler = new Login7TokenHandler(this);
-      for await (const token of this.createTokenStreamParser(message)) {
-        handler[token.handlerName](token as any);
-      }
-
-      if (handler.loginAckReceived) {
-        if (handler.routingData) {
-          this.routingData = handler.routingData;
-          return await this.handleRerouting(signal);
-        } else {
-          return await this.loggedInSendingInitialSql(signal);
-        }
-      } else if (this.ntlmpacket) {
-        const authentication = this.config.authentication as NtlmAuthentication;
-
-        const payload = new NTLMResponsePayload({
-          domain: authentication.options.domain,
-          userName: authentication.options.userName,
-          password: authentication.options.password,
-          ntlmpacket: this.ntlmpacket
-        });
-
-        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-        this.debug.payload(function() {
-          return payload.toString('  ');
-        });
-
-        this.ntlmpacket = undefined;
-      } else if (this.loginError) {
-        if (isTransientError(this.loginError)) {
-          return await this.handleRetry(signal);
-        } else {
-          throw this.loginError;
-        }
-      } else {
-        throw new ConnectionError('Login failed.', 'ELOGIN');
-      }
-    }
-  }
-
-  async handleLogin7WithFedauthResponse(signal: AbortSignal) {
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
 
-    let message;
-    try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
-
     const handler = new Login7TokenHandler(this);
-    for await (const token of this.createTokenStreamParser(message)) {
+    // TODO: Handle signal
+    for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
       handler[token.handlerName](token as any);
     }
 
     if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        return await this.handleRerouting(signal);
-      } else {
-        return await this.loggedInSendingInitialSql(signal);
-      }
+      return handler.routingData;
     }
 
     const fedAuthInfoToken = handler.fedAuthInfoToken;
@@ -3530,94 +3517,32 @@ class Connection extends EventEmitter {
 
       let tokenResponse;
       try {
+        // TODO: Handle `signal`
         tokenResponse = await credentials.getToken(tokenScope);
       } catch (err) {
-        throw new AggregateError([new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+        const error = new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
+        error.cause = err;
+        throw error;
       }
 
       const token = tokenResponse.token;
-      this.sendFedAuthTokenMessage(token);
+      await this.sendFedAuthTokenMessage(token, signal);
 
       // sent the fedAuth token message, the rest is similar to standard login 7
       return await this.handleLogin7WithStandardLoginResponse(signal);
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        return await this.handleRetry(signal);
-      } else {
-        throw this.loginError;
-      }
-    } else {
-      throw new ConnectionError('Login failed.', 'ELOGIN');
     }
-  }
 
-  async loggedInSendingInitialSql(signal: AbortSignal) {
-    this.sendInitialSql();
-    await this.handleInitialSqlResponse(signal);
-
-    this.transitionTo(this.STATE.LOGGED_IN);
-    this.clearConnectTimer();
-    this.emit('connect');
+    throw this.loginError ?? new ConnectionError('Login failed.', 'ELOGIN');
   }
 
   async handleInitialSqlResponse(signal: AbortSignal) {
-    let message;
-    try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
+    signal.throwIfAborted();
 
     const handler = new InitialSqlTokenHandler(this);
-    for await (const token of this.createTokenStreamParser(message)) {
+    // TODO: handle `signal`
+    for await (const token of this.createTokenStreamParser(this.messageIo.readMessage())) {
       handler[token.handlerName](token as any);
     }
-  }
-
-  async handleRerouting(signal: AbortSignal) {
-    this.transitionTo(this.STATE.REROUTING);
-
-    this.clearConnectTimer();
-    this.closeConnection();
-    await once(this.socket!, 'close');
-
-    this.emit('rerouting');
-
-    this.socket = undefined;
-    this.closed = true;
-    this.loginError = undefined;
-
-    this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
-
-    this.transitionTo(this.STATE.CONNECTING);
-    this.initialiseConnection();
-  }
-
-  async handleRetry(signal: AbortSignal) {
-    this.debug.log('Initiating retry on transient error');
-    this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-    this.curTransientRetryCount++;
-
-    this.clearConnectTimer();
-    this.closeConnection();
-    await once(this.socket!, 'close');
-
-    this.socket = undefined;
-    this.closed = true;
-    this.loginError = undefined;
-
-    const server = this.routingData ? this.routingData.server : this.config.server;
-    const port = this.routingData ? this.routingData.port : this.config.options.port;
-    this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
-
-    await new Promise<void>((resolve, _reject) => {
-      setTimeout(resolve, this.config.options.connectionRetryInterval);
-    });
-
-    this.emit('retry');
-
-    this.transitionTo(this.STATE.CONNECTING);
-    this.initialiseConnection();
   }
 }
 
@@ -3729,27 +3654,18 @@ Connection.prototype.STATE = {
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
     events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
+      socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-
-        sqlRequest.callback(err);
       }
     }
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
     events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-
+      socketError: function() {
         this.transitionTo(this.STATE.FINAL);
         this.cleanupConnection(CLEANUP_TYPE.NORMAL);
-
-        sqlRequest.callback(err);
       }
     }
   },

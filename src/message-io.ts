@@ -1,17 +1,28 @@
 import DuplexPair from 'native-duplexpair';
 
-import { Duplex } from 'stream';
+import { Duplex, Readable, Writable } from 'stream';
 import * as tls from 'tls';
 import { Socket } from 'net';
 import { EventEmitter } from 'events';
 
 import Debug from './debug';
 
-import Message from './message';
-import { TYPE } from './packet';
+import { HEADER_LENGTH, Packet, TYPE } from './packet';
 
-import IncomingMessageStream from './incoming-message-stream';
-import OutgoingMessageStream from './outgoing-message-stream';
+import { BufferList } from 'bl';
+import { ConnectionError } from './errors';
+
+function withResolvers<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void;
+  let reject: (reason?: any) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { resolve: resolve!, reject: reject!, promise };
+}
 
 class MessageIO extends EventEmitter {
   socket: Socket;
@@ -19,15 +30,12 @@ class MessageIO extends EventEmitter {
 
   tlsNegotiationComplete: boolean;
 
-  private incomingMessageStream: IncomingMessageStream;
-  outgoingMessageStream: OutgoingMessageStream;
-
   securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
   };
 
-  incomingMessageIterator: AsyncIterableIterator<Message>;
+  private _packetSize: number;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -35,40 +43,32 @@ class MessageIO extends EventEmitter {
     this.socket = socket;
     this.debug = debug;
 
+    this._packetSize = packetSize;
+
     this.tlsNegotiationComplete = false;
-
-    this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageIterator = this.incomingMessageStream[Symbol.asyncIterator]();
-
-    this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
-
-    this.socket.pipe(this.incomingMessageStream);
-    this.outgoingMessageStream.pipe(this.socket);
   }
 
-  packetSize(...args: [number]) {
-    if (args.length > 0) {
-      const packetSize = args[0];
-      this.debug.log('Packet size changed from ' + this.outgoingMessageStream.packetSize + ' to ' + packetSize);
-      this.outgoingMessageStream.packetSize = packetSize;
-    }
+  get packetSize(): number {
+    return this._packetSize;
+  }
+
+  set packetSize(value: number) {
+    this._packetSize = value;
 
     if (this.securePair) {
-      this.securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+      this.securePair.cleartext.setMaxSendFragment(this._packetSize);
     }
-
-    return this.outgoingMessageStream.packetSize;
   }
 
   // Negotiate TLS encryption.
-  startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean) {
+  async startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean) {
     if (!credentialsDetails.maxVersion || !['TLSv1.2', 'TLSv1.1', 'TLSv1'].includes(credentialsDetails.maxVersion)) {
       credentialsDetails.maxVersion = 'TLSv1.2';
     }
 
     const secureContext = tls.createSecureContext(credentialsDetails);
 
-    return new Promise<void>((resolve, reject) => {
+    return await new Promise<void>((resolve, reject) => {
       const duplexpair = new DuplexPair();
       const securePair = this.securePair = {
         cleartext: tls.connect({
@@ -91,6 +91,7 @@ class MessageIO extends EventEmitter {
           this.socket.destroy(err);
         });
 
+
         const cipher = securePair.cleartext.getCipher();
         if (cipher) {
           this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
@@ -98,16 +99,18 @@ class MessageIO extends EventEmitter {
 
         this.emit('secure', securePair.cleartext);
 
-        securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
-
-        this.outgoingMessageStream.unpipe(this.socket);
-        this.socket.unpipe(this.incomingMessageStream);
+        securePair.cleartext.setMaxSendFragment(this._packetSize);
 
         this.socket.pipe(securePair.encrypted);
-        securePair.encrypted.pipe(this.socket);
+        this.socket.once('error', (err) => {
+          securePair.cleartext.destroy(err);
+        });
+        this.socket.once('close', () => {
+          securePair.cleartext.destroy();
+        });
 
-        securePair.cleartext.pipe(this.incomingMessageStream);
-        this.outgoingMessageStream.pipe(securePair.cleartext);
+
+        securePair.encrypted.pipe(this.socket);
 
         this.tlsNegotiationComplete = true;
 
@@ -126,33 +129,30 @@ class MessageIO extends EventEmitter {
       };
 
       const onReadable = () => {
-        // When there is handshake data on the encryped stream of the secure pair,
-        // we wrap it into a `PRELOGIN` message and send it to the server.
-        //
-        // For each `PRELOGIN` message we sent we get back exactly one response message
-        // that contains the server's handshake response data.
-        const message = new Message({ type: TYPE.PRELOGIN, resetConnection: false });
+        (async () => {
+          // When there is handshake data on the encryped stream of the secure pair,
+          // we wrap it into a `PRELOGIN` message and send it to the server.
+          //
+          // For each `PRELOGIN` message we sent we get back exactly one response message
+          // that contains the server's handshake response data.
+          const chunks: Buffer[] = [];
+          let chunk;
+          while ((chunk = securePair.encrypted.read()) !== null) {
+            chunks.push(chunk);
+          }
 
-        let chunk;
-        while (chunk = securePair.encrypted.read()) {
-          message.write(chunk);
-        }
-        this.outgoingMessageStream.write(message);
-        message.end();
+          await this.writeMessage(TYPE.PRELOGIN, Readable.from(chunks));
 
-        this.readMessage().then(async (response) => {
-          // Setup readable handler for the next round of handshaking.
-          // If we encounter a `secureConnect` on the cleartext side
-          // of the secure pair, the `readable` handler is cleared
-          // and no further handshake handling will happen.
-          securePair.encrypted.once('readable', onReadable);
-
-          for await (const data of response) {
+          for await (const chunk of this.readMessage()) {
             // We feed the server's handshake response back into the
             // encrypted end of the secure pair.
-            securePair.encrypted.write(data);
+            securePair.encrypted.write(chunk);
           }
-        }).catch(onError);
+
+          if (!this.tlsNegotiationComplete) {
+            securePair.encrypted.once('readable', onReadable);
+          }
+        })().catch(onError);
       };
 
       securePair.cleartext.once('error', onError);
@@ -161,26 +161,240 @@ class MessageIO extends EventEmitter {
     });
   }
 
-  // TODO listen for 'drain' event when socket.write returns false.
-  // TODO implement incomplete request cancelation (2.2.1.6)
-  sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
-    const message = new Message({ type: packetType, resetConnection: resetConnection });
-    message.end(data);
-    this.outgoingMessageStream.write(message);
-    return message;
+  async writeMessage(type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, resetConnection = false) {
+    const stream = this.tlsNegotiationComplete ? this.securePair!.cleartext : this.socket;
+
+    return await MessageIO.writeMessage(stream, this.debug, this._packetSize, type, payload, resetConnection);
+  }
+
+  static async writeMessage(stream: Writable, debug: Debug, packetSize: number, type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, resetConnection = false) {
+    const bl = new BufferList();
+    const length = packetSize - HEADER_LENGTH;
+    let packetNumber = 0;
+
+    const iterator = (payload as AsyncIterable<Buffer>)[Symbol.asyncIterator] ? (payload as AsyncIterable<Buffer>)[Symbol.asyncIterator]() : (payload as Iterable<Buffer>)[Symbol.iterator]();
+
+    while (true) {
+      const { resolve, reject, promise } = withResolvers<IteratorResult<Buffer>>();
+
+      stream.once('error', reject);
+
+      try {
+        Promise.resolve(iterator.next()).then(resolve, reject);
+        const result = await promise;
+
+        if (result.done) {
+          break;
+        }
+
+        bl.append(result.value);
+      } catch (err: any) {
+        // If the stream is still writable, the error came from
+        // the payload. We will end the message with the ignore flag set.
+        if (stream.writable) {
+          const packet = new Packet(type);
+          packet.packetId(packetNumber += 1);
+          packet.resetConnection(resetConnection);
+          packet.last(true);
+          packet.ignore(true);
+
+          debug.packet('Sent', packet);
+          debug.data(packet);
+
+          if (stream.write(packet.buffer) === false) {
+            await new Promise<void>((resolve, reject) => {
+              const onError = (err: Error) => {
+                stream.removeListener('drain', onDrain);
+
+                reject(err);
+              };
+
+              const onDrain = () => {
+                stream.removeListener('error', onError);
+
+                resolve();
+              };
+
+              stream.once('drain', onDrain);
+              stream.once('error', onError);
+            });
+          }
+        }
+
+        throw err;
+      } finally {
+        stream.removeListener('error', reject);
+      }
+
+      while (bl.length > length) {
+        const data = bl.slice(0, length);
+        bl.consume(length);
+
+        // TODO: Get rid of creating `Packet` instances here.
+        const packet = new Packet(type);
+        packet.packetId(packetNumber += 1);
+        packet.resetConnection(resetConnection);
+        packet.addData(data);
+
+        debug.packet('Sent', packet);
+        debug.data(packet);
+
+        if (stream.write(packet.buffer) === false) {
+          await new Promise<void>((resolve, reject) => {
+            const onError = (err: Error) => {
+              stream.removeListener('drain', onDrain);
+
+              reject(err);
+            };
+
+            const onDrain = () => {
+              stream.removeListener('error', onError);
+
+              resolve();
+            };
+
+            stream.once('drain', onDrain);
+            stream.once('error', onError);
+          });
+        }
+      }
+    }
+
+    const data = bl.slice();
+    bl.consume(data.length);
+
+    // TODO: Get rid of creating `Packet` instances here.
+    const packet = new Packet(type);
+    packet.packetId(packetNumber += 1);
+    packet.resetConnection(resetConnection);
+    packet.last(true);
+    packet.ignore(false);
+    packet.addData(data);
+
+    debug.packet('Sent', packet);
+    debug.data(packet);
+
+    if (stream.write(packet.buffer) === false) {
+      await new Promise<void>((resolve, reject) => {
+        const onError = (err: Error) => {
+          stream.removeListener('drain', onDrain);
+
+          reject(err);
+        };
+
+        const onDrain = () => {
+          stream.removeListener('error', onError);
+
+          resolve();
+        };
+
+        stream.once('drain', onDrain);
+        stream.once('error', onError);
+      });
+    }
   }
 
   /**
    * Read the next incoming message from the socket.
+   *
+   * Returns a generator that yields `Buffer`s of the incoming message.
+   *
+   * If there's an error on the stream (e.g. connection is closed unexpectedly),
+   * this will throw an error.
    */
-  async readMessage(): Promise<Message> {
-    const result = await this.incomingMessageIterator.next();
+  readMessage(): AsyncGenerator<Buffer, void, unknown> {
+    const stream = this.tlsNegotiationComplete ? this.securePair!.cleartext : this.socket;
+    return MessageIO.readMessage(stream, this.debug);
+  }
 
-    if (result.done) {
-      throw new Error('unexpected end of message stream');
+  static async *readMessage(stream: Readable, debug: Debug) {
+    if (!stream.readable) {
+      throw new Error('Premature close');
     }
 
-    return result.value;
+    const bl = new BufferList();
+
+    let error;
+    const onError = (err: Error) => {
+      error = err;
+    };
+
+    const onClose = () => {
+      error ??= new Error('Premature close');
+    };
+
+    stream.once('error', onError);
+    stream.once('close', onClose);
+
+    try {
+      while (true) {
+        const { promise, resolve, reject } = withResolvers<void>();
+
+        stream.addListener('close', resolve);
+        stream.addListener('readable', resolve);
+        stream.addListener('error', reject);
+
+        try {
+          await promise;
+        } finally {
+          stream.removeListener('close', resolve);
+          stream.removeListener('readable', resolve);
+          stream.removeListener('error', reject);
+        }
+
+        // Did the stream error while we waited for it to become readable?
+        if (error) {
+          throw error;
+        }
+
+        let chunk: Buffer;
+        while ((chunk = stream.read()) !== null) {
+          bl.append(chunk);
+
+          // The packet header is always 8 bytes of length.
+          while (bl.length >= HEADER_LENGTH) {
+            // Get the full packet length
+            const length = bl.readUInt16BE(2);
+            if (length < HEADER_LENGTH) {
+              throw new ConnectionError('Unable to process incoming packet');
+            }
+
+            if (bl.length >= length) {
+              const data = bl.slice(0, length);
+              bl.consume(length);
+
+              // TODO: Get rid of creating `Packet` instances here.
+              const packet = new Packet(data);
+              debug.packet('Received', packet);
+              debug.data(packet);
+
+              yield packet.data();
+
+              // Did the stream error while we yielded?
+              if (error) {
+                throw error;
+              }
+
+              if (packet.isLast()) {
+                // This was the last packet. Is there any data left in the buffer?
+                // If there is, this might be coming from the next message (e.g. a response to a `ATTENTION`
+                // message sent from the client while reading an incoming response).
+                //
+                // Put any remaining bytes back on the stream so we can read them on the next `readMessage` call.
+                if (bl.length) {
+                  stream.unshift(bl.slice());
+                }
+
+                return;
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      stream.removeListener('close', onClose);
+      stream.removeListener('error', onError);
+    }
   }
 }
 

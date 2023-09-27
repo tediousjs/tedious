@@ -181,7 +181,7 @@ export class InitialSqlTokenHandler extends TokenHandler {
   }
 
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
-    this.connection.messageIo.packetSize(token.newValue);
+    this.connection.messageIo.packetSize = token.newValue;
   }
 
   onBeginTransaction(token: BeginTransactionEnvChangeToken) {
@@ -266,9 +266,7 @@ export class Login7TokenHandler extends TokenHandler {
     this.connection.emit('errorMessage', token);
 
     const error = new ConnectionError(token.message, 'ELOGIN');
-
-    const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
-    if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
+    if (this.connection.transientErrorLookup.isTransientError(token.number)) {
       error.isTransient = true;
     }
 
@@ -355,7 +353,7 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
-    this.connection.messageIo.packetSize(token.newValue);
+    this.connection.messageIo.packetSize = token.newValue;
   }
 
   onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
@@ -421,7 +419,7 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
-    this.connection.messageIo.packetSize(token.newValue);
+    this.connection.messageIo.packetSize = token.newValue;
   }
 
   onBeginTransaction(token: BeginTransactionEnvChangeToken) {
