@@ -1,5 +1,7 @@
-import Parser, { type ParserOptions } from './stream-parser';
+import type { BufferList } from 'bl/BufferList';
+import { type ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
+import { type Result, readBigUInt64LE, readUInt16LE, readUInt32LE } from './helpers';
 
 // s2.2.7.5/6/7
 
@@ -22,51 +24,49 @@ interface TokenData {
   curCmd: number;
 }
 
-function parseToken(parser: Parser, options: ParserOptions, callback: (data: TokenData) => void) {
-  parser.readUInt16LE((status) => {
-    const more = !!(status & STATUS.MORE);
-    const sqlError = !!(status & STATUS.ERROR);
-    const rowCountValid = !!(status & STATUS.COUNT);
-    const attention = !!(status & STATUS.ATTN);
-    const serverError = !!(status & STATUS.SRVERROR);
+function readToken(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<TokenData> {
+  let status;
+  ({ offset, value: status } = readUInt16LE(buf, offset));
 
-    parser.readUInt16LE((curCmd) => {
-      const next = (rowCount: number) => {
-        callback({
-          more: more,
-          sqlError: sqlError,
-          attention: attention,
-          serverError: serverError,
-          rowCount: rowCountValid ? rowCount : undefined,
-          curCmd: curCmd
-        });
-      };
+  const more = !!(status & STATUS.MORE);
+  const sqlError = !!(status & STATUS.ERROR);
+  const rowCountValid = !!(status & STATUS.COUNT);
+  const attention = !!(status & STATUS.ATTN);
+  const serverError = !!(status & STATUS.SRVERROR);
 
-      if (options.tdsVersion < '7_2') {
-        parser.readUInt32LE(next);
-      } else {
-        parser.readBigUInt64LE((rowCount) => {
-          next(Number(rowCount));
-        });
-      }
-    });
-  });
+  let curCmd;
+  ({ offset, value: curCmd } = readUInt16LE(buf, offset));
+
+  let rowCount;
+  ({ offset, value: rowCount } = (options.tdsVersion < '7_2' ? readUInt32LE : readBigUInt64LE)(buf, offset));
+
+  return {
+    value: {
+      more: more,
+      sqlError: sqlError,
+      attention: attention,
+      serverError: serverError,
+      rowCount: rowCountValid ? Number(rowCount) : undefined,
+      curCmd: curCmd
+    },
+    offset: offset
+  };
 }
 
-export function doneParser(parser: Parser, options: ParserOptions, callback: (token: DoneToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneToken(data));
-  });
+export function doneParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneToken> {
+  let value;
+  ({ offset, value } = readToken(buf, offset, options));
+  return { value: new DoneToken(value), offset };
 }
 
-export function doneInProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneInProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneInProcToken(data));
-  });
+export function doneInProcParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneInProcToken> {
+  let value;
+  ({ offset, value } = readToken(buf, offset, options));
+  return { value: new DoneInProcToken(value), offset };
 }
 
-export function doneProcParser(parser: Parser, options: ParserOptions, callback: (token: DoneProcToken) => void) {
-  parseToken(parser, options, (data) => {
-    callback(new DoneProcToken(data));
-  });
+export function doneProcParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneProcToken> {
+  let value;
+  ({ offset, value } = readToken(buf, offset, options));
+  return { value: new DoneProcToken(value), offset };
 }

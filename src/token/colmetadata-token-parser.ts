@@ -1,7 +1,9 @@
-import metadataParse, { type Metadata } from '../metadata-parser';
+import type { BufferList } from 'bl/BufferList';
+import { readMetadata, type Metadata } from '../metadata-parser';
 
 import Parser, { type ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
+import { NotEnoughDataError, type Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
 
 export interface ColumnMetadata extends Metadata {
   /**
@@ -12,101 +14,115 @@ export interface ColumnMetadata extends Metadata {
   tableName?: string | string[] | undefined;
 }
 
-function readTableName(parser: Parser, options: ParserOptions, metadata: Metadata, callback: (tableName?: string | string[]) => void) {
-  if (metadata.type.hasTableName) {
-    if (options.tdsVersion >= '7_2') {
-      parser.readUInt8((numberOfTableNameParts) => {
-        const tableName: string[] = [];
+function readTableName(buf: Buffer | BufferList, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
+  if (!metadata.type.hasTableName) {
+    return { value: undefined, offset };
+  }
 
-        let i = 0;
-        function next(done: () => void) {
-          if (numberOfTableNameParts === i) {
-            return done();
-          }
+  if (options.tdsVersion < '7_1') {
+    return readUsVarChar(buf, offset);
+  }
 
-          parser.readUsVarChar((part) => {
-            tableName.push(part);
+  let numberOfTableNameParts;
+  ({ offset, value: numberOfTableNameParts } = readUInt8(buf, offset));
 
-            i++;
+  const tableName: string[] = [];
+  for (let i = 0; i < numberOfTableNameParts; i++) {
+    let tableNamePart;
+    ({ offset, value: tableNamePart } = readUsVarChar(buf, offset));
 
-            next(done);
-          });
-        }
+    tableName.push(tableNamePart);
+  }
 
-        next(() => {
-          callback(tableName);
-        });
-      });
-    } else {
-      parser.readUsVarChar(callback);
-    }
+  return { value: tableName, offset };
+}
+
+function readColumnName(buf: Buffer | BufferList, offset: number, index: number, metadata: Metadata, options: ParserOptions): Result<string> {
+  let colName;
+  ({ offset, value: colName } = readBVarChar(buf, offset));
+
+  if (options.columnNameReplacer) {
+    return { value: options.columnNameReplacer(colName, index, metadata), offset };
+  } else if (options.camelCaseColumns) {
+    return { value: colName.replace(/^[A-Z]/, function(s) {
+      return s.toLowerCase();
+    }), offset };
   } else {
-    callback(undefined);
+    return { value: colName, offset };
   }
 }
 
-function readColumnName(parser: Parser, options: ParserOptions, index: number, metadata: Metadata, callback: (colName: string) => void) {
-  parser.readBVarChar((colName) => {
-    if (options.columnNameReplacer) {
-      callback(options.columnNameReplacer(colName, index, metadata));
-    } else if (options.camelCaseColumns) {
-      callback(colName.replace(/^[A-Z]/, function(s) {
-        return s.toLowerCase();
-      }));
-    } else {
-      callback(colName);
-    }
-  });
-}
+function readColumn(buf: Buffer | BufferList, offset: number, options: ParserOptions, index: number) {
+  let metadata;
+  ({ offset, value: metadata } = readMetadata(buf, offset, options));
 
-function readColumn(parser: Parser, options: ParserOptions, index: number, callback: (column: ColumnMetadata) => void) {
-  metadataParse(parser, options, (metadata) => {
-    readTableName(parser, options, metadata, (tableName) => {
-      readColumnName(parser, options, index, metadata, (colName) => {
-        callback({
-          userType: metadata.userType,
-          flags: metadata.flags,
-          type: metadata.type,
-          collation: metadata.collation,
-          precision: metadata.precision,
-          scale: metadata.scale,
-          udtInfo: metadata.udtInfo,
-          dataLength: metadata.dataLength,
-          schema: metadata.schema,
-          colName: colName,
-          tableName: tableName
-        });
-      });
-    });
-  });
+  let tableName;
+  ({ offset, value: tableName } = readTableName(buf, offset, metadata, options));
+
+  let colName;
+  ({ offset, value: colName } = readColumnName(buf, offset, index, metadata, options));
+
+  return {
+    value: {
+      userType: metadata.userType,
+      flags: metadata.flags,
+      type: metadata.type,
+      collation: metadata.collation,
+      precision: metadata.precision,
+      scale: metadata.scale,
+      udtInfo: metadata.udtInfo,
+      dataLength: metadata.dataLength,
+      schema: metadata.schema,
+      colName: colName,
+      tableName: tableName
+    },
+    offset
+  };
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  while (parser.buffer.length - parser.position < 2) {
-    await parser.streamBuffer.waitForChunk();
-  }
+  let columnCount;
 
-  const columnCount = parser.buffer.readUInt16LE(parser.position);
-  parser.position += 2;
+  while (true) {
+    let offset;
+
+    try {
+      ({ offset, value: columnCount } = readUInt16LE(parser.buffer, parser.position));
+    } catch (err) {
+      if (err instanceof NotEnoughDataError) {
+        await parser.streamBuffer.waitForChunk();
+        continue;
+      }
+
+      throw err;
+    }
+
+    parser.position = offset;
+    break;
+  }
 
   const columns: ColumnMetadata[] = [];
   for (let i = 0; i < columnCount; i++) {
-    let column: ColumnMetadata;
+    while (true) {
+      let column: ColumnMetadata;
+      let offset;
 
-    readColumn(parser, parser.options, i, (c) => {
-      column = c;
-    });
+      try {
+        ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i));
+      } catch (err: any) {
+        if (err instanceof NotEnoughDataError) {
+          await parser.streamBuffer.waitForChunk();
+          continue;
+        }
 
-    while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
+        throw err;
+      }
 
-      parser.suspended = false;
-      const next = parser.next!;
+      parser.position = offset;
+      columns.push(column);
 
-      next();
+      break;
     }
-
-    columns.push(column!);
   }
 
   return new ColMetadataToken(columns);

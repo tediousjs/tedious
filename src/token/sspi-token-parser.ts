@@ -1,4 +1,6 @@
-import Parser, { type ParserOptions } from './stream-parser';
+import type { BufferList } from 'bl/BufferList';
+import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
+import { type ParserOptions } from './stream-parser';
 
 import { SSPIToken } from './token';
 
@@ -40,10 +42,18 @@ function parseChallenge(buffer: Buffer) {
   return challenge as Data;
 }
 
-function sspiParser(parser: Parser, _options: ParserOptions, callback: (token: SSPIToken) => void) {
-  parser.readUsVarByte((buffer) => {
-    callback(new SSPIToken(parseChallenge(buffer), buffer));
-  });
+function sspiParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<SSPIToken> {
+  let tokenLength;
+  ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
+
+  if (buf.length < offset + tokenLength) {
+    throw new NotEnoughDataError(offset + tokenLength);
+  }
+
+  const data = buf.slice(offset, offset + tokenLength);
+  offset += tokenLength;
+
+  return { value: new SSPIToken(parseChallenge(data), data), offset };
 }
 
 export default sspiParser;

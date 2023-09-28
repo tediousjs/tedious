@@ -274,6 +274,19 @@ export class ResetConnectionEnvChangeToken extends Token {
   }
 }
 
+export type EnvChangeToken =
+  DatabaseEnvChangeToken |
+  LanguageEnvChangeToken |
+  CharsetEnvChangeToken |
+  PacketSizeEnvChangeToken |
+  BeginTransactionEnvChangeToken |
+  CommitTransactionEnvChangeToken |
+  RollbackTransactionEnvChangeToken |
+  DatabaseMirroringPartnerEnvChangeToken |
+  ResetConnectionEnvChangeToken |
+  RoutingEnvChangeToken |
+  CollationChangeToken;
+
 export class CollationChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onSqlCollationChange';

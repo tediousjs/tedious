@@ -1,32 +1,29 @@
 // s2.2.7.14
-import Parser, { type ParserOptions } from './stream-parser';
+import type { BufferList } from 'bl/BufferList';
+import { type ParserOptions } from './stream-parser';
 
 import { OrderToken } from './token';
+import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
 
-function orderParser(parser: Parser, _options: ParserOptions, callback: (token: OrderToken) => void) {
-  parser.readUInt16LE((length) => {
-    const columnCount = length / 2;
-    const orderColumns: number[] = [];
+function orderParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<OrderToken> {
+  // length
+  let tokenLength;
+  ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-    let i = 0;
-    function next(done: () => void) {
-      if (i === columnCount) {
-        return done();
-      }
+  if (buf.length < offset + tokenLength) {
+    throw new NotEnoughDataError(offset + tokenLength);
+  }
 
-      parser.readUInt16LE((column) => {
-        orderColumns.push(column);
+  const orderColumns: number[] = [];
 
-        i++;
+  for (let i = 0; i < tokenLength; i += 2) {
+    let column;
+    ({ offset, value: column } = readUInt16LE(buf, offset));
 
-        next(done);
-      });
-    }
+    orderColumns.push(column);
+  }
 
-    next(() => {
-      callback(new OrderToken(orderColumns));
-    });
-  });
+  return { value: new OrderToken(orderColumns), offset };
 }
 
 export default orderParser;
