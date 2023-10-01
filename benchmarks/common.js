@@ -12,8 +12,6 @@ const {
   }
 } = require('perf_hooks');
 
-require('@babel/register')({ extensions: ['.ts'] });
-
 const { Connection } = require('tedious');
 
 // The `Benchmark` class is taken from Node.js - see
