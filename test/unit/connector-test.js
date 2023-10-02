@@ -10,6 +10,7 @@ const {
   connectInParallel,
   connectInSequence
 } = require('../../src/connector');
+const { default: AbortError } = require('../../src/errors/abort-error');
 
 describe('lookupAllAddresses', function() {
   it('test IDN Server name', async function() {
@@ -242,7 +243,7 @@ describe('connectInSequence', function() {
 
   it('will immediately abort when called with an aborted signal', async function() {
     const controller = new AbortController();
-    controller.abort();
+    controller.abort(new AbortError());
 
     mitm.on('connect', () => {
       assert.fail('no connections expected');
@@ -277,7 +278,7 @@ describe('connectInSequence', function() {
       attemptedSockets.push(socket);
 
       process.nextTick(() => {
-        controller.abort();
+        controller.abort(new AbortError());
       });
     });
 
@@ -451,7 +452,7 @@ describe('connectInParallel', function() {
 
   it('will immediately abort when called with an aborted signal', async function() {
     const controller = new AbortController();
-    controller.abort();
+    controller.abort(new AbortError());
 
     mitm.on('connect', () => {
       assert.fail('no connections expected');
@@ -486,7 +487,7 @@ describe('connectInParallel', function() {
       attemptedSockets.push(socket);
 
       process.nextTick(() => {
-        controller.abort();
+        controller.abort(new AbortError());
       });
     });
 

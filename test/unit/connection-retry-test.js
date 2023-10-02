@@ -7,6 +7,7 @@ const OutgoingMessageStream = require('../../src/outgoing-message-stream');
 const Debug = require('../../src/debug');
 const PreloginPayload = require('../../src/prelogin-payload');
 const Message = require('../../src/message');
+const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 
 function buildLoginAckToken() {
   const progname = 'Tedious SQL Server';
@@ -386,8 +387,11 @@ describe('Automatic Connection Retry', function() {
         maxRetriesOnTransientErrors: 5,
         connectTimeout: 200,
         connectionRetryInterval: 50,
+        debug: debugOptionsFromEnv()
       }
     });
+
+    connection.on('debug', console.log);
 
     connection.connect((err) => {
       connection.close();

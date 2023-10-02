@@ -4,6 +4,7 @@ const Transaction = require('../../src/transaction');
 const fs = require('fs');
 const async = require('async');
 const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
+const { ConnectionError } = require('../../src/errors');
 const assert = require('chai').assert;
 
 const config = JSON.parse(
@@ -466,15 +467,22 @@ describe('Transactions Test', function() {
   });
 
   it('should test transaction helper socket error', function(done) {
+    const expectedError = new Error('socket error');
     const connection = new Connection(config);
     connection.on('end', function(info) {
       done();
     });
     connection.on('error', function(err) {
-      assert.ok(~err.message.indexOf('socket error'));
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(err.message, 'Connection lost');
+      assert.strictEqual(err.cause, expectedError);
     });
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
-    //  connection.on('debug', (message) => console.log(message) if (debug))
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', (message) => {
+        console.log(message);
+      });
+    }
 
     connection.connect(function(err) {
       connection.transaction(function(err, outerDone) {
@@ -492,7 +500,7 @@ describe('Transactions Test', function() {
           });
 
           connection.execSql(request);
-          connection.socket.emit('error', new Error('socket error'));
+          connection.socket.destroy(expectedError);
         });
       });
     });

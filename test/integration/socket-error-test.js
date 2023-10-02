@@ -57,7 +57,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      /** @type {Socket} */(connection.socket).destroy(socketError);
     });
   });
 
@@ -73,11 +73,11 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      /** @type {Socket} */(connection.socket).destroy(socketError);
     });
   });
 
-  it('calls the request completion callback before emitting the `end` event', function(done) {
+  it('calls the request completion callback after emitting the `end` event', function(done) {
     const socketError = new Error('socket error');
     connection.on('error', () => {});
 
@@ -87,17 +87,13 @@ describe('A `error` on the network socket', function() {
     });
 
     const request = new Request('WAITFOR 00:00:30', function(err) {
-      assert.strictEqual(endEmitted, false);
-
-      process.nextTick(() => {
-        assert.strictEqual(endEmitted, true);
-        done();
-      });
+      assert.strictEqual(endEmitted, true);
+      done();
     });
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      /** @type {Socket} */(connection.socket).destroy(socketError);
     });
   });
 });

@@ -1,6 +1,8 @@
 import * as net from 'net';
 import { Connection, ConnectionError } from '../../src/tedious';
 import { assert } from 'chai';
+import MessageIO from '../../src/message-io';
+import Debug from '../../src/debug';
 
 describe('Using `strict` encryption', function() {
   let server: net.Server;
@@ -16,8 +18,6 @@ describe('Using `strict` encryption', function() {
 
   it('does not throw an unhandled exception if the tls handshake fails', function(done) {
     server.on('connection', (connection) => {
-      console.log('incoming connection');
-
       connection.on('data', () => {
         // Ignore all incoming data
       });
@@ -36,8 +36,12 @@ describe('Using `strict` encryption', function() {
     });
 
     connection.connect((err) => {
+      console.log(err);
+
       assert.instanceOf(err, Error);
-      assert.include(err!.message, 'Client network socket disconnected before secure TLS connection was established');
+
+      assert.instanceOf(err?.cause, Error);
+      assert.include((err!.cause as Error).message, 'Client network socket disconnected before secure TLS connection was established');
 
       done();
     });
@@ -72,6 +76,72 @@ describe('Using `strict` encryption', function() {
 
     connection.on('end', () => {
       done();
+    });
+  });
+});
+
+describe('Connection error handling', function() {
+  describe('handles unexpected network issues', async function() {
+    let server: net.Server;
+    let _connections: net.Socket[];
+
+    beforeEach(function(done) {
+      _connections = [];
+      server = net.createServer();
+      server.listen(0, '127.0.0.1', done);
+    });
+
+    afterEach(function(done) {
+      _connections.forEach((connection) => {
+        connection.destroy();
+      });
+
+      server.close(done);
+    });
+
+    it('signals an error', function(done) {
+      let connectionCount = 0;
+
+      server.on('connection', async (connection) => {
+        connectionCount++;
+
+        const debug = new Debug();
+
+        try {
+          // PRELOGIN
+          {
+            const chunks = [];
+            for await (const data of MessageIO.readMessage(connection, debug)) {
+              chunks.push(data);
+            }
+
+            connection.destroy();
+          }
+        } catch (err) {
+          console.log(err);
+        } finally {
+          connection.end();
+        }
+      });
+
+      const connection = new Connection({
+        server: (server.address() as net.AddressInfo).address,
+        options: {
+          port: (server.address() as net.AddressInfo).port,
+          encrypt: false,
+          maxRetriesOnTransientErrors: 5
+        }
+      });
+
+      connection.connect((err) => {
+        connection.close();
+
+        console.log(err);
+        assert.instanceOf(err, Error);
+        assert.strictEqual(1, connectionCount);
+
+        done();
+      });
     });
   });
 });
