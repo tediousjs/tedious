@@ -54,26 +54,26 @@ interface Options {
   s2.2.6.4
  */
 class PreloginPayload {
-  data!: Buffer;
-  options: Options;
+  declare data: Buffer;
+  declare options: Options;
 
-  version!: {
+  declare version: {
     major: number;
     minor: number;
     build: number;
     subbuild: number;
   };
 
-  encryption!: number;
-  encryptionString!: string;
+  declare encryption:number;
+  declare encryptionString:string;
 
-  instance!: number;
+  declare instance:number;
 
-  threadId!: number;
+  declare threadId:number;
 
-  mars!: number;
-  marsString!: string;
-  fedAuthRequired!: number;
+  declare mars:number;
+  declare marsString:string;
+  declare fedAuthRequired:number;
 
   constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
     if (bufferOrOptions instanceof Buffer) {

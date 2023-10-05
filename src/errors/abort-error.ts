@@ -1,5 +1,5 @@
 export default class AbortError extends Error {
-  code: string;
+  declare code: string;
 
   constructor() {
     super('The operation was aborted');

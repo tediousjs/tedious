@@ -12,14 +12,14 @@ export type Encoding = 'utf8' | 'ucs2' | 'ascii';
   When writing, automatically allocates new buffers if there's not enough space.
  */
 class WritableTrackingBuffer {
-  initialSize: number;
-  encoding: Encoding;
-  doubleSizeGrowth: boolean;
+  declare initialSize: number;
+  declare encoding: Encoding;
+  declare doubleSizeGrowth: boolean;
 
-  buffer: Buffer;
-  compositeBuffer: Buffer;
+  declare buffer: Buffer;
+  declare compositeBuffer: Buffer;
 
-  position: number;
+  declare position: number;
 
   constructor(initialSize: number, encoding?: Encoding | null, doubleSizeGrowth?: boolean) {
     this.initialSize = initialSize;

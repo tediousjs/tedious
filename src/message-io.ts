@@ -14,20 +14,20 @@ import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
 class MessageIO extends EventEmitter {
-  socket: Socket;
-  debug: Debug;
+  declare socket: Socket;
+  declare debug: Debug;
 
-  tlsNegotiationComplete: boolean;
+  declare tlsNegotiationComplete: boolean;
 
-  private incomingMessageStream: IncomingMessageStream;
-  outgoingMessageStream: OutgoingMessageStream;
+  declare private incomingMessageStream: IncomingMessageStream;
+  declare outgoingMessageStream: OutgoingMessageStream;
 
-  securePair?: {
+  declare securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
   };
 
-  incomingMessageIterator: AsyncIterableIterator<Message>;
+  declare incomingMessageIterator: AsyncIterableIterator<Message>;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();

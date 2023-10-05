@@ -56,70 +56,70 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure: string | undefined;
+  declare sqlTextOrProcedure: string | undefined;
   /**
    * @private
    */
-  parameters: Parameter[];
+  declare parameters: Parameter[];
   /**
    * @private
    */
-  parametersByName: { [key: string]: Parameter };
+  declare parametersByName: { [key: string]: Parameter };
   /**
    * @private
    */
-  preparing: boolean;
+  declare preparing: boolean;
   /**
    * @private
    */
-  canceled: boolean;
+  declare canceled: boolean;
   /**
    * @private
    */
-  paused: boolean;
+  declare paused: boolean;
   /**
    * @private
    */
-  userCallback: CompletionCallback;
+  declare userCallback: CompletionCallback;
   /**
    * @private
    */
-  handle: number | undefined;
+  declare handle: number | undefined;
   /**
    * @private
    */
-  error: Error | undefined;
+  declare error: Error | undefined;
   /**
    * @private
    */
-  connection: Connection | undefined;
+  declare connection: Connection | undefined;
   /**
    * @private
    */
-  timeout: number | undefined;
+  declare timeout: number | undefined;
 
   /**
    * @private
    */
-  rows?: Array<any>;
+  declare rows?: Array<any>;
   /**
    * @private
    */
-  rst?: Array<any>;
+  declare rst?: Array<any>;
   /**
    * @private
    */
-  rowCount?: number;
+  declare rowCount?: number;
 
   /**
    * @private
    */
-  callback: CompletionCallback;
+  declare callback: CompletionCallback;
 
 
-  shouldHonorAE?: boolean;
-  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
-  cryptoMetadataLoaded: boolean;
+  declare shouldHonorAE?: boolean;
+  declare statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  declare cryptoMetadataLoaded: boolean;
 
   /**
    * This event, describing result set columns, will be emitted before row

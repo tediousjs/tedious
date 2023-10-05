@@ -897,59 +897,59 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  fedAuthRequired: boolean;
+  declare fedAuthRequired: boolean;
   /**
    * @private
    */
-  config: InternalConnectionConfig;
+  declare config: InternalConnectionConfig;
   /**
    * @private
    */
-  secureContextOptions: SecureContextOptions;
+  declare secureContextOptions: SecureContextOptions;
   /**
    * @private
    */
-  inTransaction: boolean;
+  declare inTransaction: boolean;
   /**
    * @private
    */
-  transactionDescriptors: Buffer[];
+  declare transactionDescriptors: Buffer[];
   /**
    * @private
    */
-  transactionDepth: number;
+  declare transactionDepth: number;
   /**
    * @private
    */
-  isSqlBatch: boolean;
+  declare isSqlBatch: boolean;
   /**
    * @private
    */
-  curTransientRetryCount: number;
+  declare curTransientRetryCount: number;
   /**
    * @private
    */
-  transientErrorLookup: TransientErrorLookup;
+  declare  transientErrorLookup: TransientErrorLookup;
   /**
    * @private
    */
-  closed: boolean;
+  declare closed: boolean;
   /**
    * @private
    */
-  loginError: undefined | AggregateError | ConnectionError;
+  declare loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
-  debug: Debug;
+  declare debug: Debug;
   /**
    * @private
    */
-  ntlmpacket: undefined | any;
+  declare ntlmpacket: undefined | any;
   /**
    * @private
    */
-  ntlmpacketBuffer: undefined | Buffer;
+  declare ntlmpacketBuffer: undefined | Buffer;
 
   /**
    * @private
@@ -974,54 +974,54 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  routingData: undefined | RoutingData;
+  declare routingData: undefined | RoutingData;
 
   /**
    * @private
    */
-  messageIo!: MessageIO;
+  declare messageIo: MessageIO;
   /**
    * @private
    */
-  state: State;
+  declare state: State;
   /**
    * @private
    */
-  resetConnectionOnNextRequest: undefined | boolean;
+  declare resetConnectionOnNextRequest: undefined | boolean;
 
   /**
    * @private
    */
-  request: undefined | Request | BulkLoad;
+  declare request: undefined | Request | BulkLoad;
   /**
    * @private
    */
-  procReturnStatusValue: undefined | any;
+  declare procReturnStatusValue: undefined | any;
   /**
    * @private
    */
-  socket: undefined | net.Socket;
+  declare socket: undefined | net.Socket;
   /**
    * @private
    */
-  messageBuffer: Buffer;
+  declare messageBuffer: Buffer;
 
   /**
    * @private
    */
-  connectTimer: undefined | NodeJS.Timeout;
+  declare connectTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  cancelTimer: undefined | NodeJS.Timeout;
+  declare cancelTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  requestTimer: undefined | NodeJS.Timeout;
+  declare requestTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  retryTimer: undefined | NodeJS.Timeout;
+  declare retryTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
@@ -1031,7 +1031,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  databaseCollation: Collation | undefined;
+  declare databaseCollation: Collation | undefined;
 
   /**
    * Note: be aware of the different options field:

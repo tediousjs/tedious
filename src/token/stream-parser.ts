@@ -36,9 +36,9 @@ const tokenParsers = {
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
 
 class StreamBuffer {
-  iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
-  buffer: Buffer;
-  position: number;
+  declare iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
+  declare buffer: Buffer;
+  declare position: number;
 
   constructor(iterable: AsyncIterable<Buffer> | Iterable<Buffer>) {
     this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] || (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
@@ -63,13 +63,13 @@ class StreamBuffer {
 }
 
 class Parser {
-  debug: Debug;
-  colMetadata: ColumnMetadata[];
-  options: ParserOptions;
+  declare debug: Debug;
+  declare colMetadata: ColumnMetadata[];
+  declare options: ParserOptions;
 
-  suspended: boolean;
-  next: (() => void) | undefined;
-  streamBuffer: StreamBuffer;
+  declare suspended: boolean;
+  declare next: (() => void) | undefined;
+  declare streamBuffer: StreamBuffer;
 
   static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     let token: Token | undefined;
