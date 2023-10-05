@@ -64,16 +64,16 @@ class PreloginPayload {
     subbuild: number;
   };
 
-  declare encryption:number;
-  declare encryptionString:string;
+  declare encryption: number;
+  declare encryptionString: string;
 
-  declare instance:number;
+  declare instance: number;
 
-  declare threadId:number;
+  declare threadId: number;
 
-  declare mars:number;
-  declare marsString:string;
-  declare fedAuthRequired:number;
+  declare mars: number;
+  declare marsString: string;
+  declare fedAuthRequired: number;
 
   constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
     if (bufferOrOptions instanceof Buffer) {

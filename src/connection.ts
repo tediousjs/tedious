@@ -929,7 +929,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  declare  transientErrorLookup: TransientErrorLookup;
+  declare transientErrorLookup: TransientErrorLookup;
   /**
    * @private
    */

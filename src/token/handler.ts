@@ -250,7 +250,7 @@ export class Login7TokenHandler extends TokenHandler {
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
   declare routingData: { server: string, port: number } | undefined;
 
-  declare loginAckReceived : boolean;
+  declare loginAckReceived: boolean;
 
   constructor(connection: Connection) {
     super();
