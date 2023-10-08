@@ -139,19 +139,19 @@ class RowTransform extends Transform {
   /**
    * @private
    */
-  columnMetadataWritten: boolean;
+  declare columnMetadataWritten: boolean;
   /**
    * @private
    */
-  bulkLoad: BulkLoad;
+  declare bulkLoad: BulkLoad;
   /**
    * @private
    */
-  mainOptions: BulkLoad['options'];
+  declare mainOptions: BulkLoad['options'];
   /**
    * @private
    */
-  columns: BulkLoad['columns'];
+  declare columns: BulkLoad['columns'];
 
   /**
    * @private
@@ -255,78 +255,78 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  error: Error | undefined;
+  declare error: Error | undefined;
   /**
    * @private
    */
-  canceled: boolean;
+  declare canceled: boolean;
   /**
    * @private
    */
-  executionStarted: boolean;
+  declare executionStarted: boolean;
   /**
    * @private
    */
-  streamingMode: boolean;
+  declare streamingMode: boolean;
   /**
    * @private
    */
-  table: string;
+  declare table: string;
   /**
    * @private
    */
-  timeout: number | undefined;
+  declare timeout: number | undefined;
 
   /**
    * @private
    */
-  options: InternalConnectionOptions;
+  declare options: InternalConnectionOptions;
   /**
    * @private
    */
-  callback: Callback;
+  declare callback: Callback;
 
   /**
    * @private
    */
-  columns: Array<Column>;
+  declare columns: Array<Column>;
   /**
    * @private
    */
-  columnsByName: { [name: string]: Column };
+  declare columnsByName: { [name: string]: Column };
 
   /**
    * @private
    */
-  firstRowWritten: boolean;
+  declare firstRowWritten: boolean;
   /**
    * @private
    */
-  rowToPacketTransform: RowTransform;
+  declare rowToPacketTransform: RowTransform;
 
   /**
    * @private
    */
-  bulkOptions: InternalOptions;
+  declare bulkOptions: InternalOptions;
 
   /**
    * @private
    */
-  connection: Connection | undefined;
+  declare connection: Connection | undefined;
   /**
    * @private
    */
-  rows: Array<any> | undefined;
+  declare rows: Array<any> | undefined;
   /**
    * @private
    */
-  rst: Array<any> | undefined;
+  declare rst: Array<any> | undefined;
   /**
    * @private
    */
-  rowCount: number | undefined;
+  declare rowCount: number | undefined;
 
-  collation: Collation | undefined;
+  declare collation: Collation | undefined;
 
   /**
    * @private

@@ -11,9 +11,9 @@ import { ConnectionError } from './errors';
   Transform received TDS data into individual IncomingMessage streams.
 */
 class IncomingMessageStream extends Transform {
-  debug: Debug;
-  bl: any;
-  currentMessage: Message | undefined;
+  declare debug: Debug;
+  declare bl: any;
+  declare currentMessage: Message | undefined;
 
   constructor(debug: Debug) {
     super({ readableObjectMode: true });

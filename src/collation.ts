@@ -293,13 +293,13 @@ export const Flags = {
 };
 
 export class Collation {
-  readonly lcid: number;
-  readonly flags: number;
-  readonly version: number;
-  readonly sortId: number;
-  readonly codepage: Encoding | undefined;
+  declare readonly lcid: number;
+  declare readonly flags: number;
+  declare readonly version: number;
+  declare readonly sortId: number;
+  declare readonly codepage: Encoding | undefined;
 
-  private buffer: Buffer | undefined;
+  declare private buffer: Buffer | undefined;
 
   static fromBuffer(buffer: Buffer, offset = 0) {
     let lcid = (buffer[offset + 2] & 0x0F) << 16;
