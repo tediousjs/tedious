@@ -64,6 +64,8 @@ describe('Env Change Token Parser', () => {
 
     const parser = StreamParser.parseTokens([data], {}, {});
     const result = await parser.next();
-    assert.isTrue(result.done);
+
+    assert.isFalse(result.done);
+    assert.isUndefined(result.value);
   });
 });
