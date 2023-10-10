@@ -1,5 +1,5 @@
 import type { BufferList } from 'bl/BufferList';
-import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
+import { NotEnoughDataError, readUInt32LE, type Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 import { FedAuthInfoToken } from './token';
 
@@ -45,7 +45,7 @@ function readFedAuthInfo(data: Buffer): { spn: string | undefined, stsurl: strin
 
 function fedAuthInfoParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<FedAuthInfoToken> {
   let tokenLength;
-  ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
+  ({ offset, value: tokenLength } = readUInt32LE(buf, offset));
 
   if (buf.length < offset + tokenLength) {
     throw new NotEnoughDataError(offset + tokenLength);
