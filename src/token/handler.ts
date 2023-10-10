@@ -148,7 +148,7 @@ export class TokenHandler {
  * that sets up different connection settings.
  */
 export class InitialSqlTokenHandler extends TokenHandler {
-  connection: Connection;
+  declare connection: Connection;
 
   constructor(connection: Connection) {
     super();
@@ -245,16 +245,16 @@ export class InitialSqlTokenHandler extends TokenHandler {
  * A handler for tokens received in the response message to a Login7 message.
  */
 export class Login7TokenHandler extends TokenHandler {
-  connection: Connection;
+  declare connection: Connection;
 
-  fedAuthInfoToken: FedAuthInfoToken | undefined;
-  routingData: { server: string, port: number } | undefined;
+  declare fedAuthInfoToken: FedAuthInfoToken | undefined;
+  declare routingData: { server: string, port: number } | undefined;
 
-  loginAckReceived = false;
+  declare loginAckReceived: boolean;
 
   constructor(connection: Connection) {
     super();
-
+    this.loginAckReceived = false;
     this.connection = connection;
   }
 
@@ -368,9 +368,9 @@ export class Login7TokenHandler extends TokenHandler {
  * a SQL Batch Request, a Bulk Load BCP Request or a Transaction Manager Request.
  */
 export class RequestTokenHandler extends TokenHandler {
-  connection: Connection;
-  request: Request | BulkLoad;
-  errors: RequestError[];
+  declare connection: Connection;
+  declare request: Request | BulkLoad;
+  declare errors: RequestError[];
 
   constructor(connection: Connection, request: Request | BulkLoad) {
     super();
@@ -559,13 +559,13 @@ export class RequestTokenHandler extends TokenHandler {
  * that the attention message was received by the server.
  */
 export class AttentionTokenHandler extends TokenHandler {
-  connection: Connection;
-  request: Request | BulkLoad;
+  declare connection: Connection;
+  declare request: Request | BulkLoad;
 
   /**
    * Returns whether an attention acknowledgement was received.
    */
-  attentionReceived: boolean;
+  declare attentionReceived: boolean;
 
   constructor(connection: Connection, request: Request | BulkLoad) {
     super();

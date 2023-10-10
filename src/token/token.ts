@@ -30,8 +30,8 @@ export const TYPE = {
 type HandlerName = keyof TokenHandler;
 
 export abstract class Token {
-  name: string;
-  handlerName: keyof TokenHandler;
+  declare name: string;
+  declare handlerName: keyof TokenHandler;
 
   constructor(name: string, handlerName: HandlerName) {
     this.name = name;
@@ -43,7 +43,7 @@ export class ColMetadataToken extends Token {
   declare name: 'COLMETADATA';
   declare handlerName: 'onColMetadata';
 
-  columns: ColumnMetadata[];
+  declare columns: ColumnMetadata[];
 
   constructor(columns: ColumnMetadata[]) {
     super('COLMETADATA', 'onColMetadata');
@@ -56,12 +56,12 @@ export class DoneToken extends Token {
   declare name: 'DONE';
   declare handlerName: 'onDone';
 
-  more: boolean;
-  sqlError: boolean;
-  attention: boolean;
-  serverError: boolean;
-  rowCount: number | undefined;
-  curCmd: number;
+  declare more: boolean;
+  declare sqlError: boolean;
+  declare attention: boolean;
+  declare serverError: boolean;
+  declare rowCount: number | undefined;
+  declare curCmd: number;
 
   constructor({ more, sqlError, attention, serverError, rowCount, curCmd }: { more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }) {
     super('DONE', 'onDone');
@@ -79,12 +79,12 @@ export class DoneInProcToken extends Token {
   declare name: 'DONEINPROC';
   declare handlerName: 'onDoneInProc';
 
-  more: boolean;
-  sqlError: boolean;
-  attention: boolean;
-  serverError: boolean;
-  rowCount: number | undefined;
-  curCmd: number;
+  declare more: boolean;
+  declare sqlError: boolean;
+  declare attention: boolean;
+  declare serverError: boolean;
+  declare rowCount: number | undefined;
+  declare curCmd: number;
 
   constructor({ more, sqlError, attention, serverError, rowCount, curCmd }: { more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }) {
     super('DONEINPROC', 'onDoneInProc');
@@ -102,12 +102,12 @@ export class DoneProcToken extends Token {
   declare name: 'DONEPROC';
   declare handlerName: 'onDoneProc';
 
-  more: boolean;
-  sqlError: boolean;
-  attention: boolean;
-  serverError: boolean;
-  rowCount: number | undefined;
-  curCmd: number;
+  declare more: boolean;
+  declare sqlError: boolean;
+  declare attention: boolean;
+  declare serverError: boolean;
+  declare rowCount: number | undefined;
+  declare curCmd: number;
 
   constructor({ more, sqlError, attention, serverError, rowCount, curCmd }: { more: boolean, sqlError: boolean, attention: boolean, serverError: boolean, rowCount: number | undefined, curCmd: number }) {
     super('DONEPROC', 'onDoneProc');
@@ -125,9 +125,9 @@ export class DatabaseEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onDatabaseChange';
 
-  type: 'DATABASE';
-  newValue: string;
-  oldValue: string;
+  declare type: 'DATABASE';
+  declare newValue: string;
+  declare oldValue: string;
 
   constructor(newValue: string, oldValue: string) {
     super('ENVCHANGE', 'onDatabaseChange');
@@ -142,9 +142,9 @@ export class LanguageEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onLanguageChange';
 
-  type: 'LANGUAGE';
-  newValue: string;
-  oldValue: string;
+  declare type: 'LANGUAGE';
+  declare newValue: string;
+  declare oldValue: string;
 
   constructor(newValue: string, oldValue: string) {
     super('ENVCHANGE', 'onLanguageChange');
@@ -159,9 +159,9 @@ export class CharsetEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onCharsetChange';
 
-  type: 'CHARSET';
-  newValue: string;
-  oldValue: string;
+  declare type: 'CHARSET';
+  declare newValue: string;
+  declare oldValue: string;
 
   constructor(newValue: string, oldValue: string) {
     super('ENVCHANGE', 'onCharsetChange');
@@ -176,9 +176,9 @@ export class PacketSizeEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onPacketSizeChange';
 
-  type: 'PACKET_SIZE';
-  newValue: number;
-  oldValue: number;
+  declare type: 'PACKET_SIZE';
+  declare newValue: number;
+  declare oldValue: number;
 
   constructor(newValue: number, oldValue: number) {
     super('ENVCHANGE', 'onPacketSizeChange');
@@ -193,9 +193,9 @@ export class BeginTransactionEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onBeginTransaction';
 
-  type: 'BEGIN_TXN';
-  newValue: Buffer;
-  oldValue: Buffer;
+  declare type: 'BEGIN_TXN';
+  declare newValue: Buffer;
+  declare oldValue: Buffer;
 
   constructor(newValue: Buffer, oldValue: Buffer) {
     super('ENVCHANGE', 'onBeginTransaction');
@@ -210,9 +210,9 @@ export class CommitTransactionEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onCommitTransaction';
 
-  type: 'COMMIT_TXN';
-  newValue: Buffer;
-  oldValue: Buffer;
+  declare type: 'COMMIT_TXN';
+  declare newValue: Buffer;
+  declare oldValue: Buffer;
 
   constructor(newValue: Buffer, oldValue: Buffer) {
     super('ENVCHANGE', 'onCommitTransaction');
@@ -227,9 +227,9 @@ export class RollbackTransactionEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onRollbackTransaction';
 
-  type: 'ROLLBACK_TXN';
-  oldValue: Buffer;
-  newValue: Buffer;
+  declare type: 'ROLLBACK_TXN';
+  declare oldValue: Buffer;
+  declare newValue: Buffer;
 
   constructor(newValue: Buffer, oldValue: Buffer) {
     super('ENVCHANGE', 'onRollbackTransaction');
@@ -244,9 +244,9 @@ export class DatabaseMirroringPartnerEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onDatabaseMirroringPartner';
 
-  type: 'DATABASE_MIRRORING_PARTNER';
-  oldValue: string;
-  newValue: string;
+  declare type: 'DATABASE_MIRRORING_PARTNER';
+  declare oldValue: string;
+  declare newValue: string;
 
   constructor(newValue: string, oldValue: string) {
     super('ENVCHANGE', 'onDatabaseMirroringPartner');
@@ -261,9 +261,9 @@ export class ResetConnectionEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onResetConnection';
 
-  type: 'RESET_CONNECTION';
-  oldValue: Buffer;
-  newValue: Buffer;
+  declare type: 'RESET_CONNECTION';
+  declare oldValue: Buffer;
+  declare newValue: Buffer;
 
   constructor(newValue: Buffer, oldValue: Buffer) {
     super('ENVCHANGE', 'onResetConnection');
@@ -291,9 +291,9 @@ export class CollationChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onSqlCollationChange';
 
-  type: 'SQL_COLLATION';
-  oldValue: Collation | undefined;
-  newValue: Collation | undefined;
+  declare type: 'SQL_COLLATION';
+  declare oldValue: Collation | undefined;
+  declare newValue: Collation | undefined;
 
   constructor(newValue: Collation | undefined, oldValue: Collation | undefined) {
     super('ENVCHANGE', 'onSqlCollationChange');
@@ -308,9 +308,9 @@ export class RoutingEnvChangeToken extends Token {
   declare name: 'ENVCHANGE';
   declare handlerName: 'onRoutingChange';
 
-  type: 'ROUTING_CHANGE';
-  newValue: { protocol: number, port: number, server: string };
-  oldValue: Buffer;
+  declare type: 'ROUTING_CHANGE';
+  declare newValue: { protocol: number, port: number, server: string };
+  declare oldValue: Buffer;
 
   constructor(newValue: { protocol: number, port: number, server: string }, oldValue: Buffer) {
     super('ENVCHANGE', 'onRoutingChange');
@@ -325,12 +325,12 @@ export class FeatureExtAckToken extends Token {
   declare name: 'FEATUREEXTACK';
   declare handlerName: 'onFeatureExtAck';
 
-  fedAuth: Buffer | undefined;
+  declare fedAuth: Buffer | undefined;
 
   /** Value of UTF8_SUPPORT acknowledgement.
    *
    * undefined when UTF8_SUPPORT not included in token. */
-  utf8Support: boolean | undefined;
+  declare utf8Support: boolean | undefined;
 
   constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined) {
     super('FEATUREEXTACK', 'onFeatureExtAck');
@@ -344,8 +344,8 @@ export class FedAuthInfoToken extends Token {
   declare name: 'FEDAUTHINFO';
   declare handlerName: 'onFedAuthInfo';
 
-  spn: string | undefined;
-  stsurl: string | undefined;
+  declare spn: string | undefined;
+  declare stsurl: string | undefined;
 
   constructor(spn: string | undefined, stsurl: string | undefined) {
     super('FEDAUTHINFO', 'onFedAuthInfo');
@@ -359,13 +359,13 @@ export class InfoMessageToken extends Token {
   declare name: 'INFO';
   declare handlerName: 'onInfoMessage';
 
-  number: number;
-  state: number;
-  class: number;
-  message: string;
-  serverName: string;
-  procName: string;
-  lineNumber: number;
+  declare number: number;
+  declare state: number;
+  declare class: number;
+  declare message: string;
+  declare serverName: string;
+  declare procName: string;
+  declare lineNumber: number;
 
   constructor({ number, state, class: clazz, message, serverName, procName, lineNumber }: { number: number, state: number, class: number, message: string, serverName: string, procName: string, lineNumber: number }) {
     super('INFO', 'onInfoMessage');
@@ -384,13 +384,13 @@ export class ErrorMessageToken extends Token {
   declare name: 'ERROR';
   declare handlerName: 'onErrorMessage';
 
-  number: number;
-  state: number;
-  class: number;
-  message: string;
-  serverName: string;
-  procName: string;
-  lineNumber: number;
+  declare number: number;
+  declare state: number;
+  declare class: number;
+  declare message: string;
+  declare serverName: string;
+  declare procName: string;
+  declare lineNumber: number;
 
   constructor({ number, state, class: clazz, message, serverName, procName, lineNumber }: { number: number, state: number, class: number, message: string, serverName: string, procName: string, lineNumber: number }) {
     super('ERROR', 'onErrorMessage');
@@ -409,10 +409,10 @@ export class LoginAckToken extends Token {
   declare name: 'LOGINACK';
   declare handlerName: 'onLoginAck';
 
-  interface: string;
-  tdsVersion: string;
-  progName: string;
-  progVersion: { major: number, minor: number, buildNumHi: number, buildNumLow: number };
+  declare interface: string;
+  declare tdsVersion: string;
+  declare progName: string;
+  declare progVersion: { major: number, minor: number, buildNumHi: number, buildNumLow: number };
 
   constructor({ interface: interfaze, tdsVersion, progName, progVersion }: { interface: LoginAckToken['interface'], tdsVersion: LoginAckToken['tdsVersion'], progName: LoginAckToken['progName'], progVersion: LoginAckToken['progVersion'] }) {
     super('LOGINACK', 'onLoginAck');
@@ -428,7 +428,7 @@ export class NBCRowToken extends Token {
   declare name: 'NBCROW';
   declare handlerName: 'onRow';
 
-  columns: any;
+  declare columns: any;
 
   constructor(columns: any) {
     super('NBCROW', 'onRow');
@@ -441,7 +441,7 @@ export class OrderToken extends Token {
   declare name: 'ORDER';
   declare handlerName: 'onOrder';
 
-  orderColumns: number[];
+  declare orderColumns: number[];
 
   constructor(orderColumns: number[]) {
     super('ORDER', 'onOrder');
@@ -454,7 +454,7 @@ export class ReturnStatusToken extends Token {
   declare name: 'RETURNSTATUS';
   declare handlerName: 'onReturnStatus';
 
-  value: number;
+  declare value: number;
 
   constructor(value: number) {
     super('RETURNSTATUS', 'onReturnStatus');
@@ -467,10 +467,10 @@ export class ReturnValueToken extends Token {
   declare name: 'RETURNVALUE';
   declare handlerName: 'onReturnValue';
 
-  paramOrdinal: number;
-  paramName: string;
-  metadata: Metadata;
-  value: unknown;
+  declare paramOrdinal: number;
+  declare paramName: string;
+  declare metadata: Metadata;
+  declare value: unknown;
 
   constructor({ paramOrdinal, paramName, metadata, value }: { paramOrdinal: number, paramName: string, metadata: Metadata, value: unknown }) {
     super('RETURNVALUE', 'onReturnValue');
@@ -486,7 +486,7 @@ export class RowToken extends Token {
   declare name: 'ROW';
   declare handlerName: 'onRow';
 
-  columns: any;
+  declare columns: any;
 
   constructor(columns: any) {
     super('ROW', 'onRow');
@@ -499,8 +499,8 @@ export class SSPIToken extends Token {
   declare name: 'SSPICHALLENGE';
   declare handlerName: 'onSSPI';
 
-  ntlmpacket: any;
-  ntlmpacketBuffer: Buffer;
+  declare ntlmpacket: any;
+  declare ntlmpacketBuffer: Buffer;
 
   constructor(ntlmpacket: any, ntlmpacketBuffer: Buffer) {
     super('SSPICHALLENGE', 'onSSPI');
