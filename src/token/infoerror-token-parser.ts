@@ -18,7 +18,7 @@ function readToken(buf: Buffer | BufferList, offset: number, options: ParserOpti
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-  if (buf.length + offset< tokenLength) {
+  if (buf.length + offset < tokenLength) {
     throw new NotEnoughDataError(buf.length + offset);
   }
 
