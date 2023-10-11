@@ -1,4 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
 import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
@@ -42,7 +41,7 @@ function parseChallenge(buffer: Buffer) {
   return challenge as Data;
 }
 
-function sspiParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<SSPIToken> {
+function sspiParser(buf: Buffer, offset: number, _options: ParserOptions): Result<SSPIToken> {
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 

@@ -4,7 +4,6 @@ import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
-import type { BufferList } from 'bl/BufferList';
 
 import { type Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
@@ -56,7 +55,7 @@ export type Metadata = {
   cryptoMetadata?: CryptoMetadata;
 } & BaseMetadata;
 
-function _readCollation(buf: Buffer | BufferList, offset: number): Result<Collation> {
+function _readCollation(buf: Buffer, offset: number): Result<Collation> {
   offset = +offset;
 
   if (buf.length < offset + 5) {
@@ -74,7 +73,7 @@ function readCollation(parser: Parser, callback: (collation: Collation) => void)
   });
 }
 
-function readSchema(buf: Buffer | BufferList, offset: number): Result<XmlSchema | undefined> {
+function readSchema(buf: Buffer, offset: number): Result<XmlSchema | undefined> {
   offset = +offset;
 
   let schemaPresent;
@@ -96,7 +95,7 @@ function readSchema(buf: Buffer | BufferList, offset: number): Result<XmlSchema 
   return { value: { dbname, owningSchema, xmlSchemaCollection }, offset };
 }
 
-function readUDTInfo(buf: Buffer | BufferList, offset: number): Result<UdtInfo> {
+function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
   let maxByteSize;
   ({ offset, value: maxByteSize } = readUInt16LE(buf, offset));
 
@@ -121,7 +120,7 @@ function readUDTInfo(buf: Buffer | BufferList, offset: number): Result<UdtInfo> 
   }, offset };
 }
 
-function readMetadata(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<Metadata> {
+function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
   let userType;
   ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
 

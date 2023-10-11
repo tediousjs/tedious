@@ -5,7 +5,6 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
-import type { BufferList } from 'bl/BufferList';
 import { NotEnoughDataError, type Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
@@ -20,7 +19,7 @@ function readTinyInt(parser: Parser, callback: (value: unknown) => void) {
   parser.readUInt8(callback);
 }
 
-function _readTinyInt(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
 }
 
@@ -28,7 +27,7 @@ function readSmallInt(parser: Parser, callback: (value: unknown) => void) {
   parser.readInt16LE(callback);
 }
 
-function _readSmallInt(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readSmallInt(buf: Buffer, offset: number): Result<number> {
   return readInt16LE(buf, offset);
 }
 
@@ -36,7 +35,7 @@ function readInt(parser: Parser, callback: (value: unknown) => void) {
   parser.readInt32LE(callback);
 }
 
-function _readInt(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readInt(buf: Buffer, offset: number): Result<number> {
   return readInt32LE(buf, offset);
 }
 
@@ -46,14 +45,14 @@ function readBigInt(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function _readBigInt(buf: Buffer | BufferList, offset: number): Result<string> {
+function _readBigInt(buf: Buffer, offset: number): Result<string> {
   let value;
   ({ offset, value } = readBigInt64LE(buf, offset));
 
   return { value: value.toString(), offset };
 }
 
-function _readReal(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readReal(buf: Buffer, offset: number): Result<number> {
   return readFloatLE(buf, offset);
 }
 
@@ -61,7 +60,7 @@ function readReal(parser: Parser, callback: (value: unknown) => void) {
   parser.readFloatLE(callback);
 }
 
-function _readFloat(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readFloat(buf: Buffer, offset: number): Result<number> {
   return readDoubleLE(buf, offset);
 }
 
@@ -75,7 +74,7 @@ function readSmallMoney(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function _readSmallMoney(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readSmallMoney(buf: Buffer, offset: number): Result<number> {
   let value;
   ({ offset, value } = readUInt32LE(buf, offset));
   return { value: value / MONEY_DIVISOR, offset };
@@ -89,7 +88,7 @@ function readMoney(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function _readMoney(buf: Buffer | BufferList, offset: number): Result<number> {
+function _readMoney(buf: Buffer, offset: number): Result<number> {
   let high;
   ({ offset, value: high } = readUInt32LE(buf, offset));
 
@@ -105,14 +104,14 @@ function readBit(parser: Parser, callback: (value: unknown) => void) {
   });
 }
 
-function _readBit(buf: Buffer | BufferList, offset: number): Result<boolean> {
+function _readBit(buf: Buffer, offset: number): Result<boolean> {
   let value;
   ({ offset, value } = readUInt8(buf, offset));
 
   return { value: !!value, offset };
 }
 
-function readValue(buf: Buffer | BufferList, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
+function readValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
   const type = metadata.type;
 
   switch (type.name) {
@@ -751,7 +750,7 @@ function valueParse(parser: Parser, metadata: Metadata, options: ParserOptions, 
   }
 }
 
-function _readUniqueIdentifier(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<string> {
+function _readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOptions): Result<string> {
   let data;
   ({ value: data, offset } = _readBinary(buf, offset, 0x10));
 
@@ -764,7 +763,7 @@ function readUniqueIdentifier(parser: Parser, options: ParserOptions, callback: 
   });
 }
 
-function _readNumeric(buf: Buffer | BufferList, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
+function _readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
   let sign;
   ({ offset, value: sign } = readUInt8(buf, offset));
 
@@ -809,7 +808,7 @@ function readNumeric(parser: Parser, dataLength: number, _precision: number, sca
   });
 }
 
-function _readVariant(buf: Buffer | BufferList, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
+function _readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
   let baseType;
   ({ value: baseType, offset } = readUInt8(buf, offset));
 
@@ -1026,7 +1025,7 @@ function readVariant(parser: Parser, options: ParserOptions, dataLength: number,
   });
 }
 
-function _readBinary(buf: Buffer | BufferList, offset: number, dataLength: number): Result<Buffer> {
+function _readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buffer> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
@@ -1038,7 +1037,7 @@ function readBinary(parser: Parser, dataLength: number, callback: (value: unknow
   return parser.readBuffer(dataLength, callback);
 }
 
-function _readChars(buf: Buffer | BufferList, offset: number, dataLength: number, codepage: string): Result<string> {
+function _readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
@@ -1056,7 +1055,7 @@ function readChars(parser: Parser, dataLength: number, codepage: string, callbac
   });
 }
 
-function _readNChars(buf: Buffer | BufferList, offset: number, dataLength: number): Result<string> {
+function _readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
@@ -1218,7 +1217,7 @@ function readMaxUnknownLength(parser: Parser, callback: (value: null | Buffer) =
   });
 }
 
-function _readSmallDateTime(buf: Buffer | BufferList, offset: number, useUTC: boolean): Result<Date> {
+function _readSmallDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
   let days;
   ({ offset, value: days } = readUInt16LE(buf, offset));
 
@@ -1249,7 +1248,7 @@ function readSmallDateTime(parser: Parser, useUTC: boolean, callback: (value: Da
   });
 }
 
-function _readDateTime(buf: Buffer | BufferList, offset: number, useUTC: boolean): Result<Date> {
+function _readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
   let days;
   ({ offset, value: days } = readInt32LE(buf, offset));
 
@@ -1289,7 +1288,7 @@ interface DateWithNanosecondsDelta extends Date {
   nanosecondsDelta: number;
 }
 
-function _readTime(buf: Buffer | BufferList, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+function _readTime(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
   let value;
 
   switch (dataLength) {
@@ -1367,7 +1366,7 @@ function readTime(parser: Parser, dataLength: number, scale: number, useUTC: boo
   });
 }
 
-function _readDate(buf: Buffer | BufferList, offset: number, useUTC: boolean): Result<Date> {
+function _readDate(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
@@ -1389,7 +1388,7 @@ function readDate(parser: Parser, useUTC: boolean, callback: (value: Date) => vo
 }
 
 
-function _readDateTime2(buf: Buffer | BufferList, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+function _readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
   let time;
   ({ offset, value: time } = _readTime(buf, offset, dataLength - 3, scale, useUTC));
 
@@ -1428,7 +1427,7 @@ function readDateTime2(parser: Parser, dataLength: number, scale: number, useUTC
   });
 }
 
-function _readDateTimeOffset(buf: Buffer | BufferList, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
+function _readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
   let time;
   ({ offset, value: time } = _readTime(buf, offset, dataLength - 5, scale, true));
 

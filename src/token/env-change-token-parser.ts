@@ -17,7 +17,6 @@ import {
 } from './token';
 
 import { NotEnoughDataError, readBVarByte, readBVarChar, readUInt16LE, readUInt8, readUsVarByte, type Result } from './helpers';
-import type { BufferList } from 'bl/BufferList';
 
 const types: { [key: number]: { name: string, event?: string }} = {
   1: {
@@ -69,7 +68,7 @@ const types: { [key: number]: { name: string, event?: string }} = {
   }
 };
 
-function _readNewAndOldValue(buf: Buffer | BufferList, offset: number, length: number, type: { name: string, event?: string }): Result<EnvChangeToken | undefined> {
+function _readNewAndOldValue(buf: Buffer, offset: number, length: number, type: { name: string, event?: string }): Result<EnvChangeToken | undefined> {
   switch (type.name) {
     case 'DATABASE':
     case 'LANGUAGE':
@@ -177,7 +176,7 @@ function _readNewAndOldValue(buf: Buffer | BufferList, offset: number, length: n
   }
 }
 
-function envChangeParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<EnvChangeToken | undefined> {
+function envChangeParser(buf: Buffer, offset: number, _options: ParserOptions): Result<EnvChangeToken | undefined> {
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 

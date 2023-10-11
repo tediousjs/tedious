@@ -1,4 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
 import { type ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
 import { type Result, readBigUInt64LE, readUInt16LE, readUInt32LE } from './helpers';
@@ -24,7 +23,7 @@ interface TokenData {
   curCmd: number;
 }
 
-function readToken(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<TokenData> {
+function readToken(buf: Buffer, offset: number, options: ParserOptions): Result<TokenData> {
   let status;
   ({ offset, value: status } = readUInt16LE(buf, offset));
 
@@ -53,19 +52,19 @@ function readToken(buf: Buffer | BufferList, offset: number, options: ParserOpti
   };
 }
 
-export function doneParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneToken> {
+export function doneParser(buf: Buffer, offset: number, options: ParserOptions): Result<DoneToken> {
   let value;
   ({ offset, value } = readToken(buf, offset, options));
   return { value: new DoneToken(value), offset };
 }
 
-export function doneInProcParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneInProcToken> {
+export function doneInProcParser(buf: Buffer, offset: number, options: ParserOptions): Result<DoneInProcToken> {
   let value;
   ({ offset, value } = readToken(buf, offset, options));
   return { value: new DoneInProcToken(value), offset };
 }
 
-export function doneProcParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<DoneProcToken> {
+export function doneProcParser(buf: Buffer, offset: number, options: ParserOptions): Result<DoneProcToken> {
   let value;
   ({ offset, value } = readToken(buf, offset, options));
   return { value: new DoneProcToken(value), offset };

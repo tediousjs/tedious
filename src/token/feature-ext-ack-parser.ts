@@ -1,4 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
 import { NotEnoughDataError, readUInt32LE, readUInt8, type Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
@@ -14,7 +13,7 @@ const FEATURE_ID = {
   TERMINATOR: 0xFF
 };
 
-function featureExtAckParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
+function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
 

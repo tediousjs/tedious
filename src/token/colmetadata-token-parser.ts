@@ -1,4 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
 import { readMetadata, type Metadata } from '../metadata-parser';
 
 import Parser, { type ParserOptions } from './stream-parser';
@@ -14,7 +13,7 @@ export interface ColumnMetadata extends Metadata {
   tableName?: string | string[] | undefined;
 }
 
-function readTableName(buf: Buffer | BufferList, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
+function readTableName(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
   if (!metadata.type.hasTableName) {
     return { value: undefined, offset };
   }
@@ -37,7 +36,7 @@ function readTableName(buf: Buffer | BufferList, offset: number, metadata: Metad
   return { value: tableName, offset };
 }
 
-function readColumnName(buf: Buffer | BufferList, offset: number, index: number, metadata: Metadata, options: ParserOptions): Result<string> {
+function readColumnName(buf: Buffer, offset: number, index: number, metadata: Metadata, options: ParserOptions): Result<string> {
   let colName;
   ({ offset, value: colName } = readBVarChar(buf, offset));
 
@@ -52,7 +51,7 @@ function readColumnName(buf: Buffer | BufferList, offset: number, index: number,
   }
 }
 
-function readColumn(buf: Buffer | BufferList, offset: number, options: ParserOptions, index: number) {
+function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: number) {
   let metadata;
   ({ offset, value: metadata } = readMetadata(buf, offset, options));
 

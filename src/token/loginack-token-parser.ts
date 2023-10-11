@@ -3,7 +3,6 @@ import { type ParserOptions } from './stream-parser';
 import { LoginAckToken } from './token';
 
 import { versionsByValue as versions } from '../tds-versions';
-import type { BufferList } from 'bl/BufferList';
 import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32BE, readUInt8, type Result } from './helpers';
 
 const interfaceTypes: { [key: number]: string } = {
@@ -11,7 +10,7 @@ const interfaceTypes: { [key: number]: string } = {
   1: 'SQL_TSQL'
 };
 
-function loginAckParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<LoginAckToken> {
+function loginAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<LoginAckToken> {
   // length
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));

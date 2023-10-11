@@ -1,5 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
-
 export class Result<T> {
   declare value: T;
   declare offset: number;
@@ -20,7 +18,7 @@ export class NotEnoughDataError extends Error {
   }
 }
 
-export function readUInt8(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt8(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 1) {
@@ -30,7 +28,7 @@ export function readUInt8(buf: Buffer | BufferList, offset: number): Result<numb
   return new Result(buf.readUInt8(offset), offset + 1);
 }
 
-export function readUInt16LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt16LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 2) {
@@ -40,7 +38,7 @@ export function readUInt16LE(buf: Buffer | BufferList, offset: number): Result<n
   return new Result(buf.readUInt16LE(offset), offset + 2);
 }
 
-export function readInt16LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readInt16LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 2) {
@@ -50,7 +48,7 @@ export function readInt16LE(buf: Buffer | BufferList, offset: number): Result<nu
   return { value: buf.readInt16LE(offset), offset: offset + 2 };
 }
 
-export function readUInt24LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt24LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 3) {
@@ -60,7 +58,7 @@ export function readUInt24LE(buf: Buffer | BufferList, offset: number): Result<n
   return { value: buf.readUIntLE(offset, 3), offset: offset + 3 };
 }
 
-export function readUInt32LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt32LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 4) {
@@ -70,7 +68,7 @@ export function readUInt32LE(buf: Buffer | BufferList, offset: number): Result<n
   return { value: buf.readUInt32LE(offset), offset: offset + 4 };
 }
 
-export function readUInt32BE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt32BE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 4) {
@@ -80,7 +78,7 @@ export function readUInt32BE(buf: Buffer | BufferList, offset: number): Result<n
   return { value: buf.readUInt32BE(offset), offset: offset + 4 };
 }
 
-export function readUInt40LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUInt40LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 5) {
@@ -89,7 +87,7 @@ export function readUInt40LE(buf: Buffer | BufferList, offset: number): Result<n
 
   return { value: buf.readUIntLE(offset, 5), offset: offset + 5 };
 }
-export function readInt32LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readInt32LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 4) {
@@ -99,7 +97,7 @@ export function readInt32LE(buf: Buffer | BufferList, offset: number): Result<nu
   return { value: buf.readInt32LE(offset), offset: offset + 4 };
 }
 
-export function readBigUInt64LE(buf: Buffer | BufferList, offset: number): Result<bigint> {
+export function readBigUInt64LE(buf: Buffer, offset: number): Result<bigint> {
   offset = +offset;
 
   if (buf.length < offset + 8) {
@@ -109,7 +107,7 @@ export function readBigUInt64LE(buf: Buffer | BufferList, offset: number): Resul
   return { value: buf.readBigUInt64LE(offset), offset: offset + 8 };
 }
 
-export function readBigInt64LE(buf: Buffer | BufferList, offset: number): Result<bigint> {
+export function readBigInt64LE(buf: Buffer, offset: number): Result<bigint> {
   offset = +offset;
 
   if (buf.length < offset + 8) {
@@ -119,7 +117,7 @@ export function readBigInt64LE(buf: Buffer | BufferList, offset: number): Result
   return { value: buf.readBigInt64LE(offset), offset: offset + 8 };
 }
 
-export function readFloatLE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readFloatLE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 4) {
@@ -129,7 +127,7 @@ export function readFloatLE(buf: Buffer | BufferList, offset: number): Result<nu
   return { value: buf.readFloatLE(offset), offset: offset + 4 };
 }
 
-export function readDoubleLE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readDoubleLE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 8) {
@@ -139,7 +137,7 @@ export function readDoubleLE(buf: Buffer | BufferList, offset: number): Result<n
   return { value: buf.readDoubleLE(offset), offset: offset + 8 };
 }
 
-export function readBVarChar(buf: Buffer | BufferList, offset: number): Result<string> {
+export function readBVarChar(buf: Buffer, offset: number): Result<string> {
   offset = +offset;
 
   let charCount;
@@ -154,7 +152,7 @@ export function readBVarChar(buf: Buffer | BufferList, offset: number): Result<s
   return { value: buf.toString('ucs2', offset, offset + byteLength), offset: offset + byteLength };
 }
 
-export function readBVarByte(buf: Buffer | BufferList, offset: number): Result<Buffer> {
+export function readBVarByte(buf: Buffer, offset: number): Result<Buffer> {
   offset = +offset;
 
   let byteLength;
@@ -167,7 +165,7 @@ export function readBVarByte(buf: Buffer | BufferList, offset: number): Result<B
   return { value: buf.slice(offset, offset + byteLength), offset: offset + byteLength };
 }
 
-export function readUsVarChar(buf: Buffer | BufferList, offset: number): Result<string> {
+export function readUsVarChar(buf: Buffer, offset: number): Result<string> {
   offset = +offset;
 
   let charCount;
@@ -182,7 +180,7 @@ export function readUsVarChar(buf: Buffer | BufferList, offset: number): Result<
   return { value: buf.toString('ucs2', offset, offset + byteLength), offset: offset + byteLength };
 }
 
-export function readUsVarByte(buf: Buffer | BufferList, offset: number): Result<Buffer> {
+export function readUsVarByte(buf: Buffer, offset: number): Result<Buffer> {
   offset = +offset;
 
   let byteLength;
@@ -195,7 +193,7 @@ export function readUsVarByte(buf: Buffer | BufferList, offset: number): Result<
   return { value: buf.slice(offset, offset + byteLength), offset: offset + byteLength };
 }
 
-export function readUNumeric64LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUNumeric64LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 8) {
@@ -208,7 +206,7 @@ export function readUNumeric64LE(buf: Buffer | BufferList, offset: number): Resu
   return { value: (0x100000000 * high) + low, offset: offset + 8 };
 }
 
-export function readUNumeric96LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUNumeric96LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 12) {
@@ -222,7 +220,7 @@ export function readUNumeric96LE(buf: Buffer | BufferList, offset: number): Resu
   return { value: dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3), offset: offset + 12 };
 }
 
-export function readUNumeric128LE(buf: Buffer | BufferList, offset: number): Result<number> {
+export function readUNumeric128LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
   if (buf.length < offset + 16) {

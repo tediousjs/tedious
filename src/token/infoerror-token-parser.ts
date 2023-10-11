@@ -1,4 +1,3 @@
-import type { BufferList } from 'bl/BufferList';
 import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32LE, readUInt8, readUsVarChar, type Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
@@ -14,7 +13,7 @@ interface TokenData {
   lineNumber: number;
 }
 
-function readToken(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<TokenData> {
+function readToken(buf: Buffer, offset: number, options: ParserOptions): Result<TokenData> {
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
@@ -57,14 +56,14 @@ function readToken(buf: Buffer | BufferList, offset: number, options: ParserOpti
   };
 }
 
-export function infoParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<InfoMessageToken> {
+export function infoParser(buf: Buffer, offset: number, options: ParserOptions): Result<InfoMessageToken> {
   let data;
   ({ offset, value: data } = readToken(buf, offset, options));
 
   return { value: new InfoMessageToken(data), offset };
 }
 
-export function errorParser(buf: Buffer | BufferList, offset: number, options: ParserOptions): Result<ErrorMessageToken> {
+export function errorParser(buf: Buffer, offset: number, options: ParserOptions): Result<ErrorMessageToken> {
   let data;
   ({ offset, value: data } = readToken(buf, offset, options));
 

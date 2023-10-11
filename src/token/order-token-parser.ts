@@ -1,11 +1,10 @@
 // s2.2.7.14
-import type { BufferList } from 'bl/BufferList';
 import { type ParserOptions } from './stream-parser';
 
 import { OrderToken } from './token';
 import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
 
-function orderParser(buf: Buffer | BufferList, offset: number, _options: ParserOptions): Result<OrderToken> {
+function orderParser(buf: Buffer, offset: number, _options: ParserOptions): Result<OrderToken> {
   // length
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
