@@ -1,9 +1,14 @@
 import type { BufferList } from 'bl/BufferList';
 
-export type Result<T> = {
-  value: T;
-  offset: number;
-};
+export class Result<T> {
+  declare value: T;
+  declare offset: number;
+
+  constructor(value: T, offset: number) {
+    this.value = value;
+    this.offset = offset;
+  }
+}
 
 export class NotEnoughDataError extends Error {
   byteCount: number;
@@ -22,7 +27,7 @@ export function readUInt8(buf: Buffer | BufferList, offset: number): Result<numb
     throw new NotEnoughDataError(offset + 1);
   }
 
-  return { value: buf.readUInt8(offset), offset: offset + 1 };
+  return new Result(buf.readUInt8(offset), offset + 1);
 }
 
 export function readUInt16LE(buf: Buffer | BufferList, offset: number): Result<number> {
@@ -32,7 +37,7 @@ export function readUInt16LE(buf: Buffer | BufferList, offset: number): Result<n
     throw new NotEnoughDataError(offset + 2);
   }
 
-  return { value: buf.readUInt16LE(offset), offset: offset + 2 };
+  return new Result(buf.readUInt16LE(offset), offset + 2);
 }
 
 export function readInt16LE(buf: Buffer | BufferList, offset: number): Result<number> {
