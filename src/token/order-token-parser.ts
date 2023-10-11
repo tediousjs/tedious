@@ -2,7 +2,7 @@
 import { type ParserOptions } from './stream-parser';
 
 import { OrderToken } from './token';
-import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
+import { NotEnoughDataError, readUInt16LE, Result } from './helpers';
 
 function orderParser(buf: Buffer, offset: number, _options: ParserOptions): Result<OrderToken> {
   // length
@@ -22,7 +22,7 @@ function orderParser(buf: Buffer, offset: number, _options: ParserOptions): Resu
     orderColumns.push(column);
   }
 
-  return { value: new OrderToken(orderColumns), offset };
+  return new Result(new OrderToken(orderColumns), offset);
 }
 
 export default orderParser;

@@ -16,7 +16,7 @@ import {
   type EnvChangeToken
 } from './token';
 
-import { NotEnoughDataError, readBVarByte, readBVarChar, readUInt16LE, readUInt8, readUsVarByte, type Result } from './helpers';
+import { NotEnoughDataError, readBVarByte, readBVarChar, readUInt16LE, readUInt8, readUsVarByte, Result } from './helpers';
 
 const types: { [key: number]: { name: string, event?: string }} = {
   1: {
@@ -83,19 +83,19 @@ function _readNewAndOldValue(buf: Buffer, offset: number, length: number, type: 
 
       switch (type.name) {
         case 'PACKET_SIZE':
-          return { value: new PacketSizeEnvChangeToken(parseInt(newValue), parseInt(oldValue)), offset };
+          return new Result(new PacketSizeEnvChangeToken(parseInt(newValue), parseInt(oldValue)), offset);
 
         case 'DATABASE':
-          return { value: new DatabaseEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new DatabaseEnvChangeToken(newValue, oldValue), offset);
 
         case 'LANGUAGE':
-          return { value: new LanguageEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new LanguageEnvChangeToken(newValue, oldValue), offset);
 
         case 'CHARSET':
-          return { value: new CharsetEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new CharsetEnvChangeToken(newValue, oldValue), offset);
 
         case 'DATABASE_MIRRORING_PARTNER':
-          return { value: new DatabaseMirroringPartnerEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new DatabaseMirroringPartnerEnvChangeToken(newValue, oldValue), offset);
       }
 
       throw new Error('unreachable');
@@ -117,20 +117,20 @@ function _readNewAndOldValue(buf: Buffer, offset: number, length: number, type: 
           const newCollation = newValue.length ? Collation.fromBuffer(newValue) : undefined;
           const oldCollation = oldValue.length ? Collation.fromBuffer(oldValue) : undefined;
 
-          return { value: new CollationChangeToken(newCollation, oldCollation), offset };
+          return new Result(new CollationChangeToken(newCollation, oldCollation), offset);
         }
 
         case 'BEGIN_TXN':
-          return { value: new BeginTransactionEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new BeginTransactionEnvChangeToken(newValue, oldValue), offset);
 
         case 'COMMIT_TXN':
-          return { value: new CommitTransactionEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new CommitTransactionEnvChangeToken(newValue, oldValue), offset);
 
         case 'ROLLBACK_TXN':
-          return { value: new RollbackTransactionEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new RollbackTransactionEnvChangeToken(newValue, oldValue), offset);
 
         case 'RESET_CONNECTION':
-          return { value: new ResetConnectionEnvChangeToken(newValue, oldValue), offset };
+          return new Result(new ResetConnectionEnvChangeToken(newValue, oldValue), offset);
       }
 
       throw new Error('unreachable');
@@ -164,14 +164,14 @@ function _readNewAndOldValue(buf: Buffer, offset: number, length: number, type: 
         server: server
       };
 
-      return { value: new RoutingEnvChangeToken(newValue, oldValue), offset };
+      return new Result(new RoutingEnvChangeToken(newValue, oldValue), offset);
     }
 
     default: {
       console.error('Tedious > Unsupported ENVCHANGE type ' + type.name);
 
       // skip unknown bytes
-      return { value: undefined, offset: offset + length - 1 };
+      return new Result(undefined, offset + length - 1);
     }
   }
 }
@@ -191,7 +191,7 @@ function envChangeParser(buf: Buffer, offset: number, _options: ParserOptions): 
 
   if (!type) {
     console.error('Tedious > Unsupported ENVCHANGE type ' + typeNumber);
-    return { value: undefined, offset: offset + tokenLength - 1 };
+    return new Result(undefined, offset + tokenLength - 1);
   }
 
   return _readNewAndOldValue(buf, offset, tokenLength, type);

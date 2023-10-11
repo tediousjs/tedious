@@ -45,7 +45,7 @@ export function readInt16LE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 2);
   }
 
-  return { value: buf.readInt16LE(offset), offset: offset + 2 };
+  return new Result(buf.readInt16LE(offset), offset + 2);
 }
 
 export function readUInt24LE(buf: Buffer, offset: number): Result<number> {
@@ -55,7 +55,7 @@ export function readUInt24LE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 3);
   }
 
-  return { value: buf.readUIntLE(offset, 3), offset: offset + 3 };
+  return new Result(buf.readUIntLE(offset, 3), offset + 3);
 }
 
 export function readUInt32LE(buf: Buffer, offset: number): Result<number> {
@@ -65,7 +65,7 @@ export function readUInt32LE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 4);
   }
 
-  return { value: buf.readUInt32LE(offset), offset: offset + 4 };
+  return new Result(buf.readUInt32LE(offset), offset + 4);
 }
 
 export function readUInt32BE(buf: Buffer, offset: number): Result<number> {
@@ -75,7 +75,7 @@ export function readUInt32BE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 4);
   }
 
-  return { value: buf.readUInt32BE(offset), offset: offset + 4 };
+  return new Result(buf.readUInt32BE(offset), offset + 4);
 }
 
 export function readUInt40LE(buf: Buffer, offset: number): Result<number> {
@@ -85,7 +85,7 @@ export function readUInt40LE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 5);
   }
 
-  return { value: buf.readUIntLE(offset, 5), offset: offset + 5 };
+  return new Result(buf.readUIntLE(offset, 5), offset + 5);
 }
 export function readInt32LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
@@ -94,7 +94,7 @@ export function readInt32LE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 4);
   }
 
-  return { value: buf.readInt32LE(offset), offset: offset + 4 };
+  return new Result(buf.readInt32LE(offset), offset + 4);
 }
 
 export function readBigUInt64LE(buf: Buffer, offset: number): Result<bigint> {
@@ -104,7 +104,7 @@ export function readBigUInt64LE(buf: Buffer, offset: number): Result<bigint> {
     throw new NotEnoughDataError(offset + 8);
   }
 
-  return { value: buf.readBigUInt64LE(offset), offset: offset + 8 };
+  return new Result(buf.readBigUInt64LE(offset), offset + 8);
 }
 
 export function readBigInt64LE(buf: Buffer, offset: number): Result<bigint> {
@@ -114,7 +114,7 @@ export function readBigInt64LE(buf: Buffer, offset: number): Result<bigint> {
     throw new NotEnoughDataError(offset + 8);
   }
 
-  return { value: buf.readBigInt64LE(offset), offset: offset + 8 };
+  return new Result(buf.readBigInt64LE(offset), offset + 8);
 }
 
 export function readFloatLE(buf: Buffer, offset: number): Result<number> {
@@ -124,7 +124,7 @@ export function readFloatLE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 4);
   }
 
-  return { value: buf.readFloatLE(offset), offset: offset + 4 };
+  return new Result(buf.readFloatLE(offset), offset + 4);
 }
 
 export function readDoubleLE(buf: Buffer, offset: number): Result<number> {
@@ -134,7 +134,7 @@ export function readDoubleLE(buf: Buffer, offset: number): Result<number> {
     throw new NotEnoughDataError(offset + 8);
   }
 
-  return { value: buf.readDoubleLE(offset), offset: offset + 8 };
+  return new Result(buf.readDoubleLE(offset), offset + 8);
 }
 
 export function readBVarChar(buf: Buffer, offset: number): Result<string> {
@@ -149,7 +149,7 @@ export function readBVarChar(buf: Buffer, offset: number): Result<string> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return { value: buf.toString('ucs2', offset, offset + byteLength), offset: offset + byteLength };
+  return new Result(buf.toString('ucs2', offset, offset + byteLength), offset + byteLength);
 }
 
 export function readBVarByte(buf: Buffer, offset: number): Result<Buffer> {
@@ -162,7 +162,7 @@ export function readBVarByte(buf: Buffer, offset: number): Result<Buffer> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return { value: buf.slice(offset, offset + byteLength), offset: offset + byteLength };
+  return new Result(buf.slice(offset, offset + byteLength), offset + byteLength);
 }
 
 export function readUsVarChar(buf: Buffer, offset: number): Result<string> {
@@ -177,7 +177,7 @@ export function readUsVarChar(buf: Buffer, offset: number): Result<string> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return { value: buf.toString('ucs2', offset, offset + byteLength), offset: offset + byteLength };
+  return new Result(buf.toString('ucs2', offset, offset + byteLength), offset + byteLength);
 }
 
 export function readUsVarByte(buf: Buffer, offset: number): Result<Buffer> {
@@ -190,7 +190,7 @@ export function readUsVarByte(buf: Buffer, offset: number): Result<Buffer> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return { value: buf.slice(offset, offset + byteLength), offset: offset + byteLength };
+  return new Result(buf.slice(offset, offset + byteLength), offset + byteLength);
 }
 
 export function readUNumeric64LE(buf: Buffer, offset: number): Result<number> {
@@ -203,7 +203,7 @@ export function readUNumeric64LE(buf: Buffer, offset: number): Result<number> {
   const low = buf.readUInt32LE(offset);
   const high = buf.readUInt32LE(offset + 4);
 
-  return { value: (0x100000000 * high) + low, offset: offset + 8 };
+  return new Result((0x100000000 * high) + low, offset + 8);
 }
 
 export function readUNumeric96LE(buf: Buffer, offset: number): Result<number> {
@@ -217,7 +217,7 @@ export function readUNumeric96LE(buf: Buffer, offset: number): Result<number> {
   const dword2 = buf.readUInt32LE(offset + 4);
   const dword3 = buf.readUInt32LE(offset + 8);
 
-  return { value: dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3), offset: offset + 12 };
+  return new Result(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3), offset + 12);
 }
 
 export function readUNumeric128LE(buf: Buffer, offset: number): Result<number> {
@@ -232,5 +232,5 @@ export function readUNumeric128LE(buf: Buffer, offset: number): Result<number> {
   const dword3 = buf.readUInt32LE(offset + 8);
   const dword4 = buf.readUInt32LE(offset + 12);
 
-  return { value: dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4), offset: offset + 16 };
+  return new Result(dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4), offset + 16);
 }

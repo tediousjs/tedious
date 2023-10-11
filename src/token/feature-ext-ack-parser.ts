@@ -1,4 +1,4 @@
-import { NotEnoughDataError, readUInt32LE, readUInt8, type Result } from './helpers';
+import { NotEnoughDataError, readUInt32LE, readUInt8, Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
 import { FeatureExtAckToken } from './token';
@@ -22,7 +22,7 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
     ({ value: featureId, offset } = readUInt8(buf, offset));
 
     if (featureId === FEATURE_ID.TERMINATOR) {
-      return { value: new FeatureExtAckToken(fedAuth, utf8Support), offset };
+      return new Result(new FeatureExtAckToken(fedAuth, utf8Support), offset);
     }
 
     let featureAckDataLen;

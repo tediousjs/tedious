@@ -1,4 +1,4 @@
-import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32LE, readUInt8, readUsVarChar, type Result } from './helpers';
+import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32LE, readUInt8, readUsVarChar, Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
 import { InfoMessageToken, ErrorMessageToken } from './token';
@@ -42,30 +42,27 @@ function readToken(buf: Buffer, offset: number, options: ParserOptions): Result<
   let lineNumber;
   ({ offset, value: lineNumber } = options.tdsVersion < '7_2' ? readUInt16LE(buf, offset) : readUInt32LE(buf, offset));
 
-  return {
-    value: {
-      'number': number,
-      'state': state,
-      'class': clazz,
-      'message': message,
-      'serverName': serverName,
-      'procName': procName,
-      'lineNumber': lineNumber
-    },
-    offset
-  };
+  return new Result({
+    'number': number,
+    'state': state,
+    'class': clazz,
+    'message': message,
+    'serverName': serverName,
+    'procName': procName,
+    'lineNumber': lineNumber
+  }, offset);
 }
 
 export function infoParser(buf: Buffer, offset: number, options: ParserOptions): Result<InfoMessageToken> {
   let data;
   ({ offset, value: data } = readToken(buf, offset, options));
 
-  return { value: new InfoMessageToken(data), offset };
+  return new Result(new InfoMessageToken(data), offset);
 }
 
 export function errorParser(buf: Buffer, offset: number, options: ParserOptions): Result<ErrorMessageToken> {
   let data;
   ({ offset, value: data } = readToken(buf, offset, options));
 
-  return { value: new ErrorMessageToken(data), offset };
+  return new Result(new ErrorMessageToken(data), offset);
 }

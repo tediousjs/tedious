@@ -3,7 +3,7 @@ import { type ParserOptions } from './stream-parser';
 import { LoginAckToken } from './token';
 
 import { versionsByValue as versions } from '../tds-versions';
-import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32BE, readUInt8, type Result } from './helpers';
+import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt32BE, readUInt8, Result } from './helpers';
 
 const interfaceTypes: { [key: number]: string } = {
   0: 'SQL_DFLT',
@@ -45,20 +45,17 @@ function loginAckParser(buf: Buffer, offset: number, _options: ParserOptions): R
   let buildNumLow;
   ({ offset, value: buildNumLow } = readUInt8(buf, offset));
 
-  return {
-    value: new LoginAckToken({
-      interface: interfaceType,
-      tdsVersion: tdsVersion,
-      progName: progName,
-      progVersion: {
-        major: major,
-        minor: minor,
-        buildNumHi: buildNumHi,
-        buildNumLow: buildNumLow
-      }
-    }),
-    offset
-  };
+  return new Result(new LoginAckToken({
+    interface: interfaceType,
+    tdsVersion: tdsVersion,
+    progName: progName,
+    progVersion: {
+      major: major,
+      minor: minor,
+      buildNumHi: buildNumHi,
+      buildNumLow: buildNumLow
+    }
+  }), offset);
 }
 
 export default loginAckParser;

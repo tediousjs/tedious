@@ -1,4 +1,4 @@
-import { NotEnoughDataError, readUInt16LE, type Result } from './helpers';
+import { NotEnoughDataError, readUInt16LE, Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 
 import { SSPIToken } from './token';
@@ -52,7 +52,7 @@ function sspiParser(buf: Buffer, offset: number, _options: ParserOptions): Resul
   const data = buf.slice(offset, offset + tokenLength);
   offset += tokenLength;
 
-  return { value: new SSPIToken(parseChallenge(data), data), offset };
+  return new Result(new SSPIToken(parseChallenge(data), data), offset);
 }
 
 export default sspiParser;

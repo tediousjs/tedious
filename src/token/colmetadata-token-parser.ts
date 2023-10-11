@@ -2,7 +2,7 @@ import { readMetadata, type Metadata } from '../metadata-parser';
 
 import Parser, { type ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
-import { NotEnoughDataError, type Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
+import { NotEnoughDataError, Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
 
 export interface ColumnMetadata extends Metadata {
   /**
@@ -15,7 +15,7 @@ export interface ColumnMetadata extends Metadata {
 
 function readTableName(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
   if (!metadata.type.hasTableName) {
-    return { value: undefined, offset };
+    return new Result(undefined, offset);
   }
 
   if (options.tdsVersion < '7_1') {
@@ -33,7 +33,7 @@ function readTableName(buf: Buffer, offset: number, metadata: Metadata, options:
     tableName.push(tableNamePart);
   }
 
-  return { value: tableName, offset };
+  return new Result(tableName, offset);
 }
 
 function readColumnName(buf: Buffer, offset: number, index: number, metadata: Metadata, options: ParserOptions): Result<string> {
@@ -41,13 +41,13 @@ function readColumnName(buf: Buffer, offset: number, index: number, metadata: Me
   ({ offset, value: colName } = readBVarChar(buf, offset));
 
   if (options.columnNameReplacer) {
-    return { value: options.columnNameReplacer(colName, index, metadata), offset };
+    return new Result(options.columnNameReplacer(colName, index, metadata), offset);
   } else if (options.camelCaseColumns) {
-    return { value: colName.replace(/^[A-Z]/, function(s) {
+    return new Result(colName.replace(/^[A-Z]/, function(s) {
       return s.toLowerCase();
-    }), offset };
+    }), offset);
   } else {
-    return { value: colName, offset };
+    return new Result(colName, offset);
   }
 }
 
@@ -61,22 +61,19 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
   let colName;
   ({ offset, value: colName } = readColumnName(buf, offset, index, metadata, options));
 
-  return {
-    value: {
-      userType: metadata.userType,
-      flags: metadata.flags,
-      type: metadata.type,
-      collation: metadata.collation,
-      precision: metadata.precision,
-      scale: metadata.scale,
-      udtInfo: metadata.udtInfo,
-      dataLength: metadata.dataLength,
-      schema: metadata.schema,
-      colName: colName,
-      tableName: tableName
-    },
-    offset
-  };
+  return new Result({
+    userType: metadata.userType,
+    flags: metadata.flags,
+    type: metadata.type,
+    collation: metadata.collation,
+    precision: metadata.precision,
+    scale: metadata.scale,
+    udtInfo: metadata.udtInfo,
+    dataLength: metadata.dataLength,
+    schema: metadata.schema,
+    colName: colName,
+    tableName: tableName
+  }, offset);
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {

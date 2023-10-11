@@ -5,7 +5,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 
 import { sprintf } from 'sprintf-js';
 
-import { type Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
+import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
 interface XmlSchema {
   dbname: string;
@@ -63,7 +63,7 @@ function _readCollation(buf: Buffer, offset: number): Result<Collation> {
   }
 
   const collation = Collation.fromBuffer(buf.slice(offset, offset + 5));
-  return { value: collation, offset: offset + 5 };
+  return new Result(collation, offset + 5);
 }
 
 function readCollation(parser: Parser, callback: (collation: Collation) => void) {
@@ -80,7 +80,7 @@ function readSchema(buf: Buffer, offset: number): Result<XmlSchema | undefined> 
   ({ offset, value: schemaPresent } = readUInt8(buf, offset));
 
   if (schemaPresent !== 0x01) {
-    return { value: undefined, offset };
+    return new Result(undefined, offset);
   }
 
   let dbname;
@@ -92,7 +92,7 @@ function readSchema(buf: Buffer, offset: number): Result<XmlSchema | undefined> 
   let xmlSchemaCollection;
   ({ offset, value: xmlSchemaCollection } = readUsVarChar(buf, offset));
 
-  return { value: { dbname, owningSchema, xmlSchemaCollection }, offset };
+  return new Result({ dbname, owningSchema, xmlSchemaCollection }, offset);
 }
 
 function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
@@ -111,13 +111,13 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
   let assemblyName;
   ({ offset, value: assemblyName } = readUsVarChar(buf, offset));
 
-  return { value: {
+  return new Result({
     maxByteSize: maxByteSize,
     dbname: dbname,
     owningSchema: owningSchema,
     typeName: typeName,
     assemblyName: assemblyName
-  }, offset };
+  }, offset);
 }
 
 function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
@@ -149,20 +149,17 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
     case 'SmallDateTime':
     case 'DateTime':
     case 'Date':
-      return {
-        value: {
-          userType: userType,
-          flags: flags,
-          type: type,
-          collation: undefined,
-          precision: undefined,
-          scale: undefined,
-          dataLength: undefined,
-          schema: undefined,
-          udtInfo: undefined
-        },
-        offset
-      };
+      return new Result({
+        userType: userType,
+        flags: flags,
+        type: type,
+        collation: undefined,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined
+      }, offset);
 
     case 'IntN':
     case 'FloatN':
@@ -173,27 +170,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let dataLength;
       ({ offset, value: dataLength } = readUInt8(buf, offset));
 
-      return {
-        value: {
-          userType: userType,
-          flags: flags,
-          type: type,
-          collation: undefined,
-          precision: undefined,
-          scale: undefined,
-          dataLength: dataLength,
-          schema: undefined,
-          udtInfo: undefined
-        },
-        offset
-      };
-    }
-
-    case 'Variant': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
-
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -203,7 +180,24 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
+    }
+
+    case 'Variant': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+
+      return new Result({
+        userType: userType,
+        flags: flags,
+        type: type,
+        collation: undefined,
+        precision: undefined,
+        scale: undefined,
+        dataLength: dataLength,
+        schema: undefined,
+        udtInfo: undefined
+      }, offset);
     }
 
     case 'VarChar':
@@ -216,7 +210,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let collation;
       ({ offset, value: collation } = _readCollation(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -226,7 +220,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'Text':
@@ -237,7 +231,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let collation;
       ({ offset, value: collation } = _readCollation(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -247,7 +241,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'VarBinary':
@@ -255,7 +249,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let dataLength;
       ({ offset, value: dataLength } = readUInt16LE(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -265,14 +259,14 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'Image': {
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -282,14 +276,14 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'Xml': {
       let schema;
       ({ offset, value: schema } = readSchema(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -299,7 +293,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: undefined,
         schema: schema,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'Time':
@@ -308,7 +302,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let scale;
       ({ offset, value: scale } = readUInt8(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -318,7 +312,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: undefined,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'NumericN':
@@ -332,7 +326,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       let scale;
       ({ offset, value: scale } = readUInt8(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -342,14 +336,14 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined
-      }, offset };
+      }, offset);
     }
 
     case 'UDT': {
       let udtInfo;
       ({ offset, value: udtInfo } = readUDTInfo(buf, offset));
 
-      return { value: {
+      return new Result({
         userType: userType,
         flags: flags,
         type: type,
@@ -359,7 +353,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: undefined,
         schema: undefined,
         udtInfo: udtInfo
-      }, offset };
+      }, offset);
     }
 
     default:

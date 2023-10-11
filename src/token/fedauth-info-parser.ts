@@ -1,4 +1,4 @@
-import { NotEnoughDataError, readUInt32LE, type Result } from './helpers';
+import { NotEnoughDataError, readUInt32LE, Result } from './helpers';
 import { type ParserOptions } from './stream-parser';
 import { FedAuthInfoToken } from './token';
 
@@ -54,7 +54,7 @@ function fedAuthInfoParser(buf: Buffer, offset: number, _options: ParserOptions)
   offset += tokenLength;
 
   const { spn, stsurl } = readFedAuthInfo(data);
-  return { value: new FedAuthInfoToken(spn, stsurl), offset };
+  return new Result(new FedAuthInfoToken(spn, stsurl), offset);
 }
 
 export default fedAuthInfoParser;
