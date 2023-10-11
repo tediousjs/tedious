@@ -16,8 +16,8 @@ function loginAckParser(buf: Buffer | BufferList, offset: number, _options: Pars
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-  if (buf.length < offset + tokenLength) {
-    throw new NotEnoughDataError(offset + tokenLength);
+  if (buf.length + offset< tokenLength) {
+    throw new NotEnoughDataError(buf.length + offset);
   }
 
   let interfaceNumber;

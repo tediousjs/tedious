@@ -18,8 +18,8 @@ function readToken(buf: Buffer | BufferList, offset: number, options: ParserOpti
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-  if (buf.length < offset + tokenLength) {
-    throw new NotEnoughDataError(offset + tokenLength);
+  if (buf.length + offset< tokenLength) {
+    throw new NotEnoughDataError(buf.length + offset);
   }
 
   let number;
@@ -33,7 +33,7 @@ function readToken(buf: Buffer | BufferList, offset: number, options: ParserOpti
 
   let message;
   ({ offset, value: message } = readUsVarChar(buf, offset));
-
+  console.log(message);
   let serverName;
   ({ offset, value: serverName } = readBVarChar(buf, offset));
 
