@@ -90,7 +90,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
       ({ offset, value: columnCount } = readUInt16LE(parser.buffer, parser.position));
     } catch (err) {
       if (err instanceof NotEnoughDataError) {
-        await parser.streamBuffer.waitForChunk();
+        await parser.waitForChunk();
         continue;
       }
 
@@ -111,7 +111,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
         ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i));
       } catch (err: any) {
         if (err instanceof NotEnoughDataError) {
-          await parser.streamBuffer.waitForChunk();
+          await parser.waitForChunk();
           continue;
         }
 

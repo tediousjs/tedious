@@ -239,7 +239,7 @@ function readValue(buf: Buffer | BufferList, offset: number, metadata: Metadata,
         return { value: null, offset };
       }
 
-      console.log(metadata, dataLength);
+      // console.log(metadata, dataLength);
 
       return _readChars(buf, offset, dataLength, codepage);
     }

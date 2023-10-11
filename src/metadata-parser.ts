@@ -376,7 +376,7 @@ function metadataParse(parser: Parser, options: ParserOptions, callback: (metada
         result = readMetadata(parser.buffer, parser.position, options);
       } catch (err: any) {
         if (err instanceof NotEnoughDataError) {
-          await parser.streamBuffer.waitForChunk();
+          await parser.waitForChunk();
           continue;
         }
 

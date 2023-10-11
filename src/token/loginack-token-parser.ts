@@ -46,8 +46,6 @@ function loginAckParser(buf: Buffer | BufferList, offset: number, _options: Pars
   let buildNumLow;
   ({ offset, value: buildNumLow } = readUInt8(buf, offset));
 
-  console.log("offset: ", offset);
-
   return {
     value: new LoginAckToken({
       interface: interfaceType,
