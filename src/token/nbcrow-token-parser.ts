@@ -1,15 +1,11 @@
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
-import Parser, { type ParserOptions } from './stream-parser';
+import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { NBCRowToken } from './token';
-
-import valueParse from '../value-parser';
-
-function nullHandler(_parser: Parser, _columnMetadata: ColumnMetadata, _options: ParserOptions, callback: (value: unknown) => void) {
-  callback(null);
-}
+import { isPLPStream, readPLPStream, readValue } from '../value-parser';
+import { NotEnoughDataError } from './helpers';
 
 interface Column {
   value: unknown;
@@ -18,12 +14,12 @@ interface Column {
 
 async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
   const colMetadata = parser.colMetadata;
-  const bitmapByteLength = Math.ceil(colMetadata.length / 8);
   const columns: Column[] = [];
   const bitmap: boolean[] = [];
+  const bitmapByteLength = Math.ceil(colMetadata.length / 8);
 
   while (parser.buffer.length - parser.position < bitmapByteLength) {
-    await parser.streamBuffer.waitForChunk();
+    await parser.waitForChunk();
   }
 
   const bytes = parser.buffer.slice(parser.position, parser.position + bitmapByteLength);
@@ -43,28 +39,48 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
   }
 
   for (let i = 0; i < colMetadata.length; i++) {
-    const currColMetadata = colMetadata[i];
-    let value;
-    (bitmap[i] ? nullHandler : valueParse)(parser, currColMetadata, parser.options, (v) => {
-      value = v;
-    });
-
-    while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
-
-      parser.suspended = false;
-      const next = parser.next!;
-
-      next();
+    const metadata = colMetadata[i];
+    if (bitmap[i]) {
+      columns.push({ value: null, metadata });
+      continue;
     }
-    columns.push({
-      value,
-      metadata: currColMetadata
-    });
+
+    while (true) {
+      if (isPLPStream(metadata)) {
+        const chunks = await readPLPStream(parser);
+
+        if (chunks === null) {
+          columns.push({ value: chunks, metadata });
+        } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
+          columns.push({ value: Buffer.concat(chunks).toString('ucs2'), metadata });
+        } else if (metadata.type.name === 'VarChar') {
+          columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
+        } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
+          columns.push({ value: Buffer.concat(chunks), metadata });
+        }
+      } else {
+        let result;
+        try {
+          result = readValue(parser.buffer, parser.position, metadata, parser.options);
+        } catch (err) {
+          if (err instanceof NotEnoughDataError) {
+            await parser.waitForChunk();
+            continue;
+          }
+
+          throw err;
+        }
+
+        parser.position = result.offset;
+        columns.push({ value: result.value, metadata });
+      }
+
+      break;
+    }
   }
 
   if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = {};
+    const columnsMap: { [key: string]: Column } = Object.create(null);
 
     columns.forEach((column) => {
       const colName = column.metadata.colName;
@@ -78,6 +94,7 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
     return new NBCRowToken(columns);
   }
 }
+
 
 export default nbcRowParser;
 module.exports = nbcRowParser;
