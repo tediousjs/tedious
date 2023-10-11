@@ -55,7 +55,7 @@ export type Metadata = {
   cryptoMetadata?: CryptoMetadata;
 } & BaseMetadata;
 
-function _readCollation(buf: Buffer, offset: number): Result<Collation> {
+function readCollation(buf: Buffer, offset: number): Result<Collation> {
   offset = +offset;
 
   if (buf.length < offset + 5) {
@@ -64,13 +64,6 @@ function _readCollation(buf: Buffer, offset: number): Result<Collation> {
 
   const collation = Collation.fromBuffer(buf.slice(offset, offset + 5));
   return new Result(collation, offset + 5);
-}
-
-function readCollation(parser: Parser, callback: (collation: Collation) => void) {
-  // s2.2.5.1.2
-  parser.readBuffer(5, (collationData) => {
-    callback(Collation.fromBuffer(collationData));
-  });
 }
 
 function readSchema(buf: Buffer, offset: number): Result<XmlSchema | undefined> {
@@ -208,7 +201,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       ({ offset, value: dataLength } = readUInt16LE(buf, offset));
 
       let collation;
-      ({ offset, value: collation } = _readCollation(buf, offset));
+      ({ offset, value: collation } = readCollation(buf, offset));
 
       return new Result({
         userType: userType,
@@ -229,7 +222,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
       let collation;
-      ({ offset, value: collation } = _readCollation(buf, offset));
+      ({ offset, value: collation } = readCollation(buf, offset));
 
       return new Result({
         userType: userType,
@@ -383,9 +376,8 @@ function metadataParse(parser: Parser, options: ParserOptions, callback: (metada
 }
 
 export default metadataParse;
-export { readCollation, _readCollation, readMetadata };
+export { readCollation, readMetadata };
 
 module.exports = metadataParse;
 module.exports.readCollation = readCollation;
-module.exports._readCollation = _readCollation;
 module.exports.readMetadata = readMetadata;
