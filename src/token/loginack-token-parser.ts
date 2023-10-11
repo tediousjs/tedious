@@ -16,8 +16,9 @@ function loginAckParser(buf: Buffer | BufferList, offset: number, _options: Pars
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-  if (buf.length + offset < tokenLength) {
-    throw new NotEnoughDataError(buf.length + offset);
+  // mocha --inspect test/integration/connection-test.js
+  if (buf.length < tokenLength + offset) {
+    throw new NotEnoughDataError(tokenLength + offset);
   }
 
   let interfaceNumber;
@@ -44,6 +45,8 @@ function loginAckParser(buf: Buffer | BufferList, offset: number, _options: Pars
 
   let buildNumLow;
   ({ offset, value: buildNumLow } = readUInt8(buf, offset));
+
+  console.log("offset: ", offset);
 
   return {
     value: new LoginAckToken({
