@@ -1,7 +1,7 @@
 import Debug from '../debug';
 import { type InternalConnectionOptions } from '../connection';
 
-import { TYPE, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken } from './token';
+import { TYPE, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken, Token } from './token';
 
 import colMetadataParser, { type ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
@@ -48,12 +48,15 @@ class Parser {
         const type = parser.buffer.readUInt8(parser.position);
         parser.position += 1;
 
-        yield parser.readToken(type);
+        const token = parser.readToken(type);
+        if (token !== undefined) {
+          yield token;
+        }
       }
     }
   }
 
-  readToken(type: number) {
+  readToken(type: number): Token | undefined | Promise<Token | undefined> {
     switch (type) {
       case TYPE.DONE: {
         return this.readDoneToken();
@@ -253,7 +256,7 @@ class Parser {
     return result.value;
   }
 
-  readEnvChangeToken(): EnvChangeToken | Promise<EnvChangeToken> {
+  readEnvChangeToken(): EnvChangeToken | undefined | Promise<EnvChangeToken | undefined> {
     let result;
 
     try {

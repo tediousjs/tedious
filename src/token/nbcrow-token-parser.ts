@@ -4,6 +4,8 @@ import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { NBCRowToken } from './token';
+import * as iconv from 'iconv-lite';
+
 import { isPLPStream, readPLPStream, readValue } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
 
