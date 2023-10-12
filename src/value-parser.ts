@@ -42,14 +42,14 @@ function readFloat(buf: Buffer, offset: number): Result<number> {
 }
 
 function readSmallMoney(buf: Buffer, offset: number): Result<number> {
-  let value;
-  ({ offset, value } = readUInt32LE(buf, offset));
-  return new Result(value / MONEY_DIVISOR, offset);
+    let value;
+  ({ offset, value } = readInt32LE(buf, offset));
+    return new Result(value / MONEY_DIVISOR, offset);
 }
 
 function readMoney(buf: Buffer, offset: number): Result<number> {
   let high;
-  ({ offset, value: high } = readUInt32LE(buf, offset));
+  ({ offset, value: high } = readInt32LE(buf, offset));
 
   let low;
   ({ offset, value: low } = readUInt32LE(buf, offset));
