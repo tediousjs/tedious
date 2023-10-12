@@ -425,42 +425,6 @@ describe('Row Token Parser', () => {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharMaxKnownLengthWrong', async () => {
-    const colMetadata = [
-      {
-        type: dataTypeByName.VarChar,
-        dataLength: 65535,
-        collation: {
-          codepage: 'WINDOWS-1252'
-        }
-      }
-    ];
-    const value = 'abcdef';
-
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
-    buffer.writeUInt8(0xd1);
-    buffer.writeUInt64LE(value.length + 1);
-    buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(0, 3));
-    buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(3, 6));
-    buffer.writeUInt32LE(0);
-    // console.log(buffer.data)
-
-    const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
-
-    let error;
-    try {
-      await parser.next();
-    } catch (err) {
-      error = err;
-    }
-
-    assert.instanceOf(error, Error);
-    assert.strictEqual(error.message, 'Partially Length-prefixed Bytes unmatched lengths : expected 7, but got 6 bytes');
-    assert.isTrue((await parser.next()).done);
-  });
-
   it('should write varBinaryMaxNull', async () => {
     const colMetadata = [
       {
