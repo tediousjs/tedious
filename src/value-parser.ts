@@ -191,8 +191,6 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      console.log(metadata, dataLength);
-
       return readChars(buf, offset, dataLength, codepage);
     }
 
