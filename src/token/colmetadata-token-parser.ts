@@ -18,7 +18,7 @@ function readTableName(buf: Buffer, offset: number, metadata: Metadata, options:
     return new Result(undefined, offset);
   }
 
-  if (options.tdsVersion < '7_1') {
+  if (options.tdsVersion < '7_2') {
     return readUsVarChar(buf, offset);
   }
 
