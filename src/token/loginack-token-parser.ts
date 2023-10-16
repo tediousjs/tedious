@@ -15,7 +15,6 @@ function loginAckParser(buf: Buffer, offset: number, _options: ParserOptions): R
   let tokenLength;
   ({ offset, value: tokenLength } = readUInt16LE(buf, offset));
 
-  // mocha --inspect test/integration/connection-test.js
   if (buf.length < tokenLength + offset) {
     throw new NotEnoughDataError(tokenLength + offset);
   }

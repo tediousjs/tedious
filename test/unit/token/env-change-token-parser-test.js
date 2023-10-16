@@ -52,7 +52,7 @@ describe('Env Change Token Parser', () => {
     assert.strictEqual(token.newValue, 2048);
   });
 
-  it.only('should be of bad type', async () => {
+  it('should be of bad type', async () => {
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xe3);
