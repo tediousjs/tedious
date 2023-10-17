@@ -597,7 +597,7 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   }
 
   const chunks: Buffer[] = [];
-  let offset = 0;
+  let currentLength = 0;
 
   while (true) {
     while (parser.buffer.length < parser.position + 4) {
@@ -617,20 +617,12 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
 
     chunks.push(parser.buffer.slice(parser.position, parser.position + chunkLength));
     parser.position += chunkLength;
-    offset += chunkLength;
+    currentLength += chunkLength;
   }
 
   if (!type.equals(UNKNOWN_PLP_LEN)) {
-    const low = type.readUInt32LE(0);
-    const high = type.readUInt32LE(4);
-
-    if (high >= (2 << (53 - 32))) {
-      console.warn('Read UInt64LE > 53 bits : high=' + high + ', low=' + low);
-    }
-
-    const expectedLength = low + (0x100000000 * high);
-    if (offset !== expectedLength) {
-      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + offset + ' bytes');
+    if (currentLength !== Number(readBigInt(type, 0).value)) {
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + Number(readBigInt(type, 0).value) + ', but got ' + currentLength + ' bytes');
     }
   }
 
