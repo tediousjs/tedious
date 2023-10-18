@@ -621,7 +621,7 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   }
 
   if (!type.equals(UNKNOWN_PLP_LEN)) {
-    const expectedLength = Number(readBigInt(type, 0).value);
+    const expectedLength = Number(type.readBigUInt64LE());
     if (currentLength !== expectedLength) {
       throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
     }
