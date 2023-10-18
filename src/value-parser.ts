@@ -11,8 +11,8 @@ const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
-const PLP_NULL = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-const UNKNOWN_PLP_LEN = Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
+const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
 const DEFAULT_ENCODING = 'utf8';
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
@@ -589,10 +589,11 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
     await parser.waitForChunk();
   }
 
-  const type = parser.buffer.slice(parser.position, parser.position + 8);
+  const expectedLength = parser.buffer.readBigUInt64LE(parser.position)
+
   parser.position += 8;
 
-  if (type.equals(PLP_NULL)) {
+  if (expectedLength === PLP_NULL) {
     return null;
   }
 
@@ -620,9 +621,8 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
     currentLength += chunkLength;
   }
 
-  if (!type.equals(UNKNOWN_PLP_LEN)) {
-    const expectedLength = Number(type.readBigUInt64LE());
-    if (currentLength !== expectedLength) {
+  if (expectedLength !== UNKNOWN_PLP_LEN) {
+    if (currentLength !== Number(expectedLength)) {
       throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
     }
   }
