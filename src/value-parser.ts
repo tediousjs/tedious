@@ -589,8 +589,7 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
     await parser.waitForChunk();
   }
 
-  const expectedLength = parser.buffer.readBigUInt64LE(parser.position)
-
+  const expectedLength = parser.buffer.readBigUInt64LE(parser.position);
   parser.position += 8;
 
   if (expectedLength === PLP_NULL) {
