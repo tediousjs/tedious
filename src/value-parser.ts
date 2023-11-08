@@ -549,7 +549,7 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       // maxLength (unused?)
       ({ offset } = readUInt16LE(buf, offset));
 
-      // collation (unsued?)
+      // collation (unused?)
       ({ offset } = readCollation(buf, offset));
 
       return readNChars(buf, offset, dataLength);
