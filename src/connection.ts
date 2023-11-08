@@ -203,7 +203,7 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   options: {
     /**
      * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * they need to provide `clientId` associate to their created identity.
      *
      * This is optional for retrieve token from azure web app service
      */
@@ -242,7 +242,7 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrived else where
+     * A user need to provide `token` which they retrieved else where
      * to forming the connection.
      */
     token: string;
@@ -253,12 +253,12 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` asscoiate to their account.
+     * A user need to provide `userName` associate to their account.
      */
     userName: string;
 
     /**
-     * A user need to provide `password` asscoiate to their account.
+     * A user need to provide `password` associate to their account.
      */
     password: string;
 
@@ -436,7 +436,7 @@ export interface ConnectionConfiguration {
    */
   options?: ConnectionOptions;
   /**
-   * Authentication realted options for connection.
+   * Authentication related options for connection.
    */
   authentication?: AuthenticationOptions;
 }
@@ -1234,7 +1234,7 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
-        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: milliseconds
         columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
@@ -2165,7 +2165,7 @@ class Connection extends EventEmitter {
     // If we have routing data stored, this connection has been redirected
     const server = this.routingData ? this.routingData.server : this.config.server;
     const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-    // Grab the target host from the connection configration, and from a redirect message
+    // Grab the target host from the connection configuration, and from a redirect message
     // otherwise, leave the message empty.
     const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
     const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
@@ -2301,7 +2301,7 @@ class Connection extends EventEmitter {
       // If we have routing data stored, this connection has been redirected
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-      // Grab the target host from the connection configration, and from a redirect message
+      // Grab the target host from the connection configuration, and from a redirect message
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
