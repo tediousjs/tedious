@@ -205,9 +205,13 @@ class RowTransform extends Transform {
         this.push(textPointerAndTimestampBuffer);
       }
 
-      this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-      for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-        this.push(chunk);
+      try {
+        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
+        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+          this.push(chunk);
+        }
+      } catch (error: any) {
+        return callback(error);
       }
     }
 
