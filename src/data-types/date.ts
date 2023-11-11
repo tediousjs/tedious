@@ -48,7 +48,7 @@ const Date: DataType = {
     yield buffer;
   },
 
-  // TODO: value is techincally of type 'unknown'.
+  // TODO: value is technically of type 'unknown'.
   validate: function(value): null | Date {
     if (value == null) {
       return null;
