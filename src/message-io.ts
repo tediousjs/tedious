@@ -126,7 +126,7 @@ class MessageIO extends EventEmitter {
       };
 
       const onReadable = () => {
-        // When there is handshake data on the encryped stream of the secure pair,
+        // When there is handshake data on the encrypted stream of the secure pair,
         // we wrap it into a `PRELOGIN` message and send it to the server.
         //
         // For each `PRELOGIN` message we sent we get back exactly one response message
