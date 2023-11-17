@@ -4,12 +4,12 @@
 import { type EncryptionKeyInfo } from './types';
 
 export class CEKEntry {
-  columnEncryptionKeyValues: EncryptionKeyInfo[];
-  ordinal: number;
-  databaseId: number;
-  cekId: number;
-  cekVersion: number;
-  cekMdVersion: Buffer;
+  declare columnEncryptionKeyValues: EncryptionKeyInfo[];
+  declare ordinal: number;
+  declare databaseId: number;
+  declare cekId: number;
+  declare cekVersion: number;
+  declare cekMdVersion: Buffer;
 
   constructor(ordinalVal: number) {
     this.ordinal = ordinalVal;

@@ -78,31 +78,31 @@ interface Options {
   s2.2.6.3
  */
 class Login7Payload {
-  tdsVersion: number;
-  packetSize: number;
-  clientProgVer: number;
-  clientPid: number;
-  connectionId: number;
-  clientTimeZone: number;
-  clientLcid: number;
+  declare tdsVersion: number;
+  declare packetSize: number;
+  declare clientProgVer: number;
+  declare clientPid: number;
+  declare connectionId: number;
+  declare clientTimeZone: number;
+  declare clientLcid: number;
 
-  readOnlyIntent: boolean;
-  initDbFatal: boolean;
+  declare readOnlyIntent: boolean;
+  declare initDbFatal: boolean;
 
-  userName: string | undefined;
-  password: string | undefined;
-  serverName: string | undefined;
-  appName: string | undefined;
-  hostname: string | undefined;
-  libraryName: string | undefined;
-  language: string | undefined;
-  database: string | undefined;
-  clientId: Buffer | undefined;
-  sspi: Buffer | undefined;
-  attachDbFile: string | undefined;
-  changePassword: string | undefined;
+  declare userName: string | undefined;
+  declare password: string | undefined;
+  declare serverName: string | undefined;
+  declare appName: string | undefined;
+  declare hostname: string | undefined;
+  declare libraryName: string | undefined;
+  declare language: string | undefined;
+  declare database: string | undefined;
+  declare clientId: Buffer | undefined;
+  declare sspi: Buffer | undefined;
+  declare attachDbFile: string | undefined;
+  declare changePassword: string | undefined;
 
-  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
+  declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;

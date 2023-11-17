@@ -47,7 +47,7 @@ const DEFAULT_WINDOW = 0;
 const NL = '\n';
 
 export class Packet {
-  buffer: Buffer;
+  declare buffer: Buffer;
 
   constructor(typeOrBuffer: Buffer | number) {
     if (typeOrBuffer instanceof Buffer) {

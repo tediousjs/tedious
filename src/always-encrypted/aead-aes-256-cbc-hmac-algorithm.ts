@@ -10,13 +10,13 @@ const algorithmVersion = 0x1;
 const blockSizeInBytes = 16;
 
 export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
-  private columnEncryptionkey: AeadAes256CbcHmac256EncryptionKey;
-  private isDeterministic: boolean;
-  private keySizeInBytes: number;
-  private version: Buffer;
-  private versionSize: Buffer;
-  private minimumCipherTextLengthInBytesNoAuthenticationTag: number;
-  private minimumCipherTextLengthInBytesWithAuthenticationTag: number;
+  declare private columnEncryptionkey: AeadAes256CbcHmac256EncryptionKey;
+  declare private isDeterministic: boolean;
+  declare private keySizeInBytes: number;
+  declare private version: Buffer;
+  declare private versionSize: Buffer;
+  declare private minimumCipherTextLengthInBytesNoAuthenticationTag: number;
+  declare private minimumCipherTextLengthInBytesWithAuthenticationTag: number;
 
   constructor(columnEncryptionKey: AeadAes256CbcHmac256EncryptionKey, encryptionType: SQLServerEncryptionType) {
     this.keySizeInBytes = keySize / 8;
