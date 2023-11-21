@@ -1,25 +1,25 @@
 import crypto from 'crypto';
 import os from 'os';
-import { Socket } from 'net';
+import * as tls from 'tls';
+import * as net from 'net';
+import dns from 'dns';
 
 import constants from 'constants';
-import { createSecureContext, SecureContext, SecureContextOptions } from 'tls';
+import { type SecureContextOptions } from 'tls';
 
-import { Readable } from 'readable-stream';
+import { Readable } from 'stream';
 
 import {
-  loginWithVmMSI,
-  loginWithAppServiceMSI,
-  UserTokenCredentials,
-  MSIVmTokenCredentials,
-  MSIAppServiceTokenCredentials,
-  ApplicationTokenCredentials
-} from '@azure/ms-rest-nodeauth';
+  DefaultAzureCredential,
+  ClientSecretCredential,
+  ManagedIdentityCredential,
+  UsernamePasswordCredential,
+} from '@azure/identity';
 
-import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
+import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
-import { EventEmitter } from 'events';
-import { InstanceLookup } from './instance-lookup';
+import { EventEmitter, once } from 'events';
+import { instanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
@@ -32,22 +32,24 @@ import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
-import { Connector } from './connector';
+import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
-import { Metadata } from './metadata-parser';
-import { FedAuthInfoToken, FeatureExtAckToken } from './token/token';
+import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-import depd from 'depd';
-import { MemoryCache } from 'adal-node';
 
-import AbortController from 'node-abort-controller';
+import { AbortController, AbortSignal } from 'node-abort-controller';
+import { type Parameter, TYPES } from './data-type';
+import { BulkLoadPayload } from './bulk-load-payload';
+import { Collation } from './collation';
+import Procedures from './special-stored-procedure';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const deprecate = depd('tedious');
+import AggregateError from 'es-aggregate-error';
+import { version } from '../package.json';
+import { URL } from 'url';
+import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
   /**
@@ -174,7 +176,7 @@ const DEFAULT_PACKET_SIZE = 4 * 1024;
 /**
  * @private
  */
-const DEFAULT_TEXTSIZE = '2147483647';
+const DEFAULT_TEXTSIZE = 2147483647;
 /**
  * @private
  */
@@ -201,19 +203,11 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   options: {
     /**
      * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * they need to provide `clientId` associate to their created identity.
      *
      * This is optional for retrieve token from azure web app service
      */
     clientId?: string;
-    /**
-     * A msi app service environment need to provide `msiEndpoint` for retriving the accesstoken.
-     */
-    msiEndpoint?: string;
-    /**
-     * A msi app service environment need to provide `msiSecret` for retriving the accesstoken.
-     */
-    msiSecret?: string;
   };
 }
 
@@ -221,24 +215,34 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieve a token
      */
     clientId?: string;
-    /**
-     * A user need to provide `msiEndpoint` for retriving the accesstoken.
-     */
-    msiEndpoint?: string;
   };
 }
+
+interface AzureActiveDirectoryDefaultAuthentication {
+  type: 'azure-active-directory-default';
+  options: {
+    /**
+     * If you want to connect using a specific client account
+     * they need to provide `clientId` associated to their created identity.
+     *
+     * This is optional for retrieving a token
+     */
+    clientId?: string;
+  };
+}
+
 
 interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrived else where
+     * A user need to provide `token` which they retrieved else where
      * to forming the connection.
      */
     token: string;
@@ -249,18 +253,24 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` asscoiate to their account.
+     * A user need to provide `userName` associate to their account.
      */
     userName: string;
+
     /**
-     * A user need to provide `password` asscoiate to their account.
+     * A user need to provide `password` associate to their account.
      */
     password: string;
 
     /**
+     * A client id to use.
+     */
+    clientId: string;
+
+    /**
      * Optional parameter for specific Azure tenant ID
      */
-    domain: string;
+    tenantId: string;
   };
 }
 
@@ -308,11 +318,11 @@ interface DefaultAuthentication {
     /**
      * User name to use for sql server login.
      */
-    userName?: string;
+    userName?: string | undefined;
     /**
      * Password to use for sql server login.
      */
-    password?: string;
+    password?: string | undefined;
   };
 }
 
@@ -322,7 +332,7 @@ interface ErrorWithCode extends Error {
 
 interface InternalConnectionConfig {
   server: string;
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
   options: InternalConnectionOptions;
 }
 
@@ -335,6 +345,7 @@ export interface InternalConnectionOptions {
   columnEncryptionSetting: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
+  connector: undefined | (() => Promise<net.Socket>);
   connectTimeout: number;
   connectionIsolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   cryptoCredentialsDetails: SecureContextOptions;
@@ -357,8 +368,8 @@ export interface InternalConnectionOptions {
   enableImplicitTransactions: null | boolean;
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
-  encrypt: boolean;
-  encryptionKeyStoreProviders?: KeyStoreProviderMap;
+  encrypt: string | boolean;
+  encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -375,12 +386,11 @@ export interface InternalConnectionOptions {
   serverName: undefined | string;
   serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
-  textsize: string;
-  trustedServerNameAE?: string;
+  textsize: number;
+  trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
-  validateBulkLoadParameters: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
@@ -399,14 +409,9 @@ interface State {
   events: {
     socketError?(this: Connection, err: Error): void;
     connectTimeout?(this: Connection): void;
-    socketConnect?(this: Connection): void;
     message?(this: Connection, message: Message): void;
     retry?(this: Connection): void;
     reconnect?(this: Connection): void;
-    featureExtAck?(this: Connection, token: FeatureExtAckToken): void;
-    fedAuthInfo?(this: Connection, token: FedAuthInfoToken): void;
-    loginFailed?(this: Connection): void;
-    attention?(this: Connection): void;
   };
 }
 
@@ -416,7 +421,8 @@ type Authentication = DefaultAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
   AzureActiveDirectoryAccessTokenAuthentication |
-  AzureActiveDirectoryServicePrincipalSecret;
+  AzureActiveDirectoryServicePrincipalSecret |
+  AzureActiveDirectoryDefaultAuthentication;
 
 type AuthenticationType = Authentication['type'];
 
@@ -430,7 +436,7 @@ export interface ConnectionConfiguration {
    */
   options?: ConnectionOptions;
   /**
-   * Authentication realted options for connection.
+   * Authentication related options for connection.
    */
   authentication?: AuthenticationOptions;
 }
@@ -467,6 +473,7 @@ interface AuthenticationOptions {
    * Type of the authentication method, valid types are `default`, `ntlm`,
    * `azure-active-directory-password`, `azure-active-directory-access-token`,
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
+   * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
    */
   type?: AuthenticationType;
@@ -480,11 +487,12 @@ interface AuthenticationOptions {
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   * * `azure-active-directory-default` : [[AzureActiveDirectoryDefaultAuthentication.options]]
    */
   options?: any;
 }
 
-interface ConnectionOptions {
+export interface ConnectionOptions {
   /**
    * A boolean determining whether to rollback a transaction automatically if any error is encountered
    * during the given transaction's execution. This sets the value for `SET XACT_ABORT` during the
@@ -529,6 +537,13 @@ interface ConnectionOptions {
    * (default:`500`)
    */
   connectionRetryInterval?: number;
+
+  /**
+   * Custom connector factory method.
+   *
+   * (default: `undefined`)
+   */
+  connector?: () => Promise<net.Socket>;
 
   /**
    * The number of milliseconds before the attempt to connect is considered failed
@@ -655,11 +670,12 @@ interface ConnectionOptions {
   enableQuotedIdentifier?: boolean;
 
   /**
-   * A boolean determining whether or not the connection will be encrypted. Set to `true` if you're on Windows Azure.
+   * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
+   * a boolean determining whether or not the connection will be encrypted.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
-  encrypt?: boolean;
+  encrypt?: string | boolean;
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -708,6 +724,13 @@ interface ConnectionOptions {
   localAddress?: string | undefined;
 
   /**
+   * A boolean determining whether to parse unique identifier type with lowercase case characters.
+   *
+   * (default: `false`).
+   */
+  lowerCaseGuids?: boolean;
+
+  /**
    * The maximum number of connection retries for transient errors.、
    *
    * (default: `3`).
@@ -745,7 +768,9 @@ interface ConnectionOptions {
   readOnlyIntent?: boolean;
 
   /**
-   * The number of milliseconds before a request is considered failed, or `0` for no timeout
+   * The number of milliseconds before a request is considered failed, or `0` for no timeout.
+   *
+   * As soon as a response is received, the timeout is cleared. This means that queries that immediately return a response have ability to run longer than this timeout.
    *
    * (default: `15000`).
    */
@@ -807,6 +832,10 @@ interface ConnectionOptions {
   trustServerCertificate?: boolean;
 
   /**
+   *
+   */
+  serverName?: string;
+  /**
    * A boolean determining whether to return rows as arrays or key-value collections.
    *
    * (default: `false`).
@@ -821,13 +850,6 @@ interface ConnectionOptions {
   useUTC?: boolean;
 
   /**
-   * A boolean determining whether BulkLoad parameters should be validated.
-   *
-   * (default: `false`).
-   */
-  validateBulkLoadParameters?: boolean;
-
-  /**
    * The workstation ID (WSID) of the client, default os.hostname().
    * Used for identifying a specific client in profiling, logging or
    * tracing client activity in SQLServer.
@@ -835,13 +857,6 @@ interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
-
-  /**
-   * A boolean determining whether to parse unique identifier type with lowercase case characters.
-   *
-   * (default: `false`).
-   */
-  lowerCaseGuids?: boolean;
 }
 
 /**
@@ -882,67 +897,59 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  fedAuthRequired: boolean;
+  declare fedAuthRequired: boolean;
   /**
    * @private
    */
-  fedAuthInfoToken: undefined | FedAuthInfoToken;
+  declare config: InternalConnectionConfig;
   /**
    * @private
    */
-  config: InternalConnectionConfig;
+  declare secureContextOptions: SecureContextOptions;
   /**
    * @private
    */
-  secureContext: SecureContext;
+  declare inTransaction: boolean;
   /**
    * @private
    */
-  inTransaction: boolean;
+  declare transactionDescriptors: Buffer[];
   /**
    * @private
    */
-  transactionDescriptors: Buffer[];
+  declare transactionDepth: number;
   /**
    * @private
    */
-  transactionDepth: number;
+  declare isSqlBatch: boolean;
   /**
    * @private
    */
-  isSqlBatch: boolean;
+  declare curTransientRetryCount: number;
   /**
    * @private
    */
-  curTransientRetryCount: number;
+  declare transientErrorLookup: TransientErrorLookup;
   /**
    * @private
    */
-  transientErrorLookup: TransientErrorLookup;
+  declare closed: boolean;
   /**
    * @private
    */
-  closed: boolean;
+  declare loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
-  loggedIn: boolean;
+  declare debug: Debug;
   /**
    * @private
    */
-  loginError: undefined | ConnectionError;
+  declare ntlmpacket: undefined | any;
   /**
    * @private
    */
-  debug: Debug;
-  /**
-   * @private
-   */
-  ntlmpacket: undefined | any;
-  /**
-   * @private
-   */
-  ntlmpacketBuffer: undefined | Buffer;
+  declare ntlmpacketBuffer: undefined | Buffer;
 
   /**
    * @private
@@ -962,68 +969,69 @@ class Connection extends EventEmitter {
     SENT_CLIENT_REQUEST: State;
     SENT_ATTENTION: State;
     FINAL: State;
-  }
+  };
 
   /**
    * @private
    */
-  routingData: undefined | RoutingData;
+  declare routingData: undefined | RoutingData;
 
   /**
    * @private
    */
-  messageIo!: MessageIO;
+  declare messageIo: MessageIO;
   /**
    * @private
    */
-  state: State;
+  declare state: State;
   /**
    * @private
    */
-  resetConnectionOnNextRequest: undefined | boolean;
-  /**
-   * @private
-   */
-  attentionReceived: undefined | boolean;
+  declare resetConnectionOnNextRequest: undefined | boolean;
 
   /**
    * @private
    */
-  request: undefined | Request | BulkLoad;
+  declare request: undefined | Request | BulkLoad;
   /**
    * @private
    */
-  procReturnStatusValue: undefined | any;
+  declare procReturnStatusValue: undefined | any;
   /**
    * @private
    */
-  socket: undefined | Socket;
+  declare socket: undefined | net.Socket;
   /**
    * @private
    */
-  messageBuffer: Buffer;
+  declare messageBuffer: Buffer;
 
   /**
    * @private
    */
-  connectTimer: undefined | NodeJS.Timeout;
+  declare connectTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  cancelTimer: undefined | NodeJS.Timeout;
+  declare cancelTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  requestTimer: undefined | NodeJS.Timeout;
+  declare requestTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  retryTimer: undefined | NodeJS.Timeout;
+  declare retryTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
    */
   _cancelAfterRequestSent: () => void;
+
+  /**
+   * @private
+   */
+  declare databaseCollation: Collation | undefined;
 
   /**
    * Note: be aware of the different options field:
@@ -1058,7 +1066,6 @@ class Connection extends EventEmitter {
     }
 
     this.fedAuthRequired = false;
-    this.fedAuthInfoToken = undefined;
 
     let authentication: InternalConnectionConfig['authentication'];
     if (config.authentication !== undefined) {
@@ -1073,8 +1080,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1103,6 +1110,10 @@ class Connection extends EventEmitter {
           }
         };
       } else if (type === 'azure-active-directory-password') {
+        if (typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+
         if (options.userName !== undefined && typeof options.userName !== 'string') {
           throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
@@ -1111,12 +1122,17 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.password" property must be of type string.');
         }
 
+        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
+          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
+        }
+
         authentication = {
           type: 'azure-active-directory-password',
           options: {
             userName: options.userName,
             password: options.password,
-            domain: options.domain,
+            tenantId: options.tenantId,
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -1135,15 +1151,20 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
 
-        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
-        }
-
         authentication = {
           type: 'azure-active-directory-msi-vm',
           options: {
-            clientId: options.clientId,
-            msiEndpoint: options.msiEndpoint
+            clientId: options.clientId
+          }
+        };
+      } else if (type === 'azure-active-directory-default') {
+        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
+          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
+        }
+        authentication = {
+          type: 'azure-active-directory-default',
+          options: {
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-msi-app-service') {
@@ -1151,20 +1172,10 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
         }
 
-        if (options.msiEndpoint !== undefined && typeof options.msiEndpoint !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiEndpoint" property must be of type string.');
-        }
-
-        if (options.msiSecret !== undefined && typeof options.msiSecret !== 'string') {
-          throw new TypeError('The "config.authentication.options.msiSecret" property must be of type string.');
-        }
-
         authentication = {
           type: 'azure-active-directory-msi-app-service',
           options: {
-            clientId: options.clientId,
-            msiEndpoint: options.msiEndpoint,
-            msiSecret: options.msiSecret
+            clientId: options.clientId
           }
         };
       } else if (type === 'azure-active-directory-service-principal-secret') {
@@ -1223,11 +1234,12 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
-        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: milliseconds
         columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
+        connector: undefined,
         connectionIsolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         cryptoCredentialsDetails: {},
         database: undefined,
@@ -1269,10 +1281,9 @@ class Connection extends EventEmitter {
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustedServerNameAE: undefined,
-        trustServerCertificate: true,
+        trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
-        validateBulkLoadParameters: true,
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1323,14 +1334,6 @@ class Connection extends EventEmitter {
         this.config.options.columnNameReplacer = config.options.columnNameReplacer;
       }
 
-      if (config.options.connectTimeout !== undefined) {
-        if (typeof config.options.connectTimeout !== 'number') {
-          throw new TypeError('The "config.options.connectTimeout" property must be of type number.');
-        }
-
-        this.config.options.connectTimeout = config.options.connectTimeout;
-      }
-
       if (config.options.connectionIsolationLevel !== undefined) {
         assertValidIsolationLevel(config.options.connectionIsolationLevel, 'config.options.connectionIsolationLevel');
 
@@ -1343,6 +1346,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.connectTimeout = config.options.connectTimeout;
+      }
+
+      if (config.options.connector !== undefined) {
+        if (typeof config.options.connector !== 'function') {
+          throw new TypeError('The "config.options.connector" property must be a function.');
+        }
+
+        this.config.options.connector = config.options.connector;
       }
 
       if (config.options.cryptoCredentialsDetails !== undefined) {
@@ -1494,10 +1505,11 @@ class Connection extends EventEmitter {
 
         this.config.options.enableQuotedIdentifier = config.options.enableQuotedIdentifier;
       }
-
       if (config.options.encrypt !== undefined) {
         if (typeof config.options.encrypt !== 'boolean') {
-          throw new TypeError('The "config.options.encrypt" property must be of type boolean.');
+          if (config.options.encrypt !== 'strict') {
+            throw new TypeError('The "encrypt" property must be set to "strict", or of type boolean.');
+          }
         }
 
         this.config.options.encrypt = config.options.encrypt;
@@ -1640,7 +1652,13 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.textsize" property must be of type number or null.');
         }
 
-        this.config.options.textsize = config.options.textsize;
+        if (config.options.textsize > 2147483647) {
+          throw new TypeError('The "config.options.textsize" can\'t be greater than 2147483647.');
+        } else if (config.options.textsize < -1) {
+          throw new TypeError('The "config.options.textsize" can\'t be smaller than -1.');
+        }
+
+        this.config.options.textsize = config.options.textsize | 0;
       }
 
       if (config.options.trustServerCertificate !== undefined) {
@@ -1649,6 +1667,13 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.trustServerCertificate = config.options.trustServerCertificate;
+      }
+
+      if (config.options.serverName !== undefined) {
+        if (typeof config.options.serverName !== 'string') {
+          throw new TypeError('The "config.options.serverName" property must be of type string.');
+        }
+        this.config.options.serverName = config.options.serverName;
       }
 
       if (config.options.useColumnNames !== undefined) {
@@ -1665,14 +1690,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.useUTC = config.options.useUTC;
-      }
-
-      if (config.options.validateBulkLoadParameters !== undefined) {
-        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
-          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
-        }
-
-        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
       }
 
       if (config.options.workstationId !== undefined) {
@@ -1692,21 +1709,19 @@ class Connection extends EventEmitter {
       }
     }
 
-    let credentialsDetails = this.config.options.cryptoCredentialsDetails;
-    if (credentialsDetails.secureOptions === undefined) {
+    this.secureContextOptions = this.config.options.cryptoCredentialsDetails;
+    if (this.secureContextOptions.secureOptions === undefined) {
       // If the caller has not specified their own `secureOptions`,
       // we set `SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS` here.
       // Older SQL Server instances running on older Windows versions have
       // trouble with the BEAST workaround in OpenSSL.
       // As BEAST is a browser specific exploit, we can just disable this option here.
-      credentialsDetails = Object.create(credentialsDetails, {
+      this.secureContextOptions = Object.create(this.secureContextOptions, {
         secureOptions: {
           value: constants.SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
         }
       });
     }
-
-    this.secureContext = createSecureContext(credentialsDetails);
 
     this.debug = this.createDebug();
     this.inTransaction = false;
@@ -1720,7 +1735,6 @@ class Connection extends EventEmitter {
     this.transactionDepth = 0;
     this.isSqlBatch = false;
     this.closed = false;
-    this.loggedIn = false;
     this.messageBuffer = Buffer.alloc(0);
 
     this.curTransientRetryCount = 0;
@@ -1730,8 +1744,6 @@ class Connection extends EventEmitter {
 
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
-
-      this.transitionTo(this.STATE.SENT_ATTENTION);
       this.createCancelTimer();
     };
   }
@@ -1816,6 +1828,11 @@ class Connection extends EventEmitter {
   on(event: 'languageChange', listener: (languageName: string) => void): this
 
   /**
+   * The connection was reset.
+   */
+  on(event: 'resetConnection', listener: () => void): this
+
+  /**
    * A secure connection has been established.
    */
   on(event: 'secure', listener: (cleartext: import('tls').TLSSocket) => void): this
@@ -1880,10 +1897,7 @@ class Connection extends EventEmitter {
    * @private
    */
   emit(event: 'rollbackTransaction'): boolean
-  /**
-   * @private
-   */
-  emit(event: 'sspichallenge', token: import('./token/token').SSPIToken): boolean
+
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
   }
@@ -1904,23 +1918,28 @@ class Connection extends EventEmitter {
     const signal = this.createConnectTimer();
 
     if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal);
+      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
     } else {
-      return new InstanceLookup().instanceLookup({
+      return instanceLookup({
         server: this.config.server,
         instanceName: this.config.options.instanceName!,
         timeout: this.config.options.connectTimeout,
         signal: signal
-      }, (err, port) => {
-        if (err) {
-          if (err.name === 'AbortError') {
-            return;
-          }
+      }).then((port) => {
+        process.nextTick(() => {
+          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+        });
+      }, (err) => {
+        this.clearConnectTimer();
 
-          this.emit('connect', ConnectionError(err.message, 'EINSTLOOKUP'));
-        } else {
-          this.connectOnPort(port!, this.config.options.multiSubnetFailover, signal);
+        if (signal.aborted) {
+          // Ignore the AbortError for now, this is still handled by the connectTimer firing
+          return;
         }
+
+        process.nextTick(() => {
+          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
+        });
       });
     }
   }
@@ -1944,13 +1963,12 @@ class Connection extends EventEmitter {
 
       const request = this.request;
       if (request) {
-        const err = RequestError('Connection closed before request completed.', 'ECLOSE');
+        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
         request.callback(err);
         this.request = undefined;
       }
 
       this.closed = true;
-      this.loggedIn = false;
       this.loginError = undefined;
     }
   }
@@ -1969,295 +1987,115 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message) {
-    const tokenStreamParser = new TokenStreamParser(message, this.debug, this.config.options);
-
-    tokenStreamParser.on('infoMessage', (token) => {
-      this.emit('infoMessage', token);
-    });
-
-    tokenStreamParser.on('sspichallenge', (token) => {
-      if (token.ntlmpacket) {
-        this.ntlmpacket = token.ntlmpacket;
-        this.ntlmpacketBuffer = token.ntlmpacketBuffer;
-      }
-
-      this.emit('sspichallenge', token);
-    });
-
-    tokenStreamParser.on('errorMessage', (token) => {
-      this.emit('errorMessage', token);
-      if (this.loggedIn) {
-        const request = this.request;
-        if (request) {
-          if (!request.canceled) {
-            const error = new RequestError(token.message, 'EREQUEST');
-            error.number = token.number;
-            error.state = token.state;
-            error.class = token.class;
-            error.serverName = token.serverName;
-            error.procName = token.procName;
-            error.lineNumber = token.lineNumber;
-            request.error = error;
-          }
-        }
-      } else {
-        const error = ConnectionError(token.message, 'ELOGIN');
-
-        const isLoginErrorTransient = this.transientErrorLookup.isTransientError(token.number);
-        if (isLoginErrorTransient && this.curTransientRetryCount !== this.config.options.maxRetriesOnTransientErrors) {
-          error.isTransient = true;
-        }
-
-        this.loginError = error;
-      }
-    });
-
-    tokenStreamParser.on('databaseChange', (token) => {
-      this.emit('databaseChange', token.newValue);
-    });
-
-    tokenStreamParser.on('languageChange', (token) => {
-      this.emit('languageChange', token.newValue);
-    });
-
-    tokenStreamParser.on('charsetChange', (token) => {
-      this.emit('charsetChange', token.newValue);
-    });
-
-    tokenStreamParser.on('fedAuthInfo', (token) => {
-      this.dispatchEvent('fedAuthInfo', token);
-    });
-
-    tokenStreamParser.on('featureExtAck', (token) => {
-      this.dispatchEvent('featureExtAck', token);
-    });
-
-    tokenStreamParser.on('loginack', (token) => {
-      if (!token.tdsVersion) {
-        // unsupported TDS version
-        this.loginError = ConnectionError('Server responded with unknown TDS version.', 'ETDS');
-        this.loggedIn = false;
-        return;
-      }
-
-      if (!token.interface) {
-        // unsupported interface
-        this.loginError = ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
-        this.loggedIn = false;
-        return;
-      }
-
-      // use negotiated version
-      this.config.options.tdsVersion = token.tdsVersion;
-      this.loggedIn = true;
-    });
-
-    tokenStreamParser.on('routingChange', (token) => {
-      // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
-      const [ server ] = token.newValue.server.split('\\');
-
-      this.routingData = {
-        server, port: token.newValue.port
-      };
-    });
-
-    tokenStreamParser.on('packetSizeChange', (token) => {
-      this.messageIo.packetSize(token.newValue);
-    });
-
-    // A new top-level transaction was started. This is not fired
-    // for nested transactions.
-    tokenStreamParser.on('beginTransaction', (token) => {
-      this.transactionDescriptors.push(token.newValue);
-      this.inTransaction = true;
-    });
-
-    // A top-level transaction was committed. This is not fired
-    // for nested transactions.
-    tokenStreamParser.on('commitTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      this.inTransaction = false;
-    });
-
-    // A top-level transaction was rolled back. This is not fired
-    // for nested transactions. This is also fired if a batch
-    // aborting error happened that caused a rollback.
-    tokenStreamParser.on('rollbackTransaction', () => {
-      this.transactionDescriptors.length = 1;
-      // An outermost transaction was rolled back. Reset the transaction counter
-      this.inTransaction = false;
-      this.emit('rollbackTransaction');
-    });
-
-    tokenStreamParser.on('columnMetadata', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          if (this.config.options.useColumnNames) {
-            const columns: { [key: string]: ColumnMetadata } = {};
-
-            for (let j = 0, len = token.columns.length; j < len; j++) {
-              const col = token.columns[j];
-              if (columns[col.colName] == null) {
-                columns[col.colName] = col;
-              }
-            }
-
-            request.emit('columnMetadata', columns);
-          } else {
-            request.emit('columnMetadata', token.columns);
-          }
-        }
-      } else {
-        this.emit('error', new Error("Received 'columnMetadata' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    tokenStreamParser.on('order', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('order', token.orderColumns);
-        }
-      } else {
-        this.emit('error', new Error("Received 'order' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    tokenStreamParser.on('row', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          if (this.config.options.rowCollectionOnRequestCompletion) {
-            request.rows!.push(token.columns);
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst!.push(token.columns);
-          }
-          if (!request.canceled) {
-            request.emit('row', token.columns);
-          }
-        }
-      } else {
-        this.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
-        this.close();
-      }
-    });
-
-    tokenStreamParser.on('returnStatus', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          // Keep value for passing in 'doneProc' event.
-          this.procReturnStatusValue = token.value;
-        }
-      }
-    });
-
-    tokenStreamParser.on('returnValue', (token) => {
-      const request = this.request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('returnValue', token.paramName, token.value, token.metadata);
-        }
-      }
-    });
-
-    tokenStreamParser.on('doneProc', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('doneProc', token.rowCount, token.more, this.procReturnStatusValue, request.rst);
-          this.procReturnStatusValue = undefined;
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
-    });
-
-    tokenStreamParser.on('doneInProc', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (!request.canceled) {
-          request.emit('doneInProc', token.rowCount, token.more, request.rst);
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
-    });
-
-    tokenStreamParser.on('done', (token) => {
-      const request = this.request as Request;
-      if (request) {
-        if (token.attention) {
-          this.dispatchEvent('attention');
-        }
-
-        if (!request.canceled) {
-          if (token.sqlError && !request.error) {
-            // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
-            request.error = RequestError('An unknown error has occurred.', 'UNKNOWN');
-          }
-          request.emit('done', token.rowCount, token.more, request.rst);
-          if (token.rowCount !== undefined) {
-            request.rowCount! += token.rowCount;
-          }
-          if (this.config.options.rowCollectionOnDone) {
-            request.rst = [];
-          }
-        }
-      }
-    });
-
-    tokenStreamParser.on('resetConnection', () => {
-      this.emit('resetConnection');
-    });
-
-    return tokenStreamParser;
+  createTokenStreamParser(message: Message, handler: TokenHandler) {
+    return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal) {
+  socketHandlingForSendPreLogin(socket: net.Socket) {
+    socket.on('error', (error) => { this.socketError(error); });
+    socket.on('close', () => { this.socketClose(); });
+    socket.on('end', () => { this.socketEnd(); });
+    socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+    this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+    this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+    this.socket = socket;
+
+    this.closed = false;
+    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+    this.sendPreLogin();
+    this.transitionTo(this.STATE.SENT_PRELOGIN);
+  }
+
+  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+    signal.throwIfAborted();
+
+    return new Promise((resolve, reject) => {
+      const secureContext = tls.createSecureContext(this.secureContextOptions);
+      // If connect to an ip address directly,
+      // need to set the servername to an empty string
+      // if the user has not given a servername explicitly
+      const serverName = !net.isIP(this.config.server) ? this.config.server : '';
+      const encryptOptions = {
+        host: this.config.server,
+        socket: socket,
+        ALPNProtocols: ['tds/8.0'],
+        secureContext: secureContext,
+        servername: this.config.options.serverName ? this.config.options.serverName : serverName,
+      };
+
+      const encryptsocket = tls.connect(encryptOptions);
+
+      const onAbort = () => {
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(signal.reason);
+      };
+
+      const onError = (err: Error) => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(err);
+      };
+
+      const onConnect = () => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        resolve(encryptsocket);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      encryptsocket.on('error', onError);
+      encryptsocket.on('secureConnect', onConnect);
+    });
+  }
+
+  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
       localAddress: this.config.options.localAddress
     };
 
-    new Connector(connectOpts, signal, multiSubnetFailover).execute((err, socket) => {
-      if (err) {
-        if (err.name === 'AbortError') {
-          return;
-        }
+    const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
-        return this.socketError(err);
+    (async () => {
+      let socket = await connect(connectOpts, dns.lookup, signal);
+
+      if (this.config.options.encrypt === 'strict') {
+        try {
+          // Wrap the socket with TLS for TDS 8.0
+          socket = await this.wrapWithTls(socket, signal);
+        } catch (err) {
+          socket.end();
+
+          throw err;
+        }
       }
 
-      socket = socket!;
-      socket.on('error', (error) => { this.socketError(error); });
-      socket.on('close', () => { this.socketClose(); });
-      socket.on('end', () => { this.socketEnd(); });
-      socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+      this.socketHandlingForSendPreLogin(socket);
+    })().catch((err) => {
+      this.clearConnectTimer();
 
-      this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-      this.messageIo.on('data', (message) => { this.dispatchEvent('message', message); });
-      this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-      this.messageIo.on('error', (error) => {
-        this.socketError(error);
-      });
+      if (signal.aborted) {
+        return;
+      }
 
-      this.socket = socket;
-      this.socketConnect();
+      process.nextTick(() => { this.socketError(err); });
     });
   }
 
@@ -2323,9 +2161,16 @@ class Connection extends EventEmitter {
    * @private
    */
   connectTimeout() {
-    const message = `Failed to connect to ${this.config.server}${this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`} in ${this.config.options.connectTimeout}ms`;
+    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+    // If we have routing data stored, this connection has been redirected
+    const server = this.routingData ? this.routingData.server : this.config.server;
+    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+    // Grab the target host from the connection configuration, and from a redirect message
+    // otherwise, leave the message empty.
+    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
     this.debug.log(message);
-    this.emit('connect', ConnectionError(message, 'ETIMEOUT'));
+    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -2336,7 +2181,7 @@ class Connection extends EventEmitter {
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
-    this.dispatchEvent('socketError', ConnectionError(message, 'ETIMEOUT'));
+    this.dispatchEvent('socketError', new ConnectionError(message, 'ETIMEOUT'));
   }
 
   /**
@@ -2348,7 +2193,7 @@ class Connection extends EventEmitter {
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = RequestError(message, 'ETIMEOUT');
+    request.error = new RequestError(message, 'ETIMEOUT');
   }
 
   /**
@@ -2366,6 +2211,7 @@ class Connection extends EventEmitter {
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
+      this.connectTimer = undefined;
     }
   }
 
@@ -2375,6 +2221,7 @@ class Connection extends EventEmitter {
   clearCancelTimer() {
     if (this.cancelTimer) {
       clearTimeout(this.cancelTimer);
+      this.cancelTimer = undefined;
     }
   }
 
@@ -2450,24 +2297,22 @@ class Connection extends EventEmitter {
    */
   socketError(error: Error) {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
-      const message = `Failed to connect to ${this.config.server}:${this.config.options.port} - ${error.message}`;
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configuration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+      const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET'));
     }
     this.dispatchEvent('socketError', error);
-  }
-
-  /**
-   * @private
-   */
-  socketConnect() {
-    this.closed = false;
-    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-    this.dispatchEvent('socketConnect');
   }
 
   /**
@@ -2506,27 +2351,19 @@ class Connection extends EventEmitter {
    * @private
    */
   sendPreLogin() {
+    const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
-      encrypt: this.config.options.encrypt
+      // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
+      // this function. Therefore, the encrypt will be set to false here.
+      // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
+      encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
+
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
       return payload.toString('  ');
     });
-  }
-
-  /**
-   * @private
-   */
-  emptyMessageBuffer() {
-    this.messageBuffer = Buffer.alloc(0);
-  }
-
-  /**
-   * @private
-   */
-  addToMessageBuffer(data: Buffer) {
-    this.messageBuffer = Buffer.concat([this.messageBuffer, data]);
   }
 
   /**
@@ -2562,6 +2399,7 @@ class Connection extends EventEmitter {
         break;
 
       case 'azure-active-directory-msi-vm':
+      case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
       case 'azure-active-directory-service-principal-secret':
         payload.fedAuth = {
@@ -2758,8 +2596,8 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.transformIntoExecuteSqlRpc();
-    } catch (error) {
+      request.validateParameters(this.databaseCollation);
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -2770,7 +2608,33 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'statement',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    if (request.parameters.length) {
+      parameters.push({
+        type: TYPES.NVarChar,
+        name: 'params',
+        value: request.makeParamsParameter(request.parameters),
+        output: false,
+        length: undefined,
+        precision: undefined,
+        scale: undefined
+      });
+
+      parameters.push(...request.parameters);
+    }
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2794,24 +2658,85 @@ class Connection extends EventEmitter {
     if (typeof options !== 'object') {
       throw new TypeError('"options" argument must be an object');
     }
-    return new BulkLoad(table, this.config.options, options, callback);
+    return new BulkLoad(table, this.databaseCollation, this.config.options, options, callback);
   }
 
   /**
-   * Execute the SQL batch represented by [[Request]] .
-   * There is no param support, and unlike [[execSql]],
-   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   * Execute a [[BulkLoad]].
    *
-   * In almost all cases, [[execSql]] will be a better choice.
+   * ```js
+   * // We want to perform a bulk load into a table with the following format:
+   * // CREATE TABLE employees (first_name nvarchar(255), last_name nvarchar(255), day_of_birth date);
    *
-   * @param bulkLoad A previously prepared [[Request]] .
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // ...
+   * });
+   *
+   * // First, we need to specify the columns that we want to write to,
+   * // and their definitions. These definitions must match the actual table,
+   * // otherwise the bulk load will fail.
+   * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
+   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   *
+   * // Execute a bulk load with a predefined list of rows.
+   * //
+   * // Note that these rows are held in memory until the
+   * // bulk load was performed, so if you need to write a large
+   * // number of rows (e.g. by reading from a CSV file),
+   * // passing an `AsyncIterable` is advisable to keep memory usage low.
+   * connection.execBulkLoad(bulkLoad, [
+   *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') },
+   *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') }
+   * ]);
+   * ```
+   *
+   * @param bulkLoad A previously created [[BulkLoad]].
+   * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
    */
-  execBulkLoad(bulkLoad: BulkLoad) {
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
+
+    if (rows) {
+      if (bulkLoad.streamingMode) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
+      }
+
+      if (bulkLoad.firstRowWritten) {
+        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
+      }
+
+      const rowStream = Readable.from(rows);
+
+      // Destroy the packet transform if an error happens in the row stream,
+      // e.g. if an error is thrown from within a generator or stream.
+      rowStream.on('error', (err) => {
+        bulkLoad.rowToPacketTransform.destroy(err);
+      });
+
+      // Destroy the row stream if an error happens in the packet transform,
+      // e.g. if the bulk load is cancelled.
+      bulkLoad.rowToPacketTransform.on('error', (err) => {
+        rowStream.destroy(err);
+      });
+
+      rowStream.pipe(bulkLoad.rowToPacketTransform);
+    } else if (!bulkLoad.streamingMode) {
+      // If the bulkload was not put into streaming mode by the user,
+      // we end the rowToPacketTransform here for them.
+      //
+      // If it was put into streaming mode, it's the user's responsibility
+      // to end the stream.
+      bulkLoad.rowToPacketTransform.end();
+    }
 
     const onCancel = () => {
       request.cancel();
     };
+
+    const payload = new BulkLoadPayload(bulkLoad);
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);
@@ -2825,7 +2750,7 @@ class Connection extends EventEmitter {
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
     });
 
     bulkLoad.once('cancel', onCancel);
@@ -2843,8 +2768,50 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
-    request.transformIntoPrepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      value: undefined,
+      output: true,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'params',
+      value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    parameters.push({
+      type: TYPES.NVarChar,
+      name: 'stmt',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    request.preparing = true;
+
+    // TODO: We need to clean up this event handler, otherwise this leaks memory
+    request.on('returnValue', (name: string, value: any) => {
+      if (name === 'handle') {
+        request.handle = value;
+      } else {
+        request.error = new RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
+      }
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2855,8 +2822,20 @@ class Connection extends EventEmitter {
    *   Parameter values are ignored.
    */
   unprepare(request: Request) {
-    request.transformIntoUnprepareRpc();
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    const parameters: Parameter[] = [];
+
+    parameters.push({
+      type: TYPES.Int,
+      name: 'handle',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2868,10 +2847,30 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }) {
+    const executeParameters: Parameter[] = [];
+
+    executeParameters.push({
+      type: TYPES.Int,
+      name: '',
+      // TODO: Abort if `request.handle` is not set
+      value: request.handle,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    });
+
     try {
-      request.transformIntoExecuteRpc(parameters);
-    } catch (error) {
+      for (let i = 0, len = request.parameters.length; i < len; i++) {
+        const parameter = request.parameters[i];
+
+        executeParameters.push({
+          ...parameter,
+          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
+        });
+      }
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -2882,7 +2881,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -2892,8 +2891,8 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters();
-    } catch (error) {
+      request.validateParameters(this.databaseCollation);
+    } catch (error: any) {
       request.error = error;
 
       process.nextTick(() => {
@@ -2904,7 +2903,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
   /**
@@ -3098,16 +3097,14 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: BulkLoad, packetType: number): void
-  makeRequest(request: Request, packetType: number, payload: Iterable<Buffer> & { toString: (indent?: string) => string }): void
-  makeRequest(request: Request | BulkLoad, packetType: number, payload?: Iterable<Buffer> & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
       process.nextTick(() => {
-        request.callback(RequestError('Canceled.', 'ECANCEL'));
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
@@ -3122,9 +3119,10 @@ class Connection extends EventEmitter {
       request.rows! = [];
       request.rst! = [];
 
-      let message: Message;
-
       const onCancel = () => {
+        payloadStream.unpipe(message);
+        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+
         // set the ignore bit and end the message.
         message.ignore = true;
         message.end();
@@ -3139,38 +3137,31 @@ class Connection extends EventEmitter {
 
       this.createRequestTimer();
 
-      if (request instanceof BulkLoad) {
-        message = request.getMessageStream();
-
-        // If the bulkload was not put into streaming mode by the user,
-        // we end the rowToPacketTransform here for them.
-        //
-        // If it was put into streaming mode, it's the user's responsibility
-        // to end the stream.
-        if (!request.streamingMode) {
-          request.rowToPacketTransform.end();
-        }
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-      } else {
-        message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-        this.messageIo.outgoingMessageStream.write(message);
-        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-        message.once('finish', () => {
-          this.resetConnectionOnNextRequest = false;
-          this.debug.payload(function() {
-            return payload!.toString('  ');
-          });
-        });
-
-        Readable.from(payload!).pipe(message);
-      }
+      const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+      this.messageIo.outgoingMessageStream.write(message);
+      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
         request.once('cancel', this._cancelAfterRequestSent);
+
+        this.resetConnectionOnNextRequest = false;
+        this.debug.payload(function() {
+          return payload!.toString('  ');
+        });
       });
+
+      const payloadStream = Readable.from(payload);
+      payloadStream.once('error', (error) => {
+        payloadStream.unpipe(message);
+
+        // Only set a request error if no error was set yet.
+        request.error ??= error;
+
+        message.ignore = true;
+        message.end();
+      });
+      payloadStream.pipe(message);
     }
   }
 
@@ -3233,10 +3224,15 @@ class Connection extends EventEmitter {
   }
 }
 
+function isTransientError(error: AggregateError | ConnectionError): boolean {
+  if (error instanceof AggregateError) {
+    error = error.errors[0];
+  }
+  return (error instanceof ConnectionError) && !!error.isTransient;
+}
+
 export default Connection;
 module.exports = Connection;
-
-const authenticationCache = new MemoryCache();
 
 Connection.prototype.STATE = {
   INITIALIZED: {
@@ -3254,17 +3250,72 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      socketConnect: function() {
-        this.sendPreLogin();
-        this.transitionTo(this.STATE.SENT_PRELOGIN);
       }
     }
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
     enter: function() {
-      this.emptyMessageBuffer();
+      (async () => {
+        let messageBuffer = Buffer.alloc(0);
+
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        for await (const data of message) {
+          messageBuffer = Buffer.concat([messageBuffer, data]);
+        }
+
+        const preloginPayload = new PreloginPayload(messageBuffer);
+        this.debug.payload(function() {
+          return preloginPayload.toString('  ');
+        });
+
+        if (preloginPayload.fedAuthRequired === 1) {
+          this.fedAuthRequired = true;
+        }
+        if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+          if (!this.config.options.encrypt) {
+            this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
+            return this.close();
+          }
+
+          try {
+            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+            await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+          } catch (err: any) {
+            return this.socketError(err);
+          }
+        }
+
+        this.sendLogin7Packet();
+
+        const { authentication } = this.config;
+
+        switch (authentication.type) {
+          case 'azure-active-directory-password':
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+          case 'azure-active-directory-service-principal-secret':
+          case 'azure-active-directory-default':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            break;
+          case 'ntlm':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            break;
+          default:
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            break;
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function() {
@@ -3272,41 +3323,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.addToMessageBuffer(data);
-        });
-
-        message.once('end', () => {
-          const preloginPayload = new PreloginPayload(this.messageBuffer);
-          this.debug.payload(function() {
-            return preloginPayload.toString('  ');
-          });
-
-          if (preloginPayload.fedAuthRequired === 1) {
-            this.fedAuthRequired = true;
-          }
-
-          if (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ') {
-            if (!this.config.options.encrypt) {
-              this.emit('connect', ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-              return this.close();
-            }
-
-            this.messageIo.startTls(this.secureContext, this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-            this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-          } else {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-            if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          }
-        });
       }
     }
   },
@@ -3357,97 +3373,84 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        message.on('data', (data) => {
-          this.messageIo.tlsHandshakeData(data);
-        });
-
-        message.once('end', () => {
-          if (this.messageIo.tlsNegotiationComplete) {
-            this.sendLogin7Packet();
-
-            const { authentication } = this.config;
-
-            if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            } else if (authentication.type === 'ntlm') {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            } else {
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            }
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
+    enter: function() {
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+
+        if (handler.loginAckReceived) {
+          if (handler.routingData) {
+            this.routingData = handler.routingData;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
+        } else if (this.loginError) {
+          if (isTransientError(this.loginError)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          } else {
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+          }
+        } else {
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
+    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      featureExtAck: function(token) {
-        const { authentication } = this.config;
-        if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret') {
-          if (token.fedAuth === undefined) {
-            this.loginError = ConnectionError('Did not receive Active Directory authentication acknowledgement');
-            this.loggedIn = false;
-          } else if (token.fedAuth.length !== 0) {
-            this.loginError = ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
-            this.loggedIn = false;
-          }
-        } else if (token.fedAuth === undefined) {
-          this.loginError = ConnectionError('Received acknowledgement for unknown feature');
-          this.loggedIn = false;
-        } else {
-          this.loginError = ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
-          this.loggedIn = false;
-        }
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
-
-        tokenStreamParser.once('end', () => {
-          if (this.loggedIn) {
-            if (this.routingData) {
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
-          } else if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
-          } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
-          }
-        });
       }
     }
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
+    enter: function() {
+      (async () => {
+        while (true) {
+          let message;
+          try {
+            message = await this.messageIo.readMessage();
+          } catch (err: any) {
+            return this.socketError(err);
+          }
 
-        tokenStreamParser.once('end', () => {
-          if (this.ntlmpacket) {
+          const handler = new Login7TokenHandler(this);
+          const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+          await once(tokenStreamParser, 'end');
+
+          if (handler.loginAckReceived) {
+            if (handler.routingData) {
+              this.routingData = handler.routingData;
+              return this.transitionTo(this.STATE.REROUTING);
+            } else {
+              return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+            }
+          } else if (this.ntlmpacket) {
             const authentication = this.config.authentication as NtlmAuthentication;
 
             const payload = new NTLMResponsePayload({
@@ -3463,139 +3466,160 @@ Connection.prototype.STATE = {
             });
 
             this.ntlmpacket = undefined;
-          } else if (this.loggedIn) {
-            if (this.routingData) {
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
           } else if (this.loginError) {
-            if (this.loginError.isTransient) {
+            if (isTransientError(this.loginError)) {
               this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
             } else {
               this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
+              return this.transitionTo(this.STATE.FINAL);
             }
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
-            this.transitionTo(this.STATE.FINAL);
+            this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+            return this.transitionTo(this.STATE.FINAL);
           }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
         });
-      }
-    }
-  },
-  SENT_LOGIN7_WITH_FEDAUTH: {
-    name: 'SentLogin7Withfedauth',
+      });
+    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      fedAuthInfo: function(token) {
-        this.fedAuthInfoToken = token;
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
+      }
+    }
+  },
+  SENT_LOGIN7_WITH_FEDAUTH: {
+    name: 'SentLogin7Withfedauth',
+    enter: function() {
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
 
-        tokenStreamParser.once('end', () => {
-          if (this.loggedIn) {
-            if (this.routingData) {
-              this.transitionTo(this.STATE.REROUTING);
-            } else {
-              this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-            }
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        await once(tokenStreamParser, 'end');
+        if (handler.loginAckReceived) {
+          if (handler.routingData) {
+            this.routingData = handler.routingData;
+            this.transitionTo(this.STATE.REROUTING);
+          } else {
+            this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          }
 
+          return;
+        }
+
+        const fedAuthInfoToken = handler.fedAuthInfoToken;
+
+        if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+
+          let credentials;
+
+          switch (authentication.type) {
+            case 'azure-active-directory-password':
+              credentials = new UsernamePasswordCredential(
+                authentication.options.tenantId ?? 'common',
+                authentication.options.clientId,
+                authentication.options.userName,
+                authentication.options.password
+              );
+              break;
+            case 'azure-active-directory-msi-vm':
+            case 'azure-active-directory-msi-app-service':
+              const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+              credentials = new ManagedIdentityCredential(...msiArgs);
+              break;
+            case 'azure-active-directory-default':
+              const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+              credentials = new DefaultAzureCredential(args);
+              break;
+            case 'azure-active-directory-service-principal-secret':
+              credentials = new ClientSecretCredential(
+                authentication.options.tenantId,
+                authentication.options.clientId,
+                authentication.options.clientSecret
+              );
+              break;
+          }
+
+          let tokenResponse;
+          try {
+            tokenResponse = await credentials.getToken(tokenScope);
+          } catch (err) {
+            this.loginError = new AggregateError(
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
             return;
           }
 
-          const fedAuthInfoToken = this.fedAuthInfoToken;
 
-          if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-            const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret;
+          const token = tokenResponse.token;
+          this.sendFedAuthTokenMessage(token);
 
-            const getToken = (callback: (error: Error | null, token?: string) => void) => {
-              const getTokenFromCredentials = (err: Error | undefined, credentials?: UserTokenCredentials | MSIAppServiceTokenCredentials | MSIVmTokenCredentials | ApplicationTokenCredentials) => {
-                if (err) {
-                  return callback(err);
-                }
-
-                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
-                  callback(null, tokenResponse.accessToken);
-                }, callback);
-              };
-
-              if (authentication.type === 'azure-active-directory-password') {
-                const credentials = new UserTokenCredentials(
-                  '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                  authentication.options.domain ?? 'common',
-                  authentication.options.userName,
-                  authentication.options.password,
-                  fedAuthInfoToken.spn,
-                  undefined, // environment
-                  authenticationCache
-                );
-
-                getTokenFromCredentials(undefined, credentials);
-              } else if (authentication.type === 'azure-active-directory-msi-vm') {
-                loginWithVmMSI({
-                  clientId: authentication.options.clientId,
-                  msiEndpoint: authentication.options.msiEndpoint,
-                  resource: fedAuthInfoToken.spn
-                }, getTokenFromCredentials);
-              } else if (authentication.type === 'azure-active-directory-msi-app-service') {
-                loginWithAppServiceMSI({
-                  msiEndpoint: authentication.options.msiEndpoint,
-                  msiSecret: authentication.options.msiSecret,
-                  resource: fedAuthInfoToken.spn,
-                  clientId: authentication.options.clientId
-                }, getTokenFromCredentials);
-              } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
-                const credentials = new ApplicationTokenCredentials(
-                  authentication.options.clientId,
-                  authentication.options.tenantId, // domain
-                  authentication.options.clientSecret,
-                  fedAuthInfoToken.spn,
-                  undefined, // environment
-                  authenticationCache
-                );
-
-                getTokenFromCredentials(undefined, credentials);
-              }
-            };
-
-            getToken((err, token) => {
-              if (err) {
-                this.loginError = ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH');
-                this.emit('connect', this.loginError);
-                this.transitionTo(this.STATE.FINAL);
-                return;
-              }
-
-              this.sendFedAuthTokenMessage(token!);
-            });
-          } else if (this.loginError) {
-            if (this.loginError.isTransient) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            } else {
-              this.emit('connect', this.loginError);
-              this.transitionTo(this.STATE.FINAL);
-            }
+        } else if (this.loginError) {
+          if (isTransientError(this.loginError)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           } else {
-            this.emit('connect', ConnectionError('Login failed.', 'ELOGIN'));
+            this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
           }
+        } else {
+          this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
+          this.transitionTo(this.STATE.FINAL);
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
         });
+      });
+    },
+    events: {
+      socketError: function() {
+        this.transitionTo(this.STATE.FINAL);
+      },
+      connectTimeout: function() {
+        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
     enter: function() {
-      this.sendInitialSql();
+      (async () => {
+        this.sendInitialSql();
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+        const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+        await once(tokenStreamParser, 'end');
+
+        this.transitionTo(this.STATE.LOGGED_IN);
+        this.processedInitialSql();
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function socketError() {
@@ -3603,14 +3627,6 @@ Connection.prototype.STATE = {
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
-
-        tokenStreamParser.once('end', () => {
-          this.transitionTo(this.STATE.LOGGED_IN);
-          this.processedInitialSql();
-        });
       }
     }
   },
@@ -3624,24 +3640,34 @@ Connection.prototype.STATE = {
   },
   SENT_CLIENT_REQUEST: {
     name: 'SentClientRequest',
-    exit: function(nextState) {
-      this.clearRequestTimer();
-    },
-    events: {
-      socketError: function(err) {
-        const sqlRequest = this.request!;
-        this.request = undefined;
-        this.transitionTo(this.STATE.FINAL);
-
-        sqlRequest.callback(err);
-      },
-      message: function(message) {
+    enter: function() {
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser(message);
+        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
-        const onResume = () => { tokenStreamParser.resume(); };
+        // If the request was canceled and we have a `cancelTimer`
+        // defined, we send a attention message after the
+        // request message was fully sent off.
+        //
+        // We already started consuming the current message
+        // (but all the token handlers should be no-ops), and
+        // need to ensure the next message is handled by the
+        // `SENT_ATTENTION` state.
+        if (this.request?.canceled && this.cancelTimer) {
+          return this.transitionTo(this.STATE.SENT_ATTENTION);
+        }
+
+        const onResume = () => {
+          tokenStreamParser.resume();
+        };
         const onPause = () => {
           tokenStreamParser.pause();
 
@@ -3664,6 +3690,12 @@ Connection.prototype.STATE = {
 
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
+
+          // The `_cancelAfterRequestSent` callback will have sent a
+          // attention message, so now we need to also switch to
+          // the `SENT_ATTENTION` state to make sure the attention ack
+          // message is processed correctly.
+          this.transitionTo(this.STATE.SENT_ATTENTION);
         };
 
         const onEndOfMessage = () => {
@@ -3683,13 +3715,58 @@ Connection.prototype.STATE = {
 
         tokenStreamParser.once('end', onEndOfMessage);
         this.request?.once('cancel', onCancel);
+      })();
+
+    },
+    exit: function(nextState) {
+      this.clearRequestTimer();
+    },
+    events: {
+      socketError: function(err) {
+        const sqlRequest = this.request!;
+        this.request = undefined;
+        this.transitionTo(this.STATE.FINAL);
+
+        sqlRequest.callback(err);
       }
     }
   },
   SENT_ATTENTION: {
     name: 'SentAttention',
     enter: function() {
-      this.attentionReceived = false;
+      (async () => {
+        let message;
+        try {
+          message = await this.messageIo.readMessage();
+        } catch (err: any) {
+          return this.socketError(err);
+        }
+
+        const handler = new AttentionTokenHandler(this, this.request!);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+
+        await once(tokenStreamParser, 'end');
+        // 3.2.5.7 Sent Attention State
+        // Discard any data contained in the response, until we receive the attention response
+        if (handler.attentionReceived) {
+          this.clearCancelTimer();
+
+          const sqlRequest = this.request!;
+          this.request = undefined;
+          this.transitionTo(this.STATE.LOGGED_IN);
+
+          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
+          } else {
+            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
+          }
+        }
+
+      })().catch((err) => {
+        process.nextTick(() => {
+          throw err;
+        });
+      });
     },
     events: {
       socketError: function(err) {
@@ -3699,32 +3776,6 @@ Connection.prototype.STATE = {
         this.transitionTo(this.STATE.FINAL);
 
         sqlRequest.callback(err);
-      },
-      attention: function() {
-        this.attentionReceived = true;
-      },
-      message: function(message) {
-        const tokenStreamParser = this.createTokenStreamParser(message);
-
-        tokenStreamParser.once('end', () => {
-          // 3.2.5.7 Sent Attention State
-          // Discard any data contained in the response, until we receive the attention response
-          if (this.attentionReceived) {
-            this.attentionReceived = false;
-
-            this.clearCancelTimer();
-
-            const sqlRequest = this.request!;
-            this.request = undefined;
-            this.transitionTo(this.STATE.LOGGED_IN);
-
-            if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-              sqlRequest.callback(sqlRequest.error);
-            } else {
-              sqlRequest.callback(RequestError('Canceled.', 'ECANCEL'));
-            }
-          }
-        });
       }
     }
   },
@@ -3734,9 +3785,6 @@ Connection.prototype.STATE = {
       this.cleanupConnection(CLEANUP_TYPE.NORMAL);
     },
     events: {
-      loginFailed: function() {
-        // Do nothing. The connection was probably closed by the client code.
-      },
       connectTimeout: function() {
         // Do nothing, as the timer should be cleaned up.
       },

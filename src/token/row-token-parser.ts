@@ -1,11 +1,13 @@
 // s2.2.7.17
 
 import Parser from './stream-parser';
-import { ColumnMetadata } from './colmetadata-token-parser';
+import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
+import * as iconv from 'iconv-lite';
 
-import valueParse from '../value-parser';
+import { isPLPStream, readPLPStream, readValue } from '../value-parser';
+import { NotEnoughDataError } from './helpers';
 
 interface Column {
   value: unknown;
@@ -13,33 +15,45 @@ interface Column {
 }
 
 async function rowParser(parser: Parser): Promise<RowToken> {
-  const colMetadata = parser.colMetadata;
-  const length = colMetadata.length;
   const columns: Column[] = [];
 
-  for (let i = 0; i < length; i++) {
-    const currColMetadata = colMetadata[i];
-    let value;
-    valueParse(parser, currColMetadata, parser.options, (v) => {
-      value = v;
-    });
+  for (const metadata of parser.colMetadata) {
+    while (true) {
+      if (isPLPStream(metadata)) {
+        const chunks = await readPLPStream(parser);
 
-    while (parser.suspended) {
-      await parser.streamBuffer.waitForChunk();
+        if (chunks === null) {
+          columns.push({ value: chunks, metadata });
+        } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
+          columns.push({ value: Buffer.concat(chunks).toString('ucs2'), metadata });
+        } else if (metadata.type.name === 'VarChar') {
+          columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
+        } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
+          columns.push({ value: Buffer.concat(chunks), metadata });
+        }
+      } else {
+        let result;
+        try {
+          result = readValue(parser.buffer, parser.position, metadata, parser.options);
+        } catch (err) {
+          if (err instanceof NotEnoughDataError) {
+            await parser.waitForChunk();
+            continue;
+          }
 
-      parser.suspended = false;
-      const next = parser.next!;
+          throw err;
+        }
 
-      next();
+        parser.position = result.offset;
+        columns.push({ value: result.value, metadata });
+      }
+
+      break;
     }
-    columns.push({
-      value,
-      metadata: currColMetadata
-    });
   }
 
   if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = {};
+    const columnsMap: { [key: string]: Column } = Object.create(null);
 
     columns.forEach((column) => {
       const colName = column.metadata.colName;

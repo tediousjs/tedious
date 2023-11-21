@@ -22,7 +22,7 @@ function buildLoginAckToken() {
     0x00, 0x00, // buildNum
   ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
+  buffer.writeUInt16LE(buffer.length - 3, 1);
 
   return buffer;
 }
@@ -40,7 +40,7 @@ function buildErrorMessageToken(number, message) {
     0x00, 0x00, 0x00, 0x00, // Line Number
   ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
+  buffer.writeUInt16LE(buffer.length - 3, 1);
   buffer.writeUInt32LE(number, 3);
   buffer.writeUInt16LE(Buffer.byteLength(message, 'ucs2') / 2, 9);
 
@@ -98,7 +98,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -176,7 +176,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);
@@ -339,7 +339,7 @@ describe('Automatic Connection Retry', function() {
             chunks.push(data);
           }
 
-          const responsePayload = new PreloginPayload({ encrypt: false });
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
           outgoingMessageStream.write(responseMessage);

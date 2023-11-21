@@ -1,4 +1,5 @@
 import { sprintf } from 'sprintf-js';
+import { versions } from './tds-versions';
 
 const FLAGS_1 = {
   ENDIAN_LITTLE: 0x00,
@@ -77,31 +78,31 @@ interface Options {
   s2.2.6.3
  */
 class Login7Payload {
-  tdsVersion: number;
-  packetSize: number;
-  clientProgVer: number;
-  clientPid: number;
-  connectionId: number;
-  clientTimeZone: number;
-  clientLcid: number;
+  declare tdsVersion: number;
+  declare packetSize: number;
+  declare clientProgVer: number;
+  declare clientPid: number;
+  declare connectionId: number;
+  declare clientTimeZone: number;
+  declare clientLcid: number;
 
-  readOnlyIntent: boolean;
-  initDbFatal: boolean;
+  declare readOnlyIntent: boolean;
+  declare initDbFatal: boolean;
 
-  userName: string | undefined;
-  password: string | undefined;
-  serverName: string | undefined;
-  appName: string | undefined;
-  hostname: string | undefined;
-  libraryName: string | undefined;
-  language: string | undefined;
-  database: string | undefined;
-  clientId: Buffer | undefined;
-  sspi: Buffer | undefined;
-  attachDbFile: string | undefined;
-  changePassword: string | undefined;
+  declare userName: string | undefined;
+  declare password: string | undefined;
+  declare serverName: string | undefined;
+  declare appName: string | undefined;
+  declare hostname: string | undefined;
+  declare libraryName: string | undefined;
+  declare language: string | undefined;
+  declare database: string | undefined;
+  declare clientId: Buffer | undefined;
+  declare sspi: Buffer | undefined;
+  declare attachDbFile: string | undefined;
+  declare changePassword: string | undefined;
 
-  fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
+  declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
@@ -409,6 +410,17 @@ class Login7Payload {
 
           break;
       }
+    }
+
+    if (this.tdsVersion >= versions['7_4']) {
+      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+      const buf = Buffer.alloc(6);
+      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+      buf.writeUInt32LE(1, 1);
+      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+      buffers.push(buf);
     }
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));

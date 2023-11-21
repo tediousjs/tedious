@@ -1,7 +1,7 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { EncryptionAlgorithm, SQLServerEncryptionType } from './types';
+import { type EncryptionAlgorithm, SQLServerEncryptionType } from './types';
 import { createHmac, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { AeadAes256CbcHmac256EncryptionKey, keySize } from './aead-aes-256-cbc-hmac-encryption-key';
 
@@ -10,13 +10,13 @@ const algorithmVersion = 0x1;
 const blockSizeInBytes = 16;
 
 export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
-  private columnEncryptionkey: AeadAes256CbcHmac256EncryptionKey;
-  private isDeterministic: boolean;
-  private keySizeInBytes: number;
-  private version: Buffer;
-  private versionSize: Buffer;
-  private minimumCipherTextLengthInBytesNoAuthenticationTag: number;
-  private minimumCipherTextLengthInBytesWithAuthenticationTag: number;
+  declare private columnEncryptionkey: AeadAes256CbcHmac256EncryptionKey;
+  declare private isDeterministic: boolean;
+  declare private keySizeInBytes: number;
+  declare private version: Buffer;
+  declare private versionSize: Buffer;
+  declare private minimumCipherTextLengthInBytesNoAuthenticationTag: number;
+  declare private minimumCipherTextLengthInBytesWithAuthenticationTag: number;
 
   constructor(columnEncryptionKey: AeadAes256CbcHmac256EncryptionKey, encryptionType: SQLServerEncryptionType) {
     this.keySizeInBytes = keySize / 8;
@@ -87,7 +87,7 @@ export class AeadAes256CbcHmac256Algorithm implements EncryptionAlgorithm {
     try {
       plainText = decipher.update(cipherText.slice(cipherTextOffset, cipherTextOffset + cipherTextCount));
       plainText = Buffer.concat([plainText, decipher.final()]);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Internal error while decryption: ${error.message}`);
     }
 

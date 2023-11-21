@@ -1,10 +1,21 @@
+// @ts-check
+
 const { assert } = require('chai');
 const net = require('net');
+const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 const Connection = require('../../src/tedious').Connection;
 const ConnectionError = require('../../src/errors').ConnectionError;
 
 describe('Connecting to a server that sends invalid packet data', function() {
-  let server, sockets;
+  /**
+   * @type {net.Server}
+   */
+  let server;
+
+  /**
+   * @type {net.Socket[]}
+   */
+  let sockets;
 
   beforeEach(function(done) {
     sockets = [];
@@ -40,17 +51,22 @@ describe('Connecting to a server that sends invalid packet data', function() {
       socket.write(packet);
     });
 
-    const addressInfo = server.address();
+    const addressInfo = /** @type {net.AddressInfo} */(server.address());
     const connection = new Connection({
       server: addressInfo.address,
       options: {
         port: addressInfo.port,
+        debug: debugOptionsFromEnv()
       }
     });
 
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);
-      assert.equal(err.message, 'Connection lost - Unable to process incoming packet');
+      assert.equal(/** @type {ConnectionError} */(err).message, 'Connection lost - Unable to process incoming packet');
 
       done();
     });

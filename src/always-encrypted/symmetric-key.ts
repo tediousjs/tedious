@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Microsoft Corporation
 
 export class SymmetricKey {
-  rootKey: Buffer;
+  declare rootKey: Buffer;
 
   constructor(rootKey: Buffer) {
     if (!rootKey) {

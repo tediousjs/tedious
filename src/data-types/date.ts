@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
@@ -48,7 +48,7 @@ const Date: DataType = {
     yield buffer;
   },
 
-  // TODO: value is techincally of type 'unknown'.
+  // TODO: value is technically of type 'unknown'.
   validate: function(value): null | Date {
     if (value == null) {
       return null;

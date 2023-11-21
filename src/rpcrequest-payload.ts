@@ -1,8 +1,8 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import Request from './request';
-import { Parameter, ParameterData } from './data-type';
-import { InternalConnectionOptions } from './connection';
+import { type Parameter, type ParameterData } from './data-type';
+import { type InternalConnectionOptions } from './connection';
+import { Collation } from './collation';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -19,17 +19,19 @@ const STATUS = {
   s2.2.6.5
  */
 class RpcRequestPayload implements Iterable<Buffer> {
-  request: Request;
-  procedure: string | number;
+  declare procedure: string | number;
+  declare parameters: Parameter[];
 
-  options: InternalConnectionOptions;
-  txnDescriptor: Buffer;
+  declare options: InternalConnectionOptions;
+  declare txnDescriptor: Buffer;
+  declare collation: Collation | undefined;
 
-  constructor(request: Request, txnDescriptor: Buffer, options: InternalConnectionOptions) {
-    this.request = request;
-    this.procedure = this.request.sqlTextOrProcedure!;
+  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
+    this.procedure = procedure;
+    this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
+    this.collation = collation;
   }
 
   [Symbol.iterator]() {
@@ -54,9 +56,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
     buffer.writeUInt16LE(optionFlags);
     yield buffer.data;
 
-    const parameters = this.request.parameters;
-    for (let i = 0; i < parameters.length; i++) {
-      yield * this.generateParameterData(parameters[i]);
+    const parametersLength = this.parameters.length;
+    for (let i = 0; i < parametersLength; i++) {
+      yield * this.generateParameterData(this.parameters[i]);
     }
   }
 
@@ -66,7 +68,12 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
   * generateParameterData(parameter: Parameter) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
-    buffer.writeBVarchar('@' + parameter.name);
+
+    if (parameter.name) {
+      buffer.writeBVarchar('@' + parameter.name);
+    } else {
+      buffer.writeBVarchar('');
+    }
 
     let statusFlags = 0;
     if (parameter.output) {
@@ -98,6 +105,10 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.scale = parameter.scale;
     } else if (type.resolveScale) {
       param.scale = type.resolveScale(parameter);
+    }
+
+    if (this.collation) {
+      param.collation = this.collation;
     }
 
     yield type.generateTypeInfo(param, this.options);

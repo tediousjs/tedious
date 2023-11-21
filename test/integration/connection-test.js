@@ -1,32 +1,28 @@
+// @ts-check
+
 const async = require('async');
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
+
+import Connection from '../../src/connection';
+import { ConnectionError, RequestError } from '../../src/errors';
+import Request from '../../src/request';
+import { versions } from '../../src/tds-versions';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
 }
-
-process.on('uncaughtException', function(err) {
-  console.error(err.stack);
-});
 
 function getInstanceName() {
   return JSON.parse(
@@ -49,13 +45,13 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect(function(err) {
       assert.ok(err);
@@ -86,7 +82,7 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -99,9 +95,9 @@ describe('Initiate Connect Test', function() {
       return assert.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect(function(err) {
       assert.ok(err);
@@ -126,7 +122,7 @@ describe('Initiate Connect Test', function() {
       connection.close();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -138,9 +134,9 @@ describe('Initiate Connect Test', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should connect by instance name', function(done) {
@@ -161,7 +157,7 @@ describe('Initiate Connect Test', function() {
       connection.close();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -173,9 +169,9 @@ describe('Initiate Connect Test', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should connect by invalid instance name', function(done) {
@@ -196,7 +192,7 @@ describe('Initiate Connect Test', function() {
       connection.close();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -204,9 +200,9 @@ describe('Initiate Connect Test', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should potentially throw an error on invalid crypto credential details', function(done) {
@@ -217,15 +213,10 @@ describe('Initiate Connect Test', function() {
     config.options.cryptoCredentialsDetails = {
       ciphers: '!ALL'
     };
-
-    try {
+    assert.throws(() => {
       const { createSecureContext } = require('tls');
       createSecureContext(config.options.cryptoCredentialsDetails);
-    } catch {
-      assert.throws(() => {
-        new Connection(config);
-      });
-    }
+    }, Error, new RegExp(/.*SSL routines.*no cipher match/));
 
     done();
   });
@@ -234,6 +225,9 @@ describe('Initiate Connect Test', function() {
     const config = getConfig();
 
     const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect((err) => {
       if (err) {
         return done(err);
@@ -248,6 +242,9 @@ describe('Initiate Connect Test', function() {
     const config = getConfig();
 
     const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect((err) => {
       if (err) {
         return done(err);
@@ -268,6 +265,9 @@ describe('Initiate Connect Test', function() {
     const config = getConfig();
 
     const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.on('connect', (err) => {
       if (err) {
         return done(err);
@@ -277,6 +277,60 @@ describe('Initiate Connect Test', function() {
       connection.close();
     });
     connection.connect();
+  });
+
+  it('should clear timeouts when failing to connect', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: { connectTimeout: 30000 },
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.on('connect', (err) => {
+      try {
+        assert.instanceOf(err, ConnectionError);
+        assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+        assert.strictEqual(connection.connectTimer, undefined);
+        done();
+      } catch (e) {
+        done(e);
+      }
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
+  });
+
+  it('should clear timeouts when failing to connect to named instance', function(done) {
+    const connection = new Connection({
+      server: 'something.invalid',
+      options: {
+        instanceName: 'inst',
+        connectTimeout: 30000,
+      },
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.on('connect', (err) => {
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
+      assert.strictEqual(connection.connectTimer, undefined);
+
+      done();
+    });
+
+    connection.on('error', done);
+    connection.connect();
+
+    assert.isOk(connection.connectTimer);
   });
 
   it('should fail if no cipher can be negotiated', function(done) {
@@ -289,9 +343,14 @@ describe('Initiate Connect Test', function() {
     };
 
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
     connection.connect(function(err) {
-      assert.ok(err);
-      assert.strictEqual(err.code, 'ESOCKET');
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
     });
 
     connection.on('end', function() {
@@ -315,6 +374,10 @@ describe('Initiate Connect Test', function() {
     });
 
     let connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect((err) => {
       assert.ifError(err);
@@ -344,6 +407,10 @@ describe('Initiate Connect Test', function() {
 
     let connection = new Connection({ ...config, options: { ...config.options, workstationId: 'foo.bar.baz' } });
 
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
     connection.connect((err) => {
       assert.ifError(err);
 
@@ -360,6 +427,9 @@ describe('Initiate Connect Test', function() {
     config.options.connectTimeout = 1;
 
     const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.on('error', (error) => { assert.ifError(error); });
     connection.connect((err) => { });
 
@@ -382,11 +452,15 @@ describe('Initiate Connect Test', function() {
       }
     });
 
+    if (process.env.TEDIOUS_DEBUG) {
+      conn.on('debug', console.log);
+    }
+
     conn.connect((err) => {
       conn.close();
 
       assert.instanceOf(err, Error);
-      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+      assert.strictEqual(/** @type {Error} */(err).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
 
       done();
     });
@@ -395,12 +469,21 @@ describe('Initiate Connect Test', function() {
 
 
 describe('Ntlm Test', function() {
+  /**
+   * @enum {number}
+   */
   const DomainCaseEnum = {
     AsIs: 0,
     Lower: 1,
     Upper: 2,
   };
 
+  /**
+   * @this {Mocha.Context}
+   * @param {Mocha.Done} done
+   * @param {DomainCaseEnum} domainCase
+   * @returns {void}
+   */
   function runNtlmTest(done, domainCase) {
     const ntlmConfig = getNtlmConfig();
 
@@ -421,15 +504,35 @@ describe('Ntlm Test', function() {
         assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
     }
 
-    const connection = new Connection(ntlmConfig);
+    let row = 0;
 
-    connection.connect(function(err) {
+    const request = new Request('select 1; select 2;', function(err, rowCount) {
       assert.ifError(err);
+      assert.strictEqual(rowCount, 2);
 
       connection.close();
     });
 
-    connection.on('end', function(info) {
+    request.on('doneInProc', function(rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('columnMetadata', function(columnsMetadata) {
+      assert.strictEqual(columnsMetadata.length, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns[0].value, ++row);
+    });
+
+    const connection = new Connection(ntlmConfig);
+
+    connection.connect(function(err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
       done();
     });
 
@@ -437,9 +540,9 @@ describe('Ntlm Test', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   }
 
   it('should ntlm', function(done) {
@@ -456,47 +559,186 @@ describe('Ntlm Test', function() {
 });
 
 describe('Encrypt Test', function() {
-  it('should encrypt', function(done) {
-    const config = getConfig();
-    config.options.encrypt = true;
+  /**
+   * @param {any} config
+   * @param {(err: Error | null, supportsTds8?: boolean) => void} callback
+   */
+  function supportsTds8(config, callback) {
+    if (config.options.tdsVersion < '7_2') {
+      return callback(null, false);
+    }
 
     const connection = new Connection(config);
 
-    connection.connect(function(err) {
-      assert.ifError(err);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
+    connection.connect((err) => {
+      if (err) {
+        return callback(err);
+      }
+
+      /**
+       * @type {string | undefined}
+       */
+      let productMajorVersion;
+      const request = new Request("SELECT SERVERPROPERTY('ProductMajorVersion')", (err) => {
+        if (err) {
+          connection.close();
+          return callback(err);
+        }
+
+        if (!productMajorVersion || productMajorVersion < '16') {
+          connection.close();
+          return callback(null, false);
+        }
+
+        if (productMajorVersion > '16') {
+          connection.close();
+          return callback(null, true);
+        }
+
+        let supportsTds8 = false;
+        const request = new Request('SELECT host_platform FROM sys.dm_os_host_info', (err) => {
+          connection.close();
+
+          if (err) {
+            return callback(err);
+          }
+
+          callback(null, supportsTds8);
+        });
+
+        request.on('row', (row) => {
+          supportsTds8 = row[0].value !== 'Linux';
+        });
+
+        connection.execSql(request);
+      });
+
+      request.on('row', (row) => {
+        productMajorVersion = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  }
+
+  describe('with strict encryption enabled (TDS 8.0)', function() {
+    /**
+     * @type {Connection}
+     */
+    let connection;
+
+    beforeEach(function(done) {
+      const config = getConfig();
+
+      supportsTds8(config, (err, supportsTds8) => {
+        if (err) {
+          return done(err);
+        }
+
+        if (!supportsTds8) {
+          return this.skip();
+        }
+
+        config.options.encrypt = 'strict';
+
+        connection = new Connection(config);
+        if (process.env.TEDIOUS_DEBUG) {
+          connection.on('debug', console.log);
+        }
+        connection.connect(done);
+      });
+    });
+
+    afterEach(function() {
+      connection && connection.close();
+    });
+
+    it('opens an encrypted connection', function(done) {
+      const request = new Request(`
+        SELECT c.protocol_version, c.encrypt_option
+        FROM sys.dm_exec_connections AS c
+        WHERE c.session_id = @@SPID
+      `, (err, rowCount) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
+
+        done();
+      });
+
+      request.on('row', function(columns) {
+        assert.strictEqual(columns.length, 2);
+        assert.strictEqual(versions['8_0'], columns[0].value);
+        assert.strictEqual('TRUE', columns[1].value);
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  describe('with encryption enabled', function() {
+    /**
+     * @type {Connection}
+     */
+    let connection;
+
+    beforeEach(function(done) {
+      const config = getConfig();
+      config.options.encrypt = true;
+      connection = new Connection(config);
+      if (process.env.TEDIOUS_DEBUG) {
+        connection.on('debug', console.log);
+      }
+      connection.connect(done);
+    });
+
+    afterEach(function() {
       connection.close();
     });
 
-    connection.on('end', function(info) {
-      done();
-    });
+    it('opens an encrypted connection', function(done) {
+      const request = new Request(`
+        SELECT c.protocol_version, c.encrypt_option
+        FROM sys.dm_exec_connections AS c
+        WHERE c.session_id = @@SPID
+      `, (err, rowCount) => {
+        if (err) {
+          return done(err);
+        }
 
-    connection.on('databaseChange', function(database) {
-      assert.strictEqual(database, config.options.database);
-    });
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
 
-    connection.on('secure', function(cleartext) {
-      assert.ok(cleartext);
-      assert.ok(cleartext.getCipher());
-      assert.ok(cleartext.getPeerCertificate());
-    });
+        done();
+      });
 
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
+      request.on('row', function(columns) {
+        assert.strictEqual(columns.length, 2);
+        assert.strictEqual(versions[connection.config.options.tdsVersion], columns[0].value);
+        assert.strictEqual('TRUE', columns[1].value);
+      });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
+      connection.execSql(request);
     });
   });
 });
 
 describe('BeginTransaction Tests', function() {
+  /** @type {Connection} */
   let connection;
   beforeEach(function(done) {
     const config = getConfig();
     connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect(done);
   });
 
@@ -512,7 +754,7 @@ describe('BeginTransaction Tests', function() {
   it('should validate isolation level is a number', function() {
     assert.throws(() => {
       const callback = () => { assert.fail('callback should not be executed'); };
-      connection.beginTransaction(callback, 'test', 'some string');
+      connection.beginTransaction(callback, 'test', /** @type {any} */('some string'));
     }, TypeError, 'The "isolationLevel" argument must be of type number. Received type string (some string)');
   });
 
@@ -564,7 +806,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -572,91 +814,140 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    return connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
-  it('should numeric column name', function(done) {
-    const config = getConfig();
-    config.options.useColumnNames = true;
+  describe('when `useColumnNames` is `true`', function() {
+    it('should support numeric column names', function(done) {
+      const config = getConfig();
+      config.options.useColumnNames = true;
 
-    const request = new Request('select 8 as [123]', function(err, rowCount) {
-      assert.ifError(err);
-      assert.strictEqual(rowCount, 1);
+      const connection = new Connection(config);
 
-      connection.close();
+      if (process.env.TEDIOUS_DEBUG) {
+        connection.on('debug', console.log);
+      }
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request('select 8 as [123]', (err, rowCount) => {
+          assert.ifError(err);
+          assert.strictEqual(rowCount, 1);
+
+          connection.close();
+        });
+
+        request.on('columnMetadata', (columnsMetadata) => {
+          assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+        });
+
+        request.on('row', (columns) => {
+          assert.strictEqual(Object.keys(columns).length, 1);
+          assert.strictEqual(columns[123].value, 8);
+        });
+
+        connection.execSql(request);
+      });
+
+      connection.on('end', () => {
+        done();
+      });
     });
 
-    request.on('columnMetadata', function(columnsMetadata) {
-      assert.strictEqual(Object.keys(columnsMetadata).length, 1);
+    it('supports duplicate column names', function(done) {
+      const config = getConfig();
+      config.options.useColumnNames = true;
+
+      const connection = new Connection(config);
+
+      if (process.env.TEDIOUS_DEBUG) {
+        connection.on('debug', console.log);
+      }
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request("select 1 as abc, 2 as xyz, '3' as abc", (err, rowCount) => {
+          assert.ifError(err);
+          assert.strictEqual(rowCount, 1);
+
+          connection.close();
+        });
+
+        request.on('columnMetadata', (columnsMetadata) => {
+          assert.strictEqual(Object.keys(columnsMetadata).length, 2);
+        });
+
+        request.on('row', (columns) => {
+          assert.strictEqual(Object.keys(columns).length, 2);
+
+          assert.strictEqual(columns.abc.value, 1);
+          assert.strictEqual(columns.xyz.value, 2);
+        });
+
+        connection.execSql(request);
+      });
+
+      connection.on('end', () => {
+        done();
+      });
     });
 
-    request.on('row', function(columns) {
-      assert.strictEqual(Object.keys(columns).length, 1);
-      assert.strictEqual(columns[123].value, 8);
-    });
+    describe('with a polluted `Object` prototype', function() {
+      beforeEach(function() {
+        ({}).constructor.prototype.foo = 'bar';
+      });
 
-    let connection = new Connection(config);
+      afterEach(function() {
+        delete ({}).constructor.prototype.foo;
+      });
 
-    connection.connect(function(err) {
-      connection.execSql(request);
-    });
+      it('should not have column metadata or rows be affected by the pollution', function(done) {
+        const config = getConfig();
+        config.options.useColumnNames = true;
 
-    connection.on('end', function(info) {
-      done();
-    });
+        const connection = new Connection(config);
 
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
+        if (process.env.TEDIOUS_DEBUG) {
+          connection.on('debug', console.log);
+        }
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
-  });
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
 
-  it('should duplicate column name', function(done) {
-    const config = getConfig();
-    config.options.useColumnNames = true;
+          const request = new Request('select 1 as abc', (err, rowCount) => {
+            assert.ifError(err);
+            assert.strictEqual(rowCount, 1);
 
-    const request = new Request("select 1 as abc, 2 as xyz, '3' as abc", function(
-      err,
-      rowCount
-    ) {
-      assert.ifError(err);
-      assert.strictEqual(rowCount, 1);
+            connection.close();
+          });
 
-      connection.close();
-    });
+          request.on('columnMetadata', (columnsMetadata) => {
+            assert.property(columnsMetadata, 'abc');
+            assert.notProperty(columnsMetadata, 'foo');
+          });
 
-    request.on('columnMetadata', function(columnsMetadata) {
-      assert.strictEqual(Object.keys(columnsMetadata).length, 2);
-    });
+          request.on('row', (columns) => {
+            assert.property(columns, 'abc');
+            assert.notProperty(columns, 'foo');
+          });
 
-    request.on('row', function(columns) {
-      assert.strictEqual(Object.keys(columns).length, 2);
+          connection.execSql(request);
+        });
 
-      assert.strictEqual(columns.abc.value, 1);
-      assert.strictEqual(columns.xyz.value, 2);
-    });
-
-    let connection = new Connection(config);
-
-    connection.connect(function(err) {
-      connection.execSql(request);
-    });
-
-    connection.on('end', function(info) {
-      done();
-    });
-
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
-
-    connection.on('debug', function(text) {
-      // console.log(text)
+        connection.on('end', () => {
+          done();
+        });
+      });
     });
   });
 
@@ -702,7 +993,7 @@ describe('Insertion Tests', function() {
       execSql();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -710,9 +1001,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should exec sql with order', function(done) {
@@ -752,7 +1043,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -764,9 +1055,9 @@ describe('Insertion Tests', function() {
       // console.log("#{error.number} : #{error.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should exec Bad Sql', function(done) {
@@ -784,7 +1075,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -793,17 +1084,17 @@ describe('Insertion Tests', function() {
       assert.ok(error);
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should close connection request pending', function(done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
-      assert.ok(err);
-      assert.strictEqual(err.code, 'ECLOSE');
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).code, 'ECLOSE');
     });
 
     const connection = new Connection(config);
@@ -817,7 +1108,7 @@ describe('Insertion Tests', function() {
       connection.close();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -828,9 +1119,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should sql with multiple result sets', function(done) {
@@ -862,7 +1153,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -870,9 +1161,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should row count for update', function(done) {
@@ -898,7 +1189,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -906,9 +1197,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should row collection on request completion', function(done) {
@@ -936,7 +1227,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -944,9 +1235,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should row collection on Done', function(done) {
@@ -964,6 +1255,10 @@ describe('Insertion Tests', function() {
     });
 
     request.on('doneInProc', function(rowCount, more, rows) {
+      if (!rows) {
+        assert.fail('Did not expect `rows` to be undefined');
+      }
+
       assert.strictEqual(rows.length, 1);
 
       switch (++doneCount) {
@@ -984,7 +1279,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -992,9 +1287,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should exec proc as sql', function(done) {
@@ -1026,7 +1321,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -1034,22 +1329,32 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should reset Connection', function(done) {
     const config = getConfig();
 
+    /**
+     * @param {(err?: Error | null | undefined, result?: any) => void} callback
+     */
     function testAnsiNullsOptionOn(callback) {
       testAnsiNullsOption(true, callback);
     }
 
+    /**
+     * @param {(err?: Error | null | undefined, result?: any) => void} callback
+     */
     function testAnsiNullsOptionOff(callback) {
       testAnsiNullsOption(false, callback);
     }
 
+    /**
+     * @param {boolean} expectedOptionOn
+     * @param {(err?: Error | null | undefined, result?: any) => void} callback
+     */
     function testAnsiNullsOption(expectedOptionOn, callback) {
       const request = new Request('select @@options & 32', function(err, rowCount) {
         callback(err);
@@ -1063,6 +1368,9 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     }
 
+    /**
+     * @param {(err?: Error | null | undefined, result?: any) => void} callback
+     */
     function setAnsiNullsOptionOff(callback) {
       const request = new Request('set ansi_nulls off', function(err, rowCount) {
         callback(err);
@@ -1100,7 +1408,7 @@ describe('Insertion Tests', function() {
       ]);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -1108,19 +1416,20 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should support cancelling a request while it is processed on the server', function(done) {
     const config = getConfig();
 
+    /** @type {[number, number]} */
     let cancelledAt;
 
     const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
       assert.instanceOf(err, Error);
-      assert.strictEqual(err.message, 'Canceled.');
+      assert.strictEqual(/** @type {Error} */(err).message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1172,7 +1481,7 @@ describe('Insertion Tests', function() {
       }, 2000);
     });
 
-    connection.on('end', (info) => {
+    connection.on('end', () => {
       done();
     });
 
@@ -1180,9 +1489,9 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', (text) => {
-      // console.log(text);
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should request timeout', (done) => {
@@ -1192,7 +1501,7 @@ describe('Insertion Tests', function() {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {
-        assert.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
+        assert.equal(/** @type {Error} */(err).message, 'Timeout: Request failed to complete in 1000ms');
 
         connection.close();
       }
@@ -1224,7 +1533,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -1232,18 +1541,28 @@ describe('Insertion Tests', function() {
       // console.log("#{info.number} : #{info.message}")
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 });
 
 describe('Advanced Input Test', function() {
+  /**
+   * @param {Mocha.Done} done
+   * @param {import("../../src/connection").ConnectionConfiguration} config
+   * @param {string} sql
+   * @param {(error: Error | null | undefined, rowCount?: number) => void} requestCallback
+   */
   function runSqlBatch(done, config, sql, requestCallback) {
     const connection = new Connection(config);
 
-    const request = new Request(sql, function() {
-      requestCallback.apply(this, arguments);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const request = new Request(sql, function(err, rowCount) {
+      requestCallback(err, rowCount);
       connection.close();
     });
 
@@ -1252,7 +1571,7 @@ describe('Advanced Input Test', function() {
       connection.execSqlBatch(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
   }
@@ -1281,20 +1600,28 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     config.options.enableAnsiNullDefault = false;
 
-    runSqlBatch(done, config, sql, function(err) {
-      assert.ok(err instanceof Error);
-      assert.strictEqual(err != null ? err.number : undefined, 515);
+    runSqlBatch(done, config, sql, function(/** @type {Error | null | undefined} */err) {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
     }); // Cannot insert the value NULL
   });
 });
 
 describe('Date Insert Test', function() {
-  const testDateFirstImpl = (done, datefirst) => {
+  /**
+   * @param {Mocha.Done} done
+   * @param {number | undefined} datefirst
+   */
+  function testDateFirstImpl(done, datefirst) {
     datefirst = datefirst || 7;
     const config = getConfig();
     config.options.datefirst = datefirst;
 
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request('select @@datefirst', function(err) {
       assert.ifError(err);
@@ -1311,10 +1638,10 @@ describe('Date Insert Test', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
-  };
+  }
 
   // Test that the default setting for DATEFIRST is 7
   it('should test date first default', function(done) {
@@ -1340,12 +1667,20 @@ describe('Date Insert Test', function() {
 });
 
 describe('Language Insert Test', function() {
+  /**
+   * @param {Mocha.Done} done
+   * @param {string | undefined} language
+   */
   function testLanguage(done, language) {
     language = language || 'us_english';
     const config = getConfig();
     config.options.language = language;
 
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request('select @@language', function(err) {
       assert.ifError(err);
@@ -1362,7 +1697,7 @@ describe('Language Insert Test', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
   }
@@ -1377,13 +1712,234 @@ describe('Language Insert Test', function() {
   });
 });
 
+describe('custom textsize value', function() {
+  it('should set the textsize to the given value', function(done) {
+    const config = getConfig();
+    config.options.textsize = 123456;
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 123456);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should fail if the textsize is below -1', function() {
+    const config = getConfig();
+    config.options.textsize = -2;
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" can\'t be smaller than -1.');
+  });
+
+  it('should fail if the textsize is above 2147483647', function() {
+    const config = getConfig();
+    config.options.textsize = 2147483648;
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" can\'t be greater than 2147483647.');
+  });
+
+  it('should fail if the textsize is not a number', function() {
+    const config = getConfig();
+    config.options.textsize = 'textSize';
+
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.textsize" property must be of type number or null.');
+  });
+
+  it('should default to 2147483647', function(done) {
+    const config = getConfig();
+    config.options.textsize = undefined;
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 2147483647);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should allow setting it to -1', function(done) {
+    const config = getConfig();
+    config.options.textsize = -1;
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        if (connection.config.options.tdsVersion <= '7_2') {
+          assert.strictEqual(textsize, 2147483647);
+        } else {
+          assert.strictEqual(textsize, -1);
+        }
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('should allow setting it to 0 and reset to server defaults', function(done) {
+    const config = getConfig();
+    config.options.textsize = 0;
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 4096);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+
+  it('truncates floating point numbers', function(done) {
+    const config = getConfig();
+    config.options.textsize = 1000.0123;
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      /**
+       * @type {number | undefined}
+       */
+      let textsize;
+
+      const request = new Request('SELECT @@TEXTSIZE', () => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(textsize, 1000);
+
+        connection.close();
+
+        done();
+      });
+
+      request.on('row', (row) => {
+        textsize = row[0].value;
+      });
+
+      connection.execSql(request);
+    });
+  });
+});
+
 describe('should test date format', function() {
+  /**
+   * @param {Mocha.Done} done
+   * @param {string | undefined} dateFormat
+   */
   function testDateFormat(done, dateFormat) {
     dateFormat = dateFormat || 'mdy';
     const config = getConfig();
     config.options.dateFormat = dateFormat;
 
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request(
       'SELECT DATE_FORMAT FROM sys.dm_exec_sessions WHERE SESSION_ID = @@SPID ',
@@ -1403,7 +1959,7 @@ describe('should test date format', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
   }
@@ -1419,10 +1975,21 @@ describe('should test date format', function() {
 });
 
 describe('Boolean Config Options Test', function() {
+  /**
+   * @param {Mocha.Done} done
+   * @param {string} optionName
+   * @param {boolean | undefined} optionValue
+   * @param {number} optionFlag
+   * @param {boolean} defaultOn
+   */
   function testBooleanConfigOption(done, optionName, optionValue, optionFlag, defaultOn) {
     const config = getConfig();
     config.options[optionName] = optionValue;
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request(
       `SELECT (${optionFlag} & @@OPTIONS) AS OPTION_FLAG_OR_ZERO;`,
@@ -1457,12 +2024,15 @@ describe('Boolean Config Options Test', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
   }
 
-
+  /**
+   * @param {Mocha.Done} done
+   * @param {string} optionName
+   */
   function testBadBooleanConfigOption(done, optionName) {
     const config = getConfig();
     config.options[optionName] = 'on';

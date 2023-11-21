@@ -1,10 +1,10 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { SQLServerEncryptionType, CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
+import { SQLServerEncryptionType, type CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
 import { CEKEntry } from './cek-entry';
 import { decryptSymmetricKey } from './key-crypto';
-import { typeByName as TYPES, Parameter } from '../data-type';
+import { typeByName as TYPES, type Parameter } from '../data-type';
 import Request from '../request';
 import Connection from '../connection';
 import RpcRequestPayload from '../rpcrequest-payload';
@@ -86,10 +86,9 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     });
   });
 
-  metadataRequest.originalParameters = request.parameters;
   metadataRequest.addParameter('tsql', TYPES.NVarChar, request.sqlTextOrProcedure);
-  if (metadataRequest.originalParameters && metadataRequest.originalParameters.length) {
-    metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(metadataRequest.originalParameters));
+  if (request.parameters.length) {
+    metadataRequest.addParameter('params', TYPES.NVarChar, metadataRequest.makeParamsParameter(request.parameters));
   }
 
   const resultRows: any[] = [];
@@ -98,5 +97,5 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     resultRows.push(columns);
   });
 
-  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest, connection.currentTransactionDescriptor(), connection.config.options));
+  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters, connection.currentTransactionDescriptor(), connection.config.options, connection.databaseCollation));
 };

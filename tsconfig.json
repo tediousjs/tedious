@@ -2,19 +2,23 @@
   "compilerOptions": {
     "target": "esnext",
     "moduleResolution": "node",
-    "allowJs": false,
+    "allowJs": true,
     "noEmit": true,
     "strict": true,
-    "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "lib": [ "esnext" ],
     "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true
   },
 
   "include": [
+    "types/*.d.ts",
     "src/**/*.ts",
     "test/**/*.ts",
+    "test/**/*.js",
   ],
 
   "typedocOptions": {

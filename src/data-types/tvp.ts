@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
@@ -84,7 +84,7 @@ const TVP: DataType = {
         const value = row[k];
 
         const param = {
-          value: value,
+          value: column.type.validate(value, parameter.collation),
           length: column.length,
           scale: column.scale,
           precision: column.precision

@@ -1,33 +1,32 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const fs = require('fs');
 const assert = require('chai').assert;
-const debug = false;
+
+import AggregateError from 'es-aggregate-error';
+import { RequestError } from '../../src/errors';
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
+
 config.options.textsize = 8 * 1024;
-
-if (debug) {
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true
-  };
-} else {
-  config.options.debug = {};
-}
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
+/**
+ * @param {Mocha.Done} done
+ * @param {string | undefined} sql
+ * @param {(error: Error | null | undefined, rowCount?: number, rows?: any) => void} requestCallback
+ */
 function execSql(done, sql, requestCallback) {
   const connection = new Connection(config);
 
-  const request = new Request(sql, function() {
-    requestCallback.apply(this, arguments);
+  const request = new Request(sql, function(err) {
+    requestCallback(err);
     connection.close();
   });
 
@@ -39,14 +38,12 @@ function execSql(done, sql, requestCallback) {
     connection.execSqlBatch(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function() {
     done();
   });
 
-  if (debug) {
-    connection.on('debug', function(message) {
-      console.log(message);
-    });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
   }
 }
 
@@ -60,8 +57,8 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof Error);
-      assert.strictEqual(err.number, 2627);
+      assert.ok(err instanceof RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).number, 2627);
     });
   });
 
@@ -73,8 +70,8 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof Error);
-      assert.strictEqual(err.number, 515);
+      assert.ok(err instanceof RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
     });
   });
 
@@ -84,8 +81,8 @@ describe('Errors Test', function() {
   ';
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof Error);
-      assert.strictEqual(err.number, 3701);
+      assert.ok(err instanceof RequestError);
+      assert.strictEqual(/** @type {RequestError} */(err).number, 3701);
     });
   });
 
@@ -98,23 +95,24 @@ describe('Errors Test', function() {
     const connection = new Connection(config);
 
     const execProc = new Request('#testExtendedErrorInfo', function(err) {
-      assert.ok(err instanceof Error);
+      if (!err) {
+        assert.fail('Expected `err` to not be undefined');
+      }
 
-      assert.strictEqual(err.number, 50000);
-      assert.strictEqual(err.state, 42, 'err.state wrong');
-      assert.strictEqual(err.class, 14, 'err.class wrong');
+      const requestError = /** @type {RequestError} */(err);
 
-      assert.ok(err.serverName != null, 'err.serverName not set');
+      assert.strictEqual(requestError.number, 50000);
+      assert.strictEqual(requestError.state, 42);
+      assert.strictEqual(requestError.class, 14);
+
+      assert.exists(requestError.serverName);
+      assert.exists(requestError.procName);
 
       // The procedure name will actually be padded to 128 chars with underscores and
       // some random hexadecimal digits.
-      assert.ok(
-        (err.procName != null ?
-          err.procName.indexOf('#testExtendedErrorInfo') :
-          undefined) === 0,
-        `err.procName should begin with #testExtendedErrorInfo, was actually ${err.procName}`
-      );
-      assert.strictEqual(err.lineNumber, 1, 'err.lineNumber should be 1');
+      assert.match(/** @type {string} */(requestError.procName), /^#testExtendedErrorInfo/);
+
+      assert.strictEqual(requestError.lineNumber, 1);
 
       connection.close();
     });
@@ -138,19 +136,21 @@ describe('Errors Test', function() {
       connection.execSqlBatch(createProc);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    if (debug) {
-      connection.on('debug', function(message) {
-        console.log(message);
-      });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
     }
   });
 
   it('should support cancelling after starting query execution', function(done) {
     const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     const request = new Request("select 42, 'hello world'", function(err, rowCount) {
       if (err) {
@@ -168,7 +168,74 @@ describe('Errors Test', function() {
       connection.cancel();
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('should throw aggregate error with two error messages', function(done) {
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const request = new Request('create type test_type as table ( id int, primary key (code) );', (error) => {
+        assert.instanceOf(error, AggregateError);
+
+        if (error instanceof AggregateError) {
+          assert.strictEqual(error.errors.length, 2);
+          assert.strictEqual(error.errors[0].message, 'Column name \'code\' does not exist in the target table or view.');
+          assert.strictEqual(error.errors[1].message, 'Could not create constraint or index. See previous errors.');
+        }
+
+        connection.close();
+      });
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
+  it.skip('should throw aggregate error with AAD token retrieve', function(done) {
+    config.server = 'help.kusto.windows.net';
+    config.authentication = {
+      type: 'azure-active-directory-password',
+      options: {
+        userName: 'username',
+        password: 'password',
+        // Lack of tenantId will generate a AAD token retrieve error
+        clientId: 'clientID',
+      }
+    };
+    config.options.tdsVersion = '7_4';
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    /** @type {Error | undefined} */
+    let connectionError;
+    connection.connect((err) => {
+      connectionError = err;
+
+      assert.instanceOf(connectionError, AggregateError);
+
+      if (connectionError instanceof AggregateError) {
+        assert.strictEqual(connectionError.errors.length, 2);
+        assert.strictEqual(connectionError.errors[0].message, 'Security token could not be authenticated or authorized.');
+        assert.include(connectionError.errors[1].message, 'The grant type is not supported over the /common or /consumers endpoints.');
+      }
+
       done();
     });
   });

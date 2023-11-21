@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -57,6 +57,10 @@ const NVarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt16LE(parameter.length! * 2, 1);
     } else {
       buffer.writeUInt16LE(MAX, 1);
+    }
+
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
     }
 
     return buffer;
@@ -133,12 +137,11 @@ const NVarChar: { maximumLength: number } & DataType = {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
+
     return value;
   }
 };

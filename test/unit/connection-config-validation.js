@@ -95,12 +95,39 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad validateBulkLoadParameters value', () => {
-    const validateBulkLoadParametersVal = 'text';
-    config.options.validateBulkLoadParameters = validateBulkLoadParametersVal;
-    config.options.tdsVersion = '7_2';
+  it('bad encrypt value type', () => {
+    const numberEncrypt = 0;
+    config.options.encrypt = numberEncrypt;
     assert.throws(() => {
       new Connection(config);
     });
+  });
+
+  it('bad encrypt string', () => {
+    config.options.encrypt = 'false';
+    assert.throws(() => {
+      new Connection(config);
+    });
+  });
+
+  it('good false encrypt value', () => {
+    config.options.encrypt = false;
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.encrypt, false);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('good true encrypt value', () => {
+    config.options.encrypt = true;
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.encrypt, true);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('good strict encrypt value', () => {
+    config.options.encrypt = 'strict';
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.encrypt, 'strict');
+    ensureConnectionIsClosed(connection, () => {});
   });
 });

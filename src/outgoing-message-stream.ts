@@ -1,16 +1,16 @@
 import BufferList from 'bl';
-import { Duplex } from 'readable-stream';
+import { Duplex } from 'stream';
 
 import Debug from './debug';
 import Message from './message';
 import { Packet, HEADER_LENGTH } from './packet';
 
 class OutgoingMessageStream extends Duplex {
-  packetSize: number;
-  debug: Debug;
-  bl: any;
+  declare packetSize: number;
+  declare debug: Debug;
+  declare bl: any;
 
-  currentMessage: Message | undefined;
+  declare currentMessage: Message | undefined;
 
   constructor(debug: Debug, { packetSize }: { packetSize: number }) {
     super({ writableObjectMode: true });

@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const DuplexPair = require('native-duplexpair');
+import DuplexPair from 'native-duplexpair';
 
 import { Duplex } from 'stream';
 import * as tls from 'tls';
@@ -15,18 +14,20 @@ import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
 class MessageIO extends EventEmitter {
-  socket: Socket;
-  debug: Debug;
+  declare socket: Socket;
+  declare debug: Debug;
 
-  tlsNegotiationComplete: boolean;
+  declare tlsNegotiationComplete: boolean;
 
-  incomingMessageStream: IncomingMessageStream;
-  outgoingMessageStream: OutgoingMessageStream;
+  declare private incomingMessageStream: IncomingMessageStream;
+  declare outgoingMessageStream: OutgoingMessageStream;
 
-  securePair?: {
+  declare securePair?: {
     cleartext: tls.TLSSocket;
     encrypted: Duplex;
-  }
+  };
+
+  declare incomingMessageIterator: AsyncIterableIterator<Message>;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -37,17 +38,11 @@ class MessageIO extends EventEmitter {
     this.tlsNegotiationComplete = false;
 
     this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageStream.on('data', (message: Message) => {
-      this.emit('data', message);
-    });
-
-    this.incomingMessageStream.on('error', (message) => {
-      this.emit('error', message);
-    });
+    this.incomingMessageIterator = this.incomingMessageStream[Symbol.asyncIterator]();
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
-    this.socket.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
+    this.socket.pipe(this.incomingMessageStream);
     this.outgoingMessageStream.pipe(this.socket);
   }
 
@@ -65,64 +60,105 @@ class MessageIO extends EventEmitter {
     return this.outgoingMessageStream.packetSize;
   }
 
-  startTls(secureContext: tls.SecureContext, hostname: string, trustServerCertificate: boolean) {
-    const duplexpair = new DuplexPair();
-    const securePair = this.securePair = {
-      cleartext: tls.connect({
-        socket: duplexpair.socket1 as Socket,
-        servername: hostname,
-        secureContext: secureContext,
-        rejectUnauthorized: !trustServerCertificate
-      }),
-      encrypted: duplexpair.socket2
-    };
+  // Negotiate TLS encryption.
+  startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean) {
+    if (!credentialsDetails.maxVersion || !['TLSv1.2', 'TLSv1.1', 'TLSv1'].includes(credentialsDetails.maxVersion)) {
+      credentialsDetails.maxVersion = 'TLSv1.2';
+    }
 
-    // If an error happens in the TLS layer, there is nothing we can do about it.
-    // Forward the error to the socket so the connection gets properly cleaned up.
-    securePair.cleartext.on('error', (err?: Error) => {
-      // Streams in node.js versions before 8.0.0 don't support `.destroy`
-      if (typeof securePair.encrypted.destroy === 'function') {
+    const secureContext = tls.createSecureContext(credentialsDetails);
+
+    return new Promise<void>((resolve, reject) => {
+      const duplexpair = new DuplexPair();
+      const securePair = this.securePair = {
+        cleartext: tls.connect({
+          socket: duplexpair.socket1 as Socket,
+          servername: hostname,
+          secureContext: secureContext,
+          rejectUnauthorized: !trustServerCertificate
+        }),
+        encrypted: duplexpair.socket2
+      };
+
+      const onSecureConnect = () => {
+        securePair.encrypted.removeListener('readable', onReadable);
+        securePair.cleartext.removeListener('error', onError);
+        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+
+        // If we encounter any errors from this point on,
+        // we just forward them to the actual network socket.
+        securePair.cleartext.once('error', (err) => {
+          this.socket.destroy(err);
+        });
+
+        const cipher = securePair.cleartext.getCipher();
+        if (cipher) {
+          this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+        }
+
+        this.emit('secure', securePair.cleartext);
+
+        securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+
+        this.outgoingMessageStream.unpipe(this.socket);
+        this.socket.unpipe(this.incomingMessageStream);
+
+        this.socket.pipe(securePair.encrypted);
+        securePair.encrypted.pipe(this.socket);
+
+        securePair.cleartext.pipe(this.incomingMessageStream);
+        this.outgoingMessageStream.pipe(securePair.cleartext);
+
+        this.tlsNegotiationComplete = true;
+
+        resolve();
+      };
+
+      const onError = (err?: Error) => {
+        securePair.encrypted.removeListener('readable', onReadable);
+        securePair.cleartext.removeListener('error', onError);
+        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+
+        securePair.cleartext.destroy();
         securePair.encrypted.destroy();
-      }
-      this.socket.destroy(err);
+
+        reject(err);
+      };
+
+      const onReadable = () => {
+        // When there is handshake data on the encrypted stream of the secure pair,
+        // we wrap it into a `PRELOGIN` message and send it to the server.
+        //
+        // For each `PRELOGIN` message we sent we get back exactly one response message
+        // that contains the server's handshake response data.
+        const message = new Message({ type: TYPE.PRELOGIN, resetConnection: false });
+
+        let chunk;
+        while (chunk = securePair.encrypted.read()) {
+          message.write(chunk);
+        }
+        this.outgoingMessageStream.write(message);
+        message.end();
+
+        this.readMessage().then(async (response) => {
+          // Setup readable handler for the next round of handshaking.
+          // If we encounter a `secureConnect` on the cleartext side
+          // of the secure pair, the `readable` handler is cleared
+          // and no further handshake handling will happen.
+          securePair.encrypted.once('readable', onReadable);
+
+          for await (const data of response) {
+            // We feed the server's handshake response back into the
+            // encrypted end of the secure pair.
+            securePair.encrypted.write(data);
+          }
+        }).catch(onError);
+      };
+
+      securePair.cleartext.once('error', onError);
+      securePair.cleartext.once('secureConnect', onSecureConnect);
+      securePair.encrypted.once('readable', onReadable);
     });
-
-    securePair.cleartext.on('secureConnect', () => {
-      const cipher = securePair.cleartext.getCipher();
-      if (cipher) {
-        this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
-      }
-      this.emit('secure', securePair.cleartext);
-      this.encryptAllFutureTraffic();
-    });
-
-    securePair.encrypted.on('data', (data: Buffer) => {
-      this.sendMessage(TYPE.PRELOGIN, data, false);
-    });
-  }
-
-  encryptAllFutureTraffic() {
-    const securePair = this.securePair!;
-
-    securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
-    securePair.encrypted.removeAllListeners('data');
-
-    this.outgoingMessageStream.unpipe(this.socket);
-    this.socket.unpipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-
-    this.socket.pipe(securePair.encrypted);
-    securePair.encrypted.pipe(this.socket);
-
-    securePair.cleartext.pipe(this.incomingMessageStream as unknown as NodeJS.WritableStream);
-    this.outgoingMessageStream.pipe(securePair.cleartext);
-
-    this.tlsNegotiationComplete = true;
-  }
-
-  tlsHandshakeData(data: Buffer) {
-    const securePair = this.securePair!;
-
-    securePair.encrypted.write(data);
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
@@ -134,14 +170,17 @@ class MessageIO extends EventEmitter {
     return message;
   }
 
-  // Temporarily suspends the flow of incoming packets.
-  pause() {
-    this.incomingMessageStream.pause();
-  }
+  /**
+   * Read the next incoming message from the socket.
+   */
+  async readMessage(): Promise<Message> {
+    const result = await this.incomingMessageIterator.next();
 
-  // Resumes the flow of incoming packets.
-  resume() {
-    this.incomingMessageStream.resume();
+    if (result.done) {
+      throw new Error('unexpected end of message stream');
+    }
+
+    return result.value;
   }
 }
 

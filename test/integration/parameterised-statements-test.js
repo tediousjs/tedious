@@ -1,28 +1,40 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const fs = require('fs');
-const TYPES = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
+const TYPES = require('../../src/data-type').typeByName;
+
+import async from 'async';
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
-
+  config.options.debug = debugOptionsFromEnv();
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
 }
 
+/**
+ * @typedef {typeof import('../../src/data-type').typeByName} TYPES
+ */
 
+/**
+ * @param {Mocha.Done} done
+ * @param {TYPES[keyof TYPES]} type
+ * @param {unknown} value
+ * @param {'7_0' | '7_1' | '7_2' | '7_3_A' | '7_3_A' | '7_4' | null} [tdsVersion]
+ * @param {import('../../src/request').ParameterOptions | null} [options]
+ * @param {unknown} [expectedValue]
+ * @param {boolean} [cast]
+ * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @returns {void}
+ */
 function execSql(done, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
   var config = getConfig();
   // config.options.packetSize = 32768
@@ -59,7 +71,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     } else if (expectedValue instanceof Date) {
       assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
-      assert.strictEqual(columns[0].value, expectedValue.toString());
+      assert.strictEqual(columns[0].value, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier) {
       assert.deepEqual(columns[0].value, expectedValue);
     } else {
@@ -75,7 +87,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     connection.execSql(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function() {
     done();
   });
 
@@ -83,11 +95,19 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     console.log(`${error.number} : ${error.message}`);
   });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
+  }
 }
 
+/**
+ * @param {Mocha.Done} done
+ * @param {TYPES[keyof TYPES]} type
+ * @param {unknown} value
+ * @param {unknown} [expectedValue]
+ * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @returns {void}
+ */
 function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
   var config = getConfig();
 
@@ -112,10 +132,10 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
       expectedValue = value;
     }
 
-    if (value instanceof Date) {
+    if (expectedValue instanceof Date && returnValue instanceof Date) {
       assert.strictEqual(returnValue.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
-      assert.strictEqual(returnValue, expectedValue.toString());
+      assert.strictEqual(returnValue, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier) {
       assert.deepEqual(returnValue, expectedValue);
     } else {
@@ -133,13 +153,13 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
     connection.execSql(request);
   });
 
-  connection.on('end', function(info) {
+  connection.on('end', function() {
     done();
   });
 
-  connection.on('debug', function(text) {
-    // console.log(text)
-  });
+  if (process.env.TEDIOUS_DEBUG) {
+    connection.on('debug', console.log);
+  }
 }
 
 describe('Parameterised Statements Test', function() {
@@ -403,6 +423,28 @@ describe('Parameterised Statements Test', function() {
     execSql(done, TYPES.NChar, null);
   });
 
+  describe('`ntext`', function() {
+    it('should handle `null` values', function(done) {
+      execSql(done, TYPES.NText, null);
+    });
+
+    it('should handle empty strings', function(done) {
+      execSql(done, TYPES.NText, '');
+    });
+
+    it('should handle short strings', function(done) {
+      execSql(done, TYPES.NText, 'small');
+    });
+
+    it('should handle large strings', function(done) {
+      execSql(done, TYPES.NText, new Array(500000).join('x'));
+    });
+
+    it('should handle multibyte characters', function(done) {
+      execSql(done, TYPES.NText, 'some text 中文');
+    });
+  });
+
   it('should test textNull', function(done) {
     execSql(done, TYPES.Text, null);
   });
@@ -423,49 +465,49 @@ describe('Parameterised Statements Test', function() {
 
   describe('´time´', function() {
     it('should handle `null` values', function(done) {
-      execSql(done, TYPES.Time, null, '7_3', null);
+      execSql(done, TYPES.Time, null, '7_3_A', null);
     });
 
     it('ignores the date part of given `Date` values', function(done) {
-      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3', null, new Date('1970-01-01T12:34:56Z'));
+      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3_A', null, new Date('1970-01-01T12:34:56Z'));
     });
 
     it('should handle `string` values', function(done) {
-      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3', null, '12:34:56.0000000', true);
+      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3_A', null, '12:34:56.0000000', true);
     });
 
     const testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
 
     it('should test time', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', null, '00:00:00.1111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', null, '00:00:00.1111111', true);
     });
 
     it('should test time1', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 1 }, '00:00:00.1', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 1 }, '00:00:00.1', true);
     });
 
     it('should test time2', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 2 }, '00:00:00.11', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 2 }, '00:00:00.11', true);
     });
 
     it('should test time3', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 3 }, '00:00:00.111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 3 }, '00:00:00.111', true);
     });
 
     it('should test time4', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 4 }, '00:00:00.1111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 4 }, '00:00:00.1111', true);
     });
 
     it('should test time5', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 5 }, '00:00:00.11111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 5 }, '00:00:00.11111', true);
     });
 
     it('should test time 6', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 6 }, '00:00:00.111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 6 }, '00:00:00.111111', true);
     });
 
     it('should test time7', function(done) {
-      execSql(done, TYPES.Time, testTime, '7_3', { scale: 7 }, '00:00:00.1111111', true);
+      execSql(done, TYPES.Time, testTime, '7_3_A', { scale: 7 }, '00:00:00.1111111', true);
     });
   });
 
@@ -939,6 +981,155 @@ describe('Parameterised Statements Test', function() {
     );
   });
 
+  it('supports TVP values', function(done) {
+    const config = getConfig();
+
+    if (config.options.tdsVersion < '7_3_A') {
+      this.skip();
+    }
+
+    const connection = new Connection(config);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      async.series([
+        (next) => {
+          connection.execSqlBatch(new Request(`
+            BEGIN TRY
+              DROP TYPE TediousTestType
+            END TRY
+            BEGIN CATCH
+            END CATCH
+          `, next));
+        },
+        (next) => {
+          connection.execSqlBatch(new Request(`
+            CREATE TYPE TediousTestType AS TABLE (
+              a bit,
+              b tinyint,
+              c smallint,
+              d int,
+              e bigint,
+              f real,
+              g float,
+              h varchar(100),
+              i nvarchar(100),
+              j datetime
+            )
+          `, next));
+        }
+      ], (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request('select * from @param', function(err) {
+          if (err) {
+            return done(err);
+          }
+
+          connection.close();
+        });
+
+        request.addParameter('param', TYPES.TVP, {
+          name: 'TediousTestType',
+
+          columns: [
+            {
+              name: 'a',
+              type: TYPES.Bit
+            },
+            {
+              name: 'b',
+              type: TYPES.TinyInt
+            },
+            {
+              name: 'c',
+              type: TYPES.SmallInt
+            },
+            {
+              name: 'd',
+              type: TYPES.Int
+            },
+            {
+              name: 'e',
+              type: TYPES.BigInt
+            },
+            {
+              name: 'f',
+              type: TYPES.Real
+            },
+            {
+              name: 'g',
+              type: TYPES.Float
+            },
+            {
+              name: 'h',
+              type: TYPES.VarChar,
+              length: 100
+            },
+            {
+              name: 'i',
+              type: TYPES.NVarChar,
+              length: 100
+            },
+            {
+              name: 'j',
+              type: TYPES.DateTime,
+              length: 100
+            }
+          ],
+          rows: [
+            [
+              false,
+              1,
+              2,
+              3,
+              4,
+              5.5,
+              6.6,
+              'asdf',
+              'asdf',
+              new Date(Date.UTC(2014, 0, 1))
+            ]
+          ]
+        });
+
+        request.on('doneInProc', function(rowCount, more) {
+          assert.ok(more);
+          assert.strictEqual(rowCount, 1);
+        });
+
+        request.on('row', function(columns) {
+          assert.strictEqual(columns.length, 10);
+          assert.strictEqual(columns[0].value, false);
+          assert.strictEqual(columns[1].value, 1);
+          assert.strictEqual(columns[2].value, 2);
+          assert.strictEqual(columns[3].value, 3);
+          assert.strictEqual(columns[4].value, '4');
+          assert.strictEqual(columns[5].value, 5.5);
+          assert.strictEqual(columns[6].value, 6.6);
+          assert.strictEqual(columns[7].value, 'asdf');
+          assert.strictEqual(columns[8].value, 'asdf');
+          assert.deepEqual(columns[9].value, new Date(Date.UTC(2014, 0, 1)));
+        });
+
+        connection.on('end', function() {
+          done();
+        });
+
+        connection.execSql(request);
+      });
+    });
+  });
+
   // This test fails on the version of SQL Server in AppVeyor.
   // exports.outputDatePrecision_9_day_flip = (test) ->
   //  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
@@ -972,13 +1163,13 @@ describe('Parameterised Statements Test', function() {
       connection.execSql(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should call procedure with parameters', function(done) {
@@ -1055,13 +1246,13 @@ end')\
       connection.execSqlBatch(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
 });

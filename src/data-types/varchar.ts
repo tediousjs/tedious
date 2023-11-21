@@ -1,4 +1,6 @@
-import { DataType } from '../data-type';
+import iconv from 'iconv-lite';
+
+import { type DataType } from '../data-type';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -14,13 +16,13 @@ const VarChar: { maximumLength: number } & DataType = {
   maximumLength: 8000,
 
   declaration: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     let length;
     if (parameter.length) {
       length = parameter.length;
     } else if (value != null) {
-      length = value!.toString().length || 1;
+      length = value.length || 1;
     } else if (value === null && !parameter.output) {
       length = 1;
     } else {
@@ -35,16 +37,12 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   resolveLength: function(parameter) {
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Buffer | null;
 
     if (parameter.length != null) {
       return parameter.length;
     } else if (value != null) {
-      if (Buffer.isBuffer(parameter.value)) {
-        return value.length || 1;
-      } else {
-        return value.toString().length || 1;
-      }
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -60,11 +58,17 @@ const VarChar: { maximumLength: number } & DataType = {
       buffer.writeUInt16LE(MAX, 1);
     }
 
+    if (parameter.collation) {
+      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
+    }
+
     return buffer;
   },
 
   generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       if (parameter.length! <= this.maximumLength) {
         return NULL_LENGTH;
       } else {
@@ -72,16 +76,9 @@ const VarChar: { maximumLength: number } & DataType = {
       }
     }
 
-    let value = parameter.value;
     if (parameter.length! <= this.maximumLength) {
-      if (!Buffer.isBuffer(value)) {
-        value = value.toString();
-      }
-
-      const length = Buffer.byteLength(value, 'ascii');
-
       const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(length, 0);
+      buffer.writeUInt16LE(value.length, 0);
       return buffer;
     } else {
       return UNKNOWN_PLP_LEN;
@@ -89,52 +86,45 @@ const VarChar: { maximumLength: number } & DataType = {
   },
 
   *generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as Buffer | null;
+
+    if (value == null) {
       return;
     }
 
-    let value = parameter.value;
-
-    if (!Buffer.isBuffer(value)) {
-      value = value.toString();
-    }
-
     if (parameter.length! <= this.maximumLength) {
-      if (Buffer.isBuffer(value)) {
-        yield value;
-      } else {
-        yield Buffer.from(value, 'ascii');
-      }
+      yield value;
     } else {
-      const length = Buffer.byteLength(value, 'ascii');
-
-      if (length > 0) {
+      if (value.length > 0) {
         const buffer = Buffer.alloc(4);
-        buffer.writeUInt32LE(length, 0);
+        buffer.writeUInt32LE(value.length, 0);
         yield buffer;
 
-        if (Buffer.isBuffer(value)) {
-          yield value;
-        } else {
-          yield Buffer.from(value, 'ascii');
-        }
+        yield value;
       }
 
       yield PLP_TERMINATOR;
     }
   },
 
-  validate: function(value): string | null {
+  validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;
     }
+
     if (typeof value !== 'string') {
-      if (typeof value.toString !== 'function') {
-        throw new TypeError('Invalid string.');
-      }
-      value = value.toString();
+      throw new TypeError('Invalid string.');
     }
-    return value;
+
+    if (!collation) {
+      throw new Error('No collation was set by the server for the current connection.');
+    }
+
+    if (!collation.codepage) {
+      throw new Error('The collation set by the server has no associated encoding.');
+    }
+
+    return iconv.encode(value, collation.codepage);
   }
 };
 

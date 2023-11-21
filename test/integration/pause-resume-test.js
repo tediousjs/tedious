@@ -1,11 +1,17 @@
+// @ts-check
+
 const fs = require('fs');
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { RequestError } from '../../src/errors';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  config.options.debug = debugOptionsFromEnv();
   // 250 ms timeout until the first response package is received
   config.options.requestTimeout = 250;
   return config;
@@ -13,10 +19,14 @@ function getConfig() {
 
 describe('Pause-Resume Test', function() {
   this.timeout(10000);
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect(done);
   });
 
@@ -102,7 +112,10 @@ describe('Pause-Resume Test', function() {
       assert.ifError(err);
     });
 
-    const pauseAndCancelRequest = (next) => {
+    /**
+     * @param {() => void} next
+     */
+    function pauseAndCancelRequest(next) {
       const sql = `
             with cte1 as
               (select 1 as i union all select i + 1 from cte1 where i < 20000)
@@ -110,8 +123,8 @@ describe('Pause-Resume Test', function() {
           `;
 
       const request = new Request(sql, (error) => {
-        assert.ok(error);
-        assert.strictEqual(error.code, 'ECANCEL');
+        assert.instanceOf(error, RequestError);
+        assert.strictEqual(/** @type {RequestError} */(error).code, 'ECANCEL');
 
         next();
       });
@@ -129,7 +142,7 @@ describe('Pause-Resume Test', function() {
       });
 
       connection.execSql(request);
-    };
+    }
 
     pauseAndCancelRequest(() => {
       const request = new Request('SELECT 1', (error) => {

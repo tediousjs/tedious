@@ -22,13 +22,13 @@ export const generateKeySalt = (
   `with encryption algorithm:${algorithmName} and key length:${keySize}`;
 
 export class AeadAes256CbcHmac256EncryptionKey extends SymmetricKey {
-  private readonly algorithmName: string;
-  private encryptionKeySaltFormat: string;
-  private macKeySaltFormat: string;
-  private ivKeySaltFormat: string;
-  private encryptionKey: SymmetricKey;
-  private macKey: SymmetricKey;
-  private ivKey: SymmetricKey;
+  declare private readonly algorithmName: string;
+  declare private encryptionKeySaltFormat: string;
+  declare private macKeySaltFormat: string;
+  declare private ivKeySaltFormat: string;
+  declare private encryptionKey: SymmetricKey;
+  declare private macKey: SymmetricKey;
+  declare private ivKey: SymmetricKey;
 
   constructor(rootKey: Buffer, algorithmName: string) {
     super(rootKey);
@@ -53,7 +53,7 @@ export class AeadAes256CbcHmac256EncryptionKey extends SymmetricKey {
       const ivKeyBuff = deriveKey(rootKey, this.ivKeySaltFormat);
 
       this.ivKey = new SymmetricKey(ivKeyBuff);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Key extraction failed : ${error.message}.`);
     }
   }

@@ -1,11 +1,12 @@
 import { EventEmitter } from 'events';
-import { typeByName as TYPES, Parameter, DataType } from './data-type';
+import { type Parameter, type DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
-import { Metadata } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { type ColumnMetadata } from './token/colmetadata-token-parser';
+import { Collation } from './collation';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -19,7 +20,7 @@ import { ColumnMetadata } from './token/colmetadata-token-parser';
 type CompletionCallback =
   /**
    * @param error
-   *   If an error occured, an error object.
+   *   If an error occurred, an error object.
    *
    * @param rowCount
    *   The number of rows emitted as result of executing the SQL statement.
@@ -31,7 +32,7 @@ type CompletionCallback =
   // TODO: Figure out how to type the `rows` parameter here.
   (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
 
-interface ParameterOptions {
+export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
@@ -55,78 +56,74 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure?: string;
+  declare sqlTextOrProcedure: string | undefined;
   /**
    * @private
    */
-  parameters: Parameter[];
+  declare parameters: Parameter[];
   /**
    * @private
    */
-  parametersByName: { [key: string]: Parameter };
+  declare parametersByName: { [key: string]: Parameter };
   /**
    * @private
    */
-  originalParameters: Parameter[];
+  declare preparing: boolean;
   /**
    * @private
    */
-  preparing: boolean;
+  declare canceled: boolean;
   /**
    * @private
    */
-  canceled: boolean;
+  declare paused: boolean;
   /**
    * @private
    */
-  paused: boolean;
+  declare userCallback: CompletionCallback;
   /**
    * @private
    */
-  userCallback: CompletionCallback;
+  declare handle: number | undefined;
   /**
    * @private
    */
-  handle?: number;
+  declare error: Error | undefined;
   /**
    * @private
    */
-  error?: Error;
+  declare connection: Connection | undefined;
   /**
    * @private
    */
-  connection?: Connection;
-  /**
-   * @private
-   */
-  timeout?: number;
+  declare timeout: number | undefined;
 
   /**
    * @private
    */
-  rows?: Array<any>;
+  declare rows?: Array<any>;
   /**
    * @private
    */
-  rst?: Array<any>;
+  declare rst?: Array<any>;
   /**
    * @private
    */
-  rowCount?: number;
+  declare rowCount?: number;
 
   /**
    * @private
    */
-  callback: CompletionCallback;
+  declare callback: CompletionCallback;
 
 
-  shouldHonorAE?: boolean;
-  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
-  cryptoMetadataLoaded: boolean;
+  declare shouldHonorAE?: boolean;
+  declare statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  declare cryptoMetadataLoaded: boolean;
 
   /**
    * This event, describing result set columns, will be emitted before row
-   * events are emitted. This event may be emited multiple times when more
+   * events are emitted. This event may be emitted multiple times when more
    * than one recordset is produced by the statement.
    *
    * An array like object, where the columns can be accessed either by index
@@ -176,7 +173,7 @@ class Request extends EventEmitter {
    *
    * This token is used to indicate the completion of a SQL statement.
    * As multiple SQL statements can be sent to the server in a single SQL batch, multiple `done` can be generated.
-   * An `done` event is emited for each SQL statement in the SQL batch except variable declarations.
+   * An `done` event is emitted for each SQL statement in the SQL batch except variable declarations.
    * For execution of SQL statements within stored procedures, `doneProc` and `doneInProc` events are used in place of `done`.
    *
    * If you are using [[Connection.execSql]] then SQL server may treat the multiple calls with the same query as a stored procedure.
@@ -194,7 +191,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -219,7 +216,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -241,7 +238,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, procReturnStatusValue: number, rst?: any[]) => void
   ): this
@@ -360,7 +357,6 @@ class Request extends EventEmitter {
     this.sqlTextOrProcedure = sqlTextOrProcedure;
     this.parameters = [];
     this.parametersByName = {};
-    this.originalParameters = [];
     this.preparing = false;
     this.handle = undefined;
     this.canceled = false;
@@ -402,12 +398,8 @@ class Request extends EventEmitter {
    *   Additional type options. Optional.
    */
   // TODO: `type` must be a valid TDS value type
-  addParameter(name: string, type: DataType, value: unknown, options?: ParameterOptions) {
-    if (options == null) {
-      options = {};
-    }
-
-    const { output = false, length, precision, scale } = options;
+  addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
+    const { output = false, length, precision, scale } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -418,6 +410,7 @@ class Request extends EventEmitter {
       precision: precision,
       scale: scale
     };
+
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;
   }
@@ -437,12 +430,8 @@ class Request extends EventEmitter {
    * @param options
    *   Additional type options. Optional.
    */
-  addOutputParameter(name: string, type: DataType, value?: unknown, options?: ParameterOptions) {
-    if (options == null) {
-      options = {};
-    }
-    options.output = true;
-    this.addParameter(name, type, value, options);
+  addOutputParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
+    this.addParameter(name, type, value, { ...options, output: true });
   }
 
   /**
@@ -467,80 +456,13 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  transformIntoExecuteSqlRpc() {
-    this.validateParameters();
-
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addParameter('statement', TYPES.NVarChar, this.sqlTextOrProcedure);
-    if (this.originalParameters.length) {
-      this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    }
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      this.parameters.push(parameter);
-    }
-    this.sqlTextOrProcedure = 'sp_executesql';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoPrepareRpc() {
-    this.originalParameters = this.parameters;
-    this.parameters = [];
-    this.addOutputParameter('handle', TYPES.Int, undefined);
-    this.addParameter('params', TYPES.NVarChar, this.makeParamsParameter(this.originalParameters));
-    this.addParameter('stmt', TYPES.NVarChar, this.sqlTextOrProcedure);
-    this.sqlTextOrProcedure = 'sp_prepare';
-    this.preparing = true;
-    this.on('returnValue', (name: string, value: any) => {
-      if (name === 'handle') {
-        this.handle = value;
-      } else {
-        this.error = RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
-      }
-    });
-  }
-
-  /**
-   * @private
-   */
-  transformIntoUnprepareRpc() {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-    this.sqlTextOrProcedure = 'sp_unprepare';
-  }
-
-  /**
-   * @private
-   */
-  transformIntoExecuteRpc(parameters: { [key: string]: unknown }) {
-    this.parameters = [];
-    this.addParameter('handle', TYPES.Int, this.handle);
-
-    for (let i = 0, len = this.originalParameters.length; i < len; i++) {
-      const parameter = this.originalParameters[i];
-      parameter.value = parameters[parameter.name];
-      this.parameters.push(parameter);
-    }
-
-    this.validateParameters();
-
-    this.sqlTextOrProcedure = 'sp_execute';
-  }
-
-  /**
-   * @private
-   */
-  validateParameters() {
+  validateParameters(collation: Collation | undefined) {
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
 
       try {
-        parameter.value = parameter.type.validate(parameter.value);
-      } catch (error) {
+        parameter.value = parameter.type.validate(parameter.value, collation);
+      } catch (error: any) {
         throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
       }
     }

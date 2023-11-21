@@ -1,28 +1,31 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const TYPES = require('../../src/data-type').typeByName;
 const fs = require('fs');
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true,
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
 }
 
+/**
+ * @typedef {typeof import('../../src/data-type').typeByName} TYPES
+ */
+
 describe('RPC test', function() {
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {
@@ -38,9 +41,9 @@ describe('RPC test', function() {
       console.log(`${error.number} : ${error.message}`);
     });
 
-    connection.on('debug', (text) => {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   afterEach(function(done) {
@@ -52,6 +55,11 @@ describe('RPC test', function() {
     }
   });
 
+  /**
+   * @param {Connection} connection
+   * @param {string} sql
+   * @param {() => void} done
+   */
   function execSqlBatch(connection, sql, done) {
     const request = new Request(sql, function(err) {
       if (err) {
@@ -65,6 +73,12 @@ describe('RPC test', function() {
     connection.execSqlBatch(request);
   }
 
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
   function testProc(done, type, typeAsString, value) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
@@ -105,8 +119,13 @@ select @param\
     );
   }
 
+  /**
+   * @param {Mocha.Done} done
+   * @param {TYPES[keyof TYPES]} type
+   * @param {string} typeAsString
+   * @param {unknown} value
+   */
   function testProcOutput(done, type, typeAsString, value) {
-
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 
@@ -127,7 +146,7 @@ select @param\
 
     request.on('returnValue', function(name, returnValue, metadata) {
       assert.strictEqual(name, 'paramOut');
-      if (value instanceof Date) {
+      if (value instanceof Date && returnValue instanceof Date) {
         assert.strictEqual(returnValue.getTime(), value.getTime());
       } else {
         assert.strictEqual(returnValue, value);
@@ -321,7 +340,7 @@ set @paramOut = @paramIn\
       connection.callProcedure(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -336,11 +355,9 @@ set @paramOut = @paramIn\
       assert.ok(error);
     });
 
-    connection.on(
-      'debug',
-      function(text) { }
-      // console.log(text)
-    );
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('should proc return value', function(done) {
@@ -375,7 +392,7 @@ set @paramOut = @paramIn\
       );
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
@@ -390,11 +407,9 @@ set @paramOut = @paramIn\
       assert.ok(error);
     });
 
-    connection.on(
-      'debug',
-      function(text) { }
-      // console.log(text)
-    );
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
 });

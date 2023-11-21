@@ -45,9 +45,9 @@ export function assertValidIsolationLevel(isolationLevel: any, name: string): as
 }
 
 export class Transaction {
-  name: string;
-  isolationLevel: number;
-  outstandingRequestCount: number;
+  declare name: string;
+  declare isolationLevel: number;
+  declare outstandingRequestCount: number;
 
   constructor(name: string, isolationLevel = ISOLATION_LEVEL.NO_CHANGE) {
     this.name = name;

@@ -1,22 +1,19 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
-const TYPES = require('../../src/data-type').typeByName;
+// @ts-check
 
 const fs = require('fs');
 const { assert } = require('chai');
+
+const TYPES = require('../../src/data-type').typeByName;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 
-config.options.debug = {
-  packet: true,
-  data: true,
-  payload: true,
-  token: true,
-  log: true
-};
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 describe('inserting binary data', function() {
@@ -25,6 +22,10 @@ describe('inserting binary data', function() {
   beforeEach(function(done) {
     this.connection = new Connection(config);
     this.connection.connect(done);
+
+    if (process.env.TEDIOUS_DEBUG) {
+      this.connection.on('debug', console.log);
+    }
   });
 
   afterEach(function(done) {
@@ -47,7 +48,9 @@ describe('inserting binary data', function() {
           return done(err);
         }
 
+        /** @type {unknown[]} */
         const values = [];
+
         const request = new Request('SELECT [data] FROM #test', (err) => {
           if (err) {
             return done(err);

@@ -1,22 +1,19 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+// @ts-check
+
 const fs = require('fs');
 const TYPES = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
+
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: false,
-    log: true,
-  };
-
+  config.options.debug = debugOptionsFromEnv();
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
@@ -51,12 +48,61 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+  });
+
+  it('does not cause unexpected `returnValue` events to be emitted', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      /**
+       * @type {{ parameterName: string, value: unknown, metadata: import('../../src/metadata-parser').Metadata }[]}
+       */
+      const returnValues = [];
+
+      const request = new Request('select @param', function(err) {
+        if (err) {
+          return done(err);
+        }
+
+        assert.lengthOf(returnValues, 1);
+
+        connection.close();
+      });
+      request.addParameter('param', TYPES.Int);
+
+      request.on('prepared', function() {
+        assert.ok(request.handle);
+
+        assert.lengthOf(returnValues, 1);
+        assert.strictEqual(returnValues[0].parameterName, 'handle');
+
+        connection.execute(request, { param: 8 });
+      });
+
+      request.on('returnValue', (parameterName, value, metadata) => {
+        returnValues.push({ parameterName, value, metadata });
+      });
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
     });
   });
 
@@ -64,6 +110,10 @@ describe('Prepare Execute Statement', function() {
     const config = getConfig();
 
     let eventEmitterLeak = false;
+
+    /**
+     * @type {NodeJS.WarningListener}
+     */
     const onWarning = (warning) => {
       if (warning.name === 'MaxListenersExceededWarning') {
         eventEmitterLeak = true;
@@ -85,7 +135,9 @@ describe('Prepare Execute Statement', function() {
     });
 
     const connection = new Connection(config);
-
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     request.on('prepared', function() {
       connection.execute(request);
     });
@@ -98,7 +150,7 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       process.removeListener('warning', onWarning);
 
       if (eventEmitterLeak) {
@@ -128,12 +180,12 @@ describe('Prepare Execute Statement', function() {
       connection.prepare(request);
     });
 
-    connection.on('end', function(info) {
+    connection.on('end', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 });

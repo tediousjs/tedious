@@ -2,10 +2,10 @@ name: Node CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ "master", "alpha", "beta", "*.x" ]
 
   pull_request:
-    branches: [ master ]
+    branches: [ "master", "alpha", "beta", "*.x" ]
 
 env:
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -14,19 +14,22 @@ jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
       with:
-        node-version: 12
+        fetch-depth: 0
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -36,56 +39,36 @@ jobs:
     - run: npm ci
     - run: npm run lint
 
-    - name: Prepare Commitlint (pull_request)
-      if: ${{ github.event_name == 'pull_request' }}
-      run: |
-        echo "TRAVIS_PULL_REQUEST_SLUG=${{ github.event.pull_request.head.repo.full_name }}" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=HEAD~..HEAD" >> $GITHUB_ENV
-
-    - name: Prepare Commitlint (push)
-      if: ${{ github.event_name == 'push' }}
-      run:  |
-        echo "TRAVIS_PULL_REQUEST_SLUG=" >> $GITHUB_ENV
-        echo "TRAVIS_COMMIT_RANGE=${{ github.event.before }}..${{ github.event.after }}" >> $GITHUB_ENV
-
-    - run: npx commitlint-travis
-      env:
-        TRAVIS: "true"
-        CI: "true"
-        TRAVIS_EVENT_TYPE: "${{ github.event_name }}"
-        TRAVIS_REPO_SLUG: "${{ github.repository }}"
-        TRAVIS_COMMIT: "${{ github.sha }}"
-
   test:
     name: SQL Server Linux / Node.js ${{ matrix.node-version }}
-
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x, 16.x]
+        node-version: [16.x, 18.x, 19.x]
       fail-fast: false
 
-    services:
-      sqlserver:
-        image: microsoft/mssql-server-linux
-        ports:
-          - 1433:1433
-        env:
-          ACCEPT_EULA: "Y"
-          SA_PASSWORD: "yourStrong(!)Password"
-
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
+
+    - name: Generate TLS Certificate
+      run: |
+        openssl req -x509 -newkey rsa:4096 -nodes -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
+
+    - name: Start containers
+      run: |
+        docker-compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
       run: |
         mkdir ~/.tedious
+
         echo '{
           "config": {
             "server": "localhost",
@@ -99,10 +82,10 @@ jobs:
             "options": {
               "port": 1433,
               "database": "master",
-              "trustServerCertificate": true
+              "encrypt": true
             }
           }
-        }' > ~/.tedious/test-connection.json
+        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -113,7 +96,7 @@ jobs:
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -174,32 +157,232 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-  azure:
-    name: Azure SQL Server / Node.js 12.x
-    runs-on: ubuntu-latest
+  test-windows:
+    name: SQL Server ${{ matrix.mssql-version }} Windows / Node.js ${{ matrix.node-version }}
+    runs-on: windows-2022
+    timeout-minutes: 20
 
-    # Only run these tests if we have access to the secrets
-    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+    strategy:
+      matrix:
+        mssql-version: [2016, 2017, 2019, 2022]
+        node-version: [16.x, 18.x, 19.x, 20.x]
+      fail-fast: false
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - name: Install SQL Server ${{ matrix.mssql-version }}
+      shell: pwsh
+      run: |
+        Push-Location C:\temp
+
+        $exe_link, $box_link, $update_link, $update_download_link = '', '', '', ''
+
+        switch (${{ matrix.mssql-version }}) {
+          '2022' {
+            $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=105013'
+          }
+          '2019' {
+            $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=100809'
+          }
+          '2017' {
+            $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
+            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=56128'
+          }
+          '2016' {
+            $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
+            $box_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box'
+            $update_download_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
+          }
+          default {
+            Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
+            Exit 1
+          }
+        }
+
+        if (${{ matrix.mssql-version }} -ne '2016') {
+          $dl_links = ((Invoke-WebRequest -Uri $update_link).Links | Where-Object {$_.href -like 'https://download.microsoft.com/*'})
+          if ($dl_links.count -gt 0) {
+            $update_download_link = [System.Uri]::new($dl_links[0].href)
+          } else {
+            Write-Error "Download link not found"
+            Exit 1
+          }
+          echo $update_download_link
+        }
+
+        Invoke-WebRequest -Uri $update_download_link -Outfile sqlupdate.exe
+        Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
+        Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
+
+        Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
+
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+
+        Pop-Location
+
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
       with:
-        node-version: 12
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install dbatools
+      shell: powershell
+      run: Install-Module dbatools -Force
+
+    - name: Set up TLS Key and Certificate
+      shell: powershell
+      run: |
+        Import-Module dbatools
+
+        $certificate = New-SelfSignedCertificate `
+          -Type SSLServerAuthentication `
+          -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
+          -DnsName "$env:COMPUTERNAME",'localhost.' `
+          -KeyAlgorithm 'RSA' -KeyLength 2048 -Hash 'SHA256' `
+          -TextExtension '2.5.29.37={text}1.3.6.1.5.5.7.3.1' `
+          -NotAfter (Get-Date).AddMonths(36) `
+          -KeyExportPolicy NonExportable -KeySpec KeyExchange `
+          -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
+          -CertStoreLocation Cert:\LocalMachine\My `
+
+        $sqlinstance = Find-DbaInstance -ComputerName localhost
+        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+
+        Restart-Service MSSQLSERVER
+
+        # Convert UA certificate raw data to Base64
+        $output = @(
+        '-----BEGIN CERTIFICATE-----'
+        [System.Convert]::ToBase64String($certificate.RawData, 1)
+        '-----END CERTIFICATE-----'
+        )
+        # Output PEM file to the path
+        $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
+
+    - name: Set up CI configuration
+      shell: bash
+      run: |
+        mkdir ~/.tedious
+
+        echo '{
+          "config": {
+            "server": "localhost",
+            "authentication": {
+              "type": "default",
+              "options": {
+                "userName": "sa",
+                "password": "yourStrong(!)Password"
+              }
+            },
+            "options": {
+              "port": 1433,
+              "database": "master",
+              "trustServerCertificate": true
+            }
+          }
+        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+
+    - name: Upgrade npm
+      run: npm install -g npm
+      if: ${{ matrix.node-version == '6.x' }}
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
 
+    - run: npm ci
+
+    - name: run unit tests
+      run: npx nyc --reporter=lcov npm run test
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.4)
+      env:
+        TEDIOUS_TDS_VERSION: 7_4
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.3B)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_B
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.3A)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_A
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.2)
+      env:
+        TEDIOUS_TDS_VERSION: 7_2
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: run integration tests (TDS 7.1)
+      env:
+        TEDIOUS_TDS_VERSION: 7_1
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  azure-sql-auth:
+    name: Azure SQL Server / Node.js 16.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
     - run: npm ci
 
     - run: mkdir ~/.tedious
@@ -222,13 +405,43 @@ jobs:
             }
           }
         }' > ~/.tedious/test-connection.json
-
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+
+  azure-ad-auth:
+    name: Azure SQL Server / Node.js 16.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - run: mkdir ~/.tedious
 
     - name: Set up CI configuration (AD Authentication)
       run: |
@@ -238,6 +451,8 @@ jobs:
             "authentication": {
               "type": "azure-active-directory-password",
               "options": {
+                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
+                "tenantId": "${{ secrets.AZURE_AD_TENANT_ID }}",
                 "userName": "${{ secrets.AZURE_AD_USERNAME }}",
                 "password": "${{ secrets.AZURE_AD_PASSWORD }}"
               }
@@ -255,6 +470,37 @@ jobs:
     - uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+
+  azure-ad-service-principal-auth:
+    name: Azure SQL Server / Node.js 16.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - run: mkdir ~/.tedious
 
     - name: Set up CI configuration (AD Service Principal Authentication)
       run: |
@@ -285,23 +531,23 @@ jobs:
 
   pre-release:
     name: Pre-Release
-    needs: [test, azure]
+    needs: [test, test-windows]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js 12
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v3
+    - name: Use Node.js 16
+      uses: actions/setup-node@v3
       with:
-        node-version: 12
+        node-version: 16
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
         echo "::set-output name=dir::$(npm config get cache)"
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}

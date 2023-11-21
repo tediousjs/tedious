@@ -1,28 +1,30 @@
+// @ts-check
+
 const fs = require('fs');
 const { assert } = require('chai');
 
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: false,
-    log: true
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
 }
 
+/**
+ * @typedef {import('net').Socket} Socket
+ */
+
 describe('A `error` on the network socket', function() {
+  /** @type {Connection} */
   let connection;
 
   beforeEach(function(done) {
@@ -30,6 +32,9 @@ describe('A `error` on the network socket', function() {
 
     connection = new Connection(getConfig());
     connection.on('error', done);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect((err) => {
       connection.removeListener('error', done);
       done(err);
@@ -52,7 +57,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 
@@ -68,7 +73,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 
@@ -92,7 +97,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      connection.socket.emit('error', socketError);
+      /** @type {Socket} */(connection.socket).emit('error', socketError);
     });
   });
 });

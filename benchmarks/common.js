@@ -12,9 +12,7 @@ const {
   }
 } = require('perf_hooks');
 
-require('@babel/register')({ extensions: ['.ts'] });
-
-const { Connection } = require('../src/tedious');
+const { Connection } = require('tedious');
 
 // The `Benchmark` class is taken from Node.js - see
 // https://github.com/nodejs/node/blob/0f96dc266fd0cd8c1baa82ce7eb951c11b29a331/benchmark/common.js
@@ -65,7 +63,7 @@ function Benchmark(fn, configs, options) {
 
     for (let i = 0; i < length; i++) {
       const entry = entries[i];
-      const stats = this._gcStats[entry.kind];
+      const stats = this._gcStats[entry.detail.kind];
 
       if (stats) {
         stats.count += 1;

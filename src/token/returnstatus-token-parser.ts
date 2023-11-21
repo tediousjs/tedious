@@ -1,13 +1,13 @@
 // s2.2.7.16
-import Parser from './stream-parser';
-import { InternalConnectionOptions } from '../connection';
+import { readInt32LE, Result } from './helpers';
+import { type ParserOptions } from './stream-parser';
 
 import { ReturnStatusToken } from './token';
 
-function returnStatusParser(parser: Parser, _options: InternalConnectionOptions, callback: (token: ReturnStatusToken) => void) {
-  parser.readInt32LE((value) => {
-    callback(new ReturnStatusToken(value));
-  });
+function returnStatusParser(buf: Buffer, offset: number, _options: ParserOptions): Result<ReturnStatusToken> {
+  let value;
+  ({ value, offset } = readInt32LE(buf, offset));
+  return new Result(new ReturnStatusToken(value), offset);
 }
 
 export default returnStatusParser;

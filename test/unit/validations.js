@@ -1,3 +1,4 @@
+const { Collation } = require('../../src/collation');
 const TYPE = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
 
@@ -290,32 +291,40 @@ describe('Validations', function() {
   });
 
   it('Text', () => {
-    let value = TYPE.Text.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.Text.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.Text.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.Text.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.Text.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
     assert.throws(() => {
-      TYPE.Text.validate({ toString: null });
+      TYPE.Text.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.Text.validate({ toString: null }, collation);
     }, TypeError, 'Invalid string.');
   });
 
   it('VarChar', () => {
-    let value = TYPE.VarChar.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.VarChar.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.VarChar.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.VarChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.VarChar.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
     assert.throws(() => {
-      TYPE.VarChar.validate({ toString: null });
+      TYPE.VarChar.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.VarChar.validate({ toString: null }, collation);
     }, TypeError, 'Invalid string.');
   });
 
@@ -326,8 +335,9 @@ describe('Validations', function() {
     value = TYPE.NVarChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NVarChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.NVarChar.validate({ toString: null });
@@ -335,17 +345,21 @@ describe('Validations', function() {
   });
 
   it('Char', () => {
-    let value = TYPE.Char.validate(null);
-    assert.strictEqual(value, null);
+    // SQL_Latin1_General_CP1_CI_AS
+    const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
-    value = TYPE.Char.validate('asdf');
-    assert.strictEqual(value, 'asdf');
+    let value = TYPE.Char.validate(null, collation);
+    assert.isNull(value);
 
-    value = TYPE.Char.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    value = TYPE.Char.validate('asdf', collation);
+    assert.deepEqual(value, Buffer.from('asdf', 'ascii'));
 
     assert.throws(() => {
-      TYPE.Char.validate({ toString: null });
+      TYPE.Char.validate(Buffer.from('asdf'), collation);
+    }, TypeError, 'Invalid string.');
+
+    assert.throws(() => {
+      TYPE.Char.validate({ toString: null }, collation);
     }, TypeError, 'Invalid string.');
   });
 
@@ -356,8 +370,9 @@ describe('Validations', function() {
     value = TYPE.NChar.validate('asdf');
     assert.strictEqual(value, 'asdf');
 
-    value = TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
-    assert.strictEqual(value, 'asdf');
+    assert.throws(() => {
+      TYPE.NChar.validate(Buffer.from('asdf', 'utf8'));
+    }, TypeError, 'Invalid string.');
 
     assert.throws(() => {
       TYPE.NChar.validate({ toString: null });

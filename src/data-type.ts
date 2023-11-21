@@ -37,9 +37,10 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { CryptoMetadata } from './always-encrypted/types';
+import { type CryptoMetadata } from './always-encrypted/types';
 
-import { InternalConnectionOptions } from './connection';
+import { type InternalConnectionOptions } from './connection';
+import { Collation } from './collation';
 
 export interface Parameter {
   type: DataType;
@@ -48,28 +49,24 @@ export interface Parameter {
   value: unknown;
 
   output: boolean;
-  length?: number;
-  precision?: number;
-  scale?: number;
-  collation?: {
-    lcid: number;
-    flags: number;
-    version: number;
-    sortId: number;
-  };
+  length?: number | undefined;
+  precision?: number | undefined;
+  scale?: number | undefined;
 
-  nullable?: boolean;
+  nullable?: boolean | undefined;
 
-  forceEncrypt?: boolean;
-  cryptoMetadata?: CryptoMetadata;
-  encryptedVal?: Buffer;
+  forceEncrypt?: boolean | undefined;
+  cryptoMetadata?: CryptoMetadata | undefined;
+  encryptedVal?: Buffer | undefined;
 }
 
 
 export interface ParameterData<T = any> {
-  length?: number;
-  scale?: number;
-  precision?: number;
+  length?: number | undefined;
+  scale?: number | undefined;
+  precision?: number | undefined;
+
+  collation?: Collation | undefined;
 
   value: T;
 }
@@ -83,7 +80,7 @@ export interface DataType {
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
-  validate(value: any, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
+  validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
 

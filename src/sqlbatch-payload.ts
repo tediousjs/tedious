@@ -5,9 +5,9 @@ import { writeToTrackingBuffer } from './all-headers';
   s2.2.6.6
  */
 class SqlBatchPayload implements Iterable<Buffer> {
-  sqlText: string;
-  txnDescriptor: Buffer;
-  options: { tdsVersion: string };
+  declare sqlText: string;
+  declare txnDescriptor: Buffer;
+  declare options: { tdsVersion: string };
 
   constructor(sqlText: string, txnDescriptor: Buffer, options: { tdsVersion: string }) {
     this.sqlText = sqlText;
