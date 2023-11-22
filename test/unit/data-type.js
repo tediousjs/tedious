@@ -251,13 +251,13 @@ describe('DateTime', function() {
     it('returns a TypeError for dates that are below January 1, 1753', function() {
       assert.throws(() => {
         TYPES.DateTime.validate(new Date('January 1, 1752'));
-      }, TypeError, 'Out of range.');
+      }, TypeError, 'Date is out of range.');
     });
 
     it('returns a TypeError for dates that are greater than December 31, 9999', function() {
       assert.throws(() => {
         TYPES.DateTime.validate(new Date('December 31, 10000'));
-      }, TypeError, 'Out of range.');
+      }, TypeError, 'Date is out of range.');
     });
   });
 });

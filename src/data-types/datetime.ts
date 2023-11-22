@@ -101,7 +101,7 @@ const DateTime: DataType = {
     }
 
     if (value < MIN_DATE || value > MAX_DATE) {
-      throw new TypeError('Out of range.');
+      throw new TypeError('Date is out of range.');
     }
 
     return value;
