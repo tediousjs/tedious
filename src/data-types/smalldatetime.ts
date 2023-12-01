@@ -1,8 +1,14 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
+import { type InternalConnectionOptions } from '../connection';
+
+import { Collation } from '../collation';
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+
+const MIN_DATE = new Date(1900, 1, 1);
+const MAX_DATE = new Date(2079, 5, 6, 23, 59, 59, 0);
 
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -35,7 +41,7 @@ const SmallDateTime: DataType = {
 
     const buffer = Buffer.alloc(4);
 
-    let days, dstDiff, minutes;
+    let days: number, dstDiff: number, minutes: number;
     if (options.useUTC) {
       days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
       minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
@@ -51,13 +57,23 @@ const SmallDateTime: DataType = {
     yield buffer;
   },
 
-  validate: function(value): null | Date {
+  validate: function(value, collation: Collation | undefined, options: InternalConnectionOptions): null | Date {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
       value = new Date(Date.parse(value));
+    }
+
+    value = value as Date;
+
+    if (options && options.useUTC) {
+      value = new Date(value.toUTCString());
+    }
+
+    if (value < MIN_DATE || value > MAX_DATE) {
+      throw new TypeError('Out of range.');
     }
 
     if (isNaN(value)) {
