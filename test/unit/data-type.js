@@ -741,6 +741,25 @@ describe('Money', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe.only('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+
+        TYPES.Money.validate(-922337203685477.5808 - 0.1);
+      }, TypeError, 'Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
+
+      assert.throws(() => {
+        TYPES.Money.validate(922337203685477.5807 + 0.1);
+      }, TypeError, 'Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
+    });
+  });
 });
 
 describe('NChar', function() {
