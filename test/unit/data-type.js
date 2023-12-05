@@ -680,6 +680,24 @@ describe('Int', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe.only('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.Int.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.Int.validate(-2147483648 - 1);
+      }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
+
+      assert.throws(() => {
+        TYPES.Int.validate(2147483647 + 1);
+      }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
+    });
+  });
 });
 
 describe('Money', function() {
@@ -1077,6 +1095,24 @@ describe('SmallInt', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.SmallInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.SmallInt.validate(-32768 - 1);
+      }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
+
+      assert.throws(() => {
+        TYPES.SmallInt.validate(32767 + 1);
+      }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
+    });
+  });
 });
 
 describe('SmallMoney', function() {
@@ -1108,6 +1144,24 @@ describe('SmallMoney', function() {
 
       const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
+    });
+
+    describe('.validate', function() {
+      it('throws Invalid number error for NaN input', function() {
+        assert.throws(() => {
+          TYPES.SmallMoney.validate('string');
+        }, TypeError, 'Invalid number.');
+      });
+
+      it('throws Out of Range error for numbers out of range', function() {
+        assert.throws(() => {
+          TYPES.SmallMoney.validate(-214748.3648 - 0.0001);
+        }, TypeError, 'Value must be between -214748.3648 and 214748.3647.');
+
+        assert.throws(() => {
+          TYPES.SmallMoney.validate(214748.3647 + 0.0001);
+        }, TypeError, 'Value must be between -214748.3648 and 214748.3647.');
+      });
     });
   });
 
@@ -1255,6 +1309,24 @@ describe('TinyInt', function() {
 
       const result = type.generateTypeInfo();
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate(-1);
+      }, TypeError, 'Value must be between 0 and 255, inclusive.');
+
+      assert.throws(() => {
+        TYPES.TinyInt.validate(256);
+      }, TypeError, 'Value must be between 0 and 255, inclusive.');
     });
   });
 });
