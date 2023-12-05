@@ -681,7 +681,7 @@ describe('Int', function() {
     });
   });
 
-  describe.only('.validate', function() {
+  describe('.validate', function() {
     it('throws Invalid number error for NaN input', function() {
       assert.throws(() => {
         TYPES.Int.validate('string');
