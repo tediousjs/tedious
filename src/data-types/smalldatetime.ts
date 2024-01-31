@@ -1,8 +1,12 @@
+import { type InternalConnectionOptions } from '../connection';
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-
+import { Collation } from '../collation';
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+
+const MIN_DATE = new Date(1900, 1, 1);
+const MAX_DATE = new Date(2079, 5, 6, 23, 59, 59, 0);
 
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -51,7 +55,7 @@ const SmallDateTime: DataType = {
     yield buffer;
   },
 
-  validate: function(value): null | Date {
+  validate: function(value, collation: Collation | undefined, options: InternalConnectionOptions): null | Date {
     if (value == null) {
       return null;
     }
@@ -62,6 +66,24 @@ const SmallDateTime: DataType = {
 
     if (isNaN(value)) {
       throw new TypeError('Invalid date.');
+    }
+
+    value = value as Date;
+
+    if (options && options.useUTC) {
+      value = new Date(value.toUTCString());
+    }
+
+    if (value < EPOCH_DATE) {
+      throw new TypeError('Out of range.');
+    }
+
+    if (value.getFullYear() < 1900) {
+      throw new TypeError('Out of range.');
+    }
+
+    if (value < MIN_DATE || value > MAX_DATE) {
+      throw new TypeError('Out of range.');
     }
 
     return value;
