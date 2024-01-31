@@ -1,8 +1,5 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { type InternalConnectionOptions } from '../connection';
-
-import { Collation } from '../collation';
 
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
@@ -57,7 +54,7 @@ const SmallDateTime: DataType = {
     yield buffer;
   },
 
-  validate: function(value, collation: Collation | undefined, options: InternalConnectionOptions): null | Date {
+  validate: function(value, collation, options): null | Date {
     if (value == null) {
       return null;
     }

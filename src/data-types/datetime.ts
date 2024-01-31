@@ -1,9 +1,6 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
-import { type InternalConnectionOptions } from '../connection';
-
-import { Collation } from '../collation';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -78,7 +75,7 @@ const DateTime: DataType = {
   },
 
   // TODO: type 'any' needs to be revisited.
-  validate: function(value: any, collation: Collation | undefined, options: InternalConnectionOptions): null | number {
+  validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;
     }

@@ -1,9 +1,6 @@
 import { type DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
-import { type InternalConnectionOptions } from '../connection';
-
-import { Collation } from '../collation';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -108,7 +105,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     yield buffer.data;
   },
 
-  validate: function(value: any, collation: Collation | undefined, options: InternalConnectionOptions): null | number {
+  validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;
     }

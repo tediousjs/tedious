@@ -1,8 +1,5 @@
 import { type DataType } from '../data-type';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
-import { type InternalConnectionOptions } from '../connection';
-
-import { Collation } from '../collation';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
@@ -55,7 +52,7 @@ const Date: DataType = {
   },
 
   // TODO: value is technically of type 'unknown'.
-  validate: function(value: any, collation: Collation | undefined, options: InternalConnectionOptions): null | Date {
+  validate: function(value, collation, options): null | Date {
     if (value == null) {
       return null;
     }
