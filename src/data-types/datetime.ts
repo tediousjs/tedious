@@ -6,6 +6,9 @@ const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 const DATA_LENGTH = Buffer.from([0x08]);
 
+const MIN_DATE = new Date('January 1, 1753');
+const MAX_DATE = new Date('December 31, 9999');
+
 const DateTime: DataType = {
   id: 0x3D,
   type: 'DATETIME',
@@ -34,7 +37,7 @@ const DateTime: DataType = {
 
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
-    let date;
+    let date: LocalDate;
     if (options.useUTC) {
       date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
     } else {
@@ -72,13 +75,25 @@ const DateTime: DataType = {
   },
 
   // TODO: type 'any' needs to be revisited.
-  validate: function(value): null | number {
+  validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
       value = new Date(Date.parse(value));
+    }
+
+    value = value as Date;
+
+    // TODO: check date range: January 1, 1753, through December 31, 9999
+    //    : time range: 00:00:00 through 23:59:59.997
+    if (options && options.useUTC) {
+      value = new Date(value.toUTCString());
+    }
+
+    if (value < MIN_DATE || value > MAX_DATE) {
+      throw new TypeError('Out of range.');
     }
 
     if (isNaN(value)) {
