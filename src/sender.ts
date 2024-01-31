@@ -1,7 +1,7 @@
 import dgram from 'dgram';
 import dns from 'dns';
 import net from 'net';
-import * as punycode from 'punycode';
+import * as punycode from 'punycode/';
 import { AbortSignal } from 'node-abort-controller';
 
 import AbortError from './errors/abort-error';
