@@ -1,5 +1,5 @@
 const sinon = require('sinon');
-const punycode = require('punycode');
+const punycode = require('punycode/');
 const assert = require('chai').assert;
 const dgram = require('dgram');
 const { AbortController } = require('node-abort-controller');
