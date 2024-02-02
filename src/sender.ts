@@ -2,6 +2,7 @@ import dgram from 'dgram';
 import dns from 'dns';
 import net from 'net';
 import url from 'node:url';
+
 import { AbortSignal } from 'node-abort-controller';
 
 import AbortError from './errors/abort-error';

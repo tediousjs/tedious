@@ -5,6 +5,9 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 
+const MIN_DATE = new Date('January 1, 0001');
+const MAX_DATE = new Date('December 31, 9999');
+
 const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
   type: 'DATETIMEOFFSETN',
@@ -62,7 +65,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     const buffer = new WritableTrackingBuffer(16);
     scale = scale!;
 
-    let timestamp;
+    let timestamp: number;
     timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
     timestamp = timestamp * Math.pow(10, scale - 3);
     timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
@@ -92,13 +95,25 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeInt16LE(offset);
     yield buffer.data;
   },
-  validate: function(value): null | number {
+  validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
       value = new Date(Date.parse(value));
+    }
+
+    value = value as Date;
+
+    // TODO: check date range: January 1, 0001, through December 31, 9999
+    //    : time range: 00:00:00 through 23:59:59.997
+    if (options && options.useUTC) {
+      value = new Date(value.toUTCString());
+    }
+
+    if (value < MIN_DATE || value > MAX_DATE) {
+      throw new TypeError('Out of range.');
     }
 
     if (isNaN(value)) {

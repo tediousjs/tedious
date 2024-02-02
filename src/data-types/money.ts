@@ -49,6 +49,14 @@ const Money: DataType = {
     if (isNaN(value)) {
       throw new TypeError('Invalid number.');
     }
+    // money： -922337203685477.5808 to 922337203685477.5807
+    // in javascript -922337203685477.5808 === -922337203685477.6
+    //                922337203685477.5807 === 922337203685477.6
+    // javascript number doesn't have enough precision.
+    if (value < -922337203685477.6 || value > 922337203685477.6) {
+      throw new TypeError('Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
+    }
+
     return value;
   }
 };
