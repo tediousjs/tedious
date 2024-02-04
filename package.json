@@ -89,6 +89,7 @@
   "scripts": {
     "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
+    "lint:commit": "commitlint --from origin/master --to HEAD",
     "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha test/integration/",
     "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
