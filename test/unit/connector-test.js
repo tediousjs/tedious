@@ -1,6 +1,6 @@
 const Mitm = require('mitm');
 const sinon = require('sinon');
-const punycode = require('punycode/');
+const url = require('node:url');
 const assert = require('chai').assert;
 const { AbortController } = require('node-abort-controller');
 const AggregateError = require('es-aggregate-error');
@@ -27,7 +27,7 @@ describe('lookupAllAddresses', function() {
     }
 
     assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch(punycode.toASCII(server)), 'Unexpected hostname passed to `lookup`');
+    assert.isOk(lookup.calledWithMatch(url.domainToASCII(server)), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test ASCII Server name', async function() {
