@@ -1,7 +1,8 @@
 import dgram from 'dgram';
 import dns from 'dns';
 import net from 'net';
-import * as punycode from 'punycode/';
+import url from 'node:url';
+
 import { AbortSignal } from 'node-abort-controller';
 
 import AbortError from './errors/abort-error';
@@ -83,7 +84,7 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
 
       signal.addEventListener('abort', onAbort);
 
-      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+      lookup(url.domainToASCII(host), { all: true }, (err, addresses) => {
         signal.removeEventListener('abort', onAbort);
 
         err ? reject(err) : resolve(addresses);
