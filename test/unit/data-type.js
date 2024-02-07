@@ -322,7 +322,9 @@ describe('DateTime2', function() {
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        TYPES.DateTime2.validate(new Date('Dec 31, 2000'));
+        const testDate = new Date();
+        testDate.setFullYear(0);
+        TYPES.DateTime2.validate(testDate);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
