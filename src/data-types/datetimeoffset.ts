@@ -5,9 +5,6 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 
-const MIN_DATE = new Date('January 1, 0001');
-const MAX_DATE = new Date('December 31, 9999');
-
 const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
   type: 'DATETIMEOFFSETN',
