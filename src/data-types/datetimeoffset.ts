@@ -108,11 +108,14 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
 
     // TODO: check date range: January 1, 0001, through December 31, 9999
     //    : time range: 00:00:00 through 23:59:59.997
+    let year;
     if (options && options.useUTC) {
-      value = new Date(value.toUTCString());
+      year = value.getUTCFullYear();
+    } else {
+      year = value.getFullYear();
     }
 
-    if (value < MIN_DATE || value > MAX_DATE) {
+    if (year < 1 || year > 9999) {
       throw new TypeError('Out of range.');
     }
 
