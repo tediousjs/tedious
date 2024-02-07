@@ -65,12 +65,26 @@ const SmallDateTime: DataType = {
 
     value = value as Date;
 
+    let year, month, date;
     if (options && options.useUTC) {
-      value = new Date(value.toUTCString());
+      year = value.getUTCFullYear();
+      month = value.getUTCMonth();
+      date = value.getUTCDate();
+    } else {
+      year = value.getFullYear();
+      month = value.getMonth();
+      date = value.getDate();
     }
 
-    if (value < MIN_DATE || value > MAX_DATE) {
+    if (year < 1900 || year > 2079) {
       throw new TypeError('Out of range.');
+    }
+
+    if (year === 2079) {
+      // Month is 0-indexed, i.e. Jan = 0, Dec = 11
+      if (month > 4 || (month === 4 && date > 6)) {
+        throw new TypeError('Out of range.');
+      }
     }
 
     if (isNaN(value)) {
