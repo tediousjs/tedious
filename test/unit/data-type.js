@@ -215,7 +215,9 @@ describe('Date', function() {
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        TYPES.Date.validate(new Date('Dec 31 2000'));
+        const testDate = new Date();
+        testDate.setFullYear(0);
+        TYPES.Date.validate(testDate);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
@@ -742,7 +744,7 @@ describe('Money', function() {
     });
   });
 
-  describe.only('.validate', function() {
+  describe('.validate', function() {
     it('throws Invalid number error for NaN input', function() {
       assert.throws(() => {
         TYPES.TinyInt.validate('string');
