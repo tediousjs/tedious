@@ -4,9 +4,6 @@ import DateTimeN from './datetimen';
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-const MIN_DATE = new Date(1900, 1, 1);
-const MAX_DATE = new Date(2079, 5, 6, 23, 59, 59, 0);
-
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
 
