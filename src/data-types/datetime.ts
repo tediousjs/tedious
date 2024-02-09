@@ -6,9 +6,6 @@ const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 const DATA_LENGTH = Buffer.from([0x08]);
 
-const MIN_DATE = new Date('January 1, 1753');
-const MAX_DATE = new Date('December 31, 9999');
-
 const DateTime: DataType = {
   id: 0x3D,
   type: 'DATETIME',
@@ -86,13 +83,14 @@ const DateTime: DataType = {
 
     value = value as Date;
 
-    // TODO: check date range: January 1, 1753, through December 31, 9999
-    //    : time range: 00:00:00 through 23:59:59.997
+    let year;
     if (options && options.useUTC) {
-      value = new Date(value.toUTCString());
+      year = value.getUTCFullYear();
+    } else {
+      year = value.getFullYear();
     }
 
-    if (value < MIN_DATE || value > MAX_DATE) {
+    if (year < 1753 || year > 9999) {
       throw new TypeError('Out of range.');
     }
 
