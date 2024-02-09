@@ -5,9 +5,6 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 
-const MIN_DATE = new Date('January 1, 0001');
-const MAX_DATE = new Date('December 31, 9999');
-
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
   type: 'DATETIME2N',
@@ -116,13 +113,14 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
 
     value = value as Date;
 
-    // TODO: check date range: January 1, 0001, through December 31, 9999
-    //    : time range: 00:00:00 through 23:59:59.997
+    let year;
     if (options && options.useUTC) {
-      value = new Date(value.toUTCString());
+      year = value.getUTCFullYear();
+    } else {
+      year = value.getFullYear();
     }
 
-    if (value < MIN_DATE || value > MAX_DATE) {
+    if (year < 1 || year > 9999) {
       throw new TypeError('Out of range.');
     }
 
