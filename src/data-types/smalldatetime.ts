@@ -4,9 +4,6 @@ import DateTimeN from './datetimen';
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-const MIN_DATE = new Date(1900, 1, 1);
-const MAX_DATE = new Date(2079, 5, 6, 23, 59, 59, 0);
-
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
 
@@ -65,12 +62,26 @@ const SmallDateTime: DataType = {
 
     value = value as Date;
 
+    let year, month, date;
     if (options && options.useUTC) {
-      value = new Date(value.toUTCString());
+      year = value.getUTCFullYear();
+      month = value.getUTCMonth();
+      date = value.getUTCDate();
+    } else {
+      year = value.getFullYear();
+      month = value.getMonth();
+      date = value.getDate();
     }
 
-    if (value < MIN_DATE || value > MAX_DATE) {
+    if (year < 1900 || year > 2079) {
       throw new TypeError('Out of range.');
+    }
+
+    if (year === 2079) {
+      // Month is 0-indexed, i.e. Jan = 0, Dec = 11
+      if (month > 4 || (month === 4 && date > 6)) {
+        throw new TypeError('Out of range.');
+      }
     }
 
     if (isNaN(value)) {
