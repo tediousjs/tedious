@@ -43,7 +43,7 @@
     "@azure/identity": "^3.4.1",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.5.3",
-    "bl": "^6.0.3",
+    "bl": "^6.0.11",
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0",
