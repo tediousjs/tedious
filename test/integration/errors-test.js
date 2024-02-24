@@ -3,7 +3,6 @@
 const fs = require('fs');
 const assert = require('chai').assert;
 
-import AggregateError from 'es-aggregate-error';
 import { RequestError } from '../../src/errors';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
