@@ -51,6 +51,8 @@
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
     "node-abort-controller": "^3.1.1",
+    "@types/es-aggregate-error": "^1.0.2",
+    "@types/node": ">=16.18.38",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
@@ -64,10 +66,8 @@
     "@types/bl": "^5.1.0",
     "@types/chai": "^4.3.5",
     "@types/depd": "^1.1.32",
-    "@types/es-aggregate-error": "^1.0.2",
     "@types/lru-cache": "^5.1.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^16.18.38",
     "@types/sprintf-js": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
