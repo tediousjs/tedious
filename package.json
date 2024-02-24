@@ -46,7 +46,6 @@
     "bl": "^6.0.3",
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
-    "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
     "sprintf-js": "^1.1.2"
   },
