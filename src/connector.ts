@@ -2,7 +2,6 @@ import net from 'net';
 import dns, { type LookupAddress } from 'dns';
 
 import url from 'node:url';
-import { AbortSignal } from 'node-abort-controller';
 import AbortError from './errors/abort-error';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;

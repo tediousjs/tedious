@@ -2,7 +2,6 @@ const Mitm = require('mitm');
 const sinon = require('sinon');
 const url = require('node:url');
 const assert = require('chai').assert;
-const { AbortController } = require('node-abort-controller');
 
 const {
   lookupAllAddresses,

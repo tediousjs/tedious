@@ -48,7 +48,6 @@
     "js-md4": "^0.3.2",
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
-    "node-abort-controller": "^3.1.1",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
