@@ -8,7 +8,7 @@
     // Enable features needed for type declaration generation
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationDir": "lib/types"
+    "declarationDir": "lib"
   },
 
   "include": ["types/*.d.ts", "src/tedious.ts"]
