@@ -1,4 +1,5 @@
-import Parser, { ParserOptions } from './stream-parser';
+import { NotEnoughDataError, readUInt32LE, readUInt8, Result } from './helpers';
+import { type ParserOptions } from './stream-parser';
 
 import { FeatureExtAckToken } from './token';
 
@@ -12,33 +13,37 @@ const FEATURE_ID = {
   TERMINATOR: 0xFF
 };
 
-function featureExtAckParser(parser: Parser, _options: ParserOptions, callback: (token: FeatureExtAckToken) => void) {
+function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
 
-  function next() {
-    parser.readUInt8((featureId) => {
-      if (featureId === FEATURE_ID.TERMINATOR) {
-        return callback(new FeatureExtAckToken(fedAuth, utf8Support));
-      }
+  while (true) {
+    let featureId;
+    ({ value: featureId, offset } = readUInt8(buf, offset));
 
-      parser.readUInt32LE((featureAckDataLen) => {
-        parser.readBuffer(featureAckDataLen, (featureData) => {
-          switch (featureId) {
-            case FEATURE_ID.FEDAUTH:
-              fedAuth = featureData;
-              break;
-            case FEATURE_ID.UTF8_SUPPORT:
-              utf8Support = !!featureData[0];
-              break;
-          }
-          next();
-        });
-      });
-    });
+    if (featureId === FEATURE_ID.TERMINATOR) {
+      return new Result(new FeatureExtAckToken(fedAuth, utf8Support), offset);
+    }
+
+    let featureAckDataLen;
+    ({ value: featureAckDataLen, offset } = readUInt32LE(buf, offset));
+
+    if (buf.length < offset + featureAckDataLen) {
+      throw new NotEnoughDataError(offset + featureAckDataLen);
+    }
+
+    const featureData = buf.slice(offset, offset + featureAckDataLen);
+    offset += featureAckDataLen;
+
+    switch (featureId) {
+      case FEATURE_ID.FEDAUTH:
+        fedAuth = featureData;
+        break;
+      case FEATURE_ID.UTF8_SUPPORT:
+        utf8Support = !!featureData[0];
+        break;
+    }
   }
-
-  next();
 }
 
 export default featureExtAckParser;

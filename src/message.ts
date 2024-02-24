@@ -1,9 +1,9 @@
 import { PassThrough } from 'stream';
 
 class Message extends PassThrough {
-  type: number;
-  resetConnection: boolean;
-  ignore: boolean;
+  declare type: number;
+  declare resetConnection: boolean;
+  declare ignore: boolean;
 
   constructor({ type, resetConnection = false }: { type: number, resetConnection?: boolean | undefined }) {
     super();

@@ -1,4 +1,4 @@
-import { DataType } from '../data-type';
+import { type DataType } from '../data-type';
 import MoneyN from './moneyn';
 
 const DATA_LENGTH = Buffer.from([0x04]);

@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events';
-import { Parameter, DataType } from './data-type';
+import { type Parameter, type DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
-import { Metadata } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
-import { ColumnMetadata } from './token/colmetadata-token-parser';
+import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { Collation } from './collation';
 
 /**
@@ -20,7 +20,7 @@ import { Collation } from './collation';
 type CompletionCallback =
   /**
    * @param error
-   *   If an error occured, an error object.
+   *   If an error occurred, an error object.
    *
    * @param rowCount
    *   The number of rows emitted as result of executing the SQL statement.
@@ -56,74 +56,74 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  sqlTextOrProcedure: string | undefined;
+  declare sqlTextOrProcedure: string | undefined;
   /**
    * @private
    */
-  parameters: Parameter[];
+  declare parameters: Parameter[];
   /**
    * @private
    */
-  parametersByName: { [key: string]: Parameter };
+  declare parametersByName: { [key: string]: Parameter };
   /**
    * @private
    */
-  preparing: boolean;
+  declare preparing: boolean;
   /**
    * @private
    */
-  canceled: boolean;
+  declare canceled: boolean;
   /**
    * @private
    */
-  paused: boolean;
+  declare paused: boolean;
   /**
    * @private
    */
-  userCallback: CompletionCallback;
+  declare userCallback: CompletionCallback;
   /**
    * @private
    */
-  handle: number | undefined;
+  declare handle: number | undefined;
   /**
    * @private
    */
-  error: Error | undefined;
+  declare error: Error | undefined;
   /**
    * @private
    */
-  connection: Connection | undefined;
+  declare connection: Connection | undefined;
   /**
    * @private
    */
-  timeout: number | undefined;
+  declare timeout: number | undefined;
 
   /**
    * @private
    */
-  rows?: Array<any>;
+  declare rows?: Array<any>;
   /**
    * @private
    */
-  rst?: Array<any>;
+  declare rst?: Array<any>;
   /**
    * @private
    */
-  rowCount?: number;
+  declare rowCount?: number;
 
   /**
    * @private
    */
-  callback: CompletionCallback;
+  declare callback: CompletionCallback;
 
 
-  shouldHonorAE?: boolean;
-  statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
-  cryptoMetadataLoaded: boolean;
+  declare shouldHonorAE?: boolean;
+  declare statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
+  declare cryptoMetadataLoaded: boolean;
 
   /**
    * This event, describing result set columns, will be emitted before row
-   * events are emitted. This event may be emited multiple times when more
+   * events are emitted. This event may be emitted multiple times when more
    * than one recordset is produced by the statement.
    *
    * An array like object, where the columns can be accessed either by index
@@ -173,7 +173,7 @@ class Request extends EventEmitter {
    *
    * This token is used to indicate the completion of a SQL statement.
    * As multiple SQL statements can be sent to the server in a single SQL batch, multiple `done` can be generated.
-   * An `done` event is emited for each SQL statement in the SQL batch except variable declarations.
+   * An `done` event is emitted for each SQL statement in the SQL batch except variable declarations.
    * For execution of SQL statements within stored procedures, `doneProc` and `doneInProc` events are used in place of `done`.
    *
    * If you are using [[Connection.execSql]] then SQL server may treat the multiple calls with the same query as a stored procedure.
@@ -191,7 +191,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -216,7 +216,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -238,7 +238,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be avaiable if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
        */
       (rowCount: number | undefined, more: boolean, procReturnStatusValue: number, rst?: any[]) => void
   ): this

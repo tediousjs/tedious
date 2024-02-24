@@ -5,19 +5,14 @@ const { assert } = require('chai');
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: false,
-    log: true
-  };
+  config.options.debug = debugOptionsFromEnv();
 
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
@@ -37,6 +32,9 @@ describe('A `error` on the network socket', function() {
 
     connection = new Connection(getConfig());
     connection.on('error', done);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect((err) => {
       connection.removeListener('error', done);
       done(err);

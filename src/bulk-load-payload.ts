@@ -1,8 +1,8 @@
 import BulkLoad from './bulk-load';
 
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
-  bulkLoad: BulkLoad;
-  iterator: AsyncIterableIterator<Buffer>;
+  declare bulkLoad: BulkLoad;
+  declare iterator: AsyncIterableIterator<Buffer>;
 
   constructor(bulkLoad: BulkLoad) {
     this.bulkLoad = bulkLoad;

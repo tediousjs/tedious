@@ -2,6 +2,7 @@
 
 const { assert } = require('chai');
 const net = require('net');
+const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 const Connection = require('../../src/tedious').Connection;
 const ConnectionError = require('../../src/errors').ConnectionError;
 
@@ -55,8 +56,13 @@ describe('Connecting to a server that sends invalid packet data', function() {
       server: addressInfo.address,
       options: {
         port: addressInfo.port,
+        debug: debugOptionsFromEnv()
       }
     });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
 
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);

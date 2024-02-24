@@ -6,20 +6,14 @@ const assert = require('chai').assert;
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 function getConfig() {
   const config = JSON.parse(
     fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
   ).config;
 
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: false,
-    log: true,
-  };
-
+  config.options.debug = debugOptionsFromEnv();
   config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
   return config;
@@ -58,15 +52,18 @@ describe('Prepare Execute Statement', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 
   it('does not cause unexpected `returnValue` events to be emitted', function(done) {
     const config = getConfig();
 
     const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     connection.connect(function(err) {
       if (err) {
         return done(err);
@@ -138,7 +135,9 @@ describe('Prepare Execute Statement', function() {
     });
 
     const connection = new Connection(config);
-
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
     request.on('prepared', function() {
       connection.execute(request);
     });
@@ -185,8 +184,8 @@ describe('Prepare Execute Statement', function() {
       done();
     });
 
-    connection.on('debug', function(text) {
-      // console.log(text)
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
   });
 });

@@ -1,5 +1,5 @@
 import BulkLoad from './bulk-load';
-import Connection, { ConnectionConfiguration } from './connection';
+import Connection, { type ConnectionConfiguration } from './connection';
 import Request from './request';
 import { name } from './library';
 

@@ -1,15 +1,15 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { EncryptionKeyInfo } from './types';
+import { type EncryptionKeyInfo } from './types';
 
 export class CEKEntry {
-  columnEncryptionKeyValues: EncryptionKeyInfo[];
-  ordinal: number;
-  databaseId: number;
-  cekId: number;
-  cekVersion: number;
-  cekMdVersion: Buffer;
+  declare columnEncryptionKeyValues: EncryptionKeyInfo[];
+  declare ordinal: number;
+  declare databaseId: number;
+  declare cekId: number;
+  declare cekVersion: number;
+  declare cekMdVersion: Buffer;
 
   constructor(ordinalVal: number) {
     this.ordinal = ordinalVal;

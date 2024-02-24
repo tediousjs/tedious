@@ -41,7 +41,7 @@ function buildLoginAckToken() {
     0x00, 0x00, // buildNum
   ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
+  buffer.writeUInt16LE(buffer.length - 3, 1);
 
   return buffer;
 }

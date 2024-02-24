@@ -3,14 +3,14 @@ import * as util from 'util';
 import { Packet } from './packet';
 
 class Debug extends EventEmitter {
-  options: {
+  declare options: {
     data: boolean;
     payload: boolean;
     packet: boolean;
     token: boolean;
   };
 
-  indent: string;
+  declare indent: string;
 
   /*
     @options    Which debug details should be sent.

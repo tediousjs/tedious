@@ -5,7 +5,7 @@ import * as net from 'net';
 import dns from 'dns';
 
 import constants from 'constants';
-import { SecureContextOptions } from 'tls';
+import { type SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
 
@@ -16,7 +16,7 @@ import {
   UsernamePasswordCredential,
 } from '@azure/identity';
 
-import BulkLoad, { Options as BulkLoadOptions, Callback as BulkLoadCallback } from './bulk-load';
+import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
 import { instanceLookup } from './instance-lookup';
@@ -36,12 +36,12 @@ import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
-import { Metadata } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { AbortController, AbortSignal } from 'node-abort-controller';
-import { Parameter, TYPES } from './data-type';
+import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -203,7 +203,7 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   options: {
     /**
      * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` asscoiate to their created idnetity.
+     * they need to provide `clientId` associate to their created identity.
      *
      * This is optional for retrieve token from azure web app service
      */
@@ -242,7 +242,7 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrived else where
+     * A user need to provide `token` which they retrieved else where
      * to forming the connection.
      */
     token: string;
@@ -253,12 +253,12 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` asscoiate to their account.
+     * A user need to provide `userName` associate to their account.
      */
     userName: string;
 
     /**
-     * A user need to provide `password` asscoiate to their account.
+     * A user need to provide `password` associate to their account.
      */
     password: string;
 
@@ -436,7 +436,7 @@ export interface ConnectionConfiguration {
    */
   options?: ConnectionOptions;
   /**
-   * Authentication realted options for connection.
+   * Authentication related options for connection.
    */
   authentication?: AuthenticationOptions;
 }
@@ -897,59 +897,59 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  fedAuthRequired: boolean;
+  declare fedAuthRequired: boolean;
   /**
    * @private
    */
-  config: InternalConnectionConfig;
+  declare config: InternalConnectionConfig;
   /**
    * @private
    */
-  secureContextOptions: SecureContextOptions;
+  declare secureContextOptions: SecureContextOptions;
   /**
    * @private
    */
-  inTransaction: boolean;
+  declare inTransaction: boolean;
   /**
    * @private
    */
-  transactionDescriptors: Buffer[];
+  declare transactionDescriptors: Buffer[];
   /**
    * @private
    */
-  transactionDepth: number;
+  declare transactionDepth: number;
   /**
    * @private
    */
-  isSqlBatch: boolean;
+  declare isSqlBatch: boolean;
   /**
    * @private
    */
-  curTransientRetryCount: number;
+  declare curTransientRetryCount: number;
   /**
    * @private
    */
-  transientErrorLookup: TransientErrorLookup;
+  declare transientErrorLookup: TransientErrorLookup;
   /**
    * @private
    */
-  closed: boolean;
+  declare closed: boolean;
   /**
    * @private
    */
-  loginError: undefined | AggregateError | ConnectionError;
+  declare loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
-  debug: Debug;
+  declare debug: Debug;
   /**
    * @private
    */
-  ntlmpacket: undefined | any;
+  declare ntlmpacket: undefined | any;
   /**
    * @private
    */
-  ntlmpacketBuffer: undefined | Buffer;
+  declare ntlmpacketBuffer: undefined | Buffer;
 
   /**
    * @private
@@ -974,54 +974,54 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  routingData: undefined | RoutingData;
+  declare routingData: undefined | RoutingData;
 
   /**
    * @private
    */
-  messageIo!: MessageIO;
+  declare messageIo: MessageIO;
   /**
    * @private
    */
-  state: State;
+  declare state: State;
   /**
    * @private
    */
-  resetConnectionOnNextRequest: undefined | boolean;
+  declare resetConnectionOnNextRequest: undefined | boolean;
 
   /**
    * @private
    */
-  request: undefined | Request | BulkLoad;
+  declare request: undefined | Request | BulkLoad;
   /**
    * @private
    */
-  procReturnStatusValue: undefined | any;
+  declare procReturnStatusValue: undefined | any;
   /**
    * @private
    */
-  socket: undefined | net.Socket;
+  declare socket: undefined | net.Socket;
   /**
    * @private
    */
-  messageBuffer: Buffer;
+  declare messageBuffer: Buffer;
 
   /**
    * @private
    */
-  connectTimer: undefined | NodeJS.Timeout;
+  declare connectTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  cancelTimer: undefined | NodeJS.Timeout;
+  declare cancelTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  requestTimer: undefined | NodeJS.Timeout;
+  declare requestTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
-  retryTimer: undefined | NodeJS.Timeout;
+  declare retryTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
@@ -1031,7 +1031,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  databaseCollation: Collation | undefined;
+  declare databaseCollation: Collation | undefined;
 
   /**
    * Note: be aware of the different options field:
@@ -1234,7 +1234,7 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
-        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: miliseconds
+        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: milliseconds
         columnEncryptionSetting: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
@@ -1931,7 +1931,8 @@ class Connection extends EventEmitter {
         });
       }, (err) => {
         this.clearConnectTimer();
-        if (err.name === 'AbortError') {
+
+        if (signal.aborted) {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
           return;
         }
@@ -2008,7 +2009,9 @@ class Connection extends EventEmitter {
     this.transitionTo(this.STATE.SENT_PRELOGIN);
   }
 
-  wrapWithTls(socket: net.Socket): Promise<tls.TLSSocket> {
+  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+    signal.throwIfAborted();
+
     return new Promise((resolve, reject) => {
       const secureContext = tls.createSecureContext(this.secureContextOptions);
       // If connect to an ip address directly,
@@ -2023,12 +2026,41 @@ class Connection extends EventEmitter {
         servername: this.config.options.serverName ? this.config.options.serverName : serverName,
       };
 
-      const encryptsocket = tls.connect(encryptOptions, () => {
-        encryptsocket.removeListener('error', reject);
-        resolve(encryptsocket);
-      });
+      const encryptsocket = tls.connect(encryptOptions);
 
-      encryptsocket.once('error', reject);
+      const onAbort = () => {
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(signal.reason);
+      };
+
+      const onError = (err: Error) => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        encryptsocket.destroy();
+
+        reject(err);
+      };
+
+      const onConnect = () => {
+        signal.removeEventListener('abort', onAbort);
+
+        encryptsocket.removeListener('error', onError);
+        encryptsocket.removeListener('connect', onConnect);
+
+        resolve(encryptsocket);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+
+      encryptsocket.on('error', onError);
+      encryptsocket.on('secureConnect', onConnect);
     });
   }
 
@@ -2047,7 +2079,7 @@ class Connection extends EventEmitter {
       if (this.config.options.encrypt === 'strict') {
         try {
           // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket);
+          socket = await this.wrapWithTls(socket, signal);
         } catch (err) {
           socket.end();
 
@@ -2059,7 +2091,7 @@ class Connection extends EventEmitter {
     })().catch((err) => {
       this.clearConnectTimer();
 
-      if (err.name === 'AbortError') {
+      if (signal.aborted) {
         return;
       }
 
@@ -2133,7 +2165,7 @@ class Connection extends EventEmitter {
     // If we have routing data stored, this connection has been redirected
     const server = this.routingData ? this.routingData.server : this.config.server;
     const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-    // Grab the target host from the connection configration, and from a redirect message
+    // Grab the target host from the connection configuration, and from a redirect message
     // otherwise, leave the message empty.
     const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
     const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
@@ -2269,7 +2301,7 @@ class Connection extends EventEmitter {
       // If we have routing data stored, this connection has been redirected
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-      // Grab the target host from the connection configration, and from a redirect message
+      // Grab the target host from the connection configuration, and from a redirect message
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
