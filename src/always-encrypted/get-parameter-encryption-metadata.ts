@@ -1,10 +1,10 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { SQLServerEncryptionType, CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
+import { SQLServerEncryptionType, type CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
 import { CEKEntry } from './cek-entry';
 import { decryptSymmetricKey } from './key-crypto';
-import { typeByName as TYPES, Parameter } from '../data-type';
+import { typeByName as TYPES, type Parameter } from '../data-type';
 import Request from '../request';
 import Connection from '../connection';
 import RpcRequestPayload from '../rpcrequest-payload';

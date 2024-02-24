@@ -1,7 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { Parameter, ParameterData } from './data-type';
-import { InternalConnectionOptions } from './connection';
+import { type Parameter, type ParameterData } from './data-type';
+import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 
 // const OPTION = {
@@ -19,12 +19,12 @@ const STATUS = {
   s2.2.6.5
  */
 class RpcRequestPayload implements Iterable<Buffer> {
-  procedure: string | number;
-  parameters: Parameter[];
+  declare procedure: string | number;
+  declare parameters: Parameter[];
 
-  options: InternalConnectionOptions;
-  txnDescriptor: Buffer;
-  collation: Collation | undefined;
+  declare options: InternalConnectionOptions;
+  declare txnDescriptor: Buffer;
+  declare collation: Collation | undefined;
 
   constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
     this.procedure = procedure;

@@ -1,7 +1,7 @@
 export class ConnectionError extends Error {
-  code: string | undefined;
+  declare code: string | undefined;
 
-  isTransient: boolean | undefined;
+  declare isTransient: boolean | undefined;
 
   constructor(message: string, code?: string) {
     super(message);
@@ -11,14 +11,14 @@ export class ConnectionError extends Error {
 }
 
 export class RequestError extends Error {
-  code: string | undefined;
+  declare code: string | undefined;
 
-  number: number | undefined;
-  state: number | undefined;
-  class: number | undefined;
-  serverName: string | undefined;
-  procName: string | undefined;
-  lineNumber: number | undefined;
+  declare number: number | undefined;
+  declare state: number | undefined;
+  declare class: number | undefined;
+  declare serverName: string | undefined;
+  declare procName: string | undefined;
+  declare lineNumber: number | undefined;
 
   constructor(message: string, code?: string) {
     super(message);

@@ -37,9 +37,9 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { CryptoMetadata } from './always-encrypted/types';
+import { type CryptoMetadata } from './always-encrypted/types';
 
-import { InternalConnectionOptions } from './connection';
+import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 
 export interface Parameter {
@@ -80,7 +80,7 @@ export interface DataType {
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
-  validate(value: any, collation: Collation | undefined): any; // TODO: Refactor 'any' and replace with more specific type.
+  validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
 

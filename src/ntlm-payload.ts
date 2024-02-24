@@ -13,7 +13,7 @@ interface Options {
 }
 
 class NTLMResponsePayload {
-  data: Buffer;
+  declare data: Buffer;
 
   constructor(loginData: Options) {
     this.data = this.createResponse(loginData);

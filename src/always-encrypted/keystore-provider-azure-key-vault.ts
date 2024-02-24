@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Microsoft Corporation
 
 import { ClientSecretCredential } from '@azure/identity';
-import { CryptographyClient, KeyWrapAlgorithm, KeyClient, KeyVaultKey } from '@azure/keyvault-keys';
+import { CryptographyClient, type KeyWrapAlgorithm, KeyClient, type KeyVaultKey } from '@azure/keyvault-keys';
 import { createHash } from 'crypto';
 import { parse } from 'url';
 
@@ -13,13 +13,13 @@ interface ParsedKeyPath {
 }
 
 export class ColumnEncryptionAzureKeyVaultProvider {
-  public readonly name: string;
-  private url: undefined | string;
-  private readonly rsaEncryptionAlgorithmWithOAEPForAKV: string;
-  private readonly firstVersion: Buffer;
-  private credentials: ClientSecretCredential;
-  private readonly azureKeyVaultDomainName: string;
-  private keyClient: undefined | KeyClient;
+  declare public readonly name: string;
+  declare private url: undefined | string;
+  declare private readonly rsaEncryptionAlgorithmWithOAEPForAKV: string;
+  declare private readonly firstVersion: Buffer;
+  declare private credentials: ClientSecretCredential;
+  declare private readonly azureKeyVaultDomainName: string;
+  declare private keyClient: undefined | KeyClient;
 
   constructor(clientId: string, clientKey: string, tenantId: string) {
     this.name = 'AZURE_KEY_VAULT';

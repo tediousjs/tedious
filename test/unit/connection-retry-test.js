@@ -22,7 +22,7 @@ function buildLoginAckToken() {
     0x00, 0x00, // buildNum
   ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
+  buffer.writeUInt16LE(buffer.length - 3, 1);
 
   return buffer;
 }
@@ -40,7 +40,7 @@ function buildErrorMessageToken(number, message) {
     0x00, 0x00, 0x00, 0x00, // Line Number
   ]);
 
-  buffer.writeUInt16LE(buffer.length, 1);
+  buffer.writeUInt16LE(buffer.length - 3, 1);
   buffer.writeUInt32LE(number, 3);
   buffer.writeUInt16LE(Buffer.byteLength(message, 'ucs2') / 2, 9);
 

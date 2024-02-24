@@ -3,26 +3,14 @@ const Request = require('../../src/request');
 const Transaction = require('../../src/transaction');
 const fs = require('fs');
 const async = require('async');
+const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 const assert = require('chai').assert;
-
-const debug = false;
 
 const config = JSON.parse(
   fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
 ).config;
 
-if (debug) {
-  config.options.debug = {
-    packet: true,
-    data: true,
-    payload: true,
-    token: true,
-    log: true
-  };
-} else {
-  config.options.debug = {};
-}
-
+config.options.debug = debugOptionsFromEnv();
 config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
 
 class Tester {
@@ -52,11 +40,9 @@ class Tester {
       console.log(`${error.number} : ${error.message}`);
     });
 
-    this.connection.on('debug', (message) => {
-      if (debug) {
-        console.log(message);
-      }
-    });
+    if (process.env.TEDIOUS_DEBUG) {
+      this.connection.on('debug', console.log);
+    }
   }
 
   createTable(callback) {

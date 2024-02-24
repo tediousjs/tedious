@@ -35,13 +35,13 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "publishConfig": {
     "tag": "next"
   },
   "dependencies": {
-    "@azure/identity": "^2.0.4",
+    "@azure/identity": "^3.4.1",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.5.3",
     "bl": "^6.0.3",
@@ -51,7 +51,6 @@
     "jsbi": "^4.3.0",
     "native-duplexpair": "^1.0.0",
     "node-abort-controller": "^3.1.1",
-    "punycode": "^2.3.0",
     "sprintf-js": "^1.1.2"
   },
   "devDependencies": {
@@ -89,9 +88,9 @@
   "scripts": {
     "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
-    "test": "mocha test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "mocha test/integration/",
-    "test-all": "mocha test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
+    "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
+    "test-integration": "mocha --forbid-only test/integration/",
+    "test-all": "mocha --forbid-only test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build:types": "tsc --project tsconfig.build-types.json",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts && npm run build:types",
     "prepublish": "npm run build",
@@ -107,7 +106,7 @@
         "@babel/preset-env",
         {
           "targets": {
-            "node": 16
+            "node": 18
           }
         }
       ],
