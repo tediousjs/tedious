@@ -47,7 +47,7 @@
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0",
-    "sprintf-js": "^1.1.2"
+    "sprintf-js": "^1.1.3"
   },
   "devDependencies": {
     "@babel/cli": "^7.22.9",
