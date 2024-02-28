@@ -68,7 +68,7 @@ describe('lookupAllAddresses', function() {
     assert.strictEqual(actualError.message, 'Invalid hostname: ');
   });
 
-  it.only('test invalid ASCII Server name', async function() {
+  it('test invalid ASCII Server name', async function() {
     const lookup = sinon.spy(function lookup(hostname, options, callback) {
       callback(null, [{ address: '127.0.0.1', family: 4 }]);
     });
