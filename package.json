@@ -29,6 +29,7 @@
   "license": "MIT",
   "version": "0.0.0-dev",
   "main": "./lib/tedious.js",
+  "types": "./lib/tedious.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/tediousjs/tedious.git"
@@ -43,6 +44,7 @@
     "@azure/identity": "^3.4.1",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.6.1",
+    "@types/node": ">=18",
     "bl": "^6.0.11",
     "iconv-lite": "^0.6.3",
     "js-md4": "^0.3.2",
@@ -62,7 +64,6 @@
     "@types/depd": "^1.1.36",
     "@types/lru-cache": "^5.1.1",
     "@types/mocha": "^10.0.6",
-    "@types/node": ">=18",
     "@types/sprintf-js": "^1.1.4",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
@@ -86,7 +87,8 @@
     "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha --forbid-only test/integration/",
     "test-all": "mocha --forbid-only test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
-    "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts",
+    "build:types": "tsc --project tsconfig.build-types.json",
+    "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts && npm run build:types",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release"
   },
