@@ -20,6 +20,7 @@ export function connect(config: ConnectionConfiguration, connectListener?: (err?
 export {
   BulkLoad,
   Connection,
+  ConnectionConfiguration,
   Request,
   library,
   ConnectionError,
