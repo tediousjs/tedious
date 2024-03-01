@@ -20,7 +20,6 @@ export function connect(config: ConnectionConfiguration, connectListener?: (err?
 export {
   BulkLoad,
   Connection,
-  ConnectionConfiguration,
   Request,
   library,
   ConnectionError,
@@ -28,4 +27,8 @@ export {
   TYPES,
   ISOLATION_LEVEL,
   TDS_VERSION
+};
+
+export type {
+  ConnectionConfiguration
 };
