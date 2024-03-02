@@ -26,3 +26,14 @@ export class RequestError extends Error {
     this.code = code;
   }
 }
+
+export class ParameterValidationError extends TypeError {
+  paramName: string | undefined;
+  paramValue: any | undefined;
+
+  constructor(message: string, paramName: string, paramValue: any) {
+    super(message);
+    this.paramName = paramName;
+    this.paramValue = paramValue;
+  }
+}
