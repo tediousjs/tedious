@@ -329,7 +329,7 @@ interface ErrorWithCode extends Error {
 }
 
 interface InternalConnectionConfig {
-  server: string;
+  server: undefined | string;
   authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
   options: InternalConnectionOptions;
 }
@@ -1059,7 +1059,7 @@ class Connection extends EventEmitter {
       throw new TypeError('The "config" argument is required and must be of type Object.');
     }
 
-    if (typeof config.server !== 'string') {
+    if (typeof config.server !== 'string' && !config.options!.connector) {
       throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
@@ -1350,8 +1350,15 @@ class Connection extends EventEmitter {
         if (typeof config.options.connector !== 'function') {
           throw new TypeError('The "config.options.connector" property must be a function.');
         }
+        if (config.server) {
+          throw new Error('Server and connector are mutually exclusive, but ' + config.server + ' and a connector function were provided');
+        }
+        if (config.options.port) {
+          throw new Error('Port and connector are mutually exclusive, but ' + config.options.port + ' and a connector function were provided');
+        }
 
         this.config.options.connector = config.options.connector;
+        this.config.options.port = undefined;
       }
 
       if (config.options.cryptoCredentialsDetails !== undefined) {
@@ -1915,7 +1922,10 @@ class Connection extends EventEmitter {
   initialiseConnection() {
     const signal = this.createConnectTimer();
 
-    if (this.config.options.port) {
+    if (this.config.options.connector) {
+      // port and multiSubnetFailover are not used when using a custom connector
+      return this.connectOnPort(0, false, signal, this.config.options.connector);
+    } else if (this.config.options.port) {
       return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
     } else {
       return instanceLookup({
@@ -1989,7 +1999,7 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  socketHandlingForSendPreLogin(socket: net.Socket) {
+  socketHandlingForSendPreLogin(socket: net.Socket, customConnector: boolean) {
     socket.on('error', (error) => { this.socketError(error); });
     socket.on('close', () => { this.socketClose(); });
     socket.on('end', () => { this.socketEnd(); });
@@ -2001,7 +2011,11 @@ class Connection extends EventEmitter {
     this.socket = socket;
 
     this.closed = false;
-    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+    const message =
+      'connected to ' + this.config.server + ':' + this.config.options.port;
+    const customConnectorMessage =
+      'connected via custom connector';
+    this.debug.log(customConnector ? customConnectorMessage : message);
 
     this.sendPreLogin();
     this.transitionTo(this.STATE.SENT_PRELOGIN);
@@ -2011,11 +2025,12 @@ class Connection extends EventEmitter {
     signal.throwIfAborted();
 
     return new Promise((resolve, reject) => {
+      const server = String(this.config.server);
       const secureContext = tls.createSecureContext(this.secureContextOptions);
       // If connect to an ip address directly,
       // need to set the servername to an empty string
       // if the user has not given a servername explicitly
-      const serverName = !net.isIP(this.config.server) ? this.config.server : '';
+      const serverName = !net.isIP(server) ? server : '';
       const encryptOptions = {
         host: this.config.server,
         socket: socket,
@@ -2064,7 +2079,7 @@ class Connection extends EventEmitter {
 
   connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
-      host: this.routingData ? this.routingData.server : this.config.server,
+      host: this.routingData ? this.routingData.server : String(this.config.server),
       port: this.routingData ? this.routingData.port : port,
       localAddress: this.config.options.localAddress
     };
@@ -2085,7 +2100,7 @@ class Connection extends EventEmitter {
         }
       }
 
-      this.socketHandlingForSendPreLogin(socket);
+      this.socketHandlingForSendPreLogin(socket, Boolean(customConnector));
     })().catch((err) => {
       this.clearConnectTimer();
 
@@ -2167,8 +2182,10 @@ class Connection extends EventEmitter {
     // otherwise, leave the message empty.
     const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
     const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
-    this.debug.log(message);
-    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
+    const customConnectorMessage = `Failed to connect using custom connector in ${this.config.options.connectTimeout}ms`;
+    const errMessage = this.config.options.connector ? customConnectorMessage : message;
+    this.debug.log(errMessage);
+    this.emit('connect', new ConnectionError(errMessage, 'ETIMEOUT'));
     this.connectTimer = undefined;
     this.dispatchEvent('connectTimeout');
   }
@@ -2303,8 +2320,10 @@ class Connection extends EventEmitter {
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
-      this.debug.log(message);
-      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
+      const customConnectorMessage = `Failed to connect using custom connector - ${error.message}`;
+      const errMessage = this.config.options.connector ? customConnectorMessage : message;
+      this.debug.log(errMessage);
+      this.emit('connect', new ConnectionError(errMessage, 'ESOCKET'));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
@@ -2329,15 +2348,21 @@ class Connection extends EventEmitter {
    * @private
    */
   socketClose() {
-    this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+    const message = 'connection to ' + this.config.server + ':' + this.config.options.port + ' closed';
+    const customConnectorMessage = 'connection closed';
+    this.debug.log(this.config.options.connector ? customConnectorMessage : message);
     if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+      const message = 'Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port;
+      const customConnectorMessage = 'Rerouting';
+      this.debug.log(this.config.options.connector ? customConnectorMessage : message);
 
       this.dispatchEvent('reconnect');
     } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
       const server = this.routingData ? this.routingData.server : this.config.server;
       const port = this.routingData ? this.routingData.port : this.config.options.port;
-      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+      const message = 'Retry after transient failure connecting to ' + server + ':' + port;
+      const customConnectorMessage = 'Retry after transient failure connecting';
+      this.debug.log(this.config.options.connector ? customConnectorMessage : message);
 
       this.dispatchEvent('retry');
     } else {
@@ -3284,7 +3309,8 @@ Connection.prototype.STATE = {
 
           try {
             this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-            await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
+            const serverName = this.config.options.serverName ? this.config.options.serverName : String(this.routingData?.server ?? this.config.server);
+            await this.messageIo.startTls(this.secureContextOptions, serverName, this.config.options.trustServerCertificate);
           } catch (err: any) {
             return this.socketError(err);
           }
