@@ -28,3 +28,7 @@ export {
   ISOLATION_LEVEL,
   TDS_VERSION
 };
+
+export type {
+  ConnectionConfiguration
+};
