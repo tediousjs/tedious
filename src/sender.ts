@@ -81,13 +81,7 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
       };
 
       const domainInASCII = url.domainToASCII(host);
-      if (domainInASCII === '') {
-        return reject(new Error(`Invalid hostname: ${host}`));
-      }
-
-      signal.addEventListener('abort', onAbort);
-
-      lookup(domainInASCII, { all: true }, (err, addresses) => {
+      lookup(domainInASCII === '' ? host : domainInASCII, { all: true }, (err, addresses) => {
         signal.removeEventListener('abort', onAbort);
 
         err ? reject(err) : resolve(addresses);

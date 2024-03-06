@@ -45,46 +45,6 @@ describe('lookupAllAddresses', function() {
     assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
     assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
   });
-
-  it('test empty ASCII Server name', async function() {
-    const lookup = sinon.spy(function lookup(hostname, options, callback) {
-      callback(null, [{ address: '127.0.0.1', family: 4 }]);
-    });
-
-    const server = '';
-    const controller = new AbortController();
-
-    let actualError;
-    try {
-      await lookupAllAddresses(server, lookup, controller.signal);
-    } catch (err) {
-      actualError = err;
-    }
-
-    assert.isNotOk(lookup.called, 'Expected lookup not to be called.');
-    assert.instanceOf(actualError, Error);
-    assert.strictEqual(actualError.message, 'Invalid hostname: ');
-  });
-
-  it('test invalid ASCII Server name', async function() {
-    const lookup = sinon.spy(function lookup(hostname, options, callback) {
-      callback(null, [{ address: '127.0.0.1', family: 4 }]);
-    });
-
-    const server = 'http:wrong';
-    const controller = new AbortController();
-
-    let actualError;
-    try {
-      await lookupAllAddresses(server, lookup, controller.signal);
-    } catch (err) {
-      actualError = err;
-    }
-
-    assert.isNotOk(lookup.called, 'Expected lookup not to be called.');
-    assert.instanceOf(actualError, Error);
-    assert.strictEqual(actualError.message, 'Invalid hostname: http:wrong');
-  });
 });
 
 describe('connectInSequence', function() {

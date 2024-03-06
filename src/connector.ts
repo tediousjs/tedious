@@ -162,14 +162,10 @@ export async function lookupAllAddresses(host: string, lookup: LookupFunction, s
         reject(new AbortError());
       };
 
-      const domainInASCII = url.domainToASCII(host);
-      if (domainInASCII === '') {
-        return reject(new Error(`Invalid hostname: ${host}`));
-      }
-
       signal.addEventListener('abort', onAbort);
 
-      lookup(domainInASCII, { all: true }, (err, addresses) => {
+      const domainInASCII = url.domainToASCII(host);
+      lookup(domainInASCII === '' ? host : domainInASCII, { all: true }, (err, addresses) => {
         signal.removeEventListener('abort', onAbort);
 
         err ? reject(err) : resolve(addresses);
