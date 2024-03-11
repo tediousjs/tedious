@@ -53,7 +53,7 @@ const BigInt: DataType = {
       throw new TypeError(`Value must be between ${Number.MIN_SAFE_INTEGER} and ${Number.MAX_SAFE_INTEGER}, inclusive.  For smaller or bigger numbers, use VarChar type.`);
     }
 
-    return value;
+    return value | 0;
   }
 };
 
