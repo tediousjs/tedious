@@ -16,13 +16,14 @@ const FEATURE_ID = {
 function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
+  let columnEncryption: boolean | undefined;
 
   while (true) {
     let featureId;
     ({ value: featureId, offset } = readUInt8(buf, offset));
 
     if (featureId === FEATURE_ID.TERMINATOR) {
-      return new Result(new FeatureExtAckToken(fedAuth, utf8Support), offset);
+      return new Result(new FeatureExtAckToken(fedAuth, utf8Support, columnEncryption), offset);
     }
 
     let featureAckDataLen;
@@ -32,7 +33,7 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
       throw new NotEnoughDataError(offset + featureAckDataLen);
     }
 
-    const featureData = buf.slice(offset, offset + featureAckDataLen);
+    const featureData = buf.subarray(offset, offset + featureAckDataLen);
     offset += featureAckDataLen;
 
     switch (featureId) {
@@ -41,6 +42,19 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
         break;
       case FEATURE_ID.UTF8_SUPPORT:
         utf8Support = !!featureData[0];
+        break;
+      case FEATURE_ID.COLUMNENCRYPTION:
+        if (1 > featureData.length) {
+          throw new Error(`Unsupported featureDataLength ${featureData.length} for feature type ${featureId}`);
+        }
+        // TODO: may need to look into support enclave computations version support:
+        // supportedCryptographicVersion === 0x02
+        // supportedCryptographicVersion === 0x03
+        const supportedCryptographicVersion = featureData[0];
+        if (0 === supportedCryptographicVersion || supportedCryptographicVersion > 0x01) {
+          throw new Error(`Unsupported supported cryptographic protocol version: ${supportedCryptographicVersion}`);
+        }
+        columnEncryption = true;
         break;
     }
   }
