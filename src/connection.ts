@@ -328,9 +328,11 @@ interface ErrorWithCode extends Error {
   code?: string;
 }
 
+export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+
 interface InternalConnectionConfig {
   server: string;
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+  authentication: ConnectionAuthentication;
   options: InternalConnectionOptions;
 }
 
@@ -1065,7 +1067,7 @@ class Connection extends EventEmitter {
 
     this.fedAuthRequired = false;
 
-    let authentication: InternalConnectionConfig['authentication'];
+    let authentication: ConnectionAuthentication;
     if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
         throw new TypeError('The "config.authentication" property must be of type Object.');
