@@ -1,5 +1,5 @@
 import BulkLoad from './bulk-load';
-import Connection, { type ConnectionConfiguration } from './connection';
+import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
 import { name } from './library';
 
@@ -30,5 +30,7 @@ export {
 };
 
 export type {
-  ConnectionConfiguration
+  ConnectionAuthentication,
+  ConnectionConfiguration,
+  ConnectionOptions
 };
