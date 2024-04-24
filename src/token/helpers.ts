@@ -38,6 +38,16 @@ export function readUInt16LE(buf: Buffer, offset: number): Result<number> {
   return new Result(buf.readUInt16LE(offset), offset + 2);
 }
 
+export function readUInt16BE(buf: Buffer, offset: number): Result<number> {
+  offset = +offset;
+
+  if (buf.length < offset + 2) {
+    throw new NotEnoughDataError(offset + 2);
+  }
+
+  return new Result(buf.readUInt16BE(offset), offset + 2);
+}
+
 export function readInt16LE(buf: Buffer, offset: number): Result<number> {
   offset = +offset;
 
