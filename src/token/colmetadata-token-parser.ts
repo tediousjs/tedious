@@ -293,24 +293,26 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
   }
 
   let cekList;
+  if (parser.options.serverSupportsColumnEncryption === true) {
+    while (true) {
+      let offset;
 
-  while (true) {
-    let offset;
+      try {
+        ({ offset, value: cekList } = await readCEKTable(parser));
+      } catch (err) {
+        if (err instanceof NotEnoughDataError) {
+          await parser.waitForChunk();
+          continue;
+        }
 
-    try {
-      ({ offset, value: cekList } = await readCEKTable(parser));
-    } catch (err) {
-      if (err instanceof NotEnoughDataError) {
-        await parser.waitForChunk();
-        continue;
+        throw err;
       }
 
-      throw err;
+      parser.position = offset;
+      break;
     }
-
-    parser.position = offset;
-    break;
   }
+
   const columns: ColumnMetadata[] = [];
   for (let i = 0; i < columnCount; i++) {
     while (true) {
