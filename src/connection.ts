@@ -291,6 +291,17 @@ interface AzureActiveDirectoryServicePrincipalSecret {
   };
 }
 
+/** Structure that defines the options that are necessary to authenticate the tedious instance with an `@azure/identity` chained token credential derived class. */
+interface CredentialChainAuthentication {
+    /** Unique designator for the type of authentication to be used. */
+    type: 'microsoft-credential-chain';
+    /** Set of configurations that are required or allowed with this authentication type. */
+    options: {
+        /** Credential object used to authenticate to the resource. */
+        credential: ChainedTokenCredential;
+    };
+}
+
 interface NtlmAuthentication {
   type: 'ntlm';
   options: {
@@ -325,22 +336,11 @@ interface DefaultAuthentication {
   };
 }
 
-/** Structure that defines the options that are necessary to authenticate the tedious instance with an `@azure/identity` chained token credential derived class. */
-interface CredentialChainAuthentication {
-    /** Unique designator for the type of authentication to be used. */
-    type: 'microsoft-credential-chain';
-    /** Set of configurations that are required or allowed with this authentication type. */
-    options: {
-        /** Credential object used to authenticate to the resource. */
-        credential: ChainedTokenCredential;
-    };
-}
-
 interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication  | NtlmAuthentication | CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
 
 interface InternalConnectionConfig {
   server: string;
