@@ -15,6 +15,7 @@ import {
   DefaultAzureCredential,
   ManagedIdentityCredential,
   UsernamePasswordCredential,
+  type AccessToken,
   type TokenCredential
 } from '@azure/identity';
 
@@ -3606,7 +3607,7 @@ Connection.prototype.STATE = {
           // Type guard the token value so that it is never null.
           if (tokenResponse === null) {
             this.loginError = new AggregateError(
-              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
             this.emit('connect', this.loginError);
             this.transitionTo(this.STATE.FINAL);
             return;
