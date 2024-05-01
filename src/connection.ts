@@ -14,7 +14,8 @@ import {
   ClientSecretCredential,
   DefaultAzureCredential,
   ManagedIdentityCredential,
-  UsernamePasswordCredential
+  UsernamePasswordCredential,
+  type TokenCredential
 } from '@azure/identity';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
@@ -1124,11 +1125,11 @@ class Connection extends EventEmitter {
           }
         };
       } else if (type === 'microsoft-credential-chain') {
-        if (!(options.credential instanceof TokenCredential)) {
-          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the chained token credential class from @Azure/Identity.');
+        if (typeof options.credential.getToken !== 'function') {
+          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
         }
 
-          authentication = {
+        authentication = {
           type: 'microsoft-credential-chain',
           options: {
             credential: options.credential
@@ -3560,8 +3561,8 @@ Connection.prototype.STATE = {
 
           switch (authentication.type) {
             case 'microsoft-credential-chain':
-                credentials = authentication.options.credential;
-                break;
+              credentials = authentication.options.credential;
+              break;
             case 'azure-active-directory-password':
               credentials = new UsernamePasswordCredential(
                 authentication.options.tenantId ?? 'common',
