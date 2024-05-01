@@ -10,11 +10,12 @@ import { type SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
-  DefaultAzureCredential,
-  ClientSecretCredential,
-  ManagedIdentityCredential,
-  UsernamePasswordCredential,
-} from '@azure/identity';
+    ChainedTokenCredential,
+    ClientSecretCredential,
+    DefaultAzureCredential,
+    ManagedIdentityCredential,
+    UsernamePasswordCredential,
+  } from '@azure/identity';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
@@ -324,11 +325,22 @@ interface DefaultAuthentication {
   };
 }
 
+/** Structure that defines the options that are necessary to authenticate the tedious instance with an `@azure/identity` chained token credential derived class. */
+interface CredentialChainAuthentication {
+    /** Unique designator for the type of authentication to be used. */
+    type: 'microsoft-credential-chain';
+    /** Set of configurations that are required or allowed with this authentication type. */
+    options: {
+        /** Credential object used to authenticate to the resource. */
+        credential: ChainedTokenCredential;
+    };
+}
+
 interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+export type ConnectionAuthentication = DefaultAuthentication  | NtlmAuthentication | CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
 
 interface InternalConnectionConfig {
   server: string;
@@ -417,6 +429,7 @@ interface State {
 
 type Authentication = DefaultAuthentication |
   NtlmAuthentication |
+  CredentialChainAuthentication |
   AzureActiveDirectoryPasswordAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
@@ -482,6 +495,7 @@ interface AuthenticationOptions {
    *
    * * `default`: [[DefaultAuthentication.options]]
    * * `ntlm` :[[NtlmAuthentication]]
+   * * `microsoft-credential-chain`: [[CredentialChainAuthentication.options]]
    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
@@ -3523,12 +3537,18 @@ Connection.prototype.STATE = {
         const fedAuthInfoToken = handler.fedAuthInfoToken;
 
         if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          /** Federated authentication configation. */
+          const authentication = this.config.authentication as CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          /** Permission scope to pass to Entra ID when requesting an authentication token. */
           const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
-          let credentials;
+          /** Instance of the chained token credential to use to authenticate to the resource. */
+          let credentials: CredentialChainAuthentication;
 
           switch (authentication.type) {
+            case 'microsoft-credential-chain':
+                credentials = authentication.options.credential;
+                break;
             case 'azure-active-directory-password':
               credentials = new UsernamePasswordCredential(
                 authentication.options.tenantId ?? 'common',
