@@ -41,7 +41,7 @@
     "tag": "next"
   },
   "dependencies": {
-    "@azure/identity": "^3.4.1",
+    "@azure/identity": "^4.2.0",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.6.1",
     "@types/node": ">=18",
