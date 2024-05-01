@@ -1094,8 +1094,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'microsoft-credential-chain' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "microsoft-credential-chain", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1121,6 +1121,17 @@ class Connection extends EventEmitter {
             userName: options.userName,
             password: options.password,
             domain: options.domain && options.domain.toUpperCase()
+          }
+        };
+      } else if (type === 'microsoft-credential-chain') {
+        if (!(options.credential instanceof ChainedTokenCredential)) {
+          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the chained token credential class from @Azure/Identity.');
+        }
+
+          authentication = {
+          type: 'microsoft-credential-chain',
+          options: {
+            credential: options.credential
           }
         };
       } else if (type === 'azure-active-directory-password') {
@@ -2412,6 +2423,7 @@ class Connection extends EventEmitter {
         };
         break;
 
+      case 'microsoft-credential-chain':
       case 'azure-active-directory-msi-vm':
       case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
@@ -3311,6 +3323,7 @@ Connection.prototype.STATE = {
         const { authentication } = this.config;
 
         switch (authentication.type) {
+          case 'microsoft-credential-chain':
           case 'azure-active-directory-password':
           case 'azure-active-directory-msi-vm':
           case 'azure-active-directory-msi-app-service':
