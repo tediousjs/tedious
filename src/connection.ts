@@ -3125,6 +3125,7 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string; }) {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3589,7 +3590,9 @@ Connection.prototype.STATE = {
               break;
           }
 
-          let tokenResponse;
+          /** Access token retrieved from Entra ID for the configured permission scope(s). */
+          let tokenResponse: AccessToken | null;
+
           try {
             tokenResponse = await credentials.getToken(tokenScope);
           } catch (err) {
@@ -3600,9 +3603,16 @@ Connection.prototype.STATE = {
             return;
           }
 
+          // Type guard the token value so that it is never null.
+          if (tokenResponse === null) {
+            this.loginError = new AggregateError(
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+            return;
+          }
 
-          const token = tokenResponse.token;
-          this.sendFedAuthTokenMessage(token);
+          this.sendFedAuthTokenMessage(tokenResponse.token);
 
         } else if (this.loginError) {
           if (isTransientError(this.loginError)) {
