@@ -10,14 +10,12 @@ import { type SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
-  ChainedTokenCredential,
   ClientSecretCredential,
   DefaultAzureCredential,
   ManagedIdentityCredential,
-  UsernamePasswordCredential,
-  type AccessToken,
-  type TokenCredential
+  UsernamePasswordCredential
 } from '@azure/identity';
+import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
@@ -293,14 +291,14 @@ interface AzureActiveDirectoryServicePrincipalSecret {
   };
 }
 
-/** Structure that defines the options that are necessary to authenticate the tedious instance with an `@azure/identity` chained token credential derived class. */
-interface CredentialChainAuthentication {
+/** Structure that defines the options that are necessary to authenticate the Tedious.JS instance with an `@azure/identity` token credential. */
+interface TokenCredentialAuthentication {
   /** Unique designator for the type of authentication to be used. */
-  type: 'microsoft-credential-chain';
+  type: 'microsoft-token-credential';
   /** Set of configurations that are required or allowed with this authentication type. */
   options: {
     /** Credential object used to authenticate to the resource. */
-    credential: ChainedTokenCredential;
+    credential: TokenCredential;
   };
 }
 
@@ -342,7 +340,7 @@ interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
 
 interface InternalConnectionConfig {
   server: string;
@@ -431,7 +429,7 @@ interface State {
 
 type Authentication = DefaultAuthentication |
   NtlmAuthentication |
-  CredentialChainAuthentication |
+  TokenCredentialAuthentication |
   AzureActiveDirectoryPasswordAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
@@ -497,7 +495,7 @@ interface AuthenticationOptions {
    *
    * * `default`: [[DefaultAuthentication.options]]
    * * `ntlm` :[[NtlmAuthentication]]
-   * * `microsoft-credential-chain`: [[CredentialChainAuthentication.options]]
+   * * `microsoft-token-credential`: [[CredentialChainAuthentication.options]]
    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
@@ -1096,8 +1094,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'microsoft-credential-chain' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "microsoft-credential-chain", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'microsoft-token-credential' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "microsoft-token-credential", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1125,13 +1123,13 @@ class Connection extends EventEmitter {
             domain: options.domain && options.domain.toUpperCase()
           }
         };
-      } else if (type === 'microsoft-credential-chain') {
-        if (typeof options.credential.getToken !== 'function') {
+      } else if (type === 'microsoft-token-credential') {
+        if (!isTokenCredential(options.credential)) {
           throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
         }
 
         authentication = {
-          type: 'microsoft-credential-chain',
+          type: 'microsoft-token-credential',
           options: {
             credential: options.credential
           }
@@ -2425,7 +2423,7 @@ class Connection extends EventEmitter {
         };
         break;
 
-      case 'microsoft-credential-chain':
+      case 'microsoft-token-credential':
       case 'azure-active-directory-msi-vm':
       case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
@@ -3322,7 +3320,7 @@ Connection.prototype.STATE = {
         const { authentication } = this.config;
 
         switch (authentication.type) {
-          case 'microsoft-credential-chain':
+          case 'microsoft-token-credential':
           case 'azure-active-directory-password':
           case 'azure-active-directory-msi-vm':
           case 'azure-active-directory-msi-app-service':
@@ -3550,15 +3548,15 @@ Connection.prototype.STATE = {
 
         if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
           /** Federated authentication configation. */
-          const authentication = this.config.authentication as CredentialChainAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
           /** Permission scope to pass to Entra ID when requesting an authentication token. */
           const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
-          /** Instance of the chained token credential to use to authenticate to the resource. */
+          /** Instance of the token credential to use to authenticate to the resource. */
           let credentials: TokenCredential;
 
           switch (authentication.type) {
-            case 'microsoft-credential-chain':
+            case 'microsoft-token-credential':
               credentials = authentication.options.credential;
               break;
             case 'azure-active-directory-password':
