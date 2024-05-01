@@ -14,8 +14,8 @@ import {
   ClientSecretCredential,
   DefaultAzureCredential,
   ManagedIdentityCredential,
-  UsernamePasswordCredential,
-  } from '@azure/identity';
+  UsernamePasswordCredential
+} from '@azure/identity';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
