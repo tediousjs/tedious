@@ -1124,7 +1124,7 @@ class Connection extends EventEmitter {
           }
         };
       } else if (type === 'microsoft-credential-chain') {
-        if (!(options.credential instanceof ChainedTokenCredential)) {
+        if (!(options.credential instanceof TokenCredential)) {
           throw new TypeError('The "config.authentication.options.credential" property must be an instance of the chained token credential class from @Azure/Identity.');
         }
 
@@ -3556,7 +3556,7 @@ Connection.prototype.STATE = {
           const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
           /** Instance of the chained token credential to use to authenticate to the resource. */
-          let credentials: ChainedTokenCredential;
+          let credentials: TokenCredential;
 
           switch (authentication.type) {
             case 'microsoft-credential-chain':
