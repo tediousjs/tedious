@@ -3556,7 +3556,7 @@ Connection.prototype.STATE = {
           const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
           /** Instance of the chained token credential to use to authenticate to the resource. */
-          let credentials: CredentialChainAuthentication;
+          let credentials: ChainedTokenCredential;
 
           switch (authentication.type) {
             case 'microsoft-credential-chain':
