@@ -39,7 +39,7 @@ export default tseslint.config(
             "accessor-pairs": "error",
             "array-callback-return": "error",
             "dot-notation": "error",
-            "eqeqeq": ["error", "smart"],
+            "eqeqeq": "error",
             "func-name-matching": "error",
             "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
             "no-delete-var": "error",
