@@ -1,0 +1,36 @@
+{
+	"folders": [
+		{
+			"name": "Tedious.JS",
+			"path": "."
+		}
+	],
+	"settings": {
+		"typescript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+		"javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+		"editor.tabSize": 2,
+		"editor.insertSpaces": true,
+		"files.trimTrailingWhitespace": true,
+		"files.insertFinalNewline": true,
+		"files.trimFinalNewlines": true,
+		"eslint.experimental.useFlatConfig": false,
+		"typescript.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+		"typescript.format.insertSpaceAfterOpeningAndBeforeClosingEmptyBraces": true,
+		"typescript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
+		"typescript.format.insertSpaceAfterTypeAssertion": false,
+		"typescript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
+		"javascript.format.semicolons": "ignore",
+		"typescript.format.semicolons": "ignore",
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-azuretools.vscode-docker",
+			"ms-vscode-remote.remote-containers",
+			"dbaeumer.vscode-eslint",
+			"SocketSecurity.vscode-socket-security",
+			"streetsidesoftware.code-spell-checker",
+			"ms-mssql.mssql",
+			"DavidAnson.vscode-markdownlint"
+		]
+	}
+}
