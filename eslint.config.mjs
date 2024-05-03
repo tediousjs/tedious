@@ -9,6 +9,9 @@ export default tseslint.config(
     {
         'ignores': [
             "/src/**/*.d.ts",
+            "lib/",
+            "examples/",
+            "benchmarks/",
             "eslint.config.mjs"
         ]
     },
