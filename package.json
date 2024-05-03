@@ -82,7 +82,7 @@
   },
   "scripts": {
     "docs": "typedoc",
-    "lint": "eslint src test",
+    "lint": "eslint .",
     "postlint": "tsc",
     "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha --forbid-only test/integration/",
