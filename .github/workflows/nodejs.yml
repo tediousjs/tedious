@@ -108,7 +108,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -117,7 +117,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -126,7 +126,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -135,7 +135,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -144,7 +144,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -153,7 +153,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -309,7 +309,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -318,7 +318,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -327,7 +327,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -336,7 +336,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -345,7 +345,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -354,7 +354,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -408,7 +408,7 @@ jobs:
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -467,7 +467,7 @@ jobs:
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -525,7 +525,7 @@ jobs:
     - name: run integration tests
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
