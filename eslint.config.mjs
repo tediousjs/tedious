@@ -26,11 +26,6 @@ export default tseslint.config(
         },
         'linterOptions': { 'reportUnusedDisableDirectives': true },
         'rules': {
-            "@typescript-eslint/no-use-before-define": ["error", {
-                "classes": true,
-                "functions": false,
-                "variables": false
-            }],
             "@typescript-eslint/return-await": ["error", "always"],
             "no-var": "error",
             "prefer-const": ["error", { "ignoreReadBeforeAssign": true }],
@@ -39,7 +34,7 @@ export default tseslint.config(
             "accessor-pairs": "error",
             "array-callback-return": "error",
             "dot-notation": "error",
-            "eqeqeq": "error",
+            "eqeqeq": ["error", "smart"],
             "func-name-matching": "error",
             "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
             "no-delete-var": "error",
@@ -68,7 +63,10 @@ export default tseslint.config(
             "no-throw-literal": "error",
             "no-undef-init": "error",
             "no-unused-labels": "error",
-            "no-use-before-define": ["error", {
+            "no-unused-vars": "off",
+            "@typescript-eslint/no-unused-vars": ["error", { args: "none", caughtErrors: "all" }],
+            "no-use-before-define": "off",
+            "@typescript-eslint/no-use-before-define": ["error", {
                 "classes": true,
                 "functions": false,
                 "variables": false
