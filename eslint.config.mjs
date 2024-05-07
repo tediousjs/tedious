@@ -35,7 +35,7 @@ export default tseslint.config(
             }],
             "@typescript-eslint/return-await": ["error", "always"],
             "no-var": "error",
-            "prefer-const": "error",
+            "prefer-const": ["error", { "ignoreReadBeforeAssign": true }],
             "prefer-rest-params": "error",
             "prefer-spread": "error",
             "accessor-pairs": "error",
@@ -84,7 +84,6 @@ export default tseslint.config(
             "no-void": "error",
             "no-with": "error",
             "one-var": ["error", { "initialized": "never" }],
-            "prefer-const": ["error", { "ignoreReadBeforeAssign": true }],
             "symbol-description": "error",
             "unicode-bom": "error"
         }
