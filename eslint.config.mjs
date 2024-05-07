@@ -4,8 +4,8 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
     eslint.configs.recommended,
-    // Remove the tslint base config once a typescript rule set is added
     tseslint.configs.base,
+    tseslint.configs.eslintRecommended,
     {
         'ignores': [
             "/src/**/*.d.ts",
@@ -16,8 +16,6 @@ export default tseslint.config(
         ]
     },
     {
-        // The files property can be removed after a typescript rule set is added
-        'files': ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
         'languageOptions': {
             'globals': {
                 ...globals.mocha,
