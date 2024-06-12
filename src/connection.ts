@@ -811,7 +811,7 @@ export interface ConnectionOptions {
    *
    * (default: `7_4`)
    */
-  tdsVersion?: string;
+  tdsVersion?: string | undefined;
 
   /**
    * Specifies the size of varchar(max), nvarchar(max), varbinary(max), text, ntext, and image data returned by a SELECT statement.

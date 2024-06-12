@@ -1,6 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
 const assert = require('chai').assert;
 
 import { RequestError } from '../../src/errors';
@@ -8,13 +7,17 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-const config = JSON.parse(
-  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-).config;
+import defaultConfig from '../config';
 
-config.options.textsize = 8 * 1024;
-config.options.debug = debugOptionsFromEnv();
-config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+const config = {
+  ...defaultConfig,
+  options: {
+    ...defaultConfig.options,
+    textsize: 8 * 1024,
+    debug: debugOptionsFromEnv(),
+    tdsVersion: process.env.TEDIOUS_TDS_VERSION
+  }
+};
 
 /**
  * @param {Mocha.Done} done

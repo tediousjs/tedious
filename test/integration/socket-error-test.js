@@ -1,20 +1,22 @@
 // @ts-check
 
-const fs = require('fs');
 const { assert } = require('chai');
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
+import defaultConfig from '../config';
+
 function getConfig() {
-  const config = JSON.parse(
-    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-  ).config;
-
-  config.options.debug = debugOptionsFromEnv();
-
-  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION
+    }
+  };
 
   return config;
 }
