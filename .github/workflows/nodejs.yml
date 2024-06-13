@@ -66,26 +66,7 @@ jobs:
         docker-compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "encrypt": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+      run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -266,27 +247,7 @@ jobs:
         $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
 
     - name: Set up CI configuration
-      shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+      run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -383,29 +344,17 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
+
     - run: npm ci
 
-    - run: mkdir ~/.tedious
+   - name: Set up CI configuration
+      run: cp -f test/config.azure-default.ts test/config.ts
 
-    - name: Set up CI configuration (SQL Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "${{ secrets.AZURE_USERNAME }}",
-                "password": "${{ secrets.AZURE_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
+        AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
@@ -441,30 +390,16 @@ jobs:
 
     - run: npm ci
 
-    - run: mkdir ~/.tedious
-
-    - name: Set up CI configuration (AD Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "azure-active-directory-password",
-              "options": {
-                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
-                "tenantId": "${{ secrets.AZURE_AD_TENANT_ID }}",
-                "userName": "${{ secrets.AZURE_AD_USERNAME }}",
-                "password": "${{ secrets.AZURE_AD_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
+    - name: Set up CI configuration
+      run: cp -f test/config.azure-ad-password.ts test/config.ts
 
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
+        AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
@@ -500,29 +435,15 @@ jobs:
 
     - run: npm ci
 
-    - run: mkdir ~/.tedious
-
-    - name: Set up CI configuration (AD Service Principal Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "azure-active-directory-service-principal-secret",
-              "options": {
-                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
-                "tenantId": "${{ secrets.AZURE_AD_SP_TENANT_ID }}",
-                "clientSecret": "${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
+    - name: set up test configuration
+      run: cp -f test/config.azure-ad-sp-secret.ts test/config.ts
 
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
