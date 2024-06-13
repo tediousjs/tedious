@@ -347,7 +347,7 @@ jobs:
 
     - run: npm ci
 
-   - name: Set up CI configuration
+    - name: Set up CI configuration
       run: cp -f test/config.azure-default.ts test/config.ts
 
     - name: run integration tests
