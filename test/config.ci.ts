@@ -1,6 +1,7 @@
 // Configuration to use for integration tests.
 import { type ConnectionConfiguration } from '../src/connection';
 import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 export default {
   'server': 'mssql',
@@ -16,7 +17,7 @@ export default {
     'database': 'master',
     'encrypt': true,
     'cryptoCredentialsDetails': {
-      ca: readFileSync('./fixtures/mssql.crt')
+      ca: readFileSync(resolve(__dirname, './fixtures/mssql.crt'))
     }
   }
 } as ConnectionConfiguration;
