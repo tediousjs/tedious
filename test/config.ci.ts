@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 export default {
-  'server': 'mssql',
+  'server': 'localhost',
   'authentication': {
     'type': 'default',
     'options': {
