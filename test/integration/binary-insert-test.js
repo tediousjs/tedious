@@ -14,13 +14,14 @@ describe('inserting binary data', function() {
   this.timeout(60000);
 
   beforeEach(function(done) {
-    const config = structuredClone(defaultConfig);
-
-    config.options ??= {};
-    if (process.env.TEDIOUS_TDS_VERSION) {
-      config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-    }
-    config.options.debug = debugOptionsFromEnv();
+    const config = {
+      ...defaultConfig,
+      options: {
+        ...defaultConfig.options,
+        debug: debugOptionsFromEnv(),
+        tdsVersion: process.env.TEDIOUS_TDS_VERSION,
+      }
+    };
 
     this.connection = new Connection(config);
     this.connection.connect(done);
