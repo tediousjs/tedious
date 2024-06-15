@@ -13,18 +13,14 @@ import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 import defaultConfig from '../config';
 
 function getConfig() {
-  const config = structuredClone(defaultConfig);
-
-  const options = {
-    ...config.options,
-    debug: debugOptionsFromEnv()
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION,
+    }
   };
-
-  if (process.env.TEDIOUS_TDS_VERSION) {
-    options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-  }
-
-  config.options = options;
 
   return config;
 }
