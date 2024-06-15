@@ -66,6 +66,7 @@ jobs:
         docker-compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
+      shell: bash
       run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
