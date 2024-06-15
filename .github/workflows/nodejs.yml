@@ -248,6 +248,7 @@ jobs:
         $output -join "`n" | Out-File -FilePath test\fixtures\mssql.crt -Encoding ascii -NoNewLine
 
     - name: Set up CI configuration
+      shell: bash
       run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
