@@ -37,12 +37,6 @@ function getInstanceName() {
   ).instanceName;
 }
 
-function getNtlmConfig() {
-  return JSON.parse(
-    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
-  ).ntlm;
-}
-
 describe('Initiate Connect Test', function() {
   this.timeout(20000);
 
@@ -516,9 +510,9 @@ describe('Ntlm Test', function() {
    * @returns {void}
    */
   function runNtlmTest(done, domainCase) {
-    const ntlmConfig = getNtlmConfig();
+    let config = getConfig();
 
-    if (!ntlmConfig) {
+    if (config.authentication?.type !== 'ntlm') {
       return this.skip();
     }
 
@@ -526,10 +520,30 @@ describe('Ntlm Test', function() {
       case DomainCaseEnum.AsIs:
         break;
       case DomainCaseEnum.Lower:
-        ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toLowerCase();
+        config = {
+          ...config,
+          authentication: {
+            ...config.authentication,
+            options: {
+              ...config.authentication.options,
+              domain: /** @type {string} */(config.authentication.options.domain).toLowerCase()
+            }
+          }
+        };
+
         break;
       case DomainCaseEnum.Upper:
-        ntlmConfig.authentication.options.domain = ntlmConfig.authentication.options.domain.toUpperCase();
+        config = {
+          ...config,
+          authentication: {
+            ...config.authentication,
+            options: {
+              ...config.authentication.options,
+              domain: /** @type {string} */(config.authentication.options.domain).toUpperCase()
+            }
+          }
+        };
+
         break;
       default:
         assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
@@ -556,7 +570,7 @@ describe('Ntlm Test', function() {
       assert.strictEqual(columns[0].value, ++row);
     });
 
-    const connection = new Connection(ntlmConfig);
+    const connection = new Connection(config);
 
     connection.connect(function(err) {
       assert.ifError(err);
@@ -1536,7 +1550,13 @@ describe('Insertion Tests', function() {
       assert.ok(false);
     });
 
-    const connection = new Connection({ ...config, options: { ...config.options, cancelTimeout: 500 } });
+    const connection = new Connection({
+      ...config,
+      options: {
+        ...config.options,
+        cancelTimeout: 500
+      }
+    });
 
     connection.connect((err) => {
       connection.execSql(request);
