@@ -348,6 +348,7 @@ jobs:
     - run: npm ci
 
     - name: Set up CI configuration
+      shell: bash
       run: cp -f test/config.azure-default.ts test/config.ts
 
     - name: run integration tests
@@ -391,6 +392,7 @@ jobs:
     - run: npm ci
 
     - name: Set up CI configuration
+      shell: bash
       run: cp -f test/config.azure-ad-password.ts test/config.ts
 
     - name: run integration tests
@@ -436,6 +438,7 @@ jobs:
     - run: npm ci
 
     - name: set up test configuration
+      shell: bash
       run: cp -f test/config.azure-ad-sp-secret.ts test/config.ts
 
     - name: run integration tests
