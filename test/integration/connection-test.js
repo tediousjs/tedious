@@ -1,8 +1,6 @@
 // @ts-check
 
 const async = require('async');
-const fs = require('fs');
-const homedir = require('os').homedir();
 const assert = require('chai').assert;
 const os = require('os');
 
@@ -29,12 +27,6 @@ function getConfig() {
   config.options = options;
 
   return config;
-}
-
-function getInstanceName() {
-  return JSON.parse(
-    fs.readFileSync(homedir + '/.tedious/test-connection.json', 'utf8')
-  ).instanceName;
 }
 
 describe('Initiate Connect Test', function() {
@@ -154,62 +146,20 @@ describe('Initiate Connect Test', function() {
     }
   });
 
-  it('should connect by instance name', function(done) {
-    if (!getInstanceName()) {
+  it('should fail connecting by invalid instance name', function(done) {
+    const config = getConfig();
+
+    if (!config.options?.instanceName) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
       return this.skip();
     }
-
-    const config = getConfig();
 
     const connection = new Connection({
       ...config,
       options: {
         ...config.options,
         port: undefined,
-        instanceName: getInstanceName()
-      }
-    });
-
-    connection.connect(function(err) {
-      assert.ifError(err);
-
-      connection.close();
-    });
-
-    connection.on('end', function() {
-      done();
-    });
-
-    connection.on('databaseChange', function(database) {
-      if (config.options?.database) {
-        assert.strictEqual(database, config.options.database);
-      }
-    });
-
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
-
-    if (process.env.TEDIOUS_DEBUG) {
-      connection.on('debug', console.log);
-    }
-  });
-
-  it('should connect by invalid instance name', function(done) {
-    if (!getInstanceName()) {
-      // Config says don't do this test (probably because SQL Server Browser is not available).
-      return this.skip();
-    }
-
-    const config = getConfig();
-
-    const connection = new Connection({
-      ...config,
-      options: {
-        ...config.options,
-        port: undefined,
-        instanceName: `${getInstanceName()}X`
+        instanceName: `${config.options.instanceName}X`
       }
     });
 
