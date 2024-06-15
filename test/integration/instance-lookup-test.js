@@ -1,7 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
-const homedir = require('os').homedir();
 const assert = require('chai').assert;
 
 const { instanceLookup } = require('../../src/instance-lookup');
