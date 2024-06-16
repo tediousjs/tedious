@@ -19,33 +19,33 @@ const config = {
 };
 
 describe('Datatypes in results test', function() {
-  let connection: Connection;
-
-  beforeEach(function(done) {
-    connection = new Connection(config);
-
-    connection.on('errorMessage', function(error) {
-      console.log(`${error.number} : ${error.message}`);
-    });
-
-    if (process.env.TEDIOUS_DEBUG) {
-      connection.on('debug', console.log);
-    }
-
-    connection.connect(done);
-  });
-
-  afterEach(function(done) {
-    if (!connection.closed) {
-      connection.on('end', done);
-      connection.close();
-    } else {
-      done();
-    }
-  });
-
   function testDataType(expectedType: typeof TYPES[keyof typeof TYPES], cases: { [key: string]: [string, any] | [string, any, string] }) {
     describe(expectedType.name, function() {
+      let connection: Connection;
+
+      beforeEach(function(done) {
+        connection = new Connection(config);
+
+        connection.on('errorMessage', function(error) {
+          console.log(`${error.number} : ${error.message}`);
+        });
+
+        if (process.env.TEDIOUS_DEBUG) {
+          connection.on('debug', console.log);
+        }
+
+        connection.connect(done);
+      });
+
+      afterEach(function(done) {
+        if (!connection.closed) {
+          connection.on('end', done);
+          connection.close();
+        } else {
+          done();
+        }
+      });
+
       for (const description in cases) {
         if (!cases.hasOwnProperty(description)) {
           continue;
