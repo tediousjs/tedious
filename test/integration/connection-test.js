@@ -34,15 +34,15 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('end', function() {
-      done();
-    });
-
 //    if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
 //    }
 
     connection.connect(function(err) {
+      assert.instanceOf(err, Error);
+
+      done();
+
       assert.ok(err);
     });
   });
