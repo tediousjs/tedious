@@ -15,7 +15,7 @@ function getConfig() {
   };
 }
 
-describe('Instance Lookup Test', function() {
+describe.only('Instance Lookup Test', function() {
   it('should test good instance', async function() {
     var config = getConfig();
 

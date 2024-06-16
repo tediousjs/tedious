@@ -11,6 +11,7 @@ export default {
     }
   },
   'options': {
+    'instanceName': 'SQL2017',
     'database': 'master',
     'trustServerCertificate': true
   }

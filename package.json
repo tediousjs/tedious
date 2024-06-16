@@ -85,7 +85,7 @@
     "docs": "typedoc",
     "lint": "eslint src test --ext .js,.ts && tsc",
     "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
-    "test-integration": "mocha --forbid-only test/integration/",
+    "test-integration": "mocha test/integration/",
     "test-all": "mocha --forbid-only test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
     "build:types": "tsc --project tsconfig.build-types.json",
     "build": "rimraf lib && babel src --out-dir lib --extensions .js,.ts && npm run build:types",
