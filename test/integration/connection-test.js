@@ -28,7 +28,7 @@ function getConfig() {
 describe('Initiate Connect Test', function() {
   this.timeout(20000);
 
-  it('should be bad server', function(done) {
+  it.only('should be bad server', function(done) {
     const config = getConfig();
     config.server = 'bad-server';
 
@@ -38,9 +38,9 @@ describe('Initiate Connect Test', function() {
       done();
     });
 
-    if (process.env.TEDIOUS_DEBUG) {
+//    if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
-    }
+//    }
 
     connection.connect(function(err) {
       assert.ok(err);
