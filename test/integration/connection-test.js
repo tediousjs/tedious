@@ -773,7 +773,7 @@ describe('BeginTransaction Tests', function() {
   });
 });
 
-describe.only('Insertion Tests', function() {
+describe('Insertion Tests', function() {
   this.timeout(30000);
 
   it('should execSql', function(done) {
