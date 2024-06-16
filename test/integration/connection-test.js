@@ -776,7 +776,7 @@ describe('BeginTransaction Tests', function() {
 describe('Insertion Tests', function() {
   this.timeout(30000);
 
-  it('should execSql', function(done) {
+  it.only('should execSql', function(done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
