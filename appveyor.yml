@@ -35,10 +35,10 @@ test_script:
   - npm --version
 
   - pwsh: |-
-      $PSNativeCommandUseErrorActionPreference = $true
       $ErrorActionPreference = "Stop"
 
       npm run-script test
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
       Copy-Item -Force test/config.appveyor.ts test/config.ts
 
@@ -48,15 +48,20 @@ test_script:
 
       $env:TEDIOUS_TDS_VERSION = '7_4'
       npm run-script test-integration
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
       $env:TEDIOUS_TDS_VERSION = '7_3_B'
       npm run-script test-integration
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
       $env:TEDIOUS_TDS_VERSION = '7_3_A'
       npm run-script test-integration
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
       $env:TEDIOUS_TDS_VERSION = '7_2'
       npm run-script test-integration
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
 
       $env:TEDIOUS_TDS_VERSION = '7_1'
       npm run-script test-integration
+      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
