@@ -34,7 +34,7 @@ test_script:
   - node --version
   - npm --version
 
-  - pwsh: >-
+  - ps: |-
       $PSNativeCommandUseErrorActionPreference = $true
       $ErrorActionPreference = "Stop"
 
