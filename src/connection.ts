@@ -1932,7 +1932,7 @@ class Connection extends EventEmitter {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
         });
       }, (err) => {
-        console.log('instanceLookup failed', err);
+        console.log('instanceLookup failed', err, signal);
 
         this.clearConnectTimer();
 
