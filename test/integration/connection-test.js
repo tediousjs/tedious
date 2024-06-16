@@ -28,22 +28,20 @@ function getConfig() {
 describe('Initiate Connect Test', function() {
   this.timeout(20000);
 
-  it.only('should be bad server', function(done) {
+  it('should be bad server', function(done) {
     const config = getConfig();
     config.server = 'bad-server';
 
     const connection = new Connection(config);
 
-//    if (process.env.TEDIOUS_DEBUG) {
+    if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
-//    }
+    }
 
     connection.connect(function(err) {
       assert.instanceOf(err, Error);
 
       done();
-
-      assert.ok(err);
     });
   });
 
