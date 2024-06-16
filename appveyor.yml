@@ -40,7 +40,7 @@ test_script:
 
       npm run-script test
 
-      Copy-Item -Force test/config.ntlm.ts test/config.ts
+      Copy-Item -Force test/config.appveyor.ts test/config.ts
 
       $env:NTLM_USERNAME = $env:USERNAME
       $env:NTLM_PASSWORD = [Microsoft.Win32.Registry]::GetValue("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "DefaultPassword", '')
