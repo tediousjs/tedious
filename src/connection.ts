@@ -2065,6 +2065,8 @@ class Connection extends EventEmitter {
   }
 
   connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+    this.debug.log('connectOnPort called');
+
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
