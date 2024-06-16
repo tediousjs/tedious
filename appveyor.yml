@@ -34,19 +34,29 @@ test_script:
   - node --version
   - npm --version
 
-  - sh: >-
-      set -ex
+  - ps: >-
+      $PSNativeCommandUseErrorActionPreference = $true
+      $ErrorActionPreference = "Stop"
 
       npm run-script test
 
-      export NTLM_USERNAME=$USERNAME
-      export NTLM_PASSWORD=$(cmd //c 'reg query "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword')
-      export NTLM_DOMAIN=$COMPUTERNAME
+      Copy-Item -Force test/config.ntlm.ts test/config.ts
 
-      cp -f test/config.ntlm.ts test/config.ts
+      $env:NTLM_USERNAME = $env:USERNAME
+      $env:NTLM_PASSWORD = [Microsoft.Win32.Registry]::GetValue("HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Winlogon", "DefaultPassword", '')
+      $env:NTLM_DOMAIN = $env:COMPUTERNAME
 
-      TEDIOUS_TDS_VERSION=7_4 npm run-script test-integration
-      TEDIOUS_TDS_VERSION=7_3_B npm run-script test-integration
-      TEDIOUS_TDS_VERSION=7_3_A npm run-script test-integration
-      TEDIOUS_TDS_VERSION=7_2 npm run-script test-integration
-      TEDIOUS_TDS_VERSION=7_1 npm run-script test-integration
+      $env:TEDIOUS_TDS_VERSION = '7_4'
+      npm run-script test-integration
+
+      $env:TEDIOUS_TDS_VERSION = '7_3_B'
+      npm run-script test-integration
+
+      $env:TEDIOUS_TDS_VERSION = '7_3_A'
+      npm run-script test-integration
+
+      $env:TEDIOUS_TDS_VERSION = '7_2'
+      npm run-script test-integration
+
+      $env:TEDIOUS_TDS_VERSION = '7_1'
+      npm run-script test-integration
