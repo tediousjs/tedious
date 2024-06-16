@@ -773,10 +773,10 @@ describe('BeginTransaction Tests', function() {
   });
 });
 
-describe('Insertion Tests', function() {
+describe.only('Insertion Tests', function() {
   this.timeout(30000);
 
-  it.only('should execSql', function(done) {
+  it('should execSql', function(done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
