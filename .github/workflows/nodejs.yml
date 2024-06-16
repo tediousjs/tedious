@@ -358,6 +358,7 @@ jobs:
         AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
         AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
         AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
+        TEDIOUS_DEBUG: 1
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
@@ -404,6 +405,7 @@ jobs:
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
+        TEDIOUS_DEBUG: 1
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
@@ -449,6 +451,7 @@ jobs:
         AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
+        TEDIOUS_DEBUG: 1
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v4
