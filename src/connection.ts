@@ -1926,14 +1926,10 @@ class Connection extends EventEmitter {
         timeout: this.config.options.connectTimeout,
         signal: signal
       }).then((port) => {
-        console.log('instanceLookup done', port);
-
         process.nextTick(() => {
           this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
         });
       }, (err) => {
-        console.log('instanceLookup failed', err, signal);
-
         this.clearConnectTimer();
 
         if (signal.aborted) {
