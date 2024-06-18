@@ -31,8 +31,6 @@ describe('Instance Lookup Test', function() {
       signal: controller.signal
     });
 
-    console.log(port);
-
     assert.ok(port);
   });
 
@@ -54,7 +52,6 @@ describe('Instance Lookup Test', function() {
       error = err;
     }
 
-    console.log(error);
     assert.instanceOf(error, Error);
   });
 
@@ -74,7 +71,6 @@ describe('Instance Lookup Test', function() {
       error = err;
     }
 
-    console.log(error);
     assert.instanceOf(error, Error);
   });
 });
