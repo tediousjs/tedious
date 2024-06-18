@@ -1,6 +1,5 @@
-import iconv from 'iconv-lite';
-
 import { type DataType } from '../data-type';
+import { encode } from '../conv';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
 
@@ -76,7 +75,7 @@ const Text: DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return iconv.encode(value, collation.codepage);
+    return encode(value, collation.codepage);
   }
 };
 

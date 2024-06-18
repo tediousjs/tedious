@@ -1,6 +1,5 @@
-import iconv from 'iconv-lite';
-
 import { type DataType } from '../data-type';
+import { encode } from '../conv';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -124,7 +123,7 @@ const VarChar: { maximumLength: number } & DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return iconv.encode(value, collation.codepage);
+    return encode(value, collation.codepage);
   }
 };
 

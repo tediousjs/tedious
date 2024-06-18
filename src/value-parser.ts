@@ -2,10 +2,10 @@ import Parser, { type ParserOptions } from './token/stream-parser';
 import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
-import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { decode } from './conv';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -573,7 +573,7 @@ function readChars(buf: Buffer, offset: number, dataLength: number, codepage: st
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  return new Result(decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
