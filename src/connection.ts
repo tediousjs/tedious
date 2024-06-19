@@ -1764,16 +1764,25 @@ class Connection extends EventEmitter {
     if (connectListener) {
       const onConnect = (err?: Error) => {
         this.removeListener('error', onError);
+        this.removeListener('end', onEnd);
         connectListener(err);
       };
 
       const onError = (err: Error) => {
         this.removeListener('connect', onConnect);
+        this.removeListener('end', onEnd);
         connectListener(err);
       };
 
+      const onEnd = () => {
+        this.removeListener('connect', onConnect);
+        this.removeListener('error', onError);
+        connectListener(new Error('unexpected connection end during connect'));
+      }
+
       this.once('connect', onConnect);
       this.once('error', onError);
+      this.once('end', onEnd);
     }
 
     this.transitionTo(this.STATE.CONNECTING);
