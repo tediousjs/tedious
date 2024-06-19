@@ -1033,6 +1033,10 @@ class Connection extends EventEmitter {
    */
   declare databaseCollation: Collation | undefined;
 
+  private onSocketError: (error: Error) => void;
+  private onSocketClose: () => void;
+  private onSocketEnd: () => void;
+
   /**
    * Note: be aware of the different options field:
    * 1. config.authentication.options
@@ -1742,6 +1746,10 @@ class Connection extends EventEmitter {
 
     this.state = this.STATE.INITIALIZED;
 
+    this.onSocketError = (error: Error) => { this.socketError(error); };
+    this.onSocketClose = () => { this.socketClose(); };
+    this.onSocketEnd = () => { this.socketEnd(); };
+
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
       this.createCancelTimer();
@@ -1992,9 +2000,9 @@ class Connection extends EventEmitter {
   }
 
   socketHandlingForSendPreLogin(socket: net.Socket) {
-    socket.on('error', (error) => { this.socketError(error); });
-    socket.on('close', () => { this.socketClose(); });
-    socket.on('end', () => { this.socketEnd(); });
+    socket.on('error', this.onSocketError);
+    socket.on('close', this.onSocketClose);
+    socket.on('end', this.onSocketEnd);
     socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
     this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
@@ -3395,6 +3403,8 @@ Connection.prototype.STATE = {
         if (handler.loginAckReceived) {
           if (handler.routingData) {
             this.routingData = handler.routingData;
+
+            console.log('socket closed before rerouting?', this.socket?.closed);
             this.transitionTo(this.STATE.REROUTING);
           } else {
             this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -3446,6 +3456,7 @@ Connection.prototype.STATE = {
           if (handler.loginAckReceived) {
             if (handler.routingData) {
               this.routingData = handler.routingData;
+              console.log('socket closed before rerouting?', this.socket?.closed);
               return this.transitionTo(this.STATE.REROUTING);
             } else {
               return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
@@ -3512,6 +3523,7 @@ Connection.prototype.STATE = {
         if (handler.loginAckReceived) {
           if (handler.routingData) {
             this.routingData = handler.routingData;
+            console.log('socket closed before rerouting?', this.socket?.closed);
             this.transitionTo(this.STATE.REROUTING);
           } else {
             this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
