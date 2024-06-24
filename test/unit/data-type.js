@@ -1067,7 +1067,7 @@ describe('SmallDateTime', function() {
   });
 
   describe('.validate', function() {
-    it.only('returns a TypeError for dates that are out of range', function() {
+    it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
         TYPES.SmallDateTime.validate(new Date('Dec 31, 1889'));
       }, TypeError, 'Out of range.');
