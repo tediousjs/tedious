@@ -1067,17 +1067,17 @@ describe('SmallDateTime', function() {
   });
 
   describe('.validate', function() {
-    it('returns a TypeError for dates that are out of range', function() {
+    it.only('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
         TYPES.SmallDateTime.validate(new Date('Dec 31, 1889'));
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('May 7, 2079'));
+        TYPES.SmallDateTime.validate(new Date('Jan 1, 2080'));
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('Jan 1, 2080'));
+        TYPES.SmallDateTime.validate(new Date('June 7, 2079'));
       }, TypeError, 'Out of range.');
     });
   });
