@@ -1,5 +1,3 @@
-import fs from 'fs';
-import { homedir } from 'os';
 import { assert } from 'chai';
 
 import Connection from '../../src/connection';
@@ -8,13 +6,17 @@ import { Flags } from '../../src/collation';
 import { TYPES } from '../../src/data-type';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-function getConfig() {
-  const { config } = JSON.parse(
-    fs.readFileSync(homedir() + '/.tedious/test-connection.json', 'utf8')
-  );
+import defaultConfig from '../config';
 
-  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-  config.options.debug = debugOptionsFromEnv();
+function getConfig() {
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION
+    }
+  };
 
   return config;
 }
@@ -274,7 +276,7 @@ describe('Database Collation Support', function() {
 
   describe('TVP parameter', function() {
     beforeEach(function() {
-      if (getConfig().options.tdsVersion < '7_3_A') {
+      if (process.env.TEDIOUS_TDS_VERSION && process.env.TEDIOUS_TDS_VERSION < '7_3_A') {
         this.skip();
       }
     });

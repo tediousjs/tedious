@@ -1,6 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
 const TYPES = require('../../src/data-type').typeByName;
 const assert = require('chai').assert;
 
@@ -8,13 +7,17 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-function getConfig() {
-  const config = JSON.parse(
-    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-  ).config;
+import defaultConfig from '../config';
 
-  config.options.debug = debugOptionsFromEnv();
-  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+function getConfig() {
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION
+    }
+  };
 
   return config;
 }
