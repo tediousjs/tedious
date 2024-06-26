@@ -3,18 +3,23 @@
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
 	"workspaceFolder": "/workspace",
-
-	"settings": {
-		"terminal.integrated.shell.linux": "/bin/bash"
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.shell.linux": "/bin/bash"
+			},
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"ms-vscode-remote.remote-containers",
+				"dbaeumer.vscode-eslint",
+				"SocketSecurity.vscode-socket-security",
+				"streetsidesoftware.code-spell-checker",
+				"ms-mssql.mssql",
+				"DavidAnson.vscode-markdownlint"
+			]
+		}
 	},
-
-	"extensions": [
-		"ms-mssql.mssql",
-		"dbaeumer.vscode-eslint"
-	],
-
 	"postCreateCommand": "npm install",
-
 	"containerEnv": {
 		"EDITOR": "code --wait"
 	}

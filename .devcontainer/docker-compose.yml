@@ -2,7 +2,7 @@ version: '3'
 
 services:
   app:
-    image: "mcr.microsoft.com/devcontainers/javascript-node:16"
+    image: "mcr.microsoft.com/devcontainers/javascript-node:20"
 
     volumes:
       - "..:/workspace:cached"
@@ -21,7 +21,7 @@ services:
 
     environment:
       - "ACCEPT_EULA=Y"
-      - "SA_PASSWORD=yourStrong(!)Password"
+      - "MSSQL_SA_PASSWORD=QhNemHjCWHui9vNnRC.TMRAhusvM3n9_"
 
     ports:
       - "1433:1433"

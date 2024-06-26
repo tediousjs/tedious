@@ -76,7 +76,7 @@ jobs:
               "type": "default",
               "options": {
                 "userName": "sa",
-                "password": "yourStrong(!)Password"
+                "password": "QhNemHjCWHui9vNnRC.TMRAhusvM3n9_"
               }
             },
             "options": {
@@ -220,7 +220,7 @@ jobs:
 
         Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
 
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
+        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="QhNemHjCWHui9vNnRC.TMRAhusvM3n9_"
 
         Pop-Location
 
@@ -277,7 +277,7 @@ jobs:
               "type": "default",
               "options": {
                 "userName": "sa",
-                "password": "yourStrong(!)Password"
+                "password": "QhNemHjCWHui9vNnRC.TMRAhusvM3n9_"
               }
             },
             "options": {

@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Transpile Typescript",
+      "detail": "Runs the necessary build commands for the project.",
+      "type": "npm",
+      "script": "build",
+      "icon": {
+        "id": "rocket"
+      }
+    },
+  ]
+}
