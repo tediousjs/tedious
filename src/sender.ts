@@ -80,9 +80,8 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
         reject(new AbortError());
       };
 
-      signal.addEventListener('abort', onAbort);
-
-      lookup(url.domainToASCII(host), { all: true }, (err, addresses) => {
+      const domainInASCII = url.domainToASCII(host);
+      lookup(domainInASCII === '' ? host : domainInASCII, { all: true }, (err, addresses) => {
         signal.removeEventListener('abort', onAbort);
 
         err ? reject(err) : resolve(addresses);
