@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
@@ -92,7 +93,11 @@ const TVP: DataType = {
 
         // TvpColumnData
         yield column.type.generateParameterLength(param, options);
-        yield * column.type.generateParameterData(param, options);
+        try {
+          yield * column.type.generateParameterData(param, options);
+        } catch (error) {
+          throw new InputError(`TVP column i=${k} has invalid data at row j=${i}`, error);
+        }
       }
     }
 

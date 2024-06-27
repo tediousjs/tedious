@@ -26,3 +26,11 @@ export class RequestError extends Error {
     this.code = code;
   }
 }
+
+export class InputError extends TypeError {
+  constructor(message: string, readonly cause: unknown) {
+    super(
+      message + (cause instanceof Error ? `. Details: ${cause.message}` : '')
+    );
+  }
+}
