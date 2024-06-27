@@ -65,8 +65,6 @@
     "@types/lru-cache": "^5.1.1",
     "@types/mocha": "^10.0.6",
     "@types/sprintf-js": "^1.1.4",
-    "@typescript-eslint/eslint-plugin": "^7.0.2",
-    "@typescript-eslint/parser": "^7.0.2",
     "async": "^3.2.5",
     "babel-plugin-istanbul": "^6.1.1",
     "chai": "^4.4.1",
@@ -79,11 +77,13 @@
     "semantic-release": "^19.0.3",
     "sinon": "^15.2.0",
     "typedoc": "^0.25.8",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^7.8.0"
   },
   "scripts": {
     "docs": "typedoc",
-    "lint": "eslint src test --ext .js,.ts && tsc",
+    "lint": "eslint .",
+    "postlint": "tsc",
     "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha --forbid-only test/integration/",
     "test-all": "mocha --forbid-only test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
