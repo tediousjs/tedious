@@ -64,6 +64,11 @@ const FEDAUTH_OPTIONS = {
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
+const COLUMN_ENCRYPTION_OPTIONS = {
+  FEATURE_ID: 0x04,
+  MAX_SUPPORTED_CRYPTO_VERSION: 0x01
+};
+
 interface Options {
   tdsVersion: number;
   packetSize: number;
@@ -71,6 +76,8 @@ interface Options {
   clientPid: number;
   connectionId: number;
   clientTimeZone: number;
+  // Depercated
+  // The ClientLCID value is no longer used to set language parameters and is ignored.
   clientLcid: number;
 }
 
@@ -103,7 +110,7 @@ class Login7Payload {
   declare changePassword: string | undefined;
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
-
+  declare columnEncryption: boolean;
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
@@ -117,6 +124,7 @@ class Login7Payload {
     this.initDbFatal = false;
 
     this.fedAuth = undefined;
+    this.columnEncryption = false;
 
     this.userName = undefined;
     this.password = undefined;
@@ -410,6 +418,16 @@ class Login7Payload {
 
           break;
       }
+    }
+
+    if (this.columnEncryption) {
+      const buffer = Buffer.alloc(6);
+      let offset = 0;
+      offset = buffer.writeUInt8(COLUMN_ENCRYPTION_OPTIONS.FEATURE_ID, offset);
+      offset = buffer.writeUInt32LE(1, offset);
+      buffer.writeUInt8(COLUMN_ENCRYPTION_OPTIONS.MAX_SUPPORTED_CRYPTO_VERSION, offset);
+
+      buffers.push(buffer);
     }
 
     if (this.tdsVersion >= versions['7_4']) {
