@@ -41,6 +41,7 @@
     "tag": "next"
   },
   "dependencies": {
+    "@azure/core-auth": "^1.7.2",
     "@azure/identity": "^4.2.1",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.6.1",
