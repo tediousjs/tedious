@@ -410,6 +410,53 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  token-credential-auth:
+    name: Azure SQL Server / Node.js 18.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v3
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.token-credential.ts test/config.ts
+
+    - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
+        AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+
   azure-ad-service-principal-auth:
     name: Azure SQL Server / Node.js 18.x
     runs-on: ubuntu-latest
