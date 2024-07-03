@@ -1,6 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
 const { assert } = require('chai');
 
 const TYPES = require('../../src/data-type').typeByName;
@@ -9,17 +8,21 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-const config = JSON.parse(
-  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-).config;
-
-config.options.debug = debugOptionsFromEnv();
-config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+import defaultConfig from '../config';
 
 describe('inserting binary data', function() {
   this.timeout(60000);
 
   beforeEach(function(done) {
+    const config = {
+      ...defaultConfig,
+      options: {
+        ...defaultConfig.options,
+        debug: debugOptionsFromEnv(),
+        tdsVersion: process.env.TEDIOUS_TDS_VERSION,
+      }
+    };
+
     this.connection = new Connection(config);
     this.connection.connect(done);
 

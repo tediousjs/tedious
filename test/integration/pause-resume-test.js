@@ -1,6 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
 const assert = require('chai').assert;
 
 import Connection from '../../src/connection';
@@ -8,12 +7,20 @@ import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
+import defaultConfig from '../config';
+
 function getConfig() {
-  const config = JSON.parse(fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')).config;
-  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
-  config.options.debug = debugOptionsFromEnv();
-  // 250 ms timeout until the first response package is received
-  config.options.requestTimeout = 250;
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION,
+      // 250 ms timeout until the first response package is received
+      requestTimeout: 250
+    }
+  };
+
   return config;
 }
 

@@ -328,9 +328,11 @@ interface ErrorWithCode extends Error {
   code?: string;
 }
 
+export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+
 interface InternalConnectionConfig {
   server: string;
-  authentication: DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+  authentication: ConnectionAuthentication;
   options: InternalConnectionOptions;
 }
 
@@ -496,7 +498,7 @@ export interface ConnectionOptions {
    * during the given transaction's execution. This sets the value for `SET XACT_ABORT` during the
    * initial SQL phase of a connection [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-xact-abort-transact-sql).
    */
-  abortTransactionOnError?: boolean;
+  abortTransactionOnError?: boolean | undefined;
 
   /**
    * Application name used for identifying a specific application in profiling, logging or tracing tools of SQLServer.
@@ -755,7 +757,7 @@ export interface ConnectionOptions {
    *
    * Mutually exclusive with [[instanceName]]
    */
-  port?: number;
+  port?: number | undefined;
 
   /**
    * A boolean, determining whether the connection will request read only access from a SQL Server Availability
@@ -809,14 +811,14 @@ export interface ConnectionOptions {
    *
    * (default: `7_4`)
    */
-  tdsVersion?: string;
+  tdsVersion?: string | undefined;
 
   /**
    * Specifies the size of varchar(max), nvarchar(max), varbinary(max), text, ntext, and image data returned by a SELECT statement.
    *
    * (default: `2147483647`)
    */
-  textsize?: string;
+  textsize?: number;
 
   /**
    * If "true", the SQL Server SSL certificate is automatically trusted when the communication layer is encrypted using SSL.
@@ -1065,7 +1067,7 @@ class Connection extends EventEmitter {
 
     this.fedAuthRequired = false;
 
-    let authentication: InternalConnectionConfig['authentication'];
+    let authentication: ConnectionAuthentication;
     if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
         throw new TypeError('The "config.authentication" property must be of type Object.');

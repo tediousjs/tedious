@@ -67,21 +67,25 @@ describe('Validations', function() {
     assert.strictEqual(value, null);
 
     value = TYPE.BigInt.validate(2147483647);
-    assert.strictEqual(value, 2147483647);
+    assert.strictEqual(value, 2147483647n);
 
-    value = TYPE.BigInt.validate(-9007199254740991);
-    assert.strictEqual(value, -9007199254740991);
+    value = TYPE.BigInt.validate(-9223372036854775808n);
+    assert.strictEqual(value, -9223372036854775808n);
 
-    value = TYPE.BigInt.validate(9007199254740991);
-    assert.strictEqual(value, 9007199254740991);
-
-    assert.throws(() => {
-      TYPE.BigInt.validate(-9007199254740992);
-    }, TypeError, 'Value must be between -9007199254740991 and 9007199254740991, inclusive.  For smaller or bigger numbers, use VarChar type.');
+    value = TYPE.BigInt.validate(9223372036854775807n);
+    assert.strictEqual(value, 9223372036854775807n);
 
     assert.throws(() => {
-      TYPE.BigInt.validate(9007199254740992);
-    }, TypeError, 'Value must be between -9007199254740991 and 9007199254740991, inclusive.  For smaller or bigger numbers, use VarChar type.');
+      TYPE.BigInt.validate(-9223372036854775809n);
+    }, TypeError, 'Value must be between -9223372036854775808 and 9223372036854775807, inclusive.');
+
+    assert.throws(() => {
+      TYPE.BigInt.validate(9223372036854775808n);
+    }, TypeError, 'Value must be between -9223372036854775808 and 9223372036854775807, inclusive.');
+
+    assert.throws(() => {
+      TYPE.BigInt.validate(0.5);
+    }, RangeError, 'The number 0.5 cannot be converted to a BigInt because it is not an integer');
   });
 
   it('SmallDateTime', () => {
