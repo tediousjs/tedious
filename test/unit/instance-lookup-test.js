@@ -2,7 +2,6 @@ const sinon = require('sinon');
 const url = require('node:url');
 const assert = require('chai').assert;
 const dgram = require('dgram');
-const { AbortController } = require('node-abort-controller');
 
 const { instanceLookup, parseBrowserResponse } = require('../../src/instance-lookup');
 

@@ -79,7 +79,8 @@ const SmallDateTime: DataType = {
 
     if (year === 2079) {
       // Month is 0-indexed, i.e. Jan = 0, Dec = 11
-      if (month > 4 || (month === 4 && date > 6)) {
+      // See: https://learn.microsoft.com/en-us/sql/t-sql/data-types/smalldatetime-transact-sql?view=sql-server-ver16
+      if (month > 5 || (month === 5 && date > 6)) {
         throw new TypeError('Out of range.');
       }
     }

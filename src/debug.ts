@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import * as util from 'util';
 import { Packet } from './packet';
+import type { Token } from './token/token';
 
 class Debug extends EventEmitter {
   declare options: {
@@ -44,7 +45,7 @@ class Debug extends EventEmitter {
     }
   }
 
-  token(token: any) {
+  token(token: Token) {
     if (this.haveListeners() && this.options.token) {
       this.log(util.inspect(token, { showHidden: false, depth: 5, colors: true }));
     }

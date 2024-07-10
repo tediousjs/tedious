@@ -1,28 +1,17 @@
 // @ts-check
 
-const fs = require('fs');
-const homedir = require('os').homedir();
 const assert = require('chai').assert;
-import { AbortController } from 'node-abort-controller';
 
 const { instanceLookup } = require('../../src/instance-lookup');
 
 var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
+import defaultConfig from '../config';
+
 function getConfig() {
   return {
-    server: JSON.parse(
-      fs.readFileSync(
-        homedir + '/.tedious/test-connection.json',
-        'utf8'
-      )
-    ).config.server,
-    instanceName: JSON.parse(
-      fs.readFileSync(
-        homedir + '/.tedious/test-connection.json',
-        'utf8'
-      )
-    ).instanceName
+    server: defaultConfig.server,
+    instanceName: defaultConfig.options?.instanceName
   };
 }
 
