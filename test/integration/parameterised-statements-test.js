@@ -1,6 +1,5 @@
 // @ts-check
 
-const fs = require('fs');
 const assert = require('chai').assert;
 const TYPES = require('../../src/data-type').typeByName;
 
@@ -9,13 +8,17 @@ import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-function getConfig() {
-  const config = JSON.parse(
-    fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-  ).config;
+import defaultConfig from '../config';
 
-  config.options.debug = debugOptionsFromEnv();
-  config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+function getConfig() {
+  const config = {
+    ...defaultConfig,
+    options: {
+      ...defaultConfig.options,
+      debug: debugOptionsFromEnv(),
+      tdsVersion: process.env.TEDIOUS_TDS_VERSION
+    }
+  };
 
   return config;
 }
@@ -39,7 +42,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
   var config = getConfig();
   // config.options.packetSize = 32768
 
-  if (tdsVersion && tdsVersion > config.options.tdsVersion) {
+  if (tdsVersion && process.env.TEDIOUS_TDS_VERSION && tdsVersion > process.env.TEDIOUS_TDS_VERSION) {
     done();
     return;
   }
@@ -984,7 +987,7 @@ describe('Parameterised Statements Test', function() {
   it('supports TVP values', function(done) {
     const config = getConfig();
 
-    if (config.options.tdsVersion < '7_3_A') {
+    if (process.env.TEDIOUS_TDS_VERSION && process.env.TEDIOUS_TDS_VERSION < '7_3_A') {
       this.skip();
     }
 

@@ -35,7 +35,7 @@ const Date: DataType = {
 
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
 
-    let date;
+    let date: LocalDate;
     if (options.useUTC) {
       date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
     } else {
@@ -49,13 +49,26 @@ const Date: DataType = {
   },
 
   // TODO: value is technically of type 'unknown'.
-  validate: function(value): null | Date {
+  validate: function(value, collation, options): null | Date {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof globalDate)) {
       value = new globalDate(globalDate.parse(value));
+    }
+
+    value = value as Date;
+
+    let year;
+    if (options && options.useUTC) {
+      year = value.getUTCFullYear();
+    } else {
+      year = value.getFullYear();
+    }
+
+    if (year < 1 || year > 9999) {
+      throw new TypeError('Out of range.');
     }
 
     if (isNaN(value)) {

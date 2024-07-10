@@ -33,8 +33,6 @@ import {
 } from './token';
 import BulkLoad from '../bulk-load';
 
-import AggregateError from 'es-aggregate-error';
-
 export class UnexpectedTokenError extends Error {
   constructor(handler: TokenHandler, token: Token) {
     super('Unexpected token `' + token.name + '` in `' + handler.constructor.name + '`');

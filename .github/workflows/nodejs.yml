@@ -19,10 +19,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: Use Node.js 16
+    - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
-        node-version: 16
+        node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -46,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x, 18.x, 19.x]
+        node-version: [18.x, 20.x, 21.x]
       fail-fast: false
 
     steps:
@@ -66,26 +66,8 @@ jobs:
         docker-compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "encrypt": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+      shell: bash
+      run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -108,7 +90,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -117,7 +99,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -126,7 +108,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -135,7 +117,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -144,7 +126,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -153,7 +135,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -165,7 +147,7 @@ jobs:
     strategy:
       matrix:
         mssql-version: [2016, 2017, 2019, 2022]
-        node-version: [16.x, 18.x, 19.x, 20.x]
+        node-version: [18.x, 20.x, 21.x]
       fail-fast: false
 
     steps:
@@ -180,17 +162,17 @@ jobs:
           '2022' {
             $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=105013'
+            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=105013'
           }
           '2019' {
             $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=100809'
+            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=100809'
           }
           '2017' {
             $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
             $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/confirmation.aspx?id=56128'
+            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=56128'
           }
           '2016' {
             $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
@@ -267,26 +249,7 @@ jobs:
 
     - name: Set up CI configuration
       shell: bash
-      run: |
-        mkdir ~/.tedious
-
-        echo '{
-          "config": {
-            "server": "localhost",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "sa",
-                "password": "yourStrong(!)Password"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "master",
-              "trustServerCertificate": true
-            }
-          }
-        }' | jq --arg certificate "$(cat ./test/fixtures/mssql.crt)" '.config.options.cryptoCredentialsDetails.ca |= $certificate' > ~/.tedious/test-connection.json
+      run: cp -f test/config.ci.ts test/config.ts
 
     - name: Upgrade npm
       run: npm install -g npm
@@ -309,7 +272,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -318,7 +281,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -327,7 +290,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -336,7 +299,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -345,7 +308,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -354,12 +317,12 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-sql-auth:
-    name: Azure SQL Server / Node.js 16.x
+    name: Azure SQL Server / Node.js 18.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -368,10 +331,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 16
+    - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
-        node-version: 16
+        node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -383,37 +346,26 @@ jobs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
+
     - run: npm ci
 
-    - run: mkdir ~/.tedious
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.azure-default.ts test/config.ts
 
-    - name: Set up CI configuration (SQL Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "default",
-              "options": {
-                "userName": "${{ secrets.AZURE_USERNAME }}",
-                "password": "${{ secrets.AZURE_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
+        AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-auth:
-    name: Azure SQL Server / Node.js 16.x
+    name: Azure SQL Server / Node.js 18.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -422,10 +374,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 16
+    - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
-        node-version: 16
+        node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -441,38 +393,25 @@ jobs:
 
     - run: npm ci
 
-    - run: mkdir ~/.tedious
-
-    - name: Set up CI configuration (AD Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "azure-active-directory-password",
-              "options": {
-                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
-                "tenantId": "${{ secrets.AZURE_AD_TENANT_ID }}",
-                "userName": "${{ secrets.AZURE_AD_USERNAME }}",
-                "password": "${{ secrets.AZURE_AD_PASSWORD }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.azure-ad-password.ts test/config.ts
 
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
+        AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-service-principal-auth:
-    name: Azure SQL Server / Node.js 16.x
+    name: Azure SQL Server / Node.js 18.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -481,10 +420,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 16
+    - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
-        node-version: 16
+        node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
@@ -500,32 +439,19 @@ jobs:
 
     - run: npm ci
 
-    - run: mkdir ~/.tedious
-
-    - name: Set up CI configuration (AD Service Principal Authentication)
-      run: |
-        echo '{
-          "config": {
-            "server": "${{ secrets.AZURE_SERVER }}",
-            "authentication": {
-              "type": "azure-active-directory-service-principal-secret",
-              "options": {
-                "clientId": "${{ secrets.AZURE_AD_SP_CLIENT_ID }}",
-                "tenantId": "${{ secrets.AZURE_AD_SP_TENANT_ID }}",
-                "clientSecret": "${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}"
-              }
-            },
-            "options": {
-              "port": 1433,
-              "database": "tedious"
-            }
-          }
-        }' > ~/.tedious/test-connection.json
+    - name: set up test configuration
+      shell: bash
+      run: cp -f test/config.azure-ad-sp-secret.ts test/config.ts
 
     - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -537,10 +463,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 16
+    - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
-        node-version: 16
+        node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache

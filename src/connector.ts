@@ -1,11 +1,8 @@
 import net from 'net';
 import dns, { type LookupAddress } from 'dns';
 
-import * as punycode from 'punycode';
-import { AbortSignal } from 'node-abort-controller';
+import url from 'node:url';
 import AbortError from './errors/abort-error';
-
-import AggregateError from 'es-aggregate-error';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
@@ -167,7 +164,7 @@ export async function lookupAllAddresses(host: string, lookup: LookupFunction, s
 
       signal.addEventListener('abort', onAbort);
 
-      lookup(punycode.toASCII(host), { all: true }, (err, addresses) => {
+      lookup(url.domainToASCII(host), { all: true }, (err, addresses) => {
         signal.removeEventListener('abort', onAbort);
 
         err ? reject(err) : resolve(addresses);

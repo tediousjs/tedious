@@ -19,6 +19,7 @@ export class Parser extends EventEmitter {
 
     this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
     this.parser.on('data', (token: Token) => {
+      debug.token(token);
       handler[token.handlerName as keyof TokenHandler](token as any);
     });
 

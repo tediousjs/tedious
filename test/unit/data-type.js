@@ -211,6 +211,20 @@ describe('Date', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are out of range', function() {
+      assert.throws(() => {
+        const testDate = new Date();
+        testDate.setFullYear(0);
+        TYPES.Date.validate(testDate);
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.Date.validate(new Date('Jan 1, 10000'));
+      }, TypeError, 'Out of range.');
+    });
+  });
 });
 
 describe('DateTime', function() {
@@ -244,6 +258,18 @@ describe('DateTime', function() {
 
       const result = type.generateTypeInfo();
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are out of range', function() {
+      assert.throws(() => {
+        TYPES.DateTime.validate(new Date('Dec 1, 1752'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.DateTime.validate('Jan 1, 10000');
+      }, TypeError, 'Out of range.');
     });
   });
 });
@@ -291,6 +317,19 @@ describe('DateTime2', function() {
 
       const buffer = TYPES.DateTime2.generateTypeInfo({ scale: 1 });
       assert.deepEqual(buffer, expected);
+    });
+  });
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are out of range', function() {
+      assert.throws(() => {
+        const testDate = new Date();
+        testDate.setFullYear(0);
+        TYPES.DateTime2.validate(testDate);
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.DateTime2.validate(new Date('Jan 1, 10000'));
+      }, TypeError, 'Out of range.');
     });
   });
 });
@@ -344,6 +383,20 @@ describe('DateTimeOffset', function() {
 
       const buffer = TYPES.DateTimeOffset.generateTypeInfo({ scale: 1 });
       assert.deepEqual(buffer, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are out of range', function() {
+      assert.throws(() => {
+        const testDate = new Date();
+        testDate.setFullYear(0);
+        TYPES.DateTimeOffset.validate(testDate);
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.DateTimeOffset.validate(new Date('Jan 1, 10000'));
+      }, TypeError, 'Out of range.');
     });
   });
 });
@@ -449,6 +502,34 @@ describe('Decimal', function() {
       assert.deepEqual(result4, expected4);
     });
   });
+
+  describe('.validate', function() {
+    it('returns a TypeError for decimals if the passed in value is unacceptable', function() {
+      assert.throws(() => {
+        TYPES.Decimal.validate('ABC');
+      }, TypeError, 'Invalid number.');
+      assert.throws(() => {
+        TYPES.Decimal.validate('e123');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('returns a the "Infinity" literal the decimals is outside the double-precision 64-bit IEEE 754-2019 format range', function() {
+      assert.equal(TYPES.Decimal.validate(1.7976931348623159e+308), Infinity);
+      assert.equal(TYPES.Decimal.validate(-1.7976931348623159e+308), -Infinity);
+      assert.equal(TYPES.Decimal.validate('Infinity'), Infinity);
+      assert.equal(TYPES.Decimal.validate('-Infinity'), -Infinity);
+    });
+
+    it('Corect pasing the decimals with special cases', function() {
+      assert.equal(TYPES.Decimal.validate('123.3.3'), 123.3);
+      assert.equal(TYPES.Decimal.validate('1-23'), 1);
+      assert.equal(TYPES.Decimal.validate('1+23'), 1);
+      assert.equal(TYPES.Decimal.validate('1e23e4'), 1e23);
+      assert.equal(TYPES.Decimal.validate('   123'), 123);
+      assert.equal(TYPES.Decimal.validate('1-e5'), 1);
+      assert.equal(TYPES.Decimal.validate('1e2e3'), 100);
+    });
+  });
 });
 
 describe('Float', function() {
@@ -490,6 +571,34 @@ describe('Float', function() {
 
       const result = type.generateTypeInfo();
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('returns a TypeError for decimals if the passed in value is unacceptable', function() {
+      assert.throws(() => {
+        TYPES.Float.validate('ABC');
+      }, TypeError, 'Invalid number.');
+      assert.throws(() => {
+        TYPES.Float.validate('e123');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('returns a the "Infinity" literal the decimals is outside the double-precision 64-bit IEEE 754-2019 format range', function() {
+      assert.equal(TYPES.Float.validate(1.7976931348623159e+308), Infinity);
+      assert.equal(TYPES.Float.validate(-1.7976931348623159e+308), -Infinity);
+      assert.equal(TYPES.Float.validate('Infinity'), Infinity);
+      assert.equal(TYPES.Float.validate('-Infinity'), -Infinity);
+    });
+
+    it('Corect pasing the decimals with special cases', function() {
+      assert.equal(TYPES.Float.validate('123.3.3'), 123.3);
+      assert.equal(TYPES.Float.validate('1-23'), 1);
+      assert.equal(TYPES.Float.validate('1+23'), 1);
+      assert.equal(TYPES.Float.validate('1e23e4'), 1e23);
+      assert.equal(TYPES.Float.validate('   123'), 123);
+      assert.equal(TYPES.Float.validate('1-e5'), 1);
+      assert.equal(TYPES.Float.validate('1e2e3'), 100);
     });
   });
 });
@@ -577,6 +686,24 @@ describe('Int', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.Int.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.Int.validate(-2147483648 - 1);
+      }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
+
+      assert.throws(() => {
+        TYPES.Int.validate(2147483647 + 1);
+      }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
+    });
+  });
 });
 
 describe('Money', function() {
@@ -618,6 +745,25 @@ describe('Money', function() {
 
       const result = type.generateTypeInfo();
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+
+        TYPES.Money.validate(-922337203685477.5808 - 0.1);
+      }, TypeError, 'Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
+
+      assert.throws(() => {
+        TYPES.Money.validate(922337203685477.5807 + 0.1);
+      }, TypeError, 'Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
     });
   });
 });
@@ -919,6 +1065,22 @@ describe('SmallDateTime', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('returns a TypeError for dates that are out of range', function() {
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('Dec 31, 1889'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('Jan 1, 2080'));
+      }, TypeError, 'Out of range.');
+
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date('June 7, 2079'));
+      }, TypeError, 'Out of range.');
+    });
+  });
 });
 
 describe('SmallInt', function() {
@@ -962,6 +1124,24 @@ describe('SmallInt', function() {
       assert.deepEqual(result, expected);
     });
   });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.SmallInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.SmallInt.validate(-32768 - 1);
+      }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
+
+      assert.throws(() => {
+        TYPES.SmallInt.validate(32767 + 1);
+      }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
+    });
+  });
 });
 
 describe('SmallMoney', function() {
@@ -993,6 +1173,24 @@ describe('SmallMoney', function() {
 
       const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false })]);
       assert.deepEqual(buffer, expected);
+    });
+
+    describe('.validate', function() {
+      it('throws Invalid number error for NaN input', function() {
+        assert.throws(() => {
+          TYPES.SmallMoney.validate('string');
+        }, TypeError, 'Invalid number.');
+      });
+
+      it('throws Out of Range error for numbers out of range', function() {
+        assert.throws(() => {
+          TYPES.SmallMoney.validate(-214748.3648 - 0.0001);
+        }, TypeError, 'Value must be between -214748.3648 and 214748.3647.');
+
+        assert.throws(() => {
+          TYPES.SmallMoney.validate(214748.3647 + 0.0001);
+        }, TypeError, 'Value must be between -214748.3648 and 214748.3647.');
+      });
     });
   });
 
@@ -1140,6 +1338,24 @@ describe('TinyInt', function() {
 
       const result = type.generateTypeInfo();
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('throws Invalid number error for NaN input', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate('string');
+      }, TypeError, 'Invalid number.');
+    });
+
+    it('throws Out of Range error for numbers out of range', function() {
+      assert.throws(() => {
+        TYPES.TinyInt.validate(-1);
+      }, TypeError, 'Value must be between 0 and 255, inclusive.');
+
+      assert.throws(() => {
+        TYPES.TinyInt.validate(256);
+      }, TypeError, 'Value must be between 0 and 255, inclusive.');
     });
   });
 });

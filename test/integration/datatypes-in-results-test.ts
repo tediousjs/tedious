@@ -1,49 +1,51 @@
-import fs from 'fs';
 import { assert } from 'chai';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { typeByName as TYPES } from '../../src/data-type';
 
-import { homedir } from 'os';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
-const config = JSON.parse(
-  fs.readFileSync(homedir() + '/.tedious/test-connection.json', 'utf8')
-).config;
+import defaultConfig from '../config';
 
-config.options.textsize = 8 * 1024;
-config.options.debug = debugOptionsFromEnv();
-config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+const config = {
+  ...defaultConfig,
+  options: {
+    ...defaultConfig.options,
+    textsize: 8 * 1024,
+    debug: debugOptionsFromEnv(),
+    tdsVersion: process.env.TEDIOUS_TDS_VERSION
+  }
+};
 
 describe('Datatypes in results test', function() {
-  let connection: Connection;
-
-  beforeEach(function(done) {
-    connection = new Connection(config);
-
-    connection.on('errorMessage', function(error) {
-      console.log(`${error.number} : ${error.message}`);
-    });
-
-    if (process.env.TEDIOUS_DEBUG) {
-      connection.on('debug', console.log);
-    }
-
-    connection.connect(done);
-  });
-
-  afterEach(function(done) {
-    if (!connection.closed) {
-      connection.on('end', done);
-      connection.close();
-    } else {
-      done();
-    }
-  });
-
   function testDataType(expectedType: typeof TYPES[keyof typeof TYPES], cases: { [key: string]: [string, any] | [string, any, string] }) {
     describe(expectedType.name, function() {
+      let connection: Connection;
+
+      beforeEach(function(done) {
+        connection = new Connection(config);
+
+        connection.on('errorMessage', function(error) {
+          console.log(`${error.number} : ${error.message}`);
+        });
+
+        if (process.env.TEDIOUS_DEBUG) {
+          connection.on('debug', console.log);
+        }
+
+        connection.connect(done);
+      });
+
+      afterEach(function(done) {
+        if (!connection.closed) {
+          connection.on('end', done);
+          connection.close();
+        } else {
+          done();
+        }
+      });
+
       for (const description in cases) {
         if (!cases.hasOwnProperty(description)) {
           continue;
@@ -51,7 +53,7 @@ describe('Datatypes in results test', function() {
 
         const [sql, expectedValue, tdsVersion] = cases[description];
 
-        if (tdsVersion && tdsVersion > config.options.tdsVersion) {
+        if (tdsVersion && process.env.TEDIOUS_TDS_VERSION && tdsVersion > process.env.TEDIOUS_TDS_VERSION) {
           it.skip(description);
           continue;
         }

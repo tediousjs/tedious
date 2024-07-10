@@ -1,17 +1,20 @@
 const Connection = require('../../src/connection');
 const Request = require('../../src/request');
 const Transaction = require('../../src/transaction');
-const fs = require('fs');
 const async = require('async');
 const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
 const assert = require('chai').assert;
 
-const config = JSON.parse(
-  fs.readFileSync(require('os').homedir() + '/.tedious/test-connection.json', 'utf8')
-).config;
+import defaultConfig from '../config';
 
-config.options.debug = debugOptionsFromEnv();
-config.options.tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+const config = {
+  ...defaultConfig,
+  options: {
+    ...defaultConfig.options,
+    debug: debugOptionsFromEnv(),
+    tdsVersion: process.env.TEDIOUS_TDS_VERSION
+  }
+};
 
 class Tester {
   constructor(done) {

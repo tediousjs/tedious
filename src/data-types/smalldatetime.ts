@@ -35,7 +35,7 @@ const SmallDateTime: DataType = {
 
     const buffer = Buffer.alloc(4);
 
-    let days, dstDiff, minutes;
+    let days: number, dstDiff: number, minutes: number;
     if (options.useUTC) {
       days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
       minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
@@ -51,13 +51,38 @@ const SmallDateTime: DataType = {
     yield buffer;
   },
 
-  validate: function(value): null | Date {
+  validate: function(value, collation, options): null | Date {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
       value = new Date(Date.parse(value));
+    }
+
+    value = value as Date;
+
+    let year, month, date;
+    if (options && options.useUTC) {
+      year = value.getUTCFullYear();
+      month = value.getUTCMonth();
+      date = value.getUTCDate();
+    } else {
+      year = value.getFullYear();
+      month = value.getMonth();
+      date = value.getDate();
+    }
+
+    if (year < 1900 || year > 2079) {
+      throw new TypeError('Out of range.');
+    }
+
+    if (year === 2079) {
+      // Month is 0-indexed, i.e. Jan = 0, Dec = 11
+      // See: https://learn.microsoft.com/en-us/sql/t-sql/data-types/smalldatetime-transact-sql?view=sql-server-ver16
+      if (month > 5 || (month === 5 && date > 6)) {
+        throw new TypeError('Out of range.');
+      }
     }
 
     if (isNaN(value)) {

@@ -4,6 +4,8 @@ import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer'
 
 const DATA_LENGTH = Buffer.from([0x08]);
 const NULL_LENGTH = Buffer.from([0x00]);
+const MAX_SAFE_BIGINT = 9223372036854775807n;
+const MIN_SAFE_BIGINT = -9223372036854775808n;
 
 const BigInt: DataType = {
   id: 0x7F,
@@ -32,25 +34,21 @@ const BigInt: DataType = {
     }
 
     const buffer = new WritableTrackingBuffer(8);
-    buffer.writeInt64LE(Number(parameter.value));
+    buffer.writeBigInt64LE(typeof parameter.value === 'bigint' ? parameter.value : globalThis.BigInt(parameter.value));
     yield buffer.data;
   },
 
-  validate: function(value): null | number {
+  validate: function(value): null | bigint {
     if (value == null) {
       return null;
     }
 
-    if (typeof value !== 'number') {
-      value = Number(value);
+    if (typeof value !== 'bigint') {
+      value = globalThis.BigInt(value);
     }
 
-    if (isNaN(value)) {
-      throw new TypeError('Invalid number.');
-    }
-
-    if (value < Number.MIN_SAFE_INTEGER || value > Number.MAX_SAFE_INTEGER) {
-      throw new TypeError(`Value must be between ${Number.MIN_SAFE_INTEGER} and ${Number.MAX_SAFE_INTEGER}, inclusive.  For smaller or bigger numbers, use VarChar type.`);
+    if (value < MIN_SAFE_BIGINT || value > MAX_SAFE_BIGINT) {
+      throw new TypeError(`Value must be between ${MIN_SAFE_BIGINT} and ${MAX_SAFE_BIGINT}, inclusive.`);
     }
 
     return value;

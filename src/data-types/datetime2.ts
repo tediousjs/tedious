@@ -64,7 +64,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     const buffer = new WritableTrackingBuffer(16);
     scale = scale!;
 
-    let timestamp;
+    let timestamp: number;
     if (options.useUTC) {
       timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
     } else {
@@ -102,13 +102,26 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     yield buffer.data;
   },
 
-  validate: function(value): null | number {
+  validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;
     }
 
     if (!(value instanceof Date)) {
       value = new Date(Date.parse(value));
+    }
+
+    value = value as Date;
+
+    let year;
+    if (options && options.useUTC) {
+      year = value.getUTCFullYear();
+    } else {
+      year = value.getFullYear();
+    }
+
+    if (year < 1 || year > 9999) {
+      throw new TypeError('Out of range.');
     }
 
     if (isNaN(value)) {

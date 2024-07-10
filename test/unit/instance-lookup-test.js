@@ -1,8 +1,7 @@
 const sinon = require('sinon');
-const punycode = require('punycode');
+const url = require('node:url');
 const assert = require('chai').assert;
 const dgram = require('dgram');
-const { AbortController } = require('node-abort-controller');
 
 const { instanceLookup, parseBrowserResponse } = require('../../src/instance-lookup');
 
@@ -361,7 +360,7 @@ describe('parseBrowserResponse', function() {
     }
 
     sinon.assert.calledOnce(lookup);
-    sinon.assert.calledWithMatch(lookup, punycode.toASCII(options.server));
+    sinon.assert.calledWithMatch(lookup, url.domainToASCII(options.server));
   });
 
   it('test ASCII Server name', async function() {
