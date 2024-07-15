@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { ParameterValidationError } from './errors';
 import Connection, { type InternalConnectionOptions } from './connection';
 
 import { Transform } from 'stream';
@@ -185,7 +186,8 @@ class RowTransform extends Transform {
         try {
           value = c.type.validate(value, c.collation);
         } catch (error: any) {
-          return callback(error);
+          const validateError = new ParameterValidationError(error.message, c.name, value);
+          return callback(validateError);
         }
       }
 

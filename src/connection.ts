@@ -32,7 +32,7 @@ import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
-import { ConnectionError, RequestError } from './errors';
+import { ConnectionError, RequestError, ParameterValidationError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
@@ -2887,26 +2887,27 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    try {
-      for (let i = 0, len = request.parameters.length; i < len; i++) {
-        const parameter = request.parameters[i];
 
+    for (let i = 0, len = request.parameters.length; i < len; i++) {
+      const parameter = request.parameters[i];
+      const value = parameters ? parameters[parameter.name] : null;
+      try {
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
+          value: parameter.type.validate(value, this.databaseCollation)
         });
+      } catch (error: any) {
+        const validateError = new ParameterValidationError(error.message, parameter.name, value);
+        request.error = validateError;
+
+        process.nextTick(() => {
+          this.debug.log(validateError.message);
+          request.callback(validateError);
+        });
+
+        return;
       }
-    } catch (error: any) {
-      request.error = error;
-
-      process.nextTick(() => {
-        this.debug.log(error.message);
-        request.callback(error);
-      });
-
-      return;
     }
-
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
