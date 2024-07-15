@@ -34,7 +34,7 @@ const BigInt: DataType = {
     }
 
     const buffer = new WritableTrackingBuffer(8);
-    buffer.writeInt64LE(Number(parameter.value));
+    buffer.writeBigInt64LE(typeof parameter.value === 'bigint' ? parameter.value : globalThis.BigInt(parameter.value));
     yield buffer.data;
   },
 
