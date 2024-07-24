@@ -180,9 +180,15 @@ describe('calling a procedure that takes and returns a TVP', function() {
   });
 
   it('correctly handles validation errors', function(done) {
-    const request = new Request('__tediousTvpTest', (err) => {
-      assert.instanceOf(err, TypeError);
-      assert.strictEqual(err?.message, 'Value must be between 0 and 255, inclusive.');
+     const request = new Request('__tediousTvpTest', (err) => {
+      assert.instanceOf(err, InputError);
+      assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
+
+      assert.instanceOf(err?.cause, InputError);
+      assert.strictEqual(/** @type {InputError} */(err?.cause).message, 'TVP column \'b\' has invalid data at row index 0');
+
+      assert.instanceOf(/** @type {InputError} */(err?.cause).cause, TypeError);
+      assert.strictEqual(/** @type {TypeError} */(/** @type {InputError} */(err?.cause).cause).message, 'Value must be between 0 and 255, inclusive.');
 
       const request = new Request('SELECT 1', done);
       connection.execSql(request);
