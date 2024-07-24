@@ -96,7 +96,7 @@ const TVP: DataType = {
         try {
           yield * column.type.generateParameterData(param, options);
         } catch (error) {
-          throw new InputError(`TVP column i=${k} has invalid data at row j=${i}`, error);
+          throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
         }
       }
     }
