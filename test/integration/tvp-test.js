@@ -9,6 +9,7 @@ import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
+import { InputError } from '../../src/errors';
 
 function getConfig() {
   const config = {
