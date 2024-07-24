@@ -90,7 +90,7 @@ const TVP: DataType = {
         } catch (error) {
           throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
         }
-        
+
         const param = {
           value: paramValue,
           length: column.length,
