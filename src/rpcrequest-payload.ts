@@ -117,7 +117,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     try {
       yield * type.generateParameterData(param, this.options);
     } catch (error) {
-      throw new InputError(`Input parameter with name=${parameter.name} has invalid data`, error);
+      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
   }
 }
