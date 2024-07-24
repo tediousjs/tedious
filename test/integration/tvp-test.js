@@ -194,7 +194,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
       const request = new Request('SELECT 1', done);
       connection.execSql(request);
     });
-    
+
     const table = {
       columns: [
         {
