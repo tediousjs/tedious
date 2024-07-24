@@ -27,10 +27,4 @@ export class RequestError extends Error {
   }
 }
 
-export class InputError extends TypeError {
-  constructor(message: string, readonly cause: unknown) {
-    super(
-      message + (cause instanceof Error ? `. Details: ${cause.message}` : '')
-    );
-  }
-}
+export class InputError extends TypeError {}
