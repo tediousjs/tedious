@@ -181,7 +181,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
   });
 
   it('correctly handles validation errors', function(done) {
-     const request = new Request('__tediousTvpTest', (err) => {
+    const request = new Request('__tediousTvpTest', (err) => {
       assert.instanceOf(err, InputError);
       assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
 
@@ -194,7 +194,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
       const request = new Request('SELECT 1', done);
       connection.execSql(request);
     });
-
+    
     const table = {
       columns: [
         {
