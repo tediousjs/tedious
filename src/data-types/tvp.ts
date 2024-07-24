@@ -84,8 +84,15 @@ const TVP: DataType = {
         const column = columns[k];
         const value = row[k];
 
+        let paramValue;
+        try {
+          paramValue = column.type.validate(value, parameter.collation);
+        } catch (error) {
+          throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
+        }
+        
         const param = {
-          value: column.type.validate(value, parameter.collation),
+          value: paramValue,
           length: column.length,
           scale: column.scale,
           precision: column.precision
@@ -93,11 +100,7 @@ const TVP: DataType = {
 
         // TvpColumnData
         yield column.type.generateParameterLength(param, options);
-        try {
-          yield * column.type.generateParameterData(param, options);
-        } catch (error) {
-          throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
-        }
+        yield * column.type.generateParameterData(param, options);
       }
     }
 
