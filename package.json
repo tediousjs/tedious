@@ -79,8 +79,8 @@
     "rimraf": "^5.0.5",
     "semantic-release": "^19.0.3",
     "sinon": "^15.2.0",
-    "typedoc": "^0.25.8",
-    "typescript": "^5.3.3"
+    "typedoc": "^0.26.5",
+    "typescript": "^5.5.4"
   },
   "scripts": {
     "docs": "typedoc",
