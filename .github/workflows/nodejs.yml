@@ -16,7 +16,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
       with:
         fetch-depth: 0
     - name: Use Node.js 18
@@ -50,7 +51,8 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
@@ -206,7 +208,8 @@ jobs:
 
         Pop-Location
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
@@ -330,7 +333,8 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
@@ -373,7 +377,8 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
@@ -419,7 +424,8 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
@@ -466,7 +472,8 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
@@ -509,7 +516,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
       uses: actions/setup-node@v3
       with:
