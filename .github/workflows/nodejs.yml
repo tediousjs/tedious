@@ -63,7 +63,7 @@ jobs:
 
     - name: Start containers
       run: |
-        docker-compose -f "test/docker-compose.linux.yml" up --detach
+        docker compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
       shell: bash
