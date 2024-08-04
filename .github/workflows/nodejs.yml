@@ -30,7 +30,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -80,7 +80,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -263,7 +263,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -344,7 +344,7 @@ jobs:
       id: npm-cache
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -389,7 +389,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -436,7 +436,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -484,7 +484,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -528,7 +528,7 @@ jobs:
       run: |
         echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
