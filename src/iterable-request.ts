@@ -34,10 +34,12 @@ export interface IterableRequestItem {
   * Metadata of all columns.
   */
   columnMetadata: ColumnMetadataDef;
+
 }
 
 type iteratorPromiseResolveFunction = (value: IteratorResult<IterableRequestItem>) => void;
 type iteratorPromiseRejectFunction = (error: Error) => void;
+interface IteratorPromiseFunctions {resolve: iteratorPromiseResolveFunction, reject: iteratorPromiseRejectFunction}
 
 // Internal class for the state controller logic of the iterator.
 class IterableRequestController {
@@ -54,10 +56,9 @@ class IterableRequestController {
   private fifoPauseLevel: number;
   private fifoResumeLevel: number;
 
-  private promisePending: boolean;
-  private resolvePromise: iteratorPromiseResolveFunction | undefined;
-  private rejectPromise: iteratorPromiseRejectFunction | undefined;
+  private promises: IteratorPromiseFunctions[];                                // FIFO of resolve/reject function pairs of pending promises
   private terminatorResolve: (() => void) | undefined;
+  private terminatorPromise: Promise<void> | undefined;
 
   // --- Constructor / Terminator ----------------------------------------------
 
@@ -73,7 +74,7 @@ class IterableRequestController {
     this.fifoPauseLevel = fifoSize;
     this.fifoResumeLevel = Math.floor(fifoSize / 2);
 
-    this.promisePending = false;
+    this.promises = [];
 
     request.addListener('row', this.rowEventHandler);
     request.addListener('columnMetadata', this.columnMetadataEventHandler);
@@ -86,29 +87,32 @@ class IterableRequestController {
       return Promise.resolve();
     }
     this.request.connection.cancel();
-    return new Promise<void>((resolve: () => void) => {
-      this.terminatorResolve = resolve;
-    });
+    if (!this.terminatorPromise) {
+      this.terminatorPromise = new Promise<void>((resolve: () => void) => {
+        this.terminatorResolve = resolve;
+      });
+    }
+    return this.terminatorPromise;
   }
 
   // --- Promise logic ---------------------------------------------------------
 
   private serveError(): boolean {
-    if (!this.error || !this.promisePending) {
+    if (!this.error || !this.promises.length) {
       return false;
     }
-    this.rejectPromise!(this.error);
-    this.promisePending = false;
+    const promise = this.promises.shift()!;
+    promise.reject(this.error);
     return true;
   }
 
   private serveRowItem(): boolean {
-    if (!this.fifo.length || !this.promisePending) {
+    if (!this.fifo.length || !this.promises.length) {
       return false;
     }
     const item = this.fifo.shift()!;
-    this.resolvePromise!({ value: item });
-    this.promisePending = false;
+    const promise = this.promises.shift()!;
+    promise.resolve({ value: item });
     if (this.fifo.length <= this.fifoResumeLevel && this.requestPaused) {
       this.request.resume();
       this.requestPaused = false;
@@ -117,35 +121,39 @@ class IterableRequestController {
   }
 
   private serveRequestCompletion(): boolean {
-    if (!this.requestCompleted || !this.promisePending) {
+    if (!this.requestCompleted || !this.promises.length) {
       return false;
     }
-    this.resolvePromise!({ done: true, value: undefined });
-    this.promisePending = false;
+    const promise = this.promises.shift()!;
+    promise.resolve({ done: true, value: undefined });
     return true;
   }
 
-  private servePromise() {
-    if (this.serveError()) {
-      return;
-    }
+  private serveNextPromise(): boolean {
     if (this.serveRowItem()) {
-      return;
+      return true;
+    }
+    if (this.serveError()) {
+      return true;
     }
     if (this.serveRequestCompletion()) {
-      return;                                              // eslint-disable-line no-useless-return
+      return true;
+    }
+    return false;
+  }
+
+  private servePromises() {
+    while (true) {
+      if (!this.serveNextPromise()) {
+        break;
+      }
     }
   }
 
   // This promise executor is called synchronously from within Iterator.next().
   public promiseExecutor = (resolve: iteratorPromiseResolveFunction, reject: iteratorPromiseRejectFunction) => {
-    if (this.promisePending) {
-      throw new Error('Previous promise is still active.');
-    }
-    this.resolvePromise = resolve;
-    this.rejectPromise = reject;
-    this.promisePending = true;
-    this.servePromise();
+    this.promises.push({ resolve, reject });
+    this.servePromises();
   };
 
   // --- Event handlers --------------------------------------------------------
@@ -161,7 +169,7 @@ class IterableRequestController {
     if (error && !this.error) {
       this.error = error;
     }
-    this.servePromise();
+    this.servePromises();
   }
 
   private columnMetadataEventHandler = (columnMetadata: ColumnMetadata[] | Record<string, ColumnMetadata>) => {
@@ -175,7 +183,7 @@ class IterableRequestController {
     }
     if (this.resultSetNo === 0 || !this.columnMetadata) {
       this.error = new Error('No columnMetadata event received before row event.');
-      this.servePromise();
+      this.servePromises();
       return;
     }
     const item: IterableRequestItem = { row, resultSetNo: this.resultSetNo, columnMetadata: this.columnMetadata };
@@ -184,7 +192,7 @@ class IterableRequestController {
       this.request.pause();
       this.requestPaused = true;
     }
-    this.servePromise();
+    this.servePromises();
   };
 
 }
@@ -207,9 +215,13 @@ class IterableRequestIterator implements AsyncIterator<IterableRequestItem> {
     return Promise.resolve({ value, done: true });         // eslint-disable-line @typescript-eslint/return-await
   }
 
-  public async throw(_exception?: any): Promise<any> {
+  public async throw(exception?: any): Promise<any> {
     await this.controller.terminate();
-    return Promise.resolve({ done: true });                // eslint-disable-line @typescript-eslint/return-await
+    if (exception) {
+      return Promise.reject(exception);                    // eslint-disable-line @typescript-eslint/return-await
+    } else {
+      return Promise.resolve({ done: true });              // eslint-disable-line @typescript-eslint/return-await
+    }
   }
 
 }
