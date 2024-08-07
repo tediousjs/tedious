@@ -1,6 +1,6 @@
 const Mitm = require('mitm');
 const sinon = require('sinon');
-const url = require('node:url');
+const dns = require('dns');
 const assert = require('chai').assert;
 
 const {
@@ -25,7 +25,7 @@ describe('lookupAllAddresses', function() {
     }
 
     assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch(url.domainToASCII(server)), 'Unexpected hostname passed to `lookup`');
+    assert.isOk(lookup.calledWithMatch('xn--tiq21tzznxb.ad'), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test ASCII Server name', async function() {
@@ -44,6 +44,21 @@ describe('lookupAllAddresses', function() {
 
     assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
     assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
+  });
+
+  it('test invalid ASCII Server name', async function() {
+    const server = 'http:wrong';
+    const controller = new AbortController();
+
+    let actualError;
+    try {
+      await lookupAllAddresses(server, dns.lookup, controller.signal);
+    } catch (err) {
+      actualError = err;
+    }
+
+    assert.instanceOf(actualError, Error);
+    assert.strictEqual(actualError.message, 'getaddrinfo ENOTFOUND http:wrong');
   });
 });
 
