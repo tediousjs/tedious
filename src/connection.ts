@@ -10,11 +10,12 @@ import { type SecureContextOptions } from 'tls';
 import { Readable } from 'stream';
 
 import {
-  DefaultAzureCredential,
   ClientSecretCredential,
+  DefaultAzureCredential,
   ManagedIdentityCredential,
-  UsernamePasswordCredential,
+  UsernamePasswordCredential
 } from '@azure/identity';
+import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
@@ -290,6 +291,17 @@ interface AzureActiveDirectoryServicePrincipalSecret {
   };
 }
 
+/** Structure that defines the options that are necessary to authenticate the Tedious.JS instance with an `@azure/identity` token credential. */
+interface TokenCredentialAuthentication {
+  /** Unique designator for the type of authentication to be used. */
+  type: 'token-credential';
+  /** Set of configurations that are required or allowed with this authentication type. */
+  options: {
+    /** Credential object used to authenticate to the resource. */
+    credential: TokenCredential;
+  };
+}
+
 interface NtlmAuthentication {
   type: 'ntlm';
   options: {
@@ -328,7 +340,7 @@ interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
 
 interface InternalConnectionConfig {
   server: string;
@@ -417,6 +429,7 @@ interface State {
 
 type Authentication = DefaultAuthentication |
   NtlmAuthentication |
+  TokenCredentialAuthentication |
   AzureActiveDirectoryPasswordAuthentication |
   AzureActiveDirectoryMsiAppServiceAuthentication |
   AzureActiveDirectoryMsiVmAuthentication |
@@ -482,6 +495,7 @@ interface AuthenticationOptions {
    *
    * * `default`: [[DefaultAuthentication.options]]
    * * `ntlm` :[[NtlmAuthentication]]
+   * * `token-credential`: [[CredentialChainAuthentication.options]]
    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
@@ -1080,8 +1094,8 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
+      if (type !== 'default' && type !== 'ntlm' && type !== 'token-credential' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
+        throw new TypeError('The "type" property must one of "default", "ntlm", "token-credential", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
       }
 
       if (typeof options !== 'object' || options === null) {
@@ -1107,6 +1121,17 @@ class Connection extends EventEmitter {
             userName: options.userName,
             password: options.password,
             domain: options.domain && options.domain.toUpperCase()
+          }
+        };
+      } else if (type === 'token-credential') {
+        if (!isTokenCredential(options.credential)) {
+          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
+        }
+
+        authentication = {
+          type: 'token-credential',
+          options: {
+            credential: options.credential
           }
         };
       } else if (type === 'azure-active-directory-password') {
@@ -2398,6 +2423,7 @@ class Connection extends EventEmitter {
         };
         break;
 
+      case 'token-credential':
       case 'azure-active-directory-msi-vm':
       case 'azure-active-directory-default':
       case 'azure-active-directory-msi-app-service':
@@ -3297,6 +3323,7 @@ Connection.prototype.STATE = {
         const { authentication } = this.config;
 
         switch (authentication.type) {
+          case 'token-credential':
           case 'azure-active-directory-password':
           case 'azure-active-directory-msi-vm':
           case 'azure-active-directory-msi-app-service':
@@ -3523,12 +3550,18 @@ Connection.prototype.STATE = {
         const fedAuthInfoToken = handler.fedAuthInfoToken;
 
         if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-          const authentication = this.config.authentication as AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          /** Federated authentication configation. */
+          const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+          /** Permission scope to pass to Entra ID when requesting an authentication token. */
           const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
 
-          let credentials;
+          /** Instance of the token credential to use to authenticate to the resource. */
+          let credentials: TokenCredential;
 
           switch (authentication.type) {
+            case 'token-credential':
+              credentials = authentication.options.credential;
+              break;
             case 'azure-active-directory-password':
               credentials = new UsernamePasswordCredential(
                 authentication.options.tenantId ?? 'common',
@@ -3555,7 +3588,9 @@ Connection.prototype.STATE = {
               break;
           }
 
-          let tokenResponse;
+          /** Access token retrieved from Entra ID for the configured permission scope(s). */
+          let tokenResponse: AccessToken | null;
+
           try {
             tokenResponse = await credentials.getToken(tokenScope);
           } catch (err) {
@@ -3566,9 +3601,16 @@ Connection.prototype.STATE = {
             return;
           }
 
+          // Type guard the token value so that it is never null.
+          if (tokenResponse === null) {
+            this.loginError = new AggregateError(
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
+            this.emit('connect', this.loginError);
+            this.transitionTo(this.STATE.FINAL);
+            return;
+          }
 
-          const token = tokenResponse.token;
-          this.sendFedAuthTokenMessage(token);
+          this.sendFedAuthTokenMessage(tokenResponse.token);
 
         } else if (this.loginError) {
           if (isTransientError(this.loginError)) {

@@ -3,6 +3,7 @@ import { writeToTrackingBuffer } from './all-headers';
 import { type Parameter, type ParameterData } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
+import { InputError } from './errors';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -113,7 +114,11 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     yield type.generateTypeInfo(param, this.options);
     yield type.generateParameterLength(param, this.options);
-    yield * type.generateParameterData(param, this.options);
+    try {
+      yield * type.generateParameterData(param, this.options);
+    } catch (error) {
+      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+    }
   }
 }
 

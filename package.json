@@ -41,6 +41,7 @@
     "tag": "next"
   },
   "dependencies": {
+    "@azure/core-auth": "^1.7.2",
     "@azure/identity": "^4.2.1",
     "@azure/keyvault-keys": "^4.4.0",
     "@js-joda/core": "^5.6.1",
@@ -78,8 +79,8 @@
     "rimraf": "^5.0.5",
     "semantic-release": "^19.0.3",
     "sinon": "^15.2.0",
-    "typedoc": "^0.25.8",
-    "typescript": "^5.3.3"
+    "typedoc": "^0.26.5",
+    "typescript": "^5.5.4"
   },
   "scripts": {
     "docs": "typedoc",
