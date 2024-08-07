@@ -1563,4 +1563,28 @@ describe('BulkLoad', function() {
       }
     });
   });
+
+  it('should not throw in _transform function', (done) => {
+    const bulkLoad = connection.newBulkLoad(
+      '#tmpTestTable',
+      (err, rowCount) => {
+        assert.instanceOf(err, RangeError);
+        assert.strictEqual(/** @type {RangeError} */(err).message, 'The value of "value" is out of range. It must be >= 0 and <= 4294967295. Received 3_.40_282_346_638_528_86e_+42');
+        assert.strictEqual(rowCount, 0);
+        done();
+      });
+
+    bulkLoad.addColumn('value', TYPES.Decimal, { precision: 7, scale: 4, nullable: true });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, [[-3.4028234663852886e+38]]);
+    });
+
+    connection.execSqlBatch(request);
+
+  });
 });

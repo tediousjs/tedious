@@ -16,20 +16,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
       with:
         fetch-depth: 0
     - name: Use Node.js 18
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -50,10 +51,11 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: ${{ matrix.node-version }}
 
@@ -63,7 +65,7 @@ jobs:
 
     - name: Start containers
       run: |
-        docker-compose -f "test/docker-compose.linux.yml" up --detach
+        docker compose -f "test/docker-compose.linux.yml" up --detach
 
     - name: Set up CI configuration
       shell: bash
@@ -76,9 +78,9 @@ jobs:
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -206,10 +208,11 @@ jobs:
 
         Pop-Location
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: ${{ matrix.node-version }}
 
@@ -257,10 +260,11 @@ jobs:
 
     - name: Determine npm cache directory
       id: npm-cache
+      shell: bash
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -330,17 +334,18 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
-    - uses: actions/cache@v3
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -373,18 +378,19 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -410,6 +416,54 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  token-credential-auth:
+    name: Azure SQL Server / Node.js 18.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only run these tests if we have access to the secrets
+    if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
+
+    steps:
+    - uses: actions/checkout@v4.1.7
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4.0.3
+      with:
+        node-version: 18
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+
+    - uses: actions/cache@v4.0.2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.token-credential.ts test/config.ts
+
+    - name: run integration tests
+      env:
+        AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
+        AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
+        AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
+        AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
+        AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+
   azure-ad-service-principal-auth:
     name: Azure SQL Server / Node.js 18.x
     runs-on: ubuntu-latest
@@ -419,18 +473,19 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -462,18 +517,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4.1.7
+
     - name: Use Node.js 18
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4.0.3
       with:
         node-version: 18
 
     - name: Determine npm cache directory
       id: npm-cache
       run: |
-        echo "::set-output name=dir::$(npm config get cache)"
+        echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4.0.2
       with:
         path: ${{ steps.npm-cache.outputs.dir }}
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}

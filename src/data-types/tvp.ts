@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
@@ -83,8 +84,15 @@ const TVP: DataType = {
         const column = columns[k];
         const value = row[k];
 
+        let paramValue;
+        try {
+          paramValue = column.type.validate(value, parameter.collation);
+        } catch (error) {
+          throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
+        }
+
         const param = {
-          value: column.type.validate(value, parameter.collation),
+          value: paramValue,
           length: column.length,
           scale: column.scale,
           precision: column.precision

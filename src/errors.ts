@@ -26,3 +26,5 @@ export class RequestError extends Error {
     this.code = code;
   }
 }
+
+export class InputError extends TypeError {}
