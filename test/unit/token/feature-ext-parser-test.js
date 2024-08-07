@@ -51,4 +51,45 @@ describe('Feature Ext Parser', () => {
 
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse column encryption token', async () => {
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen
+    buffer.writeUInt8(0x01); // supported
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+
+    const token = result.value;
+    assert.strictEqual(token.columnEncryption, true); // feature ext ack for COLUMNENCRYPTION was positive
+    assert.isUndefined(token.fedAuth); // fed auth not ack'd
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should return error for non support cryptographic protocol version', async () => {
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen
+    buffer.writeUInt8(0x02); // supported
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+    let error;
+    try {
+      const parser = StreamParser.parseTokens([buffer.data], {}, {});
+      await parser.next();
+    } catch (err) {
+      error = err;
+    }
+    assert.instanceOf(error, Error);
+    assert.include(error.message, 'Unsupported supported cryptographic protocol version');
+  });
 });
