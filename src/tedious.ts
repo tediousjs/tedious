@@ -1,6 +1,7 @@
 import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
+import IterableRequest from './iterable-request';
 import { name } from './library';
 
 import { ConnectionError, RequestError } from './errors';
@@ -21,6 +22,7 @@ export {
   BulkLoad,
   Connection,
   Request,
+  IterableRequest,
   library,
   ConnectionError,
   RequestError,
