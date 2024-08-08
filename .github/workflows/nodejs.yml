@@ -126,59 +126,10 @@ jobs:
 
     steps:
     - name: Install SQL Server ${{ matrix.mssql-version }}
-      shell: pwsh
-      run: |
-        Push-Location C:\temp
-
-        $exe_link, $box_link, $update_link, $update_download_link = '', '', '', ''
-
-        switch (${{ matrix.mssql-version }}) {
-          '2022' {
-            $exe_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.exe'
-            $box_link = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SQLServer2022-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=105013'
-          }
-          '2019' {
-            $exe_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.exe'
-            $box_link = 'https://download.microsoft.com/download/8/4/c/84c6c430-e0f5-476d-bf43-eaaa222a72e0/SQLServer2019-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=100809'
-          }
-          '2017' {
-            $exe_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.exe'
-            $box_link = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-DEV-x64-ENU.box'
-            $update_link = 'https://www.microsoft.com/en-us/download/details.aspx?id=56128'
-          }
-          '2016' {
-            $exe_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.exe'
-            $box_link = 'https://download.microsoft.com/download/4/1/A/41AD6EDE-9794-44E3-B3D5-A1AF62CD7A6F/sql16_sp2_dlc/en-us/SQLServer2016SP2-FullSlipstream-DEV-x64-ENU.box'
-            $update_download_link = 'https://download.microsoft.com/download/a/7/7/a77b5753-8fe7-4804-bfc5-591d9a626c98/SQLServer2016SP3-KB5003279-x64-ENU.exe'
-          }
-          default {
-            Write-Error "Invalid SQL Server version specified: ${{ matrix.mssql-version }}"
-            Exit 1
-          }
-        }
-
-        if (${{ matrix.mssql-version }} -ne '2016') {
-          $dl_links = ((Invoke-WebRequest -Uri $update_link).Links | Where-Object {$_.href -like 'https://download.microsoft.com/*'})
-          if ($dl_links.count -gt 0) {
-            $update_download_link = [System.Uri]::new($dl_links[0].href)
-          } else {
-            Write-Error "Download link not found"
-            Exit 1
-          }
-          echo $update_download_link
-        }
-
-        Invoke-WebRequest -Uri $update_download_link -Outfile sqlupdate.exe
-        Invoke-WebRequest -Uri $exe_link -OutFile sqlsetup.exe
-        Invoke-WebRequest -Uri $box_link -OutFile sqlsetup.box
-
-        Start-Process -Wait -FilePath ./sqlsetup.exe -ArgumentList /qs, /x:setup
-
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=1 /UpdateSource=C:\temp /SQLSVCACCOUNT='NT SERVICE\MSSQLSERVER' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLCOLLATION=SQL_Latin1_General_CP1_CI_AS /SECURITYMODE=SQL /SAPWD="yourStrong(!)Password"
-
-        Pop-Location
+      uses: tediousjs/setup-sqlserver@v2
+      with:
+        sqlserver-version: ${{ matrix.mssql-version }}
+        install-updates: true
 
     - uses: actions/checkout@v4.1.7
 
