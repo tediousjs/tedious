@@ -3,8 +3,8 @@ export class ConnectionError extends Error {
 
   declare isTransient: boolean | undefined;
 
-  constructor(message: string, code?: string) {
-    super(message);
+  constructor(message: string, code?: string, options?: ErrorOptions) {
+    super(message, options);
 
     this.code = code;
   }
@@ -20,8 +20,8 @@ export class RequestError extends Error {
   declare procName: string | undefined;
   declare lineNumber: number | undefined;
 
-  constructor(message: string, code?: string) {
-    super(message);
+  constructor(message: string, code?: string, options?: ErrorOptions) {
+    super(message, options);
 
     this.code = code;
   }
