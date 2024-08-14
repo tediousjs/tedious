@@ -463,7 +463,7 @@ class Request extends EventEmitter {
       try {
         parameter.value = parameter.type.validate(parameter.value, collation);
       } catch (error: any) {
-        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM');
+        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
       }
     }
   }

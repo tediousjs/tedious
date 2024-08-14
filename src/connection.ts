@@ -1963,7 +1963,7 @@ class Connection extends EventEmitter {
         }
 
         process.nextTick(() => {
-          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP'));
+          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err }));
         });
       });
     }
@@ -2331,11 +2331,11 @@ class Connection extends EventEmitter {
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
       this.debug.log(message);
-      this.emit('connect', new ConnectionError(message, 'ESOCKET'));
+      this.emit('connect', new ConnectionError(message, 'ESOCKET', { cause: error }));
     } else {
       const message = `Connection lost - ${error.message}`;
       this.debug.log(message);
-      this.emit('error', new ConnectionError(message, 'ESOCKET'));
+      this.emit('error', new ConnectionError(message, 'ESOCKET', { cause: error }));
     }
     this.dispatchEvent('socketError', error);
   }

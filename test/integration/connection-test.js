@@ -248,6 +248,10 @@ describe('Initiate Connect Test', function() {
       try {
         assert.instanceOf(err, ConnectionError);
         assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+
+        assert.instanceOf(/** @type {ConnectionError} */(err).cause, Error);
+        assert.strictEqual(/** @type {Error} */(/** @type {ConnectionError} */(err).cause).message, 'getaddrinfo ENOTFOUND something.invalid');
+
         assert.strictEqual(connection.connectTimer, undefined);
         done();
       } catch (e) {
@@ -277,6 +281,10 @@ describe('Initiate Connect Test', function() {
     connection.on('connect', (err) => {
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual(/** @type {ConnectionError} */(err).code, 'EINSTLOOKUP');
+
+      assert.instanceOf(/** @type {ConnectionError} */(err).cause, Error);
+      assert.strictEqual(/** @type {Error} */(/** @type {ConnectionError} */(err).cause).message, 'getaddrinfo ENOTFOUND something.invalid');
+
       assert.strictEqual(connection.connectTimer, undefined);
 
       done();
@@ -310,6 +318,10 @@ describe('Initiate Connect Test', function() {
     connection.connect(function(err) {
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+
+      assert.instanceOf(/** @type {ConnectionError} */(err).cause, Error);
+      console.log(/** @type {ConnectionError} */(err).cause);
+      assert.include(/** @type {Error} */(/** @type {ConnectionError} */(err).cause).message, 'no ciphers available');
     });
 
     connection.on('end', function() {
