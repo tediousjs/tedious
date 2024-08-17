@@ -38,7 +38,8 @@
     "node": ">=18"
   },
   "publishConfig": {
-    "tag": "next"
+    "tag": "next",
+    "provenance": true
   },
   "dependencies": {
     "@azure/core-auth": "^1.7.2",
