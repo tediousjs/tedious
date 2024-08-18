@@ -1,8 +1,6 @@
 import dns from 'dns';
 
-import AbortError from './errors/abort-error';
 import { sendMessage } from './sender';
-import { withTimeout } from './utils/with-timeout';
 
 const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
@@ -46,21 +44,20 @@ export async function instanceLookup(options: { server: string, instanceName: st
 
   const signal = options.signal;
 
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   let response;
 
+  const request = Buffer.from([0x02]);
+
   for (let i = 0; i <= retries; i++) {
+    const timeoutSignal = AbortSignal.timeout(timeout);
+
     try {
-      response = await withTimeout(timeout, async (signal) => {
-        const request = Buffer.from([0x02]);
-        return await sendMessage(options.server, port, lookup, signal, request);
-      }, signal);
+      response = await sendMessage(options.server, port, lookup, AbortSignal.any([ signal, timeoutSignal ]), request);
     } catch (err) {
       // If the current attempt timed out, continue with the next
-      if (!signal.aborted && err instanceof Error && err.name === 'TimeoutError') {
+      if (timeoutSignal.aborted) {
         continue;
       }
 
