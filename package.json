@@ -69,7 +69,7 @@
     "@types/sprintf-js": "^1.1.4",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
-    "async": "^3.2.5",
+    "async": "^3.2.6",
     "babel-plugin-istanbul": "^6.1.1",
     "chai": "^4.4.1",
     "codecov": "^3.8.3",
