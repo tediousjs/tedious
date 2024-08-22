@@ -80,7 +80,7 @@
     "rimraf": "^5.0.10",
     "semantic-release": "^22.0.12",
     "sinon": "^15.2.0",
-    "typedoc": "^0.26.5",
+    "typedoc": "^0.26.6",
     "typescript": "^5.5.4"
   },
   "scripts": {
