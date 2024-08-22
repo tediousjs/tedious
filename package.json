@@ -61,7 +61,6 @@
     "@babel/preset-typescript": "^7.24.7",
     "@babel/register": "^7.24.6",
     "@types/async": "^3.2.24",
-    "@types/bl": "^5.1.0",
     "@types/chai": "^4.3.12",
     "@types/depd": "^1.1.36",
     "@types/lru-cache": "^5.1.1",
