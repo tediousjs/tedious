@@ -2,14 +2,11 @@ import net from 'net';
 import dns, { type LookupAddress } from 'dns';
 
 import url from 'node:url';
-import AbortError from './errors/abort-error';
 
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export async function connectInParallel(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
 
@@ -61,7 +58,7 @@ export async function connectInParallel(options: { host: string, port: number, l
         socket.destroy();
       }
 
-      reject(new AbortError());
+      reject(signal.reason);
     };
 
     for (let i = 0, len = addresses.length; i < len; i++) {
@@ -80,9 +77,7 @@ export async function connectInParallel(options: { host: string, port: number, l
 }
 
 export async function connectInSequence(options: { host: string, port: number, localAddress?: string | undefined }, lookup: LookupFunction, signal: AbortSignal) {
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   const errors: any[] = [];
   const addresses = await lookupAllAddresses(options.host, lookup, signal);
@@ -102,7 +97,7 @@ export async function connectInSequence(options: { host: string, port: number, l
 
           socket.destroy();
 
-          reject(new AbortError());
+          reject(signal.reason);
         };
 
         const onError = (err: Error) => {
@@ -131,9 +126,8 @@ export async function connectInSequence(options: { host: string, port: number, l
         socket.on('connect', onConnect);
       });
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw err;
-      }
+      // If the signal was aborted, re-throw the error.
+      signal.throwIfAborted();
 
       errors.push(err);
 
@@ -148,9 +142,7 @@ export async function connectInSequence(options: { host: string, port: number, l
  * Look up all addresses for the given hostname.
  */
 export async function lookupAllAddresses(host: string, lookup: LookupFunction, signal: AbortSignal): Promise<dns.LookupAddress[]> {
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   if (net.isIPv6(host)) {
     return [{ address: host, family: 6 }];
@@ -159,7 +151,7 @@ export async function lookupAllAddresses(host: string, lookup: LookupFunction, s
   } else {
     return await new Promise<LookupAddress[]>((resolve, reject) => {
       const onAbort = () => {
-        reject(new AbortError());
+        reject(signal.reason);
       };
 
       signal.addEventListener('abort', onAbort);

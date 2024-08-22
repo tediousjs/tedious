@@ -35,7 +35,7 @@
     "url": "https://github.com/tediousjs/tedious.git"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.17"
   },
   "publishConfig": {
     "tag": "next",

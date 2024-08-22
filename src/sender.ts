@@ -3,14 +3,10 @@ import dns from 'dns';
 import net from 'net';
 import url from 'node:url';
 
-import AbortError from './errors/abort-error';
-
 type LookupFunction = (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
 
 export async function sendInParallel(addresses: dns.LookupAddress[], port: number, request: Buffer, signal: AbortSignal) {
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   return await new Promise<Buffer>((resolve, reject) => {
     const sockets: dgram.Socket[] = [];
@@ -38,7 +34,7 @@ export async function sendInParallel(addresses: dns.LookupAddress[], port: numbe
     const onAbort = () => {
       clearSockets();
 
-      reject(new AbortError());
+      reject(signal.reason);
     };
 
     const clearSockets = () => {
@@ -64,9 +60,7 @@ export async function sendInParallel(addresses: dns.LookupAddress[], port: numbe
 }
 
 export async function sendMessage(host: string, port: number, lookup: LookupFunction, signal: AbortSignal, request: Buffer) {
-  if (signal.aborted) {
-    throw new AbortError();
-  }
+  signal.throwIfAborted();
 
   let addresses: dns.LookupAddress[];
 
@@ -77,7 +71,7 @@ export async function sendMessage(host: string, port: number, lookup: LookupFunc
   } else {
     addresses = await new Promise<dns.LookupAddress[]>((resolve, reject) => {
       const onAbort = () => {
-        reject(new AbortError());
+        reject(signal.reason);
       };
 
       const domainInASCII = url.domainToASCII(host);
