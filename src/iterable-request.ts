@@ -212,15 +212,15 @@ class IterableRequestIterator implements AsyncIterator<IterableRequestItem> {
 
   public async return(value?: any): Promise<any> {
     await this.controller.terminate();
-    return Promise.resolve({ value, done: true });         // eslint-disable-line @typescript-eslint/return-await
+    return { value, done: true };
   }
 
   public async throw(exception?: any): Promise<any> {
     await this.controller.terminate();
     if (exception) {
-      return Promise.reject(exception);                    // eslint-disable-line @typescript-eslint/return-await
+      throw exception;
     } else {
-      return Promise.resolve({ done: true });              // eslint-disable-line @typescript-eslint/return-await
+      return { done: true };
     }
   }
 
