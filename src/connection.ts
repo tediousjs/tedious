@@ -2054,6 +2054,10 @@ class Connection extends EventEmitter {
 
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
+          await this.sendPreLogin(socket);
+          this.transitionTo(this.STATE.SENT_PRELOGIN);
+          const preloginResponse = await this.readPreloginResponse(socket, signal);
+
           this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
           this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
@@ -2062,10 +2066,6 @@ class Connection extends EventEmitter {
           this.closed = false;
           this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
 
-          this.sendPreLogin();
-
-          this.transitionTo(this.STATE.SENT_PRELOGIN);
-          const preloginResponse = await this.readPreloginResponse(signal);
           await this.performTlsNegotiation(preloginResponse, signal);
 
           this.sendLogin7Packet();
@@ -2415,7 +2415,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendPreLogin() {
+  async sendPreLogin(socket: net.Socket) {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
       // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
@@ -2425,7 +2425,7 @@ class Connection extends EventEmitter {
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
-    this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
+    await MessageIO.writeMessage(socket, this.debug, this.config.options.packetSize, TYPE.PRELOGIN, [ payload.data ]);
     this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -3314,7 +3314,7 @@ class Connection extends EventEmitter {
     }
   }
 
-  async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
+  async readPreloginResponse(socket: net.Socket, signal: AbortSignal): Promise<PreloginPayload> {
     signal.throwIfAborted();
 
     let messageBuffer = Buffer.alloc(0);
@@ -3325,14 +3325,9 @@ class Connection extends EventEmitter {
     signal.addEventListener('abort', onAbort, { once: true });
 
     try {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
+      const message = MessageIO.readMessage(socket, this.debug)
       const iterator = message[Symbol.asyncIterator]();
+
       try {
         while (true) {
           const { done, value } = await Promise.race([
