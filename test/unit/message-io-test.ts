@@ -5,17 +5,296 @@ import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
 import { TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
-import { Duplex } from 'stream';
+import { Duplex, Readable } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
 import Message from '../../src/message';
 import { Packet, TYPE } from '../../src/packet';
+import { BufferListStream } from 'bl';
 
 const packetType = 2;
 const packetSize = 8 + 4;
 
 const delay = promisify(setTimeout);
+
+function assertNoDanglingEventListeners(stream: Duplex) {
+  assert.strictEqual(stream.listenerCount('error'), 0);
+  assert.strictEqual(stream.listenerCount('drain'), 0);
+}
+
+describe('MessageIO.writeMessage', function() {
+  let debug: Debug;
+
+  beforeEach(function() {
+    debug = new Debug();
+  });
+
+  it('wraps the given packet contents into a TDS packet and writes it to the given stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    await MessageIO.writeMessage(stream, debug, packetSize, packetType, [ payload ]);
+
+    const buf = stream.read();
+    assert.instanceOf(buf, Buffer);
+
+    const packet = new Packet(buf);
+    assert.strictEqual(packet.type(), packetType);
+    assert.strictEqual(packet.length(), payload.length + 8);
+    assert.strictEqual(packet.statusAsString(), 'EOM');
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), payload);
+
+    assert.isNull(stream.read());
+  });
+
+  it('handles errors while iterating over the payload', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors while iterating over the payload, while the stream is waiting for drain', async function() {
+    const payload = Buffer.from([1, 2, 3, 4]);
+
+    const callbacks: Array<() => void> = [];
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // Collect all callbacks so that we can simulate draining the stream later
+        callbacks.push(callback);
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Simulate draining the stream after the exception was thrown
+        setTimeout(() => {
+          let cb;
+          while (cb = callbacks.shift()) {
+            cb();
+          }
+        }, 100);
+
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while handling errors from the payload while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3, 4]);
+
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call the callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 100);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Simulate an error on the stream after an error from the payload
+        setTimeout(() => {
+          stream.destroy(new Error('write error'));
+        }, 100);
+
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream during writing', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        callback(new Error('write error'));
+      },
+      read() {}
+    });
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [ payload ]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 100);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [ payload, payload, payload ]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for more data to be written', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 100);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+        yield payload;
+        yield payload;
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+});
+
+describe('MessageIO.readMessage', function() {
+  let debug: Debug;
+
+  beforeEach(function() {
+    debug = new Debug();
+  });
+
+  it('reads a TDS packet from the given stream and returns its contents', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const stream = new BufferListStream();
+    stream.write(packet.buffer);
+
+    const message = MessageIO.readMessage(stream, debug);
+
+    const chunks = [];
+    for await (const chunk of message) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, [ payload ]);
+  });
+
+  it('handles errors while reading from the stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const stream = Readable.from((async function*() {
+      throw new Error('read error');
+    })());
+
+    let hadError = false;
+
+    const chunks = [];
+    try {
+      for await (const message of MessageIO.readMessage(stream, debug)) {
+        chunks.push(message);
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'read error');
+    }
+
+    assert(hadError);
+  });
+});
 
 describe('MessageIO', function() {
   let server: Server;
