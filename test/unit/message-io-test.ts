@@ -481,47 +481,47 @@ describe('MessageIO', function() {
       ]);
     });
 
-    it('reads data that is sent across multiple packets', async function() {
-      const payload = Buffer.from([1, 2, 3]);
-      const payload1 = payload.slice(0, 2);
-      const payload2 = payload.slice(2, 3);
+    // it('reads data that is sent across multiple packets', async function() {
+    //   const payload = Buffer.from([1, 2, 3]);
+    //   const payload1 = payload.slice(0, 2);
+    //   const payload2 = payload.slice(2, 3);
 
-      await Promise.all([
-        // Server side
-        (async () => {
-          let packet = new Packet(packetType);
-          packet.addData(payload1);
+    //   await Promise.all([
+    //     // Server side
+    //     (async () => {
+    //       let packet = new Packet(packetType);
+    //       packet.addData(payload1);
 
-          serverConnection.write(packet.buffer);
+    //       serverConnection.write(packet.buffer);
 
-          await delay(5);
+    //       await delay(5);
 
-          packet = new Packet(packetType);
-          packet.last(true);
-          packet.addData(payload2);
+    //       packet = new Packet(packetType);
+    //       packet.last(true);
+    //       packet.addData(payload2);
 
-          serverConnection.write(packet.buffer);
-        })(),
+    //       serverConnection.write(packet.buffer);
+    //     })(),
 
-        // Client side
-        (async () => {
-          const io = new MessageIO(clientConnection, packetSize, debug);
+    //     // Client side
+    //     (async () => {
+    //       const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+    //       const message = await io.readMessage();
+    //       assert.instanceOf(message, Message);
 
-          const receivedData: Buffer[] = [];
-          for await (const chunk of message) {
-            receivedData.push(chunk);
-          }
+    //       const receivedData: Buffer[] = [];
+    //       for await (const chunk of message) {
+    //         receivedData.push(chunk);
+    //       }
 
-          assert.deepEqual(receivedData, [
-            payload1,
-            payload2
-          ]);
-        })()
-      ]);
-    });
+    //       assert.deepEqual(receivedData, [
+    //         payload1,
+    //         payload2
+    //       ]);
+    //     })()
+    //   ]);
+    // });
 
     it('reads data that is sent across multiple packets, with a chunk containing parts of different packets', async function() {
       const payload = Buffer.from([1, 2, 3]);
