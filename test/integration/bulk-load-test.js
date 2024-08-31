@@ -49,7 +49,7 @@ describe('BulkLoad', function() {
 
   afterEach(function(done) {
     if (this.timedout) {
-      console.log(connection);
+      console.log({ ...connection, config: undefined });
     }
 
     if (!connection.closed) {
