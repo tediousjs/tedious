@@ -87,7 +87,7 @@ export async function connectInSequence(options: { host: string, port: number, l
   try {
     addresses = await lookupAllAddresses(options.host, lookup, signal);
   } catch (err) {
-    console.log('lookup failed', options.host, process.hrtime(startTime));
+    console.log('lookup failed', err, process.hrtime(startTime));
     throw err;
   }
   console.log('looked up addresses for', options.host, process.hrtime(startTime));
