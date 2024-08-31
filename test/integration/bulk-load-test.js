@@ -48,6 +48,10 @@ describe('BulkLoad', function() {
   });
 
   afterEach(function(done) {
+    if (this.timedout) {
+      console.log(connection);
+    }
+
     if (!connection.closed) {
       connection.on('end', done);
       connection.close();
