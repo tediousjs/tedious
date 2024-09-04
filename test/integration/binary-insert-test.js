@@ -11,8 +11,6 @@ import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 import defaultConfig from '../config';
 
 describe('inserting binary data', function() {
-  this.timeout(60000);
-
   beforeEach(function(done) {
     const config = {
       ...defaultConfig,

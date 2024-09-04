@@ -30,8 +30,6 @@ describe('A `error` on the network socket', function() {
   let connection;
 
   beforeEach(function(done) {
-    this.timeout(5000);
-
     connection = new Connection(getConfig());
     connection.on('error', done);
     if (process.env.TEDIOUS_DEBUG) {

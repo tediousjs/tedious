@@ -26,8 +26,6 @@ function getConfig() {
 }
 
 describe('Initiate Connect Test', function() {
-  this.timeout(20000);
-
   it('should be bad server', function(done) {
     const config = getConfig();
     config.server = 'bad-server';
@@ -784,8 +782,6 @@ describe('BeginTransaction Tests', function() {
 });
 
 describe('Insertion Tests', function() {
-  this.timeout(30000);
-
   it('should execSql', function(done) {
     const config = getConfig();
 
