@@ -25,7 +25,6 @@ function getConfig() {
 }
 
 describe('Pause-Resume Test', function() {
-  this.timeout(10000);
   /** @type {Connection} */
   let connection;
 
