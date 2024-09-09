@@ -3448,6 +3448,11 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.enterReRouting().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         this.enterLoggedInSendingInitialSql().catch((err) => {
