@@ -3349,6 +3349,11 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.enterReRouting().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
         this.enterLoggedInSendingInitialSql().catch((err) => {
@@ -3388,7 +3393,13 @@ class Connection extends EventEmitter {
       if (handler.loginAckReceived) {
         if (handler.routingData) {
           this.routingData = handler.routingData;
-          return this.transitionTo(this.STATE.REROUTING);
+          this.transitionTo(this.STATE.REROUTING);
+          this.enterReRouting().catch((err) => {
+            process.nextTick(() => {
+              throw err;
+            });
+          });
+          return;
         } else {
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
           this.enterLoggedInSendingInitialSql().catch((err) => {
@@ -3549,6 +3560,10 @@ class Connection extends EventEmitter {
     this.transitionTo(this.STATE.LOGGED_IN);
     this.processedInitialSql();
   }
+
+  async enterReRouting() {
+    this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
+  }
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {
@@ -3593,9 +3608,6 @@ Connection.prototype.STATE = {
   },
   REROUTING: {
     name: 'ReRouting',
-    enter: function() {
-      this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
-    },
     events: {
       message: function() {
       },
