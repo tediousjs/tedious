@@ -812,6 +812,14 @@ export interface ConnectionOptions {
   rowCollectionOnRequestCompletion?: boolean;
 
   /**
+   * A string, that will allow user to provide their custom Common Name (CN) which matches a Common Name (CN)
+   * present in the server certificate.
+   *
+   * (no default)
+   */
+  serverName?: string;
+
+  /**
    * The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
    *
    * The versions are available from `require('tedious').TDS_VERSION`.
@@ -1662,6 +1670,13 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.rowCollectionOnRequestCompletion = config.options.rowCollectionOnRequestCompletion;
+      }
+
+      if (config.options.serverName !== undefined) {
+        if (typeof config.options.serverName !== 'string') {
+          throw new TypeError('The "config.options.serverName" property must be of type string.');
+        }
+        this.config.options.serverName = config.options.serverName;
       }
 
       if (config.options.tdsVersion !== undefined) {
