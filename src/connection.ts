@@ -2040,6 +2040,11 @@ class Connection extends EventEmitter {
 
     this.sendPreLogin();
     this.transitionTo(this.STATE.SENT_PRELOGIN);
+    this.performSentPrelogin().catch((err) => {
+      process.nextTick(() => {
+        throw err;
+      });
+    });
   }
 
   wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -2443,6 +2448,11 @@ class Connection extends EventEmitter {
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
     // sent the fedAuth token message, the rest is similar to standard login 7
     this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    this.performSentLogin7WithStandardLogin().catch((err) => {
+      process.nextTick(() => {
+        throw err;
+      });
+    });
   }
 
   /**
@@ -3267,12 +3277,27 @@ class Connection extends EventEmitter {
       case 'azure-active-directory-service-principal-secret':
       case 'azure-active-directory-default':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        this.performSentLogin7WithFedAuth().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
         break;
       case 'ntlm':
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+        this.performSentLogin7WithNTLMLogin().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
         break;
       default:
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        this.performSentLogin7WithStandardLogin().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
         break;
     }
   }
@@ -3343,13 +3368,20 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.performReRouting();
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.performLoggedInSendingInitialSql().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
       }
     } else if (this.loginError) {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        this.performTransientFailureRetry();
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3379,9 +3411,17 @@ class Connection extends EventEmitter {
       if (handler.loginAckReceived) {
         if (handler.routingData) {
           this.routingData = handler.routingData;
-          return this.transitionTo(this.STATE.REROUTING);
+          this.transitionTo(this.STATE.REROUTING);
+          this.performReRouting();
+          return;
         } else {
-          return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          this.performLoggedInSendingInitialSql().catch((err) => {
+            process.nextTick(() => {
+              throw err;
+            });
+          });
+          return;
         }
       } else if (this.ntlmpacket) {
         const authentication = this.config.authentication as NtlmAuthentication;
@@ -3402,7 +3442,9 @@ class Connection extends EventEmitter {
       } else if (this.loginError) {
         if (isTransientError(this.loginError)) {
           this.debug.log('Initiating retry on transient error');
-          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.performTransientFailureRetry();
+          return;
         } else {
           this.emit('connect', this.loginError);
           return this.transitionTo(this.STATE.FINAL);
@@ -3433,8 +3475,14 @@ class Connection extends EventEmitter {
       if (handler.routingData) {
         this.routingData = handler.routingData;
         this.transitionTo(this.STATE.REROUTING);
+        this.performReRouting();
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        this.performLoggedInSendingInitialSql().catch((err) => {
+          process.nextTick(() => {
+            throw err;
+          });
+        });
       }
 
       return;
@@ -3509,6 +3557,7 @@ class Connection extends EventEmitter {
       if (isTransientError(this.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        this.performTransientFailureRetry();
       } else {
         this.emit('connect', this.loginError);
         this.transitionTo(this.STATE.FINAL);
@@ -3569,13 +3618,6 @@ Connection.prototype.STATE = {
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
-    enter: function() {
-      this.performSentPrelogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3587,9 +3629,6 @@ Connection.prototype.STATE = {
   },
   REROUTING: {
     name: 'ReRouting',
-    enter: function() {
-      this.performReRouting();
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3601,9 +3640,6 @@ Connection.prototype.STATE = {
   },
   TRANSIENT_FAILURE_RETRY: {
     name: 'TRANSIENT_FAILURE_RETRY',
-    enter: function() {
-      this.performTransientFailureRetry();
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3626,13 +3662,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
-    enter: function() {
-      this.performSentLogin7WithStandardLogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3644,13 +3673,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
-    enter: function() {
-      this.performSentLogin7WithNTLMLogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3662,13 +3684,6 @@ Connection.prototype.STATE = {
   },
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7WithFedauth',
-    enter: function() {
-      this.performSentLogin7WithFedAuth().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
@@ -3680,13 +3695,6 @@ Connection.prototype.STATE = {
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
-    enter: function() {
-      this.performLoggedInSendingInitialSql().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
     events: {
       socketError: function socketError() {
         this.transitionTo(this.STATE.FINAL);
