@@ -940,10 +940,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  declare loginError: undefined | AggregateError | ConnectionError;
-  /**
-   * @private
-   */
   declare debug: Debug;
   /**
    * @private
@@ -2002,7 +1998,6 @@ class Connection extends EventEmitter {
       }
 
       this.closed = true;
-      this.loginError = undefined;
     }
   }
 
@@ -3305,7 +3300,6 @@ class Connection extends EventEmitter {
     this.curTransientRetryCount++;
 
     this.clearConnectTimer();
-    this.loginError = undefined;
 
     this.socket!.removeListener('error', this._onSocketError);
     this.socket!.removeListener('close', this._onSocketClose);
@@ -3346,12 +3340,12 @@ class Connection extends EventEmitter {
       } else {
         this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
       }
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
+    } else if (handler.loginError) {
+      if (isTransientError(handler.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
       } else {
-        this.emit('connect', this.loginError);
+        this.emit('connect', handler.loginError);
         this.transitionTo(this.STATE.FINAL);
       }
     } else {
@@ -3399,12 +3393,12 @@ class Connection extends EventEmitter {
         });
 
         this.ntlmpacket = undefined;
-      } else if (this.loginError) {
-        if (isTransientError(this.loginError)) {
+      } else if (handler.loginError) {
+        if (isTransientError(handler.loginError)) {
           this.debug.log('Initiating retry on transient error');
           return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
         } else {
-          this.emit('connect', this.loginError);
+          this.emit('connect', handler.loginError);
           return this.transitionTo(this.STATE.FINAL);
         }
       } else {
@@ -3487,30 +3481,30 @@ class Connection extends EventEmitter {
       try {
         tokenResponse = await credentials.getToken(tokenScope);
       } catch (err) {
-        this.loginError = new AggregateError(
+        const aggrErr = new AggregateError(
           [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-        this.emit('connect', this.loginError);
+        this.emit('connect', aggrErr);
         this.transitionTo(this.STATE.FINAL);
         return;
       }
 
       // Type guard the token value so that it is never null.
       if (tokenResponse === null) {
-        this.loginError = new AggregateError(
+        const aggrErr = new AggregateError(
           [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
-        this.emit('connect', this.loginError);
+        this.emit('connect', aggrErr);
         this.transitionTo(this.STATE.FINAL);
         return;
       }
 
       this.sendFedAuthTokenMessage(tokenResponse.token);
 
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
+    } else if (handler.loginError) {
+      if (isTransientError(handler.loginError)) {
         this.debug.log('Initiating retry on transient error');
         this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
       } else {
-        this.emit('connect', this.loginError);
+        this.emit('connect', handler.loginError);
         this.transitionTo(this.STATE.FINAL);
       }
     } else {
