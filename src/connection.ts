@@ -422,8 +422,6 @@ interface State {
     socketError?(this: Connection, err: Error): void;
     connectTimeout?(this: Connection): void;
     message?(this: Connection, message: Message): void;
-    retry?(this: Connection): void;
-    reconnect?(this: Connection): void;
   };
 }
 
@@ -873,15 +871,6 @@ export interface ConnectionOptions {
   workstationId?: string | undefined;
 }
 
-/**
- * @private
- */
-const CLEANUP_TYPE = {
-  NORMAL: 0,
-  REDIRECT: 1,
-  RETRY: 2
-};
-
 interface RoutingData {
   server: string;
   port: number;
@@ -1032,20 +1021,31 @@ class Connection extends EventEmitter {
    * @private
    */
   declare requestTimer: undefined | NodeJS.Timeout;
-  /**
-   * @private
-   */
-  declare retryTimer: undefined | NodeJS.Timeout;
 
   /**
    * @private
    */
-  _cancelAfterRequestSent: () => void;
+  declare _cancelAfterRequestSent: () => void;
 
   /**
    * @private
    */
   declare databaseCollation: Collation | undefined;
+
+  /**
+   * @private
+   */
+  declare _onSocketClose: (hadError: boolean) => void;
+
+  /**
+   * @private
+   */
+  declare _onSocketError: (err: Error) => void;
+
+  /**
+   * @private
+   */
+  declare _onSocketEnd: () => void;
 
   /**
    * Note: be aware of the different options field:
@@ -1771,6 +1771,18 @@ class Connection extends EventEmitter {
       this.messageIo.sendMessage(TYPE.ATTENTION);
       this.createCancelTimer();
     };
+
+    this._onSocketClose = () => {
+      this.socketClose();
+    };
+
+    this._onSocketEnd = () => {
+      this.socketEnd();
+    };
+
+    this._onSocketError = (error) => {
+      this.socketError(error);
+    };
   }
 
   connect(connectListener?: (err?: Error) => void) {
@@ -1972,19 +1984,15 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  cleanupConnection(cleanupType: typeof CLEANUP_TYPE[keyof typeof CLEANUP_TYPE]) {
+  cleanupConnection() {
     if (!this.closed) {
       this.clearConnectTimer();
       this.clearRequestTimer();
-      this.clearRetryTimer();
       this.closeConnection();
-      if (cleanupType === CLEANUP_TYPE.REDIRECT) {
-        this.emit('rerouting');
-      } else if (cleanupType !== CLEANUP_TYPE.RETRY) {
-        process.nextTick(() => {
-          this.emit('end');
-        });
-      }
+
+      process.nextTick(() => {
+        this.emit('end');
+      });
 
       const request = this.request;
       if (request) {
@@ -2017,9 +2025,9 @@ class Connection extends EventEmitter {
   }
 
   socketHandlingForSendPreLogin(socket: net.Socket) {
-    socket.on('error', (error) => { this.socketError(error); });
-    socket.on('close', () => { this.socketClose(); });
-    socket.on('end', () => { this.socketEnd(); });
+    socket.on('error', this._onSocketError);
+    socket.on('close', this._onSocketClose);
+    socket.on('end', this._onSocketEnd);
     socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
     this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
@@ -2175,16 +2183,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createRetryTimer() {
-    this.clearRetryTimer();
-    this.retryTimer = setTimeout(() => {
-      this.retryTimeout();
-    }, this.config.options.connectionRetryInterval);
-  }
-
-  /**
-   * @private
-   */
   connectTimeout() {
     const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
     // If we have routing data stored, this connection has been redirected
@@ -2224,15 +2222,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  retryTimeout() {
-    this.retryTimer = undefined;
-    this.emit('retry');
-    this.transitionTo(this.STATE.CONNECTING);
-  }
-
-  /**
-   * @private
-   */
   clearConnectTimer() {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
@@ -2257,16 +2246,6 @@ class Connection extends EventEmitter {
     if (this.requestTimer) {
       clearTimeout(this.requestTimer);
       this.requestTimer = undefined;
-    }
-  }
-
-  /**
-   * @private
-   */
-  clearRetryTimer() {
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = undefined;
     }
   }
 
@@ -2357,19 +2336,7 @@ class Connection extends EventEmitter {
    */
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
-    if (this.state === this.STATE.REROUTING) {
-      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
-
-      this.dispatchEvent('reconnect');
-    } else if (this.state === this.STATE.TRANSIENT_FAILURE_RETRY) {
-      const server = this.routingData ? this.routingData.server : this.config.server;
-      const port = this.routingData ? this.routingData.port : this.config.options.port;
-      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
-
-      this.dispatchEvent('retry');
-    } else {
-      this.transitionTo(this.STATE.FINAL);
-    }
+    this.transitionTo(this.STATE.FINAL);
   }
 
   /**
@@ -3356,19 +3323,28 @@ Connection.prototype.STATE = {
   REROUTING: {
     name: 'ReRouting',
     enter: function() {
-      this.cleanupConnection(CLEANUP_TYPE.REDIRECT);
+      // Clear the existing connection timeout
+      this.clearConnectTimer();
+
+      this.socket!.removeListener('error', this._onSocketError);
+      this.socket!.removeListener('close', this._onSocketClose);
+      this.socket!.removeListener('end', this._onSocketEnd);
+      this.socket!.destroy();
+
+      this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+
+      this.emit('rerouting');
+      this.debug.log('Rerouting to ' + this.routingData!.server + ':' + this.routingData!.port);
+
+      // Attempt connecting to the rerouting target
+      this.transitionTo(this.STATE.CONNECTING);
     },
     events: {
-      message: function() {
-      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      reconnect: function() {
-        this.transitionTo(this.STATE.CONNECTING);
       }
     }
   },
@@ -3376,19 +3352,32 @@ Connection.prototype.STATE = {
     name: 'TRANSIENT_FAILURE_RETRY',
     enter: function() {
       this.curTransientRetryCount++;
-      this.cleanupConnection(CLEANUP_TYPE.RETRY);
+
+      this.clearConnectTimer();
+      this.loginError = undefined;
+
+      this.socket!.removeListener('error', this._onSocketError);
+      this.socket!.removeListener('close', this._onSocketClose);
+      this.socket!.removeListener('end', this._onSocketEnd);
+      this.socket!.destroy();
+
+      this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? this.routingData.port : this.config.options.port;
+      this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
+
+      setTimeout(() => {
+        this.emit('retry');
+        this.transitionTo(this.STATE.CONNECTING);
+      }, this.config.options.connectionRetryInterval);
     },
     events: {
-      message: function() {
-      },
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
       },
       connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      retry: function() {
-        this.createRetryTimer();
       }
     }
   },
@@ -3803,7 +3792,6 @@ Connection.prototype.STATE = {
             sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
           }
         }
-
       })().catch((err) => {
         process.nextTick(() => {
           throw err;
@@ -3824,7 +3812,7 @@ Connection.prototype.STATE = {
   FINAL: {
     name: 'Final',
     enter: function() {
-      this.cleanupConnection(CLEANUP_TYPE.NORMAL);
+      this.cleanupConnection();
     },
     events: {
       connectTimeout: function() {
