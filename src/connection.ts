@@ -1992,9 +1992,10 @@ class Connection extends EventEmitter {
         }
 
         this.clearConnectTimer();
+        // Wrap the error before switching to a different state
+        const wrappedError = this.wrapSocketError(err);
         this.transitionTo(this.STATE.FINAL);
-
-        this.emit('connect', this.wrapSocketError(err));
+        this.emit('connect', wrappedError);
 
         return;
       }
@@ -2015,39 +2016,53 @@ class Connection extends EventEmitter {
 
       this.sendLogin7Packet();
 
-      const { authentication } = this.config;
+      try {
+        const { authentication } = this.config;
+        switch (authentication.type) {
+          case 'token-credential':
+          case 'azure-active-directory-password':
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+          case 'azure-active-directory-service-principal-secret':
+          case 'azure-active-directory-default':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+            this.routingData = await this.performSentLogin7WithFedAuth();
+            break;
+          case 'ntlm':
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+            this.routingData = await this.performSentLogin7WithNTLMLogin();
+            break;
+          default:
+            this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+            this.routingData = await this.performSentLogin7WithStandardLogin();
+            break;
+        }
+      } catch (err: any) {
+        if (isTransientError(err)) {
+          this.debug.log('Initiating retry on transient error');
+          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+          this.performTransientFailureRetry();
+        } else {
+          this.transitionTo(this.STATE.FINAL);
+          this.emit('connect', err);
+        }
 
-      switch (authentication.type) {
-        case 'token-credential':
-        case 'azure-active-directory-password':
-        case 'azure-active-directory-msi-vm':
-        case 'azure-active-directory-msi-app-service':
-        case 'azure-active-directory-service-principal-secret':
-        case 'azure-active-directory-default':
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-          this.performSentLogin7WithFedAuth().catch((err) => {
-            process.nextTick(() => {
-              throw err;
-            });
-          });
-          break;
-        case 'ntlm':
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-          this.performSentLogin7WithNTLMLogin().catch((err) => {
-            process.nextTick(() => {
-              throw err;
-            });
-          });
-          break;
-        default:
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          this.performSentLogin7WithStandardLogin().catch((err) => {
-            process.nextTick(() => {
-              throw err;
-            });
-          });
-          break;
+        return;
       }
+
+      // If routing data is present, we need to re-route the connection
+      if (this.routingData) {
+        this.transitionTo(this.STATE.REROUTING);
+        this.performReRouting();
+        return;
+      }
+
+      this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+      await this.performLoggedInSendingInitialSql();
+
+      this.transitionTo(this.STATE.LOGGED_IN);
+      this.clearConnectTimer();
+      this.emit('connect');
     })().catch((err) => {
       process.nextTick(() => {
         throw err;
@@ -2512,13 +2527,6 @@ class Connection extends EventEmitter {
     offset = data.writeUInt32LE(accessTokenLen, offset);
     data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
-    // sent the fedAuth token message, the rest is similar to standard login 7
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-    this.performSentLogin7WithStandardLogin().catch((err) => {
-      process.nextTick(() => {
-        throw err;
-      });
-    });
   }
 
   /**
@@ -2625,14 +2633,6 @@ class Connection extends EventEmitter {
     }
 
     return options.join('\n');
-  }
-
-  /**
-   * @private
-   */
-  processedInitialSql() {
-    this.clearConnectTimer();
-    this.emit('connect');
   }
 
   /**
@@ -3381,12 +3381,12 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithStandardLogin() {
+  async performSentLogin7WithStandardLogin(): Promise<RoutingData | undefined> {
     let message;
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     const handler = new Login7TokenHandler(this);
@@ -3394,43 +3394,24 @@ class Connection extends EventEmitter {
     await once(tokenStreamParser, 'end');
 
     if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
-        this.performReRouting();
-      } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        this.performLoggedInSendingInitialSql().catch((err) => {
-          process.nextTick(() => {
-            throw err;
-          });
-        });
-      }
+      return handler.routingData;
     } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        this.performTransientFailureRetry();
-      } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-      }
+      throw this.loginError;
     } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
+      throw new ConnectionError('Login failed.', 'ELOGIN');
     }
   }
 
   /**
    * @private
    */
-  async performSentLogin7WithNTLMLogin() {
+  async performSentLogin7WithNTLMLogin(): Promise<RoutingData | undefined> {
     while (true) {
       let message;
       try {
         message = await this.messageIo.readMessage();
       } catch (err: any) {
-        return this.socketError(err);
+        throw this.wrapSocketError(err);
       }
 
       const handler = new Login7TokenHandler(this);
@@ -3438,20 +3419,7 @@ class Connection extends EventEmitter {
       await once(tokenStreamParser, 'end');
 
       if (handler.loginAckReceived) {
-        if (handler.routingData) {
-          this.routingData = handler.routingData;
-          this.transitionTo(this.STATE.REROUTING);
-          this.performReRouting();
-          return;
-        } else {
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-          this.performLoggedInSendingInitialSql().catch((err) => {
-            process.nextTick(() => {
-              throw err;
-            });
-          });
-          return;
-        }
+        return handler.routingData;
       } else if (this.ntlmpacket) {
         const authentication = this.config.authentication as NtlmAuthentication;
 
@@ -3469,18 +3437,9 @@ class Connection extends EventEmitter {
 
         this.ntlmpacket = undefined;
       } else if (this.loginError) {
-        if (isTransientError(this.loginError)) {
-          this.debug.log('Initiating retry on transient error');
-          this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-          this.performTransientFailureRetry();
-          return;
-        } else {
-          this.emit('connect', this.loginError);
-          return this.transitionTo(this.STATE.FINAL);
-        }
+        throw this.loginError;
       } else {
-        this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-        return this.transitionTo(this.STATE.FINAL);
+        throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     }
   }
@@ -3488,12 +3447,12 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithFedAuth() {
+  async performSentLogin7WithFedAuth(): Promise<RoutingData | undefined> {
     let message;
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     const handler = new Login7TokenHandler(this);
@@ -3501,20 +3460,7 @@ class Connection extends EventEmitter {
     await once(tokenStreamParser, 'end');
 
     if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
-        this.performReRouting();
-      } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        this.performLoggedInSendingInitialSql().catch((err) => {
-          process.nextTick(() => {
-            throw err;
-          });
-        });
-      }
-
-      return;
+      return handler.routingData;
     }
 
     const fedAuthInfoToken = handler.fedAuthInfoToken;
@@ -3564,36 +3510,24 @@ class Connection extends EventEmitter {
       try {
         tokenResponse = await credentials.getToken(tokenScope);
       } catch (err) {
-        this.loginError = new AggregateError(
+        throw new AggregateError(
           [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
       }
 
       // Type guard the token value so that it is never null.
       if (tokenResponse === null) {
-        this.loginError = new AggregateError(
+        throw new AggregateError(
           [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
       }
 
       this.sendFedAuthTokenMessage(tokenResponse.token);
-
+      // sent the fedAuth token message, the rest is similar to standard login 7
+      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+      return await this.performSentLogin7WithStandardLogin();
     } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-        this.performTransientFailureRetry();
-      } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-      }
+      throw this.loginError;
     } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
+      throw new ConnectionError('Login failed.', 'ELOGIN');
     }
   }
 
@@ -3606,13 +3540,10 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
     const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
     await once(tokenStreamParser, 'end');
-
-    this.transitionTo(this.STATE.LOGGED_IN);
-    this.processedInitialSql();
   }
 }
 
