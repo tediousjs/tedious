@@ -1029,10 +1029,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  declare connectTimer: undefined | NodeJS.Timeout;
-  /**
-   * @private
-   */
   declare cancelTimer: undefined | NodeJS.Timeout;
   /**
    * @private
@@ -1969,7 +1965,23 @@ class Connection extends EventEmitter {
    * @private
    */
   initialiseConnection() {
-    const signal = this.createConnectTimer();
+    const controller = new AbortController();
+
+    setTimeout(() => {
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configuration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+      const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
+      this.debug.log(message);
+
+      controller.abort(new ConnectionError(message, 'ETIMEOUT'));
+    }, this.config.options.connectTimeout).unref();
+
+    const signal = controller.signal;
 
     (async () => {
       let port = this.config.options.port;
@@ -1983,9 +1995,8 @@ class Connection extends EventEmitter {
             signal: signal
           });
         } catch (err: any) {
-          // Ignore the AbortError for now, this is still handled by the connectTimer firing
           if (signal.aborted) {
-            return;
+            throw signal.reason;
           }
 
           throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
@@ -1996,9 +2007,8 @@ class Connection extends EventEmitter {
       try {
         socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
       } catch (err: any) {
-        // Ignore the AbortError for now, this is still handled by the connectTimer firing
         if (signal.aborted) {
-          return;
+          throw signal.reason;
         }
 
         throw this.wrapSocketError(err);
@@ -2006,18 +2016,9 @@ class Connection extends EventEmitter {
 
       this.socketHandlingForSendPreLogin(socket);
       this.sendPreLogin();
+
       this.transitionTo(this.STATE.SENT_PRELOGIN);
-
-      try {
-        await this.performSentPrelogin(signal);
-      } catch (err: any) {
-        // Ignore the AbortError for now, this is still handled by the connectTimer firing
-        if (signal.aborted) {
-          return;
-        }
-
-        throw err;
-      }
+      await this.performSentPrelogin(signal);
 
       this.sendLogin7Packet();
 
@@ -2031,48 +2032,19 @@ class Connection extends EventEmitter {
           case 'azure-active-directory-service-principal-secret':
           case 'azure-active-directory-default':
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            try {
-              this.routingData = await this.performSentLogin7WithFedAuth(signal);
-            } catch (err) {
-              // Ignore the AbortError for now, this is still handled by the connectTimer firing
-              if (signal.aborted) {
-                return;
-              }
-
-              throw err;
-            }
+            this.routingData = await this.performSentLogin7WithFedAuth(signal);
             break;
           case 'ntlm':
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            try {
-              this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
-            } catch (err) {
-              // Ignore the AbortError for now, this is still handled by the connectTimer firing
-              if (signal.aborted) {
-                return;
-              }
-
-              throw err;
-            }
+            this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
             break;
           default:
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            try {
-              this.routingData = await this.performSentLogin7WithStandardLogin(signal);
-            } catch (err) {
-              // Ignore the AbortError for now, this is still handled by the connectTimer firing
-              if (signal.aborted) {
-                return;
-              }
-
-              throw err;
-            }
+            this.routingData = await this.performSentLogin7WithStandardLogin(signal);
             break;
         }
       } catch (err: any) {
         if (isTransientError(err)) {
-          this.clearConnectTimer();
-
           this.debug.log('Initiating retry on transient error');
           this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           this.performTransientFailureRetry();
@@ -2084,33 +2056,20 @@ class Connection extends EventEmitter {
 
       // If routing data is present, we need to re-route the connection
       if (this.routingData) {
-        this.clearConnectTimer();
-
         this.transitionTo(this.STATE.REROUTING);
         this.performReRouting();
         return;
       }
 
       this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      try {
-        await this.performLoggedInSendingInitialSql(signal);
-      } catch (err) {
-        // Ignore the AbortError for now, this is still handled by the connectTimer firing
-        if (signal.aborted) {
-          return;
-        }
-
-        throw err;
-      }
+      await this.performLoggedInSendingInitialSql(signal);
 
       this.transitionTo(this.STATE.LOGGED_IN);
-      this.clearConnectTimer();
 
       process.nextTick(() => {
         this.emit('connect');
       });
     })().catch((err) => {
-      this.clearConnectTimer();
       this.transitionTo(this.STATE.FINAL);
 
       process.nextTick(() => {
@@ -2124,7 +2083,6 @@ class Connection extends EventEmitter {
    */
   cleanupConnection() {
     if (!this.closed) {
-      this.clearConnectTimer();
       this.clearRequestTimer();
       this.closeConnection();
 
@@ -2269,18 +2227,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createConnectTimer() {
-    const controller = new AbortController();
-    this.connectTimer = setTimeout(() => {
-      controller.abort();
-      this.connectTimeout();
-    }, this.config.options.connectTimeout);
-    return controller.signal;
-  }
-
-  /**
-   * @private
-   */
   createCancelTimer() {
     this.clearCancelTimer();
     const timeout = this.config.options.cancelTimeout;
@@ -2309,18 +2255,7 @@ class Connection extends EventEmitter {
    * @private
    */
   connectTimeout() {
-    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
-    // If we have routing data stored, this connection has been redirected
-    const server = this.routingData ? this.routingData.server : this.config.server;
-    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-    // Grab the target host from the connection configuration, and from a redirect message
-    // otherwise, leave the message empty.
-    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
-    this.debug.log(message);
-    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = undefined;
-    this.dispatchEvent('connectTimeout');
+
   }
 
   /**
@@ -2342,16 +2277,6 @@ class Connection extends EventEmitter {
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
     request.error = new RequestError(message, 'ETIMEOUT');
-  }
-
-  /**
-   * @private
-   */
-  clearConnectTimer() {
-    if (this.connectTimer) {
-      clearTimeout(this.connectTimer);
-      this.connectTimer = undefined;
-    }
   }
 
   /**
