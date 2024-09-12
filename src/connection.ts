@@ -1992,12 +1992,62 @@ class Connection extends EventEmitter {
         }
 
         this.clearConnectTimer();
-        this.socketError(err);
+        this.transitionTo(this.STATE.FINAL);
+
+        this.emit('connect', this.wrapSocketError(err));
 
         return;
       }
 
       this.socketHandlingForSendPreLogin(socket);
+      this.sendPreLogin();
+      this.transitionTo(this.STATE.SENT_PRELOGIN);
+
+      try {
+        await this.performSentPrelogin();
+      } catch (err: any) {
+        this.clearConnectTimer();
+        this.transitionTo(this.STATE.FINAL);
+
+        this.emit('connect', err);
+        return;
+      }
+
+      this.sendLogin7Packet();
+
+      const { authentication } = this.config;
+
+      switch (authentication.type) {
+        case 'token-credential':
+        case 'azure-active-directory-password':
+        case 'azure-active-directory-msi-vm':
+        case 'azure-active-directory-msi-app-service':
+        case 'azure-active-directory-service-principal-secret':
+        case 'azure-active-directory-default':
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+          this.performSentLogin7WithFedAuth().catch((err) => {
+            process.nextTick(() => {
+              throw err;
+            });
+          });
+          break;
+        case 'ntlm':
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+          this.performSentLogin7WithNTLMLogin().catch((err) => {
+            process.nextTick(() => {
+              throw err;
+            });
+          });
+          break;
+        default:
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          this.performSentLogin7WithStandardLogin().catch((err) => {
+            process.nextTick(() => {
+              throw err;
+            });
+          });
+          break;
+      }
     })().catch((err) => {
       process.nextTick(() => {
         throw err;
@@ -2061,14 +2111,6 @@ class Connection extends EventEmitter {
 
     this.closed = false;
     this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-    this.sendPreLogin();
-    this.transitionTo(this.STATE.SENT_PRELOGIN);
-    this.performSentPrelogin().catch((err) => {
-      process.nextTick(() => {
-        throw err;
-      });
-    });
   }
 
   wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -3260,7 +3302,7 @@ class Connection extends EventEmitter {
     try {
       message = await this.messageIo.readMessage();
     } catch (err: any) {
-      return this.socketError(err);
+      throw this.wrapSocketError(err);
     }
 
     for await (const data of message) {
@@ -3277,52 +3319,15 @@ class Connection extends EventEmitter {
     }
     if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
       if (!this.config.options.encrypt) {
-        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
+        throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
       }
 
       try {
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
         await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
       } catch (err: any) {
-        return this.socketError(err);
+        throw this.wrapSocketError(err);
       }
-    }
-
-    this.sendLogin7Packet();
-
-    const { authentication } = this.config;
-
-    switch (authentication.type) {
-      case 'token-credential':
-      case 'azure-active-directory-password':
-      case 'azure-active-directory-msi-vm':
-      case 'azure-active-directory-msi-app-service':
-      case 'azure-active-directory-service-principal-secret':
-      case 'azure-active-directory-default':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-        this.performSentLogin7WithFedAuth().catch((err) => {
-          process.nextTick(() => {
-            throw err;
-          });
-        });
-        break;
-      case 'ntlm':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        this.performSentLogin7WithNTLMLogin().catch((err) => {
-          process.nextTick(() => {
-            throw err;
-          });
-        });
-        break;
-      default:
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        this.performSentLogin7WithStandardLogin().catch((err) => {
-          process.nextTick(() => {
-            throw err;
-          });
-        });
-        break;
     }
   }
 
