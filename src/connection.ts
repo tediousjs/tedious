@@ -2018,6 +2018,8 @@ class Connection extends EventEmitter {
         }
       } catch (err: any) {
         if (isTransientError(err)) {
+          this.clearConnectTimer();
+
           this.debug.log('Initiating retry on transient error');
           this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           this.performTransientFailureRetry();
@@ -2029,6 +2031,8 @@ class Connection extends EventEmitter {
 
       // If routing data is present, we need to re-route the connection
       if (this.routingData) {
+        this.clearConnectTimer();
+
         this.transitionTo(this.STATE.REROUTING);
         this.performReRouting();
         return;
@@ -3318,9 +3322,6 @@ class Connection extends EventEmitter {
    * @private
    */
   performReRouting() {
-    // Clear the existing connection timeout
-    this.clearConnectTimer();
-
     this.socket!.removeListener('error', this._onSocketError);
     this.socket!.removeListener('close', this._onSocketClose);
     this.socket!.removeListener('end', this._onSocketEnd);
@@ -3341,7 +3342,6 @@ class Connection extends EventEmitter {
   performTransientFailureRetry() {
     this.curTransientRetryCount++;
 
-    this.clearConnectTimer();
     this.loginError = undefined;
 
     this.socket!.removeListener('error', this._onSocketError);
