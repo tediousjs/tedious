@@ -1971,14 +1971,7 @@ class Connection extends EventEmitter {
             return;
           }
 
-          this.clearConnectTimer();
-          this.transitionTo(this.STATE.FINAL);
-
-          process.nextTick(() => {
-            this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err }));
-          });
-
-          return;
+          throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
         }
       }
 
@@ -1991,28 +1984,14 @@ class Connection extends EventEmitter {
           return;
         }
 
-        this.clearConnectTimer();
-        // Wrap the error before switching to a different state
-        const wrappedError = this.wrapSocketError(err);
-        this.transitionTo(this.STATE.FINAL);
-        this.emit('connect', wrappedError);
-
-        return;
+        throw this.wrapSocketError(err);
       }
 
       this.socketHandlingForSendPreLogin(socket);
       this.sendPreLogin();
       this.transitionTo(this.STATE.SENT_PRELOGIN);
 
-      try {
-        await this.performSentPrelogin();
-      } catch (err: any) {
-        this.clearConnectTimer();
-        this.transitionTo(this.STATE.FINAL);
-
-        this.emit('connect', err);
-        return;
-      }
+      await this.performSentPrelogin();
 
       this.sendLogin7Packet();
 
@@ -2042,12 +2021,10 @@ class Connection extends EventEmitter {
           this.debug.log('Initiating retry on transient error');
           this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
           this.performTransientFailureRetry();
-        } else {
-          this.transitionTo(this.STATE.FINAL);
-          this.emit('connect', err);
+          return;
         }
 
-        return;
+        throw err;
       }
 
       // If routing data is present, we need to re-route the connection
@@ -2062,10 +2039,16 @@ class Connection extends EventEmitter {
 
       this.transitionTo(this.STATE.LOGGED_IN);
       this.clearConnectTimer();
-      this.emit('connect');
-    })().catch((err) => {
+
       process.nextTick(() => {
-        throw err;
+        this.emit('connect');
+      });
+    })().catch((err) => {
+      this.clearConnectTimer();
+      this.transitionTo(this.STATE.FINAL);
+
+      process.nextTick(() => {
+        this.emit('connect', err);
       });
     });
   }
