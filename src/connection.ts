@@ -877,6 +877,23 @@ interface RoutingData {
 }
 
 /**
+ * Helper function, equivalent to `Promise.withResolvers()`.
+ *
+ * @returns An object with the properties `promise`, `resolve`, and `reject`.
+ */
+function withResolvers<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void;
+  let reject: (reason?: any) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve: resolve!, reject: reject! };
+}
+
+/**
  * A [[Connection]] instance represents a single connection to a database server.
  *
  * ```js
@@ -1952,9 +1969,9 @@ class Connection extends EventEmitter {
    * @private
    */
   initialiseConnection() {
-    (async () => {
-      const signal = this.createConnectTimer();
+    const signal = this.createConnectTimer();
 
+    (async () => {
       let port = this.config.options.port;
 
       if (!port) {
@@ -1991,7 +2008,16 @@ class Connection extends EventEmitter {
       this.sendPreLogin();
       this.transitionTo(this.STATE.SENT_PRELOGIN);
 
-      await this.performSentPrelogin();
+      try {
+        await this.performSentPrelogin(signal);
+      } catch (err: any) {
+        // Ignore the AbortError for now, this is still handled by the connectTimer firing
+        if (signal.aborted) {
+          return;
+        }
+
+        throw err;
+      }
 
       this.sendLogin7Packet();
 
@@ -2005,15 +2031,42 @@ class Connection extends EventEmitter {
           case 'azure-active-directory-service-principal-secret':
           case 'azure-active-directory-default':
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-            this.routingData = await this.performSentLogin7WithFedAuth();
+            try {
+              this.routingData = await this.performSentLogin7WithFedAuth(signal);
+            } catch (err) {
+              // Ignore the AbortError for now, this is still handled by the connectTimer firing
+              if (signal.aborted) {
+                return;
+              }
+
+              throw err;
+            }
             break;
           case 'ntlm':
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-            this.routingData = await this.performSentLogin7WithNTLMLogin();
+            try {
+              this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
+            } catch (err) {
+              // Ignore the AbortError for now, this is still handled by the connectTimer firing
+              if (signal.aborted) {
+                return;
+              }
+
+              throw err;
+            }
             break;
           default:
             this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-            this.routingData = await this.performSentLogin7WithStandardLogin();
+            try {
+              this.routingData = await this.performSentLogin7WithStandardLogin(signal);
+            } catch (err) {
+              // Ignore the AbortError for now, this is still handled by the connectTimer firing
+              if (signal.aborted) {
+                return;
+              }
+
+              throw err;
+            }
             break;
         }
       } catch (err: any) {
@@ -2039,7 +2092,16 @@ class Connection extends EventEmitter {
       }
 
       this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      await this.performLoggedInSendingInitialSql();
+      try {
+        await this.performLoggedInSendingInitialSql(signal);
+      } catch (err) {
+        // Ignore the AbortError for now, this is still handled by the connectTimer firing
+        if (signal.aborted) {
+          return;
+        }
+
+        throw err;
+      }
 
       this.transitionTo(this.STATE.LOGGED_IN);
       this.clearConnectTimer();
@@ -3282,39 +3344,61 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentPrelogin() {
-    let messageBuffer = Buffer.alloc(0);
+  async performSentPrelogin(signal: AbortSignal) {
+    signal.throwIfAborted();
 
-    let message;
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
+      let messageBuffer = Buffer.alloc(0);
 
-    for await (const data of message) {
-      messageBuffer = Buffer.concat([messageBuffer, data]);
-    }
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
 
-    const preloginPayload = new PreloginPayload(messageBuffer);
-    this.debug.payload(function() {
-      return preloginPayload.toString('  ');
-    });
+      const iterator = message[Symbol.asyncIterator]();
+      while (true) {
+        const { done, value } = await Promise.race([
+          iterator.next(),
+          signalAborted
+        ]);
 
-    if (preloginPayload.fedAuthRequired === 1) {
-      this.fedAuthRequired = true;
-    }
-    if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
-      if (!this.config.options.encrypt) {
-        throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
+        if (done) {
+          break;
+        }
+
+        messageBuffer = Buffer.concat([messageBuffer, value]);
       }
 
-      try {
+      const preloginPayload = new PreloginPayload(messageBuffer);
+      this.debug.payload(function() {
+        return preloginPayload.toString('  ');
+      });
+
+      if (preloginPayload.fedAuthRequired === 1) {
+        this.fedAuthRequired = true;
+      }
+      if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+        if (!this.config.options.encrypt) {
+          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
+        }
+
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-        await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-      } catch (err: any) {
-        throw this.wrapSocketError(err);
+        await Promise.race([
+          this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate).catch((err) => {
+            throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
       }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
@@ -3364,38 +3448,21 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithStandardLogin(): Promise<RoutingData | undefined> {
-    let message;
+  async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
-
-    const handler = new Login7TokenHandler(this);
-    const tokenStreamParser = this.createTokenStreamParser(message, handler);
-    await once(tokenStreamParser, 'end');
-
-    if (handler.loginAckReceived) {
-      return handler.routingData;
-    } else if (this.loginError) {
-      throw this.loginError;
-    } else {
-      throw new ConnectionError('Login failed.', 'ELOGIN');
-    }
-  }
-
-  /**
-   * @private
-   */
-  async performSentLogin7WithNTLMLogin(): Promise<RoutingData | undefined> {
-    while (true) {
-      let message;
-      try {
-        message = await this.messageIo.readMessage();
-      } catch (err: any) {
-        throw this.wrapSocketError(err);
-      }
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
@@ -3403,130 +3470,205 @@ class Connection extends EventEmitter {
 
       if (handler.loginAckReceived) {
         return handler.routingData;
-      } else if (this.ntlmpacket) {
-        const authentication = this.config.authentication as NtlmAuthentication;
-
-        const payload = new NTLMResponsePayload({
-          domain: authentication.options.domain,
-          userName: authentication.options.userName,
-          password: authentication.options.password,
-          ntlmpacket: this.ntlmpacket
-        });
-
-        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-        this.debug.payload(function() {
-          return payload.toString('  ');
-        });
-
-        this.ntlmpacket = undefined;
       } else if (this.loginError) {
         throw this.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
   /**
    * @private
    */
-  async performSentLogin7WithFedAuth(): Promise<RoutingData | undefined> {
-    let message;
+  async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
-    }
+      while (true) {
+        const message = await Promise.race([
+          this.messageIo.readMessage().catch((err) => {
+            throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
 
-    const handler = new Login7TokenHandler(this);
-    const tokenStreamParser = this.createTokenStreamParser(message, handler);
-    await once(tokenStreamParser, 'end');
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        await Promise.race([
+          once(tokenStreamParser, 'end'),
+          signalAborted
+        ]);
 
-    if (handler.loginAckReceived) {
-      return handler.routingData;
-    }
+        if (handler.loginAckReceived) {
+          return handler.routingData;
+        } else if (this.ntlmpacket) {
+          const authentication = this.config.authentication as NtlmAuthentication;
 
-    const fedAuthInfoToken = handler.fedAuthInfoToken;
+          const payload = new NTLMResponsePayload({
+            domain: authentication.options.domain,
+            userName: authentication.options.userName,
+            password: authentication.options.password,
+            ntlmpacket: this.ntlmpacket
+          });
 
-    if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-      /** Federated authentication configation. */
-      const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
-      /** Permission scope to pass to Entra ID when requesting an authentication token. */
-      const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
 
-      /** Instance of the token credential to use to authenticate to the resource. */
-      let credentials: TokenCredential;
-
-      switch (authentication.type) {
-        case 'token-credential':
-          credentials = authentication.options.credential;
-          break;
-        case 'azure-active-directory-password':
-          credentials = new UsernamePasswordCredential(
-            authentication.options.tenantId ?? 'common',
-            authentication.options.clientId,
-            authentication.options.userName,
-            authentication.options.password
-          );
-          break;
-        case 'azure-active-directory-msi-vm':
-        case 'azure-active-directory-msi-app-service':
-          const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-          credentials = new ManagedIdentityCredential(...msiArgs);
-          break;
-        case 'azure-active-directory-default':
-          const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-          credentials = new DefaultAzureCredential(args);
-          break;
-        case 'azure-active-directory-service-principal-secret':
-          credentials = new ClientSecretCredential(
-            authentication.options.tenantId,
-            authentication.options.clientId,
-            authentication.options.clientSecret
-          );
-          break;
+          this.ntlmpacket = undefined;
+        } else if (this.loginError) {
+          throw this.loginError;
+        } else {
+          throw new ConnectionError('Login failed.', 'ELOGIN');
+        }
       }
-
-      /** Access token retrieved from Entra ID for the configured permission scope(s). */
-      let tokenResponse: AccessToken | null;
-
-      try {
-        tokenResponse = await credentials.getToken(tokenScope);
-      } catch (err) {
-        throw new AggregateError(
-          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-      }
-
-      // Type guard the token value so that it is never null.
-      if (tokenResponse === null) {
-        throw new AggregateError(
-          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
-      }
-
-      this.sendFedAuthTokenMessage(tokenResponse.token);
-      // sent the fedAuth token message, the rest is similar to standard login 7
-      this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-      return await this.performSentLogin7WithStandardLogin();
-    } else if (this.loginError) {
-      throw this.loginError;
-    } else {
-      throw new ConnectionError('Login failed.', 'ELOGIN');
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
   /**
    * @private
    */
-  async performLoggedInSendingInitialSql() {
-    this.sendInitialSql();
-    let message;
+  async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      throw this.wrapSocketError(err);
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
+
+      const handler = new Login7TokenHandler(this);
+      const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
+
+      if (handler.loginAckReceived) {
+        return handler.routingData;
+      }
+
+      const fedAuthInfoToken = handler.fedAuthInfoToken;
+
+      if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+        /** Federated authentication configation. */
+        const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+        /** Permission scope to pass to Entra ID when requesting an authentication token. */
+        const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+
+        /** Instance of the token credential to use to authenticate to the resource. */
+        let credentials: TokenCredential;
+
+        switch (authentication.type) {
+          case 'token-credential':
+            credentials = authentication.options.credential;
+            break;
+          case 'azure-active-directory-password':
+            credentials = new UsernamePasswordCredential(
+              authentication.options.tenantId ?? 'common',
+              authentication.options.clientId,
+              authentication.options.userName,
+              authentication.options.password
+            );
+            break;
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+            const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+            credentials = new ManagedIdentityCredential(...msiArgs);
+            break;
+          case 'azure-active-directory-default':
+            const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+            credentials = new DefaultAzureCredential(args);
+            break;
+          case 'azure-active-directory-service-principal-secret':
+            credentials = new ClientSecretCredential(
+              authentication.options.tenantId,
+              authentication.options.clientId,
+              authentication.options.clientSecret
+            );
+            break;
+        }
+
+        /** Access token retrieved from Entra ID for the configured permission scope(s). */
+        let tokenResponse: AccessToken | null;
+
+        try {
+          tokenResponse = await Promise.race([
+            credentials.getToken(tokenScope),
+            signalAborted
+          ]);
+        } catch (err) {
+          throw new AggregateError(
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+        }
+
+        // Type guard the token value so that it is never null.
+        if (tokenResponse === null) {
+          throw new AggregateError(
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
+        }
+
+        this.sendFedAuthTokenMessage(tokenResponse.token);
+        // sent the fedAuth token message, the rest is similar to standard login 7
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        return await this.performSentLogin7WithStandardLogin(signal);
+      } else if (this.loginError) {
+        throw this.loginError;
+      } else {
+        throw new ConnectionError('Login failed.', 'ELOGIN');
+      }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
-    const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-    await once(tokenStreamParser, 'end');
+  }
+
+  /**
+   * @private
+   */
+  async performLoggedInSendingInitialSql(signal: AbortSignal) {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      this.sendInitialSql();
+
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
+
+      const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
   }
 }
 
