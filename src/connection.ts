@@ -420,7 +420,6 @@ interface State {
   exit?(this: Connection, newState: State): void;
   events: {
     socketError?(this: Connection, err: Error): void;
-    connectTimeout?(this: Connection): void;
     message?(this: Connection, message: Message): void;
   };
 }
@@ -2254,13 +2253,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  connectTimeout() {
-
-  }
-
-  /**
-   * @private
-   */
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
@@ -3620,9 +3612,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3630,9 +3619,6 @@ Connection.prototype.STATE = {
     name: 'SentPrelogin',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       }
     }
@@ -3642,9 +3628,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3652,9 +3635,6 @@ Connection.prototype.STATE = {
     name: 'TRANSIENT_FAILURE_RETRY',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       }
     }
@@ -3664,9 +3644,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3674,9 +3651,6 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithStandardLogin',
     events: {
       socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       }
     }
@@ -3686,9 +3660,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3697,9 +3668,6 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
       }
     }
   },
@@ -3707,9 +3675,6 @@ Connection.prototype.STATE = {
     name: 'LoggedInSendingInitialSql',
     events: {
       socketError: function socketError() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
         this.transitionTo(this.STATE.FINAL);
       }
     }
@@ -3868,9 +3833,6 @@ Connection.prototype.STATE = {
       this.cleanupConnection();
     },
     events: {
-      connectTimeout: function() {
-        // Do nothing, as the timer should be cleaned up.
-      },
       message: function() {
         // Do nothing
       },
