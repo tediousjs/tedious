@@ -1952,33 +1952,57 @@ class Connection extends EventEmitter {
    * @private
    */
   initialiseConnection() {
-    const signal = this.createConnectTimer();
+    (async () => {
+      const signal = this.createConnectTimer();
 
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
-    } else {
-      return instanceLookup({
-        server: this.config.server,
-        instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout,
-        signal: signal
-      }).then((port) => {
-        process.nextTick(() => {
-          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
-        });
-      }, (err) => {
-        this.clearConnectTimer();
+      let port = this.config.options.port;
 
-        if (signal.aborted) {
+      if (!port) {
+        try {
+          port = await instanceLookup({
+            server: this.config.server,
+            instanceName: this.config.options.instanceName!,
+            timeout: this.config.options.connectTimeout,
+            signal: signal
+          });
+        } catch (err: any) {
           // Ignore the AbortError for now, this is still handled by the connectTimer firing
+          if (signal.aborted) {
+            return;
+          }
+
+          this.clearConnectTimer();
+          this.transitionTo(this.STATE.FINAL);
+
+          process.nextTick(() => {
+            this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err }));
+          });
+
+          return;
+        }
+      }
+
+      let socket;
+      try {
+        socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+      } catch (err: any) {
+        // Ignore the AbortError for now, this is still handled by the connectTimer firing
+        if (signal.aborted) {
           return;
         }
 
-        process.nextTick(() => {
-          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err }));
-        });
+        this.clearConnectTimer();
+        this.socketError(err);
+
+        return;
+      }
+
+      this.socketHandlingForSendPreLogin(socket);
+    })().catch((err) => {
+      process.nextTick(() => {
+        throw err;
       });
-    }
+    });
   }
 
   /**
@@ -2102,7 +2126,7 @@ class Connection extends EventEmitter {
     });
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+  async connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
@@ -2111,30 +2135,20 @@ class Connection extends EventEmitter {
 
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
-    (async () => {
-      let socket = await connect(connectOpts, dns.lookup, signal);
+    let socket = await connect(connectOpts, dns.lookup, signal);
 
-      if (this.config.options.encrypt === 'strict') {
-        try {
-          // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket, signal);
-        } catch (err) {
-          socket.end();
+    if (this.config.options.encrypt === 'strict') {
+      try {
+        // Wrap the socket with TLS for TDS 8.0
+        socket = await this.wrapWithTls(socket, signal);
+      } catch (err) {
+        socket.end();
 
-          throw err;
-        }
+        throw err;
       }
+    }
 
-      this.socketHandlingForSendPreLogin(socket);
-    })().catch((err) => {
-      this.clearConnectTimer();
-
-      if (signal.aborted) {
-        return;
-      }
-
-      process.nextTick(() => { this.socketError(err); });
-    });
+    return socket;
   }
 
   /**
