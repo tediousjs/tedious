@@ -2016,7 +2016,7 @@ class Connection extends EventEmitter {
 
         const controller = new AbortController();
         const onError = (err: Error) => {
-          controller.abort(err);
+          controller.abort(this.wrapSocketError(err));
         };
         const onClose = () => {
           this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
