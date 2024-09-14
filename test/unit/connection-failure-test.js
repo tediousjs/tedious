@@ -281,6 +281,8 @@ describe('Connection failure handling', function() {
     connection.connect((err) => {
       connection.close();
 
+      console.log(err);
+
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual('Connection lost - socket hang up', err.message);
 
