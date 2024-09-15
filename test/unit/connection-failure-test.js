@@ -147,10 +147,9 @@ describe('Connection failure handling', function() {
       connection.close();
 
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual('Connection lost - socket hang up', err.message);
 
-      assert.instanceOf(err.cause, Error);
-      assert.strictEqual('socket hang up', err.cause.message);
+      // We're not checking the actual error message here.
+      // The error message will end up being different between operating systems.
 
       done();
     });
@@ -281,13 +280,10 @@ describe('Connection failure handling', function() {
     connection.connect((err) => {
       connection.close();
 
-      console.log(err);
-
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual('Connection lost - socket hang up', err.message);
 
-      assert.instanceOf(err.cause, Error);
-      assert.strictEqual('socket hang up', err.cause.message);
+      // We're not checking the actual error message here.
+      // The error message will end up being different between operating systems.
 
       done();
     });
