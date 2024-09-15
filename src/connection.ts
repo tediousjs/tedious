@@ -420,7 +420,6 @@ interface State {
   exit?(this: Connection, newState: State): void;
   events: {
     socketError?(this: Connection, err: Error): void;
-    connectTimeout?(this: Connection): void;
     message?(this: Connection, message: Message): void;
   };
 }
@@ -877,6 +876,23 @@ interface RoutingData {
 }
 
 /**
+ * Helper function, equivalent to `Promise.withResolvers()`.
+ *
+ * @returns An object with the properties `promise`, `resolve`, and `reject`.
+ */
+function withResolvers<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void;
+  let reject: (reason?: any) => void;
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve: resolve!, reject: reject! };
+}
+
+/**
  * A [[Connection]] instance represents a single connection to a database server.
  *
  * ```js
@@ -1009,10 +1025,6 @@ class Connection extends EventEmitter {
    */
   declare messageBuffer: Buffer;
 
-  /**
-   * @private
-   */
-  declare connectTimer: undefined | NodeJS.Timeout;
   /**
    * @private
    */
@@ -1952,33 +1964,161 @@ class Connection extends EventEmitter {
    * @private
    */
   initialiseConnection() {
-    const signal = this.createConnectTimer();
+    (async () => {
+      const timeoutController = new AbortController();
 
-    if (this.config.options.port) {
-      return this.connectOnPort(this.config.options.port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
-    } else {
-      return instanceLookup({
-        server: this.config.server,
-        instanceName: this.config.options.instanceName!,
-        timeout: this.config.options.connectTimeout,
-        signal: signal
-      }).then((port) => {
-        process.nextTick(() => {
-          this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
-        });
-      }, (err) => {
-        this.clearConnectTimer();
+      const connectTimer = setTimeout(() => {
+        const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+        // If we have routing data stored, this connection has been redirected
+        const server = this.routingData ? this.routingData.server : this.config.server;
+        const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+        // Grab the target host from the connection configuration, and from a redirect message
+        // otherwise, leave the message empty.
+        const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+        const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
+        this.debug.log(message);
 
-        if (signal.aborted) {
-          // Ignore the AbortError for now, this is still handled by the connectTimer firing
-          return;
+        timeoutController.abort(new ConnectionError(message, 'ETIMEOUT'));
+      }, this.config.options.connectTimeout);
+
+      try {
+        let signal = timeoutController.signal;
+
+        let port = this.config.options.port;
+
+        if (!port) {
+          try {
+            port = await instanceLookup({
+              server: this.config.server,
+              instanceName: this.config.options.instanceName!,
+              timeout: this.config.options.connectTimeout,
+              signal: signal
+            });
+          } catch (err: any) {
+            if (signal.aborted) {
+              throw signal.reason;
+            }
+
+            throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
+          }
         }
 
+        let socket;
+        try {
+          socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+        } catch (err: any) {
+          if (signal.aborted) {
+            throw signal.reason;
+          }
+
+          throw this.wrapSocketError(err);
+        }
+
+        const controller = new AbortController();
+        const onError = (err: Error) => {
+          controller.abort(this.wrapSocketError(err));
+        };
+        const onClose = () => {
+          this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+        };
+        const onEnd = () => {
+          this.debug.log('socket ended');
+
+          const error: ErrorWithCode = new Error('socket hang up');
+          error.code = 'ECONNRESET';
+          controller.abort(this.wrapSocketError(error));
+        };
+
+        socket.once('error', onError);
+        socket.once('close', onClose);
+        socket.once('end', onEnd);
+
+        signal = AbortSignal.any([signal, controller.signal]);
+
+        try {
+          socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+          this.socket = socket;
+
+          this.closed = false;
+          this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+          this.sendPreLogin();
+
+          this.transitionTo(this.STATE.SENT_PRELOGIN);
+          await this.performSentPrelogin(signal);
+
+          this.sendLogin7Packet();
+
+          try {
+            const { authentication } = this.config;
+            switch (authentication.type) {
+              case 'token-credential':
+              case 'azure-active-directory-password':
+              case 'azure-active-directory-msi-vm':
+              case 'azure-active-directory-msi-app-service':
+              case 'azure-active-directory-service-principal-secret':
+              case 'azure-active-directory-default':
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+                this.routingData = await this.performSentLogin7WithFedAuth(signal);
+                break;
+              case 'ntlm':
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+                this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
+                break;
+              default:
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+                this.routingData = await this.performSentLogin7WithStandardLogin(signal);
+                break;
+            }
+          } catch (err: any) {
+            if (isTransientError(err)) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              this.performTransientFailureRetry();
+              return;
+            }
+
+            throw err;
+          }
+
+          // If routing data is present, we need to re-route the connection
+          if (this.routingData) {
+            this.transitionTo(this.STATE.REROUTING);
+            this.performReRouting();
+            return;
+          }
+
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          await this.performLoggedInSendingInitialSql(signal);
+        } finally {
+          socket.removeListener('error', onError);
+          socket.removeListener('close', onClose);
+          socket.removeListener('end', onEnd);
+        }
+
+        socket.on('error', this._onSocketError);
+        socket.on('close', this._onSocketClose);
+        socket.on('end', this._onSocketEnd);
+
+        this.transitionTo(this.STATE.LOGGED_IN);
+
         process.nextTick(() => {
-          this.emit('connect', new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err }));
+          this.emit('connect');
         });
+      } finally {
+        clearTimeout(connectTimer);
+      }
+    })().catch((err) => {
+      this.transitionTo(this.STATE.FINAL);
+
+      process.nextTick(() => {
+        this.emit('connect', err);
       });
-    }
+    });
   }
 
   /**
@@ -1986,7 +2126,6 @@ class Connection extends EventEmitter {
    */
   cleanupConnection() {
     if (!this.closed) {
-      this.clearConnectTimer();
       this.clearRequestTimer();
       this.closeConnection();
 
@@ -2022,24 +2161,6 @@ class Connection extends EventEmitter {
    */
   createTokenStreamParser(message: Message, handler: TokenHandler) {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
-  }
-
-  socketHandlingForSendPreLogin(socket: net.Socket) {
-    socket.on('error', this._onSocketError);
-    socket.on('close', this._onSocketClose);
-    socket.on('end', this._onSocketEnd);
-    socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-    this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-    this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
-    this.socket = socket;
-
-    this.closed = false;
-    this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-    this.sendPreLogin();
-    this.transitionTo(this.STATE.SENT_PRELOGIN);
   }
 
   wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -2097,7 +2218,7 @@ class Connection extends EventEmitter {
     });
   }
 
-  connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
+  async connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
@@ -2106,30 +2227,20 @@ class Connection extends EventEmitter {
 
     const connect = customConnector || (multiSubnetFailover ? connectInParallel : connectInSequence);
 
-    (async () => {
-      let socket = await connect(connectOpts, dns.lookup, signal);
+    let socket = await connect(connectOpts, dns.lookup, signal);
 
-      if (this.config.options.encrypt === 'strict') {
-        try {
-          // Wrap the socket with TLS for TDS 8.0
-          socket = await this.wrapWithTls(socket, signal);
-        } catch (err) {
-          socket.end();
+    if (this.config.options.encrypt === 'strict') {
+      try {
+        // Wrap the socket with TLS for TDS 8.0
+        socket = await this.wrapWithTls(socket, signal);
+      } catch (err) {
+        socket.end();
 
-          throw err;
-        }
+        throw err;
       }
+    }
 
-      this.socketHandlingForSendPreLogin(socket);
-    })().catch((err) => {
-      this.clearConnectTimer();
-
-      if (signal.aborted) {
-        return;
-      }
-
-      process.nextTick(() => { this.socketError(err); });
-    });
+    return socket;
   }
 
   /**
@@ -2139,18 +2250,6 @@ class Connection extends EventEmitter {
     if (this.socket) {
       this.socket.destroy();
     }
-  }
-
-  /**
-   * @private
-   */
-  createConnectTimer() {
-    const controller = new AbortController();
-    this.connectTimer = setTimeout(() => {
-      controller.abort();
-      this.connectTimeout();
-    }, this.config.options.connectTimeout);
-    return controller.signal;
   }
 
   /**
@@ -2183,24 +2282,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  connectTimeout() {
-    const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
-    // If we have routing data stored, this connection has been redirected
-    const server = this.routingData ? this.routingData.server : this.config.server;
-    const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-    // Grab the target host from the connection configuration, and from a redirect message
-    // otherwise, leave the message empty.
-    const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-    const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
-    this.debug.log(message);
-    this.emit('connect', new ConnectionError(message, 'ETIMEOUT'));
-    this.connectTimer = undefined;
-    this.dispatchEvent('connectTimeout');
-  }
-
-  /**
-   * @private
-   */
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
@@ -2217,16 +2298,6 @@ class Connection extends EventEmitter {
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
     request.error = new RequestError(message, 'ETIMEOUT');
-  }
-
-  /**
-   * @private
-   */
-  clearConnectTimer() {
-    if (this.connectTimer) {
-      clearTimeout(this.connectTimer);
-      this.connectTimer = undefined;
-    }
   }
 
   /**
@@ -2299,7 +2370,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  socketError(error: Error) {
+  wrapSocketError(error: Error): ConnectionError {
     if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
       const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
       // If we have routing data stored, this connection has been redirected
@@ -2309,12 +2380,22 @@ class Connection extends EventEmitter {
       // otherwise, leave the message empty.
       const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
       const message = `Failed to connect to ${server}${port}${routingMessage} - ${error.message}`;
-      this.debug.log(message);
-      this.emit('connect', new ConnectionError(message, 'ESOCKET', { cause: error }));
+
+      return new ConnectionError(message, 'ESOCKET', { cause: error });
     } else {
       const message = `Connection lost - ${error.message}`;
-      this.debug.log(message);
-      this.emit('error', new ConnectionError(message, 'ESOCKET', { cause: error }));
+      return new ConnectionError(message, 'ESOCKET', { cause: error });
+    }
+  }
+
+  /**
+   * @private
+   */
+  socketError(error: Error) {
+    if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
+      this.emit('connect', this.wrapSocketError(error));
+    } else {
+      this.emit('error', this.wrapSocketError(error));
     }
     this.dispatchEvent('socketError', error);
   }
@@ -2441,8 +2522,6 @@ class Connection extends EventEmitter {
     offset = data.writeUInt32LE(accessTokenLen, offset);
     data.write(token, offset, 'ucs2');
     this.messageIo.sendMessage(TYPE.FEDAUTH_TOKEN, data);
-    // sent the fedAuth token message, the rest is similar to standard login 7
-    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
   }
 
   /**
@@ -2549,14 +2628,6 @@ class Connection extends EventEmitter {
     }
 
     return options.join('\n');
-  }
-
-  /**
-   * @private
-   */
-  processedInitialSql() {
-    this.clearConnectTimer();
-    this.emit('connect');
   }
 
   /**
@@ -3219,61 +3290,61 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentPrelogin() {
-    let messageBuffer = Buffer.alloc(0);
+  async performSentPrelogin(signal: AbortSignal) {
+    signal.throwIfAborted();
 
-    let message;
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      return this.socketError(err);
-    }
+      let messageBuffer = Buffer.alloc(0);
 
-    for await (const data of message) {
-      messageBuffer = Buffer.concat([messageBuffer, data]);
-    }
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
 
-    const preloginPayload = new PreloginPayload(messageBuffer);
-    this.debug.payload(function() {
-      return preloginPayload.toString('  ');
-    });
+      const iterator = message[Symbol.asyncIterator]();
+      while (true) {
+        const { done, value } = await Promise.race([
+          iterator.next(),
+          signalAborted
+        ]);
 
-    if (preloginPayload.fedAuthRequired === 1) {
-      this.fedAuthRequired = true;
-    }
-    if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
-      if (!this.config.options.encrypt) {
-        this.emit('connect', new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT'));
-        return this.close();
+        if (done) {
+          break;
+        }
+
+        messageBuffer = Buffer.concat([messageBuffer, value]);
       }
 
-      try {
+      const preloginPayload = new PreloginPayload(messageBuffer);
+      this.debug.payload(function() {
+        return preloginPayload.toString('  ');
+      });
+
+      if (preloginPayload.fedAuthRequired === 1) {
+        this.fedAuthRequired = true;
+      }
+      if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+        if (!this.config.options.encrypt) {
+          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
+        }
+
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-        await this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate);
-      } catch (err: any) {
-        return this.socketError(err);
+        await Promise.race([
+          this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate).catch((err) => {
+            throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
       }
-    }
-
-    this.sendLogin7Packet();
-
-    const { authentication } = this.config;
-
-    switch (authentication.type) {
-      case 'token-credential':
-      case 'azure-active-directory-password':
-      case 'azure-active-directory-msi-vm':
-      case 'azure-active-directory-msi-app-service':
-      case 'azure-active-directory-service-principal-secret':
-      case 'azure-active-directory-default':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-        break;
-      case 'ntlm':
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-        break;
-      default:
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        break;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
@@ -3281,9 +3352,6 @@ class Connection extends EventEmitter {
    * @private
    */
   performReRouting() {
-    // Clear the existing connection timeout
-    this.clearConnectTimer();
-
     this.socket!.removeListener('error', this._onSocketError);
     this.socket!.removeListener('close', this._onSocketClose);
     this.socket!.removeListener('end', this._onSocketEnd);
@@ -3304,7 +3372,6 @@ class Connection extends EventEmitter {
   performTransientFailureRetry() {
     this.curTransientRetryCount++;
 
-    this.clearConnectTimer();
     this.loginError = undefined;
 
     this.socket!.removeListener('error', this._onSocketError);
@@ -3327,214 +3394,227 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithStandardLogin() {
-    let message;
+  async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      return this.socketError(err);
-    }
-
-    const handler = new Login7TokenHandler(this);
-    const tokenStreamParser = this.createTokenStreamParser(message, handler);
-    await once(tokenStreamParser, 'end');
-
-    if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
-      } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-      }
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-      } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-      }
-    } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
-    }
-  }
-
-  /**
-   * @private
-   */
-  async performSentLogin7WithNTLMLogin() {
-    while (true) {
-      let message;
-      try {
-        message = await this.messageIo.readMessage();
-      } catch (err: any) {
-        return this.socketError(err);
-      }
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
       await once(tokenStreamParser, 'end');
 
       if (handler.loginAckReceived) {
-        if (handler.routingData) {
-          this.routingData = handler.routingData;
-          return this.transitionTo(this.STATE.REROUTING);
-        } else {
-          return this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        }
-      } else if (this.ntlmpacket) {
-        const authentication = this.config.authentication as NtlmAuthentication;
-
-        const payload = new NTLMResponsePayload({
-          domain: authentication.options.domain,
-          userName: authentication.options.userName,
-          password: authentication.options.password,
-          ntlmpacket: this.ntlmpacket
-        });
-
-        this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-        this.debug.payload(function() {
-          return payload.toString('  ');
-        });
-
-        this.ntlmpacket = undefined;
+        return handler.routingData;
       } else if (this.loginError) {
-        if (isTransientError(this.loginError)) {
-          this.debug.log('Initiating retry on transient error');
-          return this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+        throw this.loginError;
+      } else {
+        throw new ConnectionError('Login failed.', 'ELOGIN');
+      }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  /**
+   * @private
+   */
+  async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      while (true) {
+        const message = await Promise.race([
+          this.messageIo.readMessage().catch((err) => {
+            throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
+
+        const handler = new Login7TokenHandler(this);
+        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        await Promise.race([
+          once(tokenStreamParser, 'end'),
+          signalAborted
+        ]);
+
+        if (handler.loginAckReceived) {
+          return handler.routingData;
+        } else if (this.ntlmpacket) {
+          const authentication = this.config.authentication as NtlmAuthentication;
+
+          const payload = new NTLMResponsePayload({
+            domain: authentication.options.domain,
+            userName: authentication.options.userName,
+            password: authentication.options.password,
+            ntlmpacket: this.ntlmpacket
+          });
+
+          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+          this.debug.payload(function() {
+            return payload.toString('  ');
+          });
+
+          this.ntlmpacket = undefined;
+        } else if (this.loginError) {
+          throw this.loginError;
         } else {
-          this.emit('connect', this.loginError);
-          return this.transitionTo(this.STATE.FINAL);
+          throw new ConnectionError('Login failed.', 'ELOGIN');
         }
-      } else {
-        this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-        return this.transitionTo(this.STATE.FINAL);
       }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
   /**
    * @private
    */
-  async performSentLogin7WithFedAuth() {
-    let message;
+  async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
+    signal.throwIfAborted();
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
     try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      return this.socketError(err);
-    }
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
 
-    const handler = new Login7TokenHandler(this);
-    const tokenStreamParser = this.createTokenStreamParser(message, handler);
-    await once(tokenStreamParser, 'end');
+      const handler = new Login7TokenHandler(this);
+      const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
 
-    if (handler.loginAckReceived) {
-      if (handler.routingData) {
-        this.routingData = handler.routingData;
-        this.transitionTo(this.STATE.REROUTING);
+      if (handler.loginAckReceived) {
+        return handler.routingData;
+      }
+
+      const fedAuthInfoToken = handler.fedAuthInfoToken;
+
+      if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+        /** Federated authentication configation. */
+        const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+        /** Permission scope to pass to Entra ID when requesting an authentication token. */
+        const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
+
+        /** Instance of the token credential to use to authenticate to the resource. */
+        let credentials: TokenCredential;
+
+        switch (authentication.type) {
+          case 'token-credential':
+            credentials = authentication.options.credential;
+            break;
+          case 'azure-active-directory-password':
+            credentials = new UsernamePasswordCredential(
+              authentication.options.tenantId ?? 'common',
+              authentication.options.clientId,
+              authentication.options.userName,
+              authentication.options.password
+            );
+            break;
+          case 'azure-active-directory-msi-vm':
+          case 'azure-active-directory-msi-app-service':
+            const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+            credentials = new ManagedIdentityCredential(...msiArgs);
+            break;
+          case 'azure-active-directory-default':
+            const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+            credentials = new DefaultAzureCredential(args);
+            break;
+          case 'azure-active-directory-service-principal-secret':
+            credentials = new ClientSecretCredential(
+              authentication.options.tenantId,
+              authentication.options.clientId,
+              authentication.options.clientSecret
+            );
+            break;
+        }
+
+        /** Access token retrieved from Entra ID for the configured permission scope(s). */
+        let tokenResponse: AccessToken | null;
+
+        try {
+          tokenResponse = await Promise.race([
+            credentials.getToken(tokenScope),
+            signalAborted
+          ]);
+        } catch (err) {
+          throw new AggregateError(
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+        }
+
+        // Type guard the token value so that it is never null.
+        if (tokenResponse === null) {
+          throw new AggregateError(
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
+        }
+
+        this.sendFedAuthTokenMessage(tokenResponse.token);
+        // sent the fedAuth token message, the rest is similar to standard login 7
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        return await this.performSentLogin7WithStandardLogin(signal);
+      } else if (this.loginError) {
+        throw this.loginError;
       } else {
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-
-      return;
-    }
-
-    const fedAuthInfoToken = handler.fedAuthInfoToken;
-
-    if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-      /** Federated authentication configation. */
-      const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
-      /** Permission scope to pass to Entra ID when requesting an authentication token. */
-      const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
-
-      /** Instance of the token credential to use to authenticate to the resource. */
-      let credentials: TokenCredential;
-
-      switch (authentication.type) {
-        case 'token-credential':
-          credentials = authentication.options.credential;
-          break;
-        case 'azure-active-directory-password':
-          credentials = new UsernamePasswordCredential(
-            authentication.options.tenantId ?? 'common',
-            authentication.options.clientId,
-            authentication.options.userName,
-            authentication.options.password
-          );
-          break;
-        case 'azure-active-directory-msi-vm':
-        case 'azure-active-directory-msi-app-service':
-          const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-          credentials = new ManagedIdentityCredential(...msiArgs);
-          break;
-        case 'azure-active-directory-default':
-          const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-          credentials = new DefaultAzureCredential(args);
-          break;
-        case 'azure-active-directory-service-principal-secret':
-          credentials = new ClientSecretCredential(
-            authentication.options.tenantId,
-            authentication.options.clientId,
-            authentication.options.clientSecret
-          );
-          break;
-      }
-
-      /** Access token retrieved from Entra ID for the configured permission scope(s). */
-      let tokenResponse: AccessToken | null;
-
-      try {
-        tokenResponse = await credentials.getToken(tokenScope);
-      } catch (err) {
-        this.loginError = new AggregateError(
-          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
-      }
-
-      // Type guard the token value so that it is never null.
-      if (tokenResponse === null) {
-        this.loginError = new AggregateError(
-          [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-        return;
-      }
-
-      this.sendFedAuthTokenMessage(tokenResponse.token);
-
-    } else if (this.loginError) {
-      if (isTransientError(this.loginError)) {
-        this.debug.log('Initiating retry on transient error');
-        this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-      } else {
-        this.emit('connect', this.loginError);
-        this.transitionTo(this.STATE.FINAL);
-      }
-    } else {
-      this.emit('connect', new ConnectionError('Login failed.', 'ELOGIN'));
-      this.transitionTo(this.STATE.FINAL);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
   /**
    * @private
    */
-  async performLoggedInSendingInitialSql() {
-    this.sendInitialSql();
-    let message;
-    try {
-      message = await this.messageIo.readMessage();
-    } catch (err: any) {
-      return this.socketError(err);
-    }
-    const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-    await once(tokenStreamParser, 'end');
+  async performLoggedInSendingInitialSql(signal: AbortSignal) {
+    signal.throwIfAborted();
 
-    this.transitionTo(this.STATE.LOGGED_IN);
-    this.processedInitialSql();
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      this.sendInitialSql();
+
+      const message = await Promise.race([
+        this.messageIo.readMessage().catch((err) => {
+          throw this.wrapSocketError(err);
+        }),
+        signalAborted
+      ]);
+
+      const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
   }
 }
 
@@ -3558,143 +3638,39 @@ Connection.prototype.STATE = {
     enter: function() {
       this.initialiseConnection();
     },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_PRELOGIN: {
     name: 'SentPrelogin',
-    enter: function() {
-      this.performSentPrelogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   REROUTING: {
     name: 'ReRouting',
-    enter: function() {
-      this.performReRouting();
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   TRANSIENT_FAILURE_RETRY: {
     name: 'TRANSIENT_FAILURE_RETRY',
-    enter: function() {
-      this.performTransientFailureRetry();
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_TLSSSLNEGOTIATION: {
     name: 'SentTLSSSLNegotiation',
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_LOGIN7_WITH_STANDARD_LOGIN: {
     name: 'SentLogin7WithStandardLogin',
-    enter: function() {
-      this.performSentLogin7WithStandardLogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_LOGIN7_WITH_NTLM: {
     name: 'SentLogin7WithNTLMLogin',
-    enter: function() {
-      this.performSentLogin7WithNTLMLogin().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   SENT_LOGIN7_WITH_FEDAUTH: {
     name: 'SentLogin7WithFedauth',
-    enter: function() {
-      this.performSentLogin7WithFedAuth().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
-    events: {
-      socketError: function() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   LOGGED_IN_SENDING_INITIAL_SQL: {
     name: 'LoggedInSendingInitialSql',
-    enter: function() {
-      this.performLoggedInSendingInitialSql().catch((err) => {
-        process.nextTick(() => {
-          throw err;
-        });
-      });
-    },
-    events: {
-      socketError: function socketError() {
-        this.transitionTo(this.STATE.FINAL);
-      },
-      connectTimeout: function() {
-        this.transitionTo(this.STATE.FINAL);
-      }
-    }
+    events: {}
   },
   LOGGED_IN: {
     name: 'LoggedIn',
@@ -3850,9 +3826,6 @@ Connection.prototype.STATE = {
       this.cleanupConnection();
     },
     events: {
-      connectTimeout: function() {
-        // Do nothing, as the timer should be cleaned up.
-      },
       message: function() {
         // Do nothing
       },
