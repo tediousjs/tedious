@@ -3309,17 +3309,23 @@ class Connection extends EventEmitter {
       ]);
 
       const iterator = message[Symbol.asyncIterator]();
-      while (true) {
-        const { done, value } = await Promise.race([
-          iterator.next(),
-          signalAborted
-        ]);
+      try {
+        while (true) {
+          const { done, value } = await Promise.race([
+            iterator.next(),
+            signalAborted
+          ]);
 
-        if (done) {
-          break;
+          if (done) {
+            break;
+          }
+
+          messageBuffer = Buffer.concat([messageBuffer, value]);
         }
-
-        messageBuffer = Buffer.concat([messageBuffer, value]);
+      } finally {
+        if (iterator.return) {
+          await iterator.return();
+        }
       }
 
       const preloginPayload = new PreloginPayload(messageBuffer);
