@@ -3391,9 +3391,9 @@ class Connection extends EventEmitter {
     const port = this.routingData ? this.routingData.port : this.config.options.port;
     this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-    await new Promise<void>((resolve, reject) => {
-      setTimeout(resolve, this.config.options.connectionRetryInterval);
-    });
+    const { promise, resolve } = withResolvers<void>();
+    setTimeout(resolve, this.config.options.connectionRetryInterval);
+    await promise;
 
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
