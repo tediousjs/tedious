@@ -2005,9 +2005,7 @@ class Connection extends EventEmitter {
             signal: signal
           });
         } catch (err: any) {
-          if (signal.aborted) {
-            throw signal.reason;
-          }
+          signal.throwIfAborted();
 
           throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
         }
@@ -2017,9 +2015,7 @@ class Connection extends EventEmitter {
       try {
         socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
       } catch (err: any) {
-        if (signal.aborted) {
-          throw signal.reason;
-        }
+        signal.throwIfAborted();
 
         throw this.wrapSocketError(err);
       }
@@ -3575,12 +3571,10 @@ class Connection extends EventEmitter {
             signalAborted
           ]);
         } catch (err) {
-          if (!signal.aborted) {
-            throw new AggregateError(
-              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-          }
+          signal.throwIfAborted();
 
-          throw err;
+          throw new AggregateError(
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
         }
 
         // Type guard the token value so that it is never null.
