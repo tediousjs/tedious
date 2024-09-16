@@ -1818,6 +1818,17 @@ class Connection extends EventEmitter {
     }
 
     this.transitionTo(this.STATE.CONNECTING);
+    this.initialiseConnection().then(() => {
+      process.nextTick(() => {
+        this.emit('connect');
+      });
+    }, (err) => {
+      this.transitionTo(this.STATE.FINAL);
+
+      process.nextTick(() => {
+        this.emit('connect', err);
+      });
+    });
   }
 
   /**
@@ -1963,163 +1974,149 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  initialiseConnection() {
-    (async () => {
-      const timeoutController = new AbortController();
+  async initialiseConnection() {
+    const timeoutController = new AbortController();
 
-      const connectTimer = setTimeout(() => {
-        const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
-        // If we have routing data stored, this connection has been redirected
-        const server = this.routingData ? this.routingData.server : this.config.server;
-        const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
-        // Grab the target host from the connection configuration, and from a redirect message
-        // otherwise, leave the message empty.
-        const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
-        const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
-        this.debug.log(message);
+    const connectTimer = setTimeout(() => {
+      const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
+      // If we have routing data stored, this connection has been redirected
+      const server = this.routingData ? this.routingData.server : this.config.server;
+      const port = this.routingData ? `:${this.routingData.port}` : hostPostfix;
+      // Grab the target host from the connection configuration, and from a redirect message
+      // otherwise, leave the message empty.
+      const routingMessage = this.routingData ? ` (redirected from ${this.config.server}${hostPostfix})` : '';
+      const message = `Failed to connect to ${server}${port}${routingMessage} in ${this.config.options.connectTimeout}ms`;
+      this.debug.log(message);
 
-        timeoutController.abort(new ConnectionError(message, 'ETIMEOUT'));
-      }, this.config.options.connectTimeout);
+      timeoutController.abort(new ConnectionError(message, 'ETIMEOUT'));
+    }, this.config.options.connectTimeout);
 
-      try {
-        let signal = timeoutController.signal;
+    try {
+      let signal = timeoutController.signal;
 
-        let port = this.config.options.port;
+      let port = this.config.options.port;
 
-        if (!port) {
-          try {
-            port = await instanceLookup({
-              server: this.config.server,
-              instanceName: this.config.options.instanceName!,
-              timeout: this.config.options.connectTimeout,
-              signal: signal
-            });
-          } catch (err: any) {
-            if (signal.aborted) {
-              throw signal.reason;
-            }
-
-            throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
-          }
-        }
-
-        let socket;
+      if (!port) {
         try {
-          socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+          port = await instanceLookup({
+            server: this.config.server,
+            instanceName: this.config.options.instanceName!,
+            timeout: this.config.options.connectTimeout,
+            signal: signal
+          });
         } catch (err: any) {
           if (signal.aborted) {
             throw signal.reason;
           }
 
-          throw this.wrapSocketError(err);
+          throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
+        }
+      }
+
+      let socket;
+      try {
+        socket = await this.connectOnPort(port, this.config.options.multiSubnetFailover, signal, this.config.options.connector);
+      } catch (err: any) {
+        if (signal.aborted) {
+          throw signal.reason;
         }
 
-        const controller = new AbortController();
-        const onError = (err: Error) => {
-          controller.abort(this.wrapSocketError(err));
-        };
-        const onClose = () => {
-          this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
-        };
-        const onEnd = () => {
-          this.debug.log('socket ended');
+        throw this.wrapSocketError(err);
+      }
 
-          const error: ErrorWithCode = new Error('socket hang up');
-          error.code = 'ECONNRESET';
-          controller.abort(this.wrapSocketError(error));
-        };
+      const controller = new AbortController();
+      const onError = (err: Error) => {
+        controller.abort(this.wrapSocketError(err));
+      };
+      const onClose = () => {
+        this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+      };
+      const onEnd = () => {
+        this.debug.log('socket ended');
 
-        socket.once('error', onError);
-        socket.once('close', onClose);
-        socket.once('end', onEnd);
+        const error: ErrorWithCode = new Error('socket hang up');
+        error.code = 'ECONNRESET';
+        controller.abort(this.wrapSocketError(error));
+      };
 
-        signal = AbortSignal.any([signal, controller.signal]);
+      socket.once('error', onError);
+      socket.once('close', onClose);
+      socket.once('end', onEnd);
+
+      signal = AbortSignal.any([signal, controller.signal]);
+
+      try {
+        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+        this.socket = socket;
+
+        this.closed = false;
+        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+        this.sendPreLogin();
+
+        this.transitionTo(this.STATE.SENT_PRELOGIN);
+        const preloginResponse = await this.readPreloginResponse(signal);
+        await this.performTlsNegotiation(preloginResponse, signal);
+
+        this.sendLogin7Packet();
 
         try {
-          socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
-
-          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
-          this.socket = socket;
-
-          this.closed = false;
-          this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-          this.sendPreLogin();
-
-          this.transitionTo(this.STATE.SENT_PRELOGIN);
-          const preloginResponse = await this.readPreloginResponse(signal);
-          await this.performTlsNegotiation(preloginResponse, signal);
-
-          this.sendLogin7Packet();
-
-          try {
-            const { authentication } = this.config;
-            switch (authentication.type) {
-              case 'token-credential':
-              case 'azure-active-directory-password':
-              case 'azure-active-directory-msi-vm':
-              case 'azure-active-directory-msi-app-service':
-              case 'azure-active-directory-service-principal-secret':
-              case 'azure-active-directory-default':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-                this.routingData = await this.performSentLogin7WithFedAuth(signal);
-                break;
-              case 'ntlm':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-                this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
-                break;
-              default:
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-                this.routingData = await this.performSentLogin7WithStandardLogin(signal);
-                break;
-            }
-          } catch (err: any) {
-            if (isTransientError(err)) {
-              this.debug.log('Initiating retry on transient error');
-              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-              this.performTransientFailureRetry();
-              return;
-            }
-
-            throw err;
+          const { authentication } = this.config;
+          switch (authentication.type) {
+            case 'token-credential':
+            case 'azure-active-directory-password':
+            case 'azure-active-directory-msi-vm':
+            case 'azure-active-directory-msi-app-service':
+            case 'azure-active-directory-service-principal-secret':
+            case 'azure-active-directory-default':
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+              this.routingData = await this.performSentLogin7WithFedAuth(signal);
+              break;
+            case 'ntlm':
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+              this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
+              break;
+            default:
+              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+              this.routingData = await this.performSentLogin7WithStandardLogin(signal);
+              break;
+          }
+        } catch (err: any) {
+          if (isTransientError(err)) {
+            this.debug.log('Initiating retry on transient error');
+            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+            return await this.performTransientFailureRetry();
           }
 
-          // If routing data is present, we need to re-route the connection
-          if (this.routingData) {
-            this.transitionTo(this.STATE.REROUTING);
-            this.performReRouting();
-            return;
-          }
-
-          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-          await this.performLoggedInSendingInitialSql(signal);
-        } finally {
-          socket.removeListener('error', onError);
-          socket.removeListener('close', onClose);
-          socket.removeListener('end', onEnd);
+          throw err;
         }
 
-        socket.on('error', this._onSocketError);
-        socket.on('close', this._onSocketClose);
-        socket.on('end', this._onSocketEnd);
+        // If routing data is present, we need to re-route the connection
+        if (this.routingData) {
+          this.transitionTo(this.STATE.REROUTING);
+          return await this.performReRouting();
+        }
 
-        this.transitionTo(this.STATE.LOGGED_IN);
-
-        process.nextTick(() => {
-          this.emit('connect');
-        });
+        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+        await this.performLoggedInSendingInitialSql(signal);
       } finally {
-        clearTimeout(connectTimer);
+        socket.removeListener('error', onError);
+        socket.removeListener('close', onClose);
+        socket.removeListener('end', onEnd);
       }
-    })().catch((err) => {
-      this.transitionTo(this.STATE.FINAL);
 
-      process.nextTick(() => {
-        this.emit('connect', err);
-      });
-    });
+      socket.on('error', this._onSocketError);
+      socket.on('close', this._onSocketClose);
+      socket.on('end', this._onSocketEnd);
+
+      this.transitionTo(this.STATE.LOGGED_IN);
+    } finally {
+      clearTimeout(connectTimer);
+    }
   }
 
   /**
@@ -3372,7 +3369,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  performReRouting() {
+  async performReRouting() {
     this.socket!.removeListener('error', this._onSocketError);
     this.socket!.removeListener('close', this._onSocketClose);
     this.socket!.removeListener('end', this._onSocketEnd);
@@ -3385,12 +3382,13 @@ class Connection extends EventEmitter {
 
     // Attempt connecting to the rerouting target
     this.transitionTo(this.STATE.CONNECTING);
+    await this.initialiseConnection();
   }
 
   /**
    * @private
    */
-  performTransientFailureRetry() {
+  async performTransientFailureRetry() {
     this.curTransientRetryCount++;
 
     this.loginError = undefined;
@@ -3406,10 +3404,13 @@ class Connection extends EventEmitter {
     const port = this.routingData ? this.routingData.port : this.config.options.port;
     this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-    setTimeout(() => {
-      this.emit('retry');
-      this.transitionTo(this.STATE.CONNECTING);
-    }, this.config.options.connectionRetryInterval);
+    await new Promise<void>((resolve, reject) => {
+      setTimeout(resolve, this.config.options.connectionRetryInterval);
+    });
+
+    this.emit('retry');
+    this.transitionTo(this.STATE.CONNECTING);
+    await this.initialiseConnection();
   }
 
   /**
@@ -3656,9 +3657,6 @@ Connection.prototype.STATE = {
   },
   CONNECTING: {
     name: 'Connecting',
-    enter: function() {
-      this.initialiseConnection();
-    },
     events: {}
   },
   SENT_PRELOGIN: {
