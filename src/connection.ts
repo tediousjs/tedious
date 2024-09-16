@@ -2049,7 +2049,8 @@ class Connection extends EventEmitter {
           this.sendPreLogin();
 
           this.transitionTo(this.STATE.SENT_PRELOGIN);
-          await this.performSentPrelogin(signal);
+          const preloginResponse = await this.readPreloginResponse(signal);
+          await this.performTlsNegotiation(preloginResponse, signal);
 
           this.sendLogin7Packet();
 
@@ -3290,7 +3291,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentPrelogin(signal: AbortSignal) {
+  async performTlsNegotiation(preloginPayload: PreloginPayload, signal: AbortSignal) {
     signal.throwIfAborted();
 
     const { promise: signalAborted, reject } = withResolvers<never>();
@@ -3299,8 +3300,38 @@ class Connection extends EventEmitter {
     signal.addEventListener('abort', onAbort, { once: true });
 
     try {
-      let messageBuffer = Buffer.alloc(0);
+      if (preloginPayload.fedAuthRequired === 1) {
+        this.fedAuthRequired = true;
+      }
+      if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+        if (!this.config.options.encrypt) {
+          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
+        }
 
+        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        await Promise.race([
+          this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate).catch((err) => {
+            throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
+      }
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
+    signal.throwIfAborted();
+
+    let messageBuffer = Buffer.alloc(0);
+
+    const { promise: signalAborted, reject } = withResolvers<never>();
+
+    const onAbort = () => { reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    try {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3327,31 +3358,15 @@ class Connection extends EventEmitter {
           await iterator.return();
         }
       }
-
-      const preloginPayload = new PreloginPayload(messageBuffer);
-      this.debug.payload(function() {
-        return preloginPayload.toString('  ');
-      });
-
-      if (preloginPayload.fedAuthRequired === 1) {
-        this.fedAuthRequired = true;
-      }
-      if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
-        if (!this.config.options.encrypt) {
-          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
-        }
-
-        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
-        await Promise.race([
-          this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate).catch((err) => {
-            throw this.wrapSocketError(err);
-          }),
-          signalAborted
-        ]);
-      }
     } finally {
       signal.removeEventListener('abort', onAbort);
     }
+
+    const preloginPayload = new PreloginPayload(messageBuffer);
+    this.debug.payload(function() {
+      return preloginPayload.toString('  ');
+    });
+    return preloginPayload;
   }
 
   /**
