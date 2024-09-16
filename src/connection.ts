@@ -2161,59 +2161,61 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
-  wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
+  async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
     signal.throwIfAborted();
 
-    return new Promise((resolve, reject) => {
-      const secureContext = tls.createSecureContext(this.secureContextOptions);
-      // If connect to an ip address directly,
-      // need to set the servername to an empty string
-      // if the user has not given a servername explicitly
-      const serverName = !net.isIP(this.config.server) ? this.config.server : '';
-      const encryptOptions = {
-        host: this.config.server,
-        socket: socket,
-        ALPNProtocols: ['tds/8.0'],
-        secureContext: secureContext,
-        servername: this.config.options.serverName ? this.config.options.serverName : serverName,
-      };
+    const { promise, resolve, reject } = withResolvers<tls.TLSSocket>();
 
-      const encryptsocket = tls.connect(encryptOptions);
+    const secureContext = tls.createSecureContext(this.secureContextOptions);
+    // If connect to an ip address directly,
+    // need to set the servername to an empty string
+    // if the user has not given a servername explicitly
+    const serverName = !net.isIP(this.config.server) ? this.config.server : '';
+    const encryptOptions = {
+      host: this.config.server,
+      socket: socket,
+      ALPNProtocols: ['tds/8.0'],
+      secureContext: secureContext,
+      servername: this.config.options.serverName ? this.config.options.serverName : serverName,
+    };
 
-      const onAbort = () => {
-        encryptsocket.removeListener('error', onError);
-        encryptsocket.removeListener('connect', onConnect);
+    const encryptsocket = tls.connect(encryptOptions);
 
-        encryptsocket.destroy();
+    const onAbort = () => {
+      encryptsocket.removeListener('error', onError);
+      encryptsocket.removeListener('connect', onConnect);
 
-        reject(signal.reason);
-      };
+      encryptsocket.destroy();
 
-      const onError = (err: Error) => {
-        signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
 
-        encryptsocket.removeListener('error', onError);
-        encryptsocket.removeListener('connect', onConnect);
+    const onError = (err: Error) => {
+      signal.removeEventListener('abort', onAbort);
 
-        encryptsocket.destroy();
+      encryptsocket.removeListener('error', onError);
+      encryptsocket.removeListener('connect', onConnect);
 
-        reject(err);
-      };
+      encryptsocket.destroy();
 
-      const onConnect = () => {
-        signal.removeEventListener('abort', onAbort);
+      reject(err);
+    };
 
-        encryptsocket.removeListener('error', onError);
-        encryptsocket.removeListener('connect', onConnect);
+    const onConnect = () => {
+      signal.removeEventListener('abort', onAbort);
 
-        resolve(encryptsocket);
-      };
+      encryptsocket.removeListener('error', onError);
+      encryptsocket.removeListener('connect', onConnect);
 
-      signal.addEventListener('abort', onAbort, { once: true });
+      resolve(encryptsocket);
+    };
 
-      encryptsocket.on('error', onError);
-      encryptsocket.on('secureConnect', onConnect);
-    });
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    encryptsocket.on('error', onError);
+    encryptsocket.on('secureConnect', onConnect);
+
+    return await promise;
   }
 
   async connectOnPort(port: number, multiSubnetFailover: boolean, signal: AbortSignal, customConnector?: () => Promise<net.Socket>) {
