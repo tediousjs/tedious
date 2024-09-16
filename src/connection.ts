@@ -3584,8 +3584,12 @@ class Connection extends EventEmitter {
             signalAborted
           ]);
         } catch (err) {
-          throw new AggregateError(
-            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+          if (!signal.aborted) {
+            throw new AggregateError(
+              [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+          }
+
+          throw err;
         }
 
         // Type guard the token value so that it is never null.
