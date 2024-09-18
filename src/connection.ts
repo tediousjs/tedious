@@ -1824,6 +1824,7 @@ class Connection extends EventEmitter {
       });
     }, (err) => {
       this.transitionTo(this.STATE.FINAL);
+      this.cleanupConnection();
 
       process.nextTick(() => {
         this.emit('connect', err);
@@ -1969,6 +1970,7 @@ class Connection extends EventEmitter {
    */
   close() {
     this.transitionTo(this.STATE.FINAL);
+    this.cleanupConnection();
   }
 
   /**
@@ -2409,6 +2411,7 @@ class Connection extends EventEmitter {
   socketClose() {
     this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
     this.transitionTo(this.STATE.FINAL);
+    this.cleanupConnection();
   }
 
   /**
@@ -3691,6 +3694,7 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection();
       }
     }
   },
@@ -3782,6 +3786,7 @@ Connection.prototype.STATE = {
         const sqlRequest = this.request!;
         this.request = undefined;
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection();
 
         sqlRequest.callback(err);
       }
@@ -3829,6 +3834,7 @@ Connection.prototype.STATE = {
         this.request = undefined;
 
         this.transitionTo(this.STATE.FINAL);
+        this.cleanupConnection();
 
         sqlRequest.callback(err);
       }
@@ -3836,16 +3842,6 @@ Connection.prototype.STATE = {
   },
   FINAL: {
     name: 'Final',
-    enter: function() {
-      this.cleanupConnection();
-    },
-    events: {
-      message: function() {
-        // Do nothing
-      },
-      socketError: function() {
-        // Do nothing
-      }
-    }
+    events: {}
   }
 };
