@@ -2143,7 +2143,6 @@ class Connection extends EventEmitter {
       }
 
       this.closed = true;
-      this.loginError = undefined;
     }
   }
 
@@ -3387,8 +3386,6 @@ class Connection extends EventEmitter {
   async performTransientFailureRetry() {
     this.curTransientRetryCount++;
 
-    this.loginError = undefined;
-
     this.socket!.removeListener('error', this._onSocketError);
     this.socket!.removeListener('close', this._onSocketClose);
     this.socket!.removeListener('end', this._onSocketEnd);
@@ -3440,6 +3437,7 @@ class Connection extends EventEmitter {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     } finally {
+      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
@@ -3496,6 +3494,7 @@ class Connection extends EventEmitter {
         }
       }
     } finally {
+      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
@@ -3602,6 +3601,7 @@ class Connection extends EventEmitter {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     } finally {
+      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
