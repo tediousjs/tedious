@@ -2020,89 +2020,95 @@ class Connection extends EventEmitter {
         throw this.wrapSocketError(err);
       }
 
-      const controller = new AbortController();
-      const onError = (err: Error) => {
-        controller.abort(this.wrapSocketError(err));
-      };
-      const onClose = () => {
-        this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
-      };
-      const onEnd = () => {
-        this.debug.log('socket ended');
-
-        const error: ErrorWithCode = new Error('socket hang up');
-        error.code = 'ECONNRESET';
-        controller.abort(this.wrapSocketError(error));
-      };
-
-      socket.once('error', onError);
-      socket.once('close', onClose);
-      socket.once('end', onEnd);
-
-      signal = AbortSignal.any([signal, controller.signal]);
-
       try {
-        socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+        const controller = new AbortController();
+        const onError = (err: Error) => {
+          controller.abort(this.wrapSocketError(err));
+        };
+        const onClose = () => {
+          this.debug.log('connection to ' + this.config.server + ':' + this.config.options.port + ' closed');
+        };
+        const onEnd = () => {
+          this.debug.log('socket ended');
 
-        this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-        this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+          const error: ErrorWithCode = new Error('socket hang up');
+          error.code = 'ECONNRESET';
+          controller.abort(this.wrapSocketError(error));
+        };
 
-        this.socket = socket;
-
-        this.closed = false;
-        this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
-
-        this.sendPreLogin();
-
-        this.transitionTo(this.STATE.SENT_PRELOGIN);
-        const preloginResponse = await this.readPreloginResponse(signal);
-        await this.performTlsNegotiation(preloginResponse, signal);
-
-        this.sendLogin7Packet();
+        socket.once('error', onError);
+        socket.once('close', onClose);
+        socket.once('end', onEnd);
 
         try {
-          const { authentication } = this.config;
-          switch (authentication.type) {
-            case 'token-credential':
-            case 'azure-active-directory-password':
-            case 'azure-active-directory-msi-vm':
-            case 'azure-active-directory-msi-app-service':
-            case 'azure-active-directory-service-principal-secret':
-            case 'azure-active-directory-default':
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-              this.routingData = await this.performSentLogin7WithFedAuth(signal);
-              break;
-            case 'ntlm':
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-              this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
-              break;
-            default:
-              this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-              this.routingData = await this.performSentLogin7WithStandardLogin(signal);
-              break;
+          signal = AbortSignal.any([signal, controller.signal]);
+
+          socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+
+          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
+          this.socket = socket;
+
+          this.closed = false;
+          this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
+
+          this.sendPreLogin();
+
+          this.transitionTo(this.STATE.SENT_PRELOGIN);
+          const preloginResponse = await this.readPreloginResponse(signal);
+          await this.performTlsNegotiation(preloginResponse, signal);
+
+          this.sendLogin7Packet();
+
+          try {
+            const { authentication } = this.config;
+            switch (authentication.type) {
+              case 'token-credential':
+              case 'azure-active-directory-password':
+              case 'azure-active-directory-msi-vm':
+              case 'azure-active-directory-msi-app-service':
+              case 'azure-active-directory-service-principal-secret':
+              case 'azure-active-directory-default':
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+                this.routingData = await this.performSentLogin7WithFedAuth(signal);
+                break;
+              case 'ntlm':
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
+                this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
+                break;
+              default:
+                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+                this.routingData = await this.performSentLogin7WithStandardLogin(signal);
+                break;
+            }
+          } catch (err: any) {
+            if (isTransientError(err)) {
+              this.debug.log('Initiating retry on transient error');
+              this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
+              return await this.performTransientFailureRetry();
+            }
+
+            throw err;
           }
-        } catch (err: any) {
-          if (isTransientError(err)) {
-            this.debug.log('Initiating retry on transient error');
-            this.transitionTo(this.STATE.TRANSIENT_FAILURE_RETRY);
-            return await this.performTransientFailureRetry();
+
+          // If routing data is present, we need to re-route the connection
+          if (this.routingData) {
+            this.transitionTo(this.STATE.REROUTING);
+            return await this.performReRouting();
           }
 
-          throw err;
+          this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
+          await this.performLoggedInSendingInitialSql(signal);
+        } finally {
+          socket.removeListener('error', onError);
+          socket.removeListener('close', onClose);
+          socket.removeListener('end', onEnd);
         }
+      } catch (err) {
+        socket.destroy();
 
-        // If routing data is present, we need to re-route the connection
-        if (this.routingData) {
-          this.transitionTo(this.STATE.REROUTING);
-          return await this.performReRouting();
-        }
-
-        this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
-        await this.performLoggedInSendingInitialSql(signal);
-      } finally {
-        socket.removeListener('error', onError);
-        socket.removeListener('close', onClose);
-        socket.removeListener('end', onEnd);
+        throw err;
       }
 
       socket.on('error', this._onSocketError);
