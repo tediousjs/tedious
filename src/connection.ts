@@ -2384,12 +2384,10 @@ class Connection extends EventEmitter {
    * @private
    */
   socketError(error: Error) {
-    if (this.state === this.STATE.CONNECTING || this.state === this.STATE.SENT_TLSSSLNEGOTIATION) {
-      this.emit('connect', this.wrapSocketError(error));
-    } else {
-      this.emit('error', this.wrapSocketError(error));
-    }
     this.dispatchEvent('socketError', error);
+    process.nextTick(() => {
+      this.emit('error', this.wrapSocketError(error));
+    });
   }
 
   /**
