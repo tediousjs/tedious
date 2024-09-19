@@ -1793,7 +1793,10 @@ class Connection extends EventEmitter {
     };
 
     this._onSocketError = (error) => {
-      this.socketError(error);
+      this.dispatchEvent('socketError', error);
+      process.nextTick(() => {
+        this.emit('error', this.wrapSocketError(error));
+      });
     };
   }
 
@@ -2383,22 +2386,16 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  socketError(error: Error) {
-    this.dispatchEvent('socketError', error);
-    process.nextTick(() => {
-      this.emit('error', this.wrapSocketError(error));
-    });
-  }
-
-  /**
-   * @private
-   */
   socketEnd() {
     this.debug.log('socket ended');
     if (this.state !== this.STATE.FINAL) {
       const error: ErrorWithCode = new Error('socket hang up');
       error.code = 'ECONNRESET';
-      this.socketError(error);
+
+      this.dispatchEvent('socketError', error);
+      process.nextTick(() => {
+        this.emit('error', this.wrapSocketError(error));
+      });
     }
   }
 
@@ -3704,7 +3701,11 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          return this.socketError(err);
+          this.dispatchEvent('socketError', err);
+          process.nextTick(() => {
+            this.emit('error', this.wrapSocketError(err));
+          });
+          return;
         }
         // request timer is stopped on first data package
         this.clearRequestTimer();
@@ -3798,7 +3799,11 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          return this.socketError(err);
+          this.dispatchEvent('socketError', err);
+          process.nextTick(() => {
+            this.emit('error', this.wrapSocketError(err));
+          });
+          return;
         }
 
         const handler = new AttentionTokenHandler(this, this.request!);
