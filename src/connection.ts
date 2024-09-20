@@ -1827,10 +1827,13 @@ class Connection extends EventEmitter {
       });
     }, (err) => {
       this.transitionTo(this.STATE.FINAL);
-      this.cleanupConnection();
+      this.closed = true;
 
       process.nextTick(() => {
         this.emit('connect', err);
+      });
+      process.nextTick(() => {
+        this.emit('end');
       });
     });
   }
