@@ -16,9 +16,10 @@ import returnValueParser from './returnvalue-token-parser';
 import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
+import { decryptSymmetricKey } from '../always-encrypted/key-crypto';
 import { NotEnoughDataError } from './helpers';
 
-export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns' | 'serverSupportsColumnEncryption'>;
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns' | 'serverSupportsColumnEncryption' | 'trustedServerNameAE' | 'encryptionKeyStoreProviders' | 'columnEncryptionKeyCacheTTL'>;
 
 class Parser {
   debug: Debug;
@@ -158,6 +159,11 @@ class Parser {
   async readColMetadataToken(): Promise<ColMetadataToken> {
     const token = await colMetadataParser(this);
     this.colMetadata = token.columns;
+    await Promise.all(this.colMetadata.map(async (metadata) => {
+      if (metadata.cryptoMetadata) {
+        await decryptSymmetricKey(metadata.cryptoMetadata, this.options);
+      }
+    }));
     return token;
   }
 

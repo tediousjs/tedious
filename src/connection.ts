@@ -39,6 +39,8 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { shouldHonorAE } from './always-encrypted/utils';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 
 import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
@@ -397,6 +399,11 @@ interface KeyStoreProviderMap {
   [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
+interface KeyStoreProvider {
+  key: string;
+  value: ColumnEncryptionAzureKeyVaultProvider;
+}
+
 /**
  * @private
  */
@@ -519,6 +526,10 @@ export interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
+
+  columnEncryptionKeyCacheTTL?: number;
+
+  columnEncryptionSetting?: boolean;
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
@@ -674,6 +685,8 @@ export interface ConnectionOptions {
    * (default: `true`)
    */
   encrypt?: string | boolean;
+
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
 
   /**
    * By default, if the database requested by [[database]] cannot be accessed,
@@ -870,6 +883,7 @@ interface RoutingData {
   server: string;
   port: number;
 }
+
 
 /**
  * A [[Connection]] instance represents a single connection to a database server.
@@ -1690,6 +1704,26 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.columnEncryptionSetting !== undefined) {
+        if (typeof config.options.columnEncryptionSetting !== 'boolean') {
+          throw new TypeError('The "config.options.columnEncryptionSetting" property must be of type boolean.');
+        }
+
+        this.config.options.columnEncryptionSetting = config.options.columnEncryptionSetting;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL <= 0) {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be greater than 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
+      }
+
       if (config.options.workstationId !== undefined) {
         if (typeof config.options.workstationId !== 'string') {
           throw new TypeError('The "config.options.workstationId" property must be of type string.');
@@ -1705,6 +1739,51 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.encryptionKeyStoreProviders) {
+        for (const entry of config.options.encryptionKeyStoreProviders) {
+          const providerName = entry.key;
+
+          if (!providerName || providerName.length === 0) {
+            throw new TypeError('Invalid key store provider name specified. Key store provider names cannot be null or empty.');
+          }
+
+          if (providerName.substring(0, 6).toUpperCase().localeCompare('MSSQL_') === 0) {
+            throw new TypeError(`Invalid key store provider name ${providerName}. MSSQL_ prefix is reserved for system key store providers.`);
+          }
+
+          if (!entry.value) {
+            throw new TypeError(`Null reference specified for key store provider ${providerName}. Expecting a non-null value.`);
+          }
+
+          if (!this.config.options.encryptionKeyStoreProviders) {
+            this.config.options.encryptionKeyStoreProviders = {};
+          }
+
+          this.config.options.encryptionKeyStoreProviders[providerName] = entry.value;
+        }
+      }
+    }
+
+    let serverName = this.config.server;
+    if (!serverName) {
+      serverName = 'localhost';
+    }
+
+    const px = serverName.indexOf('\\');
+
+    if (px > 0) {
+      serverName = serverName.substring(0, px);
+    }
+
+    this.config.options.trustedServerNameAE = serverName;
+
+    if (this.config.options.instanceName) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.instanceName}`;
+    }
+
+    if (this.config.options.port) {
+      this.config.options.trustedServerNameAE = `${this.config.options.trustedServerNameAE}:${this.config.options.port}`;
     }
 
     this.secureContextOptions = this.config.options.cryptoCredentialsDetails;
@@ -2592,7 +2671,7 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSql(request: Request) {
+  _execSql(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {
@@ -2635,6 +2714,24 @@ class Connection extends EventEmitter {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
+  execSql(request: Request) {
+    request.shouldHonorAE = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.columnEncryptionSetting);
+    if (request.shouldHonorAE && request.cryptoMetadataLoaded === false && (request.parameters && request.parameters.length > 0)) {
+      getParameterEncryptionMetadata(this, request, (error?: Error) => {
+        if (error != null) {
+          process.nextTick(() => {
+            this.transitionTo(this.STATE.LOGGED_IN);
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+        this._execSql(request);
+      });
+    } else {
+      this._execSql(request);
+    }
+  }
   /**
    * Creates a new BulkLoad instance.
    *
