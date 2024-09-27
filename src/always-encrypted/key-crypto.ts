@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Microsoft Corporation
 
 import { type CryptoMetadata, type EncryptionKeyInfo } from './types';
-import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
+import { type ParserOptions } from '../token/stream-parser';
 import SymmetricKey from './symmetric-key';
 import { getKey } from './symmetric-key-cache';
 import { AeadAes256CbcHmac256Algorithm, algorithmName } from './aead-aes-256-cbc-hmac-algorithm';
@@ -16,7 +16,7 @@ export const validateAndGetEncryptionAlgorithmName = (cipherAlgorithmId: number,
   return algorithmName;
 };
 
-export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: ConnectionOptions): Promise<Buffer> => {
+export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: ParserOptions): Promise<Buffer> => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in EncryptWithKey');
   }
@@ -38,14 +38,14 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
   return cipherText;
 };
 
-export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: ConnectionOptions): Buffer => {
+export const decryptWithKey = async (cipherText: Buffer, md: CryptoMetadata, options: ParserOptions): Promise<Buffer> => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in DecryptWithKey');
   }
 
-  // if (!md.cipherAlgorithm) {
-  //   await decryptSymmetricKey(md, options);
-  // }
+  if (!md.cipherAlgorithm) {
+    await decryptSymmetricKey(md, options);
+  }
 
   if (!md.cipherAlgorithm) {
     throw new Error('Cipher Algorithm should not be null in DecryptWithKey');
@@ -60,7 +60,7 @@ export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: 
   return plainText;
 };
 
-export const decryptSymmetricKey = async (md: CryptoMetadata, options: ConnectionOptions): Promise<void> => {
+export const decryptSymmetricKey = async (md: CryptoMetadata, options: ParserOptions): Promise<void> => {
   if (!md) {
     throw new Error('md should not be null in DecryptSymmetricKey.');
   }
