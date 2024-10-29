@@ -873,6 +873,7 @@ export interface ConnectionOptions {
 interface RoutingData {
   server: string;
   port: number;
+  login7server: string;
 }
 
 /**
@@ -2484,7 +2485,7 @@ class Connection extends EventEmitter {
     }
 
     payload.hostname = this.config.options.workstationId || os.hostname();
-    payload.serverName = this.routingData ? this.routingData.server : this.config.server;
+    payload.serverName = this.routingData ? this.routingData.login7server : this.config.server;
     payload.appName = this.config.options.appName || 'Tedious';
     payload.libraryName = libraryName;
     payload.language = this.config.options.language;

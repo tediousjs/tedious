@@ -246,7 +246,7 @@ export class Login7TokenHandler extends TokenHandler {
   declare connection: Connection;
 
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
-  declare routingData: { server: string, port: number } | undefined;
+  declare routingData: { server: string, port: number, login7server: string } | undefined;
 
   declare loginAckReceived: boolean;
 
@@ -340,7 +340,7 @@ export class Login7TokenHandler extends TokenHandler {
     const [ server ] = token.newValue.server.split('\\');
 
     this.routingData = {
-      server, port: token.newValue.port
+      server, port: token.newValue.port, login7server: token.newValue.server
     };
   }
 
