@@ -166,6 +166,10 @@ export class InitialSqlTokenHandler extends TokenHandler {
     this.connection.emit('databaseChange', token.newValue);
   }
 
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
+    this.connection.emit('databaseMirroringPartner', token.newValue);
+  }
+
   onLanguageChange(token: LanguageEnvChangeToken) {
     this.connection.emit('languageChange', token.newValue);
   }
@@ -284,6 +288,10 @@ export class Login7TokenHandler extends TokenHandler {
     this.connection.emit('databaseChange', token.newValue);
   }
 
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
+    this.connection.emit('databaseMirroringPartner', token.newValue);
+  }
+
   onLanguageChange(token: LanguageEnvChangeToken) {
     this.connection.emit('languageChange', token.newValue);
   }
@@ -355,10 +363,6 @@ export class Login7TokenHandler extends TokenHandler {
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
     this.connection.messageIo.packetSize(token.newValue);
   }
-
-  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
-    // Do nothing
-  }
 }
 
 /**
@@ -404,6 +408,10 @@ export class RequestTokenHandler extends TokenHandler {
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
     this.connection.emit('databaseChange', token.newValue);
+  }
+
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
+    this.connection.emit('databaseMirroringPartner', token.newValue);
   }
 
   onLanguageChange(token: LanguageEnvChangeToken) {
