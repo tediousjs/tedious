@@ -43,4 +43,21 @@ export class CEKEntry {
       throw new Error('Invalid databaseId, cekId, cekVersion or cekMdVersion.');
     }
   }
+
+  addEntry(encryptionKey: EncryptionKeyInfo): void {
+    this.columnEncryptionKeyValues.push(encryptionKey);
+
+    if (this.databaseId === 0) {
+      this.databaseId = encryptionKey.dbId;
+      this.cekId = encryptionKey.keyId;
+      this.cekVersion = encryptionKey.keyVersion;
+      this.cekMdVersion = encryptionKey.mdVersion;
+    } else if ((this.databaseId !== encryptionKey.dbId) ||
+     (this.cekId !== encryptionKey.keyId) ||
+     (this.cekVersion !== encryptionKey.keyVersion) ||
+     !this.cekMdVersion || !encryptionKey.mdVersion ||
+     this.cekMdVersion.length !== encryptionKey.mdVersion.length) {
+      throw new Error('Invalid databaseId, cekId, cekVersion or cekMdVersion.');
+    }
+  }
 }
