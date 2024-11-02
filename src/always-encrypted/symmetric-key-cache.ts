@@ -3,12 +3,12 @@
 
 import { type EncryptionKeyInfo } from './types';
 import SymmetricKey from './symmetric-key';
-import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
+import { type ParserOptions } from '../token/stream-parser';
 import LRU from 'lru-cache';
 
 const cache = new LRU<string, SymmetricKey>(0);
 
-export const getKey = async (keyInfo: EncryptionKeyInfo, options: ConnectionOptions): Promise<SymmetricKey> => {
+export const getKey = async (keyInfo: EncryptionKeyInfo, options: ParserOptions): Promise<SymmetricKey> => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in getKey');
   }

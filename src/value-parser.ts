@@ -6,6 +6,9 @@ import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { decryptWithKey } from './always-encrypted/key-crypto';
+import { type CryptoMetadata } from './always-encrypted/types';
+import { isUndefined } from 'util';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -14,6 +17,7 @@ const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
 const DEFAULT_ENCODING = 'utf8';
+const SUPPORTED_NOM_VER = Buffer.from([0x01]);
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
@@ -45,7 +49,6 @@ function readFloat(buf: Buffer, offset: number): Result<number> {
 function readSmallMoney(buf: Buffer, offset: number): Result<number> {
   let value;
   ({ offset, value } = readInt32LE(buf, offset));
-
   return new Result(value / MONEY_DIVISOR, offset);
 }
 
@@ -68,7 +71,7 @@ function readBit(buf: Buffer, offset: number): Result<boolean> {
 
 function readValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
   const type = metadata.type;
-
+  let dataLength = metadata.dataLength;
   switch (type.name) {
     case 'Null':
       return new Result(null, offset);
@@ -90,9 +93,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'IntN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
-
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
       switch (dataLength) {
         case 0:
           return new Result(null, offset);
@@ -120,8 +123,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'FloatN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       switch (dataLength) {
         case 0:
@@ -145,9 +149,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       return readMoney(buf, offset);
 
     case 'MoneyN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
-
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
       switch (dataLength) {
         case 0:
           return new Result(null, offset);
@@ -167,8 +171,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'BitN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       switch (dataLength) {
         case 0:
@@ -186,8 +191,13 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     case 'Char': {
       const codepage = metadata.collation!.codepage!;
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (undefined === dataLength) {
+        if (options.serverSupportsColumnEncryption && undefined === metadata.cryptoMetadata) {
+          dataLength = buf.length;
+        } else {
+          ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+        }
+      }
 
       if (dataLength === NULL) {
         return new Result(null, offset);
@@ -198,24 +208,34 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'NVarChar':
     case 'NChar': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (undefined === dataLength) {
+        if (options.serverSupportsColumnEncryption && undefined === metadata.cryptoMetadata) {
+          dataLength = buf.length;
+        } else {
+          ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+        }
+      }
 
       if (dataLength === NULL) {
         return new Result(null, offset);
       }
-
       return readNChars(buf, offset, dataLength);
     }
 
     case 'VarBinary':
     case 'Binary': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (undefined === dataLength) {
+        if (options.serverSupportsColumnEncryption && undefined === metadata.cryptoMetadata) {
+          dataLength = buf.length;
+        } else {
+          ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+        }
+      }
 
       if (dataLength === NULL) {
         return new Result(null, offset);
       }
+
 
       return readBinary(buf, offset, dataLength);
     }
@@ -289,8 +309,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTimeN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       switch (dataLength) {
         case 0:
@@ -307,8 +328,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Time': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -318,8 +340,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Date': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -329,8 +352,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTime2': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -340,8 +364,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTimeOffset': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -352,19 +377,25 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'NumericN':
     case 'DecimalN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       if (dataLength === 0) {
         return new Result(null, offset);
+      }
+
+      if (options.serverSupportsColumnEncryption && undefined === metadata.cryptoMetadata) {
+        return readEncryptNumeric(buf, offset, dataLength, metadata.precision!, metadata.scale!);
       }
 
       return readNumeric(buf, offset, dataLength, metadata.precision!, metadata.scale!);
     }
 
     case 'UniqueIdentifier': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (undefined === dataLength) {
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+      }
 
       switch (dataLength) {
         case 0:
@@ -440,6 +471,17 @@ function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision
   }
 
   return new Result((value * sign) / Math.pow(10, scale), offset);
+}
+
+function readEncryptNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
+  let sign;
+  ({ offset, value: sign } = readUInt8(buf, offset));
+
+  sign = sign === 1 ? 1 : -1;
+
+  const value = buf.slice(offset, offset + dataLength).reduceRight((acc, byte) => acc * (1 << 8) + byte);;
+
+  return new Result((value * sign) / Math.pow(10, scale), offset + dataLength);
 }
 
 function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
@@ -541,7 +583,7 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       let collation;
       ({ value: collation, offset } = readCollation(buf, offset));
 
-      return readChars(buf, offset, dataLength, collation.codepage!);
+      return readChars(buf, offset, buf.length, collation.codepage!);
     }
 
     case 'NVarChar':
@@ -762,9 +804,80 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
   });
   return new Result(date, offset);
 }
+async function readData(parser: Parser, buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Promise<Result<unknown>> {
+  let result;
+  while (true) {
+    if (isPLPStream(metadata)) {
+      let chunks;
+      if (options.serverSupportsColumnEncryption && undefined === metadata.cryptoMetadata) {
+        chunks = [buf];
+        if (buf.length >= 8 && buf.readBigUInt64LE(offset) === PLP_NULL) {
+          chunks = null;
+        }
+      } else {
+        chunks = await readPLPStream(parser);
+      }
 
+      if (chunks === null) {
+        result = new Result(chunks, parser.position);
+      } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
+        result = new Result(Buffer.concat(chunks).toString('ucs2'), parser.position);
+      } else if (metadata.type.name === 'VarChar') {
+        result = new Result(iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), parser.position);
+      } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
+        result = new Result(Buffer.concat(chunks), parser.position);
+      }
+    } else {
+      try {
+        result = readValue(buf, offset, metadata, parser.options);
+      } catch (err) {
+        if (err instanceof NotEnoughDataError) {
+          await parser.waitForChunk();
+          continue;
+        }
+
+        throw err;
+      }
+
+      offset = result.offset;
+    }
+
+    break;
+  }
+  return result!;
+}
+
+async function readDecrypt(parser: Parser, metadata: Metadata, options: ParserOptions): Promise<Result<unknown>> {
+  const result = await readData(parser, parser.buffer, parser.position, metadata, options);
+  parser.position = result.offset;
+
+  if (metadata.cryptoMetadata) {
+    const cryptoMetadata: CryptoMetadata = metadata.cryptoMetadata!;
+    const normalizationRuleVersion = cryptoMetadata.normalizationRuleVersion;
+    if (!normalizationRuleVersion.equals(SUPPORTED_NOM_VER)) {
+      throw new Error(`Normalization version "${normalizationRuleVersion}" received from SQL Server is either invalid or corrupted. Valid normalization versions are: ${SUPPORTED_NOM_VER}.`);
+    }
+    const decryptedValue = await decryptWithKey(result?.value as Buffer, cryptoMetadata, options);
+    const baseType = cryptoMetadata.baseTypeInfo;
+    const colDataType = baseType?.type.name;
+    switch (colDataType) {
+      case 'Text':
+      case 'NText':
+      case 'Image':
+      case 'Xml':
+      case 'UDT':
+      case 'Variant':
+        throw new Error(`Unsupported encrypted type "${colDataType}"`);
+    }
+    const decryptedResult = await readData(parser, decryptedValue, 0, baseType!, options);
+    result.value = decryptedResult.value;
+  }
+  return result!;
+}
+
+module.exports.readDecrypt = readDecrypt;
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, readPLPStream, readDecrypt };

@@ -27,7 +27,7 @@ export interface EncryptionAlgorithm {
 }
 
 export interface CryptoMetadata {
-  cekEntry?: CEKEntry;
+  cekEntry?: CEKEntry | undefined;
   cipherAlgorithmId: number;
   cipherAlgorithmName?: string;
   normalizationRuleVersion: Buffer;

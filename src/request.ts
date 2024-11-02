@@ -37,6 +37,8 @@ export interface ParameterOptions {
   length?: number;
   precision?: number;
   scale?: number;
+
+  forceEncrypt?: boolean;
 }
 
 interface RequestOptions {
@@ -399,7 +401,7 @@ class Request extends EventEmitter {
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
-    const { output = false, length, precision, scale } = options ?? {};
+    const { output = false, length, precision, scale, forceEncrypt = false } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -408,7 +410,8 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      forceEncrypt: forceEncrypt
     };
 
     this.parameters.push(parameter);

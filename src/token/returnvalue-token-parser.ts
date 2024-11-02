@@ -23,7 +23,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
       ({ offset, value: paramName } = readBVarChar(buf, offset));
       // status
       ({ offset } = readUInt8(buf, offset));
-      ({ offset, value: metadata } = readMetadata(buf, offset, parser.options));
+      ({ offset, value: metadata } = readMetadata(buf, offset, parser.options, true));
 
       if (paramName.charAt(0) === '@') {
         paramName = paramName.slice(1);

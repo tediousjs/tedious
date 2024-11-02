@@ -52,7 +52,7 @@ export type BaseMetadata = {
 }
 
 export type Metadata = {
-  cryptoMetadata?: CryptoMetadata;
+  cryptoMetadata?: CryptoMetadata | undefined;
 } & BaseMetadata;
 
 function readCollation(buf: Buffer, offset: number): Result<Collation> {
@@ -113,12 +113,12 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
   }, offset);
 }
 
-function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
+function readMetadata(buf: Buffer, offset: number, options: ParserOptions, shouldReadFlags: boolean): Result<Metadata> {
   let userType;
   ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
 
   let flags;
-  ({ offset, value: flags } = readUInt16LE(buf, offset));
+  shouldReadFlags ? ({ offset, value: flags } = readUInt16LE(buf, offset)) : flags = 0;
 
   let typeNumber;
   ({ offset, value: typeNumber } = readUInt8(buf, offset));
@@ -354,12 +354,12 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
   }
 }
 
-function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void) {
+function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void, shouldReadFlags = true) {
   (async () => {
     while (true) {
       let result;
       try {
-        result = readMetadata(parser.buffer, parser.position, options);
+        result = readMetadata(parser.buffer, parser.position, options, shouldReadFlags);
       } catch (err: any) {
         if (err instanceof NotEnoughDataError) {
           await parser.waitForChunk();
