@@ -406,10 +406,6 @@ export class RequestTokenHandler extends TokenHandler {
     this.connection.emit('databaseChange', token.newValue);
   }
 
-  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
-    this.connection.emit('databaseMirroringPartner', token.newValue);
-  }
-
   onLanguageChange(token: LanguageEnvChangeToken) {
     this.connection.emit('languageChange', token.newValue);
   }
