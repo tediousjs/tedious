@@ -1,4 +1,4 @@
-import Connection from '../connection';
+import type LiteConnection from '../connection-lite';
 import Request from '../request';
 import { ConnectionError, RequestError } from '../errors';
 import { type ColumnMetadata } from './colmetadata-token-parser';
@@ -146,9 +146,9 @@ export class TokenHandler {
  * that sets up different connection settings.
  */
 export class InitialSqlTokenHandler extends TokenHandler {
-  declare connection: Connection;
+  declare connection: LiteConnection;
 
-  constructor(connection: Connection) {
+  constructor(connection: LiteConnection) {
     super();
 
     this.connection = connection;
@@ -243,14 +243,14 @@ export class InitialSqlTokenHandler extends TokenHandler {
  * A handler for tokens received in the response message to a Login7 message.
  */
 export class Login7TokenHandler extends TokenHandler {
-  declare connection: Connection;
+  declare connection: LiteConnection;
 
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
   declare routingData: { server: string, port: number } | undefined;
 
   declare loginAckReceived: boolean;
 
-  constructor(connection: Connection) {
+  constructor(connection: LiteConnection) {
     super();
     this.loginAckReceived = false;
     this.connection = connection;
@@ -366,11 +366,11 @@ export class Login7TokenHandler extends TokenHandler {
  * a SQL Batch Request, a Bulk Load BCP Request or a Transaction Manager Request.
  */
 export class RequestTokenHandler extends TokenHandler {
-  declare connection: Connection;
+  declare connection: LiteConnection;
   declare request: Request | BulkLoad;
   declare errors: RequestError[];
 
-  constructor(connection: Connection, request: Request | BulkLoad) {
+  constructor(connection: LiteConnection, request: Request | BulkLoad) {
     super();
 
     this.connection = connection;
@@ -557,7 +557,7 @@ export class RequestTokenHandler extends TokenHandler {
  * that the attention message was received by the server.
  */
 export class AttentionTokenHandler extends TokenHandler {
-  declare connection: Connection;
+  declare connection: LiteConnection;
   declare request: Request | BulkLoad;
 
   /**
@@ -565,7 +565,7 @@ export class AttentionTokenHandler extends TokenHandler {
    */
   declare attentionReceived: boolean;
 
-  constructor(connection: Connection, request: Request | BulkLoad) {
+  constructor(connection: LiteConnection, request: Request | BulkLoad) {
     super();
 
     this.connection = connection;

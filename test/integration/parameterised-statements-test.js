@@ -35,7 +35,7 @@ function getConfig() {
  * @param {import('../../src/request').ParameterOptions | null} [options]
  * @param {unknown} [expectedValue]
  * @param {boolean} [cast]
- * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @param {import('../../src/connection-lite').ConnectionOptions} [connectionOptions]
  * @returns {void}
  */
 function execSql(done, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
@@ -108,7 +108,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
  * @param {TYPES[keyof TYPES]} type
  * @param {unknown} value
  * @param {unknown} [expectedValue]
- * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
+ * @param {import('../../src/connection-lite').ConnectionOptions} [connectionOptions]
  * @returns {void}
  */
 function execSqlOutput(done, type, value, expectedValue, connectionOptions) {

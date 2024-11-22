@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { type Parameter, type DataType } from './data-type';
 import { RequestError } from './errors';
 
-import Connection from './connection';
+import type LiteConnection from './connection-lite';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
@@ -92,7 +92,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare connection: Connection | undefined;
+  declare connection: LiteConnection | undefined;
   /**
    * @private
    */
