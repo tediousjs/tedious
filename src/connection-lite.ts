@@ -8,14 +8,7 @@ import constants from 'constants';
 import { type SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
-
-import {
-  ClientSecretCredential,
-  DefaultAzureCredential,
-  ManagedIdentityCredential,
-  UsernamePasswordCredential
-} from '@azure/identity';
-import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
+import { type TokenCredential } from '@azure/core-auth';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
@@ -25,7 +18,6 @@ import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
-import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
@@ -38,8 +30,7 @@ import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
-import { createNTLMRequest } from './ntlm';
-import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import type { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
@@ -47,7 +38,6 @@ import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
 
 import { version } from '../package.json';
-import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
@@ -197,7 +187,7 @@ const DEFAULT_LANGUAGE = 'us_english';
  */
 const DEFAULT_DATEFORMAT = 'mdy';
 
-interface AzureActiveDirectoryMsiAppServiceAuthentication {
+export interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
     /**
@@ -210,7 +200,7 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   };
 }
 
-interface AzureActiveDirectoryMsiVmAuthentication {
+export interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
@@ -223,7 +213,7 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   };
 }
 
-interface AzureActiveDirectoryDefaultAuthentication {
+export interface AzureActiveDirectoryDefaultAuthentication {
   type: 'azure-active-directory-default';
   options: {
     /**
@@ -237,7 +227,7 @@ interface AzureActiveDirectoryDefaultAuthentication {
 }
 
 
-interface AzureActiveDirectoryAccessTokenAuthentication {
+export interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
@@ -248,7 +238,7 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   };
 }
 
-interface AzureActiveDirectoryPasswordAuthentication {
+export interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
@@ -273,7 +263,7 @@ interface AzureActiveDirectoryPasswordAuthentication {
   };
 }
 
-interface AzureActiveDirectoryServicePrincipalSecret {
+export interface AzureActiveDirectoryServicePrincipalSecret {
   type: 'azure-active-directory-service-principal-secret';
   options: {
     /**
@@ -292,7 +282,7 @@ interface AzureActiveDirectoryServicePrincipalSecret {
 }
 
 /** Structure that defines the options that are necessary to authenticate the Tedious.JS instance with an `@azure/identity` token credential. */
-interface TokenCredentialAuthentication {
+export interface TokenCredentialAuthentication {
   /** Unique designator for the type of authentication to be used. */
   type: 'token-credential';
   /** Set of configurations that are required or allowed with this authentication type. */
@@ -302,7 +292,7 @@ interface TokenCredentialAuthentication {
   };
 }
 
-interface NtlmAuthentication {
+export interface NtlmAuthentication {
   type: 'ntlm';
   options: {
     /**
@@ -322,7 +312,7 @@ interface NtlmAuthentication {
   };
 }
 
-interface DefaultAuthentication {
+export interface DefaultAuthentication {
   type: 'default';
   options: {
     /**
@@ -416,15 +406,15 @@ interface KeyStoreProviderMap {
  */
 interface State {
   name: string;
-  enter?(this: Connection): void;
-  exit?(this: Connection, newState: State): void;
+  enter?(this: LiteConnection): void;
+  exit?(this: LiteConnection, newState: State): void;
   events: {
-    socketError?(this: Connection, err: Error): void;
-    message?(this: Connection, message: Message): void;
+    socketError?(this: LiteConnection, err: Error): void;
+    message?(this: LiteConnection, message: Message): void;
   };
 }
 
-type Authentication = DefaultAuthentication |
+export type Authentication = DefaultAuthentication |
   NtlmAuthentication |
   TokenCredentialAuthentication |
   AzureActiveDirectoryPasswordAuthentication |
@@ -870,7 +860,7 @@ export interface ConnectionOptions {
   workstationId?: string | undefined;
 }
 
-interface RoutingData {
+export interface RoutingData {
   server: string;
   port: number;
 }
@@ -880,7 +870,7 @@ interface RoutingData {
  *
  * @returns An object with the properties `promise`, `resolve`, and `reject`.
  */
-function withResolvers<T>() {
+export function withResolvers<T>() {
   let resolve: (value: T | PromiseLike<T>) => void;
   let reject: (reason?: any) => void;
 
@@ -912,7 +902,7 @@ function withResolvers<T>() {
  * or [[Connection.execSqlBatch]]), another should not be initiated until the
  * [[Request]]'s completion callback is called.
  */
-class Connection extends EventEmitter {
+class LiteConnection extends EventEmitter {
   /**
    * @private
    */
@@ -1114,129 +1104,7 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.options" property must be of type object.');
       }
 
-      if (type === 'ntlm') {
-        if (typeof options.domain !== 'string') {
-          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
-        }
-
-        if (options.userName !== undefined && typeof options.userName !== 'string') {
-          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
-        }
-
-        if (options.password !== undefined && typeof options.password !== 'string') {
-          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'ntlm',
-          options: {
-            userName: options.userName,
-            password: options.password,
-            domain: options.domain && options.domain.toUpperCase()
-          }
-        };
-      } else if (type === 'token-credential') {
-        if (!isTokenCredential(options.credential)) {
-          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
-        }
-
-        authentication = {
-          type: 'token-credential',
-          options: {
-            credential: options.credential
-          }
-        };
-      } else if (type === 'azure-active-directory-password') {
-        if (typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        if (options.userName !== undefined && typeof options.userName !== 'string') {
-          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
-        }
-
-        if (options.password !== undefined && typeof options.password !== 'string') {
-          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
-          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-password',
-          options: {
-            userName: options.userName,
-            password: options.password,
-            tenantId: options.tenantId,
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-access-token') {
-        if (typeof options.token !== 'string') {
-          throw new TypeError('The "config.authentication.options.token" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-access-token',
-          options: {
-            token: options.token
-          }
-        };
-      } else if (type === 'azure-active-directory-msi-vm') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-msi-vm',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-default') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-        authentication = {
-          type: 'azure-active-directory-default',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-msi-app-service') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-msi-app-service',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-service-principal-secret') {
-        if (typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        if (typeof options.clientSecret !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientSecret" property must be of type string.');
-        }
-
-        if (typeof options.tenantId !== 'string') {
-          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-service-principal-secret',
-          options: {
-            clientId: options.clientId,
-            clientSecret: options.clientSecret,
-            tenantId: options.tenantId
-          }
-        };
-      } else {
+      if (type === 'default') {
         if (options.userName !== undefined && typeof options.userName !== 'string') {
           throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
         }
@@ -1252,6 +1120,8 @@ class Connection extends EventEmitter {
             password: options.password
           }
         };
+      } else {
+        throw new Error('Only default authentication type is supported in the lite connection. Please switch to the normal connection.');
       }
     } else {
       authentication = {
@@ -2067,29 +1937,10 @@ class Connection extends EventEmitter {
           const preloginResponse = await this.readPreloginResponse(signal);
           await this.performTlsNegotiation(preloginResponse, signal);
 
-          this.sendLogin7Packet();
+          this.sendLoginPacket();
 
           try {
-            const { authentication } = this.config;
-            switch (authentication.type) {
-              case 'token-credential':
-              case 'azure-active-directory-password':
-              case 'azure-active-directory-msi-vm':
-              case 'azure-active-directory-msi-app-service':
-              case 'azure-active-directory-service-principal-secret':
-              case 'azure-active-directory-default':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-                this.routingData = await this.performSentLogin7WithFedAuth(signal);
-                break;
-              case 'ntlm':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-                this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
-                break;
-              default:
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-                this.routingData = await this.performSentLogin7WithStandardLogin(signal);
-                break;
-            }
+            await this.performLogin(signal);
           } catch (err: any) {
             if (isTransientError(err)) {
               this.debug.log('Initiating retry on transient error');
@@ -2127,6 +1978,11 @@ class Connection extends EventEmitter {
     } finally {
       clearTimeout(connectTimer);
     }
+  }
+
+  async performLogin(signal: AbortSignal) {
+    this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+    this.routingData = await this.performSentLogin7WithStandardLogin(signal);
   }
 
   /**
@@ -2356,7 +2212,7 @@ class Connection extends EventEmitter {
    * @private
    */
   dispatchEvent<T extends keyof State['events']>(eventName: T, ...args: Parameters<NonNullable<State['events'][T]>>) {
-    const handler = this.state.events[eventName] as ((this: Connection, ...args: any[]) => void) | undefined;
+    const handler = this.state.events[eventName] as ((this: LiteConnection, ...args: any[]) => void) | undefined;
     if (handler) {
       handler.apply(this, args);
     } else {
@@ -2430,10 +2286,7 @@ class Connection extends EventEmitter {
     });
   }
 
-  /**
-   * @private
-   */
-  sendLogin7Packet() {
+  loginPayload() {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2443,45 +2296,6 @@ class Connection extends EventEmitter {
       clientTimeZone: new Date().getTimezoneOffset(),
       clientLcid: 0x00000409
     });
-
-    const { authentication } = this.config;
-    switch (authentication.type) {
-      case 'azure-active-directory-password':
-        payload.fedAuth = {
-          type: 'ADAL',
-          echo: this.fedAuthRequired,
-          workflow: 'default'
-        };
-        break;
-
-      case 'azure-active-directory-access-token':
-        payload.fedAuth = {
-          type: 'SECURITYTOKEN',
-          echo: this.fedAuthRequired,
-          fedAuthToken: authentication.options.token
-        };
-        break;
-
-      case 'token-credential':
-      case 'azure-active-directory-msi-vm':
-      case 'azure-active-directory-default':
-      case 'azure-active-directory-msi-app-service':
-      case 'azure-active-directory-service-principal-secret':
-        payload.fedAuth = {
-          type: 'ADAL',
-          echo: this.fedAuthRequired,
-          workflow: 'integrated'
-        };
-        break;
-
-      case 'ntlm':
-        payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
-        break;
-
-      default:
-        payload.userName = authentication.options.userName;
-        payload.password = authentication.options.password;
-    }
 
     payload.hostname = this.config.options.workstationId || os.hostname();
     payload.serverName = this.routingData ? this.routingData.server : this.config.server;
@@ -2493,6 +2307,18 @@ class Connection extends EventEmitter {
 
     payload.readOnlyIntent = this.config.options.readOnlyIntent;
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
+    return payload;
+  }
+
+  sendLoginPacket() {
+    const payload = this.loginPayload();
+
+    const { authentication } = this.config;
+    if (authentication.type !== 'default') {
+      throw new Error('Login through NTLM is not supported in the lite connection. Please switch to the normal connection.');
+    }
+    payload.userName = authentication.options.userName;
+    payload.password = authentication.options.password;
 
     this.routingData = undefined;
     this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
@@ -3443,170 +3269,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
-      while (true) {
-        const message = await Promise.race([
-          this.messageIo.readMessage().catch((err) => {
-            throw this.wrapSocketError(err);
-          }),
-          signalAborted
-        ]);
-
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-        await Promise.race([
-          once(tokenStreamParser, 'end'),
-          signalAborted
-        ]);
-
-        if (handler.loginAckReceived) {
-          return handler.routingData;
-        } else if (this.ntlmpacket) {
-          const authentication = this.config.authentication as NtlmAuthentication;
-
-          const payload = new NTLMResponsePayload({
-            domain: authentication.options.domain,
-            userName: authentication.options.userName,
-            password: authentication.options.password,
-            ntlmpacket: this.ntlmpacket
-          });
-
-          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
-          this.debug.payload(function() {
-            return payload.toString('  ');
-          });
-
-          this.ntlmpacket = undefined;
-        } else if (this.loginError) {
-          throw this.loginError;
-        } else {
-          throw new ConnectionError('Login failed.', 'ELOGIN');
-        }
-      }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
-  }
-
-  /**
-   * @private
-   */
-  async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
-      const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      await Promise.race([
-        once(tokenStreamParser, 'end'),
-        signalAborted
-      ]);
-
-      if (handler.loginAckReceived) {
-        return handler.routingData;
-      }
-
-      const fedAuthInfoToken = handler.fedAuthInfoToken;
-
-      if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-        /** Federated authentication configation. */
-        const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
-        /** Permission scope to pass to Entra ID when requesting an authentication token. */
-        const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
-
-        /** Instance of the token credential to use to authenticate to the resource. */
-        let credentials: TokenCredential;
-
-        switch (authentication.type) {
-          case 'token-credential':
-            credentials = authentication.options.credential;
-            break;
-          case 'azure-active-directory-password':
-            credentials = new UsernamePasswordCredential(
-              authentication.options.tenantId ?? 'common',
-              authentication.options.clientId,
-              authentication.options.userName,
-              authentication.options.password
-            );
-            break;
-          case 'azure-active-directory-msi-vm':
-          case 'azure-active-directory-msi-app-service':
-            const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-            credentials = new ManagedIdentityCredential(...msiArgs);
-            break;
-          case 'azure-active-directory-default':
-            const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-            credentials = new DefaultAzureCredential(args);
-            break;
-          case 'azure-active-directory-service-principal-secret':
-            credentials = new ClientSecretCredential(
-              authentication.options.tenantId,
-              authentication.options.clientId,
-              authentication.options.clientSecret
-            );
-            break;
-        }
-
-        /** Access token retrieved from Entra ID for the configured permission scope(s). */
-        let tokenResponse: AccessToken | null;
-
-        try {
-          tokenResponse = await Promise.race([
-            credentials.getToken(tokenScope),
-            signalAborted
-          ]);
-        } catch (err) {
-          signal.throwIfAborted();
-
-          throw new AggregateError(
-            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
-        }
-
-        // Type guard the token value so that it is never null.
-        if (tokenResponse === null) {
-          throw new AggregateError(
-            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
-        }
-
-        this.sendFedAuthTokenMessage(tokenResponse.token);
-        // sent the fedAuth token message, the rest is similar to standard login 7
-        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        return await this.performSentLogin7WithStandardLogin(signal);
-      } else if (this.loginError) {
-        throw this.loginError;
-      } else {
-        throw new ConnectionError('Login failed.', 'ELOGIN');
-      }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
-  }
-
-  /**
-   * @private
-   */
   async performLoggedInSendingInitialSql(signal: AbortSignal) {
     signal.throwIfAborted();
 
@@ -3643,10 +3305,10 @@ function isTransientError(error: AggregateError | ConnectionError): boolean {
   return (error instanceof ConnectionError) && !!error.isTransient;
 }
 
-export default Connection;
-module.exports = Connection;
+export default LiteConnection;
+module.exports = LiteConnection;
 
-Connection.prototype.STATE = {
+LiteConnection.prototype.STATE = {
   INITIALIZED: {
     name: 'Initialized',
     events: {}

@@ -11,5 +11,5 @@
     "declarationDir": "lib"
   },
 
-  "include": ["types/*.d.ts", "src/tedious.ts"]
+  "include": ["types/*.d.ts", "src/lite.ts", "src/tedious.ts"]
 }
