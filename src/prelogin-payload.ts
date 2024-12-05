@@ -1,8 +1,10 @@
 import { sprintf } from 'sprintf-js';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { randomBytes } from 'crypto';
 
 const optionBufferSize = 20;
+const traceIdSize = 36;
 
 const TOKEN = {
   VERSION: 0x00,
@@ -10,6 +12,7 @@ const TOKEN = {
   INSTOPT: 0x02,
   THREADID: 0x03,
   MARS: 0x04,
+  TRACEID: 0x05,
   FEDAUTHREQUIRED: 0x06,
   TERMINATOR: 0xFF
 };
@@ -73,6 +76,9 @@ class PreloginPayload {
 
   declare mars: number;
   declare marsString: string;
+
+  declare traceId: Buffer;
+
   declare fedAuthRequired: number;
 
   constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
@@ -93,6 +99,7 @@ class PreloginPayload {
       this.createInstanceOption(),
       this.createThreadIdOption(),
       this.createMarsOption(),
+      this.createTraceIdOption(),
       this.createFedAuthOption()
     ];
 
@@ -171,6 +178,17 @@ class PreloginPayload {
     };
   }
 
+  createTraceIdOption() {
+    const buffer = new WritableTrackingBuffer(traceIdSize);
+    // generate a random series of bytes to use as the TraceID
+    // used for debugging purposes
+    buffer.writeBuffer(randomBytes(traceIdSize));
+    return {
+      token: TOKEN.TRACEID,
+      data: buffer.data
+    };
+  }
+
   createFedAuthOption() {
     const buffer = new WritableTrackingBuffer(optionBufferSize);
     buffer.writeUInt8(0x01);
@@ -202,6 +220,9 @@ class PreloginPayload {
           break;
         case TOKEN.MARS:
           this.extractMars(dataOffset);
+          break;
+        case TOKEN.TRACEID:
+          this.extractTraceId(dataOffset);
           break;
         case TOKEN.FEDAUTHREQUIRED:
           this.extractFedAuth(dataOffset);
@@ -239,20 +260,25 @@ class PreloginPayload {
     this.marsString = marsByValue[this.mars];
   }
 
+  extractTraceId(offset: number) {
+    this.traceId = this.data.subarray(offset, traceIdSize);
+  }
+
   extractFedAuth(offset: number) {
     this.fedAuthRequired = this.data.readUInt8(offset);
   }
 
   toString(indent = '') {
     return indent + 'PreLogin - ' + sprintf(
-      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s)',
+      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s), traceId:%s',
       this.version.major, this.version.minor, this.version.build, this.version.subbuild,
       this.encryption ? this.encryption : 0,
       this.encryptionString ? this.encryptionString : '',
       this.instance ? this.instance : 0,
       this.threadId ? this.threadId : 0,
       this.mars ? this.mars : 0,
-      this.marsString ? this.marsString : ''
+      this.marsString ? this.marsString : '',
+      this.traceId ? this.traceId.toString('hex') : '',
     );
   }
 }
