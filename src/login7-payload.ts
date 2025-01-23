@@ -251,12 +251,15 @@ class Login7Payload {
     }
 
     // (ibUnused / ibExtension): 2-byte
-    const extensionOffsetHeaderOffset = offset;
-    offset = fixedData.writeUInt16LE(0, offset);
-
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
+    const extensions = this.buildFeatureExt();
     offset = fixedData.writeUInt16LE(4, offset);
+    const extensionOffset = Buffer.alloc(4);
+    extensionOffset.writeUInt32LE(dataOffset += 4, 0);
+    dataOffset += extensions.length;
+    buffers.push(extensionOffset, extensions);
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
@@ -361,13 +364,6 @@ class Login7Payload {
     } else {
       fixedData.writeUInt32LE(0, offset);
     }
-
-    fixedData.writeUInt16LE(dataOffset, extensionOffsetHeaderOffset);
-
-    const extensions = this.buildFeatureExt();
-    const extensionOffset = Buffer.alloc(4);
-    extensionOffset.writeUInt32LE(dataOffset + 4, 0);
-    buffers.push(extensionOffset, extensions);
 
     const data = Buffer.concat(buffers);
     data.writeUInt32LE(data.length, 0);
