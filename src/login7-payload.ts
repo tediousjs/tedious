@@ -254,10 +254,10 @@ class Login7Payload {
     const extensionOffsetHeaderOffset = offset;
     if (this.tdsVersion >= versions['7_4']) {
       offset = fixedData.writeUInt16LE(0, offset);
-
-      // (cchUnused / cbExtension): 2-byte
-      offset = fixedData.writeUInt16LE(4, offset);
     }
+
+    // (cchUnused / cbExtension): 2-byte
+    offset = fixedData.writeUInt16LE(4, offset);
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
