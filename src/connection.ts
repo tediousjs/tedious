@@ -3538,34 +3538,41 @@ class Connection extends EventEmitter {
         /** Instance of the token credential to use to authenticate to the resource. */
         let credentials: TokenCredential;
 
-        switch (authentication.type) {
-          case 'token-credential':
-            credentials = authentication.options.credential;
-            break;
-          case 'azure-active-directory-password':
-            credentials = new UsernamePasswordCredential(
-              authentication.options.tenantId ?? 'common',
-              authentication.options.clientId,
-              authentication.options.userName,
-              authentication.options.password
-            );
-            break;
-          case 'azure-active-directory-msi-vm':
-          case 'azure-active-directory-msi-app-service':
-            const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-            credentials = new ManagedIdentityCredential(...msiArgs);
-            break;
-          case 'azure-active-directory-default':
-            const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-            credentials = new DefaultAzureCredential(args);
-            break;
-          case 'azure-active-directory-service-principal-secret':
-            credentials = new ClientSecretCredential(
-              authentication.options.tenantId,
-              authentication.options.clientId,
-              authentication.options.clientSecret
-            );
-            break;
+        try {
+          switch (authentication.type) {
+            case 'token-credential':
+              credentials = authentication.options.credential;
+              break;
+            case 'azure-active-directory-password':
+              credentials = new UsernamePasswordCredential(
+                authentication.options.tenantId ?? 'common',
+                authentication.options.clientId,
+                authentication.options.userName,
+                authentication.options.password
+              );
+              break;
+            case 'azure-active-directory-msi-vm':
+            case 'azure-active-directory-msi-app-service':
+              const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
+              credentials = new ManagedIdentityCredential(...msiArgs);
+              break;
+            case 'azure-active-directory-default':
+              const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
+              credentials = new DefaultAzureCredential(args);
+              break;
+            case 'azure-active-directory-service-principal-secret':
+              credentials = new ClientSecretCredential(
+                authentication.options.tenantId,
+                authentication.options.clientId,
+                authentication.options.clientSecret
+              );
+              break;
+          }
+        } catch (err) {
+          signal.throwIfAborted();
+
+          throw new AggregateError(
+            [new ConnectionError('Invalid authentication config provided.', 'EFEDAUTH'), err]);
         }
 
         /** Access token retrieved from Entra ID for the configured permission scope(s). */
