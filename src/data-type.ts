@@ -42,6 +42,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import Json from './data-types/json';
 
 export interface Parameter {
   type: DataType;
@@ -266,6 +267,7 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
+  [Json.id]: Json
 };
 
 /**
@@ -537,6 +539,13 @@ export const TYPE = {
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
+ *  <tr>
+ *     <td><code>json</code></td>
+ *     <td><code>[[TYPES.Json]]</code></td>
+ *     <td><code>string|object</code></td>
+ *     <td>✓</td>
+ *     <td>-</td>
+ *   </tr>
  * </tbody>
  * </table>
  *
@@ -604,7 +613,8 @@ export const TYPES = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant
+  Variant,
+  Json
 };
 
 export const typeByName = TYPES;
