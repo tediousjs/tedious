@@ -17,15 +17,12 @@ const Json: DataType = {
     else return JSON.stringify(parameter.value).length;
   },
 
-  generateTypeInfo: (parameter) => {
-    const buffer = Buffer.alloc(1);
-    buffer.writeUInt8(0xF4, 0);
-    return buffer;
+  generateTypeInfo(parameter) {
+    return Buffer.from([this.id]);
   },
 
   generateParameterLength: (parameter, options) => {
     const value = parameter.value as Buffer | null;
-
     if (value == null) {
       return MAX_NULL_LENGTH;
     }
@@ -34,7 +31,6 @@ const Json: DataType = {
 
   generateParameterData: function* (parameter, options) {
     const value = parameter.value as Buffer | null;
-
     if (value == null || (value?.length ?? 0) === 0) {
       return;
     }
