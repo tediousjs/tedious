@@ -180,8 +180,8 @@ class PreloginPayload {
 
   createTraceIdOption() {
     const buffer = new WritableTrackingBuffer(traceIdSize);
-    // generate a random series of bytes to use as the TraceID
-    // used for debugging purposes
+    // Generate a random series of bytes to use as the TraceID.
+    // Used for debugging purposes.
     buffer.writeBuffer(randomBytes(traceIdSize));
     return {
       token: TOKEN.TRACEID,

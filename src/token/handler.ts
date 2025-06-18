@@ -336,7 +336,7 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onRoutingChange(token: RoutingEnvChangeToken) {
-    // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
+    // Splits instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> [redirect.db.net, instance1]
     const [ server, instance ] = token.newValue.server.split('\\');
 
     this.routingData = {
