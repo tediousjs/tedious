@@ -233,5 +233,58 @@ describe('Login7Payload', function() {
         assert.lengthOf(data, expectedLength);
       });
     });
+
+    describe('for a fabric login payload with active directory authentication', function() {
+      it('generates the expected data', function() {
+        const payload = new Login7Payload({
+          tdsVersion: 0x74000004,
+          packetSize: 1024,
+          clientProgVer: 0,
+          clientPid: 12345,
+          connectionId: 0,
+          clientTimeZone: 120,
+          clientLcid: 0x00000409,
+          isFabric: true,
+        });
+
+        payload.hostname = 'example.com';
+        payload.appName = 'app';
+        payload.serverName = 'server';
+        payload.language = 'lang';
+        payload.database = 'db';
+        payload.libraryName = 'Tedious';
+        payload.attachDbFile = 'c:\\mydbfile.mdf';
+        payload.changePassword = 'new_pw';
+        payload.fedAuth = {
+          type: 'ADAL',
+          echo: true,
+          workflow: 'default'
+        };
+
+        const data = payload.toBuffer();
+
+        var expectedLength =
+          4 + // Length
+          32 + // Fixed data
+          // Variable
+          2 + 2 + (2 * payload.hostname.length) +
+          2 + 2 + 2 * 0 + // Username
+          2 + 2 + 2 * 0 + // Password
+          2 + 2 + (2 * payload.appName.length) +
+          2 + 2 + (2 * payload.serverName.length) +
+          2 + 2 + 4 +
+          2 + 2 + (2 * payload.libraryName.length) +
+          2 + 2 + (2 * payload.language.length) +
+          2 + 2 + (2 * payload.database.length) +
+          6 + // ClientID
+          2 + 2 + (2 * payload.attachDbFile.length) +
+          2 + 2 + (2 * payload.changePassword.length) +
+          4 + // cbSSPILong
+          4 + // Extension offset
+          1 + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT unlike prior versions
+
+        assert.lengthOf(data, expectedLength);
+      });
+    });
   });
 });
