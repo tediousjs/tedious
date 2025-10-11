@@ -2268,3 +2268,56 @@ describe('Boolean Config Options Test', function() {
     testBadBooleanConfigOption(done, 'abortTransactionOnError');
   });
 });
+
+describe('should test lock timeout', function() {
+  /**
+   * @param {Mocha.Done} done
+   * @param {number | undefined} lockTimeout
+   */
+  function testLockTimeout(done, lockTimeout) {
+    const config = getConfig();
+
+    const connection = new Connection({
+      ...config,
+      options: {
+        ...config.options,
+        lockTimeout: lockTimeout
+      }
+    });
+    lockTimeout = lockTimeout ?? -1;
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const request = new Request(
+      'SELECT @@LOCK_TIMEOUT',
+      function(err) {
+        assert.ifError(err);
+        connection.close();
+      }
+    );
+
+    request.on('row', function(columns) {
+      const lockTimeoutActual = columns[0].value;
+      assert.strictEqual(lockTimeoutActual, lockTimeout);
+    });
+
+    connection.connect(function(err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  }
+
+  it('should test lock timeout default', function(done) {
+    testLockTimeout(done, undefined);
+  });
+
+  it('should test lock timeout custom', function(done) {
+    testLockTimeout(done, 1000);
+  });
+});

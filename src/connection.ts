@@ -387,6 +387,7 @@ export interface InternalConnectionOptions {
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   language: string;
   localAddress: undefined | string;
+  lockTimeout: undefined | number;
   maxRetriesOnTransientErrors: number;
   multiSubnetFailover: boolean;
   packetSize: number;
@@ -733,6 +734,13 @@ export interface ConnectionOptions {
    * A string indicating which network interface (ip address) to use when connecting to SQL Server.
    */
   localAddress?: string | undefined;
+
+  /**
+   * The number of milliseconds a statement waits for a lock to be released.
+   * This sets the value for `SET LOCK_TIMEOUT` during the initial SQL phase of a connection.
+   * For more information, see [here](https://learn.microsoft.com/en-us/sql/t-sql/statements/set-lock-timeout-transact-sql)
+   */
+  lockTimeout?: number | undefined;
 
   /**
    * A boolean determining whether to parse unique identifier type with lowercase case characters.
@@ -1305,6 +1313,7 @@ class Connection extends EventEmitter {
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
         localAddress: undefined,
+        lockTimeout: undefined,
         maxRetriesOnTransientErrors: 3,
         multiSubnetFailover: false,
         packetSize: DEFAULT_PACKET_SIZE,
@@ -1589,6 +1598,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.localAddress = config.options.localAddress;
+      }
+
+      if (config.options.lockTimeout !== undefined) {
+        if (typeof config.options.lockTimeout !== 'number') {
+          throw new TypeError('The "config.options.lockTimeout" property must be of type number.');
+        }
+
+        this.config.options.lockTimeout = config.options.lockTimeout;
       }
 
       if (config.options.multiSubnetFailover !== undefined) {
@@ -2590,6 +2607,10 @@ class Connection extends EventEmitter {
 
     if (this.config.options.language !== null) {
       options.push(`set language ${this.config.options.language}`);
+    }
+
+    if (this.config.options.lockTimeout !== undefined) {
+      options.push(`set lock_timeout ${this.config.options.lockTimeout}`);
     }
 
     if (this.config.options.enableNumericRoundabort === true) {
