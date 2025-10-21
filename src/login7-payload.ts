@@ -72,7 +72,6 @@ interface Options {
   connectionId: number;
   clientTimeZone: number;
   clientLcid: number;
-  isFabric: boolean;
 }
 
 /*
@@ -86,7 +85,6 @@ class Login7Payload {
   declare connectionId: number;
   declare clientTimeZone: number;
   declare clientLcid: number;
-  declare isFabric: boolean;
 
   declare readOnlyIntent: boolean;
   declare initDbFatal: boolean;
@@ -106,7 +104,7 @@ class Login7Payload {
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
-  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid, isFabric }: Options) {
+  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
     this.clientProgVer = clientProgVer;
@@ -114,7 +112,6 @@ class Login7Payload {
     this.connectionId = connectionId;
     this.clientTimeZone = clientTimeZone;
     this.clientLcid = clientLcid;
-    this.isFabric = isFabric;
 
     this.readOnlyIntent = false;
     this.initDbFatal = false;
@@ -253,25 +250,20 @@ class Login7Payload {
       offset = fixedData.writeUInt16LE(0, offset);
     }
 
-    let extensionOffsetHeaderOffset = 0;
-    if (this.isFabric) {
-      // (ibUnused / ibExtension): 2-byte
-      extensionOffsetHeaderOffset = offset;
-      offset = fixedData.writeUInt16LE(0, offset);
+    // (ibUnused / ibExtension): 2-byte
+    offset = fixedData.writeUInt16LE(dataOffset, offset);
 
-      // (cchUnused / cbExtension): 2-byte
-      offset = fixedData.writeUInt16LE(4, offset);
-    } else {
-      // (ibUnused / ibExtension): 2-byte
-      offset = fixedData.writeUInt16LE(dataOffset, offset);
-
-      // (cchUnused / cbExtension): 2-byte
+    // (cchUnused / cbExtension): 2-byte
+    if (this.tdsVersion >= versions['7_4']) {
       const extensions = this.buildFeatureExt();
-      offset = fixedData.writeUInt16LE(4, offset);
+      offset = fixedData.writeUInt16LE(4 + extensions.length, offset);
       const extensionOffset = Buffer.alloc(4);
-      extensionOffset.writeUInt32LE(dataOffset += 4, 0);
-      dataOffset += extensions.length;
+      extensionOffset.writeUInt32LE(dataOffset + 4, 0);
+      dataOffset += 4 + extensions.length;
       buffers.push(extensionOffset, extensions);
+    } else {
+      // For TDS < 7.4, these are unused fields
+      offset = fixedData.writeUInt16LE(0, offset);
     }
 
     // ibCltIntName: 2-byte
@@ -378,15 +370,6 @@ class Login7Payload {
       fixedData.writeUInt32LE(0, offset);
     }
 
-    if (this.isFabric) {
-      fixedData.writeUInt16LE(dataOffset, extensionOffsetHeaderOffset);
-
-      const extensions = this.buildFeatureExt();
-      const extensionOffset = Buffer.alloc(4);
-      extensionOffset.writeUInt32LE(dataOffset + 4, 0);
-      buffers.push(extensionOffset, extensions);
-    }
-
     const data = Buffer.concat(buffers);
     data.writeUInt32LE(data.length, 0);
     return data;
@@ -434,16 +417,14 @@ class Login7Payload {
       }
     }
 
-    if (this.tdsVersion >= versions['7_4']) {
-      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
-      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
-      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
-      const buf = Buffer.alloc(6);
-      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
-      buf.writeUInt32LE(1, 1);
-      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
-      buffers.push(buf);
-    }
+    // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+    const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+    const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+    const buf = Buffer.alloc(6);
+    buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+    buf.writeUInt32LE(1, 1);
+    buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+    buffers.push(buf);
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 

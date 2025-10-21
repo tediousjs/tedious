@@ -70,7 +70,7 @@ describe('Login7Payload', function() {
           2 +
           2 * payload.changePassword.length +
           4 + // cbSSPILong
-          5; // FeatureExt
+          0; // No FeatureExt for TDS 7.2
 
         assert.lengthOf(data, expectedLength);
 
@@ -123,7 +123,7 @@ describe('Login7Payload', function() {
           2 + 2 + (2 * payload.attachDbFile.length) +
           2 + 2 + (2 * payload.changePassword.length) +
           4 + // cbSSPILong
-          5; // FeatureExt
+          0; // No FeatureExt for TDS 7.2
 
         assert.lengthOf(data, expectedLength);
       });
@@ -186,7 +186,7 @@ describe('Login7Payload', function() {
         const token = 'validToken';
 
         const payload = new Login7Payload({
-          tdsVersion: 0x72090002,
+          tdsVersion: 0x74000004,
           packetSize: 1024,
           clientProgVer: 0,
           clientPid: 12345,
@@ -228,7 +228,9 @@ describe('Login7Payload', function() {
           2 + 2 + (2 * payload.changePassword.length) +
           4 + // cbSSPILong
           4 + // Extension offset
-          1 + 4 + 1 + 4 + 1 + (token.length * 2); // Feature ext
+          (1 + 4 + 1 + 4 + (token.length * 2)) + // SECURITYTOKEN feature
+          (1 + 4 + 1) + // UTF8_SUPPORT feature
+          1; // Terminator
 
         assert.lengthOf(data, expectedLength);
       });

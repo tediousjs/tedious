@@ -384,7 +384,6 @@ export interface InternalConnectionOptions {
   encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
-  isFabric: boolean;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
   language: string;
   localAddress: undefined | string;
@@ -708,11 +707,6 @@ export interface ConnectionOptions {
    * Mutually exclusive with [[port]].
    */
   instanceName?: string | undefined;
-
-  /**
-   * Specifies whether the instance to connect to is a Fabric warehouse
-   */
-  isFabric?: boolean;
 
   /**
    * The default isolation level that transactions will be run with.
@@ -1309,7 +1303,6 @@ class Connection extends EventEmitter {
         fallbackToDefaultDb: false,
         encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
-        isFabric: config.options?.isFabric ?? false,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
         localAddress: undefined,
@@ -2449,8 +2442,7 @@ class Connection extends EventEmitter {
       clientPid: process.pid,
       connectionId: 0,
       clientTimeZone: new Date().getTimezoneOffset(),
-      clientLcid: 0x00000409,
-      isFabric: this.config.options.isFabric,
+      clientLcid: 0x00000409
     });
 
     const { authentication } = this.config;
