@@ -76,9 +76,7 @@ class PreloginPayload {
 
   declare mars: number;
   declare marsString: string;
-
   declare traceId: Buffer;
-
   declare fedAuthRequired: number;
 
   constructor(bufferOrOptions: Buffer | Options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } }) {
@@ -261,7 +259,7 @@ class PreloginPayload {
   }
 
   extractTraceId(offset: number) {
-    this.traceId = this.data.subarray(offset, traceIdSize);
+    this.traceId = this.data.subarray(offset, offset + traceIdSize);
   }
 
   extractFedAuth(offset: number) {
