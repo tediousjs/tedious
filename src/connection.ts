@@ -11,7 +11,7 @@ import { Readable } from 'stream';
 
 import {
   ClientSecretCredential,
-  ClientSecretCredentialOptions,
+  type ClientSecretCredentialOptions,
   DefaultAzureCredential,
   ManagedIdentityCredential,
   UsernamePasswordCredential
