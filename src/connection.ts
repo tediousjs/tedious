@@ -11,6 +11,7 @@ import { Readable } from 'stream';
 
 import {
   ClientSecretCredential,
+  ClientSecretCredentialOptions,
   DefaultAzureCredential,
   ManagedIdentityCredential,
   UsernamePasswordCredential
@@ -288,6 +289,10 @@ interface AzureActiveDirectoryServicePrincipalSecret {
      * Directory (`tenant`) ID from your registered Azure application
      */
     tenantId: string;
+    /**
+     * pass-through for configuring the msal credential options: https://learn.microsoft.com/en-us/javascript/api/@azure/identity/clientsecretcredentialoptions
+     */
+    msalOptions: ClientSecretCredentialOptions;
   };
 }
 
@@ -1233,7 +1238,8 @@ class Connection extends EventEmitter {
           options: {
             clientId: options.clientId,
             clientSecret: options.clientSecret,
-            tenantId: options.tenantId
+            tenantId: options.tenantId,
+            msalOptions: options?.msalOptions
           }
         };
       } else {
@@ -3563,7 +3569,8 @@ class Connection extends EventEmitter {
             credentials = new ClientSecretCredential(
               authentication.options.tenantId,
               authentication.options.clientId,
-              authentication.options.clientSecret
+              authentication.options.clientSecret,
+              authentication.options.msalOptions
             );
             break;
         }
