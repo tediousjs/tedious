@@ -48,7 +48,7 @@
     "@js-joda/core": "^5.6.5",
     "@types/node": ">=18",
     "bl": "^6.0.14",
-    "iconv-lite": "^0.6.3",
+    "iconv-lite": "^0.7.0",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0",
     "sprintf-js": "^1.1.3"
