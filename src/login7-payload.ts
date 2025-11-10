@@ -134,7 +134,7 @@ class Login7Payload {
 
   toBuffer() {
     const fixedData = Buffer.alloc(94);
-    const buffers = [fixedData];
+    const buffers: Buffer[] = [fixedData];
 
     let offset = 0;
     let dataOffset = fixedData.length;
