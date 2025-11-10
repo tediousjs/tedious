@@ -2,9 +2,10 @@ version: "{build}"
 
 environment:
   matrix:
-    - nodejs_version: "18"
     - nodejs_version: "20"
-    - nodejs_version: "21"
+    - nodejs_version: "22"
+    - nodejs_version: "24"
+    - nodejs_version: "25"
 
 branches:
   only:
