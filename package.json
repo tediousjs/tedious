@@ -64,7 +64,7 @@
     "@types/chai": "^4.3.12",
     "@types/depd": "^1.1.36",
     "@types/lru-cache": "^5.1.1",
-    "@types/mocha": "^10.0.7",
+    "@types/mocha": "^10.0.10",
     "@types/sprintf-js": "^1.1.4",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
