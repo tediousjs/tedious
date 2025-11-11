@@ -45,10 +45,10 @@
     "@azure/core-auth": "^1.7.2",
     "@azure/identity": "^4.2.1",
     "@azure/keyvault-keys": "^4.4.0",
-    "@js-joda/core": "^5.6.3",
+    "@js-joda/core": "^5.6.5",
     "@types/node": ">=18",
-    "bl": "^6.0.14",
-    "iconv-lite": "^0.6.3",
+    "bl": "^6.1.4",
+    "iconv-lite": "^0.7.0",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0",
     "sprintf-js": "^1.1.3"
