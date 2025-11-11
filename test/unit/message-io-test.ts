@@ -533,8 +533,8 @@ describe('MessageIO', function() {
             hadError = true;
 
             assert.instanceOf(err, Error);
-            assert.strictEqual(err.code, 'ERR_SSL_NO_CIPHERS_AVAILABLE');
-            assert.strictEqual(err.reason, 'no ciphers available');
+            assert.strictEqual((err as Error & { code?: string }).code, 'ERR_SSL_NO_CIPHERS_AVAILABLE');
+            assert.strictEqual((err as Error & { reason?: string }).reason, 'no ciphers available');
           }
 
           assert(hadError);
@@ -563,8 +563,8 @@ describe('MessageIO', function() {
             hadError = true;
 
             assert.instanceOf(err, Error);
-            assert.strictEqual(err.code, 'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE');
-            assert.strictEqual(err.reason, 'sslv3 alert handshake failure');
+            assert.strictEqual((err as Error & { code?: string }).code, 'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE');
+            assert.strictEqual((err as Error & { reason?: string }).reason, 'sslv3 alert handshake failure');
           }
 
           assert(hadError);
