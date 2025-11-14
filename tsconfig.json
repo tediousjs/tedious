@@ -19,6 +19,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "test/**/*.js",
+    "eslint.config.mjs"
   ],
 
   "typedocOptions": {
