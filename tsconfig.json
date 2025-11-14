@@ -7,7 +7,7 @@
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [ "esnext" ],
+    "lib": [ "ES2022" ],
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "exactOptionalPropertyTypes": true,

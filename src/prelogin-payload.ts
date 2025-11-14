@@ -84,7 +84,7 @@ class PreloginPayload {
       this.data = bufferOrOptions;
       this.options = { encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } };
     } else {
-      this.options = bufferOrOptions;
+      this.options = bufferOrOptions as Options;
       this.createOptions();
     }
     this.extractOptions();
