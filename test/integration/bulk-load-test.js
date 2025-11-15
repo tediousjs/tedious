@@ -172,8 +172,11 @@ describe('BulkLoad', function() {
   });
 
   it('fires triggers if the `fireTriggers` option is set to `true`', async function() {
+    // Generate a random table name to avoid collisions when tests are run in parallel
+    const tableName = 'testTable' + Math.floor(Math.random() * 1000000);
+
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
-      const dropTable = 'DROP TABLE testTable4';
+      const dropTable = `DROP TABLE ${tableName}`;
 
       const dropTableRequest = new Request(dropTable, (err) => {
         if (err) {
@@ -192,7 +195,7 @@ describe('BulkLoad', function() {
     }));
 
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
-      const createTable = 'CREATE TABLE testTable4 ([id] int);';
+      const createTable = `CREATE TABLE ${tableName} ([id] int);`;
       const createTableRequest = new Request(createTable, (err) => {
         if (err) {
           return reject(err);
@@ -206,10 +209,10 @@ describe('BulkLoad', function() {
 
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
       const createTrigger = `
-        CREATE TRIGGER bulkLoadTest on testTable4
+        CREATE TRIGGER bulkLoadTest on ${tableName}
         AFTER INSERT
         AS
-        INSERT INTO testTable4 SELECT * FROM testTable4;
+        INSERT INTO ${tableName} SELECT * FROM ${tableName};
       `;
       const createTriggerRequest = new Request(createTrigger, (err) => {
         if (err) {
@@ -223,7 +226,7 @@ describe('BulkLoad', function() {
     }));
 
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
-      const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, (err, rowCount) => {
+      const bulkLoad = connection.newBulkLoad(tableName, { fireTriggers: true }, (err, rowCount) => {
         if (err) {
           return reject(err);
         }
@@ -239,7 +242,7 @@ describe('BulkLoad', function() {
     }));
 
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
-      const verifyTrigger = 'SELECT COUNT(*) FROM testTable4';
+      const verifyTrigger = `SELECT COUNT(*) FROM ${tableName}`;
 
       const verifyTriggerRequest = new Request(verifyTrigger, (err) => {
         if (err) {
@@ -257,7 +260,7 @@ describe('BulkLoad', function() {
     }));
 
     await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
-      const dropTable = 'DROP TABLE testTable4';
+      const dropTable = `DROP TABLE ${tableName}`;
 
       const dropTableRequest = new Request(dropTable, (err) => {
         if (err) {
