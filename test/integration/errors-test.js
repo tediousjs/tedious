@@ -192,7 +192,7 @@ describe('Errors Test', function() {
 
         if (error instanceof AggregateError) {
           assert.strictEqual(error.errors.length, 2);
-          assert.strictEqual(error.errors[0].message, 'Column name \'code\' does not exist in the target table or view.');
+          assert.match(error.errors[0].message, /^Column name 'code' does not exist in the target table(, index)? or view\.$/);
           assert.strictEqual(error.errors[1].message, 'Could not create constraint or index. See previous errors.');
         }
 
