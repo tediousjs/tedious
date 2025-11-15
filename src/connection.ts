@@ -2054,9 +2054,20 @@ class Connection extends EventEmitter {
 
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
-          await this.sendPreLogin(socket);
+          try {
+            await this.sendPreLogin(socket);
+          } catch (err) {
+            throw this.wrapSocketError(err as Error);
+          }
+
           this.transitionTo(this.STATE.SENT_PRELOGIN);
-          const preloginResponse = await this.readPreloginResponse(socket, signal);
+
+          let preloginResponse: PreloginPayload;
+          try {
+            preloginResponse = await this.readPreloginResponse(socket, signal);
+          } catch (err) {
+            throw this.wrapSocketError(err as Error);
+          }
 
           this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
           this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
