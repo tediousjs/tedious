@@ -171,66 +171,107 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('fires triggers if the `fireTriggers` option is set to `true`', function(done) {
-    const bulkLoad = connection.newBulkLoad('testTable4', { fireTriggers: true }, (err, rowCount) => {
-      if (err) {
-        return done(err);
-      }
+  it('fires triggers if the `fireTriggers` option is set to `true`', async function() {
+    // Generate a random table name to avoid collisions when tests are run in parallel
+    const tableName = 'testTable' + Math.floor(Math.random() * 1000000);
 
-      connection.execSql(verifyTriggerRequest);
-    });
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const dropTable = `DROP TABLE ${tableName}`;
 
-    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+      const dropTableRequest = new Request(dropTable, (err) => {
+        if (err) {
+          if (err instanceof RequestError && err.code === 'EREQUEST' && err.number === 3701) {
+            // Table does not exist
+            return resolve();
+          } else {
+            return reject(err);
+          }
+        }
 
-    const createTable = 'CREATE TABLE testTable4 ([id] int);';
-    const createTrigger = `
-      CREATE TRIGGER bulkLoadTest on testTable4
-      AFTER INSERT
-      AS
-      INSERT INTO testTable4 SELECT * FROM testTable4;
-    `;
-    const verifyTrigger = 'SELECT COUNT(*) FROM testTable4';
-    const dropTable = 'DROP TABLE testTable4';
+        resolve();
+      });
 
-    const createTableRequest = new Request(createTable, (err) => {
-      if (err) {
-        return done(err);
-      }
+      connection.execSql(dropTableRequest);
+    }));
+
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const createTable = `CREATE TABLE ${tableName} ([id] int);`;
+      const createTableRequest = new Request(createTable, (err) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve();
+      });
+
+      connection.execSql(createTableRequest);
+    }));
+
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const createTrigger = `
+        CREATE TRIGGER bulkLoadTest on ${tableName}
+        AFTER INSERT
+        AS
+        INSERT INTO ${tableName} SELECT * FROM ${tableName};
+      `;
+      const createTriggerRequest = new Request(createTrigger, (err) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve();
+      });
 
       connection.execSql(createTriggerRequest);
-    });
+    }));
 
-    const createTriggerRequest = new Request(createTrigger, (err) => {
-      if (err) {
-        return done(err);
-      }
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const bulkLoad = connection.newBulkLoad(tableName, { fireTriggers: true }, (err, rowCount) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve();
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
 
       connection.execBulkLoad(bulkLoad, [
         { id: 555 }
       ]);
-    });
+    }));
 
-    const verifyTriggerRequest = new Request(verifyTrigger, (err) => {
-      if (err) {
-        return done(err);
-      }
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const verifyTrigger = `SELECT COUNT(*) FROM ${tableName}`;
+
+      const verifyTriggerRequest = new Request(verifyTrigger, (err) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve();
+      });
+
+      verifyTriggerRequest.on('row', (columns) => {
+        assert.deepEqual(columns[0].value, 2);
+      });
+
+      connection.execSql(verifyTriggerRequest);
+    }));
+
+    await /** @type {Promise<void>} */(new Promise((resolve, reject) => {
+      const dropTable = `DROP TABLE ${tableName}`;
+
+      const dropTableRequest = new Request(dropTable, (err) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve();
+      });
 
       connection.execSql(dropTableRequest);
-    });
-
-    const dropTableRequest = new Request(dropTable, (err) => {
-      if (err) {
-        return done(err);
-      }
-
-      done();
-    });
-
-    verifyTriggerRequest.on('row', (columns) => {
-      assert.deepEqual(columns[0].value, 2);
-    });
-
-    connection.execSql(createTableRequest);
+    }));
   });
 
   it('should not replace `null` values with column defaults if `keepNulls` is set to `true`', function(done) {
