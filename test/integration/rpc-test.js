@@ -8,6 +8,7 @@ import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
+import { config } from 'process';
 
 function getConfig() {
   const config = {
@@ -49,6 +50,10 @@ describe('RPC test', function() {
   });
 
   afterEach(function(done) {
+    if (this.timedout) {
+      console.log({ ...connection, config: undefined });
+    }
+
     if (!connection.closed) {
       connection.on('end', done);
       connection.close();
