@@ -2057,6 +2057,8 @@ class Connection extends EventEmitter {
           try {
             await this.sendPreLogin(socket);
           } catch (err) {
+            signal.throwIfAborted();
+
             throw this.wrapSocketError(err as Error);
           }
 
@@ -2066,6 +2068,8 @@ class Connection extends EventEmitter {
           try {
             preloginResponse = await this.readPreloginResponse(socket, signal);
           } catch (err) {
+            signal.throwIfAborted();
+
             throw this.wrapSocketError(err as Error);
           }
 
