@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 12 * * *'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   release:
     name: Release
@@ -11,15 +15,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4.1.7
 
-    - name: Use Node.js 18
+    - name: Use Node.js 20
       uses: actions/setup-node@v4.0.3
       with:
-        node-version: 18
+        node-version: "20"
         cache: 'npm'
+
+    - name: Update npm
+      run: npm install -g npm@latest
+
     - name: Tag latest release
       run: |
-        echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-
         read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
         if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
           date_format="%Y-%m-%dT%H:%M:%SZ"
