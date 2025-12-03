@@ -246,7 +246,7 @@ export class Login7TokenHandler extends TokenHandler {
   declare connection: Connection;
 
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
-  declare routingData: { server: string, port: number } | undefined;
+  declare routingData: { server: string, port: number, instance: string } | undefined;
 
   declare loginAckReceived: boolean;
 
@@ -336,11 +336,11 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onRoutingChange(token: RoutingEnvChangeToken) {
-    // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
-    const [ server ] = token.newValue.server.split('\\');
+    // Splits instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> [redirect.db.net, instance1]
+    const [ server, instance ] = token.newValue.server.split('\\');
 
     this.routingData = {
-      server, port: token.newValue.port
+      server, port: token.newValue.port, instance
     };
   }
 

@@ -116,26 +116,26 @@ describe('Initiate Connect Test', function() {
     connection.connect(function(err) {
       assert.ifError(err);
 
+      connection.on('end', function() {
+        done();
+      });
+
+      connection.on('databaseChange', function(database) {
+        if (config.options?.database) {
+          assert.strictEqual(database, config.options.database);
+        }
+      });
+
+      connection.on('infoMessage', function(info) {
+        // console.log("#{info.number} : #{info.message}")
+      });
+
+      if (process.env.TEDIOUS_DEBUG) {
+        connection.on('debug', console.log);
+      }
+
       connection.close();
     });
-
-    connection.on('end', function() {
-      done();
-    });
-
-    connection.on('databaseChange', function(database) {
-      if (config.options?.database) {
-        assert.strictEqual(database, config.options.database);
-      }
-    });
-
-    connection.on('infoMessage', function(info) {
-      // console.log("#{info.number} : #{info.message}")
-    });
-
-    if (process.env.TEDIOUS_DEBUG) {
-      connection.on('debug', console.log);
-    }
   });
 
   it('should fail connecting by invalid instance name', function(done) {

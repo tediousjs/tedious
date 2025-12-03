@@ -134,7 +134,7 @@ class Login7Payload {
 
   toBuffer() {
     const fixedData = Buffer.alloc(94);
-    const buffers = [fixedData];
+    const buffers: Buffer[] = [fixedData];
 
     let offset = 0;
     let dataOffset = fixedData.length;
@@ -254,12 +254,17 @@ class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
-    const extensions = this.buildFeatureExt();
-    offset = fixedData.writeUInt16LE(4, offset);
-    const extensionOffset = Buffer.alloc(4);
-    extensionOffset.writeUInt32LE(dataOffset += 4, 0);
-    dataOffset += extensions.length;
-    buffers.push(extensionOffset, extensions);
+    if (this.tdsVersion >= versions['7_4']) {
+      const extensions = this.buildFeatureExt();
+      offset = fixedData.writeUInt16LE(4 + extensions.length, offset);
+      const extensionOffset = Buffer.alloc(4);
+      extensionOffset.writeUInt32LE(dataOffset + 4, 0);
+      dataOffset += 4 + extensions.length;
+      buffers.push(extensionOffset, extensions);
+    } else {
+      // For TDS < 7.4, these are unused fields
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
@@ -412,16 +417,14 @@ class Login7Payload {
       }
     }
 
-    if (this.tdsVersion >= versions['7_4']) {
-      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
-      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
-      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
-      const buf = Buffer.alloc(6);
-      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
-      buf.writeUInt32LE(1, 1);
-      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
-      buffers.push(buf);
-    }
+    // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+    const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+    const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+    const buf = Buffer.alloc(6);
+    buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+    buf.writeUInt32LE(1, 1);
+    buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+    buffers.push(buf);
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 
