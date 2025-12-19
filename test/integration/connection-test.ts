@@ -390,7 +390,7 @@ describe('Ntlm Test', function() {
     Upper = 2,
   }
 
-  function runNtlmTest(this: Mocha.Context, done, domainCase: DomainCaseEnum): void {
+  function runNtlmTest(this: Mocha.Context, done: Mocha.Done, domainCase: DomainCaseEnum): void {
     let config = getConfig();
 
     if (config.authentication?.type !== 'ntlm') {
@@ -1490,7 +1490,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
 });
 
 describe('Advanced Input Test', function() {
-  function runSqlBatch(done, config: import("../../src/connection").ConnectionConfiguration, sql: string, requestCallback: (error: Error | null | undefined, rowCount?: number) => void) {
+  function runSqlBatch(done: Mocha.Done, config: import('../../src/connection').ConnectionConfiguration, sql: string, requestCallback: (error: Error | null | undefined, rowCount?: number) => void) {
     const connection = new Connection(config);
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -1542,7 +1542,7 @@ describe('Advanced Input Test', function() {
 });
 
 describe('Date Insert Test', function() {
-  function testDateFirstImpl(done, datefirst: number | undefined) {
+  function testDateFirstImpl(done: Mocha.Done, datefirst: number | undefined) {
     datefirst = datefirst || 7;
 
     const config = getConfig();
@@ -1606,7 +1606,7 @@ describe('Date Insert Test', function() {
 });
 
 describe('Language Insert Test', function() {
-  function testLanguage(done, language: string | undefined) {
+  function testLanguage(done: Mocha.Done, language: string | undefined) {
     language = language || 'us_english';
     const config = getConfig();
 
@@ -1891,7 +1891,7 @@ describe('custom textsize value', function() {
 });
 
 describe('should test date format', function() {
-  function testDateFormat(done, dateFormat: string | undefined) {
+  function testDateFormat(done: Mocha.Done, dateFormat: string | undefined) {
     dateFormat = dateFormat || 'mdy';
     const config = getConfig();
 
@@ -1941,7 +1941,7 @@ describe('should test date format', function() {
 });
 
 describe('Boolean Config Options Test', function() {
-  function testBooleanConfigOption(done, optionName: string, optionValue: boolean | undefined, optionFlag: number, defaultOn: boolean) {
+  function testBooleanConfigOption(done: Mocha.Done, optionName: string, optionValue: boolean | undefined, optionFlag: number, defaultOn: boolean) {
     const config = getConfig();
     const connection = new Connection({
       ...config,
@@ -1993,7 +1993,7 @@ describe('Boolean Config Options Test', function() {
     });
   }
 
-  function testBadBooleanConfigOption(done, optionName: string) {
+  function testBadBooleanConfigOption(done: Mocha.Done, optionName: string) {
     const config = getConfig();
 
     assert.throws(function() {

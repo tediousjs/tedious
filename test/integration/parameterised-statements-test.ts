@@ -25,7 +25,7 @@ type DataType = typeof TYPES[keyof typeof TYPES];
 type TdsVersion = '7_0' | '7_1' | '7_2' | '7_3_A' | '7_4' | null | undefined;
 
 function execSql(
-  done,
+  done: Mocha.Done,
   type: DataType,
   value: unknown,
   tdsVersion?: TdsVersion,
@@ -99,7 +99,7 @@ function execSql(
 }
 
 function execSqlOutput(
-  done,
+  done: Mocha.Done,
   type: DataType,
   value: unknown,
   expectedValue?: unknown,

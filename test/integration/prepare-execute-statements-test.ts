@@ -70,7 +70,7 @@ describe('Prepare Execute Statement', function() {
         return done(err);
       }
 
-      const returnValues: { parameterName: string; value: unknown; metadata: import('../../src/metadata-parser').Metadata }[] = [];
+      const returnValues: { parameterName: string, value: unknown, metadata: import('../../src/metadata-parser').Metadata }[] = [];
 
       const request = new Request('select @param', function(err) {
         if (err) {

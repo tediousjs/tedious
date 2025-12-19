@@ -17,10 +17,10 @@ const config = {
 };
 
 class Tester {
-  done;
+  done: Mocha.Done;
   connection: Connection;
 
-  constructor(done) {
+  constructor(done: Mocha.Done) {
     this.createTable = this.createTable.bind(this);
     this.createProc = this.createProc.bind(this);
     this.execProc = this.execProc.bind(this);
