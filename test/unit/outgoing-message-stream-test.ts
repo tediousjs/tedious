@@ -12,7 +12,7 @@ describe('OutgoingMessageStream', function() {
     message.end(contents);
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 1024 * 4 });
-    const result = new BufferList(function(err: Error | null, buf: Buffer) {
+    const result = new BufferList(function(err, buf) {
       if (err) {
         return done(err);
       }
@@ -45,7 +45,7 @@ describe('OutgoingMessageStream', function() {
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 8 + 4 });
 
-    const result = new BufferList(function(err: Error | null, buf: Buffer) {
+    const result = new BufferList(function(err, buf) {
       if (err) {
         return done(err);
       }
@@ -84,7 +84,7 @@ describe('OutgoingMessageStream', function() {
     ];
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 1024 * 4 });
-    const result = new BufferList(function(err: Error | null, buf: Buffer) {
+    const result = new BufferList(function(err, buf) {
       if (err) {
         return done(err);
       }

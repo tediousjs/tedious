@@ -278,7 +278,7 @@ describe('Initiate Connect Test', function() {
       assert.strictEqual(columns[0].value, os.hostname());
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
@@ -384,13 +384,13 @@ describe('Initiate Connect Test', function() {
 
 
 describe('Ntlm Test', function() {
-  enum DomainCaseEnum {
-    AsIs = 0,
-    Lower = 1,
-    Upper = 2,
-  }
+  const DomainCase = {
+    AsIs: 0,
+    Lower: 1,
+    Upper: 2,
+  } as const;
 
-  function runNtlmTest(this: Mocha.Context, done: Mocha.Done, domainCase: DomainCaseEnum): void {
+  function runNtlmTest(this: Mocha.Context, done: Mocha.Done, domainCase: typeof DomainCase[keyof typeof DomainCase]): void {
     let config = getConfig();
 
     if (config.authentication?.type !== 'ntlm') {
@@ -398,9 +398,9 @@ describe('Ntlm Test', function() {
     }
 
     switch (domainCase) {
-      case DomainCaseEnum.AsIs:
+      case DomainCase.AsIs:
         break;
-      case DomainCaseEnum.Lower:
+      case DomainCase.Lower:
         config = {
           ...config,
           authentication: {
@@ -413,7 +413,7 @@ describe('Ntlm Test', function() {
         };
 
         break;
-      case DomainCaseEnum.Upper:
+      case DomainCase.Upper:
         config = {
           ...config,
           authentication: {
@@ -472,15 +472,15 @@ describe('Ntlm Test', function() {
   }
 
   it('should ntlm', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.AsIs);
+    runNtlmTest.call(this, done, DomainCase.AsIs);
   });
 
   it('should ntlm lower', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.Lower);
+    runNtlmTest.call(this, done, DomainCase.Lower);
   });
 
   it('should ntlm upper', function(done) {
-    runNtlmTest.call(this, done, DomainCaseEnum.Upper);
+    runNtlmTest.call(this, done, DomainCase.Upper);
   });
 });
 
@@ -719,7 +719,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns[0].value, 8);
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -921,7 +921,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     }
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       execSql();
@@ -971,7 +971,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns.length, 4);
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1003,7 +1003,7 @@ describe('Insertion Tests', function() {
       connection.close();
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1081,7 +1081,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns[0].value, ++row);
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1117,7 +1117,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
       connection.close();
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1260,7 +1260,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
       assert.ok(true);
     });
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1311,7 +1311,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
       connection.execSqlBatch(request);
     }
 
-    let connection: Connection = new Connection(config);
+    let connection = new Connection(config);
 
     connection.on('resetConnection', function() {
       assert.ok(true);
