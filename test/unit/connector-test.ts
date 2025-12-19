@@ -1,4 +1,4 @@
-// @ts-expect-error - no type definitions
+// @ts-expect-error - type definitions are incomplete (missing enable() and constructor)
 import Mitm from 'mitm';
 import sinon from 'sinon';
 import * as dns from 'dns';
