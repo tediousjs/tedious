@@ -53,7 +53,7 @@ export class Packet {
     if (typeOrBuffer instanceof Buffer) {
       this.buffer = typeOrBuffer;
     } else {
-      const type = typeOrBuffer;
+      const type = typeOrBuffer as number;
       this.buffer = Buffer.alloc(HEADER_LENGTH, 0);
       this.buffer.writeUInt8(type, OFFSET.Type);
       this.buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status);
